@@ -122,7 +122,7 @@ class Certificate(db.Model):
     refid = db.Column(db.String(36), unique=True, nullable=False, index=True)
     descr = db.Column(db.String(255), nullable=False)
     caref = db.Column(db.String(36), db.ForeignKey("certificate_authorities.refid"))
-    crt = db.Column(db.Text, nullable=False)  # Base64 encoded
+    crt = db.Column(db.Text)  # Nullable - CSR doesn't have cert yet
     csr = db.Column(db.Text)  # Base64 encoded CSR
     prv = db.Column(db.Text)  # Base64 encoded private key
     
