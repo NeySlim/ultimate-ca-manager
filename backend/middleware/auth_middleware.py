@@ -13,14 +13,16 @@ def init_auth_middleware(jwt):
     
     @jwt.user_identity_loader
     def user_identity_lookup(user):
-        """Convert user object to identity"""
-        return user.id if isinstance(user, User) else user
+        """Convert user object to identity (must be string)"""
+        if isinstance(user, User):
+            return str(user.id)
+        return str(user)
     
     @jwt.user_lookup_loader
     def user_lookup_callback(_jwt_header, jwt_data):
         """Load user from JWT"""
         identity = jwt_data["sub"]
-        return User.query.filter_by(id=identity).first()
+        return User.query.filter_by(id=int(identity)).first()
     
     @jwt.expired_token_loader
     def expired_token_callback(jwt_header, jwt_payload):
@@ -62,7 +64,7 @@ def require_role(*roles):
             claims = get_jwt()
             user_id = get_jwt_identity()
             
-            user = User.query.get(user_id)
+            user = User.query.get(int(user_id))
             if not user or not user.active:
                 return jsonify({
                     "error": "forbidden",
