@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - UCM{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+        <i class="fas fa-cog mr-2"></i> Settings
+    </h1>
+    
+    <!-- User Info -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                User Information
+            </h2>
+        </div>
+        <div class="p-6">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                    <p class="text-gray-900 dark:text-white">{{ session.get('username', 'N/A') }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
+                    <p class="text-gray-900 dark:text-white capitalize">{{ session.get('role', 'viewer') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Info -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                System Information
+            </h2>
+        </div>
+        <div class="p-6">
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-500 dark:text-gray-400">Version</span>
+                    <span class="text-gray-900 dark:text-white">1.0.0</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500 dark:text-gray-400">HTTPS Port</span>
+                    <span class="text-gray-900 dark:text-white">8443</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500 dark:text-gray-400">Database</span>
+                    <span class="text-gray-900 dark:text-white">SQLite</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

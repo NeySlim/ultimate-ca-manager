@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Import from OPNsense - UCM{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+        <i class="fas fa-file-import mr-2"></i> Import from OPNsense
+    </h1>
+    
+    <!-- Configuration -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-6"
+         hx-get="/api/ui/import/config-form"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <div class="animate-pulse h-40 bg-gray-200 dark:bg-gray-700 rounded"></div>
+    </div>
+    
+    <!-- History -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Import History</h2>
+        </div>
+        <div hx-get="/api/ui/import/history"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="p-8"><div class="animate-pulse h-20 bg-gray-200 dark:bg-gray-700 rounded"></div></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
