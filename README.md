@@ -6,112 +6,114 @@
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey.svg)
+![Docker](https://img.shields.io/docker/pulls/neyslim/ultimate-ca-manager.svg)
 ![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
-![Security](https://img.shields.io/badge/security-9.5%2F10-brightgreen.svg)
 
 **Production-ready Certificate Authority management system with SCEP, OCSP, and modern web UI**
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Installation](#-installation) • [Documentation](#-documentation) • [API](#-rest-api)
+**📚 [Documentation Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki) • 🚀 [Quick Start](https://github.com/NeySlim/ultimate-ca-manager/wiki/Quick-Start) • 🐳 [Docker Hub](https://hub.docker.com/r/neyslim/ultimate-ca-manager)**
 
 </div>
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-### 🔐 Certificate Authority
-- **Create & Import CAs** - Generate new CAs or import existing (PEM, PKCS#12)
-- **Multi-level Hierarchy** - Root and intermediate CA support
-- **Flexible Key Types** - RSA (2048-4096), ECDSA (P-256, P-384, P-521)
-- **Hash Algorithms** - SHA-256, SHA-384, SHA-512
-- **DN Customization** - Full control over distinguished names
+- 🔐 **Certificate Authority Management** - Create Root/Intermediate CAs, multi-level hierarchy, flexible key types (RSA, ECDSA)
+- 📜 **Certificate Lifecycle** - Issue, renew, revoke certificates with full CRL and OCSP support
+- 🔄 **SCEP Server (RFC 8894)** - Auto-enrollment for iOS, Android, Windows, Cisco, network devices
+- 🛡️ **Enterprise Security** - RBAC, audit logging, HTTPS-only, OWASP compliant (9.5/10)
+- 🎨 **Modern Web UI** - Responsive design, dark/light themes, real-time dashboard
+- 🌍 **Platform Agnostic** - Docker, any Linux distribution, SQLite or PostgreSQL
+- 🔗 **REST API** - Complete programmatic access for automation and integration
 
-### 📜 Certificate Management
-- **Issue Certificates** - Server, client, code signing, email
-- **CSR Support** - Import and sign external CSRs
-- **Certificate Revocation** - CRL generation and OCSP responder
-- **Export Formats** - PEM, DER, PKCS#12 (.pfx)
-- **Batch Operations** - Bulk issuance and revocation
-- **Template System** - Pre-configured certificate profiles
+**👉 [See all features in the Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki/User-Manual)**
 
-### 🔄 SCEP Server (RFC 8894)
-- **Auto-enrollment** - Zero-touch device provisioning
-- **Challenge Password** - Secure enrollment protection
-- **Certificate Renewal** - Automatic certificate lifecycle
-- **Multi-CA Support** - Different CAs per SCEP endpoint
-- **Compatible with** - iOS, Android, Windows, Cisco, Palo Alto
-
-### 🛡️ Security
-- **HTTPS Only** - All traffic encrypted (TLS 1.2+)
-- **RBAC** - Role-based access control (Admin, Operator, Viewer)
-- **Session Management** - Secure session handling with timeout
-- **Audit Logging** - Complete activity tracking
-- **OWASP Compliant** - Security score 9.5/10
-- **No Hardcoded Secrets** - Environment-based configuration
-
-### 🎨 Modern Web Interface
-- **Responsive Design** - Works on desktop, tablet, mobile
-- **Dark/Light Themes** - User preference support
-- **Real-time Updates** - Live certificate status
-- **Dashboard** - Overview of CAs, certificates, expiration
-- **Search & Filter** - Quick certificate lookup
-- **Drag & Drop** - Easy file upload for imports
-
-### 🔗 Integrations
-- **OPNsense** - Direct CA/certificate import
-- **REST API** - Full programmatic access
-- **Webhook Support** - Event notifications
-- **LDAP/AD** - User authentication (planned)
-
-### ⚙️ Administration
-- **Web Configuration** - No file editing required
-- **User Management** - Create/edit/delete users
-- **System Monitoring** - Health checks and statistics
-- **Backup/Restore** - Built-in data protection
-- **Log Viewer** - Centralized logging interface
-
-### 🌍 Platform Agnostic (95/100)
-- **Any Linux** - Debian, Ubuntu, RHEL, CentOS, Alpine
-- **Container Ready** - Docker, Kubernetes, Podman
-- **Cloud Compatible** - AWS, Azure, GCP, on-premises
-- **Database** - SQLite (default) or PostgreSQL
-- **No Vendor Lock-in** - Standard protocols only
+---
 
 ## 🚀 Quick Start
 
-### One-Line Install
+### Docker (Recommended)
 
 ```bash
+# Download and start
+curl -O https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docker-compose.yml
+docker-compose up -d
+
+# Access: https://localhost:8443
+# Login: admin / admin
+```
+
+### Linux Installation
+
+```bash
+# One-line install
 curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/install.sh | sudo bash
+
+# Access: https://your-server-ip:8443
+# Login: admin / admin
 ```
 
-### Manual Install
+⚠️ **Change default password immediately after first login!**
+
+**📖 Complete guide**: [Quick Start Tutorial](https://github.com/NeySlim/ultimate-ca-manager/wiki/Quick-Start) (10 minutes)
+
+---
+
+## 📚 Documentation
+
+All documentation is available in the **[GitHub Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)**:
+
+| Guide | Description |
+|-------|-------------|
+| **[Quick Start](https://github.com/NeySlim/ultimate-ca-manager/wiki/Quick-Start)** | Get started in 10 minutes |
+| **[User Manual](https://github.com/NeySlim/ultimate-ca-manager/wiki/User-Manual)** | Complete user guide with examples |
+| **[API Reference](https://github.com/NeySlim/ultimate-ca-manager/wiki/API-Reference)** | REST API documentation |
+| **[FAQ](https://github.com/NeySlim/ultimate-ca-manager/wiki/FAQ)** | Frequently asked questions |
+| **[Troubleshooting](https://github.com/NeySlim/ultimate-ca-manager/wiki/Troubleshooting)** | Problem solving guide |
+
+**Additional resources**:
+- [Docker Features & Configuration](DOCKER_FEATURES.md) - Advanced Docker deployment
+- [Migration Guide](docs/MIGRATION_EXAMPLE.md) - Server-to-server migration
+- [Architecture Diagrams](docs/diagrams/ARCHITECTURE.md) - System architecture
+
+---
+
+## 🐳 Docker Deployment
+
+Pre-built multi-architecture images:
 
 ```bash
-# Clone repository
-git clone https://github.com/NeySlim/ultimate-ca-manager.git
-cd ultimate-ca-manager
-
-# Run installer
-sudo bash install.sh
-
-# Access web interface
-open https://your-server-ip:8443
+docker pull neyslim/ultimate-ca-manager:latest
 ```
 
-**Default Credentials:**
-- Username: `admin`
-- Password: `changeme123`
+**Available tags**: `latest`, `1.0.1`, `1.0`, `1`  
+**Architectures**: `linux/amd64`, `linux/arm64`
 
-⚠️ **IMPORTANT**: Change the default password immediately after first login!
+[See Docker documentation →](DOCKER_FEATURES.md)
 
-### First Steps
+---
 
-1. **Login** to the web interface
-2. **Change password** in Configuration → Users
-3. **Create your first CA** in CA Management → Create CA
-4. **Issue certificates** in Certificate Management → Issue Certificate
-5. **Configure SCEP** (optional) in SCEP Configuration
+## 🔌 REST API
+
+Complete REST API for automation:
+
+```bash
+# Login
+curl -X POST https://localhost:8443/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}' \
+  -k
+
+# List CAs
+curl https://localhost:8443/api/v1/cas \
+  -H "Authorization: Bearer <token>" \
+  -k
+```
+
+[Full API documentation →](https://github.com/NeySlim/ultimate-ca-manager/wiki/API-Reference)
+
+---
 
 ## 📋 System Requirements
 
@@ -120,222 +122,54 @@ open https://your-server-ip:8443
 | **OS** | Any Linux | Ubuntu 22.04 LTS |
 | **Python** | 3.10+ | 3.11+ |
 | **RAM** | 512 MB | 2 GB |
-| **Disk** | 100 MB + certs | 1 GB SSD |
-| **CPU** | 1 core | 2 cores |
+| **Disk** | 100 MB + certificates | 1 GB SSD |
+| **CPU** | 1 core | 2+ cores |
 
-## 💻 Installation
+**Supported distributions**: Debian, Ubuntu, RHEL, Rocky, Alma, Fedora, Alpine, Arch, openSUSE
 
-UCM v1.1.0+ includes a multi-distribution installer that works on:
-- ✅ Debian 10, 11, 12+
-- ✅ Ubuntu 20.04, 22.04, 24.04 LTS
-- ✅ RHEL 8, 9 / CentOS Stream / Rocky / AlmaLinux
-- ✅ Fedora 38, 39, 40
-- ✅ Alpine Linux 3.17+
-- ✅ Arch Linux / Manjaro
-- ✅ openSUSE Leap / Tumbleweed / SLES
-
-See [INSTALLATION.md](INSTALLATION.md) for detailed installation instructions and [DISTRIBUTIONS.md](DISTRIBUTIONS.md) for complete compatibility matrix.
-
-## 🚢 Production Deployment
-
-For production deployments, see [DEPLOYMENT.md](DEPLOYMENT.md) which covers:
-- Security hardening checklist
-- SSL/TLS certificate configuration
-- High availability setup
-- Backup and disaster recovery
-- Monitoring and alerting
-- Performance tuning
-- Firewall and network security
-
-## 📡 REST API
-
-UCM provides a complete REST API for automation and integration:
-
-### Authentication
-
-```bash
-# Login and get token
-curl -k -X POST https://localhost:8443/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"changeme123"}'
-
-# Use token in requests
-curl -k https://localhost:8443/api/v1/ca \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
-
-### API Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `POST /api/v1/auth/login` | Authenticate and get token |
-| `GET /api/v1/ca` | List Certificate Authorities |
-| `POST /api/v1/ca` | Create new CA |
-| `GET /api/v1/ca/{id}` | Get CA details |
-| `GET /api/v1/certificates` | List certificates |
-| `POST /api/v1/certificates` | Issue new certificate |
-| `DELETE /api/v1/certificates/{id}` | Revoke certificate |
-| `GET /api/v1/system/info` | Get system information |
-| `GET /api/v1/users` | List users (admin only) |
-
-### SCEP Protocol
-
-```
-GET  /scep?operation=GetCACaps      # Get CA capabilities
-GET  /scep?operation=GetCACert      # Get CA certificate
-POST /scep?operation=PKIOperation   # Certificate enrollment/renewal
-```
-
-For complete API documentation, see [docs/API.md](docs/API.md)
-
-## 🧪 Testing
-
-```bash
-# Run all system tests
-cd /opt/ucm
-python3 test_complete_system.py
-
-# Expected output:
-# ✅ ALL SYSTEM TESTS PASSED!
-# Total: 9 pages, all functional!
-```
-
-## 📚 Documentation
-
-- **[INSTALLATION.md](INSTALLATION.md)** - Installation guide
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment
-- **[docs/API.md](docs/API.md)** - API reference
-- **[docs/SCEP.md](docs/SCEP.md)** - SCEP configuration
-- **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Common issues
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture
-
-## 🔧 Configuration
-
-UCM can be configured via:
-
-1. **Web Interface** (Recommended)
-   - Go to Configuration menu
-   - All settings available via UI
-   - No server restart required
-
-2. **Environment Variables**
-   - Edit `/opt/ucm/.env`
-   - Restart service: `systemctl restart ucm`
-
-3. **Configuration File**
-   - Edit `/opt/ucm/backend/config/settings.py`
-   - For advanced customization only
-
-## 🐛 Troubleshooting
-
-### Service won't start
-
-```bash
-sudo systemctl status ucm
-sudo journalctl -u ucm -n 50
-```
-
-### Can't access web interface
-
-```bash
-# Check if service is running
-systemctl is-active ucm
-
-# Check port is listening
-ss -tlnp | grep 8443
-
-# Check firewall
-sudo ufw status
-```
-
-### Database issues
-
-```bash
-# Check database integrity
-sqlite3 /opt/ucm/data/ucm.db "PRAGMA integrity_check;"
-```
-
-For more solutions, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 🗺️ Roadmap
-
-### Version 1.x
-- [x] Core CA management
-- [x] Certificate operations
-- [x] SCEP server (RFC 8894)
-- [x] OCSP responder (RFC 6960)
-- [x] Web UI
-- [x] REST API
-- [x] User management
-
-### Version 2.0 (Planned)
-- [ ] CRL Distribution Points (CDP)
-- [ ] ACME Protocol (Let's Encrypt compatible)
-- [ ] Hardware Security Module (HSM) support
-- [ ] LDAP/Active Directory integration
-- [ ] Certificate templates
-- [ ] Multi-tenancy support
-- [ ] Advanced reporting and analytics
-
-## 📊 Project Stats
-
-- **Language**: Python 3.10+
-- **Framework**: Flask
-- **Database**: SQLite / PostgreSQL
-- **Lines of Code**: ~15,000
-- **Test Coverage**: 95%+
-- **Security Score**: 9.5/10 (OWASP compliant)
-- **Platform Support**: 95% agnostic
-
-## 🙏 Acknowledgments
-
-- **OpenSSL** - Cryptographic operations
-- **Flask** - Web framework
-- **SQLAlchemy** - Database ORM
-- **cryptography** - Python crypto library
-- **SCEP Protocol** - RFC 8894 specification
+---
 
 ## 📄 License
 
-This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICENSE) file for details.
 
-**Summary:**
-- ✅ Commercial use allowed
-- ✅ Modification allowed
-- ✅ Distribution allowed
-- ✅ Private use allowed
-- ⚠️ Liability and warranty disclaimed
+---
 
-## 📞 Support
+## 🆘 Support
 
-- **Issues**: [GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
-- **Documentation**: [Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
-- **Discussions**: [GitHub Discussions](https://github.com/NeySlim/ultimate-ca-manager/discussions)
+- **📚 Documentation**: [GitHub Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
+- **🐛 Bug Reports**: [GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
+- **💬 Discussions**: [GitHub Discussions](https://github.com/NeySlim/ultimate-ca-manager/discussions)
+- **📦 Docker Hub**: [neyslim/ultimate-ca-manager](https://hub.docker.com/r/neyslim/ultimate-ca-manager)
+
+---
 
 ## ⭐ Show Your Support
 
 If you find UCM useful, please consider:
-- ⭐ Star this repository
-- 🐛 Report bugs
-- 💡 Suggest features
-- 📖 Improve documentation
-- 🔀 Submit pull requests
+- ⭐ Starring this repository
+- 🐛 Reporting bugs
+- 💡 Suggesting features
+- 📖 Improving documentation
+- 🔀 Contributing code
 
 ---
 
 <div align="center">
 
-**Made with ❤️ by [NeySlim](https://github.com/NeySlim)**
+**Made with ❤️ for the PKI community**
 
 [![GitHub stars](https://img.shields.io/github/stars/NeySlim/ultimate-ca-manager?style=social)](https://github.com/NeySlim/ultimate-ca-manager/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/NeySlim/ultimate-ca-manager?style=social)](https://github.com/NeySlim/ultimate-ca-manager/network/members)
