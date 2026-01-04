@@ -353,3 +353,154 @@ class CAService:
         db.session.commit()
         
         return ca.serial
+    
+    @staticmethod
+    def generate_crl(ca_id: int, validity_days: int = 30) -> bytes:
+        """
+        Generate Certificate Revocation List for a CA
+        
+        Args:
+            ca_id: CA ID
+            validity_days: CRL validity in days
+            
+        Returns:
+            CRL in PEM format
+        """
+        ca = CA.query.get(ca_id)
+        if not ca:
+            raise ValueError("CA not found")
+        
+        if not ca.prv:
+            raise ValueError("CA has no private key - cannot sign CRL")
+        
+        # Load CA certificate and private key
+        ca_cert_pem = base64.b64decode(ca.crt)
+        ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
+        
+        ca_key_pem = base64.b64decode(ca.prv)
+        ca_private_key = serialization.load_pem_private_key(
+            ca_key_pem, password=None, backend=default_backend()
+        )
+        
+        # Get all revoked certificates signed by this CA
+        revoked_certs = Certificate.query.filter_by(
+            caref=ca.refid,
+            revoked=True
+        ).all()
+        
+        # Build list of (serial, revocation_date) tuples
+        revoked_list = []
+        for cert in revoked_certs:
+            # Use created_at as revocation date if not tracked separately
+            revoked_list.append((cert.serial, cert.created_at))
+        
+        # Generate CRL
+        crl_pem = TrustStoreService.generate_crl(
+            ca_cert=ca_cert,
+            ca_private_key=ca_private_key,
+            revoked_certs=revoked_list,
+            validity_days=validity_days,
+            digest='sha256'
+        )
+        
+        return crl_pem
+    
+    @staticmethod
+    def export_ca_with_options(
+        ca_id: int,
+        export_format: str = 'pem',
+        include_key: bool = False,
+        include_chain: bool = False,
+        password: Optional[str] = None
+    ) -> bytes:
+        """
+        Export CA with multiple format options
+        
+        Args:
+            ca_id: CA ID
+            export_format: pem, der, pkcs12
+            include_key: Include private key (PEM only)
+            include_chain: Include certificate chain (PEM only)
+            password: Password for PKCS#12
+            
+        Returns:
+            Export bytes
+        """
+        ca = CA.query.get(ca_id)
+        if not ca:
+            raise ValueError("CA not found")
+        
+        cert_pem = base64.b64decode(ca.crt)
+        
+        if export_format == 'pkcs12':
+            if not password:
+                raise ValueError("Password required for PKCS#12 export")
+            if not ca.prv:
+                raise ValueError("CA has no private key")
+            
+            key_pem = base64.b64decode(ca.prv)
+            return TrustStoreService.export_pkcs12(
+                cert_pem, key_pem, password, ca.descr
+            )
+        
+        elif export_format == 'der':
+            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+            return cert.public_bytes(serialization.Encoding.DER)
+        
+        elif export_format == 'pem':
+            result = cert_pem
+            
+            if include_key and ca.prv:
+                key_pem = base64.b64decode(ca.prv)
+                result += b'\n' + key_pem
+            
+            if include_chain:
+                chain = CAService.get_ca_chain(ca_id)
+                # Skip first cert (already included)
+                for chain_cert in chain[1:]:
+                    result += b'\n' + chain_cert
+            
+            return result
+        
+        else:
+            raise ValueError(f"Unsupported format: {export_format}")
+    
+    @staticmethod
+    def get_ca_fingerprints(ca_id: int) -> Dict[str, str]:
+        """
+        Get CA certificate fingerprints
+        
+        Args:
+            ca_id: CA ID
+            
+        Returns:
+            Dictionary with sha256, sha1, md5 fingerprints
+        """
+        ca = CA.query.get(ca_id)
+        if not ca:
+            raise ValueError("CA not found")
+        
+        cert_pem = base64.b64decode(ca.crt)
+        return TrustStoreService.get_certificate_fingerprints(cert_pem)
+    
+    @staticmethod
+    def get_ca_details(ca_id: int) -> Dict:
+        """
+        Get detailed CA certificate information
+        
+        Args:
+            ca_id: CA ID
+            
+        Returns:
+            Detailed certificate information
+        """
+        ca = CA.query.get(ca_id)
+        if not ca:
+            raise ValueError("CA not found")
+        
+        cert_pem = base64.b64decode(ca.crt)
+        details = TrustStoreService.parse_certificate_details(cert_pem)
+        details['fingerprints'] = TrustStoreService.get_certificate_fingerprints(cert_pem)
+        details['has_private_key'] = bool(ca.prv and len(ca.prv) > 0)
+        
+        return details

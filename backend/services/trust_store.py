@@ -230,6 +230,7 @@ class TrustStoreService:
         san_ip: Optional[List[str]] = None,
         san_uri: Optional[List[str]] = None,
         san_email: Optional[List[str]] = None,
+        ocsp_uri: Optional[str] = None,
     ) -> Tuple[bytes, bytes]:
         """
         Create a certificate signed by a CA
@@ -238,7 +239,7 @@ class TrustStoreService:
             subject: Subject name
             ca_cert: CA certificate object
             ca_private_key: CA private key
-            cert_type: Certificate type (usr_cert, server_cert, combined_server_client)
+            cert_type: Certificate type (usr_cert, server_cert, combined_server_client, ca_cert)
             validity_days: Validity in days
             digest: Hash algorithm
             key_type: Key type for new certificate
@@ -246,6 +247,7 @@ class TrustStoreService:
             san_ip: List of IP SANs
             san_uri: List of URI SANs
             san_email: List of email SANs
+            ocsp_uri: OCSP responder URI
             
         Returns:
             Tuple of (certificate PEM, private key PEM)
@@ -264,14 +266,32 @@ class TrustStoreService:
             datetime.utcnow() + timedelta(days=validity_days)
         )
         
-        # Basic Constraints - not a CA
+        # Basic Constraints - not a CA by default
+        is_ca = (cert_type == 'ca_cert')
         builder = builder.add_extension(
-            x509.BasicConstraints(ca=False, path_length=None),
+            x509.BasicConstraints(ca=is_ca, path_length=None if not is_ca else 0),
             critical=True,
         )
         
         # Key Usage based on cert type
-        if cert_type == 'usr_cert':
+        if cert_type == 'ca_cert':
+            # Certificate Authority (intermediate)
+            builder = builder.add_extension(
+                x509.KeyUsage(
+                    digital_signature=True,
+                    key_encipherment=False,
+                    content_commitment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=True,
+                    crl_sign=True,
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+                critical=True,
+            )
+            # No Extended Key Usage for CA certificates
+        elif cert_type == 'usr_cert' or cert_type == 'client_cert':
             # Client certificate
             builder = builder.add_extension(
                 x509.KeyUsage(
@@ -315,7 +335,7 @@ class TrustStoreService:
                 ]),
                 critical=False,
             )
-        elif cert_type == 'combined_server_client':
+        elif cert_type == 'combined_server_client' or cert_type == 'combined_cert':
             # Combined
             builder = builder.add_extension(
                 x509.KeyUsage(
@@ -335,6 +355,29 @@ class TrustStoreService:
                 x509.ExtendedKeyUsage([
                     x509.oid.ExtendedKeyUsageOID.SERVER_AUTH,
                     x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH,
+                ]),
+                critical=False,
+            )
+        else:
+            # Default to server if unknown type
+            cert_type = 'server_cert'
+            builder = builder.add_extension(
+                x509.KeyUsage(
+                    digital_signature=True,
+                    key_encipherment=True,
+                    content_commitment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=False,
+                    crl_sign=False,
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+                critical=True,
+            )
+            builder = builder.add_extension(
+                x509.ExtendedKeyUsage([
+                    x509.oid.ExtendedKeyUsageOID.SERVER_AUTH,
                 ]),
                 critical=False,
             )
@@ -371,6 +414,18 @@ class TrustStoreService:
             ),
             critical=False,
         )
+        
+        # OCSP URI (Authority Information Access)
+        if ocsp_uri:
+            builder = builder.add_extension(
+                x509.AuthorityInformationAccess([
+                    x509.AccessDescription(
+                        x509.oid.AuthorityInformationAccessOID.OCSP,
+                        x509.UniformResourceIdentifier(ocsp_uri)
+                    )
+                ]),
+                critical=False,
+            )
         
         # Sign
         hash_algo = TrustStoreService.HASH_ALGORITHMS.get(digest, hashes.SHA256())
@@ -630,3 +685,240 @@ class TrustStoreService:
         )
         
         return crl.public_bytes(serialization.Encoding.PEM)
+    
+    @staticmethod
+    def get_certificate_fingerprints(cert_pem: bytes) -> Dict[str, str]:
+        """
+        Calculate certificate fingerprints
+        
+        Args:
+            cert_pem: Certificate PEM bytes
+            
+        Returns:
+            Dictionary with sha256, sha1, md5 fingerprints
+        """
+        cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+        
+        sha256_hash = cert.fingerprint(hashes.SHA256()).hex().upper()
+        sha1_hash = cert.fingerprint(hashes.SHA1()).hex().upper()
+        md5_hash = cert.fingerprint(hashes.MD5()).hex().upper()
+        
+        # Format as colon-separated
+        sha256_formatted = ':'.join(sha256_hash[i:i+2] for i in range(0, len(sha256_hash), 2))
+        sha1_formatted = ':'.join(sha1_hash[i:i+2] for i in range(0, len(sha1_hash), 2))
+        md5_formatted = ':'.join(md5_hash[i:i+2] for i in range(0, len(md5_hash), 2))
+        
+        return {
+            'sha256': sha256_formatted,
+            'sha1': sha1_formatted,
+            'md5': md5_formatted
+        }
+    
+    @staticmethod
+    def parse_certificate_details(cert_pem: bytes) -> Dict:
+        """
+        Parse full certificate details including all X.509 extensions
+        
+        Args:
+            cert_pem: Certificate PEM bytes
+            
+        Returns:
+            Dictionary with detailed certificate information
+        """
+        cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+        
+        details = {
+            'version': cert.version.name,
+            'serial_number': format(cert.serial_number, 'x').upper(),
+            'signature_algorithm': cert.signature_algorithm_oid._name,
+            'subject': {},
+            'issuer': {},
+            'validity': {
+                'not_before': cert.not_valid_before.isoformat(),
+                'not_after': cert.not_valid_after.isoformat()
+            },
+            'extensions': {},
+            'public_key': {}
+        }
+        
+        # Parse subject
+        for attr in cert.subject:
+            details['subject'][attr.oid._name] = attr.value
+        
+        # Parse issuer
+        for attr in cert.issuer:
+            details['issuer'][attr.oid._name] = attr.value
+        
+        # Parse public key info
+        public_key = cert.public_key()
+        if isinstance(public_key, rsa.RSAPublicKey):
+            details['public_key'] = {
+                'algorithm': 'RSA',
+                'key_size': public_key.key_size,
+                'public_exponent': public_key.public_numbers().e
+            }
+        elif isinstance(public_key, ec.EllipticCurvePublicKey):
+            details['public_key'] = {
+                'algorithm': 'EC',
+                'curve': public_key.curve.name
+            }
+        
+        # Parse extensions
+        for ext in cert.extensions:
+            ext_name = ext.oid._name
+            try:
+                if isinstance(ext.value, x509.SubjectAlternativeName):
+                    sans = []
+                    for san in ext.value:
+                        if isinstance(san, x509.DNSName):
+                            sans.append(f"DNS:{san.value}")
+                        elif isinstance(san, x509.IPAddress):
+                            sans.append(f"IP:{san.value}")
+                        elif isinstance(san, x509.RFC822Name):
+                            sans.append(f"email:{san.value}")
+                        elif isinstance(san, x509.UniformResourceIdentifier):
+                            sans.append(f"URI:{san.value}")
+                    details['extensions']['subjectAltName'] = {
+                        'critical': ext.critical,
+                        'values': sans
+                    }
+                elif isinstance(ext.value, x509.KeyUsage):
+                    usages = []
+                    if ext.value.digital_signature: usages.append('Digital Signature')
+                    if ext.value.key_encipherment: usages.append('Key Encipherment')
+                    if ext.value.data_encipherment: usages.append('Data Encipherment')
+                    if ext.value.key_agreement: usages.append('Key Agreement')
+                    if ext.value.key_cert_sign: usages.append('Key Cert Sign')
+                    if ext.value.crl_sign: usages.append('CRL Sign')
+                    if ext.value.content_commitment: usages.append('Content Commitment')
+                    details['extensions']['keyUsage'] = {
+                        'critical': ext.critical,
+                        'values': usages
+                    }
+                elif isinstance(ext.value, x509.ExtendedKeyUsage):
+                    usages = [oid._name for oid in ext.value]
+                    details['extensions']['extendedKeyUsage'] = {
+                        'critical': ext.critical,
+                        'values': usages
+                    }
+                elif isinstance(ext.value, x509.BasicConstraints):
+                    details['extensions']['basicConstraints'] = {
+                        'critical': ext.critical,
+                        'ca': ext.value.ca,
+                        'path_length': ext.value.path_length
+                    }
+                elif isinstance(ext.value, x509.SubjectKeyIdentifier):
+                    details['extensions']['subjectKeyIdentifier'] = {
+                        'critical': ext.critical,
+                        'value': ext.value.digest.hex().upper()
+                    }
+                elif isinstance(ext.value, x509.AuthorityKeyIdentifier):
+                    details['extensions']['authorityKeyIdentifier'] = {
+                        'critical': ext.critical,
+                        'keyid': ext.value.key_identifier.hex().upper() if ext.value.key_identifier else None
+                    }
+                elif isinstance(ext.value, x509.AuthorityInformationAccess):
+                    # Parse Authority Information Access (OCSP, CA Issuers, etc.)
+                    aia_values = []
+                    for desc in ext.value:
+                        access_method = desc.access_method._name
+                        location = desc.access_location.value
+                        aia_values.append(f"{access_method}: {location}")
+                    details['extensions']['authorityInfoAccess'] = {
+                        'critical': ext.critical,
+                        'values': aia_values
+                    }
+                elif isinstance(ext.value, x509.CRLDistributionPoints):
+                    # Parse CRL Distribution Points
+                    crl_points = []
+                    for point in ext.value:
+                        if point.full_name:
+                            for name in point.full_name:
+                                if hasattr(name, 'value'):
+                                    crl_points.append(f"URI: {name.value}")
+                        if point.relative_name:
+                            crl_points.append(f"Relative: {point.relative_name.rfc4514_string()}")
+                    details['extensions']['cRLDistributionPoints'] = {
+                        'critical': ext.critical,
+                        'values': crl_points if crl_points else ['Not specified']
+                    }
+                elif isinstance(ext.value, x509.CertificatePolicies):
+                    # Parse Certificate Policies
+                    policies = []
+                    for policy in ext.value:
+                        policy_info = f"Policy: {policy.policy_identifier.dotted_string}"
+                        if policy.policy_qualifiers:
+                            qualifiers = []
+                            for qual in policy.policy_qualifiers:
+                                if isinstance(qual, str):
+                                    qualifiers.append(qual)
+                                elif hasattr(qual, 'notice_reference') or hasattr(qual, 'explicit_text'):
+                                    if hasattr(qual, 'explicit_text') and qual.explicit_text:
+                                        qualifiers.append(f"Text: {qual.explicit_text}")
+                            if qualifiers:
+                                policy_info += " (" + ", ".join(qualifiers) + ")"
+                        policies.append(policy_info)
+                    details['extensions']['certificatePolicies'] = {
+                        'critical': ext.critical,
+                        'values': policies
+                    }
+                elif isinstance(ext.value, x509.UnrecognizedExtension):
+                    # Handle OPNsense/Netscape custom extensions
+                    oid = ext.oid.dotted_string
+                    ext_data = ext.value.value
+                    
+                    # OID 2.16.840.1.113730.1.13 = Netscape Comment (OPNsense uses this)
+                    if oid == '2.16.840.1.113730.1.13':
+                        # ASN.1 IA5String starts with tag 0x16 (22)
+                        if ext_data[0] == 0x16:
+                            length = ext_data[1]
+                            comment = ext_data[2:2+length].decode('ascii', errors='ignore')
+                            details['extensions']['netscapeComment'] = {
+                                'critical': ext.critical,
+                                'value': comment,
+                                'oid': oid,
+                                'display_name': 'OPNsense Comment'
+                            }
+                        else:
+                            details['extensions'][f'Unknown OID ({oid})'] = {
+                                'critical': ext.critical,
+                                'value': f'<binary data, {len(ext_data)} bytes>'
+                            }
+                    # OID 2.16.840.1.113730.1.1 = Netscape Cert Type (deprecated)
+                    elif oid == '2.16.840.1.113730.1.1':
+                        # Parse cert type bitstring
+                        cert_types = []
+                        if len(ext_data) >= 3:
+                            bits = ext_data[2]
+                            if bits & 0x80: cert_types.append('SSL Client')
+                            if bits & 0x40: cert_types.append('SSL Server')
+                            if bits & 0x20: cert_types.append('S/MIME')
+                            if bits & 0x10: cert_types.append('Object Signing')
+                            if bits & 0x08: cert_types.append('SSL CA')
+                            if bits & 0x04: cert_types.append('S/MIME CA')
+                            if bits & 0x02: cert_types.append('Object Signing CA')
+                        details['extensions']['netscapeCertType'] = {
+                            'critical': ext.critical,
+                            'values': cert_types if cert_types else ['Unknown'],
+                            'oid': oid,
+                            'display_name': 'Netscape Certificate Type'
+                        }
+                    else:
+                        # Other unknown OIDs
+                        details['extensions'][f'Unknown OID ({oid})'] = {
+                            'critical': ext.critical,
+                            'value': f'<{len(ext_data)} bytes>',
+                            'oid': oid
+                        }
+                else:
+                    details['extensions'][ext_name] = {
+                        'critical': ext.critical,
+                        'value': str(ext.value)
+                    }
+            except Exception as e:
+                details['extensions'][ext_name] = {
+                    'critical': ext.critical,
+                    'error': str(e)
+                }
+        
+        return details

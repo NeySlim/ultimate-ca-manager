@@ -112,7 +112,7 @@ def get_ca(ca_id):
 @operator_required
 def delete_ca(ca_id):
     """
-    Delete CA
+    Delete CA by ID
     ---
     DELETE /api/v1/ca/<id>
     """
@@ -124,6 +124,34 @@ def delete_ca(ca_id):
             return jsonify({"message": "CA deleted successfully"}), 200
         else:
             return jsonify({"error": "CA not found"}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed to delete CA: {str(e)}"}), 500
+
+
+@ca_bp.route('/<string:refid>', methods=['DELETE'])
+@jwt_required()
+@operator_required
+def delete_ca_by_refid(refid):
+    """
+    Delete CA by refid
+    ---
+    DELETE /api/v1/ca/<refid>
+    """
+    from models import CA
+    identity = get_jwt_identity()
+    user = User.query.get(identity)
+    
+    try:
+        ca = CA.query.filter_by(refid=refid).first()
+        if not ca:
+            return jsonify({"error": "CA not found"}), 404
+        
+        if CAService.delete_ca(ca.id, user.username):
+            return jsonify({"message": "CA deleted successfully"}), 200
+        else:
+            return jsonify({"error": "Failed to delete CA"}), 500
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
@@ -178,3 +206,107 @@ def get_ca_chain(ca_id):
         }), 200
     except Exception as e:
         return jsonify({"error": f"Failed to get chain: {str(e)}"}), 500
+
+
+@ca_bp.route('/<int:ca_id>/crl', methods=['GET'])
+@jwt_required()
+def get_ca_crl(ca_id):
+    """
+    Generate and download Certificate Revocation List
+    ---
+    GET /api/v1/ca/<id>/crl?validity_days=30
+    """
+    validity_days = int(request.args.get('validity_days', 30))
+    
+    try:
+        crl_pem = CAService.generate_crl(ca_id, validity_days)
+        
+        return send_file(
+            BytesIO(crl_pem),
+            mimetype='application/pkix-crl',
+            as_attachment=True,
+            download_name=f'ca_{ca_id}.crl'
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": f"CRL generation failed: {str(e)}"}), 500
+
+
+@ca_bp.route('/<int:ca_id>/fingerprints', methods=['GET'])
+@jwt_required()
+def get_ca_fingerprints(ca_id):
+    """
+    Get CA certificate fingerprints
+    ---
+    GET /api/v1/ca/<id>/fingerprints
+    """
+    try:
+        fingerprints = CAService.get_ca_fingerprints(ca_id)
+        return jsonify(fingerprints), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": f"Failed to get fingerprints: {str(e)}"}), 500
+
+
+@ca_bp.route('/<int:ca_id>/details', methods=['GET'])
+@jwt_required()
+def get_ca_details(ca_id):
+    """
+    Get detailed CA certificate information
+    ---
+    GET /api/v1/ca/<id>/details
+    """
+    try:
+        details = CAService.get_ca_details(ca_id)
+        return jsonify(details), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": f"Failed to get details: {str(e)}"}), 500
+
+
+@ca_bp.route('/<int:ca_id>/export/advanced', methods=['GET'])
+@jwt_required()
+def export_ca_advanced(ca_id):
+    """
+    Export CA with advanced options
+    ---
+    GET /api/v1/ca/<id>/export/advanced?format=pem|der|pkcs12&key=true&chain=true&password=xxx
+    """
+    export_format = request.args.get('format', 'pem')
+    include_key = request.args.get('key', 'false').lower() == 'true'
+    include_chain = request.args.get('chain', 'false').lower() == 'true'
+    password = request.args.get('password')
+    
+    try:
+        cert_bytes = CAService.export_ca_with_options(
+            ca_id=ca_id,
+            export_format=export_format,
+            include_key=include_key,
+            include_chain=include_chain,
+            password=password
+        )
+        
+        # Determine mimetype and extension
+        if export_format == 'pkcs12':
+            mimetype = 'application/x-pkcs12'
+            extension = 'p12'
+        elif export_format == 'der':
+            mimetype = 'application/x-x509-ca-cert'
+            extension = 'crt'
+        else:
+            mimetype = 'application/x-pem-file'
+            extension = 'pem'
+        
+        return send_file(
+            BytesIO(cert_bytes),
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=f'ca_{ca_id}.{extension}'
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Export failed: {str(e)}"}), 500
