@@ -1,0 +1,75 @@
+name: Release Automation
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  discussions: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+      
+      - name: Check for release notes
+        id: check_notes
+        run: |
+          if [ -f "RELEASE_NOTES_${{ steps.version.outputs.tag }}.md" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "file=RELEASE_NOTES_${{ steps.version.outputs.tag }}.md" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Generate changelog
+        id: changelog
+        if: steps.check_notes.outputs.exists == 'false'
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git describe --abbrev=0 --tags ${{ steps.version.outputs.tag }}^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREV_TAG" ]; then
+            echo "First release - no changelog"
+            CHANGELOG="Initial release"
+          else
+            echo "Generating changelog from ${PREV_TAG} to ${{ steps.version.outputs.tag }}"
+            CHANGELOG=$(git log ${PREV_TAG}..${{ steps.version.outputs.tag }} --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          
+          # Save to file
+          cat > /tmp/changelog.md << 'EOF'
+          # What's Changed
+          
+          ${CHANGELOG}
+          
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ steps.version.outputs.tag }}
+          EOF
+          
+          echo "changelog_file=/tmp/changelog.md" >> $GITHUB_OUTPUT
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: UCM ${{ steps.version.outputs.tag }}
+          body_path: ${{ steps.check_notes.outputs.exists == 'true' && steps.check_notes.outputs.file || steps.changelog.outputs.changelog_file }}
+          draft: false
+          prerelease: false
+          generate_release_notes: ${{ steps.check_notes.outputs.exists == 'false' }}
+          discussion_category_name: Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
