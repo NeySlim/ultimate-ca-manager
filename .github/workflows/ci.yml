@@ -101,6 +101,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           push: false
+          load: true
           tags: ucm:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
