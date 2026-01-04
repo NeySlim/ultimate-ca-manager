@@ -51,6 +51,8 @@ WORKDIR /app
 # Copy application files
 COPY --chown=ucm:ucm backend/ /app/backend/
 COPY --chown=ucm:ucm frontend/ /app/frontend/
+COPY --chown=ucm:ucm wsgi.py /app/wsgi.py
+COPY --chown=ucm:ucm gunicorn.conf.py /app/gunicorn.conf.py
 COPY --chown=ucm:ucm .env.example /app/.env.example
 
 # Create necessary directories with proper permissions
@@ -74,11 +76,14 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Switch to non-root user
 USER ucm
 
+# Copy Gunicorn configuration
+COPY --chown=ucm:ucm gunicorn.conf.py /app/gunicorn.conf.py
+
 # Copy entrypoint script
 COPY --chown=ucm:ucm docker/entrypoint.sh /entrypoint.sh
 
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Default command
-CMD ["python", "/app/backend/app.py"]
+# Default command - Use Gunicorn for production
+CMD ["gunicorn", "--config", "/app/gunicorn.conf.py", "wsgi:app"]

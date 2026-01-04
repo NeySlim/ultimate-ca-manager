@@ -22,8 +22,12 @@ from middleware.auth_middleware import init_auth_middleware
 def create_app(config_name=None):
     """Application factory"""
     app = Flask(__name__, 
-                static_folder=str(BASE_DIR / "frontend" / "dist"),
-                template_folder=str(BASE_DIR / "backend" / "templates"))
+                static_folder=str(BASE_DIR / "frontend" / "static"),
+                template_folder=str(BASE_DIR / "frontend" / "templates"))
+    
+    # Disable template caching for development
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
     
     # Load configuration
     config = get_config(config_name)
@@ -63,6 +67,24 @@ def create_app(config_name=None):
     # Register blueprints
     register_blueprints(app)
     
+    # Security headers and cleanup
+    @app.after_request
+    def add_security_headers(response):
+        """Add security headers and fix deprecated headers"""
+        # Set Permissions-Policy without deprecated features
+        # Only include valid features that are widely supported
+        response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+        
+        # Add security headers if not present
+        if 'X-Content-Type-Options' not in response.headers:
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+        if 'X-Frame-Options' not in response.headers:
+            response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        if 'X-XSS-Protection' not in response.headers:
+            response.headers['X-XSS-Protection'] = '1; mode=block'
+        
+        return response
+    
     # HTTPS redirect middleware (if enabled)
     if config.HTTP_REDIRECT:
         @app.before_request
@@ -76,18 +98,6 @@ def create_app(config_name=None):
     @app.route('/api/health')
     def health():
         return {"status": "ok", "version": config.APP_VERSION}
-    
-    # Serve React app for non-API routes
-    @app.route('/', defaults={'path': ''})
-    @app.route('/<path:path>')
-    def serve_react(path):
-        from flask import send_from_directory
-        dist_dir = BASE_DIR / "frontend" / "dist"
-        
-        if path and (dist_dir / path).exists():
-            return send_from_directory(str(dist_dir), path)
-        else:
-            return send_from_directory(str(dist_dir), 'index.html')
     
     return app
 
@@ -135,13 +145,19 @@ def register_blueprints(app):
     from api.crl import crl_bp
     from api.scep import scep_bp
     from api.system import system_bp
+    from api.import_api import import_bp
+    from api.ui_routes import ui_bp
     
-    # Register with /api prefix
+    # Register UI routes (no prefix - serve from root)
+    app.register_blueprint(ui_bp)
+    
+    # Register API with /api prefix
     app.register_blueprint(auth_bp, url_prefix='/api/v1/auth')
     app.register_blueprint(ca_bp, url_prefix='/api/v1/ca')
     app.register_blueprint(cert_bp, url_prefix='/api/v1/certificates')
     app.register_blueprint(crl_bp, url_prefix='/api/v1/crl')
     app.register_blueprint(system_bp, url_prefix='/api/v1/system')
+    app.register_blueprint(import_bp, url_prefix='/api/v1/import')
     
     # SCEP endpoint (no /api prefix - standard SCEP path)
     app.register_blueprint(scep_bp, url_prefix='/scep')

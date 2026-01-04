@@ -42,7 +42,7 @@ def create_certificate():
             "O": "My Org",
             "C": "NL"
         },
-        "cert_type": "server_cert",  // usr_cert, server_cert, combined_server_client
+        "cert_type": "server_cert",  // usr_cert, server_cert, combined_server_client, ca_cert
         "key_type": "2048",
         "validity_days": 397,
         "digest": "sha256",
@@ -50,6 +50,8 @@ def create_certificate():
         "san_ip": ["192.168.1.1"],  // optional
         "san_uri": ["https://example.com"],  // optional
         "san_email": ["admin@example.com"],  // optional
+        "ocsp_uri": "http://ocsp.example.com",  // optional
+        "private_key_location": "firewall" | "download_only",  // optional
         "crt_payload": "-----BEGIN CERTIFICATE-----...",  // for import
         "prv_payload": "-----BEGIN PRIVATE KEY-----..."  // optional for import
     }
@@ -75,6 +77,8 @@ def create_certificate():
                 san_ip=data.get('san_ip'),
                 san_uri=data.get('san_uri'),
                 san_email=data.get('san_email'),
+                ocsp_uri=data.get('ocsp_uri'),
+                private_key_location=data.get('private_key_location', 'firewall'),
                 username=user.username
             )
             return jsonify(cert.to_dict()), 201
@@ -241,7 +245,7 @@ def export_certificate(cert_id):
 @operator_required
 def delete_certificate(cert_id):
     """
-    Delete certificate
+    Delete certificate by ID
     ---
     DELETE /api/v1/certificates/<id>
     """
@@ -255,4 +259,208 @@ def delete_certificate(cert_id):
             return jsonify({"error": "Certificate not found"}), 404
     except Exception as e:
         return jsonify({"error": f"Failed to delete certificate: {str(e)}"}), 500
+
+
+@cert_bp.route('/by-refid/<string:refid>', methods=['DELETE'])
+@jwt_required()
+@operator_required
+def delete_certificate_by_refid(refid):
+    """
+    Delete certificate by refid
+    ---
+    DELETE /api/v1/certificates/by-refid/<refid>
+    """
+    from models import Certificate
+    identity = get_jwt_identity()
+    user = User.query.get(int(identity))
+    
+    try:
+        cert = Certificate.query.filter_by(refid=refid).first()
+        if not cert:
+            return jsonify({"error": "Certificate not found"}), 404
+        
+        if CertificateService.delete_certificate(cert.id, user.username):
+            return jsonify({"message": "Certificate deleted successfully"}), 200
+        else:
+            return jsonify({"error": "Failed to delete certificate"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to delete certificate: {str(e)}"}), 500
+
+
+@cert_bp.route('/by-refid/<string:refid>/revoke', methods=['POST'])
+@jwt_required()
+@operator_required
+def revoke_certificate_by_refid(refid):
+    """
+    Revoke certificate by refid
+    ---
+    POST /api/v1/certificates/by-refid/<refid>/revoke
+    {
+        "reason": "compromised"
+    }
+    """
+    from models import Certificate
+    data = request.get_json() or {}
+    identity = get_jwt_identity()
+    user = User.query.get(int(identity))
+    
+    try:
+        cert = Certificate.query.filter_by(refid=refid).first()
+        if not cert:
+            return jsonify({"error": "Certificate not found"}), 404
+        
+        cert = CertificateService.revoke_certificate(
+            cert_id=cert.id,
+            reason=data.get('reason', 'unspecified'),
+            username=user.username
+        )
+        return jsonify(cert.to_dict()), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed to revoke certificate: {str(e)}"}), 500
+
+
+
+
+@cert_bp.route('/<int:cert_id>/private', methods=['GET'])
+@jwt_required()
+def get_certificate_private_data(cert_id):
+    """
+    Get certificate with private key (ADMIN ONLY - for system operations)
+    ---
+    GET /api/v1/certificates/<id>/private
+    
+    Returns certificate PEM and private key PEM for system operations
+    like configuring HTTPS. Admin only for security.
+    """
+    from middleware.auth_middleware import admin_required
+    from models import Certificate, CA
+    import base64
+    
+    identity = get_jwt_identity()
+    user = User.query.get(identity)
+    
+    # Admin only
+    if user.role != 'admin':
+        return jsonify({"error": "Admin access required"}), 403
+    
+    cert = Certificate.query.get(cert_id)
+    if not cert:
+        return jsonify({"error": "Certificate not found"}), 404
+    
+    if not cert.crt:
+        return jsonify({"error": "Certificate not issued yet"}), 400
+    
+    # Decode certificate
+    try:
+        cert_pem = base64.b64decode(cert.crt).decode('utf-8')
+    except:
+        return jsonify({"error": "Invalid certificate data"}), 500
+    
+    # Decode private key if exists
+    key_pem = None
+    if cert.prv:
+        try:
+            key_pem = base64.b64decode(cert.prv).decode('utf-8')
+        except:
+            pass
+    
+    # Get CA chain if available
+    ca_chain_pem = None
+    if cert.caref:
+        ca = CA.query.filter_by(refid=cert.caref).first()
+        if ca and ca.crt:
+            try:
+                ca_chain_pem = base64.b64decode(ca.crt).decode('utf-8')
+            except:
+                pass
+    
+    return jsonify({
+        "id": cert.id,
+        "descr": cert.descr,
+        "certificate_pem": cert_pem,
+        "private_key_pem": key_pem,
+        "ca_chain_pem": ca_chain_pem,
+        "has_private_key": key_pem is not None
+    }), 200
+
+
+@cert_bp.route('/<int:cert_id>/fingerprints', methods=['GET'])
+@jwt_required()
+def get_certificate_fingerprints(cert_id):
+    """
+    Get certificate fingerprints
+    ---
+    GET /api/v1/certificates/<id>/fingerprints
+    """
+    try:
+        fingerprints = CertificateService.get_certificate_fingerprints(cert_id)
+        return jsonify(fingerprints), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": f"Failed to get fingerprints: {str(e)}"}), 500
+
+
+@cert_bp.route('/<int:cert_id>/details', methods=['GET'])
+@jwt_required()
+def get_certificate_details(cert_id):
+    """
+    Get detailed certificate information
+    ---
+    GET /api/v1/certificates/<id>/details
+    """
+    try:
+        details = CertificateService.get_certificate_details(cert_id)
+        return jsonify(details), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": f"Failed to get details: {str(e)}"}), 500
+
+
+@cert_bp.route('/<int:cert_id>/export/advanced', methods=['GET'])
+@jwt_required()
+def export_certificate_advanced(cert_id):
+    """
+    Export certificate with advanced options
+    ---
+    GET /api/v1/certificates/<id>/export/advanced?format=pem|der|pkcs12&key=true&chain=true&password=xxx
+    """
+    export_format = request.args.get('format', 'pem')
+    include_key = request.args.get('key', 'false').lower() == 'true'
+    include_chain = request.args.get('chain', 'false').lower() == 'true'
+    password = request.args.get('password')
+    
+    try:
+        cert_bytes = CertificateService.export_certificate_with_options(
+            cert_id=cert_id,
+            export_format=export_format,
+            include_key=include_key,
+            include_chain=include_chain,
+            password=password
+        )
+        
+        # Determine mimetype and extension
+        if export_format == 'pkcs12':
+            mimetype = 'application/x-pkcs12'
+            extension = 'p12'
+        elif export_format == 'der':
+            mimetype = 'application/x-x509-user-cert'
+            extension = 'crt'
+        else:
+            mimetype = 'application/x-pem-file'
+            extension = 'pem'
+        
+        return send_file(
+            BytesIO(cert_bytes),
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=f'certificate_{cert_id}.{extension}'
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Export failed: {str(e)}"}), 500
 

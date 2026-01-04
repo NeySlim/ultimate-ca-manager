@@ -322,3 +322,76 @@ def get_system_info():
     }
     
     return jsonify(info), 200
+
+
+@system_bp.route('/stats', methods=['GET'])
+@jwt_required()
+def get_stats():
+    """
+    Get database statistics
+    ---
+    GET /api/v1/system/stats
+    """
+    from models import CA, Certificate
+    
+    stats = {
+        'cas': CA.query.count(),
+        'certificates': Certificate.query.count(),
+        'users': User.query.count()
+    }
+    
+    return jsonify(stats), 200
+
+
+@system_bp.route('/config', methods=['PUT'])
+@jwt_required()
+@admin_required
+def update_config_bulk():
+    """
+    Bulk update system configuration
+    ---
+    PUT /api/v1/system/config
+    {
+        "default_cert_validity": 730,
+        "session_timeout": 120,
+        "enable_audit_log": true,
+        "enable_rate_limit": true,
+        "scep_auto_approve": false
+    }
+    """
+    data = request.get_json()
+    identity = get_jwt_identity()
+    admin = User.query.get(identity)
+    
+    # Map frontend keys to backend config keys
+    config_mapping = {
+        'default_cert_validity': 'system.default_cert_validity',
+        'session_timeout': 'system.session_timeout',
+        'enable_audit_log': 'system.enable_audit_log',
+        'enable_rate_limit': 'system.enable_rate_limit',
+        'scep_auto_approve': 'scep.auto_approve'
+    }
+    
+    for frontend_key, backend_key in config_mapping.items():
+        if frontend_key in data:
+            value = str(data[frontend_key])
+            config = SystemConfig.query.filter_by(key=backend_key).first()
+            
+            if config:
+                config.value = value
+                config.updated_by = admin.username
+            else:
+                config = SystemConfig(
+                    key=backend_key,
+                    value=value,
+                    encrypted=False,
+                    updated_by=admin.username
+                )
+                db.session.add(config)
+    
+    db.session.commit()
+    
+    log_audit('config_bulk_updated', admin.username,
+             details='Bulk system configuration update')
+    
+    return jsonify({"message": "Configuration updated successfully"}), 200

@@ -58,6 +58,21 @@ fi
 
 echo -e "${GREEN}✅ Data directory is writable${NC}"
 
+# Check if HTTPS certificate exists, if not generate it
+if [ ! -f /app/backend/data/https_cert.pem ] || [ ! -f /app/backend/data/https_key.pem ]; then
+    echo -e "${YELLOW}📝 Generating self-signed HTTPS certificate...${NC}"
+    
+    # Generate self-signed certificate
+    openssl req -x509 -newkey rsa:4096 -nodes \
+        -keyout /app/backend/data/https_key.pem \
+        -out /app/backend/data/https_cert.pem \
+        -days 365 \
+        -subj "/C=US/ST=State/L=City/O=UCM/CN=ucm.local" \
+        2>/dev/null
+    
+    echo -e "${GREEN}✅ Certificate generated${NC}"
+fi
+
 # Check if database exists
 if [ ! -f /app/backend/data/ucm.db ]; then
     echo -e "${YELLOW}📝 First run detected - database will be auto-created${NC}"

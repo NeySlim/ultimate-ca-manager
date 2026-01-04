@@ -33,6 +33,8 @@ class CertificateService:
         san_ip: Optional[List[str]] = None,
         san_uri: Optional[List[str]] = None,
         san_email: Optional[List[str]] = None,
+        ocsp_uri: Optional[str] = None,
+        private_key_location: str = 'firewall',
         username: str = 'system'
     ) -> Certificate:
         """
@@ -42,7 +44,7 @@ class CertificateService:
             descr: Description
             caref: CA refid
             dn: Distinguished Name
-            cert_type: usr_cert, server_cert, combined_server_client
+            cert_type: usr_cert, server_cert, combined_server_client, ca_cert
             key_type: Key type
             validity_days: Validity in days
             digest: Hash algorithm
@@ -50,6 +52,8 @@ class CertificateService:
             san_ip: IP SANs
             san_uri: URI SANs
             san_email: Email SANs
+            ocsp_uri: OCSP responder URI
+            private_key_location: 'firewall' or 'download_only'
             username: User creating certificate
             
         Returns:
@@ -87,7 +91,8 @@ class CertificateService:
             san_dns=san_dns,
             san_ip=san_ip,
             san_uri=san_uri,
-            san_email=san_email
+            san_email=san_email,
+            ocsp_uri=ocsp_uri
         )
         
         # Parse certificate
@@ -97,18 +102,28 @@ class CertificateService:
         ca.serial = (ca.serial or 0) + 1
         
         # Create certificate record
+        import json
         certificate = Certificate(
             refid=str(uuid.uuid4()),
             descr=descr,
             caref=caref,
             crt=base64.b64encode(cert_pem).decode('utf-8'),
-            prv=base64.b64encode(key_pem).decode('utf-8'),
+            prv=base64.b64encode(key_pem).decode('utf-8') if private_key_location == 'firewall' else None,
             cert_type=cert_type,
             subject=cert.subject.rfc4514_string(),
             issuer=cert.issuer.rfc4514_string(),
             serial_number=str(cert.serial_number),
             valid_from=cert.not_valid_before,
             valid_to=cert.not_valid_after,
+            # SANs
+            san_dns=json.dumps(san_dns) if san_dns else None,
+            san_ip=json.dumps(san_ip) if san_ip else None,
+            san_email=json.dumps(san_email) if san_email else None,
+            san_uri=json.dumps(san_uri) if san_uri else None,
+            # OCSP and key location
+            ocsp_uri=ocsp_uri,
+            private_key_location=private_key_location,
+            # Other fields
             revoked=False,
             imported_from='generated',
             created_by=username
@@ -530,3 +545,116 @@ class CertificateService:
         db.session.commit()
         
         return True
+    
+    @staticmethod
+    def export_certificate_with_options(
+        cert_id: int,
+        export_format: str = 'pem',
+        include_key: bool = False,
+        include_chain: bool = False,
+        password: Optional[str] = None
+    ) -> bytes:
+        """
+        Export certificate with multiple format options
+        
+        Args:
+            cert_id: Certificate ID
+            export_format: pem, der, pkcs12
+            include_key: Include private key (PEM only)
+            include_chain: Include CA chain (PEM only)
+            password: Password for PKCS#12
+            
+        Returns:
+            Export bytes
+        """
+        certificate = Certificate.query.get(cert_id)
+        if not certificate:
+            raise ValueError("Certificate not found")
+        
+        if not certificate.crt:
+            raise ValueError("Certificate not yet signed")
+        
+        cert_pem = base64.b64decode(certificate.crt)
+        
+        if export_format == 'pkcs12':
+            if not password:
+                raise ValueError("Password required for PKCS#12 export")
+            if not certificate.prv:
+                raise ValueError("Certificate has no private key")
+            
+            key_pem = base64.b64decode(certificate.prv)
+            return TrustStoreService.export_pkcs12(
+                cert_pem, key_pem, password, certificate.descr
+            )
+        
+        elif export_format == 'der':
+            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+            return cert.public_bytes(serialization.Encoding.DER)
+        
+        elif export_format == 'pem':
+            result = cert_pem
+            
+            if include_key and certificate.prv:
+                key_pem = base64.b64decode(certificate.prv)
+                result += b'\n' + key_pem
+            
+            if include_chain and certificate.caref:
+                # Get CA chain
+                ca = CA.query.filter_by(refid=certificate.caref).first()
+                if ca:
+                    from services.ca_service import CAService
+                    chain = CAService.get_ca_chain(ca.id)
+                    for chain_cert in chain:
+                        result += b'\n' + chain_cert
+            
+            return result
+        
+        else:
+            raise ValueError(f"Unsupported format: {export_format}")
+    
+    @staticmethod
+    def get_certificate_fingerprints(cert_id: int) -> Dict[str, str]:
+        """
+        Get certificate fingerprints
+        
+        Args:
+            cert_id: Certificate ID
+            
+        Returns:
+            Dictionary with sha256, sha1, md5 fingerprints
+        """
+        certificate = Certificate.query.get(cert_id)
+        if not certificate:
+            raise ValueError("Certificate not found")
+        
+        if not certificate.crt:
+            raise ValueError("Certificate not yet signed")
+        
+        cert_pem = base64.b64decode(certificate.crt)
+        return TrustStoreService.get_certificate_fingerprints(cert_pem)
+    
+    @staticmethod
+    def get_certificate_details(cert_id: int) -> Dict:
+        """
+        Get detailed certificate information
+        
+        Args:
+            cert_id: Certificate ID
+            
+        Returns:
+            Detailed certificate information
+        """
+        certificate = Certificate.query.get(cert_id)
+        if not certificate:
+            raise ValueError("Certificate not found")
+        
+        if not certificate.crt:
+            raise ValueError("Certificate not yet signed")
+        
+        cert_pem = base64.b64decode(certificate.crt)
+        details = TrustStoreService.parse_certificate_details(cert_pem)
+        details['fingerprints'] = TrustStoreService.get_certificate_fingerprints(cert_pem)
+        details['has_private_key'] = bool(certificate.prv and len(certificate.prv) > 0)
+        details['revoked'] = certificate.revoked
+        
+        return details
