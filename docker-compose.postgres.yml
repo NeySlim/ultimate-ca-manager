@@ -8,8 +8,8 @@ services:
     restart: unless-stopped
     
     environment:
-      - POSTGRES_DB=ucm
-      - POSTGRES_USER=ucm
+      - POSTGRES_DB=${POSTGRES_DB:-ucm}
+      - POSTGRES_USER=${POSTGRES_USER:-ucm}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme123}
     
     volumes:
@@ -39,19 +39,19 @@ services:
         condition: service_healthy
     
     ports:
-      - "8443:8443"
+      - "${UCM_HTTPS_PORT:-8443}:8443"
     
     volumes:
       - ucm-data:/app/backend/data
     
     environment:
       - UCM_DOCKER=1
-      - UCM_HTTPS_PORT=8443
+      - UCM_HTTPS_PORT=${UCM_HTTPS_PORT:-8443}
       - DATABASE_TYPE=postgresql
       - DATABASE_HOST=postgres
       - DATABASE_PORT=5432
-      - DATABASE_NAME=ucm
-      - DATABASE_USER=ucm
+      - DATABASE_NAME=${POSTGRES_DB:-ucm}
+      - DATABASE_USER=${POSTGRES_USER:-ucm}
       - DATABASE_PASSWORD=${POSTGRES_PASSWORD:-changeme123}
     
     healthcheck:
@@ -93,5 +93,13 @@ networks:
 volumes:
   ucm-data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${UCM_DATA_DIR:-./data}
   postgres-data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${POSTGRES_DATA_DIR:-./postgres-data}
