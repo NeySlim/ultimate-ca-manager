@@ -1,71 +1,71 @@
 # 📚 Ultimate CA Manager - Documentation Wiki
 
-Bienvenue sur le wiki officiel de **Ultimate CA Manager (UCM)** - Un système moderne de gestion d'autorité de certification avec support SCEP, OCSP et interface web.
+Welcome to the official wiki of **Ultimate CA Manager (UCM)** - A modern Certificate Authority management system with SCEP, OCSP and web UI support.
 
 ---
 
-## 🚀 Démarrage Rapide
+## 🚀 Quick Start
 
-- **[Guide d'Installation](Installation-Guide)** - Installation complète sur Linux, Docker, ou Windows
-- **[Quick Start](Quick-Start)** - Premiers pas et configuration initiale
-- **[Manuel Utilisateur](User-Manual)** - Documentation complète d'utilisation
+- **[Installation Guide](Installation-Guide)** - Complete installation on Linux, Docker, or Windows
+- **[Quick Start](Quick-Start)** - First steps and initial configuration
+- **[User Manual](User-Manual)** - Complete usage documentation
 
 ---
 
-## 📖 Documentation par Fonctionnalité
+## 📖 Documentation by Feature
 
-### Gestion des Certificats
-- **[Gestion des CA](CA-Management)** - Création et gestion des autorités de certification
-- **[Opérations Certificats](Certificate-Operations)** - Émission, révocation, export de certificats
-- **[Configuration SCEP](SCEP-Configuration)** - Configuration du serveur SCEP pour auto-enrollment
+### Certificate Management
+- **[CA Management](CA-Management)** - Creating and managing certificate authorities
+- **[Certificate Operations](Certificate-Operations)** - Issuing, revoking, exporting certificates
+- **[SCEP Configuration](SCEP-Configuration)** - SCEP server configuration for auto-enrollment
 
-### Intégration et API
-- **[API REST Reference](API-Reference)** - Documentation complète de l'API REST
-- **[Intégrations](Integrations)** - Intégration avec iOS, Android, Windows, Cisco, etc.
+### Integration and API
+- **[API REST Reference](API-Reference)** - Complete REST API documentation
+- **[Integrations](Integrations)** - Integration with iOS, Android, Windows, Cisco, etc.
 
 ### Administration
-- **[Configuration Système](System-Configuration)** - Configuration avancée et paramètres
-- **[Gestion des Utilisateurs](User-Management)** - RBAC et contrôle d'accès
-- **[Sécurité](Security-Best-Practices)** - Bonnes pratiques de sécurité
+- **[System Configuration](System-Configuration)** - Advanced configuration and settings
+- **[User Management](User-Management)** - RBAC and access control
+- **[Security](Security-Best-Practices)** - Security best practices
 
 ---
 
-## 🔧 Support et Dépannage
+## 🔧 Support and Troubleshooting
 
-- **[Troubleshooting](Troubleshooting)** - Résolution de problèmes courants
-- **[FAQ](FAQ)** - Questions fréquemment posées
-- **[Migration Guide](Migration-Guide)** - Migration entre serveurs
+- **[Troubleshooting](Troubleshooting)** - Common problem resolution
+- **[FAQ](FAQ)** - Frequently asked questions
+- **[Migration Guide](Migration-Guide)** - Server-to-server migration
 
 ---
 
-## 📊 Informations Système
+## 📊 System Information
 
-| Propriété | Valeur |
-|-----------|--------|
+| Property | Value |
+|----------|-------|
 | Version | 1.0.1 |
 | Python | 3.10+ |
-| Plateforme | Linux (Debian, Ubuntu, RHEL, etc.) |
+| Platform | Linux (Debian, Ubuntu, RHEL, etc.) |
 | License | BSD-3-Clause |
 | Repository | [GitHub](https://github.com/NeySlim/ultimate-ca-manager) |
 | Docker Hub | [neyslim/ultimate-ca-manager](https://hub.docker.com/r/neyslim/ultimate-ca-manager) |
 
 ---
 
-## 🎯 Ressources Additionnelles
+## 🎯 Additional Resources
 
-- **[Release Notes](https://github.com/NeySlim/ultimate-ca-manager/releases)** - Notes de version
-- **[Docker Features](https://github.com/NeySlim/ultimate-ca-manager/blob/main/DOCKER_FEATURES.md)** - Déploiement Docker avancé
-- **[Architecture](https://github.com/NeySlim/ultimate-ca-manager/blob/main/docs/diagrams/ARCHITECTURE.md)** - Diagrammes d'architecture
+- **[Release Notes](https://github.com/NeySlim/ultimate-ca-manager/releases)** - Version notes
+- **[Docker Features](https://github.com/NeySlim/ultimate-ca-manager/blob/main/DOCKER_FEATURES.md)** - Advanced Docker deployment
+- **[Architecture](https://github.com/NeySlim/ultimate-ca-manager/blob/main/docs/diagrams/ARCHITECTURE.md)** - Architecture diagrams
 
 ---
 
-## 💡 Liens Rapides
+## 💡 Quick Links
 
-- [🏠 Retour au Repository](https://github.com/NeySlim/ultimate-ca-manager)
-- [🐛 Signaler un Bug](https://github.com/NeySlim/ultimate-ca-manager/issues)
+- [🏠 Back to Repository](https://github.com/NeySlim/ultimate-ca-manager)
+- [🐛 Report a Bug](https://github.com/NeySlim/ultimate-ca-manager/issues)
 - [💬 Discussions](https://github.com/NeySlim/ultimate-ca-manager/discussions)
 
 ---
 
-**Dernière mise à jour**: Janvier 2026  
-**Contributeurs**: NeySlim et la communauté UCM
+**Last update**: January 2026  
+**Contributors**: NeySlim and the UCM community
