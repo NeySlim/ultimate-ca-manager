@@ -1,71 +1,71 @@
 # 🚀 Quick Start - UCM
 
-Guide de démarrage rapide pour être opérationnel en 10 minutes.
+Quick start guide to get operational in 10 minutes.
 
 ---
 
-## ⏱️ Installation Rapide (5 minutes)
+## ⏱️ Quick Installation (5 minutes)
 
-### Option 1: Docker (Recommandé)
+### Option 1: Docker (Recommended)
 
 ```bash
-# Télécharger docker-compose.yml
+# Download docker-compose.yml
 curl -O https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docker-compose.yml
 
-# Démarrer UCM
+# Start UCM
 docker-compose up -d
 
-# Vérifier le statut
+# Check status
 docker-compose ps
 ```
 
-**Accès**: https://localhost:8443
+**Access**: https://localhost:8443
 
 ### Option 2: Linux Installation
 
 ```bash
-# Télécharger l'installeur
+# Download installer
 curl -LO https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.0.1/install.sh
 
-# Rendre exécutable et installer
+# Make executable and install
 chmod +x install.sh
 sudo ./install.sh
 
-# Démarrer UCM
+# Start UCM
 sudo systemctl start ucm
 ```
 
-**Accès**: https://localhost:8443
+**Access**: https://localhost:8443
 
 ---
 
-## 🔐 Première Connexion (2 minutes)
+## 🔐 First Login (2 minutes)
 
-1. **Ouvrir le navigateur**
+1. **Open browser**
    ```
    https://localhost:8443
    ```
 
-2. **Accepter le certificat auto-signé**
-   - Cliquez sur "Avancé" ou "Advanced"
-   - Puis "Continuer vers le site" ou "Proceed"
+2. **Accept self-signed certificate**
+   - Click "Advanced" or "Avancé"
+   - Then "Continue to site" or "Proceed"
 
-3. **Connexion**
+3. **Login**
    ```
-   Utilisateur: admin
-   Mot de passe: admin
+   Username: admin
+   Password: admin
    ```
 
-4. **⚠️ Changer le mot de passe**
-   - Menu utilisateur (haut droite) → Profile
+4. **⚠️ Change password**
+   - User menu (top right) → Profile
    - Security → Change Password
-   - Nouveau mot de passe: min 8 caractères
+   - New password: min 8 characters
 
 ---
 
-## 🏛️ Créer votre PKI (3 minutes)
+## 🏛️ Create Your PKI (3 minutes)
 
-### Étape 1: Créer une Root CA
+### Step 1: Create a Root CA
 
 ```
 Menu → Certificate Authorities → Create New CA
@@ -74,13 +74,13 @@ Configuration:
 ├─ CA Type: Root CA
 ├─ Key Type: RSA 4096 bits
 ├─ Hash: SHA-384
-├─ Validity: 7300 jours (20 ans)
+├─ Validity: 7300 days (20 years)
 └─ Common Name: My Company Root CA
 
-Cliquer "Create CA"
+Click "Create CA"
 ```
 
-### Étape 2: Créer une Intermediate CA
+### Step 2: Create an Intermediate CA
 
 ```
 Create New CA
@@ -90,19 +90,19 @@ Configuration:
 ├─ Parent CA: My Company Root CA
 ├─ Key Type: RSA 4096 bits
 ├─ Hash: SHA-256
-├─ Validity: 3650 jours (10 ans)
+├─ Validity: 3650 days (10 years)
 └─ Common Name: My Company Issuing CA
 
-Cliquer "Create CA"
+Click "Create CA"
 ```
 
-✅ **Votre PKI est prête !**
+✅ **Your PKI is ready!**
 
 ---
 
-## 📜 Émettre votre Premier Certificat
+## 📜 Issue Your First Certificate
 
-### Certificat Serveur Web
+### Server Certificate
 
 ```
 Menu → Certificates → Issue New Certificate
@@ -113,32 +113,32 @@ Configuration:
 ├─ Common Name: www.example.com
 ├─ Organization: My Company Inc.
 ├─ Key Type: RSA 2048
-├─ Validity: 365 jours
+├─ Validity: 365 days
 │
 └─ Subject Alternative Names (SANs):
    ├─ www.example.com
    └─ example.com
 
-Cliquer "Issue Certificate"
+Click "Issue Certificate"
 ```
 
-### Télécharger le Certificat
+### Download Certificate
 
 ```
-1. Le certificat apparaît dans la liste
-2. Cliquer sur Actions → Export
+1. Certificate appears in list
+2. Click Actions → Export
 3. Format: PKCS#12 (.pfx)
-4. Mot de passe: ******** (choisir un mot de passe fort)
+4. Password: ******** (choose strong password)
 5. Download
 ```
 
-✅ **Vous avez votre premier certificat !**
+✅ **You have your first certificate!**
 
 ---
 
-## 🔄 Configurer SCEP (Optionnel)
+## 🔄 Configure SCEP (Optional)
 
-Pour l'enrollment automatique (iOS, Android, etc.)
+For automatic enrollment (iOS, Android, etc.)
 
 ```
 Menu → SCEP → New Endpoint
@@ -148,67 +148,67 @@ Configuration:
 ├─ Issuing CA: My Company Issuing CA
 ├─ Challenge Password: ****************
 ├─ Certificate Type: Client Certificate
-├─ Validity: 365 jours
-└─ Auto-renewal: ✅ Activé
+├─ Validity: 365 days
+└─ Auto-renewal: ✅ Enabled
 
-Cliquer "Create Endpoint"
+Click "Create Endpoint"
 ```
 
-**URL SCEP générée**:
+**Generated SCEP URL**:
 ```
-https://<votre-serveur>:8443/scep/mobile-devices
+https://<your-server>:8443/scep/mobile-devices
 ```
 
 ---
 
-## 📊 Vérifier le Tableau de Bord
+## 📊 Check Dashboard
 
-Retournez au Dashboard pour voir:
+Return to Dashboard to see:
 
-- ✅ Nombre de CAs créées
-- ✅ Certificats émis
-- ✅ Endpoints SCEP actifs
-- ✅ Graphiques d'activité
-
----
-
-## 🎯 Prochaines Étapes
-
-Maintenant que votre PKI est opérationnelle:
-
-1. **[Lire le Manuel Utilisateur](User-Manual)** - Documentation complète
-2. **[Configurer CRL/OCSP](System-Configuration)** - Révocation de certificats
-3. **[Créer des utilisateurs](User-Management)** - Déléguer des tâches
-4. **[Configurer les backups](System-Configuration#backup)** - Sécuriser vos données
-5. **[Déployer en production](Installation-Guide#production-deployment)** - Bonnes pratiques
+- ✅ Number of CAs created
+- ✅ Certificates issued
+- ✅ Active SCEP endpoints
+- ✅ Activity charts
 
 ---
 
-## 🆘 Besoin d'Aide ?
+## 🎯 Next Steps
 
-- **[Troubleshooting](Troubleshooting)** - Problèmes courants
-- **[FAQ](FAQ)** - Questions fréquentes
-- **[GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)** - Support communauté
+Now that your PKI is operational:
 
----
-
-## ✅ Checklist Démarrage Rapide
-
-- [ ] UCM installé et accessible
-- [ ] Mot de passe admin changé
-- [ ] Root CA créée
-- [ ] Intermediate CA créée
-- [ ] Premier certificat émis
-- [ ] Certificat téléchargé et testé
-- [ ] SCEP configuré (si nécessaire)
-- [ ] Dashboard vérifié
-
-**Félicitations ! Vous êtes prêt à utiliser UCM ! 🎉**
+1. **[Read User Manual](User-Manual)** - Complete documentation
+2. **[Configure CRL/OCSP](System-Configuration)** - Certificate revocation
+3. **[Create users](User-Management)** - Delegate tasks
+4. **[Configure backups](System-Configuration#backup)** - Secure your data
+5. **[Deploy to production](Installation-Guide#production-deployment)** - Best practices
 
 ---
 
-**Temps total**: ~10 minutes  
-**Niveau**: Débutant  
-**Prérequis**: Aucun
+## 🆘 Need Help?
 
-[← Retour à l'accueil](Home) | [Manuel Utilisateur →](User-Manual)
+- **[Troubleshooting](Troubleshooting)** - Common problems
+- **[FAQ](FAQ)** - Frequently asked questions
+- **[GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)** - Community support
+
+---
+
+## ✅ Quick Start Checklist
+
+- [ ] UCM installed and accessible
+- [ ] Admin password changed
+- [ ] Root CA created
+- [ ] Intermediate CA created
+- [ ] First certificate issued
+- [ ] Certificate downloaded and tested
+- [ ] SCEP configured (if needed)
+- [ ] Dashboard verified
+
+**Congratulations! You're ready to use UCM! 🎉**
+
+---
+
+**Total time**: ~10 minutes  
+**Level**: Beginner  
+**Prerequisites**: None
+
+[← Back to Home](Home) | [User Manual →](User-Manual)
