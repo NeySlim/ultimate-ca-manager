@@ -125,12 +125,16 @@ open https://your-server-ip:8443
 
 ## 💻 Installation
 
-See [INSTALLATION.md](INSTALLATION.md) for detailed installation instructions including:
-- Automated installation
-- Manual installation
-- Docker deployment
-- Post-installation configuration
-- Troubleshooting
+UCM v1.1.0+ includes a multi-distribution installer that works on:
+- ✅ Debian 10, 11, 12+
+- ✅ Ubuntu 20.04, 22.04, 24.04 LTS
+- ✅ RHEL 8, 9 / CentOS Stream / Rocky / AlmaLinux
+- ✅ Fedora 38, 39, 40
+- ✅ Alpine Linux 3.17+
+- ✅ Arch Linux / Manjaro
+- ✅ openSUSE Leap / Tumbleweed / SLES
+
+See [INSTALLATION.md](INSTALLATION.md) for detailed installation instructions and [DISTRIBUTIONS.md](DISTRIBUTIONS.md) for complete compatibility matrix.
 
 ## 🚢 Production Deployment
 

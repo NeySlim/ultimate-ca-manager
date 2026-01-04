@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# Ultimate CA Manager - Installation Script
-# Version: 1.0.0
+# Ultimate CA Manager - Multi-Distribution Installation Script
+# Version: 1.1.0
 # 
-# This script installs UCM to /opt/ucm with systemd service
+# Supports: Debian, Ubuntu, RHEL, CentOS, Rocky, Alma, Fedora, Alpine, Arch
 #
 
 set -e
@@ -45,6 +45,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
@@ -53,9 +54,16 @@ SERVICE_USER="ucm"
 SERVICE_NAME="ucm"
 PYTHON_MIN_VERSION="3.9"
 
+# Distribution detection variables
+DISTRO=""
+DISTRO_FAMILY=""
+PACKAGE_MANAGER=""
+INSTALL_CMD=""
+UPDATE_CMD=""
+
 echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║  Ultimate CA Manager - Installer      ║${NC}"
-echo -e "${BLUE}║  Version 1.0.0                         ║${NC}"
+echo -e "${BLUE}║  Version 1.1.0 (Multi-Distro)          ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -67,6 +75,110 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo -e "${GREEN}✅ Running as root${NC}"
+
+# Detect distribution
+echo ""
+echo "🔍 Detecting Linux distribution..."
+
+detect_distribution() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        DISTRO=$ID
+        DISTRO_VERSION=$VERSION_ID
+        DISTRO_NAME=$NAME
+    elif [ -f /etc/redhat-release ]; then
+        DISTRO="rhel"
+        DISTRO_NAME=$(cat /etc/redhat-release)
+    elif [ -f /etc/alpine-release ]; then
+        DISTRO="alpine"
+        DISTRO_NAME="Alpine Linux"
+    else
+        echo -e "${RED}❌ Unable to detect distribution${NC}"
+        exit 1
+    fi
+    
+    # Determine distribution family and package manager
+    case "$DISTRO" in
+        ubuntu|debian|linuxmint|pop)
+            DISTRO_FAMILY="debian"
+            PACKAGE_MANAGER="apt"
+            UPDATE_CMD="apt-get update -qq"
+            INSTALL_CMD="apt-get install -y -qq"
+            ;;
+        rhel|centos|rocky|almalinux|fedora|ol)
+            DISTRO_FAMILY="rhel"
+            # Check if dnf or yum is available
+            if command -v dnf &> /dev/null; then
+                PACKAGE_MANAGER="dnf"
+                INSTALL_CMD="dnf install -y -q"
+                UPDATE_CMD="dnf check-update -q || true"
+            else
+                PACKAGE_MANAGER="yum"
+                INSTALL_CMD="yum install -y -q"
+                UPDATE_CMD="yum check-update -q || true"
+            fi
+            ;;
+        alpine)
+            DISTRO_FAMILY="alpine"
+            PACKAGE_MANAGER="apk"
+            UPDATE_CMD="apk update -q"
+            INSTALL_CMD="apk add --no-cache"
+            ;;
+        arch|manjaro)
+            DISTRO_FAMILY="arch"
+            PACKAGE_MANAGER="pacman"
+            UPDATE_CMD="pacman -Sy --noconfirm"
+            INSTALL_CMD="pacman -S --noconfirm --needed"
+            ;;
+        opensuse*|sles)
+            DISTRO_FAMILY="suse"
+            PACKAGE_MANAGER="zypper"
+            UPDATE_CMD="zypper refresh"
+            INSTALL_CMD="zypper install -y"
+            ;;
+        *)
+            echo -e "${YELLOW}⚠️  Distribution '$DISTRO' not explicitly supported${NC}"
+            echo "   Attempting to detect package manager..."
+            
+            if command -v apt-get &> /dev/null; then
+                DISTRO_FAMILY="debian"
+                PACKAGE_MANAGER="apt"
+                UPDATE_CMD="apt-get update -qq"
+                INSTALL_CMD="apt-get install -y -qq"
+            elif command -v dnf &> /dev/null; then
+                DISTRO_FAMILY="rhel"
+                PACKAGE_MANAGER="dnf"
+                INSTALL_CMD="dnf install -y -q"
+                UPDATE_CMD="dnf check-update -q || true"
+            elif command -v yum &> /dev/null; then
+                DISTRO_FAMILY="rhel"
+                PACKAGE_MANAGER="yum"
+                INSTALL_CMD="yum install -y -q"
+                UPDATE_CMD="yum check-update -q || true"
+            elif command -v apk &> /dev/null; then
+                DISTRO_FAMILY="alpine"
+                PACKAGE_MANAGER="apk"
+                UPDATE_CMD="apk update -q"
+                INSTALL_CMD="apk add --no-cache"
+            elif command -v pacman &> /dev/null; then
+                DISTRO_FAMILY="arch"
+                PACKAGE_MANAGER="pacman"
+                UPDATE_CMD="pacman -Sy --noconfirm"
+                INSTALL_CMD="pacman -S --noconfirm --needed"
+            else
+                echo -e "${RED}❌ No supported package manager found${NC}"
+                exit 1
+            fi
+            ;;
+    esac
+    
+    echo -e "${GREEN}✅ Detected: $DISTRO_NAME${NC}"
+    echo -e "${CYAN}   Distribution: $DISTRO${NC}"
+    echo -e "${CYAN}   Family: $DISTRO_FAMILY${NC}"
+    echo -e "${CYAN}   Package Manager: $PACKAGE_MANAGER${NC}"
+}
+
+detect_distribution
 
 # Verify we're in the right directory
 echo ""
@@ -88,7 +200,7 @@ echo -e "${GREEN}✅ Installation package verified${NC}"
 # Check disk space
 echo ""
 echo "💾 Checking disk space..."
-AVAILABLE_SPACE=$(df /opt | tail -1 | awk '{print $4}')
+AVAILABLE_SPACE=$(df /opt 2>/dev/null | tail -1 | awk '{print $4}' || echo "1000000")
 REQUIRED_SPACE=102400  # 100 MB in KB
 
 if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_SPACE" ]; then
@@ -104,13 +216,12 @@ echo -e "${GREEN}✅ Disk space available: $(($AVAILABLE_SPACE / 1024)) MB${NC}"
 echo ""
 echo "🐍 Checking Python version..."
 if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}❌ Python 3 is not installed${NC}"
-    echo "   Please install Python 3.9 or higher"
-    exit 1
+    echo -e "${YELLOW}⚠️  Python 3 is not installed${NC}"
+    echo "   Will be installed with system dependencies"
+else
+    PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
+    echo -e "${GREEN}✅ Python $PYTHON_VERSION found${NC}"
 fi
-
-PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-echo -e "${GREEN}✅ Python $PYTHON_VERSION found${NC}"
 
 # Check if already installed
 FRESH_INSTALL=true
@@ -136,12 +247,65 @@ if [ -d "$INSTALL_DIR" ]; then
     echo -e "${GREEN}✅ Backup created${NC}"
 fi
 
-# Install system dependencies
+# Install system dependencies based on distribution
 echo ""
 echo "📦 Installing system dependencies..."
-apt-get update -qq
-apt-get install -y -qq python3-pip python3-venv python3-dev build-essential libssl-dev \
-    libffi-dev python3-setuptools curl
+
+install_dependencies() {
+    case "$DISTRO_FAMILY" in
+        debian)
+            echo "   Using apt package manager..."
+            $UPDATE_CMD
+            $INSTALL_CMD python3 python3-pip python3-venv python3-dev \
+                build-essential libssl-dev libffi-dev python3-setuptools curl
+            ;;
+        rhel)
+            echo "   Using $PACKAGE_MANAGER package manager..."
+            $UPDATE_CMD
+            
+            # RHEL/CentOS might need EPEL for python3-pip
+            if [ "$DISTRO" = "centos" ] || [ "$DISTRO" = "rhel" ]; then
+                if [ ! -f /etc/yum.repos.d/epel.repo ]; then
+                    echo "   Installing EPEL repository..."
+                    $INSTALL_CMD epel-release 2>/dev/null || true
+                fi
+            fi
+            
+            # Python package names differ slightly
+            if [ "$PACKAGE_MANAGER" = "dnf" ]; then
+                $INSTALL_CMD python3 python3-pip python3-devel \
+                    gcc openssl-devel libffi-devel python3-setuptools curl
+            else
+                $INSTALL_CMD python3 python3-pip python3-devel \
+                    gcc openssl-devel libffi-devel python3-setuptools curl
+            fi
+            ;;
+        alpine)
+            echo "   Using apk package manager..."
+            $UPDATE_CMD
+            $INSTALL_CMD python3 py3-pip python3-dev \
+                gcc musl-dev libffi-dev openssl-dev curl
+            ;;
+        arch)
+            echo "   Using pacman package manager..."
+            $UPDATE_CMD
+            $INSTALL_CMD python python-pip base-devel openssl curl
+            ;;
+        suse)
+            echo "   Using zypper package manager..."
+            $UPDATE_CMD
+            $INSTALL_CMD python3 python3-pip python3-devel \
+                gcc libopenssl-devel libffi-devel curl
+            ;;
+        *)
+            echo -e "${YELLOW}⚠️  Unknown distribution family, attempting generic install...${NC}"
+            $UPDATE_CMD
+            $INSTALL_CMD python3 python3-pip curl || true
+            ;;
+    esac
+}
+
+install_dependencies
 
 echo -e "${GREEN}✅ Dependencies installed${NC}"
 
@@ -149,7 +313,13 @@ echo -e "${GREEN}✅ Dependencies installed${NC}"
 echo ""
 echo "👤 Creating service user..."
 if ! id "$SERVICE_USER" &>/dev/null; then
-    useradd -r -s /bin/false -d $INSTALL_DIR -m $SERVICE_USER
+    # Alpine uses different options for useradd
+    if [ "$DISTRO_FAMILY" = "alpine" ]; then
+        adduser -D -H -s /sbin/nologin $SERVICE_USER
+    else
+        useradd -r -s /bin/false -d $INSTALL_DIR -m $SERVICE_USER 2>/dev/null || \
+        useradd -r -s /usr/sbin/nologin -d $INSTALL_DIR -m $SERVICE_USER
+    fi
     echo -e "${GREEN}✅ User '$SERVICE_USER' created${NC}"
 else
     echo -e "${YELLOW}⚠️  User '$SERVICE_USER' already exists${NC}"
@@ -314,6 +484,9 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     fi
 fi
 
+# Get IP address for display
+IP_ADDR=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+
 # Print success message
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
@@ -321,12 +494,13 @@ echo -e "${GREEN}║     Installation Complete! 🎉         ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
 echo ""
 echo "📋 Installation Summary:"
+echo "   • Distribution: $DISTRO_NAME"
 echo "   • Installation directory: $INSTALL_DIR"
 echo "   • Service name: $SERVICE_NAME"
 echo "   • Service user: $SERVICE_USER"
 echo ""
 echo "🔗 Access UCM:"
-echo "   • URL: https://$(hostname -I | awk '{print $1}'):8443"
+echo "   • URL: https://$IP_ADDR:8443"
 echo "   • URL: https://localhost:8443"
 echo ""
 echo "🔑 Default credentials:"
@@ -342,4 +516,22 @@ echo "   • Service status:   systemctl status $SERVICE_NAME"
 echo "   • View logs:        journalctl -u $SERVICE_NAME -f"
 echo ""
 echo "📖 Documentation: $INSTALL_DIR/README.md"
+echo ""
+
+# Show distribution-specific notes if any
+case "$DISTRO_FAMILY" in
+    alpine)
+        echo -e "${CYAN}📝 Alpine Linux Note:${NC}"
+        echo "   If you encounter permission issues, check SELinux/AppArmor status"
+        echo ""
+        ;;
+    rhel)
+        echo -e "${CYAN}📝 RHEL/CentOS Note:${NC}"
+        echo "   If SELinux is enabled, you may need to adjust policies:"
+        echo "   semanage port -a -t http_port_t -p tcp 8443"
+        echo ""
+        ;;
+esac
+
+echo -e "${GREEN}Thank you for installing Ultimate CA Manager!${NC}"
 echo ""
