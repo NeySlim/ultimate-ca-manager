@@ -2,7 +2,7 @@
 
 # Ultimate CA Manager
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux-lightgrey.svg)
