@@ -311,7 +311,27 @@ None (initial release).
 
 ## [Unreleased]
 
-### Planned for v2.0
+### Added
+- Multi-distribution installer (v1.1.0)
+  - Auto-detection of Linux distribution
+  - Support for Debian, Ubuntu, RHEL, CentOS, Rocky, AlmaLinux, Fedora
+  - Support for Alpine Linux
+  - Support for Arch Linux / Manjaro
+  - Support for openSUSE / SLES
+  - Automatic package manager detection (apt, dnf, yum, apk, pacman, zypper)
+  - Distribution-specific dependency installation
+  - Distribution-specific user creation (Alpine compatibility)
+  - Distribution-specific notes and warnings (SELinux, etc.)
+  - DISTRIBUTIONS.md documentation with compatibility matrix
+
+### Changed
+- Installer version bumped to 1.1.0
+- Installer now displays detected distribution information
+- Python 3 installation no longer mandatory pre-install (installed automatically)
+
+---
+
+## [1.0.0] - 2026-01-04
 
 - CRL Distribution Points (CDP)
 - ACME Protocol (Let's Encrypt compatible)
