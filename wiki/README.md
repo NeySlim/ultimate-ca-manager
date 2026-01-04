@@ -1,82 +1,77 @@
-# 📚 UCM Wiki - Instructions de Publication
+# 📚 UCM Wiki - Publication Instructions
 
-Ce dossier contient les pages wiki de Ultimate CA Manager.
+This folder contains the English wiki pages for Ultimate CA Manager.
 
----
-
-## 📁 Pages Créées
-
-1. **Home.md** (2.7 KB) - Page d'accueil du wiki
-2. **Quick-Start.md** (4.5 KB) - Guide de démarrage rapide (10 minutes)
-3. **User-Manual.md** (17 KB) - Manuel utilisateur complet
-4. **FAQ.md** (11 KB) - Questions fréquemment posées
-5. **Troubleshooting.md** (11 KB) - Guide de dépannage
-6. **API-Reference.md** (13 KB) - Documentation API REST
-
-**Total**: ~59 KB de documentation
+**French version available in**: `wiki-fr/`
 
 ---
 
-## 🚀 Publier le Wiki sur GitHub
+## 📁 Pages Created
 
-GitHub Wiki utilise un repository Git séparé. Voici comment publier :
+1. **Home.md** (2.7 KB) - Wiki homepage
+2. **Quick-Start.md** (4.5 KB) - 10-minute quick start guide  
+3. **User-Manual.md** - Complete user manual (TO BE TRANSLATED)
+4. **FAQ.md** - Frequently asked questions (TO BE TRANSLATED)
+5. **Troubleshooting.md** - Troubleshooting guide (TO BE TRANSLATED)
+6. **API-Reference.md** - REST API documentation (TO BE TRANSLATED)
 
-### Méthode 1: Via Interface Web (Recommandé pour première publication)
+**Status**: Home and Quick-Start ready in English. Technical pages can remain in French or be translated gradually.
 
-1. **Activer le Wiki**
+---
+
+## 🚀 Publish Wiki to GitHub
+
+GitHub Wiki uses a separate Git repository. Here's how to publish:
+
+### Method 1: Web Interface (Recommended for first publication)
+
+1. **Enable Wiki**
    ```
    https://github.com/NeySlim/ultimate-ca-manager/settings
    → Features → ✅ Wikis
    → Save
    ```
 
-2. **Créer la première page**
+2. **Create first page**
    ```
    https://github.com/NeySlim/ultimate-ca-manager/wiki
    → Create the first page
    → Title: Home
-   → Copier-coller le contenu de wiki/Home.md
+   → Copy content from wiki/Home.md
    → Save Page
    ```
 
-3. **Créer les autres pages**
-   - Cliquer "New Page" pour chaque fichier
-   - Title = nom du fichier sans .md (ex: "Quick-Start")
-   - Copier-coller le contenu correspondant
-   - Répéter pour toutes les pages
+3. **Create other pages**
+   - Click "New Page" for each file
+   - Title = filename without .md (e.g., "Quick-Start")
+   - Copy-paste corresponding content
+   - Repeat for all pages
 
-### Méthode 2: Via Git (Recommandé pour mises à jour)
+### Method 2: Via Git (Recommended for updates)
 
-1. **Cloner le Wiki repository**
+1. **Clone Wiki repository**
    ```bash
    cd /tmp
    git clone https://github.com/NeySlim/ultimate-ca-manager.wiki.git
    cd ultimate-ca-manager.wiki
    ```
 
-2. **Copier les fichiers**
+2. **Copy files**
    ```bash
    cp /root/ucm-src/wiki/*.md .
+   rm -f README.md publish-wiki.sh
    ```
 
-3. **Commit et Push**
+3. **Commit and Push**
    ```bash
    git add *.md
-   git commit -m "docs: Add comprehensive wiki documentation
-   
-   - Home page with navigation
-   - Quick Start guide (10 min setup)
-   - Complete User Manual (17 KB)
-   - FAQ with common questions
-   - Troubleshooting guide
-   - API REST reference
-   "
+   git commit -m "docs: Publish wiki documentation"
    git push origin master
    ```
 
-### Méthode 3: Script Automatique
+### Method 3: Automated Script
 
-Utiliser le script `publish-wiki.sh` inclus dans ce dossier :
+Use the included `publish-wiki.sh` script:
 
 ```bash
 cd /root/ucm-src/wiki
@@ -86,81 +81,74 @@ chmod +x publish-wiki.sh
 
 ---
 
-## 🔄 Mettre à Jour le Wiki
+## 🔄 Update Wiki
 
-### Modification d'une page
+### Modify a page
 
 ```bash
-# 1. Modifier le fichier localement
+# 1. Edit file locally
 nano /root/ucm-src/wiki/User-Manual.md
 
-# 2. Cloner le wiki (si pas déjà fait)
+# 2. Clone wiki (if not done)
 cd /tmp
 git clone https://github.com/NeySlim/ultimate-ca-manager.wiki.git
 cd ultimate-ca-manager.wiki
 
-# 3. Copier la version modifiée
+# 3. Copy modified version
 cp /root/ucm-src/wiki/User-Manual.md .
 
-# 4. Commit et push
+# 4. Commit and push
 git add User-Manual.md
 git commit -m "docs: Update User Manual"
 git push origin master
 ```
 
-### Ajout d'une nouvelle page
+### Add a new page
 
 ```bash
-# 1. Créer le fichier
+# 1. Create file
 cd /root/ucm-src/wiki
 nano New-Page.md
 
-# 2. L'ajouter au wiki
+# 2. Add to wiki
 cd /tmp/ultimate-ca-manager.wiki
 cp /root/ucm-src/wiki/New-Page.md .
 git add New-Page.md
 git commit -m "docs: Add New Page"
 git push origin master
 
-# 3. Mettre à jour Home.md pour lien vers nouvelle page
+# 3. Update Home.md to link to new page
 ```
 
 ---
 
-## 📝 Conventions de Nommage
+## 📝 Naming Conventions
 
-### Fichiers
-- **Format**: `Page-Title.md` (PascalCase avec tirets)
-- **Exemples**: 
+### Files
+- **Format**: `Page-Title.md` (PascalCase with hyphens)
+- **Examples**: 
   - `Home.md`
   - `Quick-Start.md`
   - `User-Manual.md`
   - `API-Reference.md`
 
-### Liens Internes
+### Internal Links
 ```markdown
-[Texte du lien](Page-Title)
+[Link text](Page-Title)
 ```
 
-**Exemples**:
+**Examples**:
 ```markdown
 [Quick Start](Quick-Start)
 [User Manual](User-Manual)
-[FAQ](FAQ#section-specifique)
-```
-
-### Sections
-```markdown
-## Section Principale
-### Sous-section
-#### Sous-sous-section
+[FAQ](FAQ#specific-section)
 ```
 
 ---
 
 ## 🖼️ Images
 
-### Ajouter des Images
+### Add Images
 
 1. **Upload via web**
    ```
@@ -177,12 +165,12 @@ git push origin master
    git push
    ```
 
-3. **Référencer l'image**
+3. **Reference image**
    ```markdown
    ![Description](images/screenshot.png)
    ```
 
-### Images depuis le Repository Principal
+### Images from Main Repository
 
 ```markdown
 ![Architecture](https://github.com/NeySlim/ultimate-ca-manager/blob/main/docs/diagrams/architecture.png?raw=true)
@@ -190,50 +178,45 @@ git push origin master
 
 ---
 
-## ✅ Checklist de Publication
+## ✅ Publication Checklist
 
-Avant de publier:
+Before publishing:
 
-- [ ] Toutes les pages créées (6 pages minimum)
-- [ ] Liens internes vérifiés
-- [ ] Orthographe et grammaire vérifiées
-- [ ] Code examples testés
-- [ ] Screenshots ajoutés (si disponibles)
-- [ ] Home.md à jour avec tous les liens
-- [ ] Navigation cohérente entre pages
+- [ ] All pages created
+- [ ] Internal links verified
+- [ ] Spelling and grammar checked
+- [ ] Code examples tested
+- [ ] Screenshots added (if available)
+- [ ] Home.md updated with all links
+- [ ] Navigation consistent between pages
 
-Après publication:
+After publishing:
 
-- [ ] Vérifier rendu sur GitHub Wiki
-- [ ] Tester tous les liens
-- [ ] Vérifier images s'affichent
-- [ ] Navigation fonctionne
-- [ ] Recherche wiki fonctionne
+- [ ] Verify rendering on GitHub Wiki
+- [ ] Test all links
+- [ ] Verify images display
+- [ ] Navigation works
+- [ ] Wiki search works
 
 ---
 
-## 🎯 Prochaines Pages à Ajouter (Optionnel)
+## 🌍 Language Versions
 
-1. **Installation-Guide.md** - Guide installation détaillé
-2. **CA-Management.md** - Gestion approfondie des CAs
-3. **Certificate-Operations.md** - Opérations certificats avancées
-4. **SCEP-Configuration.md** - Configuration SCEP détaillée
-5. **System-Configuration.md** - Configuration système
-6. **User-Management.md** - Gestion utilisateurs et RBAC
-7. **Security-Best-Practices.md** - Bonnes pratiques sécurité
-8. **Migration-Guide.md** - Guide de migration
-9. **Integrations.md** - Intégrations iOS, Android, etc.
+- **English** (primary): `/wiki/`
+- **French** (reference): `/wiki-fr/`
+
+Technical pages (API, Troubleshooting) work well in either language as they're mostly code.
 
 ---
 
 ## 📞 Support
 
-Questions sur la publication du wiki ?
+Questions about wiki publication?
 
 - **GitHub Docs**: https://docs.github.com/en/communities/documenting-your-project-with-wikis
 - **Markdown Guide**: https://docs.github.com/en/get-started/writing-on-github
 
 ---
 
-**Status**: ✅ 6 pages prêtes à publier (~59 KB)  
-**Dernière mise à jour**: Janvier 2026
+**Status**: ✅ Ready to publish  
+**Last update**: January 2026
