@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}CA Details - {{ ca.common_name }} - UCM{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6 flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ ca.common_name }}</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Certificate Authority Details</p>
+        </div>
+        <div class="flex space-x-3">
+            <a href="/ca" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600">
+                <i class="fas fa-arrow-left mr-2"></i>Back to List
+            </a>
+            <button onclick="downloadCRL('{{ ca.id }}')" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+                <i class="fas fa-ban mr-2"></i>Download CRL
+            </button>
+            <div class="relative inline-block text-left">
+                <button onclick="toggleExportMenu()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center">
+                    <i class="fas fa-download mr-2"></i>Export
+                    <i class="fas fa-chevron-down ml-2"></i>
+                </button>
+                <div id="export-menu" class="hidden absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-700 ring-1 ring-black ring-opacity-5 z-10">
+                    <div class="py-1" role="menu">
+                        <button onclick="exportCASimple('{{ ca.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                            <i class="fas fa-file-certificate mr-2"></i>Certificate only (PEM)
+                        </button>
+                        <button onclick="exportCAWithKey('{{ ca.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                            <i class="fas fa-key mr-2"></i>Certificate + Key (PEM)
+                        </button>
+                        <button onclick="exportCAWithChain('{{ ca.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                            <i class="fas fa-link mr-2"></i>Certificate + Chain (PEM)
+                        </button>
+                        <button onclick="exportCAFull('{{ ca.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                            <i class="fas fa-archive mr-2"></i>Full Chain + Key (PEM)
+                        </button>
+                        <button onclick="exportCADER('{{ ca.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                            <i class="fas fa-file-binary mr-2"></i>Certificate (DER)
+                        </button>
+                        <button onclick="showPKCS12Modal('{{ ca.id }}', 'ca')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                            <i class="fas fa-lock mr-2"></i>PKCS#12 (.p12/.pfx)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CA Information -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Basic Information -->
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Basic Information</h2>
+            <dl class="space-y-3">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Common Name</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{{ ca.common_name }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Organization</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ca.organization or 'N/A' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Organizational Unit</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ca.organizational_unit or 'N/A' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Country</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ca.country or 'N/A' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">State/Province</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ca.state or 'N/A' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Locality</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ca.locality or 'N/A' }}</dd>
+                </div>
+            </dl>
+        </div>
+
+        <!-- Technical Details -->
+        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Technical Details</h2>
+            <dl class="space-y-3">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Type</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">
+                        {% if ca.is_root %}
+                        <span class="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded text-xs font-semibold">Root CA</span>
+                        {% else %}
+                        <span class="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-xs font-semibold">Intermediate CA</span>
+                        {% endif %}
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Key Type</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{{ ca.key_type }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Hash Algorithm</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{{ ca.hash_algorithm }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Serial Number</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono break-all">{{ ca.serial_number }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Valid From</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ca.not_valid_before }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Valid Until</dt>
+                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ ca.not_valid_after }}</dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+
+    <!-- Fingerprints -->
+    <div class="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+            <i class="fas fa-fingerprint mr-2"></i>Certificate Fingerprints
+        </h2>
+        <div id="fingerprints-section">
+            <div class="text-center py-4">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading fingerprints...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- X.509 Extensions and Details -->
+    <div class="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+            <i class="fas fa-certificate mr-2"></i>X.509 Certificate Details
+        </h2>
+        <div id="x509-details">
+            <div class="text-center py-4">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading certificate details...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Certificates issued by this CA -->
+    <div class="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+        <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Issued Certificates</h2>
+        <div hx-get="/api/ui/ca/{{ ca.id }}/certificates" hx-trigger="load" hx-target="#cert-list">
+            <div id="cert-list">
+                <div class="text-center py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading certificates...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PKCS#12 Export Modal -->
+<div id="pkcs12-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div class="p-6">
+            <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+                <i class="fas fa-lock mr-2"></i>Export PKCS#12
+            </h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                PKCS#12 format includes the certificate and private key in a password-protected file (.p12 or .pfx). 
+                This format is compatible with Windows, macOS, and most browsers.
+            </p>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Password <span class="text-red-500">*</span>
+                </label>
+                <input type="password" id="pkcs12-password" 
+                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="Enter password for PKCS#12 file" />
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Confirm Password <span class="text-red-500">*</span>
+                </label>
+                <input type="password" id="pkcs12-password-confirm" 
+                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="Confirm password" />
+            </div>
+            <div id="pkcs12-error" class="hidden mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded text-sm"></div>
+            <div class="flex justify-end space-x-3">
+                <button onclick="closePKCS12Modal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600">
+                    Cancel
+                </button>
+                <button onclick="exportPKCS12()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                    <i class="fas fa-download mr-2"></i>Export
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let pkcs12ExportId = null;
+let pkcs12ExportType = null;
+
+// Load fingerprints on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadFingerprints();
+    loadX509Details();
+});
+
+function loadFingerprints() {
+    const token = '{{ session.get("access_token") }}';
+    fetch('/api/v1/ca/{{ ca.id }}/fingerprints', {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(response => response.json())
+    .then(data => {
+        const html = `
+            <dl class="space-y-3">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">SHA-256</dt>
+                    <dd class="mt-1 text-xs text-gray-900 dark:text-white font-mono break-all bg-gray-50 dark:bg-gray-900 p-2 rounded">${data.sha256}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">SHA-1</dt>
+                    <dd class="mt-1 text-xs text-gray-900 dark:text-white font-mono break-all bg-gray-50 dark:bg-gray-900 p-2 rounded">${data.sha1}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">MD5</dt>
+                    <dd class="mt-1 text-xs text-gray-900 dark:text-white font-mono break-all bg-gray-50 dark:bg-gray-900 p-2 rounded">${data.md5}</dd>
+                </div>
+            </dl>
+        `;
+        document.getElementById('fingerprints-section').innerHTML = html;
+    })
+    .catch(error => {
+        document.getElementById('fingerprints-section').innerHTML = '<p class="text-red-500">Failed to load fingerprints</p>';
+    });
+}
+
+function loadX509Details() {
+    const token = '{{ session.get("access_token") }}';
+    fetch('/api/v1/ca/{{ ca.id }}/details', {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(response => response.json())
+    .then(data => {
+        let html = '<div class="space-y-4">';
+        
+        // Public Key Info
+        if (data.public_key) {
+            html += `
+                <div>
+                    <h3 class="font-semibold text-gray-900 dark:text-white mb-2">Public Key</h3>
+                    <dl class="ml-4 space-y-1">
+                        <div class="flex">
+                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 w-32">Algorithm:</dt>
+                            <dd class="text-sm text-gray-900 dark:text-white">${data.public_key.algorithm}</dd>
+                        </div>
+                        ${data.public_key.key_size ? `
+                        <div class="flex">
+                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 w-32">Key Size:</dt>
+                            <dd class="text-sm text-gray-900 dark:text-white">${data.public_key.key_size} bits</dd>
+                        </div>` : ''}
+                        ${data.public_key.curve ? `
+                        <div class="flex">
+                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 w-32">Curve:</dt>
+                            <dd class="text-sm text-gray-900 dark:text-white">${data.public_key.curve}</dd>
+                        </div>` : ''}
+                    </dl>
+                </div>
+            `;
+        }
+        
+        // Extensions
+        if (data.extensions && Object.keys(data.extensions).length > 0) {
+            html += '<div><h3 class="font-semibold text-gray-900 dark:text-white mb-2">X.509 Extensions</h3>';
+            for (const [name, ext] of Object.entries(data.extensions)) {
+                html += `<div class="ml-4 mb-3 p-3 bg-gray-50 dark:bg-gray-900 rounded">`;
+                html += `<div class="font-medium text-sm text-gray-900 dark:text-white">${name} ${ext.critical ? '<span class="text-red-500">(Critical)</span>' : ''}</div>`;
+                
+                if (ext.values && Array.isArray(ext.values)) {
+                    html += '<ul class="mt-1 ml-4 text-sm text-gray-700 dark:text-gray-300 list-disc">';
+                    ext.values.forEach(v => html += `<li>${v}</li>`);
+                    html += '</ul>';
+                } else if (ext.ca !== undefined) {
+                    html += `<div class="mt-1 text-sm text-gray-700 dark:text-gray-300">CA: ${ext.ca ? 'Yes' : 'No'}`;
+                    if (ext.path_length !== null) html += `, Path Length: ${ext.path_length}`;
+                    html += '</div>';
+                } else if (ext.value !== undefined) {
+                    html += `<div class="mt-1 text-sm text-gray-700 dark:text-gray-300 font-mono break-all">${ext.value}</div>`;
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+        
+        html += '</div>';
+        document.getElementById('x509-details').innerHTML = html;
+    })
+    .catch(error => {
+        document.getElementById('x509-details').innerHTML = '<p class="text-red-500">Failed to load certificate details</p>';
+    });
+}
+
+function toggleExportMenu() {
+    const menu = document.getElementById('export-menu');
+    menu.classList.toggle('hidden');
+}
+
+// Close menu when clicking outside
+document.addEventListener('click', function(event) {
+    const menu = document.getElementById('export-menu');
+    const button = event.target.closest('button');
+    if (!button || button.textContent.indexOf('Export') === -1) {
+        if (!menu.classList.contains('hidden')) {
+            menu.classList.add('hidden');
+        }
+    }
+});
+
+function exportCASimple(caId) {
+    exportWithToken(`/api/v1/ca/${caId}/export/advanced?format=pem`);
+}
+
+function exportCAWithKey(caId) {
+    exportWithToken(`/api/v1/ca/${caId}/export/advanced?format=pem&key=true`);
+}
+
+function exportCAWithChain(caId) {
+    exportWithToken(`/api/v1/ca/${caId}/export/advanced?format=pem&chain=true`);
+}
+
+function exportCAFull(caId) {
+    exportWithToken(`/api/v1/ca/${caId}/export/advanced?format=pem&key=true&chain=true`);
+}
+
+function exportCADER(caId) {
+    exportWithToken(`/api/v1/ca/${caId}/export/advanced?format=der`);
+}
+
+function downloadCRL(caId) {
+    exportWithToken(`/api/v1/ca/${caId}/crl`);
+}
+
+function showPKCS12Modal(id, type) {
+    pkcs12ExportId = id;
+    pkcs12ExportType = type;
+    document.getElementById('pkcs12-password').value = '';
+    document.getElementById('pkcs12-password-confirm').value = '';
+    document.getElementById('pkcs12-error').classList.add('hidden');
+    document.getElementById('pkcs12-modal').classList.remove('hidden');
+}
+
+function closePKCS12Modal() {
+    document.getElementById('pkcs12-modal').classList.add('hidden');
+}
+
+function exportPKCS12() {
+    const password = document.getElementById('pkcs12-password').value;
+    const confirm = document.getElementById('pkcs12-password-confirm').value;
+    const errorDiv = document.getElementById('pkcs12-error');
+    
+    if (!password) {
+        errorDiv.textContent = 'Password is required';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+    
+    if (password !== confirm) {
+        errorDiv.textContent = 'Passwords do not match';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+    
+    if (password.length < 4) {
+        errorDiv.textContent = 'Password must be at least 4 characters';
+        errorDiv.classList.remove('hidden');
+        return;
+    }
+    
+    const url = pkcs12ExportType === 'ca' 
+        ? `/api/v1/ca/${pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`
+        : `/api/v1/certificates/${pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`;
+    
+    exportWithToken(url);
+    closePKCS12Modal();
+}
+
+function exportWithToken(url) {
+    const token = '{{ session.get("access_token") }}';
+    fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Export failed');
+        return response.blob();
+    })
+    .then(blob => {
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = ''; // Browser will use filename from Content-Disposition
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(downloadUrl);
+    })
+    .catch(error => {
+        alert('Export failed: ' + error.message);
+    });
+}
+</script>
+{% endblock %}

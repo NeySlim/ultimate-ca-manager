@@ -93,6 +93,117 @@ class CA(db.Model):
     # Relationships
     certificates = db.relationship("Certificate", back_populates="ca", lazy="dynamic")
     
+    @property
+    def has_private_key(self) -> bool:
+        """Check if CA has a private key"""
+        return bool(self.prv and len(self.prv) > 0)
+    
+    @property
+    def common_name(self) -> str:
+        """Extract Common Name from subject"""
+        if not self.subject:
+            return ""
+        for part in self.subject.split(','):
+            if part.strip().startswith('CN='):
+                return part.strip()[3:]
+        return ""
+    
+    @property
+    def organization(self) -> str:
+        """Extract Organization from subject"""
+        if not self.subject:
+            return ""
+        for part in self.subject.split(','):
+            if part.strip().startswith('O='):
+                return part.strip()[2:]
+        return ""
+    
+    @property
+    def organizational_unit(self) -> str:
+        """Extract Organizational Unit from subject"""
+        if not self.subject:
+            return ""
+        for part in self.subject.split(','):
+            if part.strip().startswith('OU='):
+                return part.strip()[3:]
+        return ""
+    
+    @property
+    def country(self) -> str:
+        """Extract Country from subject"""
+        if not self.subject:
+            return ""
+        for part in self.subject.split(','):
+            if part.strip().startswith('C='):
+                return part.strip()[2:]
+        return ""
+    
+    @property
+    def state(self) -> str:
+        """Extract State/Province from subject"""
+        if not self.subject:
+            return ""
+        for part in self.subject.split(','):
+            if part.strip().startswith('ST='):
+                return part.strip()[3:]
+        return ""
+    
+    @property
+    def locality(self) -> str:
+        """Extract Locality/City from subject"""
+        if not self.subject:
+            return ""
+        for part in self.subject.split(','):
+            if part.strip().startswith('L='):
+                return part.strip()[2:]
+        return ""
+    
+    @property
+    def is_root(self) -> bool:
+        """Check if this is a root CA (self-signed)"""
+        return self.subject == self.issuer if self.subject and self.issuer else False
+    
+    @property
+    def key_type(self) -> str:
+        """Parse key type from certificate"""
+        if not self.crt:
+            return "N/A"
+        try:
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives.asymmetric import rsa, ec, dsa
+            import base64
+            
+            cert_pem = base64.b64decode(self.crt).decode('utf-8')
+            cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
+            public_key = cert.public_key()
+            
+            if isinstance(public_key, rsa.RSAPublicKey):
+                return f"RSA {public_key.key_size}"
+            elif isinstance(public_key, ec.EllipticCurvePublicKey):
+                return f"EC {public_key.curve.name}"
+            elif isinstance(public_key, dsa.DSAPublicKey):
+                return f"DSA {public_key.key_size}"
+            return "Unknown"
+        except:
+            return "N/A"
+    
+    @property
+    def hash_algorithm(self) -> str:
+        """Parse hash algorithm from certificate"""
+        if not self.crt:
+            return "N/A"
+        try:
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            import base64
+            
+            cert_pem = base64.b64decode(self.crt).decode('utf-8')
+            cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
+            return cert.signature_algorithm_oid._name.upper().replace('SHA', 'SHA-')
+        except:
+            return "N/A"
+    
     def to_dict(self, include_private=False):
         """Convert to dictionary"""
         data = {
@@ -107,6 +218,17 @@ class CA(db.Model):
             "valid_to": self.valid_to.isoformat() if self.valid_to else None,
             "imported_from": self.imported_from,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "has_private_key": self.has_private_key,
+            # Computed properties for display
+            "common_name": self.common_name,
+            "organization": self.organization,
+            "organizational_unit": self.organizational_unit,
+            "country": self.country,
+            "state": self.state,
+            "locality": self.locality,
+            "is_root": self.is_root,
+            "key_type": self.key_type,
+            "hash_algorithm": self.hash_algorithm,
         }
         if include_private:
             data["crt"] = self.crt
@@ -127,12 +249,24 @@ class Certificate(db.Model):
     prv = db.Column(db.Text)  # Base64 encoded private key
     
     # Certificate details
-    cert_type = db.Column(db.String(50))  # usr_cert, server_cert, etc.
+    cert_type = db.Column(db.String(50))  # client_cert, server_cert, combined_cert, ca_cert
     subject = db.Column(db.Text)
     issuer = db.Column(db.Text)
     serial_number = db.Column(db.String(100))
     valid_from = db.Column(db.DateTime)
     valid_to = db.Column(db.DateTime)
+    
+    # Subject Alternative Names (SAN)
+    san_dns = db.Column(db.Text)  # JSON array of DNS names
+    san_ip = db.Column(db.Text)   # JSON array of IP addresses
+    san_email = db.Column(db.Text)  # JSON array of email addresses
+    san_uri = db.Column(db.Text)  # JSON array of URIs
+    
+    # OCSP
+    ocsp_uri = db.Column(db.String(255))
+    
+    # Private key management
+    private_key_location = db.Column(db.String(20), default='firewall')  # 'firewall' or 'download_only'
     
     # Status
     revoked = db.Column(db.Boolean, default=False)
@@ -146,6 +280,102 @@ class Certificate(db.Model):
     
     # Relationships
     ca = db.relationship("CA", back_populates="certificates")
+    
+    @property
+    def has_private_key(self) -> bool:
+        """Check if certificate has a private key"""
+        return bool(self.prv and len(self.prv) > 0)
+    
+    @property
+    def san_dns_list(self) -> list:
+        """Get list of DNS SANs"""
+        import json
+        if not self.san_dns:
+            return []
+        try:
+            return json.loads(self.san_dns)
+        except:
+            return []
+    
+    @property
+    def san_ip_list(self) -> list:
+        """Get list of IP SANs"""
+        import json
+        if not self.san_ip:
+            return []
+        try:
+            return json.loads(self.san_ip)
+        except:
+            return []
+    
+    @property
+    def san_email_list(self) -> list:
+        """Get list of Email SANs"""
+        import json
+        if not self.san_email:
+            return []
+        try:
+            return json.loads(self.san_email)
+        except:
+            return []
+    
+    @property
+    def san_uri_list(self) -> list:
+        """Get list of URI SANs"""
+        import json
+        if not self.san_uri:
+            return []
+        try:
+            return json.loads(self.san_uri)
+        except:
+            return []
+    
+    @property
+    def common_name(self) -> str:
+        """Extract Common Name from subject"""
+        if not self.subject:
+            return ""
+        # Subject format: "CN=example.com,O=Company,..."
+        for part in self.subject.split(','):
+            if part.strip().startswith('CN='):
+                return part.strip()[3:]
+        return ""
+    
+    @property
+    def organization(self) -> str:
+        """Extract Organization from subject"""
+        if not self.subject:
+            return ""
+        # Subject format: "CN=example.com,O=Company,..."
+        for part in self.subject.split(','):
+            if part.strip().startswith('O='):
+                return part.strip()[2:]
+        return ""
+    
+    @property
+    def issuer_name(self) -> str:
+        """Extract issuer Common Name"""
+        if not self.issuer:
+            return ""
+        # Issuer format: "CN=CA Name,O=Company,..."
+        for part in self.issuer.split(','):
+            if part.strip().startswith('CN='):
+                return part.strip()[3:]
+        return self.issuer
+    
+    @property
+    def not_valid_before(self) -> str:
+        """Formatted valid from date"""
+        if not self.valid_from:
+            return ""
+        return self.valid_from.strftime("%Y-%m-%d %H:%M:%S UTC")
+    
+    @property
+    def not_valid_after(self) -> str:
+        """Formatted valid until date"""
+        if not self.valid_to:
+            return ""
+        return self.valid_to.strftime("%Y-%m-%d %H:%M:%S UTC")
     
     def to_dict(self, include_private=False):
         """Convert to dictionary"""
@@ -165,6 +395,13 @@ class Certificate(db.Model):
             "revoke_reason": self.revoke_reason,
             "imported_from": self.imported_from,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "has_private_key": self.has_private_key,
+            # Computed properties for display
+            "common_name": self.common_name,
+            "organization": self.organization,
+            "issuer_name": self.issuer_name,
+            "not_valid_before": self.not_valid_before,
+            "not_valid_after": self.not_valid_after,
         }
         if include_private:
             data["crt"] = self.crt

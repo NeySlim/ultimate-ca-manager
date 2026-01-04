@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - UCM{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+            <i class="fas fa-tachometer-alt mr-2"></i> Dashboard
+        </h1>
+        <div class="text-sm text-gray-500 dark:text-gray-400">
+            <i class="fas fa-clock mr-1"></i> Last updated: <span id="last-updated">{{ now.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+        </div>
+    </div>
+    
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+         hx-get="/api/dashboard/stats" 
+         hx-trigger="load, every 30s"
+         hx-swap="innerHTML">
+        <!-- Will be populated by HTMX -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 animate-pulse">
+            <div class="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 animate-pulse">
+            <div class="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 animate-pulse">
+            <div class="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 animate-pulse">
+            <div class="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+    </div>
+    
+    <!-- Recent Activity & Quick Actions -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Recent CAs -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-certificate text-primary-600 mr-2"></i> Recent Certificate Authorities
+                </h2>
+            </div>
+            <div class="p-6" 
+                 hx-get="/api/dashboard/recent-cas" 
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <div class="animate-pulse space-y-4">
+                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                    <i class="fas fa-bolt text-primary-600 mr-2"></i> Quick Actions
+                </h2>
+            </div>
+            <div class="p-6 space-y-3">
+                <a href="/ca/new" class="flex items-center p-4 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-lg transition-colors">
+                    <div class="flex-shrink-0 w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center text-white">
+                        <i class="fas fa-plus"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">Create New CA</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Generate a new Certificate Authority</p>
+                    </div>
+                </a>
+                
+                <a href="/certificates/new" class="flex items-center p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 rounded-lg transition-colors">
+                    <div class="flex-shrink-0 w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center text-white">
+                        <i class="fas fa-file-certificate"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">Issue Certificate</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Create a new certificate</p>
+                    </div>
+                </a>
+                
+                <a href="/import" class="flex items-center p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-lg transition-colors">
+                    <div class="flex-shrink-0 w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center text-white">
+                        <i class="fas fa-file-import"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">Import from OPNsense</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Import existing CAs and certificates</p>
+                    </div>
+                </a>
+                
+                <a href="/scep" class="flex items-center p-4 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40 rounded-lg transition-colors">
+                    <div class="flex-shrink-0 w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center text-white">
+                        <i class="fas fa-network-wired"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">Configure SCEP</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Manage SCEP enrollment settings</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- SCEP Status -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+                <i class="fas fa-network-wired text-primary-600 mr-2"></i> SCEP Server Status
+            </h2>
+        </div>
+        <div class="p-6"
+             hx-get="/api/dashboard/scep-status"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="animate-pulse">
+                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Update timestamp every second
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById('last-updated').textContent = now.toLocaleString();
+    }, 1000);
+</script>
+{% endblock %}
