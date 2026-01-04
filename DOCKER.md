@@ -148,6 +148,39 @@ docker run -d \
 
 ## Running with Docker Compose
 
+### Configuration with .env File
+
+All Docker Compose settings can be customized via environment variables:
+
+```bash
+# Copy example configuration
+cp .env.docker.example .env
+
+# Edit configuration
+nano .env
+```
+
+**Available variables:**
+- `UCM_HTTPS_PORT` - Host port (default: 8443)
+- `UCM_DATA_DIR` - Data directory path (default: ./data)
+- `POSTGRES_DATA_DIR` - PostgreSQL data (default: ./postgres-data)
+- `POSTGRES_DB` - Database name (default: ucm)
+- `POSTGRES_USER` - Database user (default: ucm)
+- `POSTGRES_PASSWORD` - Database password (default: changeme123)
+
+**Example `.env` file:**
+```env
+# Custom port
+UCM_HTTPS_PORT=9443
+
+# Custom data directories (absolute or relative paths)
+UCM_DATA_DIR=/mnt/storage/ucm-data
+POSTGRES_DATA_DIR=/mnt/storage/postgres-data
+
+# Database credentials
+POSTGRES_PASSWORD=my-super-secure-password
+```
+
 ### Standard Deployment (SQLite)
 
 ```yaml
@@ -262,6 +295,44 @@ docker run -d \
 | `/app/backend/data/certs` | Issued certificates | ✅ Yes |
 | `/app/backend/data/private` | Private keys | ✅ Yes |
 | `/app/.env` | Configuration file | ⚠️ Optional |
+
+### Migrate to Another Docker Host
+
+**Complete migration with all data:**
+
+```bash
+# 1. On source host - Stop container and backup
+docker-compose down
+tar -czf ucm-complete-backup.tar.gz data/ postgres-data/ .env docker-compose.yml
+
+# 2. Transfer to new host
+scp ucm-complete-backup.tar.gz user@new-host:/opt/ucm/
+
+# 3. On new host - Extract and start
+cd /opt/ucm
+tar -xzf ucm-complete-backup.tar.gz
+docker-compose up -d
+
+# Done! All certificates, database, and configuration preserved.
+```
+
+**Migration with custom paths (.env):**
+
+```bash
+# Source host .env:
+UCM_DATA_DIR=/mnt/disk1/ucm
+POSTGRES_DATA_DIR=/mnt/disk1/postgres
+UCM_HTTPS_PORT=8443
+
+# New host .env (adjust paths):
+UCM_DATA_DIR=/data/ucm
+POSTGRES_DATA_DIR=/data/postgres
+UCM_HTTPS_PORT=9443
+
+# Just sync data directories:
+rsync -avz /mnt/disk1/ucm/ user@new-host:/data/ucm/
+rsync -avz /mnt/disk1/postgres/ user@new-host:/data/postgres/
+```
 
 ### Backup Data
 

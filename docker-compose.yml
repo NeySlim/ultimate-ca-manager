@@ -10,7 +10,7 @@ services:
     restart: unless-stopped
     
     ports:
-      - "8443:8443"
+      - "${UCM_HTTPS_PORT:-8443}:8443"
     
     volumes:
       # Persistent data volume
@@ -23,7 +23,7 @@ services:
       - UCM_DOCKER=1
       # - UCM_SECRET_KEY=your-secret-key-here
       # - UCM_JWT_SECRET=your-jwt-secret-here
-      - UCM_HTTPS_PORT=8443
+      - UCM_HTTPS_PORT=${UCM_HTTPS_PORT:-8443}
       # - UCM_DATABASE_PATH=/app/backend/data/ucm.db
     
     healthcheck:
