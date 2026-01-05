@@ -44,10 +44,10 @@
 
 ```bash
 # Download package
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.6.0/ucm_1.6.0_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.6.1/ucm_1.6.1_all.deb
 
 # Install
-sudo dpkg -i ucm_1.6.0_all.deb
+sudo dpkg -i ucm_1.6.1_all.deb
 
 # Service will start automatically
 ```
@@ -175,7 +175,7 @@ python backend/app.py
 # Build package
 ./build_deb.sh
 
-# Package will be created as ucm_1.6.0_all.deb
+# Package will be created as ucm_1.6.1_all.deb
 ```
 
 ## 📚 Documentation
@@ -233,10 +233,10 @@ BSD 3-Clause License - See [LICENSE](LICENSE) file for details
 
 ```bash
 # Download package
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.6.0/ucm_1.6.0_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.6.1/ucm_1.6.1_all.deb
 
 # Install
-sudo dpkg -i ucm_1.6.0_all.deb
+sudo dpkg -i ucm_1.6.1_all.deb
 
 # Service will start automatically
 ```
@@ -364,7 +364,7 @@ python backend/app.py
 # Build package
 ./build_deb.sh
 
-# Package will be created as ucm_1.6.0_all.deb
+# Package will be created as ucm_1.6.1_all.deb
 ```
 
 ## 📚 Documentation
