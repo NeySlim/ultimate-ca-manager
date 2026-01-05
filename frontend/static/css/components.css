@@ -420,75 +420,168 @@ background: var(--bg-hover) !important;
 }
 
 .btn-primary {
-    background: var(--btn-secondary-bg, var(--bg-secondary)) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border-color) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+    background: var(--primary-color) !important;
+    color: white !important;
+    border: 1px solid var(--primary-color) !important;
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: var(--btn-secondary-hover, var(--sidebar-hover)) !important;
+    background: var(--primary-dark, var(--primary-color)) !important;
+    opacity: 0.9;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
+.btn-primary:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
 .btn-primary i,
+.btn-primary i.fas,
+.btn-primary i.far,
+.btn-primary i.fab,
 .btn-primary svg,
-.btn-primary .ucm-icon {
-    color: var(--primary-color) !important;
+.btn-primary svg path,
+.btn-primary .ucm-icon,
+.btn-primary .ucm-icon path,
+button.btn-primary i,
+button.btn-primary i.fas,
+button.btn-primary svg,
+button.btn-primary svg path,
+button.btn-primary .ucm-icon,
+button.btn-primary .ucm-icon path,
+a.btn-primary i,
+a.btn-primary i.fas,
+a.btn-primary svg,
+a.btn-primary svg path,
+a.btn-primary .ucm-icon,
+a.btn-primary .ucm-icon path {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+    stroke: #ffffff !important;
+    opacity: 1 !important;
 }
 
 .btn-secondary {
-    background: var(--btn-secondary-bg, var(--bg-secondary)) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+    background: var(--bg-secondary) !important;
     color: var(--text-primary) !important;
     border: 1px solid var(--border-color) !important;
 }
 
 .btn-secondary:hover:not(:disabled) {
-    background: var(--btn-secondary-hover, var(--sidebar-hover)) !important;
+    background: var(--sidebar-hover) !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
+.btn-secondary:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
+.btn-secondary i,
+.btn-secondary i.fas,
+.btn-secondary i.far,
+.btn-secondary i.fab,
+.btn-secondary svg,
+.btn-secondary .ucm-icon {
+    color: var(--text-primary) !important;
+    opacity: 1 !important;
+}
+
 .btn-danger {
-    background: var(--btn-secondary-bg, var(--bg-secondary)) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+    background: var(--bg-secondary) !important;
     color: var(--text-primary) !important;
     border: 1px solid var(--border-color) !important;
 }
 
 .btn-danger:hover:not(:disabled) {
-    background: var(--btn-secondary-hover, var(--sidebar-hover)) !important;
+    background: var(--sidebar-hover) !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
+.btn-danger:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
 .btn-danger i,
+.btn-danger i.fas,
+.btn-danger i.far,
+.btn-danger i.fab,
 .btn-danger svg,
 .btn-danger .ucm-icon {
     color: var(--status-danger) !important;
+    opacity: 1 !important;
 }
 
 .btn-success {
-    background: var(--btn-secondary-bg, var(--bg-secondary)) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+    background: var(--bg-secondary) !important;
     color: var(--text-primary) !important;
     border: 1px solid var(--border-color) !important;
 }
 
 .btn-success:hover:not(:disabled) {
-    background: var(--btn-secondary-hover, var(--sidebar-hover)) !important;
+    background: var(--sidebar-hover) !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
+.btn-success:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
 .btn-success i,
+.btn-success i.fas,
+.btn-success i.far,
+.btn-success i.fab,
 .btn-success svg,
 .btn-success .ucm-icon {
     color: var(--status-success) !important;
-}
-
-/* Ensure icons are visible in all buttons */
-.btn i.fas,
-.btn i.far,
-.btn i.fab,
-.btn svg,
-.btn .ucm-icon {
     opacity: 1 !important;
-    color: inherit !important;
 }
 
 .btn-sm {
