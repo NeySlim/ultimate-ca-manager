@@ -117,7 +117,7 @@
         
         .btn-login {
             width: 100%;
-            padding: 12px;
+            padding: 16px;
             font-size: 14px;
             font-weight: 500;
             display: inline-flex;
@@ -159,6 +159,33 @@
             font-size: 13px;
             color: var(--text-secondary);
             margin-bottom: 8px;
+        }
+        
+        .github-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            margin-top: 8px;
+        }
+        
+        .github-badge:hover {
+            color: var(--text-primary);
+            background: var(--sidebar-hover);
+            border-color: var(--primary-color);
+            transform: translateY(-1px);
+        }
+        
+        .github-badge i {
+            font-size: 12px;
         }
         
         .theme-selector {
@@ -351,8 +378,11 @@
         
         <!-- Footer -->
         <div class="login-footer">
-            <p class="login-info">Default credentials: <strong>admin / changeme123</strong></p>
             <p class="login-info" style="font-size: 12px; opacity: 0.7;">HTTPS-only secure connection</p>
+            <a href="https://github.com/NeySlim/ultimate-ca-manager" target="_blank" class="github-badge">
+                <i class="fab fa-github"></i>
+                <span>View on GitHub</span>
+            </a>
         </div>
     </div>
     
