@@ -9,40 +9,10 @@
 
 Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Certificate Authorities, issuing certificates, and providing industry-standard protocols (SCEP, OCSP, CRL) with a modern, intuitive interface.
 
-## 📸 Screenshots
-
-### Professional Interface with Multiple Themes
+## 📸 Dashboard Preview
 
 ![Dashboard](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/02-dashboard_amber-dark.png)
-*Dashboard - Amber Dark Theme*
-
-![Certificate Management](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/05-certificates-list_amber-dark.png)
-*Certificate Management*
-
-### 8 Beautiful Themes Available
-
-<table>
-  <tr>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/08-theme-sentinel-light.png" width="350"/><br/>
-      <b>Sentinel Light</b>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/09-theme-nebula-dark.png" width="350"/><br/>
-      <b>Nebula Dark</b>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/10-theme-blossom-light.png" width="350"/><br/>
-      <b>Blossom Light</b>
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/02-dashboard_amber-dark.png" width="350"/><br/>
-      <b>Amber Dark</b>
-    </td>
-  </tr>
-</table>
+*Professional Dashboard - Amber Dark Theme*
 
 ---
 
@@ -133,6 +103,39 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/in
 - JWT authentication
 - Comprehensive endpoints
 - API documentation
+
+---
+
+## 📸 More Screenshots
+
+### Certificate Management
+![Certificate List](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/05-certificates-list_amber-dark.png)
+*Comprehensive Certificate Management Interface*
+
+### 8 Beautiful Themes Available
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/08-theme-sentinel-light.png" width="350"/><br/>
+      <b>Sentinel Light</b>
+    </td>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/09-theme-nebula-dark.png" width="350"/><br/>
+      <b>Nebula Dark</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/10-theme-blossom-light.png" width="350"/><br/>
+      <b>Blossom Light</b>
+    </td>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/02-dashboard_amber-dark.png" width="350"/><br/>
+      <b>Amber Dark</b>
+    </td>
+  </tr>
+</table>
 
 ---
 

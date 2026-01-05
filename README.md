@@ -8,6 +8,11 @@
 
 **Ultimate CA Manager (UCM)** - Complete Certificate Authority management system with modern theming and RFC-compliant protocols.
 
+## 📸 Dashboard Preview
+
+![Dashboard](docs/screenshots/02-dashboard_amber-dark.png)
+*Professional Dashboard - Amber Dark Theme*
+
 ## ✨ Features
 
 ### Core CA Management
@@ -37,6 +42,26 @@
 - 🔐 **JWT Authentication** - Secure session management
 - 📋 **RFC Compliant** - Follows PKI standards
 - 🔒 **Public Endpoints** - CDP/OCSP accessible without auth
+
+## 📸 More Screenshots
+
+### Certificate Authority Management
+![CA Management](docs/screenshots/04-ca-detail_amber-dark.png)
+
+### Certificate List
+![Certificates](docs/screenshots/05-certificates-list_amber-dark.png)
+
+### 8 Beautiful Themes Available
+<table>
+  <tr>
+    <td><img src="docs/screenshots/08-theme-sentinel-light.png" alt="Sentinel Light" width="400"/><br/><i>Sentinel Light</i></td>
+    <td><img src="docs/screenshots/09-theme-nebula-dark.png" alt="Nebula Dark" width="400"/><br/><i>Nebula Dark</i></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/10-theme-blossom-light.png" alt="Blossom Light" width="400"/><br/><i>Blossom Light</i></td>
+    <td><img src="docs/screenshots/02-dashboard_amber-dark.png" alt="Amber Dark" width="400"/><br/><i>Amber Dark</i></td>
+  </tr>
+</table>
 
 ## 🚀 Quick Start
 
@@ -203,60 +228,6 @@ BSD 3-Clause License - See [LICENSE](LICENSE) file for details
 
 ---
 
-
-## 📸 Screenshots
-
-### Dashboard - Amber Dark Theme
-![Dashboard](docs/screenshots/02-dashboard_amber-dark.png)
-
-### Certificate Authority Management
-![CA Management](docs/screenshots/04-ca-detail_amber-dark.png)
-
-### Certificate List
-![Certificates](docs/screenshots/05-certificates-list_amber-dark.png)
-
-### Multiple Themes
-<table>
-  <tr>
-    <td><img src="docs/screenshots/08-theme-sentinel-light.png" alt="Sentinel Light" width="400"/><br/><i>Sentinel Light</i></td>
-    <td><img src="docs/screenshots/09-theme-nebula-dark.png" alt="Nebula Dark" width="400"/><br/><i>Nebula Dark</i></td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/10-theme-blossom-light.png" alt="Blossom Light" width="400"/><br/><i>Blossom Light</i></td>
-    <td><img src="docs/screenshots/02-dashboard_amber-dark.png" alt="Amber Dark" width="400"/><br/><i>Amber Dark</i></td>
-  </tr>
-</table>
-
-## 🚀 Quick Start
-
-### Debian/Ubuntu Installation
-
-```bash
-# Download package
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.6.1/ucm_1.6.1_all.deb
-
-# Install
-sudo dpkg -i ucm_1.6.1_all.deb
-
-# Service will start automatically
-```
-
-### Manual Installation
-
-```bash
-# Clone repository
-git clone https://github.com/NeySlim/ultimate-ca-manager.git
-cd ultimate-ca-manager
-
-# Run installation script
-sudo ./install.sh
-
-# Start service
-sudo systemctl start ucm
-```
-
-**Web Interface:** https://your-server-ip:8443  
-**Default Credentials:** admin / changeme123 ⚠️ **CHANGE IMMEDIATELY!**
 
 ## 📡 API Endpoints
 
