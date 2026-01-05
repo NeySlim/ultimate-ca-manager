@@ -1,5 +1,5 @@
 /* Button reset - remove default browser styles */
-button:not(.btn):not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.btn-success) {
+button:not(.btn):not(.btn-primary):not(.btn-secondary):not(.btn-danger):not(.btn-success):not(.btn-login) {
 background: none;
 border: none;
 padding: 0;
