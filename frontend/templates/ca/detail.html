@@ -3,46 +3,46 @@
 {% block title %}CA Details - {{ ca.common_name }} - UCM{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<div style="max-width: 1400px; margin: 0 auto;">
     <!-- Header -->
-    <div class="mb-6 flex justify-between items-center">
+    <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">
-                <i class="fas fa-lock mr-2"></i>{{ ca.common_name }}
+            <h1 style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">
+                <i class="fas fa-lock" style="margin-right: 0.5rem;"></i>{{ ca.common_name }}
             </h1>
-            <p class="mt-2 text-sm text-gray-600">Certificate Authority Details</p>
+            <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Certificate Authority Details</p>
         </div>
-        <div class="flex space-x-3">
+        <div style="display: flex; gap: 0.75rem;">
             <a href="/ca" class="btn-secondary">
-                <i class="fas fa-arrow-left mr-2"></i>Back to List
+                <i class="fas fa-arrow-left" style="margin-right: 0.5rem;"></i>Back to List
             </a>
-            <button onclick="downloadCRL('{{ ca.id }}')" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
-                <i class="fas fa-ban mr-2"></i>Download CRL
+            <button onclick="downloadCRL('{{ ca.id }}')" class="btn" style="background: var(--purple-color, #9333ea); color: white;">
+                <i class="fas fa-ban" style="margin-right: 0.5rem;"></i>Download CRL
             </button>
-            <div class="relative inline-block text-left">
-                <button onclick="toggleExportMenu()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center">
-                    <i class="fas fa-download mr-2"></i>Export
-                    <i class="fas fa-chevron-down ml-2"></i>
+            <div style="position: relative; display: inline-block;">
+                <button onclick="toggleExportMenu()" class="btn-primary" style="display: flex; align-items: center;">
+                    <i class="fas fa-download" style="margin-right: 0.5rem;"></i>Export
+                    <i class="fas fa-chevron-down" style="margin-left: 0.5rem;"></i>
                 </button>
-                <div id="export-menu" class="hidden absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                    <div class="py-1" role="menu">
-                        <button onclick="exportCASimple('{{ ca.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                            <i class="fas fa-file-certificate mr-2"></i>Certificate only (PEM)
+                <div id="export-menu" class="hidden" style="position: absolute; right: 0; margin-top: 0.5rem; width: 14rem; border-radius: 0.375rem; box-shadow: var(--shadow-lg); background: var(--card-bg); border: 1px solid var(--border-color); z-index: 10;">
+                    <div style="padding: 0.25rem 0;">
+                        <button onclick="exportCASimple('{{ ca.id }}')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                            <i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i>Certificate only (PEM)
                         </button>
-                        <button onclick="exportCAWithKey('{{ ca.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                            <i class="fas fa-key mr-2"></i>Certificate + Key (PEM)
+                        <button onclick="exportCAWithKey('{{ ca.id }}')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                            <i class="fas fa-key" style="margin-right: 0.5rem;"></i>Certificate + Key (PEM)
                         </button>
-                        <button onclick="exportCAWithChain('{{ ca.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                            <i class="fas fa-link mr-2"></i>Certificate + Chain (PEM)
+                        <button onclick="exportCAWithChain('{{ ca.id }}')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                            <i class="fas fa-link" style="margin-right: 0.5rem;"></i>Certificate + Chain (PEM)
                         </button>
-                        <button onclick="exportCAFull('{{ ca.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                            <i class="fas fa-archive mr-2"></i>Full Chain + Key (PEM)
+                        <button onclick="exportCAFull('{{ ca.id }}')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                            <i class="fas fa-archive" style="margin-right: 0.5rem;"></i>Full Chain + Key (PEM)
                         </button>
-                        <button onclick="exportCADER('{{ ca.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                            <i class="fas fa-file-binary mr-2"></i>Certificate (DER)
+                        <button onclick="exportCADER('{{ ca.id }}')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                            <i class="fas fa-file-binary" style="margin-right: 0.5rem;"></i>Certificate (DER)
                         </button>
-                        <button onclick="showPKCS12Modal('{{ ca.id }}', 'ca')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                            <i class="fas fa-lock mr-2"></i>PKCS#12 (.p12/.pfx)
+                        <button onclick="showPKCS12Modal('{{ ca.id }}', 'ca')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                            <i class="fas fa-lock" style="margin-right: 0.5rem;"></i>PKCS#12 (.p12/.pfx)
                         </button>
                     </div>
                 </div>
@@ -51,110 +51,308 @@
     </div>
 
     <!-- CA Information -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 1.5rem;">
         <!-- Basic Information -->
-        <div class="bg-white shadow rounded-lg p-6">
+        <div class="card">
             <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Basic Information</h2>
-            <dl class="space-y-3">
+            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">Common Name</dt>
-                    <dd class="mt-1 text-sm text-gray-900 font-mono">{{ ca.common_name }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Common Name</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{{ ca.common_name }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">Organization</dt>
-                    <dd class="mt-1 text-sm text-gray-900">{{ ca.organization or 'N/A' }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Organization</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.organization or 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">Organizational Unit</dt>
-                    <dd class="mt-1 text-sm text-gray-900">{{ ca.organizational_unit or 'N/A' }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Organizational Unit</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.organizational_unit or 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">Country</dt>
-                    <dd class="mt-1 text-sm text-gray-900">{{ ca.country or 'N/A' }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Country</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.country or 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">State/Province</dt>
-                    <dd class="mt-1 text-sm text-gray-900">{{ ca.state or 'N/A' }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">State/Province</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.state or 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">Locality</dt>
-                    <dd class="mt-1 text-sm text-gray-900">{{ ca.locality or 'N/A' }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Locality</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.locality or 'N/A' }}</dd>
                 </div>
             </dl>
         </div>
 
         <!-- Technical Details -->
-        <div class="bg-white shadow rounded-lg p-6">
+        <div class="card">
             <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Technical Details</h2>
-            <dl class="space-y-3">
+            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">Type</dt>
-                    <dd class="mt-1 text-sm text-gray-900">
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Type</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">
                         {% if ca.is_root %}
-                        <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">Root CA</span>
+                        <span class="badge" style="background: var(--info-bg); color: var(--info-color);">Root CA</span>
                         {% else %}
-                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">Intermediate CA</span>
+                        <span class="badge badge-success">Intermediate CA</span>
                         {% endif %}
                     </dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">Key Type</dt>
-                    <dd class="mt-1 text-sm text-gray-900 font-mono">{{ ca.key_type }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Key Type</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{{ ca.key_type }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">Hash Algorithm</dt>
-                    <dd class="mt-1 text-sm text-gray-900 font-mono">{{ ca.hash_algorithm }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Hash Algorithm</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{{ ca.hash_algorithm }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">Serial Number</dt>
-                    <dd class="mt-1 text-sm text-gray-900 font-mono break-all">{{ ca.serial_number }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Serial Number</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace; word-break: break-all;">{{ ca.serial_number }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">Valid From</dt>
-                    <dd class="mt-1 text-sm text-gray-900">{{ ca.not_valid_before }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Valid From</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.not_valid_before }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">Valid Until</dt>
-                    <dd class="mt-1 text-sm text-gray-900">{{ ca.not_valid_after }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Valid Until</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.not_valid_after }}</dd>
                 </div>
             </dl>
         </div>
     </div>
 
     <!-- Fingerprints -->
-    <div class="mt-6 bg-white shadow rounded-lg p-6">
+    <div class="card" style="margin-top: 1.5rem;">
         <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">
-            <i class="fas fa-fingerprint mr-2"></i>Certificate Fingerprints
+            <i class="fas fa-fingerprint" style="margin-right: 0.5rem;"></i>Certificate Fingerprints
         </h2>
         <div id="fingerprints-section">
-            <div class="text-center py-4">
-                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
-                <p class="mt-2 text-sm text-gray-500">Loading fingerprints...</p>
+            <div style="text-align: center; padding: 1rem 0;">
+                <div style="display: inline-block; width: 1.5rem; height: 1.5rem; border: 2px solid var(--primary-color); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading fingerprints...</p>
             </div>
         </div>
     </div>
 
     <!-- X.509 Extensions and Details -->
-    <div class="mt-6 bg-white shadow rounded-lg p-6">
+    <div class="card" style="margin-top: 1.5rem;">
         <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">
-            <i class="fas fa-certificate mr-2"></i>X.509 Certificate Details
+            <i class="fas fa-certificate" style="margin-right: 0.5rem;"></i>X.509 Certificate Details
         </h2>
         <div id="x509-details">
-            <div class="text-center py-4">
-                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
-                <p class="mt-2 text-sm text-gray-500">Loading certificate details...</p>
+            <div style="text-align: center; padding: 1rem 0;">
+                <div style="display: inline-block; width: 1.5rem; height: 1.5rem; border: 2px solid var(--primary-color); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading certificate details...</p>
             </div>
         </div>
     </div>
 
+    <!-- CRL Distribution Points Configuration -->
+    <div class="card" style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
+                <i class="fas fa-file-contract" style="margin-right: 0.5rem;"></i>CRL Distribution Points (CDP)
+            </h2>
+            <button onclick="toggleCDPEdit()" id="cdp-edit-btn" class="btn-secondary" style="padding: 0.375rem 0.75rem; font-size: 0.875rem;">
+                <i class="fas fa-edit" style="margin-right: 0.25rem;"></i>Configure
+            </button>
+        </div>
+        
+        <div id="cdp-view-mode">
+            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">CDP Status</dt>
+                    <dd style="margin-top: 0.25rem;">
+                        {% if ca.cdp_enabled %}
+                            <span class="badge badge-success">
+                                <i class="fas fa-check" style="margin-right: 0.25rem;"></i>Enabled
+                            </span>
+                        {% else %}
+                            <span class="badge" style="background: var(--bg-secondary); color: var(--text-secondary);">
+                                <i class="fas fa-times" style="margin-right: 0.25rem;"></i>Disabled
+                            </span>
+                        {% endif %}
+                    </dd>
+                </div>
+                {% if ca.cdp_enabled and ca.cdp_url %}
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">CDP URL Template</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem;">
+                        {{ ca.cdp_url }}
+                    </dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Resolved CDP URL</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--primary-color); font-family: monospace; background: var(--info-bg); padding: 0.5rem; border-radius: 0.25rem;">
+                        {{ ca.cdp_url.replace('{ca_refid}', ca.refid) }}
+                    </dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Public Access</dt>
+                    <dd style="margin-top: 0.25rem;">
+                        <a href="/crl/info/{{ ca.refid }}" style="color: var(--primary-color); font-size: 0.875rem;">
+                            <i class="fas fa-info-circle" style="margin-right: 0.25rem;"></i>View CRL Info
+                        </a>
+                        <span style="margin: 0 0.5rem;">|</span>
+                        <a href="/cdp/{{ ca.refid }}/crl.pem" target="_blank" style="color: var(--primary-color); font-size: 0.875rem;">
+                            <i class="fas fa-download" style="margin-right: 0.25rem;"></i>Download CRL (PEM)
+                        </a>
+                        <span style="margin: 0 0.5rem;">|</span>
+                        <a href="/cdp/{{ ca.refid }}/info" target="_blank" style="color: var(--primary-color); font-size: 0.875rem;">
+                            <i class="fas fa-external-link" style="margin-right: 0.25rem;"></i>Public Link
+                        </a>
+                    </dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+        
+        <div id="cdp-edit-mode" class="hidden">
+            <form id="cdp-form">
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="display: flex; align-items: center;">
+                        <input type="checkbox" id="cdp_enabled" name="cdp_enabled" 
+                               {% if ca.cdp_enabled %}checked{% endif %}
+                               style="width: 1rem; height: 1rem; color: var(--primary-color); border: 1px solid var(--border-color); border-radius: 0.25rem;"
+                               onchange="toggleCDPURLField()">
+                        <label for="cdp_enabled" style="margin-left: 0.5rem; font-size: 0.875rem; font-weight: 500; color: var(--text-primary);">
+                            Enable CRL Distribution Points
+                        </label>
+                    </div>
+                    
+                    <div id="cdp-url-field" {% if not ca.cdp_enabled %}class="hidden"{% endif %}>
+                        <label for="cdp_url" style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary);">
+                            CDP URL Template
+                        </label>
+                        <input type="text" id="cdp_url" name="cdp_url" 
+                               value="{{ ca.cdp_url or '' }}"
+                               placeholder="https://your-domain:8443/cdp/{ca_refid}/crl.pem"
+                               style="margin-top: 0.25rem; display: block; width: 100%; border-radius: 0.375rem; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-primary); padding: 0.5rem; font-size: 0.875rem; font-family: monospace;">
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">
+                            <i class="fas fa-info-circle" style="margin-right: 0.25rem;"></i>
+                            Use <code style="background: var(--bg-secondary); padding: 0 0.25rem; border-radius: 0.125rem;">{ ca_refid}</code> as placeholder for CA reference ID. 
+                            This URL will be included in issued certificates.
+                        </p>
+                        <div style="margin-top: 0.5rem; background: var(--info-bg); border: 1px solid var(--info-border, var(--border-color)); border-radius: 0.25rem; padding: 0.75rem;">
+                            <p style="font-size: 0.75rem; color: var(--info-color, var(--text-primary));">
+                                <strong>Preview:</strong> <span id="cdp-preview" style="font-family: monospace;"></span>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.75rem; padding-top: 0.75rem;">
+                        <button type="button" onclick="saveCDPConfig()" class="btn-primary">
+                            <i class="fas fa-save" style="margin-right: 0.25rem;"></i>Save Configuration
+                        </button>
+                        <button type="button" onclick="cancelCDPEdit()" class="btn-secondary">
+                            <i class="fas fa-times" style="margin-right: 0.25rem;"></i>Cancel
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- OCSP Configuration -->
+    <div class="card" style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
+                <i class="fas fa-circle-check" style="margin-right: 0.5rem;"></i>OCSP (Online Certificate Status Protocol)
+            </h2>
+            <button onclick="toggleOCSPEdit()" id="ocsp-edit-btn" class="btn-secondary" style="padding: 0.375rem 0.75rem; font-size: 0.875rem;">
+                <i class="fas fa-edit" style="margin-right: 0.25rem;"></i>Configure
+            </button>
+        </div>
+        
+        <div id="ocsp-view-mode">
+            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">OCSP Status</dt>
+                    <dd style="margin-top: 0.25rem;">
+                        {% if ca.ocsp_enabled %}
+                            <span class="badge badge-success">
+                                <i class="fas fa-check" style="margin-right: 0.25rem;"></i>Enabled
+                            </span>
+                        {% else %}
+                            <span class="badge" style="background: var(--bg-secondary); color: var(--text-secondary);">
+                                <i class="fas fa-times" style="margin-right: 0.25rem;"></i>Disabled
+                            </span>
+                        {% endif %}
+                    </dd>
+                </div>
+                {% if ca.ocsp_enabled and ca.ocsp_url %}
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">OCSP Responder URL</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem;">
+                        {{ ca.ocsp_url }}
+                    </dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Test OCSP</dt>
+                    <dd style="margin-top: 0.25rem;">
+                        <code style="font-size: 0.75rem; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem; display: block; overflow-x: auto;">
+                            openssl ocsp -issuer ca.crt -cert cert.crt -url {{ ca.ocsp_url }} -text
+                        </code>
+                    </dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+        
+        <div id="ocsp-edit-mode" class="hidden">
+            <form id="ocsp-form">
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="display: flex; align-items: center;">
+                        <input type="checkbox" id="ocsp_enabled" name="ocsp_enabled" 
+                               {% if ca.ocsp_enabled %}checked{% endif %}
+                               style="width: 1rem; height: 1rem; color: var(--primary-color); border: 1px solid var(--border-color); border-radius: 0.25rem;"
+                               onchange="toggleOCSPURLField()">
+                        <label for="ocsp_enabled" style="margin-left: 0.5rem; font-size: 0.875rem; font-weight: 500; color: var(--text-primary);">
+                            Enable OCSP Responder
+                        </label>
+                    </div>
+                    
+                    <div id="ocsp-url-field" {% if not ca.ocsp_enabled %}class="hidden"{% endif %}>
+                        <label for="ocsp_url" style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary);">
+                            OCSP Responder URL
+                        </label>
+                        <input type="text" id="ocsp_url" name="ocsp_url" 
+                               value="{{ ca.ocsp_url or '' }}"
+                               placeholder="https://your-domain:8443/ocsp"
+                               style="margin-top: 0.25rem; display: block; width: 100%; border-radius: 0.375rem; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-primary); padding: 0.5rem; font-size: 0.875rem; font-family: monospace;">
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">
+                            <i class="fas fa-info-circle" style="margin-right: 0.25rem;"></i>
+                            This URL will be included in the AuthorityInfoAccess extension of issued certificates.
+                        </p>
+                        <div style="margin-top: 0.5rem; background: var(--warning-bg); border: 1px solid var(--warning-border, var(--border-color)); border-radius: 0.25rem; padding: 0.75rem;">
+                            <p style="font-size: 0.75rem; color: var(--warning-color, var(--text-primary));">
+                                <strong><i class="fas fa-exclamation-triangle" style="margin-right: 0.25rem;"></i>Privacy Note:</strong> 
+                                OCSP requests reveal which certificates are being verified. Consider using CRL for better privacy.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.75rem; padding-top: 0.75rem;">
+                        <button type="button" onclick="saveOCSPConfig()" class="btn-primary">
+                            <i class="fas fa-save" style="margin-right: 0.25rem;"></i>Save Configuration
+                        </button>
+                        <button type="button" onclick="cancelOCSPEdit()" class="btn-secondary">
+                            <i class="fas fa-times" style="margin-right: 0.25rem;"></i>Cancel
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Certificates issued by this CA -->
-    <div class="mt-6 bg-white shadow rounded-lg p-6">
+    <div class="card" style="margin-top: 1.5rem;">
         <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Issued Certificates</h2>
         <div hx-get="/api/ui/ca/{{ ca.id }}/certificates" hx-trigger="load" hx-target="#cert-list">
             <div id="cert-list">
-                <div class="text-center py-8">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-                    <p class="mt-2 text-sm text-gray-500">Loading certificates...</p>
+                <div style="text-align: center; padding: 2rem 0;">
+                    <div style="display: inline-block; width: 2rem; height: 2rem; border: 2px solid var(--primary-color); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading certificates...</p>
                 </div>
             </div>
         </div>
@@ -162,40 +360,40 @@
 </div>
 
 <!-- PKCS#12 Export Modal -->
-<div id="pkcs12-modal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 50;">
+<div id="pkcs12-modal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000;">
     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
-    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 1rem; box-shadow: var(--shadow-xl);">
         <div style="padding: 1.5rem;">
             <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">
-                <i class="fas fa-lock mr-2"></i>Export PKCS#12
+                <i class="fas fa-lock" style="margin-right: 0.5rem;"></i>Export PKCS#12
             </h3>
-            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
                 PKCS#12 format includes the certificate and private key in a password-protected file (.p12 or .pfx). 
                 This format is compatible with Windows, macOS, and most browsers.
             </p>
-            <div class="modal-form-group">
-                <label class="modal-form-label">
-                    Password <span class="text-red-500">*</span>
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">
+                    Password <span style="color: var(--danger-color);">*</span>
                 </label>
                 <input type="password" id="pkcs12-password" 
-                    class="modal-form-input"
+                    style="display: block; width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--input-bg); color: var(--text-primary);"
                     placeholder="Enter password for PKCS#12 file" />
             </div>
-            <div class="modal-form-group">
-                <label class="modal-form-label">
-                    Confirm Password <span class="text-red-500">*</span>
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">
+                    Confirm Password <span style="color: var(--danger-color);">*</span>
                 </label>
                 <input type="password" id="pkcs12-password-confirm" 
-                    class="modal-form-input"
+                    style="display: block; width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--input-bg); color: var(--text-primary);"
                     placeholder="Confirm password" />
             </div>
-            <div id="pkcs12-error" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background: var(--danger-bg-light); color: var(--status-danger); border-radius: 0.25rem; font-size: 0.875rem;"></div>
+            <div id="pkcs12-error" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background: var(--danger-bg); color: var(--danger-color); border-radius: 0.25rem; font-size: 0.875rem;"></div>
             <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
                 <button onclick="closePKCS12Modal()" class="btn-secondary">
                     Cancel
                 </button>
                 <button onclick="exportPKCS12()" class="btn-primary">
-                    <i class="fas fa-download mr-2"></i>Export
+                    <i class="fas fa-download" style="margin-right: 0.5rem;"></i>Export
                 </button>
             </div>
         </div>
@@ -203,11 +401,18 @@
     </div>
 </div>
 
-<script>
-let pkcs12ExportId = null;
-let pkcs12ExportType = null;
+<style>
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
 
-// Load fingerprints on page load
+<script>
+if (typeof window.pkcs12ExportId === 'undefined') {
+    window.pkcs12ExportId = null;
+    window.pkcs12ExportType = null;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     loadFingerprints();
     loadX509Details();
@@ -221,25 +426,25 @@ function loadFingerprints() {
     .then(response => response.json())
     .then(data => {
         const html = `
-            <dl class="space-y-3">
+            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">SHA-256</dt>
-                    <dd class="mt-1 text-xs text-gray-900 font-mono break-all bg-gray-50 p-2 rounded">${data.sha256}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">SHA-256</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-primary); font-family: monospace; word-break: break-all; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem;">${data.sha256}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">SHA-1</dt>
-                    <dd class="mt-1 text-xs text-gray-900 font-mono break-all bg-gray-50 p-2 rounded">${data.sha1}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">SHA-1</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-primary); font-family: monospace; word-break: break-all; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem;">${data.sha1}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500">MD5</dt>
-                    <dd class="mt-1 text-xs text-gray-900 font-mono break-all bg-gray-50 p-2 rounded">${data.md5}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">MD5</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-primary); font-family: monospace; word-break: break-all; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem;">${data.md5}</dd>
                 </div>
             </dl>
         `;
         document.getElementById('fingerprints-section').innerHTML = html;
     })
     .catch(error => {
-        document.getElementById('fingerprints-section').innerHTML = '<p class="text-red-500">Failed to load fingerprints</p>';
+        document.getElementById('fingerprints-section').innerHTML = '<p style="color: var(--danger-color);">Failed to load fingerprints</p>';
     });
 }
 
@@ -250,50 +455,48 @@ function loadX509Details() {
     })
     .then(response => response.json())
     .then(data => {
-        let html = '<div class="space-y-4">';
+        let html = '<div style="display: flex; flex-direction: column; gap: 1rem;">';
         
-        // Public Key Info
         if (data.public_key) {
             html += `
                 <div>
-                    <h3 class="font-semibold text-gray-900 mb-2">Public Key</h3>
-                    <dl class="ml-4 space-y-1">
-                        <div class="flex">
-                            <dt class="text-sm font-medium text-gray-500 w-32">Algorithm:</dt>
-                            <dd class="text-sm text-gray-900">${data.public_key.algorithm}</dd>
+                    <h3 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Public Key</h3>
+                    <dl style="margin-left: 1rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                        <div style="display: flex;">
+                            <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); width: 8rem;">Algorithm:</dt>
+                            <dd style="font-size: 0.875rem; color: var(--text-primary);">${data.public_key.algorithm}</dd>
                         </div>
                         ${data.public_key.key_size ? `
-                        <div class="flex">
-                            <dt class="text-sm font-medium text-gray-500 w-32">Key Size:</dt>
-                            <dd class="text-sm text-gray-900">${data.public_key.key_size} bits</dd>
+                        <div style="display: flex;">
+                            <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); width: 8rem;">Key Size:</dt>
+                            <dd style="font-size: 0.875rem; color: var(--text-primary);">${data.public_key.key_size} bits</dd>
                         </div>` : ''}
                         ${data.public_key.curve ? `
-                        <div class="flex">
-                            <dt class="text-sm font-medium text-gray-500 w-32">Curve:</dt>
-                            <dd class="text-sm text-gray-900">${data.public_key.curve}</dd>
+                        <div style="display: flex;">
+                            <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); width: 8rem;">Curve:</dt>
+                            <dd style="font-size: 0.875rem; color: var(--text-primary);">${data.public_key.curve}</dd>
                         </div>` : ''}
                     </dl>
                 </div>
             `;
         }
         
-        // Extensions
         if (data.extensions && Object.keys(data.extensions).length > 0) {
-            html += '<div><h3 class="font-semibold text-gray-900 mb-2">X.509 Extensions</h3>';
+            html += '<div><h3 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">X.509 Extensions</h3>';
             for (const [name, ext] of Object.entries(data.extensions)) {
-                html += `<div class="ml-4 mb-3 p-3 bg-gray-50 rounded">`;
-                html += `<div class="font-medium text-sm text-gray-900">${name} ${ext.critical ? '<span class="text-red-500">(Critical)</span>' : ''}</div>`;
+                html += `<div style="margin-left: 1rem; margin-bottom: 0.75rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.25rem;">`;
+                html += `<div style="font-weight: 500; font-size: 0.875rem; color: var(--text-primary);">${name} ${ext.critical ? '<span style="color: var(--danger-color);">(Critical)</span>' : ''}</div>`;
                 
                 if (ext.values && Array.isArray(ext.values)) {
-                    html += '<ul class="mt-1 ml-4 text-sm text-gray-700 list-disc">';
+                    html += '<ul style="margin-top: 0.25rem; margin-left: 1rem; font-size: 0.875rem; color: var(--text-secondary); list-style-type: disc;">';
                     ext.values.forEach(v => html += `<li>${v}</li>`);
                     html += '</ul>';
                 } else if (ext.ca !== undefined) {
-                    html += `<div class="mt-1 text-sm text-gray-700">CA: ${ext.ca ? 'Yes' : 'No'}`;
+                    html += `<div style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">CA: ${ext.ca ? 'Yes' : 'No'}`;
                     if (ext.path_length !== null) html += `, Path Length: ${ext.path_length}`;
                     html += '</div>';
                 } else if (ext.value !== undefined) {
-                    html += `<div class="mt-1 text-sm text-gray-700 font-mono break-all">${ext.value}</div>`;
+                    html += `<div style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-secondary); font-family: monospace; word-break: break-all;">${ext.value}</div>`;
                 }
                 html += '</div>';
             }
@@ -304,7 +507,7 @@ function loadX509Details() {
         document.getElementById('x509-details').innerHTML = html;
     })
     .catch(error => {
-        document.getElementById('x509-details').innerHTML = '<p class="text-red-500">Failed to load certificate details</p>';
+        document.getElementById('x509-details').innerHTML = '<p style="color: var(--danger-color);">Failed to load certificate details</p>';
     });
 }
 
@@ -313,7 +516,6 @@ function toggleExportMenu() {
     menu.classList.toggle('hidden');
 }
 
-// Close menu when clicking outside
 document.addEventListener('click', function(event) {
     const menu = document.getElementById('export-menu');
     const button = event.target.closest('button');
@@ -349,16 +551,16 @@ function downloadCRL(caId) {
 }
 
 function showPKCS12Modal(id, type) {
-    pkcs12ExportId = id;
-    pkcs12ExportType = type;
+    window.pkcs12ExportId = id;
+    window.pkcs12ExportType = type;
     document.getElementById('pkcs12-password').value = '';
     document.getElementById('pkcs12-password-confirm').value = '';
-    document.getElementById('pkcs12-error').classList.add('hidden');
-    document.getElementById('pkcs12-modal').classList.remove('hidden');
+    document.getElementById('pkcs12-error').style.display = 'none';
+    openModal('pkcs12-modal');
 }
 
 function closePKCS12Modal() {
-    document.getElementById('pkcs12-modal').classList.add('hidden');
+    closeModal('pkcs12-modal');
 }
 
 function exportPKCS12() {
@@ -368,25 +570,25 @@ function exportPKCS12() {
     
     if (!password) {
         errorDiv.textContent = 'Password is required';
-        errorDiv.classList.remove('hidden');
+        errorDiv.style.display = 'block';
         return;
     }
     
     if (password !== confirm) {
         errorDiv.textContent = 'Passwords do not match';
-        errorDiv.classList.remove('hidden');
+        errorDiv.style.display = 'block';
         return;
     }
     
     if (password.length < 4) {
         errorDiv.textContent = 'Password must be at least 4 characters';
-        errorDiv.classList.remove('hidden');
+        errorDiv.style.display = 'block';
         return;
     }
     
-    const url = pkcs12ExportType === 'ca' 
-        ? `/api/v1/ca/${pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`
-        : `/api/v1/certificates/${pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`;
+    const url = window.window.pkcs12ExportType === 'ca' 
+        ? `/api/v1/ca/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`
+        : `/api/v1/certificates/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`;
     
     exportWithToken(url);
     closePKCS12Modal();
@@ -405,7 +607,7 @@ function exportWithToken(url) {
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = downloadUrl;
-        a.download = ''; // Browser will use filename from Content-Disposition
+        a.download = '';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -414,6 +616,154 @@ function exportWithToken(url) {
     .catch(error => {
         alert('Export failed: ' + error.message);
     });
+}
+
+function toggleCDPEdit() {
+    document.getElementById('cdp-view-mode').classList.toggle('hidden');
+    document.getElementById('cdp-edit-mode').classList.toggle('hidden');
+    updateCDPPreview();
+}
+
+function cancelCDPEdit() {
+    toggleCDPEdit();
+}
+
+function toggleCDPURLField() {
+    const enabled = document.getElementById('cdp_enabled').checked;
+    const urlField = document.getElementById('cdp-url-field');
+    if (enabled) {
+        urlField.classList.remove('hidden');
+        updateCDPPreview();
+    } else {
+        urlField.classList.add('hidden');
+    }
+}
+
+function updateCDPPreview() {
+    const urlInput = document.getElementById('cdp_url');
+    const preview = document.getElementById('cdp-preview');
+    if (urlInput && preview) {
+        const url = urlInput.value || 'https://your-domain:8443/cdp/{ca_refid}/crl.pem';
+        const resolved = url.replace('{ca_refid}', '{{ ca.refid }}');
+        preview.textContent = resolved;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const urlInput = document.getElementById('cdp_url');
+    if (urlInput) {
+        urlInput.addEventListener('input', updateCDPPreview);
+        updateCDPPreview();
+    }
+});
+
+function saveCDPConfig() {
+    const enabled = document.getElementById('cdp_enabled').checked;
+    const url = document.getElementById('cdp_url').value;
+    
+    if (enabled && !url) {
+        alert('CDP URL is required when CDP is enabled');
+        return;
+    }
+    
+    if (enabled && !url.includes('{ca_refid}')) {
+        alert('CDP URL must contain {ca_refid} placeholder');
+        return;
+    }
+    
+    const token = '{{ session.get("access_token") }}';
+    const data = {
+        cdp_enabled: enabled,
+        cdp_url: url || null
+    };
+    
+    fetch('/api/v1/ca/{{ ca.id }}', {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => { throw new Error(err.error || 'Update failed'); });
+        }
+        return response.json();
+    })
+    .then(() => {
+        alert('CDP configuration updated successfully');
+        location.reload();
+    })
+    .catch(error => {
+        alert('Failed to update CDP configuration: ' + error.message);
+    });
+}
+
+function toggleOCSPEdit() {
+    document.getElementById('ocsp-view-mode').classList.toggle('hidden');
+    document.getElementById('ocsp-edit-mode').classList.toggle('hidden');
+    
+    const btn = document.getElementById('ocsp-edit-btn');
+    if (document.getElementById('ocsp-edit-mode').classList.contains('hidden')) {
+        btn.innerHTML = '<i class="fas fa-edit" style="margin-right: 0.25rem;"></i>Configure';
+    } else {
+        btn.innerHTML = '<i class="fas fa-times" style="margin-right: 0.25rem;"></i>Close';
+    }
+}
+
+function toggleOCSPURLField() {
+    const enabled = document.getElementById('ocsp_enabled').checked;
+    const urlField = document.getElementById('ocsp-url-field');
+    
+    if (enabled) {
+        urlField.classList.remove('hidden');
+    } else {
+        urlField.classList.add('hidden');
+    }
+}
+
+function saveOCSPConfig() {
+    const enabled = document.getElementById('ocsp_enabled').checked;
+    const url = document.getElementById('ocsp_url').value;
+    
+    if (enabled && !url) {
+        alert('Please provide an OCSP Responder URL');
+        return;
+    }
+    
+    const data = {
+        ocsp_enabled: enabled,
+        ocsp_url: enabled ? url : null
+    };
+    
+    fetch(`/api/v1/ca/{{ ca.id }}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            location.reload();
+        } else {
+            alert('Failed to update OCSP configuration');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to update OCSP configuration');
+    });
+}
+
+function cancelOCSPEdit() {
+    document.getElementById('ocsp_enabled').checked = {{ 'true' if ca.ocsp_enabled else 'false' }};
+    document.getElementById('ocsp_url').value = '{{ ca.ocsp_url or "" }}';
+    toggleOCSPURLField();
+    toggleOCSPEdit();
 }
 </script>
 {% endblock %}

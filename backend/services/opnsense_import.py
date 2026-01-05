@@ -649,6 +649,36 @@ class OPNsenseImportService:
                         )
                         continue
                 
+                # Parse certificate to extract SANs
+                import json
+                san_dns_list = []
+                san_ip_list = []
+                san_email_list = []
+                san_uri_list = []
+                
+                if cert_data.get('crt'):
+                    try:
+                        from cryptography import x509
+                        from cryptography.hazmat.backends import default_backend
+                        cert_pem = base64.b64decode(cert_data['crt'])
+                        x509_cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+                        
+                        try:
+                            ext = x509_cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+                            for name in ext.value:
+                                if isinstance(name, x509.DNSName):
+                                    san_dns_list.append(name.value)
+                                elif isinstance(name, x509.IPAddress):
+                                    san_ip_list.append(str(name.value))
+                                elif isinstance(name, x509.RFC822Name):
+                                    san_email_list.append(name.value)
+                                elif isinstance(name, x509.UniformResourceIdentifier):
+                                    san_uri_list.append(name.value)
+                        except x509.ExtensionNotFound:
+                            pass  # No SAN extension
+                    except:
+                        pass  # Ignore parsing errors
+                
                 # Create certificate record
                 cert = Certificate(
                     refid=refid,
@@ -662,6 +692,11 @@ class OPNsenseImportService:
                     serial_number=cert_data.get('serial_number', ''),
                     valid_from=cert_data.get('valid_from'),
                     valid_to=cert_data.get('valid_to'),
+                    # Store extracted SANs
+                    san_dns=json.dumps(san_dns_list) if san_dns_list else None,
+                    san_ip=json.dumps(san_ip_list) if san_ip_list else None,
+                    san_email=json.dumps(san_email_list) if san_email_list else None,
+                    san_uri=json.dumps(san_uri_list) if san_uri_list else None,
                     imported_from='opnsense',
                     created_by='import'
                 )

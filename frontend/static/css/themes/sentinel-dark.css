@@ -79,12 +79,18 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.5);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 * { 
     margin: 0; 
     padding: 0; 
     box-sizing: border-box; 
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 body {
@@ -92,6 +98,9 @@ body {
     font-size: 13px;
     color: var(--text-secondary);
     background: var(--content-bg);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===== NAVBAR ===== */
@@ -109,29 +118,44 @@ nav {
     align-items: center;
     justify-content: space-between;
     padding: 0 20px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 nav > div {
     display: flex;
     align-items: center;
     gap: 10px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 nav i.fa-shield-halved {
     font-size: 20px;
     color: var(--primary);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .navbar-brand-text {
     font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .navbar-actions {
     display: flex;
     gap: 8px;
     align-items: center;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===== SIDEBAR ===== */
@@ -145,11 +169,17 @@ aside {
     border-right: 1px solid var(--border);
     overflow-y: auto;
     z-index: 999;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-nav {
     padding: 0;
     margin: 0;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-link {
@@ -161,6 +191,9 @@ aside {
     text-decoration: none;
     border-left: 3px solid transparent;
     transition: all 0.15s;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-link:hover,
@@ -168,16 +201,25 @@ aside {
     background: var(--sidebar-hover);
     color: #ffffff;
     border-left-color: var(--primary);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-link i {
     font-size: 16px;
     width: 20px;
     text-align: center;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-submenu {
     background: rgba(0,0,0,0.3);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-submenu a {
@@ -187,11 +229,17 @@ aside {
     text-decoration: none;
     font-size: 12px;
     border-left: 3px solid transparent;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-submenu a:hover {
     background: rgba(255,255,255,0.05);
     color: #ffffff;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===== MAIN ===== */
@@ -200,6 +248,9 @@ main {
     margin-top: 60px;
     padding: 20px;
     min-height: calc(100vh - 60px);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===== BUTTONS ===== */
@@ -215,40 +266,64 @@ main {
     cursor: pointer;
     text-decoration: none;
     transition: all 0.15s;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .btn-primary {
     background: var(--primary);
     color: #ffffff;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .btn-primary:hover {
     background: var(--primary-hover);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .btn-secondary {
     background: var(--bg-secondary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .btn-secondary:hover {
     background: var(--sidebar-hover);
     color: var(--text-primary);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .btn-danger {
     background: var(--danger);
     color: #ffffff;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .btn-danger:hover {
     background: #dc2626;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===== DROPDOWN ===== */
 .dropdown {
     position: relative;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-menu {
@@ -263,6 +338,9 @@ main {
     box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     z-index: 1000;
     padding: 8px 0;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-header {
@@ -271,6 +349,9 @@ main {
     font-weight: 600;
     color: #9ca3af;
     text-transform: uppercase;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-item {
@@ -280,21 +361,33 @@ main {
     text-decoration: none;
     font-size: 13px;
     transition: all 0.15s;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-item:hover {
     background: rgba(255,255,255,0.05);
     color: #f3f4f6;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-item.disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-divider {
     border-top: 1px solid var(--border);
     margin: 4px 0;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 [x-cloak] { display: none !important; }
@@ -306,16 +399,25 @@ main {
     border-radius: 4px;
     margin-bottom: 20px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .card-header {
     padding: 14px 20px;
     border-bottom: 1px solid var(--border);
     background: rgba(0,0,0,0.2);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .card-body {
     padding: 20px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .card-title {
@@ -323,17 +425,26 @@ main {
     font-weight: 600;
     color: var(--text-primary);
     margin: 0;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===== TABLES ===== */
 table {
     width: 100%;
     border-collapse: collapse;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 thead {
     background: rgba(0,0,0,0.2);
     border-bottom: 1px solid var(--border);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 th {
@@ -342,20 +453,32 @@ th {
     font-weight: 600;
     text-align: left;
     color: var(--text-primary);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 td {
     padding: 10px 12px;
     border-bottom: 1px solid #2d3748;
     color: var(--text-secondary);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 tr:hover {
     background: rgba(255,255,255,0.03);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 tbody tr:last-child td {
     border-bottom: none;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===== BADGES ===== */
@@ -366,41 +489,62 @@ tbody tr:last-child td {
     font-weight: 500;
     border-radius: 2px;
     text-transform: uppercase;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-xs {
     padding: 1px 4px;
     font-size: 9px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-primary {
     background: rgba(59,130,246,0.2);
     color: #60a5fa;
     border: 1px solid rgba(59,130,246,0.3);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-success {
     background: rgba(16,185,129,0.2);
     color: #34d399;
     border: 1px solid rgba(16,185,129,0.3);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-warning {
     background: rgba(245,158,11,0.2);
     color: #fbbf24;
     border: 1px solid rgba(245,158,11,0.3);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-danger {
     background: rgba(239,68,68,0.2);
     color: #f87171;
     border: 1px solid rgba(239,68,68,0.3);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-secondary {
     background: rgba(156,163,175,0.2);
     color: #9ca3af;
     border: 1px solid rgba(156,163,175,0.3);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===== PAGE HEADER ===== */
@@ -408,6 +552,9 @@ tbody tr:last-child td {
     margin-bottom: 20px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .page-title {
@@ -415,30 +562,48 @@ tbody tr:last-child td {
     font-weight: 600;
     color: var(--text-primary);
     margin: 0 0 4px 0;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .page-subtitle {
     font-size: 13px;
     color: var(--text-secondary);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 ::-webkit-scrollbar-track {
     background: #1f2937;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 ::-webkit-scrollbar-thumb {
     background: #4b5563;
     border-radius: 4px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 ::-webkit-scrollbar-thumb:hover {
     background: #6b7280;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 
@@ -502,6 +667,9 @@ tbody tr:last-child td {
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
@@ -512,39 +680,60 @@ tbody tr:last-child td {
 .table-container {
     overflow-x: auto;
     border-radius: 6px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table thead {
     background: var(--bg-hover);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table thead th {
-    padding: 12px;
+    padding: 8px;
     text-align: left;
     font-size: 13px;
     font-weight: 600;
     color: var(--text-primary);
     border-bottom: 2px solid var(--border);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table tbody td {
-    padding: 12px;
+    padding: 4px 10px;
     font-size: 13px;
     color: var(--text-primary);
     border-bottom: 1px solid var(--border);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table tbody tr:hover {
     background: var(--bg-hover);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table tbody tr:last-child td {
     border-bottom: none;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 /* Additional Tailwind-like classes for API responses */
 

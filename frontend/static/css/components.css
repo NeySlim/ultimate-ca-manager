@@ -283,7 +283,7 @@ background: var(--bg-hover) !important;
 }
 
 .table thead th {
-    padding: 12px 16px;
+    padding: 4px 12px;
     text-align: left;
     font-weight: 600;
     font-size: 12px;
@@ -304,7 +304,7 @@ background: var(--bg-hover) !important;
 }
 
 .table tbody td {
-    padding: 12px 16px;
+    padding: 4px 12px;
     border-bottom: 1px solid var(--border-light, var(--border-color));
     color: var(--text-primary);
     background: var(--bg-secondary);
@@ -323,11 +323,11 @@ background: var(--bg-hover) !important;
 }
 
 .table-sm thead th {
-    padding: 8px 12px;
+    padding: 3px 10px;
 }
 
 .table-sm tbody td {
-    padding: 8px 12px;
+    padding: 3px 10px;
     font-size: 13px;
 }
 
@@ -338,29 +338,30 @@ background: var(--bg-hover) !important;
 .badge {
     display: inline-flex;
     align-items: center;
-    padding: 4px 10px;
-    font-size: 11px;
+    padding: 2px 6px;
+    font-size: 12px;
     font-weight: 600;
     border-radius: 4px;
     text-transform: uppercase;
     letter-spacing: 0.3px;
     border: 1px solid transparent;
     white-space: nowrap;
+    vertical-align: middle;
 }
 
 .badge-xs {
-    padding: 2px 6px;
-    font-size: 9px;
-}
-
-.badge-sm {
-    padding: 3px 8px;
+    padding: 1px 4px;
     font-size: 10px;
 }
 
+.badge-sm {
+    padding: 2px 5px;
+    font-size: 11px;
+}
+
 .badge-lg {
-    padding: 6px 14px;
-    font-size: 12px;
+    padding: 3px 8px;
+    font-size: 13px;
 }
 
 .badge-primary {
@@ -501,9 +502,9 @@ background: var(--bg-hover) !important;
 }
 
 .btn-icon {
-    padding: 8px;
-    width: 36px;
-    height: 36px;
+    padding: 4px;
+    width: 24px;
+    height: 24px;
     justify-content: center;
 }
 
@@ -1132,8 +1133,8 @@ i.fas.text-yellow-600,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     border-radius: 4px;
     border: 1px solid transparent;
     background: transparent;
@@ -1159,18 +1160,18 @@ i.fas.text-yellow-600,
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    padding: 2px 6px;
-    border-radius: 9px;
-    font-size: 8.5px;
+    padding: 2px 5px;
+    border-radius: 10px;
+    font-size: 11px;
     font-weight: 500;
     border: 1px solid currentColor;
     background: transparent;
     vertical-align: middle;
-    line-height: 1;
+    line-height: 1.2;
 }
 
 .badge-outline i {
-    font-size: 7.5px;
+    font-size: 9px;
 }
 
 /* Semantic badge colors - use theme colors */
@@ -1682,4 +1683,54 @@ select:hover {
     --success-bg-light: rgba(16, 185, 129, 0.2);
     --warning-bg-light: rgba(251, 188, 4, 0.2);
     --danger-bg-light: rgba(239, 68, 68, 0.2);
+}
+
+/* ==========================================
+   Custom Scrollbars
+   ========================================== */
+
+/* Body scrollbar always visible */
+html, body {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* Scrollable elements */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 5px;
+    border: 2px solid var(--scrollbar-track);
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+/* Prevent body scroll when modal is open */
+body.modal-open {
+    overflow: hidden;
 }

@@ -361,6 +361,27 @@ class SCEPService:
         # Save to database and file
         cert_pem = cert.public_bytes(serialization.Encoding.PEM)
         
+        # Extract SANs from issued certificate
+        import json
+        san_dns_list = []
+        san_ip_list = []
+        san_email_list = []
+        san_uri_list = []
+        
+        try:
+            ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            for name in ext.value:
+                if isinstance(name, x509.DNSName):
+                    san_dns_list.append(name.value)
+                elif isinstance(name, x509.IPAddress):
+                    san_ip_list.append(str(name.value))
+                elif isinstance(name, x509.RFC822Name):
+                    san_email_list.append(name.value)
+                elif isinstance(name, x509.UniformResourceIdentifier):
+                    san_uri_list.append(name.value)
+        except x509.ExtensionNotFound:
+            pass  # No SAN extension
+        
         # Save certificate to database
         cert_obj = Certificate(
             refid=cert_refid,
@@ -374,6 +395,11 @@ class SCEPService:
             serial_number=str(cert.serial_number),
             valid_from=cert.not_valid_before,
             valid_to=cert.not_valid_after,
+            # Store extracted SANs
+            san_dns=json.dumps(san_dns_list) if san_dns_list else None,
+            san_ip=json.dumps(san_ip_list) if san_ip_list else None,
+            san_email=json.dumps(san_email_list) if san_email_list else None,
+            san_uri=json.dumps(san_uri_list) if san_uri_list else None,
             created_by="scep"
         )
         db.session.add(cert_obj)

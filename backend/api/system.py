@@ -395,3 +395,254 @@ def update_config_bulk():
              details='Bulk system configuration update')
     
     return jsonify({"message": "Configuration updated successfully"}), 200
+
+
+# HTTPS Certificate Management Endpoints
+
+@system_bp.route('/https-cert-info', methods=['GET'])
+@jwt_required()
+def https_cert_info():
+    """
+    Get current HTTPS certificate information
+    ---
+    GET /api/v1/system/https-cert-info
+    """
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+    from datetime import datetime
+    
+    cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
+    
+    try:
+        with open(cert_path, 'rb') as f:
+            cert_pem = f.read()
+            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+        
+        # Determine certificate source
+        config = SystemConfig.query.filter_by(key='https_cert_source').first()
+        source = config.value if config else 'auto'
+        
+        # Extract subject
+        subject_parts = []
+        for attr in cert.subject:
+            subject_parts.append(f"{attr.oid._name}={attr.value}")
+        subject_str = ', '.join(subject_parts)
+        
+        # Format expiry date (compatible with all cryptography versions)
+        expires = cert.not_valid_after.strftime('%Y-%m-%d %H:%M:%S UTC')
+        
+        cert_type = 'Self-Signed' if source == 'auto' else 'UCM Managed'
+        
+        return jsonify({
+            'type': cert_type,
+            'subject': subject_str,
+            'expires': expires,
+            'source': source,
+            'issuer': cert.issuer.rfc4514_string()
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'type': 'Error',
+            'subject': str(e),
+            'expires': 'N/A',
+            'source': 'unknown'
+        }), 200
+
+
+@system_bp.route('/https-cert-candidates', methods=['GET'])
+@jwt_required()
+def https_cert_candidates():
+    """
+    Get list of certificates suitable for HTTPS
+    ---
+    GET /api/v1/system/https-cert-candidates
+    
+    Returns certificates with:
+    - Server Authentication EKU
+    - Valid (not expired, not revoked)
+    - Has private key available
+    """
+    from models import Certificate, CA
+    from datetime import datetime
+    
+    # Get current cert_id if using managed
+    current_cert_id = None
+    config = SystemConfig.query.filter_by(key='https_cert_id').first()
+    if config:
+        current_cert_id = int(config.value)
+    
+    # Find suitable certificates
+    certificates = Certificate.query.filter(
+        Certificate.status == 'valid',
+        Certificate.cert_type.in_(['server', 'cert'])
+    ).all()
+    
+    candidates = []
+    for cert in certificates:
+        # Check if private key exists
+        key_path = Path(f'/opt/ucm/backend/data/private/cert_{cert.cert_id}.key')
+        if not key_path.exists():
+            # Try old format
+            key_path = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
+            if not key_path.exists():
+                continue
+        
+        # Get CA name
+        ca = CA.query.get(cert.ca_id)
+        
+        candidates.append({
+            'id': cert.id,
+            'cert_id': cert.cert_id,
+            'common_name': cert.common_name or 'N/A',
+            'san': cert.san or '',
+            'expires': cert.valid_until.strftime('%Y-%m-%d') if cert.valid_until else 'N/A',
+            'ca_name': ca.ca_name if ca else 'Unknown',
+            'is_current': cert.id == current_cert_id
+        })
+    
+    return jsonify({'certificates': candidates}), 200
+
+
+@system_bp.route('/https-cert-apply', methods=['POST'])
+@jwt_required()
+@admin_required
+def apply_https_certificate():
+    """
+    Apply a new HTTPS certificate
+    ---
+    POST /api/v1/system/https-cert-apply
+    {
+        "source": "auto" | "managed",
+        "cert_id": 123  // required if source=managed
+    }
+    """
+    data = request.get_json()
+    source = data.get('source', 'auto')
+    cert_id = data.get('cert_id')
+    
+    admin = User.query.filter_by(username=get_jwt_identity()).first()
+    
+    try:
+        if source == 'managed':
+            if not cert_id:
+                return jsonify({'success': False, 'error': 'cert_id required for managed source'}), 400
+            
+            # Get certificate from database
+            from models import Certificate
+            cert = Certificate.query.get(cert_id)
+            if not cert:
+                return jsonify({'success': False, 'error': 'Certificate not found'}), 404
+            
+            # Load certificate and key
+            cert_file = Path(f'/opt/ucm/backend/data/certs/{cert.cert_id}.crt')
+            if not cert_file.exists():
+                cert_file = Path(f'/opt/ucm/backend/data/certs/{cert.refid}.crt')
+            
+            key_file = Path(f'/opt/ucm/backend/data/private/cert_{cert.cert_id}.key')
+            if not key_file.exists():
+                key_file = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
+            
+            if not cert_file.exists() or not key_file.exists():
+                return jsonify({'success': False, 'error': 'Certificate or key file not found'}), 404
+            
+            # Copy to HTTPS location
+            import shutil
+            https_cert = Path('/opt/ucm/backend/data/https_cert.pem')
+            https_key = Path('/opt/ucm/backend/data/https_key.pem')
+            
+            # Backup current cert
+            if https_cert.exists():
+                shutil.copy(https_cert, str(https_cert) + '.backup')
+            if https_key.exists():
+                shutil.copy(https_key, str(https_key) + '.backup')
+            
+            # Copy new cert
+            shutil.copy(cert_file, https_cert)
+            shutil.copy(key_file, https_key)
+            
+            # Set permissions
+            import os
+            os.chmod(https_key, 0o600)
+            os.chmod(https_cert, 0o644)
+            
+            # Save configuration
+            config = SystemConfig.query.filter_by(key='https_cert_source').first()
+            if not config:
+                config = SystemConfig(key='https_cert_source', value='managed')
+                db.session.add(config)
+            else:
+                config.value = 'managed'
+            
+            cert_id_config = SystemConfig.query.filter_by(key='https_cert_id').first()
+            if not cert_id_config:
+                cert_id_config = SystemConfig(key='https_cert_id', value=str(cert_id))
+                db.session.add(cert_id_config)
+            else:
+                cert_id_config.value = str(cert_id)
+            
+            db.session.commit()
+            
+            log_audit('https_cert_applied', admin.username,
+                     details=f'Applied managed certificate: {cert.common_name} (ID: {cert_id})')
+        
+        else:  # auto (regenerate self-signed)
+            # This will be handled by regenerate endpoint
+            pass
+        
+        # Restart UCM service
+        import subprocess
+        subprocess.Popen(['systemctl', 'restart', 'ucm'])
+        
+        return jsonify({'success': True}), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@system_bp.route('/https-cert-regenerate', methods=['POST'])
+@jwt_required()
+@admin_required
+def regenerate_https_certificate():
+    """
+    Regenerate self-signed HTTPS certificate
+    ---
+    POST /api/v1/system/https-cert-regenerate
+    """
+    admin = User.query.filter_by(username=get_jwt_identity()).first()
+    
+    try:
+        cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
+        key_path = Path('/opt/ucm/backend/data/https_key.pem')
+        
+        # Backup current
+        import shutil
+        if cert_path.exists():
+            shutil.copy(cert_path, str(cert_path) + '.backup')
+        if key_path.exists():
+            shutil.copy(key_path, str(key_path) + '.backup')
+        
+        # Generate new
+        HTTPSManager.generate_self_signed_cert(cert_path, key_path)
+        
+        # Update config
+        config = SystemConfig.query.filter_by(key='https_cert_source').first()
+        if not config:
+            config = SystemConfig(key='https_cert_source', value='auto')
+            db.session.add(config)
+        else:
+            config.value = 'auto'
+        
+        db.session.commit()
+        
+        log_audit('https_cert_regenerated', admin.username,
+                 details='Regenerated self-signed HTTPS certificate')
+        
+        # Restart UCM service
+        import subprocess
+        subprocess.Popen(['systemctl', 'restart', 'ucm'])
+        
+        return jsonify({'success': True}), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

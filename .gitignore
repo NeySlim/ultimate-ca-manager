@@ -9,57 +9,59 @@ env/
 ENV/
 .venv
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-backend/data/*.db
-
-# Logs
-*.log
-logs/
-backend/data/*.log
-
-# Environment
-.env
-.env.local
-
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Certificate data
-backend/data/ca/
-backend/data/certs/
-backend/data/private/
-backend/data/crl/
-backend/data/scep/
-backend/data/backups/
+# Application
+.env
+backend/data/*.db
+backend/data/*.db-*
+backend/data/ca/*
+!backend/data/ca/.gitkeep
+backend/data/certs/*
+!backend/data/certs/.gitkeep
+backend/data/crl/*
+!backend/data/crl/.gitkeep
+backend/data/private/*
+!backend/data/private/.gitkeep
+backend/data/scep/*
+!backend/data/scep/.gitkeep
+backend/data/backups/*
+!backend/data/backups/.gitkeep
 backend/data/*.pem
-backend/data/*.key
-backend/data/*.crt
+*.crt
+*.key
+*.csr
+*.p12
+*.pfx
 
-# Temporary files
-*.tmp
-*.bak
-*.backup
-*~
-
-# Package files
+# Build artifacts
+*.deb
+*.rpm
 *.tar.gz
 *.zip
-ucm-*.tar.gz
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*~
 
 # Test files
 test_*.py
-
-# Build
-build/
-dist/
-*.egg-info/
+migrate_*.py

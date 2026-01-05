@@ -143,6 +143,8 @@ def register_blueprints(app):
     from api.ca import ca_bp
     from api.cert import cert_bp
     from api.crl import crl_bp
+    from api.cdp_routes import cdp_bp
+    from api.ocsp_routes import ocsp_bp
     from api.scep import scep_bp
     from api.system import system_bp
     from api.import_api import import_bp
@@ -156,11 +158,18 @@ def register_blueprints(app):
     app.register_blueprint(ca_bp, url_prefix='/api/v1/ca')
     app.register_blueprint(cert_bp, url_prefix='/api/v1/certificates')
     app.register_blueprint(crl_bp, url_prefix='/api/v1/crl')
+    
+    # Import and register OCSP API
+    from api.ocsp_api import ocsp_api_bp
+    app.register_blueprint(ocsp_api_bp, url_prefix='/api/v1/ocsp')
+    
     app.register_blueprint(system_bp, url_prefix='/api/v1/system')
     app.register_blueprint(import_bp, url_prefix='/api/v1/import')
     
-    # SCEP endpoint (no /api prefix - standard SCEP path)
-    app.register_blueprint(scep_bp, url_prefix='/scep')
+    # Public endpoints (no auth, no /api prefix - standard paths)
+    app.register_blueprint(scep_bp, url_prefix='/scep')  # SCEP protocol
+    app.register_blueprint(cdp_bp, url_prefix='/cdp')     # CRL Distribution Points
+    app.register_blueprint(ocsp_bp)                        # OCSP Responder (/ocsp)
 
 
 def main():

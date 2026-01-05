@@ -90,6 +90,14 @@ class CA(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(80))
     
+    # CRL Distribution Points (CDP)
+    cdp_enabled = db.Column(db.Boolean, default=False)
+    cdp_url = db.Column(db.String(512))  # Ex: http://ucm.local:8443/cdp/{ca_refid}/crl.pem
+    
+    # OCSP (Online Certificate Status Protocol)
+    ocsp_enabled = db.Column(db.Boolean, default=False)
+    ocsp_url = db.Column(db.String(512))  # Ex: http://ucm.local:8443/ocsp
+    
     # Relationships
     certificates = db.relationship("Certificate", back_populates="ca", lazy="dynamic")
     
@@ -266,7 +274,7 @@ class Certificate(db.Model):
     ocsp_uri = db.Column(db.String(255))
     
     # Private key management
-    private_key_location = db.Column(db.String(20), default='firewall')  # 'firewall' or 'download_only'
+    private_key_location = db.Column(db.String(20), default='stored')  # 'stored' or 'download_only'
     
     # Status
     revoked = db.Column(db.Boolean, default=False)
@@ -502,3 +510,10 @@ class AuditLog(db.Model):
             "ip_address": self.ip_address,
             "success": self.success,
         }
+
+
+# Import CRL metadata model
+from .crl import CRLMetadata
+from .ocsp import OCSPResponse
+
+__all__ = ["db", "User", "SystemConfig", "CA", "Certificate", "CRL", "SCEPRequest", "AuditLog", "CRLMetadata", "OCSPResponse"]
