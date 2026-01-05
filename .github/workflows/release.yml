@@ -52,7 +52,7 @@ jobs:
           fi
           
           # Save to file
-          cat > /tmp/changelog.md << 'EOF'
+          cat > /tmp/changelog.md << EOF
           # What's Changed
           
           ${CHANGELOG}
