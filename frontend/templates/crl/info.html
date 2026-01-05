@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRL Information - {{ crl_info.ca_common_name }}</title>
+    
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    
+    <script>
+        (function() {
+            var theme = localStorage.getItem('ucm-theme') || 'sentinel-light';
+            document.documentElement.setAttribute('data-theme', theme);
+            document.write('<link id="theme-css" rel="stylesheet" href="/static/css/themes/' + theme + '.css">');
+        })();
+    </script>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/fontawesome.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    
+    <style>
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            padding: 2rem;
+            margin: 0;
+        }
+        .container {
+            max-width: 80rem;
+            margin: 0 auto;
+        }
+        .header {
+            margin-bottom: 2rem;
+        }
+        .header h1 {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--text-primary);
+            margin: 0 0 0.5rem 0;
+        }
+        .header p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .info-item {
+            margin-bottom: 1rem;
+        }
+        .info-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+        .info-value {
+            color: var(--text-primary);
+        }
+        .download-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-ban"></i> CRL Information</h1>
+            <p>{{ crl_info.ca_common_name }}</p>
+        </div>
+
+        {% if crl_info.has_crl %}
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+                <h2 class="section-title" style="margin: 0;">
+                    <i class="fas fa-info-circle"></i> CRL Status
+                </h2>
+                {% if crl_info.is_stale %}
+                <span class="badge badge-danger">
+                    <i class="fas fa-exclamation-triangle"></i> Stale
+                </span>
+                {% else %}
+                <span class="badge badge-success">
+                    <i class="fas fa-check-circle"></i> Valid
+                </span>
+                {% endif %}
+            </div>
+
+            <div class="info-grid">
+                <div>
+                    <div class="info-item">
+                        <span class="info-label">CA Name</span>
+                        <div class="info-value">{{ crl_info.ca_name }}</div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Common Name</span>
+                        <div class="info-value">{{ crl_info.ca_common_name }}</div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">CA Reference ID</span>
+                        <div class="info-value" style="font-family: monospace; font-size: 0.875rem;">{{ crl_info.ca_refid }}</div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">CRL Number</span>
+                        <div class="info-value">{{ crl_info.crl_number }}</div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="info-item">
+                        <span class="info-label">This Update</span>
+                        <div class="info-value">{{ crl_info.this_update }}</div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Next Update</span>
+                        <div class="info-value">{{ crl_info.next_update }}</div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Days Until Expiry</span>
+                        <div class="info-value">
+                            {% if crl_info.days_until_expiry < 2 %}
+                            <span style="color: var(--danger-color); font-weight: 600;">{{ crl_info.days_until_expiry }} days</span>
+                            {% elif crl_info.days_until_expiry < 5 %}
+                            <span style="color: var(--warning-color); font-weight: 600;">{{ crl_info.days_until_expiry }} days</span>
+                            {% else %}
+                            {{ crl_info.days_until_expiry }} days
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Revoked Certificates</span>
+                        <div class="info-value">{{ crl_info.revoked_count }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">
+                <i class="fas fa-download"></i> Download CRL
+            </h2>
+            <div class="download-grid">
+                <a href="{{ crl_info.download_urls.pem }}" class="btn btn-secondary">
+                    <i class="fas fa-file-lines"></i> PEM Format
+                </a>
+                <a href="{{ crl_info.download_urls.der }}" class="btn btn-secondary">
+                    <i class="fas fa-file-binary"></i> DER Format
+                </a>
+                <a href="{{ crl_info.download_urls.crl }}" class="btn btn-secondary">
+                    <i class="fas fa-file"></i> CRL Format
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <div class="card" style="background: var(--warning-bg); border: 1px solid var(--warning-border);">
+            <div style="display: flex; gap: 1rem;">
+                <i class="fas fa-exclamation-triangle" style="color: var(--warning-color); font-size: 2rem; margin-top: 0.25rem;"></i>
+                <div>
+                    <h3 style="font-size: 1.125rem; font-weight: 600; margin: 0 0 0.5rem 0;">No CRL Available</h3>
+                    <p style="margin: 0 0 1rem 0;">{{ crl_info.message }}</p>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                        <p style="margin: 0.5rem 0;"><strong>CA Name:</strong> {{ crl_info.ca_name }}</p>
+                        <p style="margin: 0.5rem 0;"><strong>Common Name:</strong> {{ crl_info.ca_common_name }}</p>
+                        <p style="margin: 0.5rem 0;"><strong>CA Reference ID:</strong> <span style="font-family: monospace;">{{ crl_info.ca_refid }}</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
