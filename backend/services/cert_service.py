@@ -34,7 +34,7 @@ class CertificateService:
         san_uri: Optional[List[str]] = None,
         san_email: Optional[List[str]] = None,
         ocsp_uri: Optional[str] = None,
-        private_key_location: str = 'firewall',
+        private_key_location: str = 'stored',
         username: str = 'system'
     ) -> Certificate:
         """
@@ -53,7 +53,7 @@ class CertificateService:
             san_uri: URI SANs
             san_email: Email SANs
             ocsp_uri: OCSP responder URI
-            private_key_location: 'firewall' or 'download_only'
+            private_key_location: 'stored' or 'download_only'
             username: User creating certificate
             
         Returns:
@@ -79,6 +79,16 @@ class CertificateService:
         # Build subject
         subject = TrustStoreService.build_subject(dn)
         
+        # Prepare CDP URL if CA has it enabled
+        cdp_url = None
+        if ca.cdp_enabled and ca.cdp_url:
+            cdp_url = ca.cdp_url.replace('{ca_refid}', ca.refid)
+        
+        # Prepare OCSP URL if CA has it enabled
+        ocsp_url = None
+        if ca.ocsp_enabled and ca.ocsp_url:
+            ocsp_url = ca.ocsp_url  # OCSP URL doesn't need ca_refid, it's a global endpoint
+        
         # Create certificate
         cert_pem, key_pem = TrustStoreService.create_certificate(
             subject=subject,
@@ -92,7 +102,8 @@ class CertificateService:
             san_ip=san_ip,
             san_uri=san_uri,
             san_email=san_email,
-            ocsp_uri=ocsp_uri
+            ocsp_uri=ocsp_url,
+            cdp_url=cdp_url
         )
         
         # Parse certificate
@@ -108,7 +119,7 @@ class CertificateService:
             descr=descr,
             caref=caref,
             crt=base64.b64encode(cert_pem).decode('utf-8'),
-            prv=base64.b64encode(key_pem).decode('utf-8') if private_key_location == 'firewall' else None,
+            prv=base64.b64encode(key_pem).decode('utf-8') if private_key_location == 'stored' else None,
             cert_type=cert_type,
             subject=cert.subject.rfc4514_string(),
             issuer=cert.issuer.rfc4514_string(),
@@ -360,6 +371,27 @@ class CertificateService:
             default_backend()
         )
         
+        # Extract SANs from certificate
+        import json
+        san_dns_list = []
+        san_ip_list = []
+        san_email_list = []
+        san_uri_list = []
+        
+        try:
+            ext = cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            for name in ext.value:
+                if isinstance(name, x509.DNSName):
+                    san_dns_list.append(name.value)
+                elif isinstance(name, x509.IPAddress):
+                    san_ip_list.append(str(name.value))
+                elif isinstance(name, x509.RFC822Name):
+                    san_email_list.append(name.value)
+                elif isinstance(name, x509.UniformResourceIdentifier):
+                    san_uri_list.append(name.value)
+        except x509.ExtensionNotFound:
+            pass  # No SAN extension
+        
         # Create certificate record
         certificate = Certificate(
             refid=str(uuid.uuid4()),
@@ -371,6 +403,11 @@ class CertificateService:
             serial_number=str(cert.serial_number),
             valid_from=cert.not_valid_before,
             valid_to=cert.not_valid_after,
+            # Store extracted SANs
+            san_dns=json.dumps(san_dns_list) if san_dns_list else None,
+            san_ip=json.dumps(san_ip_list) if san_ip_list else None,
+            san_email=json.dumps(san_email_list) if san_email_list else None,
+            san_uri=json.dumps(san_uri_list) if san_uri_list else None,
             imported_from='manual',
             created_by=username
         )
@@ -444,6 +481,39 @@ class CertificateService:
         )
         db.session.add(log)
         db.session.commit()
+        
+        # Auto-generate CRL if CA has CDP enabled
+        ca = CA.query.filter_by(refid=certificate.caref).first()
+        if ca and ca.cdp_enabled:
+            from services.crl_service import CRLService
+            try:
+                CRLService.generate_crl(ca.id, username=username)
+            except Exception as e:
+                # Log error but don't fail revocation
+                error_log = AuditLog(
+                    username=username,
+                    action='crl_auto_generation_failed',
+                    resource_type='crl',
+                    resource_id=str(ca.id),
+                    details=f'Failed to auto-generate CRL after revocation: {str(e)}',
+                    success=False
+                )
+                db.session.add(error_log)
+                db.session.commit()
+        
+        # Invalidate OCSP cache if CA has OCSP enabled
+        if ca and ca.ocsp_enabled:
+            try:
+                from models import OCSPResponse
+                # Delete cached OCSP response for this certificate
+                OCSPResponse.query.filter_by(
+                    ca_id=ca.id,
+                    cert_serial=certificate.serial
+                ).delete()
+                db.session.commit()
+                logger.info(f"Invalidated OCSP cache for certificate {certificate.refid}")
+            except Exception as e:
+                logger.error(f"Failed to invalidate OCSP cache: {e}")
         
         return certificate
     

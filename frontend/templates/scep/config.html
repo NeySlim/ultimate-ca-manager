@@ -3,23 +3,23 @@
 {% block title %}SCEP Configuration - UCM{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <h1 class="text-3xl font-bold text-gray-900">
-        <i class="fas fa-network-wired mr-2"></i> SCEP Configuration
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <h1 style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">
+        <i class="fas fa-network-wired" style="margin-right: 0.5rem;"></i> SCEP Configuration
     </h1>
     
     <!-- Configuration Form -->
-    <div class="bg-white rounded-lg shadow border border-gray-200 p-6"
+    <div class="card"
          hx-get="/api/ui/scep/config-form"
          hx-trigger="load"
          hx-swap="innerHTML">
-        <div class="animate-pulse h-32 bg-gray-200 rounded"></div>
+        <div style="height: 8rem; background: var(--bg-secondary); border-radius: 0.25rem; animation: pulse 2s infinite;"></div>
     </div>
     
     <!-- Pending Requests -->
-    <div class="bg-white rounded-lg shadow border border-gray-200">
-        <div class="p-6 border-b border-gray-200">
-            <h2 class="text-xl font-semibold text-gray-900">
+    <div class="card" style="padding: 0;">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
                 Pending SCEP Requests
             </h2>
         </div>
@@ -27,8 +27,15 @@
              hx-get="/api/ui/scep/requests"
              hx-trigger="load, refreshSCEP from:body"
              hx-swap="innerHTML">
-            <div class="p-8"><div class="animate-pulse h-20 bg-gray-200 rounded"></div></div>
+            <div style="padding: 2rem;"><div style="height: 5rem; background: var(--bg-secondary); border-radius: 0.25rem; animation: pulse 2s infinite;"></div></div>
         </div>
     </div>
 </div>
+
+<style>
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+</style>
 {% endblock %}

@@ -477,25 +477,35 @@ def ca_list_content():
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" id="ca-table">
                 <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                        <th onclick="sortTable(0)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            Description <i class="fas fa-sort ml-1"></i>
+                        <th onclick="sortTable(0)" style="position: relative;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span>Description <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i></span>
+                                <div style="position: relative; margin-left: 12px;">
+                                    <input type="text" id="searchCA" placeholder="Recherche..." 
+                                           class="form-control"
+                                           style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px;"
+                                           onkeyup="filterTableCA()"
+                                           onclick="event.stopPropagation()">
+                                    <i class="fas fa-search" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: 0.5; pointer-events: none;"></i>
+                                </div>
+                            </div>
                         </th>
-                        <th onclick="sortTable(1)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            Émetteur <i class="fas fa-sort ml-1"></i>
+                        <th onclick="sortTable(1)">
+                            Émetteur <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th onclick="sortTable(2)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            Nom <i class="fas fa-sort ml-1"></i>
+                        <th onclick="sortTable(2)">
+                            Nom <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th onclick="sortTable(3)" class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            Utilisations <i class="fas fa-sort ml-1"></i>
+                        <th onclick="sortTable(3)">
+                            Utilisations <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th onclick="sortTable(4)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            Début validité <i class="fas fa-sort ml-1"></i>
+                        <th onclick="sortTable(4)">
+                            Début validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th onclick="sortTable(5)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            Fin validité <i class="fas fa-sort ml-1"></i>
+                        <th onclick="sortTable(5)">
+                            Fin validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th>
                             Commandes
                         </th>
                     </tr>
@@ -538,32 +548,36 @@ def ca_list_content():
             
             html += f'''
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onclick="window.location.href='/ca/{ca['id']}'">
-                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                        {ca['descr']}
-                        <span class="badge-outline badge-primary ml-2">
-                            <i class="{'fas fa-crown' if is_root else 'fas fa-link'}"></i>
-                            {'ROOT' if is_root else 'INT'}
-                        </span>
-                        {key_badge}
+                    <td>
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span>{ca['descr']}</span>
+                            <div style="display: flex; gap: 4px;">
+                                <span class="badge-outline badge-primary">
+                                    <i class="{'fas fa-crown' if is_root else 'fas fa-link'}"></i>
+                                    {'ROOT' if is_root else 'INT'}
+                                </span>
+                                {key_badge}
+                            </div>
+                        </div>
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td>
                         {issuer_cn}
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td>
                         {cn}
                     </td>
-                    <td class="px-4 py-3 text-sm text-center text-gray-600 dark:text-gray-400">
-                        <span class="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+                    <td>
+                        <span>
                             {usage_count}
                         </span>
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td>
                         {valid_from}
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td>
                         {valid_to}
                     </td>
-                    <td class="px-4 py-3 text-sm text-right" onclick="event.stopPropagation()">
+                    <td onclick="event.stopPropagation()">
                         <button onclick="exportCA({ca['id']}, event)" 
                                 class="btn-icon btn-icon-primary"
                                 title="Export CA">
@@ -613,6 +627,19 @@ def ca_list_content():
                 });
                 
                 rows.forEach(row => tbody.appendChild(row));
+            };
+            
+            window.filterTableCA = function() {
+                const input = document.getElementById('searchCA');
+                const filter = input.value.toLowerCase();
+                const table = document.getElementById('ca-table');
+                const tbody = table.querySelector('tbody');
+                const rows = tbody.querySelectorAll('tr');
+                
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(filter) ? '' : 'none';
+                });
             };
         })();
         
@@ -880,22 +907,32 @@ def cert_list_content():
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" id="cert-table">
                 <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                        <th onclick="sortTableCert(0)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            Description <i class="fas fa-sort ml-1"></i>
+                        <th onclick="sortTableCert(0)" style="position: relative;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span>Description <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i></span>
+                                <div style="position: relative; margin-left: 12px;">
+                                    <input type="text" id="searchCert" placeholder="Recherche..." 
+                                           class="form-control"
+                                           style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px;"
+                                           onkeyup="filterTableCert()"
+                                           onclick="event.stopPropagation()">
+                                    <i class="fas fa-search" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: 0.5; pointer-events: none;"></i>
+                                </div>
+                            </div>
                         </th>
-                        <th onclick="sortTableCert(1)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            Émetteur <i class="fas fa-sort ml-1"></i>
+                        <th onclick="sortTableCert(1)">
+                            Émetteur <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th onclick="sortTableCert(2)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            Type <i class="fas fa-sort ml-1"></i>
+                        <th onclick="sortTableCert(2)">
+                            Type <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th onclick="sortTableCert(3)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            Début validité <i class="fas fa-sort ml-1"></i>
+                        <th onclick="sortTableCert(3)">
+                            Début validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th onclick="sortTableCert(4)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
-                            Fin validité <i class="fas fa-sort ml-1"></i>
+                        <th onclick="sortTableCert(4)">
+                            Fin validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <th>
                             Commandes
                         </th>
                     </tr>
@@ -911,18 +948,18 @@ def cert_list_content():
             
             # Determine status badge
             if is_csr:
-                status_badge = '<span class="badge-outline badge-warning ml-2"><i class="fas fa-file-signature"></i> CSR</span>'
+                status_badge = '<span class="badge-outline badge-warning"><i class="fas fa-file-signature"></i> CSR</span>'
             elif is_revoked:
-                status_badge = '<span class="badge-outline badge-danger ml-2"><i class="fas fa-ban"></i> REVOKED</span>'
+                status_badge = '<span class="badge-outline badge-danger"><i class="fas fa-ban"></i> REVOKED</span>'
             else:
-                status_badge = '<span class="badge-outline badge-success ml-2"><i class="fas fa-circle-check"></i> VALID</span>'
+                status_badge = '<span class="badge-outline badge-success"><i class="fas fa-check"></i> VALID</span>'
             
             # Add CRT/KEY badges - for CSRs these will be false, for signed certs check actual presence
             has_crt = not is_csr  # If it's not a CSR, it has a certificate
             has_key = cert.get('has_private_key', False)
             
-            crt_badge = '<span class="badge-outline badge-info ml-2"><i class="fas fa-certificate"></i> CRT</span>' if has_crt else ''
-            key_badge = '<span class="badge-outline badge-success ml-2"><i class="fas fa-key"></i> KEY</span>' if has_key else ''
+            crt_badge = '<span class="badge-outline badge-info"><i class="fas fa-certificate"></i> CRT</span>' if has_crt else ''
+            key_badge = '<span class="badge-outline badge-success"><i class="fas fa-key"></i> KEY</span>' if has_key else ''
             
             # Get issuer name
             issuer_name = ca_names.get(cert.get('caref', ''), 'Unknown')
@@ -950,25 +987,29 @@ def cert_list_content():
             
             html += f'''
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onclick="window.location.href='/certificates/{cert['id']}'">
-                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                        {cert['descr']}
-                        {status_badge}
-                        {crt_badge}
-                        {key_badge}
+                    <td>
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span>{cert['descr']}</span>
+                            <div style="display: flex; gap: 4px;">
+                                {status_badge}
+                                {crt_badge}
+                                {key_badge}
+                            </div>
+                        </div>
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td>
                         {issuer_name}
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td>
                         {cert_type_display}
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td>
                         {valid_from}
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                    <td>
                         {valid_to}
                     </td>
-                    <td class="px-4 py-3 text-sm text-right" onclick="event.stopPropagation()">
+                    <td onclick="event.stopPropagation()">
             '''
             
             # Unified export button for both CSR and certificates
@@ -1029,6 +1070,19 @@ def cert_list_content():
             });
             
             rows.forEach(row => tbody.appendChild(row));
+        }
+        
+        function filterTableCert() {
+            const input = document.getElementById('searchCert');
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById('cert-table');
+            const tbody = table.querySelector('tbody');
+            const rows = tbody.querySelectorAll('tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(filter) ? '' : 'none';
+            });
         }
         
         function exportCert(id, event, isCSR) {
@@ -1276,7 +1330,7 @@ def cert_create():
             'key_type': request.form.get('key_type'),
             'digest_alg': request.form.get('digest_alg', 'sha256'),
             'ocsp_uri': request.form.get('ocsp_uri', '').strip() or None,
-            'private_key_location': request.form.get('private_key_location', 'firewall'),
+            'private_key_location': request.form.get('private_key_location', 'stored'),
         }
         
         response = requests.post(
@@ -1325,6 +1379,175 @@ def cert_csr():
 
 
 # SCEP Management
+@ui_bp.route('/crl')
+@login_required
+def crl_list():
+    """CRL Management page"""
+    return render_template('crl/list.html')
+
+
+@ui_bp.route('/api/ui/crl/list')
+@login_required
+def crl_list_data():
+    """Get CRL list data"""
+    try:
+        token = session.get('access_token')
+        headers = {'Authorization': f'Bearer {token}'}
+        
+        # Get all CRLs
+        response = requests.get(
+            f"{request.url_root}api/v1/crl/",
+            headers=headers,
+            verify=False
+        )
+        
+        if response.status_code != 200:
+            return f'<div class="p-4 text-red-600">Failed to load CRLs: {response.text}</div>'
+        
+        crls = response.json()
+        
+        if not crls:
+            return '''
+            <div class="p-8 text-center text-gray-500">
+                <i class="fas fa-file-contract text-6xl mb-4"></i>
+                <p class="text-lg">No CRLs generated yet</p>
+                <p class="text-sm mt-2">Enable CDP on a CA and generate a CRL to get started</p>
+            </div>
+            '''
+        
+        # Build table HTML
+        html = '''
+        <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr>
+                    <th>CA</th>
+                    <th>CDP Status</th>
+                    <th>CRL Status</th>
+                    <th>Revoked Count</th>
+                    <th>Last Update</th>
+                    <th>Next Update</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+        '''
+        
+        for crl_data in crls:
+            ca_name = crl_data.get('ca_name', 'Unknown')
+            ca_id = crl_data.get('ca_id')
+            ca_refid = crl_data.get('ca_refid', '')
+            cdp_enabled = crl_data.get('cdp_enabled', False)
+            has_crl = crl_data.get('has_crl', False)
+            
+            # CDP Status badge
+            if cdp_enabled:
+                cdp_status = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Enabled</span>'
+            else:
+                cdp_status = '<span class="badge badge-secondary"><i class="fas fa-times mr-1"></i>Disabled</span>'
+            
+            # CRL Status badge
+            if not has_crl:
+                crl_status = '<span class="badge badge-warning">Never Generated</span>'
+                revoked_count = '-'
+                last_update = '-'
+                next_update = '-'
+                days_until = '-'
+            else:
+                is_stale = crl_data.get('is_stale', False)
+                days_until_expiry = crl_data.get('days_until_expiry', 0)
+                
+                if is_stale:
+                    crl_status = '<span class="badge badge-danger"><i class="fas fa-exclamation-triangle mr-1"></i>Stale</span>'
+                elif days_until_expiry <= 1:
+                    crl_status = '<span class="badge badge-warning"><i class="fas fa-clock mr-1"></i>Expiring Soon</span>'
+                else:
+                    crl_status = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Up to Date</span>'
+                
+                revoked_count = crl_data.get('revoked_count', 0)
+                
+                # Format dates
+                this_update = crl_data.get('this_update', '')
+                next_update_str = crl_data.get('next_update', '')
+                
+                if this_update:
+                    from datetime import datetime
+                    try:
+                        dt = datetime.fromisoformat(this_update.replace('Z', '+00:00'))
+                        last_update = dt.strftime('%Y-%m-%d %H:%M UTC')
+                    except:
+                        last_update = this_update[:16]
+                else:
+                    last_update = '-'
+                
+                if next_update_str:
+                    try:
+                        dt = datetime.fromisoformat(next_update_str.replace('Z', '+00:00'))
+                        next_update = dt.strftime('%Y-%m-%d %H:%M UTC')
+                        days_until = f"({days_until_expiry}d)"
+                    except:
+                        next_update = next_update_str[:16]
+                        days_until = ''
+                else:
+                    next_update = '-'
+                    days_until = ''
+            
+            # Actions buttons
+            actions = f'''
+            <div class="flex justify-end space-x-2">
+            '''
+            
+            if has_crl:
+                actions += f'''
+                <button onclick="downloadCRL({ca_id}, 'pem')" 
+                        class="btn-sm btn-secondary" title="Download PEM">
+                    <i class="fas fa-download"></i> PEM
+                </button>
+                <button onclick="downloadCRL({ca_id}, 'der')" 
+                        class="btn-sm btn-secondary" title="Download DER">
+                    <i class="fas fa-download"></i> DER
+                </button>
+                <button onclick="viewCRLInfo('{ca_refid}')" 
+                        class="btn-sm btn-secondary" title="View Info">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+                '''
+            
+            if cdp_enabled:
+                actions += f'''
+                <button onclick="generateCRL({ca_id}, '{ca_name}')" 
+                        class="btn-sm btn-primary" title="Force Generate">
+                    <i class="fas fa-refresh"></i>
+                </button>
+                '''
+            
+            actions += '</div>'
+            
+            html += f'''
+            <tr class="hover:bg-gray-50">
+                <td>
+                    <div class="font-medium text-gray-900">{ca_name}</div>
+                    <div class="text-sm text-gray-500">{ca_refid}</div>
+                </td>
+                <td>{cdp_status}</td>
+                <td>{crl_status}</td>
+                <td>{revoked_count}</td>
+                <td>{last_update}</td>
+                <td>{next_update} {days_until}</td>
+                <td>{actions}</td>
+            </tr>
+            '''
+        
+        html += '''
+            </tbody>
+        </table>
+        '''
+        
+        return html
+        
+    except Exception as e:
+        return f'<div class="p-4 text-red-600">Error: {str(e)}</div>'
+
+
 @ui_bp.route('/scep')
 @login_required
 def scep_config():
@@ -2174,10 +2397,10 @@ def config_users():
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Username</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Role</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -2186,14 +2409,14 @@ def config_users():
         for user in users:
             html += f'''
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{user['username']}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user['email']}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <td>{user['username']}</td>
+                        <td>{user['email']}</td>
+                        <td>
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
                                 {user['role']}
                             </span>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td>
                             <button onclick="$dispatch('open-modal', {{ modal: 'changePasswordModal', userId: {user['id']} }})"
                                     class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3">
                                 Change Password
@@ -2521,8 +2744,11 @@ def ca_detail(ca_id):
 @ui_bp.route('/ca/new')
 @login_required
 def ca_new():
-    """Create new CA page - redirects to CA list with modal"""
-    return redirect(url_for('ui.ca_list') + '#create')
+    """Create new CA page - returns CA list with trigger to open modal"""
+    response = make_response(render_template('ca/list.html'))
+    # Send trigger after swap to open modal
+    response.headers['HX-Trigger-After-Swap'] = 'openCreateCAModal'
+    return response
 
 
 # Certificate Detail Pages  
@@ -2554,8 +2780,11 @@ def cert_detail(cert_id):
 @ui_bp.route('/certificates/new')
 @login_required
 def cert_new():
-    """Create new certificate page - redirects to cert list with modal"""
-    return redirect(url_for('ui.cert_list') + '#create')
+    """Create new certificate page - returns cert list with trigger to open modal"""
+    response = make_response(render_template('certs/list.html'))
+    # Send trigger after swap to open modal
+    response.headers['HX-Trigger-After-Swap'] = 'openCreateCertModal'
+    return response
 
 
 @ui_bp.route('/api/ui/ca/<ca_id>/certificates')
@@ -2586,11 +2815,11 @@ def ca_certificates(ca_id):
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Subject</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Valid Until</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
+                        <th>Subject</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Valid Until</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -2606,21 +2835,21 @@ def ca_certificates(ca_id):
             
             html += f'''
                 <tr>
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td>
                         <a href="/certificates/{cert['id']}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
                             {cert.get('common_name', cert.get('subject', 'N/A'))}
                         </a>
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td>
                         {cert.get('cert_type', 'server')}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
+                    <td>
                         {status_badge}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td>
                         {cert.get('not_valid_after', 'N/A')[:10] if cert.get('not_valid_after') else 'N/A'}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td>
                         <a href="/certificates/{cert['id']}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
                             View
                         </a>
@@ -2796,10 +3025,10 @@ def managed_certs_list():
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Subject</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Valid Until</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Action</th>
+                        <th>Subject</th>
+                        <th>Valid Until</th>
+                        <th>Type</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -2844,7 +3073,7 @@ def managed_certs_list():
             
             html += f'''
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                    <td>
                         <div class="flex items-center">
                             <i class="fas fa-certificate text-blue-500 mr-2"></i>
                             {cn}
@@ -2853,16 +3082,16 @@ def managed_certs_list():
                             {'ID: ' + str(cert.get('id', 'N/A'))}
                         </div>
                     </td>
-                    <td class="px-4 py-3 text-sm {date_class}">
+                    <td>
                         {valid_to}
                         <div class="text-xs text-gray-500 dark:text-gray-400">({days_left} days)</div>
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
-                        <span class="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                    <td>
+                        <span>
                             {cert_type}
                         </span>
                     </td>
-                    <td class="px-4 py-3 text-sm">
+                    <td>
             '''
             
             if has_key:
@@ -2876,7 +3105,7 @@ def managed_certs_list():
                 '''
             else:
                 html += '''
-                        <span class="px-3 py-1.5 bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 text-xs rounded cursor-not-allowed" title="Private key not available">
+                        <span class="" title="Private key not available">
                             <i class="fas fa-key-skeleton mr-1"></i>No Key
                         </span>
                 '''
@@ -3011,6 +3240,457 @@ def check_session():
     return jsonify({
         'success': True,
         'active': True,
-        'last_activity': session.get('last_activity'),
-        'expires_at': session.get('last_activity', time.time()) + 1800
+        'last_activity': session.get('last_activity')
     }), 200
+
+
+@ui_bp.route('/ocsp')
+@login_required
+def ocsp_page():
+    """OCSP Status page"""
+    return render_template('ocsp/status.html')
+
+
+@ui_bp.route('/api/ui/ocsp/status')
+@login_required
+def ocsp_status_list():
+    """Get OCSP status for all CAs"""
+    try:
+        from models import CA, OCSPResponse
+        
+        cas = CA.query.all()
+        
+        html = '''
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th>CA Name</th>
+                        <th>OCSP Status</th>
+                        <th>OCSP URL</th>
+                        <th>Cached Responses</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+        '''
+        
+        for ca in cas:
+            cached_count = OCSPResponse.query.filter_by(ca_id=ca.id).count()
+            
+            status_badge = ''
+            if ca.ocsp_enabled:
+                status_badge = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Enabled</span>'
+            else:
+                status_badge = '<span class="badge badge-secondary"><i class="fas fa-times mr-1"></i>Disabled</span>'
+            
+            ocsp_url_display = ca.ocsp_url if ca.ocsp_url else '<span class="text-gray-400">Not configured</span>'
+            
+            html += f'''
+                <tr>
+                    <td>
+                        <div class="font-medium">{ca.descr}</div>
+                        <div class="text-xs text-gray-500">{ca.refid}</div>
+                    </td>
+                    <td>{status_badge}</td>
+                    <td><code class="text-xs">{ocsp_url_display}</code></td>
+                    <td class="text-center">{cached_count}</td>
+                    <td>
+                        <a href="/ca/{ca.id}" class="text-blue-600 hover:text-blue-800 text-sm">
+                            <i class="fas fa-cog mr-1"></i>Configure
+                        </a>
+                    </td>
+                </tr>
+            '''
+        
+        html += '''
+                </tbody>
+            </table>
+        </div>
+        '''
+        
+        return html
+        
+    except Exception as e:
+        logger.error(f"Error getting OCSP status: {e}")
+        return f'<div class="text-red-600">Error loading OCSP status: {str(e)}</div>'
+
+
+@ui_bp.route('/api/ui/ocsp/stats')
+@login_required
+def ocsp_stats_ui():
+    """Get OCSP statistics for UI"""
+    try:
+        from models import CA, OCSPResponse
+        
+        # Count CAs with OCSP enabled
+        ocsp_enabled_cas = CA.query.filter_by(ocsp_enabled=True).count()
+        
+        # Count cached responses
+        cached_responses = OCSPResponse.query.count()
+        
+        # Return HTML fragments for HTMX
+        return f'''
+        <span class="ocsp-enabled-count">{ocsp_enabled_cas}</span>
+        <span class="cached-responses-count">{cached_responses}</span>
+        '''
+        
+    except Exception as e:
+        logger.error(f"Error getting OCSP stats: {e}")
+        return '<span class="text-red-600">Error</span>'
+
+
+# HTTPS Certificate Management UI Routes
+
+@ui_bp.route('/api/ui/system/https-cert-info')
+@login_required
+def https_cert_info_ui():
+    """Get current HTTPS certificate information (UI route with session auth)"""
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+    from pathlib import Path
+    from models import SystemConfig
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
+    
+    try:
+        with open(cert_path, 'rb') as f:
+            cert_pem = f.read()
+            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+        
+        # Determine certificate source
+        config = SystemConfig.query.filter_by(key='https_cert_source').first()
+        source = config.value if config else 'auto'
+        
+        # Extract subject
+        subject_parts = []
+        for attr in cert.subject:
+            subject_parts.append(f"{attr.oid._name}={attr.value}")
+        subject_str = ', '.join(subject_parts)
+        
+        # Format expiry date (compatible with all cryptography versions)
+        expires = cert.not_valid_after.strftime('%Y-%m-%d %H:%M:%S UTC')
+        
+        cert_type = 'Self-Signed' if source == 'auto' else 'UCM Managed'
+        
+        return jsonify({
+            'type': cert_type,
+            'subject': subject_str,
+            'expires': expires,
+            'source': source,
+            'issuer': cert.issuer.rfc4514_string()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error loading HTTPS cert info: {e}")
+        return jsonify({
+            'type': 'Error',
+            'subject': str(e),
+            'expires': 'N/A',
+            'source': 'unknown'
+        }), 200
+
+
+@ui_bp.route('/api/ui/system/https-cert-candidates')
+@login_required
+def https_cert_candidates_ui():
+    """Get list of certificates suitable for HTTPS (UI route with session auth)"""
+    from pathlib import Path
+    from models import SystemConfig, Certificate, CA
+    from datetime import datetime
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.x509.oid import ExtendedKeyUsageOID
+    import base64
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Get current cert_id if using managed
+    current_cert_id = None
+    config = SystemConfig.query.filter_by(key='https_cert_id').first()
+    if config:
+        current_cert_id = int(config.value)
+    
+    # Find suitable certificates (not revoked, server certs, not expired)
+    now = datetime.utcnow()
+    certificates = Certificate.query.filter(
+        Certificate.revoked == False,
+        Certificate.cert_type.in_(['server_cert', 'cert']),
+        Certificate.valid_to > now  # Not expired
+    ).all()
+    
+    logger.info(f"Found {len(certificates)} potential HTTPS certificate candidates")
+    
+    candidates = []
+    for cert in certificates:
+        # Check if certificate has been issued (has crt field)
+        if not cert.crt:
+            continue
+            
+        # Check if private key exists
+        key_path = Path(f'/opt/ucm/backend/data/private/cert_{cert.refid}.key')
+        if not key_path.exists():
+            # Try refid-based naming
+            key_path = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
+            if not key_path.exists():
+                continue
+        
+        # Parse certificate to check Extended Key Usage
+        try:
+            cert_pem = base64.b64decode(cert.crt)
+            x509_cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+            
+            # Check if certificate has Server Authentication EKU
+            has_server_auth = False
+            try:
+                ext = x509_cert.extensions.get_extension_for_oid(
+                    x509.oid.ExtensionOID.EXTENDED_KEY_USAGE
+                )
+                if ExtendedKeyUsageOID.SERVER_AUTH in ext.value:
+                    has_server_auth = True
+            except x509.ExtensionNotFound:
+                # If no EKU extension, accept server_cert type certificates
+                if cert.cert_type == 'server_cert':
+                    has_server_auth = True
+            
+            if not has_server_auth:
+                logger.debug(f"Certificate {cert.descr} rejected: no Server Authentication EKU")
+                continue
+                
+        except Exception as e:
+            logger.warning(f"Failed to parse certificate {cert.descr}: {e}")
+            # If can't parse, skip for safety
+            continue
+        
+        # Get CA name
+        ca = CA.query.filter_by(refid=cert.caref).first()
+        
+        # Extract CN from subject if available
+        cn = 'N/A'
+        if cert.subject:
+            for part in cert.subject.split(','):
+                if 'CN=' in part:
+                    cn = part.split('CN=')[1].strip()
+                    break
+        
+        # Build SAN list
+        san_list = []
+        if cert.san_dns:
+            try:
+                import json
+                dns_names = json.loads(cert.san_dns)
+                san_list.extend(dns_names)
+            except:
+                pass
+        
+        # Calculate days until expiration
+        days_left = (cert.valid_to - now).days if cert.valid_to else 0
+        
+        candidates.append({
+            'id': cert.id,
+            'cert_id': cert.refid,
+            'common_name': cn or cert.descr,
+            'san': ', '.join(san_list) if san_list else '',
+            'expires': cert.valid_to.strftime('%Y-%m-%d') if cert.valid_to else 'N/A',
+            'days_left': days_left,
+            'ca_name': ca.descr if ca else 'Unknown',
+            'is_current': cert.id == current_cert_id
+        })
+    
+    logger.info(f"Filtered to {len(candidates)} suitable HTTPS certificates")
+    return jsonify({'certificates': candidates}), 200
+
+
+@ui_bp.route('/api/ui/system/https-cert-apply', methods=['POST'])
+@login_required
+def https_cert_apply_ui():
+    """Apply a new HTTPS certificate (UI route with session auth)"""
+    from pathlib import Path
+    from models import SystemConfig, Certificate, CA, User, db
+    import shutil
+    import subprocess
+    import os
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    data = request.get_json()
+    source = data.get('source', 'auto')
+    cert_id = data.get('cert_id')
+    
+    # Check admin role
+    user = User.query.get(session['user_id'])
+    if user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Admin role required'}), 403
+    
+    try:
+        if source == 'managed':
+            if not cert_id:
+                return jsonify({'success': False, 'error': 'cert_id required for managed source'}), 400
+            
+            # Get certificate from database
+            cert = Certificate.query.get(cert_id)
+            if not cert:
+                return jsonify({'success': False, 'error': 'Certificate not found'}), 404
+            
+            # Load certificate and key (use refid for file paths)
+            cert_file = Path(f'/opt/ucm/backend/data/certs/{cert.refid}.crt')
+            
+            key_file = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
+            
+            if not cert_file.exists() or not key_file.exists():
+                return jsonify({'success': False, 'error': 'Certificate or key file not found'}), 404
+            
+            # Copy to HTTPS location
+            https_cert = Path('/opt/ucm/backend/data/https_cert.pem')
+            https_key = Path('/opt/ucm/backend/data/https_key.pem')
+            
+            # Backup current cert
+            if https_cert.exists():
+                shutil.copy(https_cert, str(https_cert) + '.backup')
+            if https_key.exists():
+                shutil.copy(https_key, str(https_key) + '.backup')
+            
+            # Copy new cert
+            shutil.copy(cert_file, https_cert)
+            shutil.copy(key_file, https_key)
+            
+            # Set permissions
+            os.chmod(https_key, 0o600)
+            os.chmod(https_cert, 0o644)
+            
+            # Save configuration
+            config = SystemConfig.query.filter_by(key='https_cert_source').first()
+            if not config:
+                config = SystemConfig(key='https_cert_source', value='managed')
+                db.session.add(config)
+            else:
+                config.value = 'managed'
+            
+            cert_id_config = SystemConfig.query.filter_by(key='https_cert_id').first()
+            if not cert_id_config:
+                cert_id_config = SystemConfig(key='https_cert_id', value=str(cert_id))
+                db.session.add(cert_id_config)
+            else:
+                cert_id_config.value = str(cert_id)
+            
+            db.session.commit()
+            
+            logger.info(f"HTTPS certificate applied: {cert.common_name} (ID: {cert_id}) by {user.username}")
+        
+        # Restart UCM service
+        subprocess.Popen(['systemctl', 'restart', 'ucm'])
+        
+        return jsonify({'success': True}), 200
+        
+    except Exception as e:
+        logger.error(f"Error applying HTTPS certificate: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@ui_bp.route('/api/ui/system/https-cert-regenerate', methods=['POST'])
+@login_required
+def https_cert_regenerate_ui():
+    """Regenerate self-signed HTTPS certificate (UI route with session auth)"""
+    from config.https_manager import HTTPSManager
+    from pathlib import Path
+    from models import SystemConfig, User, db
+    import shutil
+    import subprocess
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Check admin role
+    user = User.query.get(session['user_id'])
+    if user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Admin role required'}), 403
+    
+    try:
+        cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
+        key_path = Path('/opt/ucm/backend/data/https_key.pem')
+        
+        # Backup current
+        if cert_path.exists():
+            shutil.copy(cert_path, str(cert_path) + '.backup')
+        if key_path.exists():
+            shutil.copy(key_path, str(key_path) + '.backup')
+        
+        # Generate new
+        HTTPSManager.generate_self_signed_cert(cert_path, key_path)
+        
+        # Update config
+        config = SystemConfig.query.filter_by(key='https_cert_source').first()
+        if not config:
+            config = SystemConfig(key='https_cert_source', value='auto')
+            db.session.add(config)
+        else:
+            config.value = 'auto'
+        
+        db.session.commit()
+        
+        logger.info(f"HTTPS certificate regenerated by {user.username}")
+        
+        # Restart UCM service
+        subprocess.Popen(['systemctl', 'restart', 'ucm'])
+        
+        return jsonify({'success': True}), 200
+        
+    except Exception as e:
+        logger.error(f"Error regenerating HTTPS certificate: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@ui_bp.route('/crl/info/<ca_refid>')
+@login_required
+def crl_info_integrated(ca_refid):
+    """CRL Information page (integrated in app)"""
+    from models import CA
+    from services.crl_service import CRLService
+    
+    try:
+        # Get CA by refid
+        ca = CA.query.filter_by(refid=ca_refid).first()
+        if not ca:
+            flash('CA not found', 'error')
+            return redirect(url_for('ui.crl_list'))
+        
+        # Get latest CRL
+        latest_crl = CRLService.get_latest_crl_by_refid(ca_refid)
+        
+        if not latest_crl:
+            crl_info = {
+                'ca_refid': ca_refid,
+                'ca_name': ca.descr,
+                'ca_common_name': ca.common_name,
+                'has_crl': False,
+                'message': 'No CRL generated yet for this CA'
+            }
+        else:
+            crl_info = {
+                'ca_refid': ca_refid,
+                'ca_name': ca.descr,
+                'ca_common_name': ca.common_name,
+                'has_crl': True,
+                'crl_number': latest_crl.crl_number,
+                'this_update': latest_crl.this_update.isoformat() if latest_crl.this_update else None,
+                'next_update': latest_crl.next_update.isoformat() if latest_crl.next_update else None,
+                'revoked_count': latest_crl.revoked_count,
+                'is_stale': latest_crl.is_stale,
+                'days_until_expiry': latest_crl.days_until_expiry,
+                'download_urls': {
+                    'pem': f'/cdp/{ca_refid}/crl.pem',
+                    'der': f'/cdp/{ca_refid}/crl.der',
+                    'crl': f'/cdp/{ca_refid}/crl.crl'
+                }
+            }
+        
+        return render_template('crl/info_integrated.html', crl_info=crl_info)
+        
+    except Exception as e:
+        flash(f'Error loading CRL info: {str(e)}', 'error')
+        return redirect(url_for('ui.crl_list'))

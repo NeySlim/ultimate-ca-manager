@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from io import BytesIO
 
-from models import db, User
+from models import db, CA, AuditLog
 from services.ca_service import CAService
 from middleware.auth_middleware import operator_required, admin_required
 
@@ -310,3 +310,77 @@ def export_ca_advanced(ca_id):
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": f"Export failed: {str(e)}"}), 500
+
+
+@ca_bp.route('/<int:ca_id>', methods=['PATCH'])
+@jwt_required()
+@operator_required
+def update_ca(ca_id):
+    """Update CA configuration (CDP settings)"""
+    try:
+        data = request.get_json()
+        
+        ca = CA.query.get(ca_id)
+        if not ca:
+            return jsonify({"error": "CA not found"}), 404
+        
+        # Update CDP configuration
+        if 'cdp_enabled' in data:
+            ca.cdp_enabled = bool(data['cdp_enabled'])
+        
+        if 'cdp_url' in data:
+            cdp_url = data['cdp_url']
+            if cdp_url:
+                # Validate CDP URL format
+                if '{ca_refid}' not in cdp_url:
+                    return jsonify({"error": "CDP URL must contain {ca_refid} placeholder"}), 400
+                ca.cdp_url = cdp_url
+            else:
+                ca.cdp_url = None
+        
+        # Update OCSP configuration
+        if 'ocsp_enabled' in data:
+            ca.ocsp_enabled = bool(data['ocsp_enabled'])
+        
+        if 'ocsp_url' in data:
+            ocsp_url = data['ocsp_url']
+            ca.ocsp_url = ocsp_url if ocsp_url else None
+        
+        # Validate: if CDP enabled, URL must be set
+        if ca.cdp_enabled and not ca.cdp_url:
+            return jsonify({"error": "CDP URL is required when CDP is enabled"}), 400
+        
+        # Validate: if OCSP enabled, URL must be set
+        if ca.ocsp_enabled and not ca.ocsp_url:
+            return jsonify({"error": "OCSP URL is required when OCSP is enabled"}), 400
+        
+        db.session.commit()
+        
+        # Audit log
+        username = get_jwt_identity()
+        audit = AuditLog(
+            username=username,
+            action='ca_updated',
+            resource_type='ca',
+            resource_id=ca.refid,
+            details=f"Updated CA configuration: CDP={ca.cdp_enabled}, OCSP={ca.ocsp_enabled}",
+            success=True
+        )
+        db.session.add(audit)
+        db.session.commit()
+        
+        return jsonify({
+            "message": "CA updated successfully",
+            "ca": {
+                "id": ca.id,
+                "refid": ca.refid,
+                "cdp_enabled": ca.cdp_enabled,
+                "cdp_url": ca.cdp_url,
+                "ocsp_enabled": ca.ocsp_enabled,
+                "ocsp_url": ca.ocsp_url
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500

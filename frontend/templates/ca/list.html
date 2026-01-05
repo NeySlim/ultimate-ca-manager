@@ -3,43 +3,50 @@
 {% block title %}Certificate Authorities - UCM{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <!-- Header -->
-    <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold text-gray-900">
-            <i class="fas fa-certificate mr-2"></i> Certificate Authorities
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">
+            <i class="fas fa-certificate" style="margin-right: 0.5rem;"></i> Certificate Authorities
         </h1>
-        <div class="flex space-x-2">
+        <div style="display: flex; gap: 0.5rem;">
             <button onclick="openImportCAModal()" 
                     class="btn btn-secondary">
-                <i class="fas fa-file-import mr-2 text-success"></i> Import CA
+                <i class="fas fa-file-import" style="margin-right: 0.5rem; color: var(--success-color);"></i> Import CA
             </button>
             <button onclick="openCreateCAModal()" 
                     class="btn btn-secondary">
-                <i class="fas fa-plus mr-2"></i> Create CA
+                <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> Create CA
             </button>
         </div>
     </div>
     
     <!-- CA List -->
-    <div class="bg-white rounded-lg shadow border border-gray-200">
+    <div class="card" style="padding: 0;">
         <div id="ca-list" 
              hx-get="/api/ui/ca/list" 
              hx-trigger="load, refreshCAs from:body"
              hx-swap="innerHTML">
-            <div class="p-8 text-center">
-                <div class="animate-pulse space-y-4">
-                    <div class="h-4 bg-gray-200 rounded"></div>
-                    <div class="h-4 bg-gray-200 rounded"></div>
-                    <div class="h-4 bg-gray-200 rounded"></div>
+            <div style="padding: 2rem; text-align: center;">
+                <div style="display: flex; flex-direction: column; gap: 1rem; animation: pulse 2s infinite;">
+                    <div style="height: 1rem; background: var(--bg-secondary); border-radius: 0.25rem;"></div>
+                    <div style="height: 1rem; background: var(--bg-secondary); border-radius: 0.25rem;"></div>
+                    <div style="height: 1rem; background: var(--bg-secondary); border-radius: 0.25rem;"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<style>
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+</style>
+
 <!-- Create CA Modal -->
-<div id="createCAModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 50; padding: 1rem;">
+<div id="createCAModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
     <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 1400px; width: 100%; max-height: calc(100vh - 80px); overflow-y: auto; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
@@ -62,9 +69,9 @@
                     <h3 class="modal-form-heading">Basic Information</h3>
                     
                     <div style="margin-bottom: 1rem;">
-                        <label class="modal-form-label">
-                            Description <span class="text-red-500">*</span>
-                        </label>
+                    <label class="modal-form-label">
+                        Description <span style="color: var(--danger-color);">*</span>
+                    </label>
                         <input type="text" name="descr" required placeholder="My Certificate Authority"
                                class="modal-form-input">
                     </div>
@@ -77,7 +84,7 @@
                     <div class="modal-form-grid-2">
                         <div>
                             <label class="modal-form-label">
-                                Key Type <span class="text-red-500">*</span>
+                                Key Type <span style="color: var(--danger-color);">*</span>
                             </label>
                             <select name="key_type" required
                                     class="modal-form-input">
@@ -89,7 +96,7 @@
                         </div>
                         <div>
                             <label class="modal-form-label">
-                                Digest Algorithm <span class="text-red-500">*</span>
+                                Digest Algorithm <span style="color: var(--danger-color);">*</span>
                             </label>
                             <select name="digest_alg"
                                     class="modal-form-input">
@@ -102,7 +109,7 @@
                     
                     <div style="margin-bottom: 1rem;">
                         <label class="modal-form-label">
-                            Lifetime (days) <span class="text-red-500">*</span>
+                            Lifetime (days) <span style="color: var(--danger-color);">*</span>
                         </label>
                         <input type="number" name="lifetime" value="3650" min="1" max="7300" required
                                class="modal-form-input">
@@ -117,14 +124,14 @@
                     <div class="modal-form-grid-2">
                         <div>
                             <label class="modal-form-label">
-                                Country Code <span class="text-red-500">*</span>
+                                Country Code <span style="color: var(--danger-color);">*</span>
                             </label>
                             <input type="text" name="dn_country" required maxlength="2" placeholder="US"
                                    class="modal-form-input">
                         </div>
                         <div>
                             <label class="modal-form-label">
-                                State / Province <span class="text-red-500">*</span>
+                                State / Province <span style="color: var(--danger-color);">*</span>
                             </label>
                             <input type="text" name="dn_state" required placeholder="California"
                                    class="modal-form-input">
@@ -134,14 +141,14 @@
                     <div class="modal-form-grid-2">
                         <div>
                             <label class="modal-form-label">
-                                City / Locality <span class="text-red-500">*</span>
+                                City / Locality <span style="color: var(--danger-color);">*</span>
                             </label>
                             <input type="text" name="dn_city" required placeholder="San Francisco"
                                    class="modal-form-input">
                         </div>
                         <div>
                             <label class="modal-form-label">
-                                Organization <span class="text-red-500">*</span>
+                                Organization <span style="color: var(--danger-color);">*</span>
                             </label>
                             <input type="text" name="dn_org" required placeholder="My Company"
                                    class="modal-form-input">
@@ -158,7 +165,7 @@
                         </div>
                         <div>
                             <label class="modal-form-label">
-                                Common Name <span class="text-red-500">*</span>
+                                Common Name <span style="color: var(--danger-color);">*</span>
                             </label>
                             <input type="text" name="dn_commonname" required placeholder="Internal CA"
                                    class="modal-form-input">
@@ -174,7 +181,9 @@
                 </button>
                 <button type="submit" 
                         class="btn-primary">
-                    <i class="fas fa-plus mr-2"></i> Create CA
+                <button type="submit" 
+                        class="btn-primary">
+                    <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> Create CA
                 </button>
             </div>
         </form>
@@ -183,7 +192,7 @@
 </div>
 
 <!-- Import CA Modal -->
-<div id="importCAModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 50; padding: 1rem;">
+<div id="importCAModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
     <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 1400px; width: 100%; max-height: calc(100vh - 80px); overflow-y: auto; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
@@ -203,7 +212,7 @@
                 
                 <div style="margin-bottom: 1rem;">
                     <label class="modal-form-label">
-                        Description <span class="text-red-500">*</span>
+                        Description <span style="color: var(--danger-color);">*</span>
                     </label>
                     <input type="text" name="description" required placeholder="Imported CA"
                            class="modal-form-input">
@@ -211,7 +220,7 @@
                 
                 <div style="margin-bottom: 1rem;">
                     <label class="modal-form-label">
-                        Certificate (PEM format) <span class="text-red-500">*</span>
+                        Certificate (PEM format) <span style="color: var(--danger-color);">*</span>
                     </label>
                     <textarea name="certificate" required rows="10" 
                               placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
@@ -240,7 +249,7 @@
                 </button>
                 <button type="submit" 
                         class="btn-primary">
-                    <i class="fas fa-file-import mr-2"></i> Import CA
+                    <i class="fas fa-file-import" style="margin-right: 0.5rem;"></i> Import CA
                 </button>
             </div>
         </form>
@@ -249,7 +258,7 @@
 </div>
 
 <!-- PKCS#12 Password Modal -->
-<div id="pkcs12PasswordModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 50; padding: 1rem;">
+<div id="pkcs12PasswordModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
     <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
@@ -284,33 +293,35 @@
 
 <script>
 // Auto-open create modal if URL has #create hash
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', checkCreateHash);
+
+function checkCreateHash() {
     if (window.location.hash === '#create') {
-        openCreateCAModal();
-        // Remove hash from URL after opening modal
-        history.replaceState(null, null, window.location.pathname);
+        setTimeout(() => {
+            openCreateCAModal();
+            // Remove hash from URL after opening modal
+            history.replaceState(null, null, window.location.pathname);
+        }, 100);
     }
-});
+}
 
 // Global variables for PKCS12 export
-let pkcs12Params = {};
+if (typeof window.pkcs12Params === 'undefined') window.pkcs12Params = {};
 
 function openImportCAModal() {
-    document.getElementById('importCAModal').classList.remove('hidden');
+    openModal('importCAModal');
 }
 
 function closeImportCAModal() {
-    document.getElementById('importCAModal').classList.add('hidden');
-    document.querySelector('#importCAModal form').reset();
+    closeModal('importCAModal', true);
 }
 
 function openCreateCAModal() {
-    document.getElementById('createCAModal').classList.remove('hidden');
+    openModal('createCAModal');
 }
 
 function closeCreateCAModal() {
-    document.getElementById('createCAModal').classList.add('hidden');
-    document.querySelector('#createCAModal form').reset();
+    closeModal('createCAModal', true);
 }
 
 function handleCACreateResponse(event) {
@@ -344,15 +355,15 @@ function showNotification(message, type) {
 
 // PKCS#12 Modal Functions
 function showPKCS12ModalTable(id, type) {
-    pkcs12Params = { id, type };
-    document.getElementById('pkcs12PasswordModal').classList.remove('hidden');
+    window.pkcs12Params = { id, type };
+    openModal('pkcs12PasswordModal');
     document.getElementById('pkcs12Password').value = '';
     document.getElementById('pkcs12PasswordConfirm').value = '';
 }
 
 function closePKCS12Modal() {
-    document.getElementById('pkcs12PasswordModal').classList.add('hidden');
-    pkcs12Params = {};
+    closeModal('pkcs12PasswordModal');
+    window.pkcs12Params = {};
 }
 
 function downloadPKCS12WithPassword() {
@@ -369,7 +380,7 @@ function downloadPKCS12WithPassword() {
         return;
     }
     
-    const { id, type } = pkcs12Params;
+    const { id, type } = window.pkcs12Params;
     const url = type === 'ca' 
         ? `/api/v1/ca/${id}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`
         : `/api/v1/certificates/${id}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`;
@@ -396,25 +407,31 @@ function exportCA(id, event) {
     // Create menu
     const menu = document.createElement('div');
     menu.id = 'export-menu-' + id;
-    menu.className = 'fixed w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50';
-    menu.innerHTML = '<div class="py-1" role="menu">' +
-        '<button onclick="exportCASimple(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
-            '<i class="fas fa-file-certificate mr-2"></i>Certificate only (PEM)' +
+    menu.className = 'fixed';
+    menu.style.width = '14rem';
+    menu.style.borderRadius = '0.375rem';
+    menu.style.boxShadow = 'var(--shadow-lg)';
+    menu.style.background = 'var(--card-bg)';
+    menu.style.border = '1px solid var(--border-color)';
+    menu.style.zIndex = '50';
+    menu.innerHTML = '<div style="padding: 0.25rem 0;">' +
+        '<button onclick="exportCASimple(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+            '<i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i>Certificate only (PEM)' +
         '</button>' +
-        '<button onclick="exportCAWithKey(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
-            '<i class="fas fa-key mr-2"></i>Certificate + Key (PEM)' +
+        '<button onclick="exportCAWithKey(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+            '<i class="fas fa-key" style="margin-right: 0.5rem;"></i>Certificate + Key (PEM)' +
         '</button>' +
-        '<button onclick="exportCAWithChain(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
-            '<i class="fas fa-link mr-2"></i>Certificate + Chain (PEM)' +
+        '<button onclick="exportCAWithChain(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+            '<i class="fas fa-link" style="margin-right: 0.5rem;"></i>Certificate + Chain (PEM)' +
         '</button>' +
-        '<button onclick="exportCAFull(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
-            '<i class="fas fa-archive mr-2"></i>Full Chain + Key (PEM)' +
+        '<button onclick="exportCAFull(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+            '<i class="fas fa-archive" style="margin-right: 0.5rem;"></i>Full Chain + Key (PEM)' +
         '</button>' +
-        '<button onclick="exportCADER(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
-            '<i class="fas fa-file-binary mr-2"></i>Certificate (DER)' +
+        '<button onclick="exportCADER(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+            '<i class="fas fa-file-binary" style="margin-right: 0.5rem;"></i>Certificate (DER)' +
         '</button>' +
-        '<button onclick="showPKCS12ModalTable(' + id + ', \'ca\')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
-            '<i class="fas fa-lock mr-2"></i>PKCS#12 (.p12/.pfx)' +
+        '<button onclick="showPKCS12ModalTable(' + id + ', \'ca\')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+            '<i class="fas fa-lock" style="margin-right: 0.5rem;"></i>PKCS#12 (.p12/.pfx)' +
         '</button>' +
     '</div>';
     

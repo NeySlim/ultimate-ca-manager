@@ -145,7 +145,7 @@ class Certificate(db.Model):
     ocsp_uri = db.Column(db.String(255))
     
     # Private key management
-    private_key_location = db.Column(db.String(20), default='firewall')  # 'firewall' or 'download_only'
+    private_key_location = db.Column(db.String(20), default='stored')  # 'stored' or 'download_only'
     
     # Status
     revoked = db.Column(db.Boolean, default=False)

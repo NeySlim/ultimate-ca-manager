@@ -60,12 +60,18 @@
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.5);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 body {
@@ -75,6 +81,9 @@ body {
     line-height: 1.6;
     font-size: 14px;
     min-height: 100vh;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===========================
@@ -95,12 +104,18 @@ nav {
     padding: 0 24px 0 260px;
     z-index: 1000;
     box-shadow: var(--shadow-md);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 nav > div {
     display: flex;
     align-items: center;
     gap: 10px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .navbar {
@@ -117,6 +132,9 @@ nav > div {
     padding: 0 24px 0 260px;
     z-index: 1000;
     box-shadow: var(--shadow-md);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .navbar-brand {
@@ -127,23 +145,35 @@ nav > div {
     font-size: 16px;
     color: var(--navbar-text);
     text-decoration: none;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .navbar-brand i {
     color: var(--primary-color);
     font-size: 22px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .navbar-brand-text {
     font-size: 16px;
     font-weight: 600;
     color: var(--navbar-text);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .navbar-actions {
     display: flex;
     align-items: center;
     gap: 8px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===========================
@@ -160,6 +190,9 @@ aside {
     border-right: 1px solid var(--border-color);
     overflow-y: auto;
     z-index: 999;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar {
@@ -173,12 +206,18 @@ aside {
     overflow-y: auto;
     z-index: 1001;
     padding-top: 20px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-header {
     padding: 0 20px 20px;
     border-bottom: 1px solid var(--border-light);
     margin-bottom: 10px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-brand {
@@ -189,14 +228,23 @@ aside {
     font-weight: 700;
     color: var(--primary-color);
     text-decoration: none;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-brand i {
     font-size: 24px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-nav {
     padding: 10px 0;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-link {
@@ -210,11 +258,17 @@ aside {
     font-size: 14px;
     font-weight: 500;
     border-left: 3px solid transparent;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-link:hover {
     background: var(--sidebar-link-hover-bg);
     color: var(--primary-color);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-link.active {
@@ -222,24 +276,36 @@ aside {
     color: var(--sidebar-link-active-text);
     border-left: 2px solid var(--sidebar-link-active-border);
     padding-left: 18px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-link i {
     width: 18px;
     text-align: center;
     font-size: 16px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* Sidebar submenu */
 .sidebar-submenu {
     background: rgba(211, 54, 130, 0.08);
     border-left: 2px solid var(--primary-light);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-submenu .sidebar-link {
     padding-left: 52px;
     font-size: 13px;
     font-weight: 400;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-submenu a {
@@ -249,11 +315,17 @@ aside {
     text-decoration: none;
     font-size: 12px;
     border-left: 3px solid transparent;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar-submenu a:hover {
     background: rgba(211, 54, 130, 0.12);
     color: var(--primary-color);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===========================
@@ -272,26 +344,41 @@ aside {
     cursor: pointer;
     transition: all 0.2s ease;
     text-decoration: none;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .btn-primary {
     background: var(--primary-color);
     color: #fdf6e3;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .btn-primary:hover {
     background: var(--primary-hover);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .btn-secondary {
     background: var(--btn-secondary-bg);
     color: var(--btn-secondary-text);
     border: 1px solid var(--border-color);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .btn-secondary:hover {
     background: var(--btn-secondary-hover);
     border-color: var(--border-color);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===========================
@@ -300,6 +387,9 @@ aside {
 
 .dropdown {
     position: relative;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-menu {
@@ -313,6 +403,9 @@ aside {
     min-width: 200px;
     z-index: 2000;
     overflow: hidden;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-header {
@@ -323,6 +416,9 @@ aside {
     color: var(--text-muted);
     background: var(--table-header-bg);
     letter-spacing: 0.5px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-item {
@@ -334,22 +430,34 @@ aside {
     text-decoration: none;
     transition: background 0.15s ease;
     font-size: 13px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-item:hover {
     background: var(--dropdown-item-hover);
     color: var(--primary-color);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-item.disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .dropdown-divider {
     height: 1px;
     background: var(--border-light);
     margin: 4px 0;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===========================
@@ -361,6 +469,9 @@ main {
     margin-top: 60px;
     padding: 24px;
     min-height: calc(100vh - 60px);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .main-content {
@@ -368,6 +479,9 @@ main {
     margin-top: 60px;
     padding: 24px;
     min-height: calc(100vh - 60px);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===========================
@@ -380,6 +494,9 @@ main {
     border-radius: 4px;
     box-shadow: var(--shadow-sm);
     margin-bottom: 24px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .card-header {
@@ -389,10 +506,16 @@ main {
     font-weight: 600;
     font-size: 1.1rem;
     color: #e39b6f;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .card-body {
     padding: 20px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===========================
@@ -403,6 +526,9 @@ main {
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .table thead th {
@@ -417,34 +543,55 @@ main {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     transition: background 0.2s;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .table thead th:hover {
     background: linear-gradient(135deg, #4d4a62 0%, #453f58 100%);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .table thead th:last-child {
     border-right: none;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .table tbody td {
-    padding: 6px 10px;
+    padding: 4px 10px;
     border-bottom: 1px solid var(--border-light);
     border-right: 1px solid var(--border-light);
     color: var(--text-primary);
     font-size: 0.8rem;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .table tbody td:last-child {
     border-right: none;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .table tbody tr:hover {
     background: var(--table-row-hover);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .table tbody tr:last-child td {
     border-bottom: none;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===========================
@@ -461,47 +608,71 @@ main {
     text-transform: uppercase;
     letter-spacing: 0.3px;
     border: 1px solid transparent;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-success {
     background: rgba(163, 213, 163, 0.2);
     color: #a3d5a3;
     border-color: #a3d5a3;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-warning {
     background: rgba(240, 201, 135, 0.2);
     color: #f0c987;
     border-color: #f0c987;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-danger {
     background: rgba(232, 139, 139, 0.2);
     color: #e88b8b;
     border-color: #e88b8b;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-info {
     background: rgba(139, 184, 232, 0.2);
     color: #8bb8e8;
     border-color: #8bb8e8;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-primary {
     background: rgba(227, 155, 111, 0.2);
     color: #e39b6f;
     border-color: #e39b6f;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-secondary {
     background: rgba(184, 153, 104, 0.2);
     color: #c4a76e;
     border-color: rgba(184, 153, 104, 0.4);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .badge-xs {
     padding: 1px 4px;
     font-size: 9px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===========================
@@ -510,10 +681,16 @@ main {
 
 .text-muted {
     color: var(--text-muted) !important;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 [x-cloak] {
     display: none !important;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 /* ===========================
@@ -523,22 +700,34 @@ main {
 .sidebar::-webkit-scrollbar,
 aside::-webkit-scrollbar {
     width: 6px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar::-webkit-scrollbar-track,
 aside::-webkit-scrollbar-track {
     background: transparent;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar::-webkit-scrollbar-thumb,
 aside::-webkit-scrollbar-thumb {
     background: rgba(216, 140, 146, 0.4);
     border-radius: 3px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 .sidebar::-webkit-scrollbar-thumb:hover,
 aside::-webkit-scrollbar-thumb:hover {
     background: rgba(227, 155, 111, 0.6);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 
@@ -602,6 +791,9 @@ aside::-webkit-scrollbar-thumb:hover {
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
@@ -612,39 +804,60 @@ aside::-webkit-scrollbar-thumb:hover {
 .table-container {
     overflow-x: auto;
     border-radius: 6px;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table thead {
     background: var(--bg-hover);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table thead th {
-    padding: 12px;
+    padding: 8px;
     text-align: left;
     font-size: 13px;
     font-weight: 600;
     color: var(--text-primary);
     border-bottom: 2px solid var(--border);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table tbody td {
-    padding: 12px;
+    padding: 8px;
     font-size: 13px;
     color: var(--text-primary);
     border-bottom: 1px solid var(--border);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table tbody tr:hover {
     background: var(--bg-hover);
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 
 table tbody tr:last-child td {
     border-bottom: none;
+    --scrollbar-track: rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 }
 /* Additional Tailwind-like classes for API responses */
 

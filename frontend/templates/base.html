@@ -174,6 +174,18 @@
                 <a href="/scep" class="sidebar-link" hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Configuration</a>
             </div>
             
+            <a href="/crl" class="sidebar-link {% if request.path.startswith('/crl') %}active{% endif %}"
+               hx-get="/crl" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fas fa-file-contract"></i>
+                <span>CRL Management</span>
+            </a>
+            
+            <a href="/ocsp" class="sidebar-link {% if request.path.startswith('/ocsp') %}active{% endif %}"
+               hx-get="/ocsp" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fas fa-circle-check"></i>
+                <span>OCSP Status</span>
+            </a>
+            
             <a href="/users" class="sidebar-link {% if request.path.startswith('/users') %}active{% endif %}"
                hx-get="/users" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-user-group"></i>
@@ -203,12 +215,37 @@
     <!-- Scripts at end -->
     <script src="{{ url_for('static', filename='vendor/js/htmx.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/js/alpine.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/modal-utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/icon-system.js') }}"></script>
     <script src="{{ url_for('static', filename='js/theme-switcher.js') }}"></script>
     <script src="{{ url_for('static', filename='js/spa-navigation.js') }}"></script>
     {% if request.endpoint and request.endpoint != 'ui.login' %}
     <script src="{{ url_for('static', filename='js/session-manager.js') }}"></script>
     {% endif %}
+    
+    <!-- Global HTMX event handlers -->
+    <script>
+    // Listen for specific modal triggers from server
+    document.body.addEventListener('openCreateCAModal', function() {
+        console.log('openCreateCAModal event received');
+        // Wait a bit for DOM to be ready
+        setTimeout(function() {
+            if (typeof openCreateCAModal !== 'undefined') {
+                openCreateCAModal();
+            }
+        }, 50);
+    });
+    
+    document.body.addEventListener('openCreateCertModal', function() {
+        console.log('openCreateCertModal event received');
+        // Wait a bit for DOM to be ready
+        setTimeout(function() {
+            if (typeof openCreateCertModal !== 'undefined') {
+                openCreateCertModal();
+            }
+        }, 50);
+    });
+    </script>
     
     {% block extra_body %}{% endblock %}
 </body>

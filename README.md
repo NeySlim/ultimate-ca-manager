@@ -1,177 +1,204 @@
-<div align="center">
-
 # Ultimate CA Manager
 
-![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
-![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
-![Platform](https://img.shields.io/badge/platform-Linux-lightgrey.svg)
-![Docker](https://img.shields.io/docker/pulls/neyslim/ultimate-ca-manager.svg)
-![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 
-**Production-ready Certificate Authority management system with SCEP, OCSP, and modern web UI**
+**Ultimate CA Manager (UCM)** - Complete Certificate Authority management system with modern theming and RFC-compliant protocols.
 
-**📚 [Documentation Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki) • 🚀 [Quick Start](https://github.com/NeySlim/ultimate-ca-manager/wiki/Quick-Start) • 🐳 [Docker Hub](https://hub.docker.com/r/neyslim/ultimate-ca-manager)**
+## ✨ Features
 
-</div>
+### Core CA Management
+- 🔐 **HTTPS Only** - Auto-generated self-signed certificates
+- 🔑 **Full CA Management** - Create, import, manage Certificate Authorities
+- 📜 **Certificate Operations** - Generate, sign, revoke, export (PEM, DER, PKCS#12)
+- 🔄 **CRL Distribution** - RFC 5280 compliant CRL Distribution Points
+- 🟢 **OCSP Responder** - Real-time certificate status validation
+- 🔗 **SCEP Server** - RFC 8894 compliant auto-enrollment
 
----
+### User Experience
+- 🎨 **8 Beautiful Themes** - Sentinel, Amber, Blossom, Nebula (Light & Dark)
+- 🖱️ **Custom Scrollbars** - Theme-aware styled scrollbars
+- 🌓 **Full Dark Mode** - Complete dark theme support
+- 📱 **Responsive UI** - Works on desktop and mobile
+- ⚡ **HTMX Powered** - Fast, modern SPA experience
+- 🔒 **Modal Body Lock** - Smooth modal interactions
 
-## ✨ Key Features
+### Integration & Import
+- 🔗 **OPNsense Import** - Direct import from OPNsense
+- 📥 **CA Import** - Import existing CAs (PEM, PKCS#12)
+- 📤 **Flexible Export** - Multiple export formats
+- 🔌 **REST API** - Full API access
 
-- 🔐 **Certificate Authority Management** - Create Root/Intermediate CAs, multi-level hierarchy, flexible key types (RSA, ECDSA)
-- 📜 **Certificate Lifecycle** - Issue, renew, revoke certificates with full CRL and OCSP support
-- 🔄 **SCEP Server (RFC 8894)** - Auto-enrollment for iOS, Android, Windows, Cisco, network devices
-- 🛡️ **Enterprise Security** - RBAC, audit logging, HTTPS-only, OWASP compliant (9.5/10)
-- 🎨 **Modern Web UI** - Responsive design, dark/light themes, real-time dashboard
-- 🌍 **Platform Agnostic** - Docker, any Linux distribution, SQLite or PostgreSQL
-- 🔗 **REST API** - Complete programmatic access for automation and integration
-
-**👉 [See all features in the Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki/User-Manual)**
-
----
+### Security & Compliance
+- 👥 **User Management** - Role-based access control
+- 🔐 **JWT Authentication** - Secure session management
+- 📋 **RFC Compliant** - Follows PKI standards
+- 🔒 **Public Endpoints** - CDP/OCSP accessible without auth
 
 ## 🚀 Quick Start
 
-### Docker (Recommended)
+### Debian/Ubuntu Installation
 
 ```bash
-# Download and start
-curl -O https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docker-compose.yml
-docker-compose up -d
+# Download package
+wget https://github.com/yourusername/ucm/releases/download/v1.6.0/ucm_1.6.0_all.deb
 
-# Access: https://localhost:8443
-# Login: admin / admin
+# Install
+sudo dpkg -i ucm_1.6.0_all.deb
+
+# Service will start automatically
 ```
 
-### Linux Installation
+### Manual Installation
 
 ```bash
-# One-line install
-curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/install.sh | sudo bash
+# Clone repository
+git clone https://github.com/yourusername/ucm.git
+cd ucm
 
-# Access: https://your-server-ip:8443
-# Login: admin / admin
+# Run installation script
+sudo ./install.sh
+
+# Start service
+sudo systemctl start ucm
 ```
 
-⚠️ **Change default password immediately after first login!**
+**Web Interface:** https://your-server-ip:8443  
+**Default Credentials:** admin / admin ⚠️ **CHANGE IMMEDIATELY!**
 
-**📖 Complete guide**: [Quick Start Tutorial](https://github.com/NeySlim/ultimate-ca-manager/wiki/Quick-Start) (10 minutes)
+## 📡 API Endpoints
 
----
+### Authentication
+- `POST /api/v1/auth/login` - User login
+- `POST /api/v1/auth/logout` - User logout
+- `GET /api/v1/auth/me` - Get current user
+
+### Certificate Authorities
+- `GET /api/v1/ca/` - List all CAs
+- `POST /api/v1/ca/` - Create new CA
+- `GET /api/v1/ca/{id}` - Get CA details
+- `POST /api/v1/ca/{id}/revoke` - Revoke CA
+- `GET /api/v1/ca/{id}/export` - Export CA
+
+### Certificates
+- `GET /api/v1/certificates/` - List all certificates
+- `POST /api/v1/certificates/` - Create certificate
+- `GET /api/v1/certificates/{id}` - Get certificate details
+- `POST /api/v1/certificates/{id}/revoke` - Revoke certificate
+- `GET /api/v1/certificates/{id}/export` - Export certificate
+
+### CRL & OCSP (Public Endpoints)
+- `GET /cdp/{ca_refid}/crl.pem` - Download CRL (PEM)
+- `GET /cdp/{ca_refid}/crl.der` - Download CRL (DER)
+- `GET /cdp/{ca_refid}/info` - CRL information
+- `POST /ocsp` - OCSP status request
+
+### SCEP (Public Endpoints)
+- `GET /scep/pkiclient.exe` - SCEP enrollment
+- `POST /scep/pkiclient.exe` - SCEP operations
+
+## 🎨 Themes
+
+UCM includes 8 professionally designed themes:
+
+**Light Themes:**
+- **Sentinel Light** - Clean and professional
+- **Amber Light** - Warm and inviting
+- **Blossom Light** - Soft and elegant
+- **Nebula Light** - Modern and vibrant
+
+**Dark Themes:**
+- **Sentinel Dark** - Professional dark mode
+- **Amber Dark** - Warm dark palette
+- **Blossom Dark** - Elegant dark theme
+- **Nebula Dark** - Vibrant dark mode
+
+All themes feature:
+- Custom styled scrollbars
+- Consistent color schemes
+- Smooth transitions
+- Optimized contrast ratios
+
+## 📦 What's New in 1.6.0
+
+### Major Changes
+- ✨ **Complete Tailwind Removal** - Migrated to custom CSS with CSS variables
+- 🎨 **Custom Scrollbars** - Theme-aware scrollbars for all 8 themes
+- 🔒 **Modal Improvements** - Body scroll lock, proper z-indexing
+- 📄 **CRL Info Pages** - Public and integrated CRL information views
+- 🐛 **Bug Fixes** - Fixed HTMX triggers, JavaScript conflicts, theme flash
+
+### Technical Details
+- Removed ~827 Tailwind CSS classes
+- Added modal-utils.js for consistent modal behavior
+- Implemented HX-Trigger-After-Swap for modal opening
+- Fixed variable conflicts (pkcs12ExportId, IconSystem, SessionManager)
+- Enhanced theme consistency across all pages
+
+See [CHANGELOG.md](CHANGELOG.md) for complete details.
+
+## 🛠️ Development
+
+### Requirements
+- Python 3.11+
+- Flask 3.0+
+- SQLite 3
+- OpenSSL
+
+### Setup Development Environment
+
+```bash
+# Clone repository
+git clone https://github.com/yourusername/ucm.git
+cd ucm
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r backend/requirements.txt
+
+# Initialize database
+python backend/init_db.py
+
+# Run development server
+python backend/app.py
+```
+
+### Build Debian Package
+
+```bash
+# Build package
+./build_deb.sh
+
+# Package will be created as ucm_1.6.0_all.deb
+```
 
 ## 📚 Documentation
 
-All documentation is available in the **[GitHub Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)**:
-
-| Guide | Description |
-|-------|-------------|
-| **[Quick Start](https://github.com/NeySlim/ultimate-ca-manager/wiki/Quick-Start)** | Get started in 10 minutes |
-| **[User Manual](https://github.com/NeySlim/ultimate-ca-manager/wiki/User-Manual)** | Complete user guide with examples |
-| **[API Reference](https://github.com/NeySlim/ultimate-ca-manager/wiki/API-Reference)** | REST API documentation |
-| **[FAQ](https://github.com/NeySlim/ultimate-ca-manager/wiki/FAQ)** | Frequently asked questions |
-| **[Troubleshooting](https://github.com/NeySlim/ultimate-ca-manager/wiki/Troubleshooting)** | Problem solving guide |
-
-**Additional resources**:
-- [Docker Features & Configuration](DOCKER_FEATURES.md) - Advanced Docker deployment
-- [Migration Guide](docs/MIGRATION_EXAMPLE.md) - Server-to-server migration
-- [Architecture Diagrams](docs/diagrams/ARCHITECTURE.md) - System architecture
-
----
-
-## 🐳 Docker Deployment
-
-Pre-built multi-architecture images:
-
-```bash
-docker pull neyslim/ultimate-ca-manager:latest
-```
-
-**Available tags**: `latest`, `1.0.1`, `1.0`, `1`  
-**Architectures**: `linux/amd64`, `linux/arm64`
-
-[See Docker documentation →](DOCKER_FEATURES.md)
-
----
-
-## 🔌 REST API
-
-Complete REST API for automation:
-
-```bash
-# Login
-curl -X POST https://localhost:8443/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}' \
-  -k
-
-# List CAs
-curl https://localhost:8443/api/v1/cas \
-  -H "Authorization: Bearer <token>" \
-  -k
-```
-
-[Full API documentation →](https://github.com/NeySlim/ultimate-ca-manager/wiki/API-Reference)
-
----
-
-## 📋 System Requirements
-
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| **OS** | Any Linux | Ubuntu 22.04 LTS |
-| **Python** | 3.10+ | 3.11+ |
-| **RAM** | 512 MB | 2 GB |
-| **Disk** | 100 MB + certificates | 1 GB SSD |
-| **CPU** | 1 core | 2+ cores |
-
-**Supported distributions**: Debian, Ubuntu, RHEL, Rocky, Alma, Fedora, Alpine, Arch, openSUSE
-
----
+- [Installation Guide](INSTALLATION.md)
+- [API Documentation](docs/API.md)
+- [SCEP Setup Guide](docs/SCEP.md)
+- [Changelog](CHANGELOG.md)
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
 ## 📄 License
 
-This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICENSE) file for details.
+BSD 3-Clause License - See [LICENSE](LICENSE) file for details
+
+## 🙏 Acknowledgments
+
+- Flask framework
+- HTMX for modern interactions
+- Alpine.js for reactive components
+- Font Awesome for icons
+- All contributors and testers
 
 ---
 
-## 🆘 Support
-
-- **📚 Documentation**: [GitHub Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
-- **🐛 Bug Reports**: [GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
-- **💬 Discussions**: [GitHub Discussions](https://github.com/NeySlim/ultimate-ca-manager/discussions)
-- **📦 Docker Hub**: [neyslim/ultimate-ca-manager](https://hub.docker.com/r/neyslim/ultimate-ca-manager)
-
----
-
-## ⭐ Show Your Support
-
-If you find UCM useful, please consider:
-- ⭐ Starring this repository
-- 🐛 Reporting bugs
-- 💡 Suggesting features
-- 📖 Improving documentation
-- 🔀 Contributing code
-
----
-
-<div align="center">
-
-**Made with ❤️ for the PKI community**
-
-[![GitHub stars](https://img.shields.io/github/stars/NeySlim/ultimate-ca-manager?style=social)](https://github.com/NeySlim/ultimate-ca-manager/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/NeySlim/ultimate-ca-manager?style=social)](https://github.com/NeySlim/ultimate-ca-manager/network/members)
-
-</div>
+**Made with ❤️ by the UCM Team**

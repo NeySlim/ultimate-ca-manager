@@ -16,7 +16,7 @@ class IconSystem {
             // Try to load from localStorage cache first
             const cachedData = localStorage.getItem('ucm-icons-data');
             const cachedVersion = localStorage.getItem('ucm-icons-version');
-            const currentVersion = '2.1'; // Increment this when icons.json changes
+            const currentVersion = '2.3'; // Increment this when icons.json changes
             
             if (cachedData && cachedVersion === currentVersion) {
                 // Use cached data for instant load
@@ -234,7 +234,10 @@ class IconSystem {
             'fa-crown': 'crown',
             'fa-eye': 'eye',
             'fa-spinner': 'spinner',
-            'fa-spin': 'spinner'
+            'fa-spin': 'spinner',
+            'fa-file-contract': 'crl',
+            'fa-circle-check': 'ocsp',
+            'fa-check-double': 'ocsp'
         };
 
         document.querySelectorAll('i.fas, i.far, i.fab').forEach(icon => {

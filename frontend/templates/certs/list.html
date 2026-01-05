@@ -3,34 +3,34 @@
 {% block title %}Certificates - UCM{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <!-- Header -->
-    <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold text-gray-900">
-            <i class="fas fa-file-certificate mr-2"></i> Certificates
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
+            <i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i> Certificates
         </h1>
-        <div class="flex space-x-2">
+        <div style="display: flex; gap: 0.5rem;">
             <button onclick="openCreateCertModal()" 
                     class="btn btn-secondary">
-                <i class="fas fa-plus mr-2"></i> Create Certificate
+                <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> Create Certificate
             </button>
             <button onclick="openCSRModal()" 
                     class="btn btn-secondary">
-                <i class="fas fa-file-signature mr-2 text-success"></i> Generate CSR
+                <i class="fas fa-file-signature" style="margin-right: 0.5rem; color: var(--success-color);"></i> Generate CSR
             </button>
         </div>
     </div>
     
     <!-- Certificate List -->
-    <div class="bg-white rounded-lg shadow border border-gray-200">
+    <div class="card">
         <div id="cert-list" 
              hx-get="/api/ui/cert/list" 
              hx-trigger="load, refreshCerts from:body"
              hx-swap="innerHTML">
-            <div class="p-8 text-center">
-                <div class="animate-pulse space-y-4">
-                    <div class="h-4 bg-gray-200 rounded"></div>
-                    <div class="h-4 bg-gray-200 rounded"></div>
+            <div style="padding: 2rem; text-align: center;">
+                <div style="animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="height: 1rem; background: var(--border-color); border-radius: 0.25rem;"></div>
+                    <div style="height: 1rem; background: var(--border-color); border-radius: 0.25rem;"></div>
                 </div>
             </div>
         </div>
@@ -38,7 +38,7 @@
 </div>
 
 <!-- Create Certificate Modal -->
-<div id="createCertModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 50; padding: 1rem;">
+<div id="createCertModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
     <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 1400px; width: 100%; max-height: calc(100vh - 80px); overflow-y: auto; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
@@ -63,7 +63,7 @@
                     <!-- Description -->
                     <div style="margin-bottom: 1rem;">
                         <label class="modal-form-label">
-                            Description <span class="text-red-500">*</span>
+                            Description <span style="color: var(--danger-color);">*</span>
                         </label>
                         <input type="text" name="descr" required placeholder="My Server Certificate"
                                class="modal-form-input">
@@ -72,7 +72,7 @@
                     <!-- Certificate Type -->
                     <div style="margin-bottom: 1rem;">
                         <label class="modal-form-label">
-                            Type <span class="text-red-500">*</span>
+                            Type <span style="color: var(--danger-color);">*</span>
                         </label>
                         <select name="cert_type" required onchange="updateCertTypeHints(this.value)"
                                 class="modal-form-input">
@@ -89,15 +89,15 @@
                     <!-- Private Key Location -->
                     <div style="margin-bottom: 1rem;">
                         <label class="modal-form-label">
-                            Private Key Location <span class="text-red-500">*</span>
+                            Private Key Location <span style="color: var(--danger-color);">*</span>
                         </label>
                         <select name="private_key_location"
                                 class="modal-form-input">
-                            <option value="firewall">Save on this firewall</option>
-                            <option value="download_only">Download only (higher security)</option>
+                            <option value="stored">Store private key in UCM</option>
+                            <option value="download_only">Download only (not stored)</option>
                         </select>
                         <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
-                            For higher security, download the private key and do not store it on the firewall
+                            For higher security, download the private key and do not store it in UCM
                         </p>
                     </div>
                 </div>
@@ -109,7 +109,7 @@
                     <div class="modal-form-grid-2">
                         <div>
                             <label class="modal-form-label">
-                                Key Type <span class="text-red-500">*</span>
+                                Key Type <span class="style="color: var(--danger-color);"">*</span>
                             </label>
                             <select name="key_type" required
                                     class="modal-form-input">
@@ -121,7 +121,7 @@
                         </div>
                         <div>
                             <label class="modal-form-label">
-                                Digest Algorithm <span class="text-red-500">*</span>
+                                Digest Algorithm <span class="style="color: var(--danger-color);"">*</span>
                             </label>
                             <select name="digest_alg"
                                     class="modal-form-input">
@@ -138,7 +138,7 @@
                     <h3 class="modal-form-heading">Issuer</h3>
                     <div style="margin-bottom: 1rem;">
                         <label class="modal-form-label">
-                            Certificate Authority <span class="text-red-500">*</span>
+                            Certificate Authority <span class="style="color: var(--danger-color);"">*</span>
                         </label>
                         <select name="caref" required id="ca-select"
                                 hx-get="/api/ui/ca/options"
@@ -150,7 +150,7 @@
                     
                     <div style="margin-bottom: 1rem;">
                         <label class="modal-form-label">
-                            Lifetime (days) <span class="text-red-500">*</span>
+                            Lifetime (days) <span class="style="color: var(--danger-color);"">*</span>
                         </label>
                         <input type="number" name="lifetime" value="397" required min="1" max="36500"
                                class="modal-form-input">
@@ -211,7 +211,7 @@
                     
                     <div class="mt-4">
                         <label class="modal-form-label">
-                            Common Name (CN) <span class="text-red-500">*</span>
+                            Common Name (CN) <span class="style="color: var(--danger-color);"">*</span>
                         </label>
                         <input type="text" name="common_name" required placeholder="server.example.com"
                                class="modal-form-input">
@@ -293,7 +293,7 @@
 </div>
 
 <!-- Generate CSR Modal -->
-<div id="csrModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 50; padding: 1rem;">
+<div id="csrModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
     <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 1400px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
@@ -312,7 +312,7 @@
             <div class="p-6 space-y-4">
                 <div>
                     <label class="modal-form-label">
-                        Description <span class="text-red-500">*</span>
+                        Description <span class="style="color: var(--danger-color);"">*</span>
                     </label>
                     <input type="text" name="descr" required
                            class="modal-form-input">
@@ -320,7 +320,7 @@
                 
                 <div>
                     <label class="modal-form-label">
-                        Common Name <span class="text-red-500">*</span>
+                        Common Name <span class="style="color: var(--danger-color);"">*</span>
                     </label>
                     <input type="text" name="common_name" required
                            class="modal-form-input">
@@ -328,7 +328,7 @@
                 
                 <div>
                     <label class="modal-form-label">
-                        Key Type <span class="text-red-500">*</span>
+                        Key Type <span class="style="color: var(--danger-color);"">*</span>
                     </label>
                     <select name="key_type" required
                             class="modal-form-input">
@@ -354,11 +354,11 @@
 
 <script>
 function openCreateCertModal() {
-    document.getElementById('createCertModal').classList.remove('hidden');
+    openModal('createCertModal');
 }
 
 function closeCertModal() {
-    document.getElementById('createCertModal').classList.add('hidden');
+    closeModal('createCertModal');
 }
 
 function updateCertTypeHints(certType) {
@@ -375,21 +375,25 @@ function updateCertTypeHints(certType) {
 }
 
 function openCSRModal() {
-    document.getElementById('csrModal').classList.remove('hidden');
+    openModal('csrModal');
 }
 
 function closeCSRModal() {
-    document.getElementById('csrModal').classList.add('hidden');
+    closeModal('csrModal');
 }
 
 // Auto-open create modal if hash is #create
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', checkCreateHash);
+
+function checkCreateHash() {
     if (window.location.hash === '#create') {
-        openCreateCertModal();
-        // Remove hash from URL after opening modal
-        history.replaceState(null, null, window.location.pathname);
+        setTimeout(() => {
+            openCreateCertModal();
+            // Remove hash from URL after opening modal
+            history.replaceState(null, null, window.location.pathname);
+        }, 100);
     }
-});
+}
 
 function showToast(message, type) {
     console.log('🔔 showToast called:', message, 'type:', type);
@@ -422,17 +426,19 @@ function handleCSRResponse(event) {
     }
 }
 
-// PKCS#12 Modal Functions
-let pkcs12ExportId = null;
-let pkcs12ExportType = null;
+// PKCS#12 Modal Functions (scoped to avoid conflicts)
+if (typeof window.pkcs12ExportId === 'undefined') {
+    window.pkcs12ExportId = null;
+    window.pkcs12ExportType = null;
+}
 
 function showPKCS12ModalTable(id, type) {
-    pkcs12ExportId = id;
-    pkcs12ExportType = type;
+    window.pkcs12ExportId = id;
+    window.pkcs12ExportType = type;
     document.getElementById('pkcs12-password').value = '';
     document.getElementById('pkcs12-password-confirm').value = '';
-    document.getElementById('pkcs12-error').classList.add('hidden');
-    document.getElementById('pkcs12-modal').classList.remove('hidden');
+    closeModal('pkcs12-error');
+    openModal('pkcs12-modal');
     
     // Close any export menus
     document.querySelectorAll('[id^="export-menu-"]').forEach(m => m.remove());
@@ -440,7 +446,7 @@ function showPKCS12ModalTable(id, type) {
 }
 
 function closePKCS12Modal() {
-    document.getElementById('pkcs12-modal').classList.add('hidden');
+    closeModal('pkcs12-modal');
 }
 
 function exportPKCS12() {
@@ -466,9 +472,9 @@ function exportPKCS12() {
         return;
     }
     
-    const url = pkcs12ExportType === 'ca' 
-        ? `/api/v1/ca/${pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`
-        : `/api/v1/certificates/${pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`;
+    const url = window.pkcs12ExportType === 'ca' 
+        ? `/api/v1/ca/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`
+        : `/api/v1/certificates/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`;
     
     const token = '{{ session.get("access_token") }}';
     fetch(url, {
@@ -649,7 +655,7 @@ function revokeCert(refid, descr) {
 </script>
 
 <!-- PKCS#12 Export Modal -->
-<div id="pkcs12-modal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 50;">
+<div id="pkcs12-modal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000;">
     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
     <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
         <div style="padding: 1.5rem;">
@@ -662,7 +668,7 @@ function revokeCert(refid, descr) {
             </p>
             <div style="margin-bottom: 1rem;">
                 <label class="modal-form-label">
-                    Mot de passe <span class="text-red-500">*</span>
+                    Mot de passe <span class="style="color: var(--danger-color);"">*</span>
                 </label>
                 <input type="password" id="pkcs12-password" 
                     class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
@@ -670,7 +676,7 @@ function revokeCert(refid, descr) {
             </div>
             <div style="margin-bottom: 1rem;">
                 <label class="modal-form-label">
-                    Confirmation <span class="text-red-500">*</span>
+                    Confirmation <span class="style="color: var(--danger-color);"">*</span>
                 </label>
                 <input type="password" id="pkcs12-password-confirm" 
                     class="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"

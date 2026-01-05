@@ -51,7 +51,7 @@ def create_certificate():
         "san_uri": ["https://example.com"],  // optional
         "san_email": ["admin@example.com"],  // optional
         "ocsp_uri": "http://ocsp.example.com",  // optional
-        "private_key_location": "firewall" | "download_only",  // optional
+        "private_key_location": "stored" | "download_only",  // optional
         "crt_payload": "-----BEGIN CERTIFICATE-----...",  // for import
         "prv_payload": "-----BEGIN PRIVATE KEY-----..."  // optional for import
     }
@@ -78,7 +78,7 @@ def create_certificate():
                 san_uri=data.get('san_uri'),
                 san_email=data.get('san_email'),
                 ocsp_uri=data.get('ocsp_uri'),
-                private_key_location=data.get('private_key_location', 'firewall'),
+                private_key_location=data.get('private_key_location', 'stored'),
                 username=user.username
             )
             return jsonify(cert.to_dict()), 201

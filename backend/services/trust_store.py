@@ -231,6 +231,7 @@ class TrustStoreService:
         san_uri: Optional[List[str]] = None,
         san_email: Optional[List[str]] = None,
         ocsp_uri: Optional[str] = None,
+        cdp_url: Optional[str] = None,
     ) -> Tuple[bytes, bytes]:
         """
         Create a certificate signed by a CA
@@ -248,6 +249,7 @@ class TrustStoreService:
             san_uri: List of URI SANs
             san_email: List of email SANs
             ocsp_uri: OCSP responder URI
+            cdp_url: CRL Distribution Point URL (RFC 5280)
             
         Returns:
             Tuple of (certificate PEM, private key PEM)
@@ -422,6 +424,20 @@ class TrustStoreService:
                     x509.AccessDescription(
                         x509.oid.AuthorityInformationAccessOID.OCSP,
                         x509.UniformResourceIdentifier(ocsp_uri)
+                    )
+                ]),
+                critical=False,
+            )
+        
+        # CRL Distribution Points (RFC 5280 - Section 4.2.1.13)
+        if cdp_url:
+            builder = builder.add_extension(
+                x509.CRLDistributionPoints([
+                    x509.DistributionPoint(
+                        full_name=[x509.UniformResourceIdentifier(cdp_url)],
+                        relative_name=None,
+                        reasons=None,
+                        crl_issuer=None
                     )
                 ]),
                 critical=False,

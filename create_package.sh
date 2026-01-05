@@ -20,23 +20,7 @@ mkdir -p "$BUILD_DIR/$PACKAGE_NAME"
 
 # Copy source files
 echo "Copying source files..."
-cd /root/ucm-src
-
-# Copy visible files
-cp -r backend frontend scripts docs *.sh *.md *.py "$BUILD_DIR/$PACKAGE_NAME/" 2>/dev/null || true
-
-# Copy hidden files explicitly
-cp .env.example "$BUILD_DIR/$PACKAGE_NAME/" 2>/dev/null || true
-cp .gitignore "$BUILD_DIR/$PACKAGE_NAME/" 2>/dev/null || true
-
-# Copy any other hidden files if they exist
-shopt -s dotglob
-for file in .[^.]*; do
-    if [ -f "$file" ]; then
-        cp "$file" "$BUILD_DIR/$PACKAGE_NAME/" 2>/dev/null || true
-    fi
-done
-shopt -u dotglob
+cp -r /root/ucm-src/* "$BUILD_DIR/$PACKAGE_NAME/"
 
 # Ensure clean state
 echo "Ensuring clean state..."
@@ -44,14 +28,10 @@ cd "$BUILD_DIR/$PACKAGE_NAME"
 
 # Remove any runtime data
 rm -rf backend/data/*.db
-rm -rf backend/data/*.log
 rm -rf backend/data/*.pem
 rm -rf backend/data/ca/* backend/data/certs/* backend/data/crl/*
 rm -rf backend/data/scep/* backend/data/private/* backend/data/backups/*
 rm -rf venv/ __pycache__ *.pyc cookies.txt
-
-# Remove .env (keep only .env.example)
-rm -f .env
 
 # Keep .gitkeep files
 find backend/data -type d -exec touch {}/.gitkeep \;
