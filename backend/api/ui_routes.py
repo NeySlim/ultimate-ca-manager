@@ -1834,6 +1834,243 @@ def import_history():
         return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
 
 
+@ui_bp.route('/api/ui/certificates/import', methods=['POST'])
+@login_required
+def import_certificate_manual():
+    """Manual certificate import endpoint"""
+    try:
+        data = request.get_json()
+        import_method = data.get('import_method', 'paste')
+        
+        # Prepare payload for backend API
+        payload = {
+            'description': data.get('description', 'Imported Certificate'),
+        }
+        
+        if import_method == 'container':
+            # Container import (PKCS#12, PKCS#7, JKS, DER)
+            import base64
+            from cryptography.hazmat.primitives.serialization import pkcs12
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives import serialization
+            
+            container_data = base64.b64decode(data.get('container_data'))
+            container_format = data.get('container_format', 'auto')
+            container_password = data.get('container_password', '').encode() if data.get('container_password') else None
+            
+            try:
+                # Try PKCS#12 first
+                if container_format in ['auto', 'pkcs12']:
+                    try:
+                        private_key, certificate, additional_certs = pkcs12.load_key_and_certificates(
+                            container_data, 
+                            container_password,
+                            backend=default_backend()
+                        )
+                        
+                        # Convert to PEM
+                        cert_pem = certificate.public_bytes(serialization.Encoding.PEM).decode()
+                        key_pem = private_key.private_bytes(
+                            encoding=serialization.Encoding.PEM,
+                            format=serialization.PrivateFormat.PKCS8,
+                            encryption_algorithm=serialization.NoEncryption()
+                        ).decode() if private_key else None
+                        
+                        chain_pem = None
+                        if additional_certs:
+                            chain_pem = '\n'.join([
+                                cert.public_bytes(serialization.Encoding.PEM).decode() 
+                                for cert in additional_certs
+                            ])
+                        
+                        payload['crt'] = cert_pem
+                        payload['prv'] = key_pem
+                        if chain_pem:
+                            payload['certificate_chain'] = chain_pem
+                            
+                    except Exception as e:
+                        if container_format == 'pkcs12':
+                            raise
+                        # Try other formats
+                        pass
+                
+                # Try DER format
+                if container_format in ['auto', 'der'] and 'crt' not in payload:
+                    try:
+                        certificate = x509.load_der_x509_certificate(container_data, default_backend())
+                        cert_pem = certificate.public_bytes(serialization.Encoding.PEM).decode()
+                        payload['crt'] = cert_pem
+                    except:
+                        pass
+                
+                # Try PKCS#7
+                if container_format in ['auto', 'pkcs7'] and 'crt' not in payload:
+                    try:
+                        from cryptography.hazmat.primitives.serialization import pkcs7
+                        certs = pkcs7.load_der_pkcs7_certificates(container_data)
+                        if certs:
+                            cert_pem = certs[0].public_bytes(serialization.Encoding.PEM).decode()
+                            payload['crt'] = cert_pem
+                            if len(certs) > 1:
+                                chain_pem = '\n'.join([
+                                    cert.public_bytes(serialization.Encoding.PEM).decode() 
+                                    for cert in certs[1:]
+                                ])
+                                payload['certificate_chain'] = chain_pem
+                    except:
+                        pass
+                
+                if 'crt' not in payload:
+                    return jsonify({'error': 'Unable to parse container file'}), 400
+                    
+            except Exception as e:
+                return jsonify({'error': f'Container parsing failed: {str(e)}'}), 400
+        else:
+            # PEM paste or upload
+            payload['crt'] = data.get('certificate')
+            payload['prv'] = data.get('private_key')
+            if data.get('certificate_chain'):
+                payload['certificate_chain'] = data.get('certificate_chain')
+            
+            if not payload['crt'] or not payload['prv']:
+                return jsonify({'error': 'Certificate and private key are required'}), 400
+        
+        # Get access token and call backend API
+        token = session.get('access_token')
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Call the existing certificate creation endpoint
+        response = requests.post(
+            f"{request.url_root}api/v1/certificates",
+            headers=headers,
+            json=payload,
+            verify=False
+        )
+        
+        if response.status_code in [200, 201]:
+            return jsonify({'success': True, 'message': 'Certificate imported successfully'}), 200
+        else:
+            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Import failed'
+            return jsonify({'error': error_msg}), response.status_code
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@ui_bp.route('/api/ui/ca/import', methods=['POST'])
+@login_required
+def import_ca_manual():
+    """Manual CA import endpoint"""
+    try:
+        data = request.get_json()
+        import_method = data.get('import_method', 'paste')
+        
+        # Prepare payload for backend API
+        payload = {
+            'descr': data.get('description', 'Imported CA'),
+            'trust': 'enabled',  # Default trust level
+        }
+        
+        if import_method == 'container':
+            # Container import
+            import base64
+            from cryptography.hazmat.primitives.serialization import pkcs12
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives import serialization
+            
+            container_data = base64.b64decode(data.get('container_data'))
+            container_format = data.get('container_format', 'auto')
+            container_password = data.get('container_password', '').encode() if data.get('container_password') else None
+            
+            try:
+                # Try PKCS#12 first
+                if container_format in ['auto', 'pkcs12']:
+                    try:
+                        private_key, certificate, additional_certs = pkcs12.load_key_and_certificates(
+                            container_data,
+                            container_password,
+                            backend=default_backend()
+                        )
+                        
+                        cert_pem = certificate.public_bytes(serialization.Encoding.PEM).decode()
+                        key_pem = None
+                        if private_key:
+                            key_pem = private_key.private_bytes(
+                                encoding=serialization.Encoding.PEM,
+                                format=serialization.PrivateFormat.PKCS8,
+                                encryption_algorithm=serialization.NoEncryption()
+                            ).decode()
+                        
+                        payload['crt'] = cert_pem
+                        payload['prv'] = key_pem
+                    except Exception as e:
+                        if container_format == 'pkcs12':
+                            raise
+                        pass
+                
+                # Try DER format
+                if container_format in ['auto', 'der'] and 'crt' not in payload:
+                    try:
+                        certificate = x509.load_der_x509_certificate(container_data, default_backend())
+                        cert_pem = certificate.public_bytes(serialization.Encoding.PEM).decode()
+                        payload['crt'] = cert_pem
+                    except:
+                        pass
+                
+                # Try PKCS#7
+                if container_format in ['auto', 'pkcs7'] and 'crt' not in payload:
+                    try:
+                        from cryptography.hazmat.primitives.serialization import pkcs7
+                        certs = pkcs7.load_der_pkcs7_certificates(container_data)
+                        if certs:
+                            cert_pem = certs[0].public_bytes(serialization.Encoding.PEM).decode()
+                            payload['crt'] = cert_pem
+                    except:
+                        pass
+                
+                if 'crt' not in payload:
+                    return jsonify({'error': 'Unable to parse container file'}), 400
+                    
+            except Exception as e:
+                return jsonify({'error': f'Container parsing failed: {str(e)}'}), 400
+        else:
+            # PEM paste or upload
+            payload['crt'] = data.get('certificate')
+            payload['prv'] = data.get('private_key')  # Optional for CAs
+            
+            if not payload['crt']:
+                return jsonify({'error': 'CA certificate is required'}), 400
+        
+        # Get access token and call backend API
+        token = session.get('access_token')
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Call the CA creation endpoint
+        response = requests.post(
+            f"{request.url_root}api/v1/ca",
+            headers=headers,
+            json=payload,
+            verify=False
+        )
+        
+        if response.status_code in [200, 201]:
+            return jsonify({'success': True, 'message': 'CA imported successfully'}), 200
+        else:
+            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Import failed'
+            return jsonify({'error': error_msg}), response.status_code
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # Configuration Management
 @ui_bp.route('/config')
 @login_required
