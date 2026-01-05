@@ -527,15 +527,27 @@
         }
     });
     
-    // Display current theme name
-    document.addEventListener('DOMContentLoaded', function() {
+    // Initialize settings page
+    function initializeSettingsPage() {
         const theme = getCurrentTheme();
         const themeName = theme.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-        document.getElementById('current-theme-name').textContent = themeName;
+        const themeNameEl = document.getElementById('current-theme-name');
+        if (themeNameEl) {
+            themeNameEl.textContent = themeName;
+        }
         
         // Load HTTPS certificate info
         loadHTTPSCertInfo();
         loadManagedCertificates();
+    }
+    
+    // Initialize on both DOMContentLoaded (first load) and htmx:afterSettle (SPA navigation)
+    document.addEventListener('DOMContentLoaded', initializeSettingsPage);
+    document.body.addEventListener('htmx:afterSettle', function(evt) {
+        // Only run if we're on the settings page
+        if (document.getElementById('https-cert-type')) {
+            initializeSettingsPage();
+        }
     });
     
     // Load current HTTPS certificate information
