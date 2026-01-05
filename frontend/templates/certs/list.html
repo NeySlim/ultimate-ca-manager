@@ -11,7 +11,7 @@
         </h1>
         <div style="display: flex; gap: 0.5rem;">
             <button onclick="openCreateCertModal()" 
-                    class="btn btn-secondary">
+                    class="btn btn-primary">
                 <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> Create Certificate
             </button>
             <button onclick="openCSRModal()" 
@@ -344,8 +344,8 @@
                     Cancel
                 </button>
                 <button type="submit"
-                        class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">
-                    <i class="fas fa-file-signature mr-2"></i> Generate CSR
+                        class="btn-primary">
+                    <i class="fas fa-file-signature" style="margin-right: 0.5rem;"></i> Generate CSR
                 </button>
             </div>
         </form>
@@ -684,11 +684,11 @@ function revokeCert(refid, descr) {
             </div>
             <div id="pkcs12-error" class="hidden mb-4 p-3 bg-red-100 text-red-700 rounded text-sm"></div>
             <div class="flex justify-end space-x-3">
-                <button onclick="closePKCS12Modal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+                <button onclick="closePKCS12Modal()" class="btn-secondary">
                     Annuler
                 </button>
-                <button onclick="exportPKCS12()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                    <i class="fas fa-download mr-2"></i>Exporter
+                <button onclick="exportPKCS12()" class="btn-primary">
+                    <i class="fas fa-download" style="margin-right: 0.5rem;"></i>Exporter
                 </button>
             </div>
         </div>
