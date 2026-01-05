@@ -481,7 +481,11 @@
 </div>
 
 <script>
-    // Get current session duration
+(function() {
+    // Wrap all code in IIFE to avoid variable conflicts when HTMX reloads
+    
+    // Store selected certificate
+    let selectedCertId = null;
     function getCurrentSessionDuration() {
         return parseInt(localStorage.getItem('ucm-session-duration')) || 30;
     }
@@ -636,9 +640,6 @@
             });
     }
     
-    // Store selected certificate
-    let selectedCertId = null;
-    
     // Select certificate
     function selectCertificate(certId, rowElement) {
         selectedCertId = certId;
@@ -752,6 +753,15 @@
             ' mr-2"></i>' + message;
         statusDiv.classList.remove('hidden');
     }
+    
+    // Make functions globally accessible for onclick handlers
+    window.setSessionDuration = setSessionDuration;
+    window.toggleHTTPSCertSelection = toggleHTTPSCertSelection;
+    window.applyHTTPSCertificate = applyHTTPSCertificate;
+    window.regenerateHTTPSCertificate = regenerateHTTPSCertificate;
+    window.selectCertificate = selectCertificate;
+    
+})(); // End IIFE
 </script>
 
 <style>
