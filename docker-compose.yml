@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  ucm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ucm:latest
+    container_name: ucm
+    restart: unless-stopped
+    
+    ports:
+      - "${UCM_HTTPS_PORT:-8443}:8443"
+    
+    volumes:
+      # Persistent data volume
+      - ucm-data:/app/backend/data
+      # Optional: Custom configuration
+      # - ./custom.env:/app/.env:ro
+    
+    environment:
+      # Generate random secrets on first run or specify your own
+      - UCM_DOCKER=1
+      # - UCM_SECRET_KEY=your-secret-key-here
+      # - UCM_JWT_SECRET=your-jwt-secret-here
+      - UCM_HTTPS_PORT=${UCM_HTTPS_PORT:-8443}
+      # - UCM_DATABASE_PATH=/app/backend/data/ucm.db
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:8443/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Security settings
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    read_only: false  # Needs to write to database
+    
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    networks:
+      - ucm-network
+    
+    labels:
+      - "com.ultimate-ca-manager.version=1.0.0"
+      - "com.ultimate-ca-manager.description=Certificate Authority Management"
+
+networks:
+  ucm-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  ucm-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${UCM_DATA_DIR:-./data}
