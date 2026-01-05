@@ -1,71 +1,400 @@
-{% extends "base.html" %}
-
-{% block title %}Login - Ultimate CA Manager{% endblock %}
-
-{% block content %}
-<div class="min-h-screen flex items-center justify-center px-4">
-    <div class="max-w-md w-full space-y-8">
-        <!-- Logo -->
-        <div class="text-center">
-            <i class="fas fa-shield-alt text-primary-600 dark:text-primary-400 text-6xl mb-4"></i>
-            <h2 class="text-3xl font-extrabold text-gray-900 dark:text-white">
-                Ultimate CA Manager
-            </h2>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                Secure Certificate Authority Management
-            </p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Ultimate CA Manager</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    
+    <!-- CRITICAL: Set theme attribute IMMEDIATELY before any CSS loads -->
+    <script>
+        (function() {
+            var theme = localStorage.getItem('ucm-theme') || 'sentinel-light';
+            document.documentElement.setAttribute('data-theme', theme);
+            document.write('<link id="theme-css" rel="stylesheet" href="/static/css/themes/' + theme + '.css">');
+        })();
+    </script>
+    
+    <!-- Components CSS for dropdown styling -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            max-width: 420px;
+            width: 100%;
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        
+        .login-logo {
+            margin: 0 auto 20px;
+        }
+        
+        .login-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        
+        .login-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .login-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 32px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 14px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: border-color 0.2s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        
+        .form-checkbox {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .form-checkbox input {
+            margin-right: 8px;
+        }
+        
+        .form-checkbox label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: var(--btn-secondary-bg, var(--bg-secondary)) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-login:hover {
+            background: var(--btn-secondary-hover, var(--sidebar-hover)) !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+        }
+        
+        .btn-login i {
+            color: var(--primary-color) !important;
+            opacity: 1 !important;
+        }
+        
+        /* Ensure login button icons are always visible */
+        .btn-login i.fas,
+        .btn-login svg,
+        .btn-login .ucm-icon {
+            opacity: 1 !important;
+            color: var(--primary-color) !important;
+        }
+        
+        .login-footer {
+            margin-top: 24px;
+            text-align: center;
+        }
+        
+        .login-info {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .theme-selector {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .theme-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+        
+        .theme-btn:hover {
+            background: var(--bg-hover);
+        }
+        
+        .theme-dropdown {
+            position: relative;
+        }
+        
+        .theme-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            min-width: 180px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .theme-dropdown-menu.active {
+            display: block;
+        }
+        
+        .theme-dropdown-header {
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .theme-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 13px;
+            transition: background-color 0.15s;
+        }
+        
+        .theme-dropdown-item:hover {
+            background: var(--bg-hover);
+        }
+        
+        .theme-dropdown-item i {
+            width: 16px;
+            text-align: center;
+            font-size: 12px;
+        }
+        
+        .theme-dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Theme Selector -->
+    <div class="theme-selector">
+        <div class="theme-dropdown">
+            <button class="theme-btn" onclick="toggleDropdown()">
+                <i class="fas fa-palette"></i>
+            </button>
+            
+            <div id="themeDropdown" class="theme-dropdown-menu">
+                <div class="theme-dropdown-header">Sentinel</div>
+                <a href="#" onclick="setTheme('sentinel-light'); closeDropdown(); return false;" class="theme-dropdown-item">
+                    <i class="fas fa-sun"></i> Light
+                </a>
+                <a href="#" onclick="setTheme('sentinel-dark'); closeDropdown(); return false;" class="theme-dropdown-item">
+                    <i class="fas fa-moon"></i> Dark
+                </a>
+                
+                <div class="theme-dropdown-divider"></div>
+                
+                <div class="theme-dropdown-header">Amber</div>
+                <a href="#" onclick="setTheme('amber-light'); closeDropdown(); return false;" class="theme-dropdown-item">
+                    <i class="fas fa-sun"></i> Light
+                </a>
+                <a href="#" onclick="setTheme('amber-dark'); closeDropdown(); return false;" class="theme-dropdown-item">
+                    <i class="fas fa-moon"></i> Dark
+                </a>
+                
+                <div class="theme-dropdown-divider"></div>
+                
+                <div class="theme-dropdown-header">Blossom</div>
+                <a href="#" onclick="setTheme('blossom-light'); closeDropdown(); return false;" class="theme-dropdown-item">
+                    <i class="fas fa-sun"></i> Light
+                </a>
+                <a href="#" onclick="setTheme('blossom-dark'); closeDropdown(); return false;" class="theme-dropdown-item">
+                    <i class="fas fa-moon"></i> Dark
+                </a>
+                
+                <div class="theme-dropdown-divider"></div>
+                
+                <div class="theme-dropdown-header">Nebula</div>
+                <a href="#" onclick="setTheme('nebula-light'); closeDropdown(); return false;" class="theme-dropdown-item">
+                    <i class="fas fa-sun"></i> Light
+                </a>
+                <a href="#" onclick="setTheme('nebula-dark'); closeDropdown(); return false;" class="theme-dropdown-item">
+                    <i class="fas fa-moon"></i> Dark
+                </a>
+            </div>
         </div>
         
-        <!-- Login form -->
-        <div class="bg-white dark:bg-gray-800 shadow-xl rounded-lg p-8 border border-gray-200 dark:border-gray-700">
-            <form class="space-y-6" action="/login" method="POST">
-                <div>
-                    <label for="username" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        <i class="fas fa-user mr-2"></i> Username
-                    </label>
-                    <input id="username" name="username" type="text" required
-                           class="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                           placeholder="Enter your username">
+        <button class="theme-btn" onclick="toggleThemeVariant(); updateToggleIcon();" title="Toggle Dark/Light">
+            <i id="theme-toggle-icon" class="fas fa-moon"></i>
+        </button>
+    </div>
+
+    <div class="login-container">
+        <!-- Header -->
+        <div class="login-header">
+            <svg class="login-logo" width="64" height="64" viewBox="0 0 192 150" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="ucm-logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:var(--primary-color);stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:var(--primary-hover);stop-opacity:1" />
+                </linearGradient>
+              </defs>
+              <rect class="logo-border" x="8" y="0" width="176" height="116" rx="4" fill="url(#ucm-logo-gradient)"/>
+              <rect class="logo-bg" x="12" y="4" width="168" height="108" rx="3" fill="transparent"/>
+              <line class="logo-line" x1="42" y1="22" x2="150" y2="22" stroke="url(#ucm-logo-gradient)" stroke-width="4" opacity="0.3"/>
+              <line class="logo-line" x1="42" y1="34" x2="138" y2="34" stroke="url(#ucm-logo-gradient)" stroke-width="4" opacity="0.3"/>
+              <line class="logo-line" x1="42" y1="46" x2="126" y2="46" stroke="url(#ucm-logo-gradient)" stroke-width="4" opacity="0.3"/>
+              <circle class="logo-badge" cx="96" cy="70" r="24" fill="url(#ucm-logo-gradient)"/>
+              <circle class="logo-badge-ring" cx="96" cy="70" r="20" fill="none" stroke="#fff" stroke-width="3"/>
+              <circle class="logo-badge-ring" cx="96" cy="70" r="16" fill="none" stroke="#fff" stroke-width="2" opacity="0.5"/>
+              <path class="logo-check" d="M88 70l5 5 11-11" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path class="logo-ribbon" d="M70 116 L70 142 L80 133 L80 116 Z" fill="url(#ucm-logo-gradient)"/>
+              <path class="logo-ribbon-outline" d="M70 116 L70 142 L80 133 L80 116" fill="none" stroke="#fff" stroke-width="2" opacity="0.6"/>
+              <path class="logo-ribbon" d="M112 116 L112 142 L102 133 L102 116 Z" fill="url(#ucm-logo-gradient)"/>
+              <path class="logo-ribbon-outline" d="M112 116 L112 142 L102 133 L102 116" fill="none" stroke="#fff" stroke-width="2" opacity="0.6"/>
+            </svg>
+            <h1 class="login-title">Ultimate CA Manager</h1>
+            <p class="login-subtitle">Secure Certificate Authority Management</p>
+        </div>
+        
+        <!-- Login Card -->
+        <div class="login-card">
+            <form action="/login" method="POST">
+                <div class="form-group">
+                    <label class="form-label" for="username">Username</label>
+                    <input class="form-input" id="username" name="username" type="text" required placeholder="Enter your username" autofocus>
                 </div>
                 
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        <i class="fas fa-lock mr-2"></i> Password
-                    </label>
-                    <input id="password" name="password" type="password" required
-                           class="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                           placeholder="Enter your password">
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input class="form-input" id="password" name="password" type="password" required placeholder="Enter your password">
                 </div>
                 
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center">
-                        <input id="remember" name="remember" type="checkbox"
-                               class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded">
-                        <label for="remember" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-                            Remember me
-                        </label>
-                    </div>
+                <div class="form-checkbox">
+                    <input id="remember" name="remember" type="checkbox">
+                    <label for="remember">Remember me</label>
                 </div>
                 
-                <div>
-                    <button type="submit"
-                            class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors">
-                        <i class="fas fa-sign-in-alt mr-2"></i>
-                        Sign in
-                    </button>
-                </div>
+                <button type="submit" class="btn-login">
+                    <i class="fas fa-right-from-bracket"></i>
+                    <span>Sign In</span>
+                </button>
             </form>
         </div>
         
-        <!-- Info -->
-        <div class="text-center text-sm text-gray-500 dark:text-gray-400">
-            <p class="mb-2">
-                <i class="fas fa-info-circle mr-1"></i> Default credentials: admin / changeme123
-            </p>
-            <p class="text-xs">
-                <i class="fas fa-lock mr-1"></i> HTTPS-only secure connection
-            </p>
+        <!-- Footer -->
+        <div class="login-footer">
+            <p class="login-info">Default credentials: <strong>admin / changeme123</strong></p>
+            <p class="login-info" style="font-size: 12px; opacity: 0.7;">HTTPS-only secure connection</p>
         </div>
     </div>
-</div>
-{% endblock %}
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/fontawesome.css') }}">
+    
+    <!-- Icon System -->
+    <script src="{{ url_for('static', filename='js/icon-system.js') }}"></script>
+    
+    <!-- Theme Switcher -->
+    <script src="{{ url_for('static', filename='js/theme-switcher.js') }}"></script>
+    <script>
+        function toggleDropdown() {
+            const dropdown = document.getElementById('themeDropdown');
+            dropdown.classList.toggle('active');
+        }
+        
+        function closeDropdown() {
+            const dropdown = document.getElementById('themeDropdown');
+            dropdown.classList.remove('active');
+        }
+        
+        function updateToggleIcon() {
+            const variant = getThemeVariant();
+            const icon = document.getElementById('theme-toggle-icon');
+            if (icon) {
+                icon.className = variant === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+            }
+        }
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.querySelector('.theme-dropdown');
+            if (dropdown && !dropdown.contains(event.target)) {
+                closeDropdown();
+            }
+        });
+        
+        // Set correct icon on load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateToggleIcon();
+        });
+    </script>
+</body>
+</html>

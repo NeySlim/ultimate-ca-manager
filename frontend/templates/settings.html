@@ -3,55 +3,275 @@
 {% block title %}Settings - UCM{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-6">
-    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-        <i class="fas fa-cog mr-2"></i> Settings
-    </h1>
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-gray-900">
+            <i class="fas fa-user-gear mr-2"></i> User Settings
+        </h1>
+    </div>
     
-    <!-- User Info -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                User Information
+    <!-- User Profile -->
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-user text-primary-color"></i>
+                Profile Information
             </h2>
         </div>
         <div class="p-6">
-            <div class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
-                    <p class="text-gray-900 dark:text-white">{{ session.get('username', 'N/A') }}</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-user-circle text-primary-color text-2xl"></i>
+                        <span class="text-lg font-semibold text-gray-900">{{ session.get('username', 'N/A') }}</span>
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
-                    <p class="text-gray-900 dark:text-white capitalize">{{ session.get('role', 'viewer') }}</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                    <div class="flex items-center gap-3">
+                        {% if session.get('role') == 'admin' %}
+                        <span class="badge-outline badge-primary">
+                            <i class="fas fa-crown" style="width: 10px; height: 10px;"></i>
+                            Administrator
+                        </span>
+                        {% else %}
+                        <span class="badge-outline badge-info">
+                            <i class="fas fa-eye" style="width: 10px; height: 10px;"></i>
+                            {{ session.get('role', 'viewer').title() }}
+                        </span>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- System Info -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                System Information
+    <!-- Password Change -->
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-key text-primary-color"></i>
+                Change Password
             </h2>
         </div>
         <div class="p-6">
-            <div class="space-y-3 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-gray-500 dark:text-gray-400">Version</span>
-                    <span class="text-gray-900 dark:text-white">1.0.0</span>
+            <form class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+                    <input type="password" class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900" placeholder="Enter current password">
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500 dark:text-gray-400">HTTPS Port</span>
-                    <span class="text-gray-900 dark:text-white">8443</span>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                    <input type="password" class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900" placeholder="Enter new password">
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-500 dark:text-gray-400">Database</span>
-                    <span class="text-gray-900 dark:text-white">SQLite</span>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+                    <input type="password" class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900" placeholder="Confirm new password">
                 </div>
+                <div class="pt-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save mr-2"></i> Update Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Theme Preferences -->
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-palette text-primary-color"></i>
+                Theme Preferences
+            </h2>
+        </div>
+        <div class="p-6">
+            <p class="text-sm text-gray-500 mb-4">Current theme: <span id="current-theme-name" class="font-semibold text-gray-900"></span></p>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
+                <!-- Sentinel Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: #3b82f6;"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Sentinel</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button onclick="setTheme('sentinel-light')" style="padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem; cursor: pointer; transition: all 0.2s;">
+                            Light
+                        </button>
+                        <button onclick="setTheme('sentinel-dark')" style="padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem; cursor: pointer; transition: all 0.2s;">
+                            Dark
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Amber Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: #f97316;"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Amber</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button onclick="setTheme('amber-light')" style="padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem; cursor: pointer; transition: all 0.2s;">
+                            Light
+                        </button>
+                        <button onclick="setTheme('amber-dark')" style="padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem; cursor: pointer; transition: all 0.2s;">
+                            Dark
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Blossom Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: #ec4899;"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Blossom</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button onclick="setTheme('blossom-light')" style="padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem; cursor: pointer; transition: all 0.2s;">
+                            Light
+                        </button>
+                        <button onclick="setTheme('blossom-dark')" style="padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem; cursor: pointer; transition: all 0.2s;">
+                            Dark
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Nebula Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: #3b82f6;"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Nebula</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button onclick="setTheme('nebula-light')" style="padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem; cursor: pointer; transition: all 0.2s;">
+                            Light
+                        </button>
+                        <button onclick="setTheme('nebula-dark')" style="padding: 0.5rem 1rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--bg-secondary); color: var(--text-primary); font-size: 0.875rem; cursor: pointer; transition: all 0.2s;">
+                            Dark
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Session Info -->
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-clock text-primary-color"></i>
+                Session Configuration
+            </h2>
+        </div>
+        <div class="p-6">
+            <!-- Session Duration -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Session Duration</label>
+                <p class="text-sm text-gray-500 mb-3">Choose how long you want to stay logged in before being automatically disconnected.</p>
+                
+                <div style="max-width: 300px; position: relative;">
+                    <select id="session-duration-select" onchange="setSessionDuration(this.value)" 
+                            style="width: 100%; padding: 10px 40px 10px 12px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--card-bg); color: var(--text-primary); cursor: pointer; transition: all 0.2s; appearance: none; -webkit-appearance: none; -moz-appearance: none;">
+                        <option value="5">5 minutes (Quick session)</option>
+                        <option value="15">15 minutes (Short session)</option>
+                        <option value="30" selected>30 minutes (Default)</option>
+                        <option value="60">1 hour (Long session)</option>
+                        <option value="120">2 hours (Extended session)</option>
+                    </select>
+                    <div style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-secondary);">
+                        <i class="fas fa-chevron-down" style="font-size: 12px;"></i>
+                    </div>
+                </div>
+                
+                <div id="session-duration-status" class="mt-3 text-sm" style="color: var(--status-success); display: none;">
+                    <i class="fas fa-check-circle"></i> 
+                    <span id="session-duration-message"></span>
+                </div>
+            </div>
+            
+            <!-- Session Info -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="text-sm font-medium text-gray-700">Session Active</span>
+                    <span class="badge-outline badge-success">
+                        <i class="fas fa-check-circle" style="width: 10px; height: 10px;"></i>
+                        Yes
+                    </span>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="text-sm font-medium text-gray-700">Login Method</span>
+                    <span class="text-sm text-gray-900">Password</span>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <a href="/logout" class="btn btn-danger">
+                    <i class="fas fa-sign-out mr-2"></i> Logout
+                </a>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    // Get current session duration
+    function getCurrentSessionDuration() {
+        return parseInt(localStorage.getItem('ucm-session-duration')) || 30;
+    }
+    
+    // Set session duration
+    function setSessionDuration(minutes) {
+        minutes = parseInt(minutes);
+        localStorage.setItem('ucm-session-duration', minutes);
+        
+        // Update session manager if it exists
+        if (window.sessionManager) {
+            window.sessionManager.sessionDuration = minutes * 60 * 1000;
+            window.sessionManager.resetTimers();
+            console.log('Session duration updated to', minutes, 'minutes');
+        }
+        
+        // Show status message
+        const statusDiv = document.getElementById('session-duration-status');
+        const messageSpan = document.getElementById('session-duration-message');
+        
+        let durationText = minutes + ' minutes';
+        if (minutes === 60) durationText = '1 hour';
+        if (minutes === 120) durationText = '2 hours';
+        
+        messageSpan.textContent = `Session duration set to ${durationText}. Changes apply immediately.`;
+        statusDiv.style.display = 'block';
+        
+        setTimeout(() => {
+            statusDiv.style.display = 'none';
+        }, 3000);
+    }
+    
+    // Initialize session duration display
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentDuration = getCurrentSessionDuration();
+        const select = document.getElementById('session-duration-select');
+        if (select) {
+            select.value = currentDuration;
+        }
+    });
+    
+    // Display current theme name
+    document.addEventListener('DOMContentLoaded', function() {
+        const theme = getCurrentTheme();
+        const themeName = theme.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        document.getElementById('current-theme-name').textContent = themeName;
+    });
+    
+    // Display current theme name
+        const statusDiv = document.getElementById('opnsense-status');
+        statusDiv.className = 'mt-4 p-4 rounded-lg ' + (
+            type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
+            type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' :
+            'bg-blue-50 text-blue-800 border border-blue-200'
+        );
+        statusDiv.textContent = message;
+        statusDiv.classList.remove('hidden');
+    }
+</script>
 {% endblock %}

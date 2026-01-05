@@ -3,133 +3,185 @@
 {% block title %}Dashboard - UCM{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-    <!-- Header -->
-    <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-            <i class="fas fa-tachometer-alt mr-2"></i> Dashboard
+<!-- Page Header -->
+<div class="page-header" style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1 style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0;">
+            <i class="fas fa-gauge-high" style="margin-right: 8px;"></i>Dashboard
         </h1>
-        <div class="text-sm text-gray-500 dark:text-gray-400">
-            <i class="fas fa-clock mr-1"></i> Last updated: <span id="last-updated">{{ now.strftime('%Y-%m-%d %H:%M:%S') }}</span>
-        </div>
+        <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0 0;">Overview of your certificate infrastructure</p>
     </div>
-    
-    <!-- Stats Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-         hx-get="/api/dashboard/stats" 
-         hx-trigger="load, every 30s"
-         hx-swap="innerHTML">
-        <!-- Will be populated by HTMX -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 animate-pulse">
-            <div class="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 animate-pulse">
-            <div class="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 animate-pulse">
-            <div class="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
-        </div>
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 animate-pulse">
-            <div class="h-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
-        </div>
-    </div>
-    
-    <!-- Recent Activity & Quick Actions -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Recent CAs -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                    <i class="fas fa-certificate text-primary-600 mr-2"></i> Recent Certificate Authorities
-                </h2>
+    <button class="btn btn-primary">
+        <i class="fas fa-sync"></i> Refresh
+    </button>
+</div>
+
+<!-- Stats Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px;">
+    <!-- CA Count -->
+    <div class="card" style="box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+        <div class="card-body" style="display: flex; gap: 16px; align-items: center;">
+            <div style="width: 48px; height: 48px; border-radius: 6px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.15) 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">
+                <i class="fas fa-lock" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
             </div>
-            <div class="p-6" 
-                 hx-get="/api/dashboard/recent-cas" 
-                 hx-trigger="load"
-                 hx-swap="innerHTML">
-                <div class="animate-pulse space-y-4">
-                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div style="flex: 1;">
+                <div style="font-size: 28px; font-weight: 600; color: var(--text-primary); line-height: 1;">
+                    {{ stats.total_cas or 0 }}
+                </div>
+                <div style="font-size: 14px; color: var(--text-secondary); font-weight: 500; margin-top: 4px;">
+                    Certificate Authorities
                 </div>
             </div>
         </div>
-        
-        <!-- Quick Actions -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                    <i class="fas fa-bolt text-primary-600 mr-2"></i> Quick Actions
-                </h2>
+    </div>
+    
+    <!-- Certificates Count -->
+    <div class="card" style="box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+        <div class="card-body" style="display: flex; gap: 16px; align-items: center;">
+            <div style="width: 48px; height: 48px; border-radius: 6px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.15) 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">
+                <i class="fas fa-certificate" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
             </div>
-            <div class="p-6 space-y-3">
-                <a href="/ca/new" class="flex items-center p-4 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 rounded-lg transition-colors">
-                    <div class="flex-shrink-0 w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center text-white">
-                        <i class="fas fa-plus"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-900 dark:text-white">Create New CA</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Generate a new Certificate Authority</p>
-                    </div>
-                </a>
-                
-                <a href="/certificates/new" class="flex items-center p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 rounded-lg transition-colors">
-                    <div class="flex-shrink-0 w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center text-white">
-                        <i class="fas fa-file-certificate"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-900 dark:text-white">Issue Certificate</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Create a new certificate</p>
-                    </div>
-                </a>
-                
-                <a href="/import" class="flex items-center p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-lg transition-colors">
-                    <div class="flex-shrink-0 w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center text-white">
-                        <i class="fas fa-file-import"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-900 dark:text-white">Import from OPNsense</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Import existing CAs and certificates</p>
-                    </div>
-                </a>
-                
-                <a href="/scep" class="flex items-center p-4 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40 rounded-lg transition-colors">
-                    <div class="flex-shrink-0 w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center text-white">
-                        <i class="fas fa-network-wired"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-900 dark:text-white">Configure SCEP</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Manage SCEP enrollment settings</p>
-                    </div>
-                </a>
+            <div style="flex: 1;">
+                <div style="font-size: 28px; font-weight: 600; color: var(--text-primary); line-height: 1;">
+                    {{ stats.total_certificates or 0 }}
+                </div>
+                <div style="font-size: 14px; color: var(--text-secondary); font-weight: 500; margin-top: 4px;">
+                    Total Certificates
+                </div>
             </div>
         </div>
     </div>
     
-    <!-- SCEP Status -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                <i class="fas fa-network-wired text-primary-600 mr-2"></i> SCEP Server Status
-            </h2>
+    <!-- Valid Certificates -->
+    <div class="card" style="box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+        <div class="card-body" style="display: flex; gap: 16px; align-items: center;">
+            <div style="width: 48px; height: 48px; border-radius: 6px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.15) 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">
+                <i class="fas fa-check" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 28px; font-weight: 600; color: var(--text-primary); line-height: 1;">
+                    {{ stats.valid_certificates or 0 }}
+                </div>
+                <div style="font-size: 14px; color: var(--text-secondary); font-weight: 500; margin-top: 4px;">
+                    Valid Certificates
+                </div>
+            </div>
         </div>
-        <div class="p-6"
-             hx-get="/api/dashboard/scep-status"
-             hx-trigger="load"
-             hx-swap="innerHTML">
-            <div class="animate-pulse">
-                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
-                <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+    </div>
+    
+    <!-- Expiring Soon -->
+    <div class="card" style="box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+        <div class="card-body" style="display: flex; gap: 16px; align-items: center;">
+            <div style="width: 48px; height: 48px; border-radius: 6px; background: linear-gradient(135deg, rgba(251, 188, 4, 0.1) 0%, rgba(251, 188, 4, 0.15) 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">
+                <i class="fas fa-exclamation-triangle" style="background: linear-gradient(135deg, #fbbf04 0%, #f59e0b 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 28px; font-weight: 600; color: var(--text-primary); line-height: 1;">
+                    {{ stats.expiring_soon or 0 }}
+                </div>
+                <div style="font-size: 14px; color: var(--text-secondary); font-weight: 500; margin-top: 4px;">
+                    Expiring Soon
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-    // Update timestamp every second
-    setInterval(() => {
-        const now = new Date();
-        document.getElementById('last-updated').textContent = now.toLocaleString();
-    }, 1000);
-</script>
+<!-- Recent Certificates -->
+<div class="card">
+    <div class="card-header">
+        <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">Recent Certificates</h2>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 30%;">Common Name</th>
+                    <th style="width: 15%;">Type</th>
+                    <th style="width: 25%;">Issuer</th>
+                    <th style="width: 15%;">Status</th>
+                    <th style="width: 15%;">Expires</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if certificates %}
+                    {% for cert in certificates[:10] %}
+                    <tr>
+                        <td><strong>{{ cert.common_name }}</strong></td>
+                        <td><span class="badge badge-primary badge-xs">{{ cert.type or 'SERVER' }}</span></td>
+                        <td>{{ cert.issuer_cn }}</td>
+                        <td>
+                            {% if cert.is_valid %}
+                                <span class="badge badge-success badge-xs">Valid</span>
+                            {% else %}
+                                <span class="badge badge-secondary badge-xs">Expired</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-size: 12px;">
+                            {% if cert.not_after %}
+                                {{ cert.not_after[:10] }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 40px;">
+                        <i class="fas fa-certificate" style="font-size: 48px; opacity: 0.2; margin-bottom: 12px; display: block;"></i>
+                        No certificates found
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- SCEP Requests -->
+<div class="card">
+    <div class="card-header">
+        <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">Recent SCEP Requests</h2>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 35%;">Device</th>
+                    <th style="width: 20%;">Status</th>
+                    <th style="width: 30%;">CA</th>
+                    <th style="width: 15%;">Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if scep_requests %}
+                    {% for req in scep_requests[:5] %}
+                    <tr>
+                        <td><strong>{{ req.common_name }}</strong></td>
+                        <td>
+                            {% if req.status == 'approved' %}
+                                <span class="badge badge-success badge-xs">Approved</span>
+                            {% elif req.status == 'pending' %}
+                                <span class="badge badge-warning badge-xs">Pending</span>
+                            {% else %}
+                                <span class="badge badge-secondary badge-xs">{{ req.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ req.ca_name }}</td>
+                        <td style="font-size: 12px;">{{ req.created_at.strftime('%Y-%m-%d %H:%M') if req.created_at else 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 40px;">
+                        <i class="fas fa-network-wired" style="font-size: 48px; opacity: 0.2; margin-bottom: 12px; display: block;"></i>
+                        No SCEP requests
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock %}
