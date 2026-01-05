@@ -1,10 +1,35 @@
 # Ultimate CA Manager
 
-![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.6.1-blue.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![Docker](https://img.shields.io/docker/pulls/neyslim/ultimate-ca-manager)
+[![Complete Release Pipeline](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/release-complete.yml/badge.svg)](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/release-complete.yml)
 
 **Ultimate CA Manager (UCM)** - Complete Certificate Authority management system with modern theming and RFC-compliant protocols.
+
+## 📸 Screenshots
+
+### Dashboard - Amber Dark Theme
+![Dashboard](docs/screenshots/02-dashboard_amber-dark.png)
+
+### Certificate Authority Management
+![CA Management](docs/screenshots/04-ca-detail_amber-dark.png)
+
+### Certificate List
+![Certificates](docs/screenshots/05-certificates-list_amber-dark.png)
+
+### Multiple Themes
+<table>
+  <tr>
+    <td><img src="docs/screenshots/08-theme-sentinel-light.png" alt="Sentinel Light" width="400"/><br/><i>Sentinel Light</i></td>
+    <td><img src="docs/screenshots/09-theme-nebula-dark.png" alt="Nebula Dark" width="400"/><br/><i>Nebula Dark</i></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/10-theme-blossom-light.png" alt="Blossom Light" width="400"/><br/><i>Blossom Light</i></td>
+    <td><img src="docs/screenshots/02-dashboard_amber-dark.png" alt="Amber Dark" width="400"/><br/><i>Amber Dark</i></td>
+  </tr>
+</table>
 
 ## ✨ Features
 

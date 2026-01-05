@@ -1,36 +1,71 @@
-# UCM - Ultimate CA Manager
+# GitHub Repository Description
 
-**Professional Certificate Authority management system with modern UI and RFC-compliant protocols**
+## Short Description (160 characters max)
+🔐 Enterprise Certificate Authority Manager with SCEP, OCSP, CRL support. 8 beautiful themes. Docker & multi-platform. RFC-compliant PKI solution.
 
-🔐 Full PKI Suite | 🎨 8 Beautiful Themes | ⚡ HTMX Powered | 🔒 RFC Compliant
+## About Section
 
-## Quick Description
+Ultimate CA Manager (UCM) - Complete Certificate Authority management system with modern theming and RFC-compliant protocols (SCEP, OCSP, CRL).
 
-Ultimate CA Manager (UCM) is a comprehensive web-based Certificate Authority management system featuring CA creation, certificate issuance/revocation, CRL distribution (RFC 5280), OCSP responder, and SCEP server (RFC 8894). Built with Flask and HTMX, it offers 8 professionally designed themes with custom scrollbars, dark mode support, and a modern SPA experience.
+**Key Features:**
+- 🔐 Full CA & Certificate lifecycle management
+- 🔗 SCEP Server (RFC 8894) - Auto-enrollment
+- 🟢 OCSP Responder (RFC 6960) - Real-time status
+- 📄 CRL Distribution (RFC 5280) - Revocation lists
+- 🎨 8 Professional Themes (Light & Dark)
+- 🐳 Docker ready with multi-arch support
+- 📱 Responsive modern UI with HTMX
+- 🔒 Role-based access control
+- 📡 Complete REST API
 
-## Key Features
+**Perfect for:**
+- Internal PKI infrastructure
+- Device auto-enrollment (iOS, Android, Windows)
+- Certificate lifecycle automation
+- Enterprise security teams
+- DevOps and SRE teams
 
-✅ Complete CA lifecycle management
-✅ CRL & OCSP distribution (public endpoints)
-✅ SCEP auto-enrollment server
-✅ Multi-format export (PEM, DER, PKCS#12)
-✅ 8 themes (4 light + 4 dark) with custom scrollbars
-✅ Responsive web interface
-✅ REST API with JWT authentication
-✅ OPNsense integration
-✅ SQLite backend (portable)
+## Topics (GitHub repository topics)
+```
+certificate-authority
+pki
+scep
+ocsp
+crl
+certificate-management
+docker
+flask
+python
+https
+tls
+ssl
+cryptography
+security
+enterprise
+pki-infrastructure
+certificate-lifecycle
+auto-enrollment
+rfc-compliant
+multi-platform
+```
 
-## Tags
+## Website
+https://github.com/NeySlim/ultimate-ca-manager
 
-`certificate-authority` `pki` `x509` `ssl` `tls` `crl` `ocsp` `scep` `flask` `htmx` `python` `web-ui` `dark-mode` `themes` `rfc5280` `rfc8894`
+## Social Preview Image
+Use: `/docs/screenshots/02-dashboard_amber-dark.png`
+Recommended size: 1280×640px (will be cropped from 1530×921)
 
-## GitHub About Section
+---
 
-**Description:**
-Professional PKI management system with CA creation, certificate operations, CRL/OCSP distribution, SCEP server, and beautiful theming
+## README Badges to Add
 
-**Website:**
-https://github.com/NeySlim/ultimate-ca-manager/wiki
-
-**Topics:**
-certificate-authority, pki, x509, ssl-tls, crl, ocsp, scep, flask, htmx, python, web-application, certificate-management, dark-mode, responsive-ui
+```markdown
+![Version](https://img.shields.io/badge/version-1.6.1-blue.svg)
+![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![Docker](https://img.shields.io/docker/pulls/neyslim/ultimate-ca-manager)
+![GitHub Stars](https://img.shields.io/github/stars/NeySlim/ultimate-ca-manager)
+![GitHub Issues](https://img.shields.io/github/issues/NeySlim/ultimate-ca-manager)
+[![Complete Release Pipeline](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/release-complete.yml/badge.svg)](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/release-complete.yml)
+```
