@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  discussions: write
 
 jobs:
   create-release:
@@ -70,6 +69,5 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: ${{ steps.check_notes.outputs.exists == 'false' }}
-          discussion_category_name: Releases
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
