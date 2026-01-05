@@ -67,7 +67,7 @@ sudo systemctl start ucm
 ```
 
 **Web Interface:** https://your-server-ip:8443  
-**Default Credentials:** admin / admin ⚠️ **CHANGE IMMEDIATELY!**
+**Default Credentials:** admin / changeme123 ⚠️ **CHANGE IMMEDIATELY!**
 
 ## 📡 API Endpoints
 
@@ -256,7 +256,7 @@ sudo systemctl start ucm
 ```
 
 **Web Interface:** https://your-server-ip:8443  
-**Default Credentials:** admin / admin ⚠️ **CHANGE IMMEDIATELY!**
+**Default Credentials:** admin / changeme123 ⚠️ **CHANGE IMMEDIATELY!**
 
 ## 📡 API Endpoints
 
