@@ -42,7 +42,7 @@
 
 ```bash
 # Download package
-wget https://github.com/yourusername/ucm/releases/download/v1.6.0/ucm_1.6.0_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.6.0/ucm_1.6.0_all.deb
 
 # Install
 sudo dpkg -i ucm_1.6.0_all.deb
@@ -54,8 +54,8 @@ sudo dpkg -i ucm_1.6.0_all.deb
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/ucm.git
-cd ucm
+git clone https://github.com/NeySlim/ultimate-ca-manager.git
+cd ultimate-ca-manager
 
 # Run installation script
 sudo ./install.sh
@@ -150,8 +150,8 @@ See [CHANGELOG.md](CHANGELOG.md) for complete details.
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/ucm.git
-cd ucm
+git clone https://github.com/NeySlim/ultimate-ca-manager.git
+cd ultimate-ca-manager
 
 # Create virtual environment
 python3 -m venv venv
