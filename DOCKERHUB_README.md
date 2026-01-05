@@ -3,8 +3,7 @@
 ![Docker Pulls](https://img.shields.io/docker/pulls/neyslim/ultimate-ca-manager)
 ![Docker Image Size](https://img.shields.io/docker/image-size/neyslim/ultimate-ca-manager/latest)
 ![GitHub release](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager)
-[![Docker Publish](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/docker-publish.yml)
-[![CI](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/ci.yml)
+[![Complete Release Pipeline](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/release-complete.yml/badge.svg)](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/release-complete.yml)
 
 🔐 **Enterprise-grade Certificate Authority Management System**
 
