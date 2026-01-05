@@ -7,7 +7,42 @@
 
 🔐 **Enterprise-grade Certificate Authority Management System**
 
-Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Certificate Authorities, issuing certificates, and providing industry-standard protocols (SCEP, OCSP) with a modern, intuitive interface.
+Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Certificate Authorities, issuing certificates, and providing industry-standard protocols (SCEP, OCSP, CRL) with a modern, intuitive interface.
+
+## 📸 Screenshots
+
+### Professional Interface with Multiple Themes
+
+![Dashboard](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/02-dashboard_amber-dark.png)
+*Dashboard - Amber Dark Theme*
+
+![Certificate Management](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/05-certificates-list_amber-dark.png)
+*Certificate Management*
+
+### 8 Beautiful Themes Available
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/08-theme-sentinel-light.png" width="350"/><br/>
+      <b>Sentinel Light</b>
+    </td>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/09-theme-nebula-dark.png" width="350"/><br/>
+      <b>Nebula Dark</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/10-theme-blossom-light.png" width="350"/><br/>
+      <b>Blossom Light</b>
+    </td>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/02-dashboard_amber-dark.png" width="350"/><br/>
+      <b>Amber Dark</b>
+    </td>
+  </tr>
+</table>
 
 ---
 
@@ -67,7 +102,7 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/in
 ### Certificate Operations
 - Issue certificates (server, client, code signing, email)
 - Import and sign CSRs
-- Certificate revocation
+- Certificate revocation with CRL support
 - Export to PEM, DER, PKCS#12
 - Certificate lifecycle tracking
 - Expiration monitoring
@@ -75,7 +110,15 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/in
 ### Industry-Standard Protocols
 - **SCEP Server** (RFC 8894) - Zero-touch device enrollment
 - **OCSP Responder** (RFC 6960) - Real-time certificate status
+- **CRL Distribution** (RFC 5280) - Certificate Revocation Lists
 - Compatible with iOS, Android, Windows, Cisco, Palo Alto
+
+### Modern Web Interface
+- 🎨 **8 Professional Themes** - Sentinel, Amber, Blossom, Nebula (Light & Dark)
+- 📱 **Responsive Design** - Desktop, tablet, mobile optimized
+- 🌓 **Full Dark Mode** - Complete dark theme support
+- ⚡ **Modern SPA** - HTMX-powered fast navigation
+- 🖱️ **Custom Scrollbars** - Theme-aware styled scrollbars
 
 ### Security
 - HTTPS-only access (TLS 1.2+)
@@ -83,12 +126,7 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/in
 - JWT authentication for API
 - Audit logging
 - OWASP Top 10 2021 compliant
-
-### Modern Web Interface
-- Responsive design (desktop, tablet, mobile)
-- Dark/Light theme support
-- Real-time dashboard
-- Intuitive navigation
+- Non-root container execution
 
 ### REST API
 - Complete programmatic access
@@ -117,8 +155,8 @@ docker pull neyslim/ultimate-ca-manager:latest  # Multi-arch (amd64, arm64)
 ```
 
 **Tags**:
-- `latest` - Latest stable release
-- `1.0.1`, `1.0`, `1` - Semantic versions
+- `latest` - Latest stable release (v1.6.1)
+- `1.6.1`, `1.6`, `1` - Semantic versions
 - `v*.*.*` - Specific releases
 
 **Image Details**:
@@ -255,6 +293,6 @@ If you find UCM useful, please consider giving it a star! ⭐
 
 ---
 
-**Version**: 1.0.1  
+**Version**: 1.6.1  
 **Status**: Production Ready ✅  
-**Last Updated**: 2026-01-04
+**Last Updated**: 2026-01-06
