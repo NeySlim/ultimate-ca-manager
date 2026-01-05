@@ -7,11 +7,13 @@
     <!-- Header -->
     <div class="mb-6 flex justify-between items-center">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ cert.common_name }}</h1>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Certificate Details</p>
+            <h1 class="text-3xl font-bold text-gray-900">
+                <i class="fas fa-certificate mr-2"></i>{{ cert.common_name }}
+            </h1>
+            <p class="mt-2 text-sm text-gray-600">Certificate Details</p>
         </div>
         <div class="flex space-x-3">
-            <a href="/certificates" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600">
+            <a href="/certificates" class="btn-secondary">
                 <i class="fas fa-arrow-left mr-2"></i>Back to List
             </a>
             {% if not cert.revoked %}
@@ -24,24 +26,24 @@
                     <i class="fas fa-download mr-2"></i>Export
                     <i class="fas fa-chevron-down ml-2"></i>
                 </button>
-                <div id="export-menu" class="hidden absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-gray-700 ring-1 ring-black ring-opacity-5 z-10">
+                <div id="export-menu" class="hidden absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
                     <div class="py-1" role="menu">
-                        <button onclick="exportCertSimple('{{ cert.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                        <button onclick="exportCertSimple('{{ cert.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                             <i class="fas fa-file-certificate mr-2"></i>Certificate only (PEM)
                         </button>
-                        <button onclick="exportCertWithKey('{{ cert.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                        <button onclick="exportCertWithKey('{{ cert.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                             <i class="fas fa-key mr-2"></i>Certificate + Key (PEM)
                         </button>
-                        <button onclick="exportCertWithChain('{{ cert.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                        <button onclick="exportCertWithChain('{{ cert.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                             <i class="fas fa-link mr-2"></i>Certificate + CA Chain (PEM)
                         </button>
-                        <button onclick="exportCertFull('{{ cert.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                        <button onclick="exportCertFull('{{ cert.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                             <i class="fas fa-archive mr-2"></i>Full Chain + Key (PEM)
                         </button>
-                        <button onclick="exportCertDER('{{ cert.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                        <button onclick="exportCertDER('{{ cert.id }}')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                             <i class="fas fa-file-binary mr-2"></i>Certificate (DER)
                         </button>
-                        <button onclick="showPKCS12Modal('{{ cert.id }}', 'cert')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">
+                        <button onclick="showPKCS12Modal('{{ cert.id }}', 'cert')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                             <i class="fas fa-lock mr-2"></i>PKCS#12 (.p12/.pfx)
                         </button>
                     </div>
@@ -53,42 +55,42 @@
     <!-- Certificate Information -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Basic Information -->
-        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Basic Information</h2>
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Basic Information</h2>
             <dl class="space-y-3">
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Description</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ cert.descr }}</dd>
+                    <dt class="text-sm font-medium text-gray-500">Description</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ cert.descr }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Common Name</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{{ cert['common_name'] if cert['common_name'] else 'N/A' }}</dd>
+                    <dt class="text-sm font-medium text-gray-500">Common Name</dt>
+                    <dd class="mt-1 text-sm text-gray-900 font-mono">{{ cert['common_name'] if cert['common_name'] else 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Organization</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ cert['organization'] if cert['organization'] else 'N/A' }}</dd>
+                    <dt class="text-sm font-medium text-gray-500">Organization</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ cert['organization'] if cert['organization'] else 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Type</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">
+                    <dt class="text-sm font-medium text-gray-500">Type</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
                         {% if cert.cert_type == 'server_cert' %}
-                        <span class="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded text-xs font-semibold">Server</span>
+                        <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">Server</span>
                         {% elif cert.cert_type == 'usr_cert' %}
-                        <span class="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-xs font-semibold">Client</span>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">Client</span>
                         {% elif cert.cert_type == 'sign_cert' %}
-                        <span class="px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded text-xs font-semibold">Signature</span>
+                        <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">Signature</span>
                         {% else %}
-                        <span class="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 rounded text-xs font-semibold">{{ cert.cert_type }}</span>
+                        <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-semibold">{{ cert.cert_type }}</span>
                         {% endif %}
                     </dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">
+                    <dt class="text-sm font-medium text-gray-500">Status</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
                         {% if cert.revoked %}
-                        <span class="px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded text-xs font-semibold">REVOKED</span>
+                        <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">REVOKED</span>
                         {% else %}
-                        <span class="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-xs font-semibold">Active</span>
+                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">Active</span>
                         {% endif %}
                     </dd>
                 </div>
@@ -96,34 +98,34 @@
         </div>
 
         <!-- Technical Details -->
-        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Technical Details</h2>
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Technical Details</h2>
             <dl class="space-y-3">
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Serial Number</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono break-all">{{ cert.serial_number }}</dd>
+                    <dt class="text-sm font-medium text-gray-500">Serial Number</dt>
+                    <dd class="mt-1 text-sm text-gray-900 font-mono break-all">{{ cert.serial_number }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Issuer</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{{ cert['issuer_name'] if cert['issuer_name'] else 'N/A' }}</dd>
+                    <dt class="text-sm font-medium text-gray-500">Issuer</dt>
+                    <dd class="mt-1 text-sm text-gray-900 font-mono">{{ cert['issuer_name'] if cert['issuer_name'] else 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Valid From</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ cert['not_valid_before'] if cert['not_valid_before'] else 'N/A' }}</dd>
+                    <dt class="text-sm font-medium text-gray-500">Valid From</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ cert['not_valid_before'] if cert['not_valid_before'] else 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Valid Until</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{{ cert['not_valid_after'] if cert['not_valid_after'] else 'N/A' }}</dd>
+                    <dt class="text-sm font-medium text-gray-500">Valid Until</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ cert['not_valid_after'] if cert['not_valid_after'] else 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Private Key</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">
+                    <dt class="text-sm font-medium text-gray-500">Private Key</dt>
+                    <dd class="mt-1 text-sm text-gray-900">
                         {% if cert['has_private_key'] %}
-                        <span class="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded text-xs font-semibold">
+                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">
                             <i class="fas fa-key mr-1"></i>Available
                         </span>
                         {% else %}
-                        <span class="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 rounded text-xs font-semibold">
+                        <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-semibold">
                             <i class="fas fa-times mr-1"></i>Not Available
                         </span>
                         {% endif %}
@@ -134,69 +136,71 @@
     </div>
 
     <!-- Fingerprints -->
-    <div class="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-        <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+    <div class="mt-6 bg-white shadow rounded-lg p-6">
+        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">
             <i class="fas fa-fingerprint mr-2"></i>Certificate Fingerprints
         </h2>
         <div id="fingerprints-section">
             <div class="text-center py-4">
                 <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading fingerprints...</p>
+                <p class="mt-2 text-sm text-gray-500">Loading fingerprints...</p>
             </div>
         </div>
     </div>
 
     <!-- X.509 Extensions and Details -->
-    <div class="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-        <h2 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+    <div class="mt-6 bg-white shadow rounded-lg p-6">
+        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">
             <i class="fas fa-certificate mr-2"></i>X.509 Certificate Details
         </h2>
         <div id="x509-details">
             <div class="text-center py-4">
                 <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading certificate details...</p>
+                <p class="mt-2 text-sm text-gray-500">Loading certificate details...</p>
             </div>
         </div>
     </div>
 </div>
 
 <!-- PKCS#12 Export Modal -->
-<div id="pkcs12-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div class="p-6">
-            <h3 class="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+<div id="pkcs12-modal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 50;">
+    <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div style="padding: 1.5rem;">
+            <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">
                 <i class="fas fa-lock mr-2"></i>Export PKCS#12
             </h3>
-            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
                 PKCS#12 format includes the certificate and private key in a password-protected file (.p12 or .pfx). 
                 This format is compatible with Windows, macOS, and most browsers.
             </p>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <div class="modal-form-group">
+                <label class="modal-form-label">
                     Password <span class="text-red-500">*</span>
                 </label>
                 <input type="password" id="pkcs12-password" 
-                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    class="modal-form-input"
                     placeholder="Enter password for PKCS#12 file" />
             </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <div class="modal-form-group">
+                <label class="modal-form-label">
                     Confirm Password <span class="text-red-500">*</span>
                 </label>
                 <input type="password" id="pkcs12-password-confirm" 
-                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    class="modal-form-input"
                     placeholder="Confirm password" />
             </div>
-            <div id="pkcs12-error" class="hidden mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded text-sm"></div>
-            <div class="flex justify-end space-x-3">
-                <button onclick="closePKCS12Modal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600">
+            <div id="pkcs12-error" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background: var(--danger-bg-light); color: var(--status-danger); border-radius: 0.25rem; font-size: 0.875rem;"></div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button onclick="closePKCS12Modal()" class="btn-secondary">
                     Cancel
                 </button>
-                <button onclick="exportPKCS12()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                <button onclick="exportPKCS12()" class="btn-primary">
                     <i class="fas fa-download mr-2"></i>Export
                 </button>
             </div>
         </div>
+    </div>
     </div>
 </div>
 
@@ -220,16 +224,16 @@ function loadFingerprints() {
         const html = `
             <dl class="space-y-3">
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">SHA-256</dt>
-                    <dd class="mt-1 text-xs text-gray-900 dark:text-white font-mono break-all bg-gray-50 dark:bg-gray-900 p-2 rounded">${data.sha256}</dd>
+                    <dt class="text-sm font-medium text-gray-500">SHA-256</dt>
+                    <dd class="mt-1 text-xs text-gray-900 font-mono break-all bg-gray-50 p-2 rounded">${data.sha256}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">SHA-1</dt>
-                    <dd class="mt-1 text-xs text-gray-900 dark:text-white font-mono break-all bg-gray-50 dark:bg-gray-900 p-2 rounded">${data.sha1}</dd>
+                    <dt class="text-sm font-medium text-gray-500">SHA-1</dt>
+                    <dd class="mt-1 text-xs text-gray-900 font-mono break-all bg-gray-50 p-2 rounded">${data.sha1}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">MD5</dt>
-                    <dd class="mt-1 text-xs text-gray-900 dark:text-white font-mono break-all bg-gray-50 dark:bg-gray-900 p-2 rounded">${data.md5}</dd>
+                    <dt class="text-sm font-medium text-gray-500">MD5</dt>
+                    <dd class="mt-1 text-xs text-gray-900 font-mono break-all bg-gray-50 p-2 rounded">${data.md5}</dd>
                 </div>
             </dl>
         `;
@@ -253,21 +257,21 @@ function loadX509Details() {
         if (data.public_key) {
             html += `
                 <div>
-                    <h3 class="font-semibold text-gray-900 dark:text-white mb-2">Public Key</h3>
+                    <h3 class="font-semibold text-gray-900 mb-2">Public Key</h3>
                     <dl class="ml-4 space-y-1">
                         <div class="flex">
-                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 w-32">Algorithm:</dt>
-                            <dd class="text-sm text-gray-900 dark:text-white">${data.public_key.algorithm}</dd>
+                            <dt class="text-sm font-medium text-gray-500 w-32">Algorithm:</dt>
+                            <dd class="text-sm text-gray-900">${data.public_key.algorithm}</dd>
                         </div>
                         ${data.public_key.key_size ? `
                         <div class="flex">
-                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 w-32">Key Size:</dt>
-                            <dd class="text-sm text-gray-900 dark:text-white">${data.public_key.key_size} bits</dd>
+                            <dt class="text-sm font-medium text-gray-500 w-32">Key Size:</dt>
+                            <dd class="text-sm text-gray-900">${data.public_key.key_size} bits</dd>
                         </div>` : ''}
                         ${data.public_key.curve ? `
                         <div class="flex">
-                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 w-32">Curve:</dt>
-                            <dd class="text-sm text-gray-900 dark:text-white">${data.public_key.curve}</dd>
+                            <dt class="text-sm font-medium text-gray-500 w-32">Curve:</dt>
+                            <dd class="text-sm text-gray-900">${data.public_key.curve}</dd>
                         </div>` : ''}
                     </dl>
                 </div>
@@ -276,7 +280,7 @@ function loadX509Details() {
         
         // Extensions
         if (data.extensions && Object.keys(data.extensions).length > 0) {
-            html += '<div><h3 class="font-semibold text-gray-900 dark:text-white mb-2">X.509 Extensions</h3>';
+            html += '<div><h3 class="font-semibold text-gray-900 mb-2">X.509 Extensions</h3>';
             for (const [name, ext] of Object.entries(data.extensions)) {
                 // Special handling for OPNsense extensions
                 let displayName = name;
@@ -284,29 +288,29 @@ function loadX509Details() {
                     displayName = ext.display_name;
                 }
                 
-                html += `<div class="ml-4 mb-3 p-3 bg-gray-50 dark:bg-gray-900 rounded">`;
+                html += `<div class="ml-4 mb-3 p-3 bg-gray-50 rounded">`;
                 
                 // Add OID badge for OPNsense extensions
                 if (ext.oid) {
-                    html += `<div class="font-medium text-sm text-gray-900 dark:text-white">
+                    html += `<div class="font-medium text-sm text-gray-900">
                         ${displayName} 
                         ${ext.critical ? '<span class="text-red-500">(Critical)</span>' : ''}
-                        <span class="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded">OID: ${ext.oid}</span>
+                        <span class="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">OID: ${ext.oid}</span>
                     </div>`;
                 } else {
-                    html += `<div class="font-medium text-sm text-gray-900 dark:text-white">${displayName} ${ext.critical ? '<span class="text-red-500">(Critical)</span>' : ''}</div>`;
+                    html += `<div class="font-medium text-sm text-gray-900">${displayName} ${ext.critical ? '<span class="text-red-500">(Critical)</span>' : ''}</div>`;
                 }
                 
                 if (ext.values && Array.isArray(ext.values)) {
-                    html += '<ul class="mt-1 ml-4 text-sm text-gray-700 dark:text-gray-300 list-disc">';
+                    html += '<ul class="mt-1 ml-4 text-sm text-gray-700 list-disc">';
                     ext.values.forEach(v => html += `<li>${v}</li>`);
                     html += '</ul>';
                 } else if (ext.ca !== undefined) {
-                    html += `<div class="mt-1 text-sm text-gray-700 dark:text-gray-300">CA: ${ext.ca ? 'Yes' : 'No'}`;
+                    html += `<div class="mt-1 text-sm text-gray-700">CA: ${ext.ca ? 'Yes' : 'No'}`;
                     if (ext.path_length !== null) html += `, Path Length: ${ext.path_length}`;
                     html += '</div>';
                 } else if (ext.value !== undefined) {
-                    html += `<div class="mt-1 text-sm text-gray-700 dark:text-gray-300 font-mono break-all">${ext.value}</div>`;
+                    html += `<div class="mt-1 text-sm text-gray-700 font-mono break-all">${ext.value}</div>`;
                 }
                 html += '</div>';
             }

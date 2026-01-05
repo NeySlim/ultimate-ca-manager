@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="en" x-data="{ darkMode: localStorage.getItem('darkMode') === 'true' }" 
+      :class="{ 'dark': darkMode }">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Ultimate CA Manager{% endblock %}</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    
+    <!-- Tailwind CSS (CDN for development - consider building for production) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Suppress Tailwind CDN warning in production
+        (function() {
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                const message = args[0] || '';
+                if (typeof message === 'string' && message.includes('cdn.tailwindcss.com')) {
+                    return; // Suppress Tailwind CDN warning
+                }
+                originalWarn.apply(console, args);
+            };
+        })();
+        
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        accent: {
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+<!-- Adminto-Inspired Professional Theme for UCM -->
+<!-- Modern, clean, professional admin dashboard -->
+
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    // Adminto color palette
+                    primary: {
+                        50: '#f0f9ff',
+                        100: '#e0f2fe',
+                        200: '#bae6fd',
+                        300: '#7dd3fc',
+                        400: '#38bdf8',
+                        500: '#0ea5e9',  // Sky blue
+                        600: '#0284c7',
+                        700: '#0369a1',
+                        800: '#075985',
+                        900: '#0c4a6e',
+                    },
+                    secondary: {
+                        50: '#faf5ff',
+                        100: '#f3e8ff',
+                        200: '#e9d5ff',
+                        300: '#d8b4fe',
+                        400: '#c084fc',
+                        500: '#a855f7',  // Purple
+                        600: '#9333ea',
+                        700: '#7e22ce',
+                        800: '#6b21a8',
+                        900: '#581c87',
+                    },
+                    success: {
+                        500: '#10b981',
+                        600: '#059669',
+                    },
+                    danger: {
+                        500: '#ef4444',
+                        600: '#dc2626',
+                    },
+                    warning: {
+                        500: '#f59e0b',
+                        600: '#d97706',
+                    },
+                    // Dark theme colors (Adminto dark)
+                    dark: {
+                        bg: '#1a1d2e',        // Main dark background
+                        card: '#222736',      // Card background
+                        border: '#2f3349',    // Border color
+                        text: '#adb5bd',      // Text color
+                        heading: '#ced4da',   // Heading color
+                        sidebar: '#1f2330',   // Sidebar background
+                    },
+                    // Light theme
+                    light: {
+                        bg: '#fafbfe',
+                        card: '#ffffff',
+                        border: '#e3e6ef',
+                        text: '#6c757d',
+                        heading: '#313a46',
+                        sidebar: '#ffffff',
+                    }
+                },
+                fontFamily: {
+                    sans: ['Nunito', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                },
+                boxShadow: {
+                    'card': '0 0 35px 0 rgba(154,161,171,.15)',
+                    'card-hover': '0 0 45px 0 rgba(154,161,171,.25)',
+                },
+            }
+        }
+    }
+</script>
+
+<!-- Google Fonts - Nunito (Adminto uses Nunito) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+    /* ============================================ */
+    /* ADMINTO INSPIRED PROFESSIONAL THEME */
+    /* ============================================ */
+    
+    /* Base Reset & Typography */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+    
+    body {
+        font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 14px;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #6c757d;
+        background: #fafbfe;
+        overflow-x: hidden;
+    }
+    
+    .dark body {
+        background: #1a1d2e;
+        color: #adb5bd;
+    }
+    
+    /* Typography - Adminto style */
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 700;
+        color: #313a46;
+        margin-bottom: 0.5rem;
+    }
+    
+    .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+        color: #ced4da;
+    }
+    
+    h1 { font-size: 2.25rem; }
+    h2 { font-size: 1.875rem; }
+    h3 { font-size: 1.5rem; }
+    h4 { font-size: 1.125rem; }
+    h5 { font-size: 1rem; }
+    h6 { font-size: 0.875rem; }
+    
+    /* ============================================ */
+    /* LAYOUT - Adminto Structure */
+    /* ============================================ */
+    
+    /* Header/Navbar - Compact like Adminto */
+    .navbar {
+        background: #ffffff;
+        border-bottom: 1px solid #e3e6ef;
+        height: 70px;
+        box-shadow: 0 0 35px 0 rgba(154,161,171,.15);
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        padding: 0 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .dark .navbar {
+        background: #222736;
+        border-bottom: 1px solid #2f3349;
+    }
+    
+    /* Sidebar - Adminto left sidebar */
+    .sidebar {
+        position: fixed;
+        top: 70px;
+        left: 0;
+        width: 260px;
+        height: calc(100vh - 70px);
+        background: #ffffff;
+        border-right: 1px solid #e3e6ef;
+        overflow-y: auto;
+        overflow-x: hidden;
+        z-index: 999;
+        box-shadow: 0 0 35px 0 rgba(154,161,171,.15);
+    }
+    
+    .dark .sidebar {
+        background: #1f2330;
+        border-right: 1px solid #2f3349;
+    }
+    
+    /* Sidebar scrollbar */
+    .sidebar::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .sidebar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    
+    .sidebar::-webkit-scrollbar-thumb {
+        background: rgba(154,161,171,.3);
+        border-radius: 3px;
+    }
+    
+    .sidebar::-webkit-scrollbar-thumb:hover {
+        background: rgba(154,161,171,.5);
+    }
+    
+    /* Main content area */
+    .main-content {
+        margin-left: 260px;
+        margin-top: 70px;
+        padding: 30px 24px;
+        min-height: calc(100vh - 70px);
+        background: #fafbfe;
+    }
+    
+    .dark .main-content {
+        background: #1a1d2e;
+    }
+    
+    /* ============================================ */
+    /* SIDEBAR NAVIGATION - Adminto style */
+    /* ============================================ */
+    
+    .sidebar-nav {
+        padding: 20px 0;
+    }
+    
+    .nav-title {
+        padding: 12px 24px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #98a6ad;
+        margin-top: 10px;
+    }
+    
+    .dark .nav-title {
+        color: #6c757d;
+    }
+    
+    .nav-link {
+        display: flex;
+        align-items: center;
+        padding: 12px 24px;
+        color: #6c757d;
+        text-decoration: none;
+        transition: all 0.2s;
+        position: relative;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    
+    .dark .nav-link {
+        color: #adb5bd;
+    }
+    
+    .nav-link i {
+        width: 20px;
+        margin-right: 12px;
+        font-size: 16px;
+        text-align: center;
+    }
+    
+    .nav-link:hover {
+        background: rgba(14,165,233,0.06);
+        color: #0ea5e9;
+    }
+    
+    .dark .nav-link:hover {
+        background: rgba(14,165,233,0.1);
+        color: #0ea5e9;
+    }
+    
+    .nav-link.active {
+        background: rgba(14,165,233,0.1);
+        color: #0ea5e9;
+        border-left: 3px solid #0ea5e9;
+        font-weight: 700;
+    }
+    
+    .dark .nav-link.active {
+        background: rgba(14,165,233,0.15);
+    }
+    
+    /* ============================================ */
+    /* CARDS - Adminto card style */
+    /* ============================================ */
+    
+    .card {
+        background: #ffffff;
+        border: 1px solid #e3e6ef;
+        border-radius: 0.25rem;
+        box-shadow: 0 0 35px 0 rgba(154,161,171,.15);
+        margin-bottom: 24px;
+        transition: all 0.2s;
+    }
+    
+    .dark .card {
+        background: #222736;
+        border-color: #2f3349;
+    }
+    
+    .card:hover {
+        box-shadow: 0 0 45px 0 rgba(154,161,171,.25);
+    }
+    
+    .card-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e3e6ef;
+        background: transparent;
+    }
+    
+    .dark .card-header {
+        border-bottom-color: #2f3349;
+    }
+    
+    .card-body {
+        padding: 24px;
+    }
+    
+    .card-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #313a46;
+        margin-bottom: 0;
+    }
+    
+    .dark .card-title {
+        color: #ced4da;
+    }
+    
+    /* ============================================ */
+    /* STAT CARDS - Adminto dashboard widgets */
+    /* ============================================ */
+    
+    .stat-card {
+        background: #ffffff;
+        border: 1px solid #e3e6ef;
+        border-radius: 0.25rem;
+        padding: 24px;
+        box-shadow: 0 0 35px 0 rgba(154,161,171,.15);
+        transition: all 0.2s;
+    }
+    
+    .dark .stat-card {
+        background: #222736;
+        border-color: #2f3349;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 0 45px 0 rgba(154,161,171,.25);
+    }
+    
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 0.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        margin-bottom: 12px;
+    }
+    
+    .stat-icon.primary {
+        background: rgba(14,165,233,0.1);
+        color: #0ea5e9;
+    }
+    
+    .stat-icon.success {
+        background: rgba(16,185,129,0.1);
+        color: #10b981;
+    }
+    
+    .stat-icon.warning {
+        background: rgba(245,158,11,0.1);
+        color: #f59e0b;
+    }
+    
+    .stat-icon.danger {
+        background: rgba(239,68,68,0.1);
+        color: #ef4444;
+    }
+    
+    .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #313a46;
+        margin-bottom: 4px;
+    }
+    
+    .dark .stat-value {
+        color: #ced4da;
+    }
+    
+    .stat-label {
+        font-size: 13px;
+        color: #98a6ad;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+    
+    /* ============================================ */
+    /* BUTTONS - Adminto button styles */
+    /* ============================================ */
+    
+    .btn {
+        display: inline-block;
+        padding: 8px 20px;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.5;
+        text-align: center;
+        text-decoration: none;
+        border: 1px solid transparent;
+        border-radius: 0.25rem;
+        transition: all 0.15s;
+        cursor: pointer;
+    }
+    
+    .btn-primary {
+        background: #0ea5e9;
+        color: #ffffff;
+        border-color: #0ea5e9;
+    }
+    
+    .btn-primary:hover {
+        background: #0284c7;
+        border-color: #0284c7;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: #ffffff;
+        border-color: #6c757d;
+    }
+    
+    .btn-secondary:hover {
+        background: #5a6268;
+        border-color: #545b62;
+    }
+    
+    .btn-success {
+        background: #10b981;
+        color: #ffffff;
+        border-color: #10b981;
+    }
+    
+    .btn-success:hover {
+        background: #059669;
+        border-color: #059669;
+    }
+    
+    .btn-danger {
+        background: #ef4444;
+        color: #ffffff;
+        border-color: #ef4444;
+    }
+    
+    .btn-danger:hover {
+        background: #dc2626;
+        border-color: #dc2626;
+    }
+    
+    .btn-outline-primary {
+        background: transparent;
+        color: #0ea5e9;
+        border-color: #0ea5e9;
+    }
+    
+    .btn-outline-primary:hover {
+        background: #0ea5e9;
+        color: #ffffff;
+    }
+    
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 13px;
+    }
+    
+    .btn-lg {
+        padding: 12px 28px;
+        font-size: 16px;
+    }
+    
+    /* ============================================ */
+    /* FORMS - Adminto input styles */
+    /* ============================================ */
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #313a46;
+    }
+    
+    .dark .form-label {
+        color: #ced4da;
+    }
+    
+    .form-control {
+        display: block;
+        width: 100%;
+        padding: 8px 12px;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #6c757d;
+        background: #ffffff;
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        transition: all 0.15s;
+    }
+    
+    .dark .form-control {
+        background: #2b3142;
+        border-color: #404656;
+        color: #adb5bd;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #0ea5e9;
+        box-shadow: 0 0 0 3px rgba(14,165,233,0.1);
+    }
+    
+    .form-control::placeholder {
+        color: #98a6ad;
+    }
+    
+    /* ============================================ */
+    /* TABLES - Adminto table design */
+    /* ============================================ */
+    
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    
+    .table thead {
+        background: #f1f3fa;
+        border-bottom: 2px solid #e3e6ef;
+    }
+    
+    .dark .table thead {
+        background: #2b3142;
+        border-bottom-color: #404656;
+    }
+    
+    .table thead th {
+        padding: 12px 16px;
+        font-weight: 700;
+        color: #313a46;
+        text-align: left;
+        text-transform: uppercase;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+    }
+    
+    .dark .table thead th {
+        color: #ced4da;
+    }
+    
+    .table tbody td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f1f3fa;
+        color: #6c757d;
+    }
+    
+    .dark .table tbody td {
+        border-bottom-color: #2b3142;
+        color: #adb5bd;
+    }
+    
+    .table tbody tr:hover {
+        background: #fafbfe;
+    }
+    
+    .dark .table tbody tr:hover {
+        background: #222736;
+    }
+    
+    /* ============================================ */
+    /* BADGES - Adminto badge styles */
+    /* ============================================ */
+    
+    .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 0.25rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    
+    .badge-primary {
+        background: rgba(14,165,233,0.15);
+        color: #0ea5e9;
+    }
+    
+    .badge-success {
+        background: rgba(16,185,129,0.15);
+        color: #10b981;
+    }
+    
+    .badge-warning {
+        background: rgba(245,158,11,0.15);
+        color: #f59e0b;
+    }
+    
+    .badge-danger {
+        background: rgba(239,68,68,0.15);
+        color: #ef4444;
+    }
+    
+    .badge-secondary {
+        background: rgba(108,117,125,0.15);
+        color: #6c757d;
+    }
+    
+    /* ============================================ */
+    /* ALERTS - Adminto alert styles */
+    /* ============================================ */
+    
+    .alert {
+        padding: 12px 16px;
+        margin-bottom: 20px;
+        border: 1px solid transparent;
+        border-radius: 0.25rem;
+        font-size: 14px;
+    }
+    
+    .alert-primary {
+        background: rgba(14,165,233,0.1);
+        border-color: rgba(14,165,233,0.2);
+        color: #0369a1;
+    }
+    
+    .alert-success {
+        background: rgba(16,185,129,0.1);
+        border-color: rgba(16,185,129,0.2);
+        color: #047857;
+    }
+    
+    .alert-warning {
+        background: rgba(245,158,11,0.1);
+        border-color: rgba(245,158,11,0.2);
+        color: #b45309;
+    }
+    
+    .alert-danger {
+        background: rgba(239,68,68,0.1);
+        border-color: rgba(239,68,68,0.2);
+        color: #b91c1c;
+    }
+    
+    /* ============================================ */
+    /* BREADCRUMBS - Adminto style */
+    /* ============================================ */
+    
+    .breadcrumb {
+        display: flex;
+        flex-wrap: wrap;
+        padding: 0;
+        margin: 0 0 20px;
+        list-style: none;
+        background: transparent;
+        font-size: 13px;
+    }
+    
+    .breadcrumb-item {
+        color: #98a6ad;
+    }
+    
+    .breadcrumb-item + .breadcrumb-item::before {
+        content: '/';
+        padding: 0 8px;
+        color: #98a6ad;
+    }
+    
+    .breadcrumb-item.active {
+        color: #313a46;
+    }
+    
+    .dark .breadcrumb-item.active {
+        color: #ced4da;
+    }
+    
+    /* ============================================ */
+    /* PAGE HEADER - Adminto page title area */
+    /* ============================================ */
+    
+    .page-header {
+        margin-bottom: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .page-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #313a46;
+        margin-bottom: 4px;
+    }
+    
+    .dark .page-title {
+        color: #ced4da;
+    }
+    
+    .page-title-sub {
+        font-size: 13px;
+        color: #98a6ad;
+    }
+    
+    /* ============================================ */
+    /* DROPDOWNS - Adminto dropdown menu */
+    /* ============================================ */
+    
+    .dropdown-menu {
+        min-width: 200px;
+        padding: 8px 0;
+        background: #ffffff;
+        border: 1px solid #e3e6ef;
+        border-radius: 0.25rem;
+        box-shadow: 0 0 35px 0 rgba(154,161,171,.15);
+    }
+    
+    .dark .dropdown-menu {
+        background: #222736;
+        border-color: #2f3349;
+    }
+    
+    .dropdown-item {
+        padding: 8px 20px;
+        font-size: 14px;
+        color: #6c757d;
+        text-decoration: none;
+        display: block;
+        transition: all 0.15s;
+    }
+    
+    .dark .dropdown-item {
+        color: #adb5bd;
+    }
+    
+    .dropdown-item:hover {
+        background: #f1f3fa;
+        color: #313a46;
+    }
+    
+    .dark .dropdown-item:hover {
+        background: #2b3142;
+        color: #ced4da;
+    }
+    
+    /* ============================================ */
+    /* UTILITIES */
+    /* ============================================ */
+    
+    /* Text colors */
+    .text-muted {
+        color: #98a6ad !important;
+    }
+    
+    .text-primary {
+        color: #0ea5e9 !important;
+    }
+    
+    .text-success {
+        color: #10b981 !important;
+    }
+    
+    .text-danger {
+        color: #ef4444 !important;
+    }
+    
+    .text-warning {
+        color: #f59e0b !important;
+    }
+    
+    /* Background colors */
+    .bg-primary {
+        background: #0ea5e9 !important;
+    }
+    
+    .bg-light {
+        background: #f1f3fa !important;
+    }
+    
+    .dark .bg-light {
+        background: #2b3142 !important;
+    }
+    
+    /* Spacing utilities */
+    .mb-0 { margin-bottom: 0 !important; }
+    .mb-1 { margin-bottom: 8px !important; }
+    .mb-2 { margin-bottom: 16px !important; }
+    .mb-3 { margin-bottom: 24px !important; }
+    .mb-4 { margin-bottom: 32px !important; }
+    
+    .mt-0 { margin-top: 0 !important; }
+    .mt-1 { margin-top: 8px !important; }
+    .mt-2 { margin-top: 16px !important; }
+    .mt-3 { margin-top: 24px !important; }
+    .mt-4 { margin-top: 32px !important; }
+    
+    /* ============================================ */
+    /* ANIMATIONS & TRANSITIONS */
+    /* ============================================ */
+    
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .fade-in {
+        animation: fadeIn 0.3s ease-out;
+    }
+    
+    /* Loading spinner */
+    .spinner-border {
+        width: 32px;
+        height: 32px;
+        border: 3px solid rgba(14,165,233,0.2);
+        border-top-color: #0ea5e9;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* ============================================ */
+    /* RESPONSIVE */
+    /* ============================================ */
+    
+    @media (max-width: 768px) {
+        .sidebar {
+            transform: translateX(-100%);
+            transition: transform 0.3s;
+        }
+        
+        .sidebar.show {
+            transform: translateX(0);
+        }
+        
+        .main-content {
+            margin-left: 0;
+        }
+    }
+</style>
+
+<!-- Remove old gradient-bg and glass styles -->
+<style>
+    /* Override previous theme styles */
+    .gradient-bg {
+        background: none !important;
+    }
+    
+    .glass {
+        background: none !important;
+        backdrop-filter: none !important;
+        border: none !important;
+    }
+</style>
+
+
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        /* Gradient background */
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .dark .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #581c87 100%);
+        }
+        
+        /* Glass morphism effect */
+        .glass {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        
+        .dark .glass {
+            background: rgba(17, 24, 39, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Smooth hover transitions */
+        .nav-link {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+        
+        .nav-link:hover::after {
+            width: 100%;
+        }
+        
+        .nav-link.active::after {
+            width: 100%;
+        }
+        
+        /* Card hover effects */
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        /* Button gradient */
+        .btn-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-gradient:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+    </style>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100 transition-colors duration-200 min-h-screen">
+    
+    {% if request.endpoint and request.endpoint != 'ui.login' %}
+    <!-- Navigation -->
+    <nav class="glass sticky top-0 z-50 shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <!-- Logo and main nav -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center mr-8">
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                            <i class="fas fa-shield-halved text-white text-lg"></i>
+                        </div>
+                        <span class="ml-3 text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Ultimate CA Manager</span>
+                    </div>
+                    <div class="hidden md:flex md:space-x-2">
+                        <a href="/dashboard" class="nav-link {% if request.path == '/dashboard' %}active{% endif %} px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-700/50">
+                            <i class="fas fa-gauge-high mr-2"></i>Dashboard
+                        </a>
+                        <a href="/ca" class="nav-link {% if request.path.startswith('/ca') %}active{% endif %} px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-700/50">
+                            <i class="fas fa-certificate mr-2"></i>CAs
+                        </a>
+                        <a href="/certificates" class="nav-link {% if request.path.startswith('/certificates') %}active{% endif %} px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-700/50">
+                            <i class="fas fa-file-certificate mr-2"></i>Certificates
+                        </a>
+                        <a href="/scep" class="nav-link {% if request.path.startswith('/scep') %}active{% endif %} px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-700/50">
+                            <i class="fas fa-server mr-2"></i>SCEP
+                        </a>
+                        <a href="/import" class="nav-link {% if request.path.startswith('/import') %}active{% endif %} px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-700/50">
+                            <i class="fas fa-download mr-2"></i>Import
+                        </a>
+                        <a href="/config" class="nav-link {% if request.path.startswith('/config') %}active{% endif %} px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-700/50">
+                            <i class="fas fa-sliders mr-2"></i>Configuration
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Right side -->
+                <div class="flex items-center space-x-3">
+                    <!-- Theme toggle -->
+                    <button @click="darkMode = !darkMode; localStorage.setItem('darkMode', darkMode)" 
+                            class="p-2.5 rounded-lg text-yellow-500 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-700/50 transition-all duration-200">
+                        <i class="fas fa-sun text-lg" x-show="!darkMode"></i>
+                        <i class="fas fa-moon text-lg" x-show="darkMode" x-cloak></i>
+                    </button>
+                    
+                    <!-- User menu -->
+                    <div x-data="{ open: false }" class="relative">
+                        <button @click="open = !open" class="flex items-center space-x-2 px-4 py-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-700/50 transition-all duration-200">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                                <span class="text-white text-sm font-bold">{{ session.get('username', 'U')[0].upper() }}</span>
+                            </div>
+                            <span class="hidden sm:block text-sm font-medium">{{ session.get('username', 'User') }}</span>
+                            <i class="fas fa-chevron-down text-xs transition-transform" :class="open ? 'rotate-180' : ''"></i>
+                        </button>
+                        <div x-show="open" 
+                             @click.away="open = false" 
+                             x-cloak
+                             x-transition:enter="transition ease-out duration-200"
+                             x-transition:enter-start="opacity-0 scale-95"
+                             x-transition:enter-end="opacity-100 scale-100"
+                             x-transition:leave="transition ease-in duration-150"
+                             x-transition:leave-start="opacity-100 scale-100"
+                             x-transition:leave-end="opacity-0 scale-95"
+                             class="absolute right-0 mt-2 w-56 glass rounded-xl shadow-2xl py-2 z-50">
+                            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ session.get('username', 'User') }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ session.get('role', 'User').capitalize() }}</p>
+                            </div>
+                            <a href="/config" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-700/50 transition-colors">
+                                <i class="fas fa-sliders mr-2"></i>Configuration
+                            </a>
+                            <a href="/settings" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-gray-700/50 transition-colors">
+                                <i class="fas fa-user-gear mr-2"></i>Settings
+                            </a>
+                            <hr class="border-gray-200 dark:border-gray-700">
+                            <form action="/logout" method="POST">
+                                <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors rounded-lg">
+                                    <i class="fas fa-arrow-right-from-bracket mr-2"></i>Logout
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+    
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+            {% for category, message in messages %}
+            <div x-data="{ show: true }" x-show="show" x-transition
+                 class="relative p-4 rounded-xl mb-4 shadow-lg backdrop-blur-sm
+                 {% if category == 'error' %}bg-red-50/90 dark:bg-red-900/30 border border-red-200 dark:border-red-800{% elif category == 'success' %}bg-green-50/90 dark:bg-green-900/30 border border-green-200 dark:border-green-800{% else %}bg-blue-50/90 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800{% endif %}">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0">
+                            {% if category == 'error' %}
+                            <i class="fas fa-circle-exclamation text-red-600 dark:text-red-400 text-xl"></i>
+                            {% elif category == 'success' %}
+                            <i class="fas fa-circle-check text-green-600 dark:text-green-400 text-xl"></i>
+                            {% else %}
+                            <i class="fas fa-circle-info text-blue-600 dark:text-blue-400 text-xl"></i>
+                            {% endif %}
+                        </div>
+                        <span class="text-sm font-medium
+                            {% if category == 'error' %}text-red-800 dark:text-red-200{% elif category == 'success' %}text-green-800 dark:text-green-200{% else %}text-blue-800 dark:text-blue-200{% endif %}">
+                            {{ message }}
+                        </span>
+                    </div>
+                    <button @click="show = false" class="ml-4 flex-shrink-0 text-current hover:opacity-75 transition-opacity">
+                        <i class="fas fa-xmark text-lg"></i>
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+    
+    <!-- Main content -->
+    <main class="{% if request.endpoint and request.endpoint != 'ui.login' %}max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8{% endif %}">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Footer -->
+    {% if request.endpoint and request.endpoint != 'ui.login' %}
+    <footer class="mt-16 glass border-t border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                        <i class="fas fa-shield-halved text-white text-sm"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">Ultimate CA Manager</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">v1.0.0 - Enterprise Edition</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-6 text-sm text-gray-500 dark:text-gray-400">
+                    <a href="/config" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                        <i class="fas fa-sliders mr-1"></i>Configuration
+                    </a>
+                    <span>•</span>
+                    <a href="#" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                        <i class="fas fa-book mr-1"></i>Documentation
+                    </a>
+                    <span>•</span>
+                    <span class="text-xs">&copy; 2026 All rights reserved</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+    {% endif %}
+    
+    <!-- Toast Notification Container (Global) - Available everywhere -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+    
+    <!-- Global Toast Function - Available everywhere -->
+    <script>
+        // ========================================
+        // Global Toast Notification Function
+        // ========================================
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            
+            const toast = document.createElement('div');
+            toast.className = 'transform transition-all duration-300 ease-in-out opacity-0 translate-x-full';
+            
+            const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
+            const icon = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+            
+            toast.innerHTML = '<div class="' + bgColor + ' text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3 min-w-[300px]">' +
+                '<i class="fas ' + icon + ' text-xl"></i>' +
+                '<span class="flex-1">' + message + '</span>' +
+                '<button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">' +
+                    '<i class="fas fa-times"></i>' +
+                '</button>' +
+            '</div>';
+            
+            container.appendChild(toast);
+            
+            setTimeout(function() { toast.classList.remove('opacity-0', 'translate-x-full'); }, 10);
+            setTimeout(function() { 
+                toast.classList.add('opacity-0', 'translate-x-full');
+                setTimeout(function() { toast.remove(); }, 300);
+            }, 5000);
+        }
+    </script>
+    
+    {% if request.endpoint and request.endpoint != 'ui.login' %}
+    <!-- Session Timeout Warning Modal -->
+    <div id="sessionTimeoutModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 p-6 animate-pulse-slow">
+            <div class="flex items-center justify-center mb-4">
+                <div class="w-16 h-16 rounded-full bg-yellow-100 dark:bg-yellow-900 flex items-center justify-center">
+                    <i class="fas fa-clock text-yellow-600 dark:text-yellow-400 text-3xl"></i>
+                </div>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white text-center mb-2">Session Expiring</h3>
+            <p class="text-gray-600 dark:text-gray-400 text-center mb-6">
+                Vous serez déconnecté dans <span id="timeoutCountdown" class="font-bold text-yellow-600 dark:text-yellow-400">60</span> secondes par inactivité.
+            </p>
+            <div class="flex space-x-3">
+                <button onclick="extendSession()" class="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium">
+                    <i class="fas fa-check mr-2"></i>Prolonger la session
+                </button>
+                <button onclick="logoutNow()" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium">
+                    <i class="fas fa-arrow-right-from-bracket mr-2"></i>Déconnexion
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Session Management Script -->
+    <script>
+        // ========================================
+        // Session timeout configuration
+        // ========================================
+        const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+        const WARNING_TIME = 60 * 1000; // Show warning 60 seconds before timeout
+        
+        var sessionTimer;
+        var warningTimer;
+        var countdownInterval;
+        var lastActivity = Date.now();
+        
+        // Reset session timers on user activity
+        function resetSessionTimer() {
+            lastActivity = Date.now();
+            clearTimeout(sessionTimer);
+            clearTimeout(warningTimer);
+            clearInterval(countdownInterval);
+            hideTimeoutModal();
+            
+            // Set timer to show warning
+            warningTimer = setTimeout(showTimeoutWarning, SESSION_TIMEOUT - WARNING_TIME);
+            
+            // Set timer to logout
+            sessionTimer = setTimeout(autoLogout, SESSION_TIMEOUT);
+        }
+        
+        // Show timeout warning modal
+        function showTimeoutWarning() {
+            document.getElementById('sessionTimeoutModal').classList.remove('hidden');
+            
+            var countdown = 60;
+            document.getElementById('timeoutCountdown').textContent = countdown;
+            
+            countdownInterval = setInterval(function() {
+                countdown--;
+                document.getElementById('timeoutCountdown').textContent = countdown;
+                
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                    autoLogout();
+                }
+            }, 1000);
+        }
+        
+        // Hide timeout modal
+        function hideTimeoutModal() {
+            document.getElementById('sessionTimeoutModal').classList.add('hidden');
+        }
+        
+        // Extend session (user clicked "Yes")
+        function extendSession() {
+            // Make a simple request to keep session alive
+            fetch('/api/health', { credentials: 'include' })
+                .then(() => {
+                    resetSessionTimer();
+                })
+                .catch(() => {
+                    // If health check fails, redirect to login
+                    window.location.href = '/login';
+                });
+        }
+        
+        // Auto logout on timeout
+        function autoLogout() {
+            window.location.href = '/logout';
+        }
+        
+        // Manual logout
+        function logoutNow() {
+            window.location.href = '/logout';
+        }
+        
+        // Track user activity
+        const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+        activityEvents.forEach(function(eventName) {
+            document.addEventListener(eventName, resetSessionTimer, true);
+        });
+        
+        // Check session validity on HTMX requests
+        document.body.addEventListener('htmx:responseError', function(evt) {
+            if (evt.detail.xhr.status === 401 || evt.detail.xhr.status === 403) {
+                // Session expired - redirect to login
+                window.location.href = '/login?expired=1';
+            }
+        });
+        
+        // Check for session expired flag in URL
+        window.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('expired') === '1') {
+                alert('Votre session a expiré. Veuillez vous reconnecter.');
+            }
+        });
+        
+        // Initialize session timer
+        resetSessionTimer();
+    </script>
+    {% endif %}
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

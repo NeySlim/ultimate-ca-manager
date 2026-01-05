@@ -6,89 +6,340 @@
 <div class="space-y-6">
     <!-- Header -->
     <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+        <h1 class="text-3xl font-bold text-gray-900">
             <i class="fas fa-certificate mr-2"></i> Certificate Authorities
         </h1>
         <div class="flex space-x-2">
             <button onclick="openImportCAModal()" 
-                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors">
-                <i class="fas fa-file-import mr-2"></i> Import CA
+                    class="btn btn-secondary">
+                <i class="fas fa-file-import mr-2 text-success"></i> Import CA
             </button>
             <button onclick="openCreateCAModal()" 
-                    class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
+                    class="btn btn-secondary">
                 <i class="fas fa-plus mr-2"></i> Create CA
             </button>
         </div>
     </div>
     
     <!-- CA List -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+    <div class="bg-white rounded-lg shadow border border-gray-200">
         <div id="ca-list" 
              hx-get="/api/ui/ca/list" 
              hx-trigger="load, refreshCAs from:body"
              hx-swap="innerHTML">
             <div class="p-8 text-center">
                 <div class="animate-pulse space-y-4">
-                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                    <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div class="h-4 bg-gray-200 rounded"></div>
+                    <div class="h-4 bg-gray-200 rounded"></div>
+                    <div class="h-4 bg-gray-200 rounded"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modals will be added here -->
-<div id="createCAModal" class="hidden">
-    <!-- Create CA Modal content -->
+<!-- Create CA Modal -->
+<div id="createCAModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 50; padding: 1rem;">
+    <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 1400px; width: 100%; max-height: calc(100vh - 80px); overflow-y: auto; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">
+                    <i class="fas fa-plus-circle" style="margin-right: 0.5rem;"></i> Create Certificate Authority
+                </h2>
+                <button onclick="closeCreateCAModal()" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
+                    <i class="fas fa-times" style="font-size: 1.25rem;"></i>
+                </button>
+            </div>
+        </div>
+        
+        <form hx-post="/api/ui/ca/create" 
+              hx-on::after-request="handleCACreateResponse(event)">
+            <div style="padding: 1.5rem;">
+                
+                <!-- Basic Information -->
+                <div>
+                    <h3 class="modal-form-heading">Basic Information</h3>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Description <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" name="descr" required placeholder="My Certificate Authority"
+                               class="modal-form-input">
+                    </div>
+                </div>
+                
+                <!-- Key Configuration -->
+                <div>
+                    <h3 class="modal-form-heading">Key Configuration</h3>
+                    
+                    <div class="modal-form-grid-2">
+                        <div>
+                            <label class="modal-form-label">
+                                Key Type <span class="text-red-500">*</span>
+                            </label>
+                            <select name="key_type" required
+                                    class="modal-form-input">
+                                <option value="2048">RSA 2048</option>
+                                <option value="4096" selected>RSA 4096</option>
+                                <option value="prime256v1">EC P-256</option>
+                                <option value="secp384r1">EC P-384</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                Digest Algorithm <span class="text-red-500">*</span>
+                            </label>
+                            <select name="digest_alg"
+                                    class="modal-form-input">
+                                <option value="sha256" selected>SHA-256</option>
+                                <option value="sha384">SHA-384</option>
+                                <option value="sha512">SHA-512</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Lifetime (days) <span class="text-red-500">*</span>
+                        </label>
+                        <input type="number" name="lifetime" value="3650" min="1" max="7300" required
+                               class="modal-form-input">
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">Default: 3650 days (10 years)</p>
+                    </div>
+                </div>
+                
+                <!-- Distinguished Name -->
+                <div>
+                    <h3 class="modal-form-heading">Distinguished Name (DN)</h3>
+                    
+                    <div class="modal-form-grid-2">
+                        <div>
+                            <label class="modal-form-label">
+                                Country Code <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="dn_country" required maxlength="2" placeholder="US"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                State / Province <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="dn_state" required placeholder="California"
+                                   class="modal-form-input">
+                        </div>
+                    </div>
+                    
+                    <div class="modal-form-grid-2">
+                        <div>
+                            <label class="modal-form-label">
+                                City / Locality <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="dn_city" required placeholder="San Francisco"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                Organization <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="dn_org" required placeholder="My Company"
+                                   class="modal-form-input">
+                        </div>
+                    </div>
+                    
+                    <div class="modal-form-grid-2">
+                        <div>
+                            <label class="modal-form-label">
+                                Organizational Unit
+                            </label>
+                            <input type="text" name="dn_orgunit" placeholder="IT Department"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                Common Name <span class="text-red-500">*</span>
+                            </label>
+                            <input type="text" name="dn_commonname" required placeholder="Internal CA"
+                                   class="modal-form-input">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-form-footer">
+                <button type="button" onclick="closeCreateCAModal()" 
+                        class="btn-secondary">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="btn-primary">
+                    <i class="fas fa-plus mr-2"></i> Create CA
+                </button>
+            </div>
+        </form>
+    </div>
+    </div>
 </div>
 
-<div id="importCAModal" class="hidden">
-    <!-- Import CA Modal content -->
+<!-- Import CA Modal -->
+<div id="importCAModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 50; padding: 1rem;">
+    <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 1400px; width: 100%; max-height: calc(100vh - 80px); overflow-y: auto; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">
+                    <i class="fas fa-file-import" style="margin-right: 0.5rem;"></i> Import Certificate Authority
+                </h2>
+                <button onclick="closeImportCAModal()" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
+                    <i class="fas fa-times" style="font-size: 1.25rem;"></i>
+                </button>
+            </div>
+        </div>
+        
+        <form hx-post="/api/ui/ca/import" 
+              hx-on::after-request="handleCAImportResponse(event)">
+            <div style="padding: 1.5rem;">
+                
+                <div style="margin-bottom: 1rem;">
+                    <label class="modal-form-label">
+                        Description <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" name="description" required placeholder="Imported CA"
+                           class="modal-form-input">
+                </div>
+                
+                <div style="margin-bottom: 1rem;">
+                    <label class="modal-form-label">
+                        Certificate (PEM format) <span class="text-red-500">*</span>
+                    </label>
+                    <textarea name="certificate" required rows="10" 
+                              placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                              class="modal-form-textarea"></textarea>
+                    <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">Paste the CA certificate in PEM format</p>
+                </div>
+                
+                <div style="margin-bottom: 1rem;">
+                    <label class="modal-form-label">
+                        Private Key (PEM format, optional)
+                    </label>
+                    <textarea name="private_key" rows="10" 
+                              placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+                              class="modal-form-textarea"></textarea>
+                    <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                        Optional: Include the private key if you want to use this CA for signing certificates
+                    </p>
+                </div>
+                
+            </div>
+            
+            <div class="modal-form-footer">
+                <button type="button" onclick="closeImportCAModal()" 
+                        class="btn-secondary">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="btn-primary">
+                    <i class="fas fa-file-import mr-2"></i> Import CA
+                </button>
+            </div>
+        </form>
+    </div>
+    </div>
 </div>
 
 <!-- PKCS#12 Password Modal -->
-<div id="pkcs12PasswordModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
-        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white">
-                <i class="fas fa-lock mr-2"></i> PKCS#12 Password
+<div id="pkcs12PasswordModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 50; padding: 1rem;">
+    <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h3 style="font-size: 1.25rem; font-weight: bold; color: var(--text-primary);">
+                <i class="fas fa-lock" style="margin-right: 0.5rem;"></i> PKCS#12 Password
             </h3>
         </div>
-        <div class="p-6">
-            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
                 Enter a password to protect the PKCS#12 file (minimum 4 characters):
             </p>
             <input type="password" id="pkcs12Password" 
-                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                   class="modal-form-input"
                    placeholder="Enter password" minlength="4">
             <input type="password" id="pkcs12PasswordConfirm" 
-                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white mt-3"
+                   style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); margin-top: 0.75rem;"
                    placeholder="Confirm password" minlength="4">
         </div>
-        <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+        <div class="modal-form-footer">
             <button onclick="closePKCS12Modal()" 
-                    class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    class="btn-secondary">
                 Cancel
             </button>
             <button onclick="downloadPKCS12WithPassword()" 
-                    class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
+                    class="btn-primary">
                 Download
             </button>
         </div>
     </div>
+    </div>
 </div>
 
 <script>
+// Auto-open create modal if URL has #create hash
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.location.hash === '#create') {
+        openCreateCAModal();
+        // Remove hash from URL after opening modal
+        history.replaceState(null, null, window.location.pathname);
+    }
+});
+
 // Global variables for PKCS12 export
 let pkcs12Params = {};
 
 function openImportCAModal() {
-    alert('Import CA feature - to be implemented');
+    document.getElementById('importCAModal').classList.remove('hidden');
+}
+
+function closeImportCAModal() {
+    document.getElementById('importCAModal').classList.add('hidden');
+    document.querySelector('#importCAModal form').reset();
 }
 
 function openCreateCAModal() {
-    alert('Create CA feature - to be implemented');
+    document.getElementById('createCAModal').classList.remove('hidden');
+}
+
+function closeCreateCAModal() {
+    document.getElementById('createCAModal').classList.add('hidden');
+    document.querySelector('#createCAModal form').reset();
+}
+
+function handleCACreateResponse(event) {
+    if (event.detail.successful) {
+        closeCreateCAModal();
+        // Refresh the CA list
+        htmx.trigger('body', 'refreshCAs');
+        // Show success message
+        showNotification('CA created successfully', 'success');
+    } else {
+        showNotification('Error creating CA: ' + event.detail.xhr.responseText, 'error');
+    }
+}
+
+function handleCAImportResponse(event) {
+    if (event.detail.successful) {
+        closeImportCAModal();
+        // Refresh the CA list
+        htmx.trigger('body', 'refreshCAs');
+        // Show success message
+        showNotification('CA imported successfully', 'success');
+    } else {
+        showNotification('Error importing CA: ' + event.detail.xhr.responseText, 'error');
+    }
+}
+
+function showNotification(message, type) {
+    // Simple notification (you can enhance this)
+    alert(message);
 }
 
 // PKCS#12 Modal Functions
@@ -145,24 +396,24 @@ function exportCA(id, event) {
     // Create menu
     const menu = document.createElement('div');
     menu.id = 'export-menu-' + id;
-    menu.className = 'fixed w-56 rounded-md shadow-lg bg-white dark:bg-gray-700 ring-1 ring-black ring-opacity-5 z-50';
+    menu.className = 'fixed w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50';
     menu.innerHTML = '<div class="py-1" role="menu">' +
-        '<button onclick="exportCASimple(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
+        '<button onclick="exportCASimple(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
             '<i class="fas fa-file-certificate mr-2"></i>Certificate only (PEM)' +
         '</button>' +
-        '<button onclick="exportCAWithKey(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
+        '<button onclick="exportCAWithKey(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
             '<i class="fas fa-key mr-2"></i>Certificate + Key (PEM)' +
         '</button>' +
-        '<button onclick="exportCAWithChain(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
+        '<button onclick="exportCAWithChain(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
             '<i class="fas fa-link mr-2"></i>Certificate + Chain (PEM)' +
         '</button>' +
-        '<button onclick="exportCAFull(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
+        '<button onclick="exportCAFull(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
             '<i class="fas fa-archive mr-2"></i>Full Chain + Key (PEM)' +
         '</button>' +
-        '<button onclick="exportCADER(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
+        '<button onclick="exportCADER(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
             '<i class="fas fa-file-binary mr-2"></i>Certificate (DER)' +
         '</button>' +
-        '<button onclick="showPKCS12ModalTable(' + id + ', \'ca\')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
+        '<button onclick="showPKCS12ModalTable(' + id + ', \'ca\')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">' +
             '<i class="fas fa-lock mr-2"></i>PKCS#12 (.p12/.pfx)' +
         '</button>' +
     '</div>';

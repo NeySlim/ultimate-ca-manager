@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Import Certificates - UCM{% endblock %}
+{% block title %}Import Certificate Authority - UCM{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
@@ -8,22 +8,22 @@
     <div class="page-header" style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
         <div>
             <h1 style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0;">
-                <i class="fas fa-file-import" style="margin-right: 8px;"></i>Import Certificates
+                <i class="fas fa-file-import" style="margin-right: 8px;"></i>Import Certificate Authority
             </h1>
-            <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0 0;">Import certificates from various sources</p>
+            <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0 0;">Import CA certificates from various sources</p>
         </div>
     </div>
     
-    <!-- Manual Import Section -->
+    <!-- Manual CA Import Section -->
     <div class="card">
         <div class="card-header">
             <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">
-                <i class="fas fa-upload" style="margin-right: 8px;"></i>Manual Certificate Import
+                <i class="fas fa-upload" style="margin-right: 8px;"></i>Manual CA Import
             </h2>
         </div>
         <div class="card-body">
             <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
-                Import a certificate and its private key by uploading files or pasting PEM content.
+                Import a CA certificate and optionally its private key.
             </p>
             
             <form id="manual-import-form" style="display: grid; gap: 20px;">
@@ -43,37 +43,28 @@
                 <!-- Paste Method -->
                 <div id="paste-method" style="display: grid; gap: 16px;">
                     <div>
-                        <label class="modal-form-label">Certificate (PEM format) <span style="color: var(--status-danger);">*</span></label>
-                        <textarea id="cert-paste" rows="8" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" 
+                        <label class="modal-form-label">CA Certificate (PEM format) <span style="color: var(--status-danger);">*</span></label>
+                        <textarea id="cert-paste" rows="10" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" 
                                   class="modal-form-input" style="font-family: monospace; font-size: 12px;"></textarea>
                     </div>
                     <div>
-                        <label class="modal-form-label">Private Key (PEM format) <span style="color: var(--status-danger);">*</span></label>
+                        <label class="modal-form-label">Private Key (PEM format - Optional for Root CAs)</label>
                         <textarea id="key-paste" rows="8" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" 
                                   class="modal-form-input" style="font-family: monospace; font-size: 12px;"></textarea>
-                    </div>
-                    <div>
-                        <label class="modal-form-label">Certificate Chain (Optional)</label>
-                        <textarea id="chain-paste" rows="6" placeholder="-----BEGIN CERTIFICATE-----&#10;...intermediate CA...&#10;-----END CERTIFICATE-----" 
-                                  class="modal-form-input" style="font-family: monospace; font-size: 12px;"></textarea>
-                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Include intermediate and root CA certificates if needed</p>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Only required if this CA will sign certificates</p>
                     </div>
                 </div>
                 
                 <!-- Upload Method -->
                 <div id="upload-method" style="display: none; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div>
-                        <label class="modal-form-label">Certificate File (.crt, .pem, .cer) <span style="color: var(--status-danger);">*</span></label>
+                        <label class="modal-form-label">CA Certificate File (.crt, .pem, .cer) <span style="color: var(--status-danger);">*</span></label>
                         <input type="file" id="cert-file" accept=".crt,.pem,.cer,.der" class="modal-form-input" style="padding: 8px;">
                     </div>
                     <div>
-                        <label class="modal-form-label">Private Key File (.key, .pem) <span style="color: var(--status-danger);">*</span></label>
+                        <label class="modal-form-label">Private Key File (.key, .pem - Optional)</label>
                         <input type="file" id="key-file" accept=".key,.pem" class="modal-form-input" style="padding: 8px;">
-                    </div>
-                    <div style="grid-column: 1 / -1;">
-                        <label class="modal-form-label">Certificate Chain File (Optional)</label>
-                        <input type="file" id="chain-file" accept=".crt,.pem,.cer,.ca-bundle" class="modal-form-input" style="padding: 8px;">
-                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">CA bundle or intermediate certificates</p>
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Only for signing CAs</p>
                     </div>
                 </div>
                 
@@ -85,29 +76,27 @@
                             <option value="auto">Auto-detect</option>
                             <option value="pkcs12">PKCS#12 (.p12, .pfx)</option>
                             <option value="pkcs7">PKCS#7 (.p7b, .p7c)</option>
-                            <option value="jks">Java KeyStore (.jks)</option>
                             <option value="der">DER Binary (.der)</option>
                         </select>
                     </div>
                     <div>
                         <label class="modal-form-label">Container File <span style="color: var(--status-danger);">*</span></label>
-                        <input type="file" id="container-file" accept=".p12,.pfx,.p7b,.p7c,.jks,.der" class="modal-form-input" style="padding: 8px;">
+                        <input type="file" id="container-file" accept=".p12,.pfx,.p7b,.p7c,.der" class="modal-form-input" style="padding: 8px;">
                         <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
-                            Supported: PKCS#12 (P12/PFX), PKCS#7 (P7B), Java KeyStore (JKS), DER binary
+                            Supported: PKCS#12 (P12/PFX), PKCS#7 (P7B), DER binary
                         </p>
                     </div>
                     <div>
                         <label class="modal-form-label">Container Password</label>
                         <input type="password" id="container-password" placeholder="Password (if encrypted)" class="modal-form-input">
-                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Required for encrypted PKCS#12/JKS files</p>
                     </div>
                 </div>
                 
                 <!-- Common Fields -->
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div>
-                        <label class="modal-form-label">Description</label>
-                        <input type="text" id="cert-description" placeholder="My imported certificate" class="modal-form-input">
+                        <label class="modal-form-label">Description <span style="color: var(--status-danger);">*</span></label>
+                        <input type="text" id="ca-description" placeholder="My Root CA" class="modal-form-input" required>
                     </div>
                     <div>
                         <label class="modal-form-label">Private Key Password (if encrypted)</label>
@@ -116,8 +105,8 @@
                 </div>
                 
                 <div style="display: flex; gap: 12px;">
-                    <button type="button" onclick="importManualCertificate()" class="btn btn-primary">
-                        <i class="fas fa-check"></i> Import Certificate
+                    <button type="button" onclick="importManualCA()" class="btn btn-primary">
+                        <i class="fas fa-check"></i> Import CA
                     </button>
                     <button type="button" onclick="clearManualForm()" class="btn btn-secondary">
                         <i class="fas fa-times"></i> Clear
@@ -129,39 +118,26 @@
         </div>
     </div>
     
-    <!-- OPNsense Import Section -->
-    <div class="card">
-        <div class="card-header">
-            <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">
-                <i class="fas fa-server" style="margin-right: 8px;"></i>OPNsense Import
-            </h2>
-        </div>
-        <div class="card-body"
-             hx-get="/api/ui/import/config-form"
-             hx-trigger="load"
-             hx-swap="innerHTML">
-            <div class="animate-pulse h-40 bg-gray-200 rounded"></div>
-        </div>
-    </div>
-    
-    <!-- Last OPNsense Import History -->
-    <div class="card">
-        <div class="card-header">
-            <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">
-                <i class="fas fa-history" style="margin-right: 8px;"></i>Last OPNsense Import History
-            </h2>
-        </div>
-        <div hx-get="/api/ui/import/history"
-             hx-trigger="load"
-             hx-swap="innerHTML">
-            <div class="p-8"><div class="animate-pulse h-20 bg-gray-200 rounded"></div></div>
+    <!-- Quick Link to OPNsense Import -->
+    <div class="card" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0.02) 100%);">
+        <div class="card-body" style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h3 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0 0 4px 0;">
+                    <i class="fas fa-server" style="margin-right: 8px; color: var(--primary-color);"></i>Bulk Import from OPNsense
+                </h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">
+                    Import multiple CAs and certificates automatically from your OPNsense firewall
+                </p>
+            </div>
+            <a href="/import" class="btn btn-primary" hx-get="/import" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i class="fas fa-arrow-right"></i> Go to OPNsense Import
+            </a>
         </div>
     </div>
 </div>
 
 <script>
 function switchImportMethod(method) {
-    // Update tabs
     document.querySelectorAll('.tab-button').forEach(btn => {
         btn.classList.remove('active');
         btn.style.borderBottomColor = 'transparent';
@@ -171,12 +147,10 @@ function switchImportMethod(method) {
     event.target.closest('.tab-button').style.borderBottomColor = 'var(--primary-color)';
     event.target.closest('.tab-button').style.color = 'var(--primary-color)';
     
-    // Hide all methods
     document.getElementById('paste-method').style.display = 'none';
     document.getElementById('upload-method').style.display = 'none';
     document.getElementById('container-method').style.display = 'none';
     
-    // Show selected method
     if (method === 'paste') {
         document.getElementById('paste-method').style.display = 'grid';
     } else if (method === 'upload') {
@@ -186,7 +160,7 @@ function switchImportMethod(method) {
     }
 }
 
-async function importManualCertificate() {
+async function importManualCA() {
     const statusDiv = document.getElementById('manual-import-status');
     let method = 'paste';
     
@@ -196,32 +170,35 @@ async function importManualCertificate() {
         method = 'container';
     }
     
-    let certContent, keyContent, chainContent, containerData;
+    const description = document.getElementById('ca-description').value.trim();
+    if (!description) {
+        showStatus(statusDiv, 'Please provide a description', 'error');
+        return;
+    }
+    
+    let certContent, keyContent, containerData;
     
     try {
         if (method === 'paste') {
             certContent = document.getElementById('cert-paste').value.trim();
             keyContent = document.getElementById('key-paste').value.trim();
-            chainContent = document.getElementById('chain-paste').value.trim();
             
-            if (!certContent || !keyContent) {
-                showStatus(statusDiv, 'Please provide both certificate and private key', 'error');
+            if (!certContent) {
+                showStatus(statusDiv, 'Please provide the CA certificate', 'error');
                 return;
             }
         } else if (method === 'upload') {
             const certFile = document.getElementById('cert-file').files[0];
             const keyFile = document.getElementById('key-file').files[0];
-            const chainFile = document.getElementById('chain-file').files[0];
             
-            if (!certFile || !keyFile) {
-                showStatus(statusDiv, 'Please select both certificate and key files', 'error');
+            if (!certFile) {
+                showStatus(statusDiv, 'Please select the CA certificate file', 'error');
                 return;
             }
             
             certContent = await certFile.text();
-            keyContent = await keyFile.text();
-            if (chainFile) {
-                chainContent = await chainFile.text();
+            if (keyFile) {
+                keyContent = await keyFile.text();
             }
         } else if (method === 'container') {
             const containerFile = document.getElementById('container-file').files[0];
@@ -231,7 +208,6 @@ async function importManualCertificate() {
                 return;
             }
             
-            // Read as base64 for binary formats
             const reader = new FileReader();
             containerData = await new Promise((resolve, reject) => {
                 reader.onload = (e) => resolve(e.target.result.split(',')[1]);
@@ -242,7 +218,7 @@ async function importManualCertificate() {
         
         const formData = {
             import_method: method,
-            description: document.getElementById('cert-description').value,
+            description: description,
             key_password: document.getElementById('key-password').value
         };
         
@@ -252,15 +228,14 @@ async function importManualCertificate() {
             formData.container_password = document.getElementById('container-password').value;
         } else {
             formData.certificate = certContent;
-            formData.private_key = keyContent;
-            if (chainContent) {
-                formData.certificate_chain = chainContent;
+            if (keyContent) {
+                formData.private_key = keyContent;
             }
         }
         
-        showStatus(statusDiv, 'Importing certificate...', 'info');
+        showStatus(statusDiv, 'Importing CA...', 'info');
         
-        const response = await fetch('/api/ui/certificates/import', {
+        const response = await fetch('/api/ui/ca/import', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -271,9 +246,9 @@ async function importManualCertificate() {
         const result = await response.json();
         
         if (response.ok) {
-            showStatus(statusDiv, '✓ Certificate imported successfully!', 'success');
+            showStatus(statusDiv, '✓ CA imported successfully!', 'success');
             setTimeout(() => {
-                window.location.href = '/certificates';
+                window.location.href = '/ca';
             }, 1500);
         } else {
             showStatus(statusDiv, '✗ Import failed: ' + (result.error || result.message || 'Unknown error'), 'error');
@@ -286,14 +261,12 @@ async function importManualCertificate() {
 function clearManualForm() {
     document.getElementById('cert-paste').value = '';
     document.getElementById('key-paste').value = '';
-    document.getElementById('chain-paste').value = '';
     document.getElementById('cert-file').value = '';
     document.getElementById('key-file').value = '';
-    document.getElementById('chain-file').value = '';
     document.getElementById('container-file').value = '';
     document.getElementById('container-format').value = 'auto';
     document.getElementById('container-password').value = '';
-    document.getElementById('cert-description').value = '';
+    document.getElementById('ca-description').value = '';
     document.getElementById('key-password').value = '';
     document.getElementById('manual-import-status').style.display = 'none';
 }
@@ -308,7 +281,6 @@ function showStatus(element, message, type) {
     element.style.display = 'block';
 }
 
-// Initialize first tab
 document.addEventListener('DOMContentLoaded', function() {
     const firstTab = document.querySelector('.tab-button.active');
     if (firstTab) {

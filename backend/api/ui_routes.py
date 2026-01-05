@@ -111,7 +111,89 @@ def logout():
 @login_required
 def dashboard():
     """Dashboard page"""
-    return render_template('dashboard.html', now=datetime.now())
+    from datetime import datetime, timedelta
+    
+    stats = {
+        'total_cas': 0,
+        'total_certificates': 0,
+        'valid_certificates': 0,
+        'expiring_soon': 0
+    }
+    
+    certificates = []
+    scep_requests = []
+    
+    try:
+        token = session.get('access_token')
+        if not token:
+            return render_template('dashboard.html', stats=stats, certificates=certificates, scep_requests=scep_requests)
+        
+        headers = {'Authorization': f'Bearer {token}'}
+        
+        # Get CAs count
+        ca_response = requests.get(f"{request.url_root}api/v1/ca/", headers=headers, verify=False)
+        if ca_response.status_code == 200:
+            cas = ca_response.json()
+            stats['total_cas'] = len(cas)
+        
+        # Get all certificates
+        cert_response = requests.get(f"{request.url_root}api/v1/certificates/", headers=headers, verify=False)
+        if cert_response.status_code == 200:
+            all_certs = cert_response.json()
+            stats['total_certificates'] = len(all_certs)
+            
+            now = datetime.now()
+            threshold = now + timedelta(days=30)
+            
+            valid_count = 0
+            expiring_count = 0
+            recent_list = []
+            
+            # Process certificates
+            for cert in all_certs:
+                # Determine if certificate is valid
+                is_valid = False
+                if cert.get('valid_to') and not cert.get('revoked', False):
+                    try:
+                        valid_to = datetime.fromisoformat(cert['valid_to'].replace('Z', '+00:00'))
+                        is_valid = valid_to > now
+                        
+                        # Count expiring certificates
+                        if is_valid and valid_to <= threshold:
+                            expiring_count += 1
+                    except:
+                        pass
+                
+                if is_valid:
+                    valid_count += 1
+                
+                # Add to recent list (will sort by created_at later)
+                recent_list.append({
+                    'common_name': cert.get('common_name', cert.get('descr', 'Unknown')),
+                    'type': cert.get('cert_type', 'N/A'),
+                    'issuer_cn': cert.get('issuer_name', 'Unknown'),
+                    'is_valid': is_valid,
+                    'not_after': cert.get('valid_to'),
+                    'created_at': cert.get('created_at', '')
+                })
+            
+            stats['valid_certificates'] = valid_count
+            stats['expiring_soon'] = expiring_count
+            
+            # Sort by created_at and take top 5
+            recent_list.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            certificates = recent_list[:5]
+            
+    except Exception as e:
+        print(f"⚠️  Dashboard error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return render_template('dashboard.html',
+                         stats=stats,
+                         certificates=certificates,
+                         scep_requests=scep_requests)
+
 
 
 # Dashboard API endpoints (for HTMX)
@@ -281,7 +363,7 @@ def dashboard_scep_status():
                         <p class="text-sm text-gray-500 dark:text-gray-400">Configure SCEP to start accepting enrollment requests</p>
                     </div>
                 </div>
-                <a href="/scep" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm">
+                <a href="/scep" class="btn btn-primary text-sm">
                     Configure
                 </a>
             </div>
@@ -297,7 +379,7 @@ def dashboard_scep_status():
                         <p class="text-sm text-gray-500 dark:text-gray-400">Accepting enrollment requests</p>
                     </div>
                 </div>
-                <a href="/scep" class="text-primary-600 hover:text-primary-700 text-sm">
+                <a href="/scep" class="text-accent hover:text-accent-hover text-sm">
                     Manage <i class="fas fa-chevron-right ml-1"></i>
                 </a>
             </div>
@@ -325,6 +407,13 @@ def dashboard_scep_status():
 def settings():
     """Settings page"""
     return render_template('settings.html')
+
+
+@ui_bp.route('/users')
+@login_required
+def users():
+    """Users management page"""
+    return render_template('users.html')
 
 
 # CA Management
@@ -441,7 +530,7 @@ def ca_list_content():
             
             # Check if CA has private key
             has_key = ca.get('has_private_key', False)
-            key_badge = '<span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"><i class="fas fa-key mr-1"></i>Key</span>' if has_key else '<span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"><i class="fas fa-key-skeleton mr-1"></i>No Key</span>'
+            key_badge = '<span class="badge-outline badge-success ml-2"><i class="fas fa-key"></i> Key</span>' if has_key else '<span class="badge-outline badge-secondary ml-2"><i class="fas fa-key-skeleton"></i> No Key</span>'
             
             # Escape values for JavaScript
             safe_refid = escape_js(ca['refid'])
@@ -451,7 +540,8 @@ def ca_list_content():
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onclick="window.location.href='/ca/{ca['id']}'">
                     <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                         {ca['descr']}
-                        <span class="ml-2 px-2 py-0.5 text-xs rounded-full {'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' if is_root else 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200'}">
+                        <span class="badge-outline badge-primary ml-2">
+                            <i class="{'fas fa-crown' if is_root else 'fas fa-link'}"></i>
                             {'ROOT' if is_root else 'INT'}
                         </span>
                         {key_badge}
@@ -475,14 +565,14 @@ def ca_list_content():
                     </td>
                     <td class="px-4 py-3 text-sm text-right" onclick="event.stopPropagation()">
                         <button onclick="exportCA({ca['id']}, event)" 
-                                class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mr-3"
-                                title="Export">
-                            <i class="fas fa-download"></i>
+                                class="btn-icon btn-icon-primary"
+                                title="Export CA">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
                         </button>
                         <button onclick="deleteCA('{safe_refid}', '{safe_descr}')" 
-                                class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                                title="Delete">
-                            <i class="fas fa-trash"></i>
+                                class="btn-icon btn-icon-danger"
+                                title="Delete CA">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
                         </button>
                     </td>
                 </tr>
@@ -819,20 +909,20 @@ def cert_list_content():
             is_csr = not cert.get('crt') if 'crt' in cert else (cert.get('valid_from') is None or cert.get('serial_number') is None)
             is_revoked = cert.get('revoked', False)
             
-            # Determine status and type
+            # Determine status badge
             if is_csr:
-                status_badge = '<span class="px-2 py-0.5 text-xs rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">CSR</span>'
+                status_badge = '<span class="badge-outline badge-warning ml-2"><i class="fas fa-file-signature"></i> CSR</span>'
             elif is_revoked:
-                status_badge = '<span class="px-2 py-0.5 text-xs rounded-full bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">REVOKED</span>'
+                status_badge = '<span class="badge-outline badge-danger ml-2"><i class="fas fa-ban"></i> REVOKED</span>'
             else:
-                status_badge = '<span class="px-2 py-0.5 text-xs rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">VALID</span>'
+                status_badge = '<span class="badge-outline badge-success ml-2"><i class="fas fa-circle-check"></i> VALID</span>'
             
             # Add CRT/KEY badges - for CSRs these will be false, for signed certs check actual presence
             has_crt = not is_csr  # If it's not a CSR, it has a certificate
             has_key = cert.get('has_private_key', False)
             
-            crt_badge = '<span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200"><i class="fas fa-certificate mr-1"></i>CRT</span>' if has_crt else ''
-            key_badge = '<span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"><i class="fas fa-key mr-1"></i>KEY</span>' if has_key else ''
+            crt_badge = '<span class="badge-outline badge-info ml-2"><i class="fas fa-certificate"></i> CRT</span>' if has_crt else ''
+            key_badge = '<span class="badge-outline badge-success ml-2"><i class="fas fa-key"></i> KEY</span>' if has_key else ''
             
             # Get issuer name
             issuer_name = ca_names.get(cert.get('caref', ''), 'Unknown')
@@ -882,29 +972,29 @@ def cert_list_content():
             '''
             
             # Unified export button for both CSR and certificates
-            button_class = "text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300" if is_csr else "text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+            button_class = "btn-icon btn-icon-primary"
             html += f'''
                         <button onclick="exportCert({cert['id']}, event, {'true' if is_csr else 'false'})" 
-                                class="{button_class} mr-3"
-                                title="Export">
-                            <i class="fas fa-download"></i>
+                                class="{button_class}"
+                                title="Export {'CSR' if is_csr else 'Certificate'}">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
                         </button>
             '''
                 
             if not is_revoked and not is_csr:
                 html += f'''
                         <button onclick="revokeCert('{safe_refid}', '{safe_descr}')" 
-                                class="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300 mr-3"
-                                title="Revoke">
-                            <i class="fas fa-ban"></i>
+                                class="btn-icon btn-icon-danger"
+                                title="Revoke Certificate">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-ban"/></svg>
                         </button>
                 '''
             
             html += f'''
                         <button onclick="deleteCert('{safe_refid}', '{safe_descr}')" 
-                                class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                                title="Delete">
-                            <i class="fas fa-trash"></i>
+                                class="btn-icon btn-icon-danger"
+                                title="Delete {'CSR' if is_csr else 'Certificate'}">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
                         </button>
                     </td>
                 </tr>
@@ -1301,9 +1391,11 @@ def scep_config_form():
                     <label class="ml-2 text-gray-700 dark:text-gray-300">Auto-approve enrollment requests</label>
                 </div>
                 
-                <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
-                    <i class="fas fa-save mr-2"></i> Save Configuration
-                </button>
+                <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save mr-2"></i> Save Configuration
+                    </button>
+                </div>
             </div>
         </form>
         '''
@@ -1374,11 +1466,11 @@ def scep_requests():
                     </div>
                     <div class="flex space-x-2">
                         <button onclick="approveSCEP('{safe_txid}')"
-                                class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">
+                                class="btn btn-success text-sm">
                             Approve
                         </button>
                         <button onclick="rejectSCEP('{safe_txid}')"
-                                class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">
+                                class="btn btn-danger text-sm">
                             Reject
                         </button>
                     </div>
@@ -1423,6 +1515,13 @@ def scep_requests():
 def import_page():
     """Import page"""
     return render_template('import/index.html')
+
+
+@ui_bp.route('/import-ca')
+@login_required
+def import_ca_page():
+    """Import CA page"""
+    return render_template('ca-import/index.html')
 
 
 @ui_bp.route('/api/ui/import/config-form')
@@ -1508,15 +1607,15 @@ def import_config_form():
                 </div>
                 
                 <div class="flex space-x-3">
-                    <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
+                    <button type="submit" class="btn btn-primary">
                         Save Configuration
                     </button>
                     <button type="button" onclick="testImportConnection()"
-                            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">
+                            class="btn btn-success">
                         Test Connection
                     </button>
                     <button type="button" onclick="executeImport()"
-                            class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
+                            class="btn btn-secondary">
                         Execute Import
                     </button>
                 </div>
@@ -2261,11 +2360,12 @@ def ca_certificates(ca_id):
         '''
         
         for cert in ca_certs:
-            status_class = {
-                'active': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-                'revoked': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-                'pending': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-            }.get(cert.get('status', 'active'), 'bg-gray-100 text-gray-800')
+            # Badge for status instead of just icon
+            status_badge = {
+                'active': '<span class="badge-outline badge-success"><i class="fas fa-circle-check"></i> Active</span>',
+                'revoked': '<span class="badge-outline badge-danger"><i class="fas fa-ban"></i> Revoked</span>',
+                'pending': '<span class="badge-outline badge-warning"><i class="fas fa-clock"></i> Pending</span>'
+            }.get(cert.get('status', 'active'), '<span class="badge-outline badge-secondary"><i class="fas fa-circle"></i> Unknown</span>')
             
             html += f'''
                 <tr>
@@ -2278,9 +2378,7 @@ def ca_certificates(ca_id):
                         {cert.get('cert_type', 'server')}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {status_class}">
-                            {cert.get('status', 'active')}
-                        </span>
+                        {status_badge}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {cert.get('not_valid_after', 'N/A')[:10] if cert.get('not_valid_after') else 'N/A'}
@@ -2535,7 +2633,7 @@ def managed_certs_list():
                         <button hx-post="/api/ui/config/use-managed-cert/{cert['id']}" 
                                 hx-confirm="Use this certificate for HTTPS? The server will restart."
                                 hx-swap="none"
-                                class="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                                class="btn btn-success text-xs">
                             <i class="fas fa-check mr-1"></i>Use This
                         </button>
                 '''
@@ -2641,3 +2739,41 @@ def use_managed_cert(cert_id):
         flash(f'Error applying certificate: {str(e)}', 'error')
         return str(e), 500
 
+
+
+# ===== SENTINEL THEME DEMO =====
+
+
+@ui_bp.route('/test-simple')
+def test_simple():
+    """Ultra simple test page"""
+    return render_template('test-simple.html')
+
+
+# ===== SESSION MANAGEMENT API =====
+
+@ui_bp.route('/api/session/extend', methods=['POST'])
+@login_required
+def extend_session():
+    """Extend user session by updating last_activity"""
+    try:
+        session['last_activity'] = time.time()
+        return jsonify({
+            'success': True,
+            'message': 'Session extended',
+            'expires_at': session['last_activity'] + 1800  # 30 minutes from now
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@ui_bp.route('/api/session/check', methods=['GET'])
+@login_required
+def check_session():
+    """Check if session is still valid"""
+    return jsonify({
+        'success': True,
+        'active': True,
+        'last_activity': session.get('last_activity'),
+        'expires_at': session.get('last_activity', time.time()) + 1800
+    }), 200

@@ -4,22 +4,22 @@
 
 {% block content %}
 <div class="space-y-6">
-    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+    <h1 class="text-3xl font-bold text-gray-900">
         <i class="fas fa-network-wired mr-2"></i> SCEP Configuration
     </h1>
     
     <!-- Configuration Form -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 p-6"
+    <div class="bg-white rounded-lg shadow border border-gray-200 p-6"
          hx-get="/api/ui/scep/config-form"
          hx-trigger="load"
          hx-swap="innerHTML">
-        <div class="animate-pulse h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        <div class="animate-pulse h-32 bg-gray-200 rounded"></div>
     </div>
     
     <!-- Pending Requests -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
-        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900">
                 Pending SCEP Requests
             </h2>
         </div>
@@ -27,7 +27,7 @@
              hx-get="/api/ui/scep/requests"
              hx-trigger="load, refreshSCEP from:body"
              hx-swap="innerHTML">
-            <div class="p-8"><div class="animate-pulse h-20 bg-gray-200 dark:bg-gray-700 rounded"></div></div>
+            <div class="p-8"><div class="animate-pulse h-20 bg-gray-200 rounded"></div></div>
         </div>
     </div>
 </div>

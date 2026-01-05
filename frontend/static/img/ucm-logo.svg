@@ -1,0 +1,27 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Document/Certificate shape with folded corner -->
+  <path d="M8 4C8 2.89543 8.89543 2 10 2H26L34 10V34C34 35.1046 33.1046 36 32 36H10C8.89543 36 8 35.1046 8 34V4Z" 
+        fill="currentColor" opacity="0.1"/>
+  <path d="M8 4C8 2.89543 8.89543 2 10 2H26L34 10V34C34 35.1046 33.1046 36 32 36H10C8.89543 36 8 35.1046 8 34V4Z" 
+        stroke="currentColor" stroke-width="1.5"/>
+  
+  <!-- Folded corner detail -->
+  <path d="M26 2V8C26 9.10457 26.8954 10 28 10H34" 
+        stroke="currentColor" stroke-width="1.5" stroke-linejoin="bevel"/>
+  
+  <!-- Shield/security element integrated -->
+  <path d="M21 16C21 16 24 16.5 24 13.5C24 10.5 21 11 21 11C21 11 18 10.5 18 13.5C18 16.5 21 16 21 16Z" 
+        fill="currentColor" opacity="0.2"/>
+  <path d="M21 11V16M21 11C21 11 18 10.5 18 13.5C18 16.5 21 16 21 16M21 11C21 11 24 10.5 24 13.5C24 16.5 21 16 21 16" 
+        stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  
+  <!-- UCM Letters stylized -->
+  <text x="21" y="28" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" 
+        fill="currentColor" text-anchor="middle" letter-spacing="-0.5">UCM</text>
+  
+  <!-- Decorative security lines (like certificate validation marks) -->
+  <line x1="13" y1="20" x2="16" y2="20" stroke="currentColor" stroke-width="1" opacity="0.4"/>
+  <line x1="26" y1="20" x2="29" y2="20" stroke="currentColor" stroke-width="1" opacity="0.4"/>
+  <line x1="13" y1="31" x2="17" y2="31" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+  <line x1="25" y1="31" x2="29" y2="31" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+</svg>
