@@ -3694,3 +3694,66 @@ def crl_info_integrated(ca_refid):
     except Exception as e:
         flash(f'Error loading CRL info: {str(e)}', 'error')
         return redirect(url_for('ui.crl_list'))
+
+
+@ui_bp.route('/api/ui/system/pki-stats')
+@login_required
+def pki_stats_ui():
+    """Get PKI statistics (UI route with session auth)"""
+    from services.pki_reset_service import PKIResetService
+    
+    try:
+        stats = PKIResetService.get_pki_stats()
+        return jsonify(stats), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@ui_bp.route('/api/ui/system/pki-reset', methods=['POST'])
+@login_required
+def pki_reset_ui():
+    """Reset PKI database (UI route with session auth - admin only)"""
+    from services.pki_reset_service import PKIResetService
+    from models import User, db, AuditLog
+    
+    # Check admin role
+    user = User.query.get(session['user_id'])
+    if user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Admin role required'}), 403
+    
+    # Require confirmation
+    data = request.get_json()
+    if not data or data.get('confirmation') != 'RESET PKI DATA':
+        return jsonify({
+            'success': False,
+            'error': 'Invalid confirmation. Must be exactly: RESET PKI DATA'
+        }), 400
+    
+    try:
+        # Perform reset
+        stats = PKIResetService.reset_pki_data()
+        
+        # Log audit
+        log = AuditLog(
+            username=user.username,
+            action='pki_reset',
+            resource_type='system',
+            details=f"Reset PKI data. Backup: {stats['backup_path']}",
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'PKI data reset successfully',
+            'stats': stats
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"PKI reset error: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
