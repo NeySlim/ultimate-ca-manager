@@ -1750,7 +1750,7 @@ def import_ca_page():
 @ui_bp.route('/api/ui/import/config-form')
 @login_required
 def import_config_form():
-    """Get import configuration form with support for API key or username/password"""
+    """Get import configuration form - API Key authentication only"""
     try:
         token = session.get('access_token')
         import sys
@@ -1766,10 +1766,10 @@ def import_config_form():
         )
         
         config = response.json() if response.status_code == 200 else {}
-        auth_method = config.get('auth_method', 'web')
         
         html = f'''
-        <form hx-post="/api/ui/import/save" hx-on::after-request="showToast('Config saved', 'success')">
+        <form hx-post="/api/ui/import/save" hx-swap="none" 
+              hx-on::after-request="if(event.detail.successful) window.showToast('Configuration saved successfully', 'success')">
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">OPNsense URL</label>
@@ -1777,60 +1777,27 @@ def import_config_form():
                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                 </div>
                 
-                <!-- Authentication Method Toggle -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Authentication Method</label>
-                    <div class="flex space-x-4">
-                        <label class="flex items-center">
-                            <input type="radio" name="auth_method" value="api" {"checked" if auth_method == "api" else ""}
-                                   onchange="toggleAuthMethod()" class="mr-2">
-                            <span class="text-sm text-gray-700 dark:text-gray-300">API Key (Recommended)</span>
-                        </label>
-                        <label class="flex items-center">
-                            <input type="radio" name="auth_method" value="web" {"checked" if auth_method == "web" else ""}
-                                   onchange="toggleAuthMethod()" class="mr-2">
-                            <span class="text-sm text-gray-700 dark:text-gray-300">Username/Password</span>
-                        </label>
-                    </div>
-                </div>
+                <!-- API Key Authentication (only method) -->
+                <input type="hidden" name="auth_method" value="api">
                 
-                <!-- API Key Fields -->
-                <div id="api-fields" style="display: {"block" if auth_method == "api" else "none"}">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
-                            <input type="text" name="api_key" value="{config.get('api_key', '')}" 
-                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Secret</label>
-                            <input type="password" name="api_secret"
-                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                        </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
+                        <input type="text" name="api_key" value="{config.get('api_key', '')}" required
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     </div>
-                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        Create API key in OPNsense: System → Access → Users → Edit user → API keys
-                    </p>
-                </div>
-                
-                <!-- Username/Password Fields -->
-                <div id="web-fields" style="display: {"block" if auth_method == "web" else "none"}">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Username</label>
-                            <input type="text" name="username" value="{config.get('username', 'root')}"
-                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
-                            <input type="password" name="password"
-                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                        </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Secret</label>
+                        <input type="password" name="api_secret" required
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                     </div>
                 </div>
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <i class="fas fa-info-circle"></i> Create API key in OPNsense: System → Access → Users → Edit user → API keys
+                </p>
                 
                 <div class="flex space-x-3">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" id="save-config-btn">
                         Save Configuration
                     </button>
                     <button type="button" onclick="testImportConnection()"
@@ -1845,52 +1812,22 @@ def import_config_form():
             </div>
         </form>
         <script>
-        function toggleAuthMethod() {{
-            const authMethod = document.querySelector('input[name="auth_method"]:checked').value;
-            const apiFields = document.getElementById('api-fields');
-            const webFields = document.getElementById('web-fields');
-            
-            if (authMethod === 'api') {{
-                apiFields.style.display = 'block';
-                webFields.style.display = 'none';
-            }} else {{
-                apiFields.style.display = 'none';
-                webFields.style.display = 'block';
-            }}
-        }}
-        
         function testImportConnection() {{
             const baseUrl = document.querySelector('input[name="base_url"]').value;
-            const authMethod = document.querySelector('input[name="auth_method"]:checked').value;
+            const apiKey = document.querySelector('input[name="api_key"]').value;
+            const apiSecret = document.querySelector('input[name="api_secret"]').value;
+            
+            if (!baseUrl || !apiKey || !apiSecret) {{
+                showToast('Please fill in all fields', 'error');
+                return;
+            }}
             
             let requestData = {{
                 base_url: baseUrl,
-                verify_ssl: false
+                verify_ssl: false,
+                api_key: apiKey,
+                api_secret: apiSecret
             }};
-            
-            if (authMethod === 'api') {{
-                const apiKey = document.querySelector('input[name="api_key"]').value;
-                const apiSecret = document.querySelector('input[name="api_secret"]').value;
-                
-                if (!baseUrl || !apiKey || !apiSecret) {{
-                    showToast('Please fill in all API fields', 'error');
-                    return;
-                }}
-                
-                requestData.api_key = apiKey;
-                requestData.api_secret = apiSecret;
-            }} else {{
-                const username = document.querySelector('input[name="username"]').value;
-                const password = document.querySelector('input[name="password"]').value;
-                
-                if (!baseUrl || !username || !password) {{
-                    showToast('Please fill in all fields', 'error');
-                    return;
-                }}
-                
-                requestData.username = username;
-                requestData.password = password;
-            }}
             
             fetch('/api/v1/import/test-connection', {{
                 method: 'POST',
@@ -1914,37 +1851,21 @@ def import_config_form():
         function executeImport() {{
             if (confirm('Execute import from OPNsense?')) {{
                 const baseUrl = document.querySelector('input[name="base_url"]').value;
-                const authMethod = document.querySelector('input[name="auth_method"]:checked').value;
+                const apiKey = document.querySelector('input[name="api_key"]').value;
+                const apiSecret = document.querySelector('input[name="api_secret"]').value;
+                
+                if (!baseUrl || !apiKey || !apiSecret) {{
+                    showToast('Please fill in all fields', 'error');
+                    return;
+                }}
                 
                 let requestData = {{
                     skip_existing: true,
                     base_url: baseUrl,
-                    verify_ssl: false
+                    verify_ssl: false,
+                    api_key: apiKey,
+                    api_secret: apiSecret
                 }};
-                
-                if (authMethod === 'api') {{
-                    const apiKey = document.querySelector('input[name="api_key"]').value;
-                    const apiSecret = document.querySelector('input[name="api_secret"]').value;
-                    
-                    if (!baseUrl || !apiKey || !apiSecret) {{
-                        showToast('Please fill in all API fields', 'error');
-                        return;
-                    }}
-                    
-                    requestData.api_key = apiKey;
-                    requestData.api_secret = apiSecret;
-                }} else {{
-                    const username = document.querySelector('input[name="username"]').value;
-                    const password = document.querySelector('input[name="password"]').value;
-                    
-                    if (!baseUrl || !username || !password) {{
-                        showToast('Please fill in all fields', 'error');
-                        return;
-                    }}
-                    
-                    requestData.username = username;
-                    requestData.password = password;
-                }}
                 
                 fetch('/api/v1/import/execute', {{
                     method: 'POST',
@@ -1956,7 +1877,24 @@ def import_config_form():
                     if (d.error) {{
                         showToast('Import failed: ' + d.error, 'error');
                     }} else {{
-                        showToast('Import complete: ' + (d.cas?.imported || 0) + ' CAs, ' + (d.certs?.imported || 0) + ' certs', 'success');
+                        const casImported = d.cas?.imported || 0;
+                        const casSkipped = d.cas?.skipped || 0;
+                        const certsImported = d.certs?.imported || 0;
+                        const certsSkipped = d.certs?.skipped || 0;
+                        
+                        let message = 'Import complete: ';
+                        if (casImported > 0 || certsImported > 0) {{
+                            message += casImported + ' CAs, ' + certsImported + ' certs imported';
+                            if (casSkipped > 0 || certsSkipped > 0) {{
+                                message += ' (' + (casSkipped + certsSkipped) + ' skipped)';
+                            }}
+                        }} else if (casSkipped > 0 || certsSkipped > 0) {{
+                            message += 'All items already exist (' + casSkipped + ' CAs, ' + certsSkipped + ' certs skipped)';
+                        }} else {{
+                            message += 'No items found';
+                        }}
+                        
+                        showToast(message, 'success');
                         htmx.trigger('body', 'refreshCAs');
                         htmx.trigger('body', 'refreshCerts');
                     }}
