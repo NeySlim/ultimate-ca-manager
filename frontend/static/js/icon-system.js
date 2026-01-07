@@ -16,7 +16,7 @@ class IconSystem {
             // Try to load from localStorage cache first
             const cachedData = localStorage.getItem('ucm-icons-data');
             const cachedVersion = localStorage.getItem('ucm-icons-version');
-            const currentVersion = '2.3'; // Increment this when icons.json changes
+            const currentVersion = '2.4'; // Increment this when icons.json changes
             
             if (cachedData && cachedVersion === currentVersion) {
                 // Use cached data for instant load
@@ -191,7 +191,7 @@ class IconSystem {
             'fa-file-certificate': 'certificate',
             'fa-file-binary': 'certificate',
             'fa-truck': 'scep',
-            'fa-server': 'scep',
+            'fa-server': 'server',
             'fa-network-wired': 'scep',
             'fa-users': 'users',
             'fa-user-group': 'users',
@@ -200,6 +200,7 @@ class IconSystem {
             'fa-user': 'user',
             'fa-user-circle': 'user',
             'fa-user-gear': 'settings',
+            'fa-user-check': 'user-check',
             'fa-sync': 'refresh',
             'fa-refresh': 'refresh',
             'fa-palette': 'theme-palette',
@@ -208,8 +209,9 @@ class IconSystem {
             'fa-right-from-bracket': 'logout',
             'fa-sign-out': 'logout',
             'fa-check-circle': 'check-circle',
-            'fa-check': 'check-circle',
+            'fa-check': 'check',
             'fa-exclamation-triangle': 'warning-triangle',
+            'fa-exclamation-circle': 'exclamation-circle',
             'fa-warning': 'warning-triangle',
             'fa-chevron-down': 'chevron-down',
             'fa-trash': 'trash',
@@ -223,6 +225,7 @@ class IconSystem {
             'fa-file-import': 'file-import',
             'fa-file-signature': 'file-signature',
             'fa-arrow-left': 'arrow-left',
+            'fa-arrow-right': 'arrow-right',
             'fa-times': 'times',
             'fa-info-circle': 'info-circle',
             'fa-key': 'key',
@@ -233,11 +236,21 @@ class IconSystem {
             'fa-clock': 'clock',
             'fa-crown': 'crown',
             'fa-eye': 'eye',
+            'fa-eye-slash': 'eye-slash',
             'fa-spinner': 'spinner',
             'fa-spin': 'spinner',
             'fa-file-contract': 'crl',
             'fa-circle-check': 'ocsp',
-            'fa-check-double': 'ocsp'
+            'fa-check-double': 'ocsp',
+            'fa-bell': 'bell',
+            'fa-envelope': 'envelope',
+            'fa-mail': 'envelope',
+            'fa-shield-alt': 'shield-check',
+            'fa-book-open': 'book-open',
+            'fa-chart-bar': 'chart-bar',
+            'fa-inbox': 'inbox',
+            'fa-play': 'play',
+            'fa-circle': 'circle'
         };
 
         document.querySelectorAll('i.fas, i.far, i.fab').forEach(icon => {
