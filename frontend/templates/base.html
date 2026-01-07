@@ -188,19 +188,19 @@
             
             <a href="/config/notifications" class="sidebar-link {% if request.path.startswith('/config/notifications') %}active{% endif %}"
                hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <i data-icon="bell"></i>
+                <i class="fas fa-bell"></i>
                 <span>Notifications</span>
             </a>
             
             <a href="/config/mtls" class="sidebar-link {% if request.path.startswith('/config/mtls') %}active{% endif %}"
                hx-get="/config/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <i data-icon="shield-check"></i>
+                <i class="fas fa-shield-alt"></i>
                 <span>mTLS Authentication</span>
             </a>
             
             <a href="/config/webauthn" class="sidebar-link {% if request.path.startswith('/config/webauthn') %}active{% endif %}"
                hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <i data-icon="key"></i>
+                <i class="fas fa-key"></i>
                 <span>WebAuthn / FIDO2</span>
             </a>
             
