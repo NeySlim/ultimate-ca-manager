@@ -411,7 +411,7 @@ function renderCredentials(credentials) {
 
 function updateStats(credentials) {
     document.getElementById('total-credentials').textContent = credentials.length;
-    document.getElementById('active-credentials').textContent = credentials.filter(c => c.is_active).length;
+    document.getElementById('active-credentials').textContent = credentials.filter(c => c.enabled).length;
     
     const lastUsed = credentials
         .filter(c => c.last_used_at)
