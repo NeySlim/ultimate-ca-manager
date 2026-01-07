@@ -241,6 +241,7 @@
 </div>
 
 <script>
+(function() {
 const token = '{{ session.get("access_token") }}';
 
 // Toast helper
@@ -562,5 +563,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadMTLSSettings();
     loadCertificates();
 });
+})();
 </script>
 {% endblock %}
