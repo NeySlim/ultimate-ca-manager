@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.2] - 2026-01-07
+
+### 🐛 Critical Bugfixes
+
+### Fixed
+- **OPNsense Import Page**: Fixed critical JavaScript errors preventing configuration imports
+  - Added global `showToast()` function to base template for reliable toast notifications
+  - Fixed "showToast is not defined" error in HTMX-loaded content
+  - Removed authentication method toggle, now uses API Key only (simplified UX)
+  - Improved error handling and user feedback during import process
+- **Import Statistics Display**: Fixed toast message showing "0 CA 0 Cert" after successful import
+  - Corrected response data parsing in import completion handler
+  - Enhanced import result feedback with proper counts
+
+### Changed
+- Simplified OPNsense import authentication to API Key only (removed username/password option)
+- Improved toast notification system with consistent styling across all themes
+
+---
+
 ## [1.6.0] - 2026-01-05
 
 ### 🎨 Complete UI Redesign & Tailwind Removal - Production Ready

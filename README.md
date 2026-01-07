@@ -1,6 +1,6 @@
 # Ultimate CA Manager
 
-![Version](https://img.shields.io/badge/version-1.6.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.6.2-blue.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![Docker](https://img.shields.io/docker/pulls/neyslim/ultimate-ca-manager)
@@ -69,10 +69,10 @@
 
 ```bash
 # Download package
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.6.1/ucm_1.6.1_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.6.2/ultimate-ca-manager_1.6.2_amd64.deb
 
 # Install
-sudo dpkg -i ucm_1.6.1_all.deb
+sudo dpkg -i ultimate-ca-manager_1.6.2_amd64.deb
 
 # Service will start automatically
 ```
@@ -147,20 +147,19 @@ All themes feature:
 - Smooth transitions
 - Optimized contrast ratios
 
-## 📦 What's New in 1.6.1
+## 📦 What's New in 1.6.2
 
-### Latest Changes (v1.6.1)
+### Latest Changes (v1.6.2) - Critical Bugfixes
+- 🐛 **OPNsense Import Fixed** - Resolved critical JavaScript errors blocking configuration imports
+- ✅ **Toast Notifications** - Added global showToast() function for reliable user feedback
+- 🔧 **Simplified Import** - Streamlined to API Key authentication only (removed username/password)
+- 📊 **Accurate Statistics** - Fixed import result display showing correct CA and certificate counts
+
+### Previous Release (v1.6.1)
 - 🐛 **Docker Files** - Fixed missing Dockerfile, entrypoint.sh, wsgi.py, gunicorn.conf.py
 - ✅ **CI/CD** - All 4 GitHub Actions workflows passing
 - 🐳 **Multi-arch** - Docker Hub builds for amd64/arm64
 - 📦 **Packages** - Automated .deb and .rpm package builds
-
-### Major Features (v1.6.0)
-- ✨ **Complete Tailwind Removal** - Migrated to custom CSS with CSS variables
-- 🎨 **Custom Scrollbars** - Theme-aware scrollbars for all 8 themes
-- 🔒 **Modal Improvements** - Body scroll lock, proper z-indexing
-- 📄 **CRL Info Pages** - Public and integrated CRL information views
-- 🐛 **Bug Fixes** - Fixed HTMX triggers, JavaScript conflicts, theme flash
 
 See [CHANGELOG.md](CHANGELOG.md) for complete details.
 
@@ -199,7 +198,7 @@ python backend/app.py
 # Build package
 ./build_deb.sh
 
-# Package will be created as ucm_1.6.1_all.deb
+# Package will be created as ultimate-ca-manager_1.6.2_amd64.deb
 ```
 
 ## 📚 Documentation

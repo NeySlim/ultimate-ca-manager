@@ -61,7 +61,7 @@ Recommended size: 1280×640px (will be cropped from 1530×921)
 ## README Badges to Add
 
 ```markdown
-![Version](https://img.shields.io/badge/version-1.6.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.6.2-blue.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![Docker](https://img.shields.io/docker/pulls/neyslim/ultimate-ca-manager)
