@@ -95,7 +95,7 @@ def login():
         except Exception as e:
             flash(f'Login failed: {str(e)}', 'error')
     
-    return render_template('auth/login.html')
+    return render_template('auth/login-sentinel.html')
 
 
 @ui_bp.route('/logout', methods=['GET', 'POST'])
@@ -126,7 +126,7 @@ def dashboard():
     try:
         token = session.get('access_token')
         if not token:
-            return render_template('dashboard.html', stats=stats, certificates=certificates, scep_requests=scep_requests)
+            return render_template('dashboard-sentinel.html', stats=stats, certificates=certificates, scep_requests=scep_requests)
         
         headers = {'Authorization': f'Bearer {token}'}
         
@@ -189,7 +189,7 @@ def dashboard():
         import traceback
         traceback.print_exc()
     
-    return render_template('dashboard.html',
+    return render_template('dashboard-sentinel.html',
                          stats=stats,
                          certificates=certificates,
                          scep_requests=scep_requests)
@@ -363,7 +363,7 @@ def dashboard_scep_status():
                         <p class="text-sm text-gray-500 dark:text-gray-400">Configure SCEP to start accepting enrollment requests</p>
                     </div>
                 </div>
-                <a href="/scep" class="btn btn-primary text-sm">
+                <a href="/scep" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm">
                     Configure
                 </a>
             </div>
@@ -379,7 +379,7 @@ def dashboard_scep_status():
                         <p class="text-sm text-gray-500 dark:text-gray-400">Accepting enrollment requests</p>
                     </div>
                 </div>
-                <a href="/scep" class="text-accent hover:text-accent-hover text-sm">
+                <a href="/scep" class="text-primary-600 hover:text-primary-700 text-sm">
                     Manage <i class="fas fa-chevron-right ml-1"></i>
                 </a>
             </div>
@@ -477,35 +477,25 @@ def ca_list_content():
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" id="ca-table">
                 <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                        <th onclick="sortTable(0)" style="position: relative;">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span>Description <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i></span>
-                                <div style="position: relative; margin-left: 12px;">
-                                    <input type="text" id="searchCA" placeholder="Recherche..." 
-                                           class="form-control"
-                                           style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px;"
-                                           onkeyup="filterTableCA()"
-                                           onclick="event.stopPropagation()">
-                                    <i class="fas fa-search" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: 0.5; pointer-events: none;"></i>
-                                </div>
-                            </div>
+                        <th onclick="sortTable(0)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Description <i class="fas fa-sort ml-1"></i>
                         </th>
-                        <th onclick="sortTable(1)">
-                            Émetteur <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        <th onclick="sortTable(1)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Émetteur <i class="fas fa-sort ml-1"></i>
                         </th>
-                        <th onclick="sortTable(2)">
-                            Nom <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        <th onclick="sortTable(2)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Nom <i class="fas fa-sort ml-1"></i>
                         </th>
-                        <th onclick="sortTable(3)">
-                            Utilisations <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        <th onclick="sortTable(3)" class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Utilisations <i class="fas fa-sort ml-1"></i>
                         </th>
-                        <th onclick="sortTable(4)">
-                            Début validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        <th onclick="sortTable(4)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Début validité <i class="fas fa-sort ml-1"></i>
                         </th>
-                        <th onclick="sortTable(5)">
-                            Fin validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        <th onclick="sortTable(5)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Fin validité <i class="fas fa-sort ml-1"></i>
                         </th>
-                        <th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Commandes
                         </th>
                     </tr>
@@ -540,7 +530,7 @@ def ca_list_content():
             
             # Check if CA has private key
             has_key = ca.get('has_private_key', False)
-            key_badge = '<span class="badge-outline badge-success ml-2"><i class="fas fa-key"></i> Key</span>' if has_key else '<span class="badge-outline badge-secondary ml-2"><i class="fas fa-key-skeleton"></i> No Key</span>'
+            key_badge = '<span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"><i class="fas fa-key mr-1"></i>Key</span>' if has_key else '<span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"><i class="fas fa-key-skeleton mr-1"></i>No Key</span>'
             
             # Escape values for JavaScript
             safe_refid = escape_js(ca['refid'])
@@ -548,45 +538,40 @@ def ca_list_content():
             
             html += f'''
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onclick="window.location.href='/ca/{ca['id']}'">
-                    <td>
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <span>{ca['descr']}</span>
-                            <div style="display: flex; gap: 4px;">
-                                <span class="badge-outline badge-primary">
-                                    <i class="{'fas fa-crown' if is_root else 'fas fa-link'}"></i>
-                                    {'ROOT' if is_root else 'INT'}
-                                </span>
-                                {key_badge}
-                            </div>
-                        </div>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                        {ca['descr']}
+                        <span class="ml-2 px-2 py-0.5 text-xs rounded-full {'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' if is_root else 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200'}">
+                            {'ROOT' if is_root else 'INT'}
+                        </span>
+                        {key_badge}
                     </td>
-                    <td>
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                         {issuer_cn}
                     </td>
-                    <td>
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                         {cn}
                     </td>
-                    <td>
-                        <span>
+                    <td class="px-4 py-3 text-sm text-center text-gray-600 dark:text-gray-400">
+                        <span class="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
                             {usage_count}
                         </span>
                     </td>
-                    <td>
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                         {valid_from}
                     </td>
-                    <td>
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                         {valid_to}
                     </td>
-                    <td onclick="event.stopPropagation()">
+                    <td class="px-4 py-3 text-sm text-right" onclick="event.stopPropagation()">
                         <button onclick="exportCA({ca['id']}, event)" 
-                                class="btn-icon btn-icon-primary"
-                                title="Export CA">
-                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
+                                class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mr-3"
+                                title="Export">
+                            <i class="fas fa-download"></i>
                         </button>
                         <button onclick="deleteCA('{safe_refid}', '{safe_descr}')" 
-                                class="btn-icon btn-icon-danger"
-                                title="Delete CA">
-                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
+                                class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                title="Delete">
+                            <i class="fas fa-trash"></i>
                         </button>
                     </td>
                 </tr>
@@ -627,19 +612,6 @@ def ca_list_content():
                 });
                 
                 rows.forEach(row => tbody.appendChild(row));
-            };
-            
-            window.filterTableCA = function() {
-                const input = document.getElementById('searchCA');
-                const filter = input.value.toLowerCase();
-                const table = document.getElementById('ca-table');
-                const tbody = table.querySelector('tbody');
-                const rows = tbody.querySelectorAll('tr');
-                
-                rows.forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    row.style.display = text.includes(filter) ? '' : 'none';
-                });
             };
         })();
         
@@ -907,32 +879,22 @@ def cert_list_content():
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" id="cert-table">
                 <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                        <th onclick="sortTableCert(0)" style="position: relative;">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span>Description <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i></span>
-                                <div style="position: relative; margin-left: 12px;">
-                                    <input type="text" id="searchCert" placeholder="Recherche..." 
-                                           class="form-control"
-                                           style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px;"
-                                           onkeyup="filterTableCert()"
-                                           onclick="event.stopPropagation()">
-                                    <i class="fas fa-search" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: 0.5; pointer-events: none;"></i>
-                                </div>
-                            </div>
+                        <th onclick="sortTableCert(0)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Description <i class="fas fa-sort ml-1"></i>
                         </th>
-                        <th onclick="sortTableCert(1)">
-                            Émetteur <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        <th onclick="sortTableCert(1)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Émetteur <i class="fas fa-sort ml-1"></i>
                         </th>
-                        <th onclick="sortTableCert(2)">
-                            Type <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        <th onclick="sortTableCert(2)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Type <i class="fas fa-sort ml-1"></i>
                         </th>
-                        <th onclick="sortTableCert(3)">
-                            Début validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        <th onclick="sortTableCert(3)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Début validité <i class="fas fa-sort ml-1"></i>
                         </th>
-                        <th onclick="sortTableCert(4)">
-                            Fin validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        <th onclick="sortTableCert(4)" class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600">
+                            Fin validité <i class="fas fa-sort ml-1"></i>
                         </th>
-                        <th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                             Commandes
                         </th>
                     </tr>
@@ -946,20 +908,20 @@ def cert_list_content():
             is_csr = not cert.get('crt') if 'crt' in cert else (cert.get('valid_from') is None or cert.get('serial_number') is None)
             is_revoked = cert.get('revoked', False)
             
-            # Determine status badge
+            # Determine status and type
             if is_csr:
-                status_badge = '<span class="badge-outline badge-warning"><i class="fas fa-file-signature"></i> CSR</span>'
+                status_badge = '<span class="px-2 py-0.5 text-xs rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">CSR</span>'
             elif is_revoked:
-                status_badge = '<span class="badge-outline badge-danger"><i class="fas fa-ban"></i> REVOKED</span>'
+                status_badge = '<span class="px-2 py-0.5 text-xs rounded-full bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">REVOKED</span>'
             else:
-                status_badge = '<span class="badge-outline badge-success"><i class="fas fa-check"></i> VALID</span>'
+                status_badge = '<span class="px-2 py-0.5 text-xs rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">VALID</span>'
             
             # Add CRT/KEY badges - for CSRs these will be false, for signed certs check actual presence
             has_crt = not is_csr  # If it's not a CSR, it has a certificate
             has_key = cert.get('has_private_key', False)
             
-            crt_badge = '<span class="badge-outline badge-info"><i class="fas fa-certificate"></i> CRT</span>' if has_crt else ''
-            key_badge = '<span class="badge-outline badge-success"><i class="fas fa-key"></i> KEY</span>' if has_key else ''
+            crt_badge = '<span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200"><i class="fas fa-certificate mr-1"></i>CRT</span>' if has_crt else ''
+            key_badge = '<span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"><i class="fas fa-key mr-1"></i>KEY</span>' if has_key else ''
             
             # Get issuer name
             issuer_name = ca_names.get(cert.get('caref', ''), 'Unknown')
@@ -987,55 +949,51 @@ def cert_list_content():
             
             html += f'''
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onclick="window.location.href='/certificates/{cert['id']}'">
-                    <td>
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <span>{cert['descr']}</span>
-                            <div style="display: flex; gap: 4px;">
-                                {status_badge}
-                                {crt_badge}
-                                {key_badge}
-                            </div>
-                        </div>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                        {cert['descr']}
+                        {status_badge}
+                        {crt_badge}
+                        {key_badge}
                     </td>
-                    <td>
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                         {issuer_name}
                     </td>
-                    <td>
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                         {cert_type_display}
                     </td>
-                    <td>
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                         {valid_from}
                     </td>
-                    <td>
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                         {valid_to}
                     </td>
-                    <td onclick="event.stopPropagation()">
+                    <td class="px-4 py-3 text-sm text-right" onclick="event.stopPropagation()">
             '''
             
             # Unified export button for both CSR and certificates
-            button_class = "btn-icon btn-icon-primary"
+            button_class = "text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300" if is_csr else "text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
             html += f'''
                         <button onclick="exportCert({cert['id']}, event, {'true' if is_csr else 'false'})" 
-                                class="{button_class}"
-                                title="Export {'CSR' if is_csr else 'Certificate'}">
-                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
+                                class="{button_class} mr-3"
+                                title="Export">
+                            <i class="fas fa-download"></i>
                         </button>
             '''
                 
             if not is_revoked and not is_csr:
                 html += f'''
                         <button onclick="revokeCert('{safe_refid}', '{safe_descr}')" 
-                                class="btn-icon btn-icon-danger"
-                                title="Revoke Certificate">
-                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-ban"/></svg>
+                                class="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300 mr-3"
+                                title="Revoke">
+                            <i class="fas fa-ban"></i>
                         </button>
                 '''
             
             html += f'''
                         <button onclick="deleteCert('{safe_refid}', '{safe_descr}')" 
-                                class="btn-icon btn-icon-danger"
-                                title="Delete {'CSR' if is_csr else 'Certificate'}">
-                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
+                                class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                title="Delete">
+                            <i class="fas fa-trash"></i>
                         </button>
                     </td>
                 </tr>
@@ -1070,19 +1028,6 @@ def cert_list_content():
             });
             
             rows.forEach(row => tbody.appendChild(row));
-        }
-        
-        function filterTableCert() {
-            const input = document.getElementById('searchCert');
-            const filter = input.value.toLowerCase();
-            const table = document.getElementById('cert-table');
-            const tbody = table.querySelector('tbody');
-            const rows = tbody.querySelectorAll('tr');
-            
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(filter) ? '' : 'none';
-            });
         }
         
         function exportCert(id, event, isCSR) {
@@ -1330,7 +1275,7 @@ def cert_create():
             'key_type': request.form.get('key_type'),
             'digest_alg': request.form.get('digest_alg', 'sha256'),
             'ocsp_uri': request.form.get('ocsp_uri', '').strip() or None,
-            'private_key_location': request.form.get('private_key_location', 'stored'),
+            'private_key_location': request.form.get('private_key_location', 'firewall'),
         }
         
         response = requests.post(
@@ -1379,175 +1324,6 @@ def cert_csr():
 
 
 # SCEP Management
-@ui_bp.route('/crl')
-@login_required
-def crl_list():
-    """CRL Management page"""
-    return render_template('crl/list.html')
-
-
-@ui_bp.route('/api/ui/crl/list')
-@login_required
-def crl_list_data():
-    """Get CRL list data"""
-    try:
-        token = session.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
-        
-        # Get all CRLs
-        response = requests.get(
-            f"{request.url_root}api/v1/crl/",
-            headers=headers,
-            verify=False
-        )
-        
-        if response.status_code != 200:
-            return f'<div class="p-4 text-red-600">Failed to load CRLs: {response.text}</div>'
-        
-        crls = response.json()
-        
-        if not crls:
-            return '''
-            <div class="p-8 text-center text-gray-500">
-                <i class="fas fa-file-contract text-6xl mb-4"></i>
-                <p class="text-lg">No CRLs generated yet</p>
-                <p class="text-sm mt-2">Enable CDP on a CA and generate a CRL to get started</p>
-            </div>
-            '''
-        
-        # Build table HTML
-        html = '''
-        <table class="w-full">
-            <thead class="bg-gray-50 border-b border-gray-200">
-                <tr>
-                    <th>CA</th>
-                    <th>CDP Status</th>
-                    <th>CRL Status</th>
-                    <th>Revoked Count</th>
-                    <th>Last Update</th>
-                    <th>Next Update</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-        '''
-        
-        for crl_data in crls:
-            ca_name = crl_data.get('ca_name', 'Unknown')
-            ca_id = crl_data.get('ca_id')
-            ca_refid = crl_data.get('ca_refid', '')
-            cdp_enabled = crl_data.get('cdp_enabled', False)
-            has_crl = crl_data.get('has_crl', False)
-            
-            # CDP Status badge
-            if cdp_enabled:
-                cdp_status = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Enabled</span>'
-            else:
-                cdp_status = '<span class="badge badge-secondary"><i class="fas fa-times mr-1"></i>Disabled</span>'
-            
-            # CRL Status badge
-            if not has_crl:
-                crl_status = '<span class="badge badge-warning">Never Generated</span>'
-                revoked_count = '-'
-                last_update = '-'
-                next_update = '-'
-                days_until = '-'
-            else:
-                is_stale = crl_data.get('is_stale', False)
-                days_until_expiry = crl_data.get('days_until_expiry', 0)
-                
-                if is_stale:
-                    crl_status = '<span class="badge badge-danger"><i class="fas fa-exclamation-triangle mr-1"></i>Stale</span>'
-                elif days_until_expiry <= 1:
-                    crl_status = '<span class="badge badge-warning"><i class="fas fa-clock mr-1"></i>Expiring Soon</span>'
-                else:
-                    crl_status = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Up to Date</span>'
-                
-                revoked_count = crl_data.get('revoked_count', 0)
-                
-                # Format dates
-                this_update = crl_data.get('this_update', '')
-                next_update_str = crl_data.get('next_update', '')
-                
-                if this_update:
-                    from datetime import datetime
-                    try:
-                        dt = datetime.fromisoformat(this_update.replace('Z', '+00:00'))
-                        last_update = dt.strftime('%Y-%m-%d %H:%M UTC')
-                    except:
-                        last_update = this_update[:16]
-                else:
-                    last_update = '-'
-                
-                if next_update_str:
-                    try:
-                        dt = datetime.fromisoformat(next_update_str.replace('Z', '+00:00'))
-                        next_update = dt.strftime('%Y-%m-%d %H:%M UTC')
-                        days_until = f"({days_until_expiry}d)"
-                    except:
-                        next_update = next_update_str[:16]
-                        days_until = ''
-                else:
-                    next_update = '-'
-                    days_until = ''
-            
-            # Actions buttons
-            actions = f'''
-            <div class="flex justify-end space-x-2">
-            '''
-            
-            if has_crl:
-                actions += f'''
-                <button onclick="downloadCRL({ca_id}, 'pem')" 
-                        class="btn-sm btn-secondary" title="Download PEM">
-                    <i class="fas fa-download"></i> PEM
-                </button>
-                <button onclick="downloadCRL({ca_id}, 'der')" 
-                        class="btn-sm btn-secondary" title="Download DER">
-                    <i class="fas fa-download"></i> DER
-                </button>
-                <button onclick="viewCRLInfo('{ca_refid}')" 
-                        class="btn-sm btn-secondary" title="View Info">
-                    <i class="fas fa-info-circle"></i>
-                </button>
-                '''
-            
-            if cdp_enabled:
-                actions += f'''
-                <button onclick="generateCRL({ca_id}, '{ca_name}')" 
-                        class="btn-sm btn-primary" title="Force Generate">
-                    <i class="fas fa-refresh"></i>
-                </button>
-                '''
-            
-            actions += '</div>'
-            
-            html += f'''
-            <tr class="hover:bg-gray-50">
-                <td>
-                    <div class="font-medium text-gray-900">{ca_name}</div>
-                    <div class="text-sm text-gray-500">{ca_refid}</div>
-                </td>
-                <td>{cdp_status}</td>
-                <td>{crl_status}</td>
-                <td>{revoked_count}</td>
-                <td>{last_update}</td>
-                <td>{next_update} {days_until}</td>
-                <td>{actions}</td>
-            </tr>
-            '''
-        
-        html += '''
-            </tbody>
-        </table>
-        '''
-        
-        return html
-        
-    except Exception as e:
-        return f'<div class="p-4 text-red-600">Error: {str(e)}</div>'
-
-
 @ui_bp.route('/scep')
 @login_required
 def scep_config():
@@ -1614,11 +1390,9 @@ def scep_config_form():
                     <label class="ml-2 text-gray-700 dark:text-gray-300">Auto-approve enrollment requests</label>
                 </div>
                 
-                <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save mr-2"></i> Save Configuration
-                    </button>
-                </div>
+                <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
+                    <i class="fas fa-save mr-2"></i> Save Configuration
+                </button>
             </div>
         </form>
         '''
@@ -1689,11 +1463,11 @@ def scep_requests():
                     </div>
                     <div class="flex space-x-2">
                         <button onclick="approveSCEP('{safe_txid}')"
-                                class="btn btn-success text-sm">
+                                class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">
                             Approve
                         </button>
                         <button onclick="rejectSCEP('{safe_txid}')"
-                                class="btn btn-danger text-sm">
+                                class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">
                             Reject
                         </button>
                     </div>
@@ -1740,13 +1514,6 @@ def import_page():
     return render_template('import/index.html')
 
 
-@ui_bp.route('/import-ca')
-@login_required
-def import_ca_page():
-    """Import CA page"""
-    return render_template('ca-import/index.html')
-
-
 @ui_bp.route('/api/ui/import/config-form')
 @login_required
 def import_config_form():
@@ -1769,8 +1536,7 @@ def import_config_form():
         auth_method = config.get('auth_method', 'web')
         
         html = f'''
-        <form hx-post="/api/ui/import/save" hx-swap="none" 
-              hx-on::after-request="if(event.detail.successful) window.showToast('Configuration saved successfully', 'success')">
+        <form hx-post="/api/ui/import/save" hx-on::after-request="showToast('Config saved', 'success')">
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">OPNsense URL</label>
@@ -1778,57 +1544,120 @@ def import_config_form():
                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                 </div>
                 
-                <!-- API Key Authentication (only method) -->
-                <input type="hidden" name="auth_method" value="api">
-                
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
-                        <input type="text" name="api_key" value="{config.get('api_key', '')}" required
-                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Secret</label>
-                        <input type="password" name="api_secret" required
-                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                <!-- Authentication Method Toggle -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Authentication Method</label>
+                    <div class="flex space-x-4">
+                        <label class="flex items-center">
+                            <input type="radio" name="auth_method" value="api" {"checked" if auth_method == "api" else ""}
+                                   onchange="toggleAuthMethod()" class="mr-2">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">API Key (Recommended)</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="auth_method" value="web" {"checked" if auth_method == "web" else ""}
+                                   onchange="toggleAuthMethod()" class="mr-2">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Username/Password</span>
+                        </label>
                     </div>
                 </div>
-                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    <i class="fas fa-info-circle"></i> Create API key in OPNsense: System → Access → Users → Edit user → API keys
-                </p>
+                
+                <!-- API Key Fields -->
+                <div id="api-fields" style="display: {"block" if auth_method == "api" else "none"}">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
+                            <input type="text" name="api_key" value="{config.get('api_key', '')}" 
+                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Secret</label>
+                            <input type="password" name="api_secret"
+                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        Create API key in OPNsense: System → Access → Users → Edit user → API keys
+                    </p>
+                </div>
+                
+                <!-- Username/Password Fields -->
+                <div id="web-fields" style="display: {"block" if auth_method == "web" else "none"}">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Username</label>
+                            <input type="text" name="username" value="{config.get('username', 'root')}"
+                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+                            <input type="password" name="password"
+                                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="flex space-x-3">
-                    <button type="submit" class="btn btn-primary" id="save-config-btn">
+                    <button type="submit" class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg">
                         Save Configuration
                     </button>
                     <button type="button" onclick="testImportConnection()"
-                            class="btn btn-success">
+                            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg">
                         Test Connection
                     </button>
                     <button type="button" onclick="executeImport()"
-                            class="btn btn-secondary">
+                            class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
                         Execute Import
                     </button>
                 </div>
             </div>
         </form>
         <script>
+        function toggleAuthMethod() {{
+            const authMethod = document.querySelector('input[name="auth_method"]:checked').value;
+            const apiFields = document.getElementById('api-fields');
+            const webFields = document.getElementById('web-fields');
+            
+            if (authMethod === 'api') {{
+                apiFields.style.display = 'block';
+                webFields.style.display = 'none';
+            }} else {{
+                apiFields.style.display = 'none';
+                webFields.style.display = 'block';
+            }}
+        }}
+        
         function testImportConnection() {{
             const baseUrl = document.querySelector('input[name="base_url"]').value;
-            const apiKey = document.querySelector('input[name="api_key"]').value;
-            const apiSecret = document.querySelector('input[name="api_secret"]').value;
-            
-            if (!baseUrl || !apiKey || !apiSecret) {{
-                showToast('Please fill in all fields', 'error');
-                return;
-            }}
+            const authMethod = document.querySelector('input[name="auth_method"]:checked').value;
             
             let requestData = {{
                 base_url: baseUrl,
-                verify_ssl: false,
-                api_key: apiKey,
-                api_secret: apiSecret
+                verify_ssl: false
             }};
+            
+            if (authMethod === 'api') {{
+                const apiKey = document.querySelector('input[name="api_key"]').value;
+                const apiSecret = document.querySelector('input[name="api_secret"]').value;
+                
+                if (!baseUrl || !apiKey || !apiSecret) {{
+                    showToast('Please fill in all API fields', 'error');
+                    return;
+                }}
+                
+                requestData.api_key = apiKey;
+                requestData.api_secret = apiSecret;
+            }} else {{
+                const username = document.querySelector('input[name="username"]').value;
+                const password = document.querySelector('input[name="password"]').value;
+                
+                if (!baseUrl || !username || !password) {{
+                    showToast('Please fill in all fields', 'error');
+                    return;
+                }}
+                
+                requestData.username = username;
+                requestData.password = password;
+            }}
             
             fetch('/api/v1/import/test-connection', {{
                 method: 'POST',
@@ -1852,21 +1681,37 @@ def import_config_form():
         function executeImport() {{
             if (confirm('Execute import from OPNsense?')) {{
                 const baseUrl = document.querySelector('input[name="base_url"]').value;
-                const apiKey = document.querySelector('input[name="api_key"]').value;
-                const apiSecret = document.querySelector('input[name="api_secret"]').value;
-                
-                if (!baseUrl || !apiKey || !apiSecret) {{
-                    showToast('Please fill in all fields', 'error');
-                    return;
-                }}
+                const authMethod = document.querySelector('input[name="auth_method"]:checked').value;
                 
                 let requestData = {{
                     skip_existing: true,
                     base_url: baseUrl,
-                    verify_ssl: false,
-                    api_key: apiKey,
-                    api_secret: apiSecret
+                    verify_ssl: false
                 }};
+                
+                if (authMethod === 'api') {{
+                    const apiKey = document.querySelector('input[name="api_key"]').value;
+                    const apiSecret = document.querySelector('input[name="api_secret"]').value;
+                    
+                    if (!baseUrl || !apiKey || !apiSecret) {{
+                        showToast('Please fill in all API fields', 'error');
+                        return;
+                    }}
+                    
+                    requestData.api_key = apiKey;
+                    requestData.api_secret = apiSecret;
+                }} else {{
+                    const username = document.querySelector('input[name="username"]').value;
+                    const password = document.querySelector('input[name="password"]').value;
+                    
+                    if (!baseUrl || !username || !password) {{
+                        showToast('Please fill in all fields', 'error');
+                        return;
+                    }}
+                    
+                    requestData.username = username;
+                    requestData.password = password;
+                }}
                 
                 fetch('/api/v1/import/execute', {{
                     method: 'POST',
@@ -1979,243 +1824,6 @@ def import_history():
         return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
 
 
-@ui_bp.route('/api/ui/certificates/import', methods=['POST'])
-@login_required
-def import_certificate_manual():
-    """Manual certificate import endpoint"""
-    try:
-        data = request.get_json()
-        import_method = data.get('import_method', 'paste')
-        
-        # Prepare payload for backend API
-        payload = {
-            'description': data.get('description', 'Imported Certificate'),
-        }
-        
-        if import_method == 'container':
-            # Container import (PKCS#12, PKCS#7, JKS, DER)
-            import base64
-            from cryptography.hazmat.primitives.serialization import pkcs12
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
-            from cryptography.hazmat.primitives import serialization
-            
-            container_data = base64.b64decode(data.get('container_data'))
-            container_format = data.get('container_format', 'auto')
-            container_password = data.get('container_password', '').encode() if data.get('container_password') else None
-            
-            try:
-                # Try PKCS#12 first
-                if container_format in ['auto', 'pkcs12']:
-                    try:
-                        private_key, certificate, additional_certs = pkcs12.load_key_and_certificates(
-                            container_data, 
-                            container_password,
-                            backend=default_backend()
-                        )
-                        
-                        # Convert to PEM
-                        cert_pem = certificate.public_bytes(serialization.Encoding.PEM).decode()
-                        key_pem = private_key.private_bytes(
-                            encoding=serialization.Encoding.PEM,
-                            format=serialization.PrivateFormat.PKCS8,
-                            encryption_algorithm=serialization.NoEncryption()
-                        ).decode() if private_key else None
-                        
-                        chain_pem = None
-                        if additional_certs:
-                            chain_pem = '\n'.join([
-                                cert.public_bytes(serialization.Encoding.PEM).decode() 
-                                for cert in additional_certs
-                            ])
-                        
-                        payload['crt'] = cert_pem
-                        payload['prv'] = key_pem
-                        if chain_pem:
-                            payload['certificate_chain'] = chain_pem
-                            
-                    except Exception as e:
-                        if container_format == 'pkcs12':
-                            raise
-                        # Try other formats
-                        pass
-                
-                # Try DER format
-                if container_format in ['auto', 'der'] and 'crt' not in payload:
-                    try:
-                        certificate = x509.load_der_x509_certificate(container_data, default_backend())
-                        cert_pem = certificate.public_bytes(serialization.Encoding.PEM).decode()
-                        payload['crt'] = cert_pem
-                    except:
-                        pass
-                
-                # Try PKCS#7
-                if container_format in ['auto', 'pkcs7'] and 'crt' not in payload:
-                    try:
-                        from cryptography.hazmat.primitives.serialization import pkcs7
-                        certs = pkcs7.load_der_pkcs7_certificates(container_data)
-                        if certs:
-                            cert_pem = certs[0].public_bytes(serialization.Encoding.PEM).decode()
-                            payload['crt'] = cert_pem
-                            if len(certs) > 1:
-                                chain_pem = '\n'.join([
-                                    cert.public_bytes(serialization.Encoding.PEM).decode() 
-                                    for cert in certs[1:]
-                                ])
-                                payload['certificate_chain'] = chain_pem
-                    except:
-                        pass
-                
-                if 'crt' not in payload:
-                    return jsonify({'error': 'Unable to parse container file'}), 400
-                    
-            except Exception as e:
-                return jsonify({'error': f'Container parsing failed: {str(e)}'}), 400
-        else:
-            # PEM paste or upload
-            payload['crt'] = data.get('certificate')
-            payload['prv'] = data.get('private_key')
-            if data.get('certificate_chain'):
-                payload['certificate_chain'] = data.get('certificate_chain')
-            
-            if not payload['crt'] or not payload['prv']:
-                return jsonify({'error': 'Certificate and private key are required'}), 400
-        
-        # Get access token and call backend API
-        token = session.get('access_token')
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        }
-        
-        # Call the existing certificate creation endpoint
-        response = requests.post(
-            f"{request.url_root}api/v1/certificates",
-            headers=headers,
-            json=payload,
-            verify=False
-        )
-        
-        if response.status_code in [200, 201]:
-            return jsonify({'success': True, 'message': 'Certificate imported successfully'}), 200
-        else:
-            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Import failed'
-            return jsonify({'error': error_msg}), response.status_code
-            
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@ui_bp.route('/api/ui/ca/import', methods=['POST'])
-@login_required
-def import_ca_manual():
-    """Manual CA import endpoint"""
-    try:
-        data = request.get_json()
-        import_method = data.get('import_method', 'paste')
-        
-        # Prepare payload for backend API
-        payload = {
-            'descr': data.get('description', 'Imported CA'),
-            'trust': 'enabled',  # Default trust level
-        }
-        
-        if import_method == 'container':
-            # Container import
-            import base64
-            from cryptography.hazmat.primitives.serialization import pkcs12
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
-            from cryptography.hazmat.primitives import serialization
-            
-            container_data = base64.b64decode(data.get('container_data'))
-            container_format = data.get('container_format', 'auto')
-            container_password = data.get('container_password', '').encode() if data.get('container_password') else None
-            
-            try:
-                # Try PKCS#12 first
-                if container_format in ['auto', 'pkcs12']:
-                    try:
-                        private_key, certificate, additional_certs = pkcs12.load_key_and_certificates(
-                            container_data,
-                            container_password,
-                            backend=default_backend()
-                        )
-                        
-                        cert_pem = certificate.public_bytes(serialization.Encoding.PEM).decode()
-                        key_pem = None
-                        if private_key:
-                            key_pem = private_key.private_bytes(
-                                encoding=serialization.Encoding.PEM,
-                                format=serialization.PrivateFormat.PKCS8,
-                                encryption_algorithm=serialization.NoEncryption()
-                            ).decode()
-                        
-                        payload['crt'] = cert_pem
-                        payload['prv'] = key_pem
-                    except Exception as e:
-                        if container_format == 'pkcs12':
-                            raise
-                        pass
-                
-                # Try DER format
-                if container_format in ['auto', 'der'] and 'crt' not in payload:
-                    try:
-                        certificate = x509.load_der_x509_certificate(container_data, default_backend())
-                        cert_pem = certificate.public_bytes(serialization.Encoding.PEM).decode()
-                        payload['crt'] = cert_pem
-                    except:
-                        pass
-                
-                # Try PKCS#7
-                if container_format in ['auto', 'pkcs7'] and 'crt' not in payload:
-                    try:
-                        from cryptography.hazmat.primitives.serialization import pkcs7
-                        certs = pkcs7.load_der_pkcs7_certificates(container_data)
-                        if certs:
-                            cert_pem = certs[0].public_bytes(serialization.Encoding.PEM).decode()
-                            payload['crt'] = cert_pem
-                    except:
-                        pass
-                
-                if 'crt' not in payload:
-                    return jsonify({'error': 'Unable to parse container file'}), 400
-                    
-            except Exception as e:
-                return jsonify({'error': f'Container parsing failed: {str(e)}'}), 400
-        else:
-            # PEM paste or upload
-            payload['crt'] = data.get('certificate')
-            payload['prv'] = data.get('private_key')  # Optional for CAs
-            
-            if not payload['crt']:
-                return jsonify({'error': 'CA certificate is required'}), 400
-        
-        # Get access token and call backend API
-        token = session.get('access_token')
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        }
-        
-        # Call the CA creation endpoint
-        response = requests.post(
-            f"{request.url_root}api/v1/ca",
-            headers=headers,
-            json=payload,
-            verify=False
-        )
-        
-        if response.status_code in [200, 201]:
-            return jsonify({'success': True, 'message': 'CA imported successfully'}), 200
-        else:
-            error_msg = response.json().get('error', 'Unknown error') if response.text else 'Import failed'
-            return jsonify({'error': error_msg}), response.status_code
-            
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
 # Configuration Management
 @ui_bp.route('/config')
 @login_required
@@ -2319,10 +1927,10 @@ def config_users():
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Actions</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Username</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Role</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -2331,14 +1939,14 @@ def config_users():
         for user in users:
             html += f'''
                     <tr>
-                        <td>{user['username']}</td>
-                        <td>{user['email']}</td>
-                        <td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{user['username']}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user['email']}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
                                 {user['role']}
                             </span>
                         </td>
-                        <td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <button onclick="$dispatch('open-modal', {{ modal: 'changePasswordModal', userId: {user['id']} }})"
                                     class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3">
                                 Change Password
@@ -2666,11 +2274,8 @@ def ca_detail(ca_id):
 @ui_bp.route('/ca/new')
 @login_required
 def ca_new():
-    """Create new CA page - returns CA list with trigger to open modal"""
-    response = make_response(render_template('ca/list.html'))
-    # Send trigger after swap to open modal
-    response.headers['HX-Trigger-After-Swap'] = 'openCreateCAModal'
-    return response
+    """Create new CA page - redirects to CA list with modal"""
+    return redirect(url_for('ui.ca_list') + '#create')
 
 
 # Certificate Detail Pages  
@@ -2702,11 +2307,8 @@ def cert_detail(cert_id):
 @ui_bp.route('/certificates/new')
 @login_required
 def cert_new():
-    """Create new certificate page - returns cert list with trigger to open modal"""
-    response = make_response(render_template('certs/list.html'))
-    # Send trigger after swap to open modal
-    response.headers['HX-Trigger-After-Swap'] = 'openCreateCertModal'
-    return response
+    """Create new certificate page - redirects to cert list with modal"""
+    return redirect(url_for('ui.cert_list') + '#create')
 
 
 @ui_bp.route('/api/ui/ca/<ca_id>/certificates')
@@ -2737,41 +2339,42 @@ def ca_certificates(ca_id):
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                        <th>Subject</th>
-                        <th>Type</th>
-                        <th>Status</th>
-                        <th>Valid Until</th>
-                        <th>Actions</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Subject</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Valid Until</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
         '''
         
         for cert in ca_certs:
-            # Badge for status instead of just icon
-            status_badge = {
-                'active': '<span class="badge-outline badge-success"><i class="fas fa-circle-check"></i> Active</span>',
-                'revoked': '<span class="badge-outline badge-danger"><i class="fas fa-ban"></i> Revoked</span>',
-                'pending': '<span class="badge-outline badge-warning"><i class="fas fa-clock"></i> Pending</span>'
-            }.get(cert.get('status', 'active'), '<span class="badge-outline badge-secondary"><i class="fas fa-circle"></i> Unknown</span>')
+            status_class = {
+                'active': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                'revoked': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+                'pending': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+            }.get(cert.get('status', 'active'), 'bg-gray-100 text-gray-800')
             
             html += f'''
                 <tr>
-                    <td>
+                    <td class="px-6 py-4 whitespace-nowrap">
                         <a href="/certificates/{cert['id']}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
                             {cert.get('common_name', cert.get('subject', 'N/A'))}
                         </a>
                     </td>
-                    <td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {cert.get('cert_type', 'server')}
                     </td>
-                    <td>
-                        {status_badge}
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {status_class}">
+                            {cert.get('status', 'active')}
+                        </span>
                     </td>
-                    <td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {cert.get('not_valid_after', 'N/A')[:10] if cert.get('not_valid_after') else 'N/A'}
                     </td>
-                    <td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <a href="/certificates/{cert['id']}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
                             View
                         </a>
@@ -2947,10 +2550,10 @@ def managed_certs_list():
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0">
                     <tr>
-                        <th>Subject</th>
-                        <th>Valid Until</th>
-                        <th>Type</th>
-                        <th>Action</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Subject</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Valid Until</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Action</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -2995,7 +2598,7 @@ def managed_certs_list():
             
             html += f'''
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                         <div class="flex items-center">
                             <i class="fas fa-certificate text-blue-500 mr-2"></i>
                             {cn}
@@ -3004,16 +2607,16 @@ def managed_certs_list():
                             {'ID: ' + str(cert.get('id', 'N/A'))}
                         </div>
                     </td>
-                    <td>
+                    <td class="px-4 py-3 text-sm {date_class}">
                         {valid_to}
                         <div class="text-xs text-gray-500 dark:text-gray-400">({days_left} days)</div>
                     </td>
-                    <td>
-                        <span>
+                    <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                        <span class="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
                             {cert_type}
                         </span>
                     </td>
-                    <td>
+                    <td class="px-4 py-3 text-sm">
             '''
             
             if has_key:
@@ -3021,13 +2624,13 @@ def managed_certs_list():
                         <button hx-post="/api/ui/config/use-managed-cert/{cert['id']}" 
                                 hx-confirm="Use this certificate for HTTPS? The server will restart."
                                 hx-swap="none"
-                                class="btn btn-success text-xs">
+                                class="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">
                             <i class="fas fa-check mr-1"></i>Use This
                         </button>
                 '''
             else:
                 html += '''
-                        <span class="" title="Private key not available">
+                        <span class="px-3 py-1.5 bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 text-xs rounded cursor-not-allowed" title="Private key not available">
                             <i class="fas fa-key-skeleton mr-1"></i>No Key
                         </span>
                 '''
@@ -3136,546 +2739,3 @@ def use_managed_cert(cert_id):
 def test_simple():
     """Ultra simple test page"""
     return render_template('test-simple.html')
-
-
-# ===== SESSION MANAGEMENT API =====
-
-@ui_bp.route('/api/session/extend', methods=['POST'])
-@login_required
-def extend_session():
-    """Extend user session by updating last_activity"""
-    try:
-        session['last_activity'] = time.time()
-        return jsonify({
-            'success': True,
-            'message': 'Session extended',
-            'expires_at': session['last_activity'] + 1800  # 30 minutes from now
-        }), 200
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@ui_bp.route('/api/session/check', methods=['GET'])
-@login_required
-def check_session():
-    """Check if session is still valid"""
-    return jsonify({
-        'success': True,
-        'active': True,
-        'last_activity': session.get('last_activity')
-    }), 200
-
-
-@ui_bp.route('/ocsp')
-@login_required
-def ocsp_page():
-    """OCSP Status page"""
-    return render_template('ocsp/status.html')
-
-
-@ui_bp.route('/api/ui/ocsp/status')
-@login_required
-def ocsp_status_list():
-    """Get OCSP status for all CAs"""
-    try:
-        from models import CA, OCSPResponse
-        
-        cas = CA.query.all()
-        
-        html = '''
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th>CA Name</th>
-                        <th>OCSP Status</th>
-                        <th>OCSP URL</th>
-                        <th>Cached Responses</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-        '''
-        
-        for ca in cas:
-            cached_count = OCSPResponse.query.filter_by(ca_id=ca.id).count()
-            
-            status_badge = ''
-            if ca.ocsp_enabled:
-                status_badge = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Enabled</span>'
-            else:
-                status_badge = '<span class="badge badge-secondary"><i class="fas fa-times mr-1"></i>Disabled</span>'
-            
-            ocsp_url_display = ca.ocsp_url if ca.ocsp_url else '<span class="text-gray-400">Not configured</span>'
-            
-            html += f'''
-                <tr>
-                    <td>
-                        <div class="font-medium">{ca.descr}</div>
-                        <div class="text-xs text-gray-500">{ca.refid}</div>
-                    </td>
-                    <td>{status_badge}</td>
-                    <td><code class="text-xs">{ocsp_url_display}</code></td>
-                    <td class="text-center">{cached_count}</td>
-                    <td>
-                        <a href="/ca/{ca.id}" class="text-blue-600 hover:text-blue-800 text-sm">
-                            <i class="fas fa-cog mr-1"></i>Configure
-                        </a>
-                    </td>
-                </tr>
-            '''
-        
-        html += '''
-                </tbody>
-            </table>
-        </div>
-        '''
-        
-        return html
-        
-    except Exception as e:
-        logger.error(f"Error getting OCSP status: {e}")
-        return f'<div class="text-red-600">Error loading OCSP status: {str(e)}</div>'
-
-
-@ui_bp.route('/api/ui/ocsp/stats')
-@login_required
-def ocsp_stats_ui():
-    """Get OCSP statistics for UI"""
-    try:
-        from models import CA, OCSPResponse
-        
-        # Count CAs with OCSP enabled
-        ocsp_enabled_cas = CA.query.filter_by(ocsp_enabled=True).count()
-        
-        # Count cached responses
-        cached_responses = OCSPResponse.query.count()
-        
-        # Return HTML fragments for HTMX
-        return f'''
-        <span class="ocsp-enabled-count">{ocsp_enabled_cas}</span>
-        <span class="cached-responses-count">{cached_responses}</span>
-        '''
-        
-    except Exception as e:
-        logger.error(f"Error getting OCSP stats: {e}")
-        return '<span class="text-red-600">Error</span>'
-
-
-# HTTPS Certificate Management UI Routes
-
-@ui_bp.route('/api/ui/system/https-cert-info')
-@login_required
-def https_cert_info_ui():
-    """Get current HTTPS certificate information (UI route with session auth)"""
-    from cryptography import x509
-    from cryptography.hazmat.backends import default_backend
-    from pathlib import Path
-    from models import SystemConfig
-    import logging
-    
-    logger = logging.getLogger(__name__)
-    
-    cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
-    
-    try:
-        with open(cert_path, 'rb') as f:
-            cert_pem = f.read()
-            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-        
-        # Determine certificate source
-        config = SystemConfig.query.filter_by(key='https_cert_source').first()
-        source = config.value if config else 'auto'
-        
-        # Extract subject
-        subject_parts = []
-        for attr in cert.subject:
-            subject_parts.append(f"{attr.oid._name}={attr.value}")
-        subject_str = ', '.join(subject_parts)
-        
-        # Format expiry date (compatible with all cryptography versions)
-        expires = cert.not_valid_after.strftime('%Y-%m-%d %H:%M:%S UTC')
-        
-        cert_type = 'Self-Signed' if source == 'auto' else 'UCM Managed'
-        
-        return jsonify({
-            'type': cert_type,
-            'subject': subject_str,
-            'expires': expires,
-            'source': source,
-            'issuer': cert.issuer.rfc4514_string()
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Error loading HTTPS cert info: {e}")
-        return jsonify({
-            'type': 'Error',
-            'subject': str(e),
-            'expires': 'N/A',
-            'source': 'unknown'
-        }), 200
-
-
-@ui_bp.route('/api/ui/system/https-cert-candidates')
-@login_required
-def https_cert_candidates_ui():
-    """Get list of certificates suitable for HTTPS (UI route with session auth)"""
-    from pathlib import Path
-    from models import SystemConfig, Certificate, CA
-    from datetime import datetime
-    from cryptography import x509
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.x509.oid import ExtendedKeyUsageOID
-    import base64
-    import logging
-    
-    logger = logging.getLogger(__name__)
-    
-    # Get current cert_id if using managed
-    current_cert_id = None
-    config = SystemConfig.query.filter_by(key='https_cert_id').first()
-    if config:
-        current_cert_id = int(config.value)
-    
-    # Find suitable certificates (not revoked, server certs, not expired)
-    now = datetime.utcnow()
-    certificates = Certificate.query.filter(
-        Certificate.revoked == False,
-        Certificate.cert_type.in_(['server_cert', 'cert']),
-        Certificate.valid_to > now  # Not expired
-    ).all()
-    
-    logger.info(f"Found {len(certificates)} potential HTTPS certificate candidates")
-    
-    candidates = []
-    for cert in certificates:
-        # Check if certificate has been issued (has crt field)
-        if not cert.crt:
-            continue
-            
-        # Check if private key exists
-        key_path = Path(f'/opt/ucm/backend/data/private/cert_{cert.refid}.key')
-        if not key_path.exists():
-            # Try refid-based naming
-            key_path = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
-            if not key_path.exists():
-                continue
-        
-        # Parse certificate to check Extended Key Usage
-        try:
-            cert_pem = base64.b64decode(cert.crt)
-            x509_cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-            
-            # Check if certificate has Server Authentication EKU
-            has_server_auth = False
-            try:
-                ext = x509_cert.extensions.get_extension_for_oid(
-                    x509.oid.ExtensionOID.EXTENDED_KEY_USAGE
-                )
-                if ExtendedKeyUsageOID.SERVER_AUTH in ext.value:
-                    has_server_auth = True
-            except x509.ExtensionNotFound:
-                # If no EKU extension, accept server_cert type certificates
-                if cert.cert_type == 'server_cert':
-                    has_server_auth = True
-            
-            if not has_server_auth:
-                logger.debug(f"Certificate {cert.descr} rejected: no Server Authentication EKU")
-                continue
-                
-        except Exception as e:
-            logger.warning(f"Failed to parse certificate {cert.descr}: {e}")
-            # If can't parse, skip for safety
-            continue
-        
-        # Get CA name
-        ca = CA.query.filter_by(refid=cert.caref).first()
-        
-        # Extract CN from subject if available
-        cn = 'N/A'
-        if cert.subject:
-            for part in cert.subject.split(','):
-                if 'CN=' in part:
-                    cn = part.split('CN=')[1].strip()
-                    break
-        
-        # Build SAN list
-        san_list = []
-        if cert.san_dns:
-            try:
-                import json
-                dns_names = json.loads(cert.san_dns)
-                san_list.extend(dns_names)
-            except:
-                pass
-        
-        # Calculate days until expiration
-        days_left = (cert.valid_to - now).days if cert.valid_to else 0
-        
-        candidates.append({
-            'id': cert.id,
-            'cert_id': cert.refid,
-            'common_name': cn or cert.descr,
-            'san': ', '.join(san_list) if san_list else '',
-            'expires': cert.valid_to.strftime('%Y-%m-%d') if cert.valid_to else 'N/A',
-            'days_left': days_left,
-            'ca_name': ca.descr if ca else 'Unknown',
-            'is_current': cert.id == current_cert_id
-        })
-    
-    logger.info(f"Filtered to {len(candidates)} suitable HTTPS certificates")
-    return jsonify({'certificates': candidates}), 200
-
-
-@ui_bp.route('/api/ui/system/https-cert-apply', methods=['POST'])
-@login_required
-def https_cert_apply_ui():
-    """Apply a new HTTPS certificate (UI route with session auth)"""
-    from pathlib import Path
-    from models import SystemConfig, Certificate, CA, User, db
-    import shutil
-    import subprocess
-    import os
-    import logging
-    
-    logger = logging.getLogger(__name__)
-    
-    data = request.get_json()
-    source = data.get('source', 'auto')
-    cert_id = data.get('cert_id')
-    
-    # Check admin role
-    user = User.query.get(session['user_id'])
-    if user.role != 'admin':
-        return jsonify({'success': False, 'error': 'Admin role required'}), 403
-    
-    try:
-        if source == 'managed':
-            if not cert_id:
-                return jsonify({'success': False, 'error': 'cert_id required for managed source'}), 400
-            
-            # Get certificate from database
-            cert = Certificate.query.get(cert_id)
-            if not cert:
-                return jsonify({'success': False, 'error': 'Certificate not found'}), 404
-            
-            # Load certificate and key (use refid for file paths)
-            cert_file = Path(f'/opt/ucm/backend/data/certs/{cert.refid}.crt')
-            
-            key_file = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
-            
-            if not cert_file.exists() or not key_file.exists():
-                return jsonify({'success': False, 'error': 'Certificate or key file not found'}), 404
-            
-            # Copy to HTTPS location
-            https_cert = Path('/opt/ucm/backend/data/https_cert.pem')
-            https_key = Path('/opt/ucm/backend/data/https_key.pem')
-            
-            # Backup current cert
-            if https_cert.exists():
-                shutil.copy(https_cert, str(https_cert) + '.backup')
-            if https_key.exists():
-                shutil.copy(https_key, str(https_key) + '.backup')
-            
-            # Copy new cert
-            shutil.copy(cert_file, https_cert)
-            shutil.copy(key_file, https_key)
-            
-            # Set permissions
-            os.chmod(https_key, 0o600)
-            os.chmod(https_cert, 0o644)
-            
-            # Save configuration
-            config = SystemConfig.query.filter_by(key='https_cert_source').first()
-            if not config:
-                config = SystemConfig(key='https_cert_source', value='managed')
-                db.session.add(config)
-            else:
-                config.value = 'managed'
-            
-            cert_id_config = SystemConfig.query.filter_by(key='https_cert_id').first()
-            if not cert_id_config:
-                cert_id_config = SystemConfig(key='https_cert_id', value=str(cert_id))
-                db.session.add(cert_id_config)
-            else:
-                cert_id_config.value = str(cert_id)
-            
-            db.session.commit()
-            
-            logger.info(f"HTTPS certificate applied: {cert.common_name} (ID: {cert_id}) by {user.username}")
-        
-        # Restart UCM service
-        subprocess.Popen(['systemctl', 'restart', 'ucm'])
-        
-        return jsonify({'success': True}), 200
-        
-    except Exception as e:
-        logger.error(f"Error applying HTTPS certificate: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@ui_bp.route('/api/ui/system/https-cert-regenerate', methods=['POST'])
-@login_required
-def https_cert_regenerate_ui():
-    """Regenerate self-signed HTTPS certificate (UI route with session auth)"""
-    from config.https_manager import HTTPSManager
-    from pathlib import Path
-    from models import SystemConfig, User, db
-    import shutil
-    import subprocess
-    import logging
-    
-    logger = logging.getLogger(__name__)
-    
-    # Check admin role
-    user = User.query.get(session['user_id'])
-    if user.role != 'admin':
-        return jsonify({'success': False, 'error': 'Admin role required'}), 403
-    
-    try:
-        cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
-        key_path = Path('/opt/ucm/backend/data/https_key.pem')
-        
-        # Backup current
-        if cert_path.exists():
-            shutil.copy(cert_path, str(cert_path) + '.backup')
-        if key_path.exists():
-            shutil.copy(key_path, str(key_path) + '.backup')
-        
-        # Generate new
-        HTTPSManager.generate_self_signed_cert(cert_path, key_path)
-        
-        # Update config
-        config = SystemConfig.query.filter_by(key='https_cert_source').first()
-        if not config:
-            config = SystemConfig(key='https_cert_source', value='auto')
-            db.session.add(config)
-        else:
-            config.value = 'auto'
-        
-        db.session.commit()
-        
-        logger.info(f"HTTPS certificate regenerated by {user.username}")
-        
-        # Restart UCM service
-        subprocess.Popen(['systemctl', 'restart', 'ucm'])
-        
-        return jsonify({'success': True}), 200
-        
-    except Exception as e:
-        logger.error(f"Error regenerating HTTPS certificate: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@ui_bp.route('/crl/info/<ca_refid>')
-@login_required
-def crl_info_integrated(ca_refid):
-    """CRL Information page (integrated in app)"""
-    from models import CA
-    from services.crl_service import CRLService
-    
-    try:
-        # Get CA by refid
-        ca = CA.query.filter_by(refid=ca_refid).first()
-        if not ca:
-            flash('CA not found', 'error')
-            return redirect(url_for('ui.crl_list'))
-        
-        # Get latest CRL
-        latest_crl = CRLService.get_latest_crl_by_refid(ca_refid)
-        
-        if not latest_crl:
-            crl_info = {
-                'ca_refid': ca_refid,
-                'ca_name': ca.descr,
-                'ca_common_name': ca.common_name,
-                'has_crl': False,
-                'message': 'No CRL generated yet for this CA'
-            }
-        else:
-            crl_info = {
-                'ca_refid': ca_refid,
-                'ca_name': ca.descr,
-                'ca_common_name': ca.common_name,
-                'has_crl': True,
-                'crl_number': latest_crl.crl_number,
-                'this_update': latest_crl.this_update.isoformat() if latest_crl.this_update else None,
-                'next_update': latest_crl.next_update.isoformat() if latest_crl.next_update else None,
-                'revoked_count': latest_crl.revoked_count,
-                'is_stale': latest_crl.is_stale,
-                'days_until_expiry': latest_crl.days_until_expiry,
-                'download_urls': {
-                    'pem': f'/cdp/{ca_refid}/crl.pem',
-                    'der': f'/cdp/{ca_refid}/crl.der',
-                    'crl': f'/cdp/{ca_refid}/crl.crl'
-                }
-            }
-        
-        return render_template('crl/info_integrated.html', crl_info=crl_info)
-        
-    except Exception as e:
-        flash(f'Error loading CRL info: {str(e)}', 'error')
-        return redirect(url_for('ui.crl_list'))
-
-
-@ui_bp.route('/api/ui/system/pki-stats')
-@login_required
-def pki_stats_ui():
-    """Get PKI statistics (UI route with session auth)"""
-    from services.pki_reset_service import PKIResetService
-    
-    try:
-        stats = PKIResetService.get_pki_stats()
-        return jsonify(stats), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@ui_bp.route('/api/ui/system/pki-reset', methods=['POST'])
-@login_required
-def pki_reset_ui():
-    """Reset PKI database (UI route with session auth - admin only)"""
-    from services.pki_reset_service import PKIResetService
-    from models import User, db, AuditLog
-    
-    # Check admin role
-    user = User.query.get(session['user_id'])
-    if user.role != 'admin':
-        return jsonify({'success': False, 'error': 'Admin role required'}), 403
-    
-    # Require confirmation
-    data = request.get_json()
-    if not data or data.get('confirmation') != 'RESET PKI DATA':
-        return jsonify({
-            'success': False,
-            'error': 'Invalid confirmation. Must be exactly: RESET PKI DATA'
-        }), 400
-    
-    try:
-        # Perform reset
-        stats = PKIResetService.reset_pki_data()
-        
-        # Log audit
-        log = AuditLog(
-            username=user.username,
-            action='pki_reset',
-            resource_type='system',
-            details=f"Reset PKI data. Backup: {stats['backup_path']}",
-            ip_address=request.remote_addr
-        )
-        db.session.add(log)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': 'PKI data reset successfully',
-            'stats': stats
-        }), 200
-        
-    except Exception as e:
-        import traceback
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"PKI reset error: {e}")
-        logger.error(traceback.format_exc())
-        return jsonify({'success': False, 'error': str(e)}), 500
