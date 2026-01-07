@@ -245,6 +245,76 @@
             }
         }, 50);
     });
+    
+    // Global toast notification function
+    window.showToast = function(message, type = 'info') {
+        // Create toast container if it doesn't exist
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            toastContainer.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 10px;';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.style.cssText = 'padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 250px; max-width: 400px; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease;';
+        
+        // Set color based on type
+        const colors = {
+            'success': 'background: #10b981; color: white;',
+            'error': 'background: #ef4444; color: white;',
+            'warning': 'background: #f59e0b; color: white;',
+            'info': 'background: #3b82f6; color: white;'
+        };
+        toast.style.cssText += colors[type] || colors['info'];
+        
+        // Add icon
+        const icons = {
+            'success': '✓',
+            'error': '✗',
+            'warning': '⚠',
+            'info': 'ℹ'
+        };
+        const icon = document.createElement('span');
+        icon.textContent = icons[type] || icons['info'];
+        icon.style.cssText = 'font-size: 18px; font-weight: bold;';
+        
+        // Add message
+        const messageEl = document.createElement('span');
+        messageEl.textContent = message;
+        messageEl.style.flex = '1';
+        
+        toast.appendChild(icon);
+        toast.appendChild(messageEl);
+        toastContainer.appendChild(toast);
+        
+        // Auto remove after 4 seconds
+        setTimeout(() => {
+            toast.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }, 4000);
+    }
+    
+    // Add CSS animation
+    if (!document.getElementById('toast-animations')) {
+        const toastStyle = document.createElement('style');
+        toastStyle.id = 'toast-animations';
+        toastStyle.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(400px); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(400px); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(toastStyle);
+    }
     </script>
     
     {% block extra_body %}{% endblock %}
