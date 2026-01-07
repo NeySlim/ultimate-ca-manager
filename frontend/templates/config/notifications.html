@@ -150,6 +150,9 @@
 </div>
 
 <script>
+// Get JWT token from session
+const token = '{{ session.get("access_token") }}';
+
 // Toast notification helper
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
@@ -168,7 +171,7 @@ function showToast(message, type = 'info') {
 async function loadSMTPConfig() {
     try {
         const response = await fetch('/api/v1/notifications/smtp/config', {
-            headers: {'Authorization': `Bearer ${localStorage.getItem('token')}`}
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -223,7 +226,7 @@ document.getElementById('smtp-form').addEventListener('submit', async (e) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify(data)
         });
@@ -252,7 +255,7 @@ async function testSMTP() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({email})
         });
@@ -273,7 +276,7 @@ async function testSMTP() {
 async function loadNotificationRules() {
     try {
         const response = await fetch('/api/v1/notifications/config', {
-            headers: {'Authorization': `Bearer ${localStorage.getItem('token')}`}
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -345,7 +348,7 @@ async function updateRule(type) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({enabled, days_before: days, recipients})
         });
@@ -366,7 +369,7 @@ async function updateRule(type) {
 async function loadNotificationHistory() {
     try {
         const response = await fetch('/api/v1/notifications/history?limit=20', {
-            headers: {'Authorization': `Bearer ${localStorage.getItem('token')}`}
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -409,7 +412,7 @@ async function loadNotificationHistory() {
 async function loadNotificationStats() {
     try {
         const response = await fetch('/api/v1/notifications/stats', {
-            headers: {'Authorization': `Bearer ${localStorage.getItem('token')}`}
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -441,7 +444,7 @@ async function testNotifications() {
     try {
         const response = await fetch('/api/v1/notifications/check', {
             method: 'POST',
-            headers: {'Authorization': `Bearer ${localStorage.getItem('token')}`}
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         const result = await response.json();
