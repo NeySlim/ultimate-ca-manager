@@ -46,6 +46,7 @@ class WebAuthnService:
         if ':' in hostname:
             hostname = hostname.split(':')[0]
         WebAuthnService.RP_ID = hostname
+        logger.info(f"WebAuthn RP ID set to: {hostname}")
     
     @staticmethod
     def generate_registration_options(user: User, hostname: str) -> dict:

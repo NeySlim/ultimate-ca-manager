@@ -376,7 +376,7 @@
             </form>
             
             <!-- WebAuthn Login Option -->
-            <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
+            <div id="webauthn-section" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
                 <div style="text-align: center; margin-bottom: 12px;">
                     <span style="font-size: 13px; color: var(--text-secondary);">Or sign in with</span>
                 </div>
@@ -385,6 +385,14 @@
                     <span>Security Key</span>
                 </button>
                 <div id="webauthn-status" style="margin-top: 12px; text-align: center; font-size: 13px; color: var(--text-secondary); display: none;"></div>
+                
+                <!-- Hostname warning for login page -->
+                <div id="webauthn-hostname-warning" style="display: none; margin-top: 12px; padding: 8px; background: var(--bg-warning); border-radius: 4px; font-size: 12px; text-align: left;">
+                    <strong style="color: var(--text-primary);">⚠️ WebAuthn unavailable</strong>
+                    <p style="margin: 4px 0 0 0; color: var(--text-secondary);">
+                        Access via <a id="suggested-url" href="#" style="color: var(--primary-color); font-weight: 600;"></a> to use security keys.
+                    </p>
+                </div>
             </div>
         </div>
         
@@ -497,21 +505,25 @@
                 const options = await optionsResponse.json();
                 
                 // Convert base64url strings to ArrayBuffers
-                options.publicKey.challenge = base64urlToBuffer(options.publicKey.challenge);
-                
-                if (options.publicKey.allowCredentials) {
-                    options.publicKey.allowCredentials = options.publicKey.allowCredentials.map(cred => ({
-                        ...cred,
-                        id: base64urlToBuffer(cred.id)
-                    }));
-                }
+                // Note: API returns the options object directly, not wrapped in {publicKey: ...}
+                const publicKeyOptions = {
+                    publicKey: {
+                        ...options,
+                        challenge: base64urlToBuffer(options.challenge),
+                        allowCredentials: options.allowCredentials ?
+                            options.allowCredentials.map(cred => ({
+                                ...cred,
+                                id: base64urlToBuffer(cred.id)
+                            })) : []
+                    }
+                };
                 
                 // Step 2: Show "Touch your key" message
                 btn.innerHTML = '<i class="fas fa-key"></i> <span>Touch your security key...</span>';
                 showWebAuthnStatus('Follow your browser prompts to authenticate');
                 
                 // Step 3: Call WebAuthn API
-                const credential = await navigator.credentials.get(options);
+                const credential = await navigator.credentials.get(publicKeyOptions);
                 
                 if (!credential) {
                     throw new Error('Authentication was cancelled');
@@ -571,13 +583,52 @@
             }
         }
         
-        // Check WebAuthn support
-        document.addEventListener('DOMContentLoaded', () => {
+        // Check WebAuthn support and hostname compatibility
+        document.addEventListener('DOMContentLoaded', async () => {
+            const hostname = window.location.hostname;
+            const isCompatible = hostname === 'localhost' || 
+                                hostname === '127.0.0.1' || 
+                                hostname === '::1' ||
+                                /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
+                                hostname.includes('.');
+            
             if (!window.PublicKeyCredential) {
                 const btn = document.getElementById('webauthn-login-btn');
                 btn.disabled = true;
                 btn.title = 'WebAuthn is not supported in this browser';
                 btn.style.opacity = '0.5';
+            } else if (!isCompatible) {
+                // Hostname not compatible with WebAuthn
+                const btn = document.getElementById('webauthn-login-btn');
+                btn.disabled = true;
+                btn.title = 'WebAuthn not available with current hostname';
+                btn.style.opacity = '0.5';
+                
+                // Try to get FQDN, fallback to .lan.pew.pet
+                let fqdn = `${hostname}.lan.pew.pet`;
+                
+                // Show warning with redirect button
+                const warning = document.getElementById('webauthn-hostname-warning');
+                const port = window.location.port;
+                const protocol = window.location.protocol;
+                const redirectUrl = `${protocol}//${fqdn}:${port}`;
+                
+                warning.innerHTML = `
+                    <strong style="color: var(--text-primary);">⚠️ WebAuthn unavailable</strong>
+                    <p style="margin: 4px 0; color: var(--text-secondary);">
+                        Access via 
+                        <a href="${redirectUrl}" style="color: var(--primary-color); font-weight: 600; text-decoration: none;">
+                            ${fqdn}:${port}
+                        </a> 
+                        to use security keys.
+                    </p>
+                    <button onclick="window.location.href='${redirectUrl}'" 
+                            style="margin-top: 8px; padding: 6px 12px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">
+                        <i class="fas fa-arrow-right"></i> Switch to ${fqdn}
+                    </button>
+                `;
+                
+                warning.style.display = 'block';
             }
         });
     </script>

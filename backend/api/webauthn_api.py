@@ -46,7 +46,11 @@ def registration_options():
             return jsonify({'error': 'User not found'}), 404
         
         hostname = request.host
+        logger.info(f"WebAuthn registration for user {user.username}, hostname: {hostname}")
+        
         options = WebAuthnService.generate_registration_options(user, hostname)
+        
+        logger.info(f"Generated options with RP ID: {options.get('rp', {}).get('id')}")
         
         return jsonify(options), 200
         
