@@ -321,7 +321,7 @@
       "paths": [
         {
           "d": "M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2",
-          "gradient": "danger",
+          "gradient": "trash",
           "fill": "none",
           "stroke-linecap": "round",
           "stroke-linejoin": "round",
@@ -329,7 +329,7 @@
         },
         {
           "d": "M10 11v6m4-6v6",
-          "gradient": "danger",
+          "gradient": "trash",
           "fill": "none",
           "stroke-linecap": "round",
           "stroke-width": "1.5"
@@ -1032,6 +1032,10 @@
       "info": [
         "#17a2b8",
         "#138496"
+      ],
+      "trash": [
+        "#ef4444",
+        "#dc2626"
       ]
     },
     "sentinel-dark": {
@@ -1058,6 +1062,10 @@
       "info": [
         "#3b82f6",
         "#60a5fa"
+      ],
+      "trash": [
+        "#ef4444",
+        "#dc2626"
       ]
     },
     "amber-light": {
@@ -1084,6 +1092,10 @@
       "info": [
         "#5bc0de",
         "#46b8da"
+      ],
+      "trash": [
+        "#ef4444",
+        "#dc2626"
       ]
     },
     "amber-dark": {
@@ -1110,6 +1122,10 @@
       "info": [
         "#3498db",
         "#5dade2"
+      ],
+      "trash": [
+        "#ef4444",
+        "#dc2626"
       ]
     },
     "nebula-light": {
@@ -1136,6 +1152,10 @@
       "info": [
         "#17a2b8",
         "#138496"
+      ],
+      "trash": [
+        "#ef4444",
+        "#dc2626"
       ]
     },
     "nebula-dark": {
@@ -1162,6 +1182,10 @@
       "info": [
         "#4285f4",
         "#5c97f5"
+      ],
+      "trash": [
+        "#ef4444",
+        "#dc2626"
       ]
     },
     "blossom-light": {
@@ -1188,6 +1212,10 @@
       "info": [
         "#5bc0de",
         "#46b8da"
+      ],
+      "trash": [
+        "#ef4444",
+        "#dc2626"
       ]
     },
     "blossom-dark": {
@@ -1214,6 +1242,10 @@
       "info": [
         "#8bb8e8",
         "#a3c7ed"
+      ],
+      "trash": [
+        "#ef4444",
+        "#dc2626"
       ]
     }
   }
