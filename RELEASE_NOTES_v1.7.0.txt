@@ -1,0 +1,321 @@
+## 🎉 Ultimate CA Manager v1.7.0 - Major Feature Release
+
+**Release Date**: January 8, 2026  
+**Release Type**: Major Feature Release  
+**Previous Version**: v1.6.2 (Bugfix Release - January 7, 2026)
+
+---
+
+## 🌟 Major Features
+
+### 1. 📧 Email Notifications System
+Complete email notification system for certificate and CRL expiration monitoring.
+
+**Features:**
+- **SMTP Configuration**: Full SMTP server setup with TLS/SSL support
+- **Alert Rules**: Configurable notification rules for:
+  - Certificate expiration alerts (customizable threshold in days)
+  - CRL expiration alerts (customizable threshold in days)
+- **Notification History**: Track all sent notifications with success/failure status
+- **Statistics Dashboard**: View sent/failed counts for last 30 days
+- **Test Email**: Send test emails to verify SMTP configuration
+- **Manual Check**: Trigger immediate notification check for expiring items
+- **Per-Rule Recipients**: Specify different email recipients for each alert type
+
+**New Database Tables:**
+- `smtp_config` - SMTP server configuration
+- `notification_config` - Alert rule settings
+- `notification_log` - Notification history and tracking
+
+**New API Endpoints:**
+- `GET/POST /api/v1/notifications/smtp/config` - SMTP configuration
+- `POST /api/v1/notifications/smtp/test` - Test email sending
+- `GET /api/v1/notifications/config` - List notification rules
+- `POST /api/v1/notifications/config/<type>` - Update specific rule
+- `GET /api/v1/notifications/history` - View notification history
+- `GET /api/v1/notifications/stats` - Get notification statistics
+- `POST /api/v1/notifications/check` - Manual notification check
+
+**UI Page:** `/config/notifications` with full management interface
+
+---
+
+### 2. 🔐 WebAuthn/FIDO2 Support
+Passwordless authentication with hardware security keys (YubiKey, Windows Hello, etc.)
+
+**Features:**
+- **Security Key Registration**: Register multiple FIDO2/WebAuthn credentials
+- **Passwordless Login**: Authenticate using security keys without passwords
+- **Credential Management**: 
+  - View all registered keys with metadata
+  - Enable/disable individual credentials
+  - Delete unused credentials
+  - Track last usage and sign counter
+- **Browser Biometrics**: Support for Windows Hello, Touch ID, Face ID
+- **Hardware Tokens**: Support for YubiKey, Titan Key, and all FIDO2 devices
+- **Security Features**:
+  - Challenge-response authentication
+  - Replay protection via sign counter
+  - Credential scoped to domain (RP ID)
+  - User verification support (PIN/biometrics)
+
+**New Database Table:**
+- `webauthn_credentials` - Stores public keys and metadata
+
+**New API Endpoints:**
+- `POST /api/v1/webauthn/register/options` - Get registration challenge
+- `POST /api/v1/webauthn/register/verify` - Verify registration
+- `POST /api/v1/webauthn/authenticate/options` - Get authentication challenge
+- `POST /api/v1/webauthn/authenticate/verify` - Verify authentication
+- `GET /api/v1/webauthn/credentials` - List user credentials
+- `POST /api/v1/webauthn/credentials/<id>/toggle` - Enable/disable credential
+- `DELETE /api/v1/webauthn/credentials/<id>` - Delete credential
+
+**UI Pages:**
+- `/config/webauthn` - Manage security keys
+- Enhanced `/login` page with "Sign in with Security Key" button
+
+**Supported Protocols:**
+- FIDO2 (modern standard)
+- WebAuthn W3C API
+- Backwards compatible with U2F devices
+
+---
+
+### 3. 🛡️ mTLS Client Certificate Authentication
+Mutual TLS authentication for passwordless certificate-based login.
+
+**Features:**
+- **Certificate-Based Login**: Authenticate using X.509 client certificates
+- **Auto-Login**: Automatic authentication when valid certificate detected
+- **Hybrid Mode**: Supports both mTLS and password authentication simultaneously
+- **Certificate Management**:
+  - Associate certificates with user accounts
+  - Enable/disable individual certificates
+  - View certificate details (issuer, subject, serial, expiration)
+- **Reverse Proxy Integration**:
+  - Nginx configuration generator
+  - Apache configuration generator
+  - Automatic header parsing (X-SSL-Client-*)
+- **Security Features**:
+  - Certificate chain validation
+  - CRL/OCSP revocation checking
+  - Subject DN validation
+  - Serial number tracking
+
+**New Database Table:**
+- `auth_certificates` - Stores authorized client certificates
+
+**New API Endpoints:**
+- `GET /api/v1/mtls/certificates` - List user certificates
+- `POST /api/v1/mtls/certificates` - Associate new certificate
+- `POST /api/v1/mtls/certificates/<id>/toggle` - Enable/disable certificate
+- `DELETE /api/v1/mtls/certificates/<id>` - Remove certificate
+- `POST /api/v1/mtls/auto-detect` - Auto-detect current client certificate
+
+**UI Page:** `/config/mtls` with full certificate management interface
+
+**Reverse Proxy Support:**
+- Nginx with `ssl_verify_client` configuration
+- Apache with `SSLVerifyClient` configuration
+- Both configs auto-generated with copy-to-clipboard
+
+---
+
+### 4. 🎨 Enhanced UI Navigation & Organization
+
+#### Collapsible Sidebar Submenus
+The sidebar navigation now features expandable/collapsible submenus for better organization:
+
+- **Certificate Authorities Section**: List CAs, Create CA, Import CA
+- **Certificates Section**: List Certificates, Create Certificate, Import Certificate  
+- **SCEP Section**: SCEP Configuration
+
+**Features:**
+- 🔽 Smooth chevron rotation animations (0deg → 180deg)
+- 💾 State persisted in browser localStorage
+- 🎯 Auto-expand when navigating to child pages
+- ⚡ HTMX-aware: works seamlessly with dynamic content
+
+#### Submenu Icons
+All submenu items now have dedicated 14×14px SVG icons (smaller than main menu 20×20px) for better visual hierarchy with hover effects (opacity 0.7 → 1.0).
+
+#### My Account Section
+User-specific settings now grouped at the bottom of sidebar:
+- 📧 Email Notifications
+- 🛡️ mTLS Authentication  
+- 🔑 Security Keys (WebAuthn/FIDO2)
+
+Visual separation with border-top separator for clear distinction between system and user settings.
+
+#### Optimized Sidebar Width
+- **Before**: 240-260px (varied by theme)
+- **After**: 220px (uniform across all themes)
+- **Benefit**: 20-40px more space for main content
+
+#### My Account Page
+New dedicated `/my-account` page separating user preferences from admin settings:
+- Profile information (username, role)
+- Password change form
+- Theme preferences (8 themes × 2 variants)
+- Session configuration (duration, login method)
+- Logout button
+
+**Settings Page** now reserved for administrators only with system-level configuration.
+
+---
+
+### 5. �� Themed Modal System
+Complete replacement of browser native popups with custom UCM-themed modals.
+
+**Features:**
+- **Custom Modals**: Replace alert(), confirm(), prompt() with themed modals
+- **Theme Integration**: Adapts to all 8 UCM themes automatically
+- **Promise-Based API**: Modern async/await support
+- **Customizable Options**:
+  - Custom button text
+  - Danger mode (red buttons)
+  - Custom icons from UCM icon system
+  - Multi-step confirmations
+- **Animations**: Smooth fade-in/slide-in animations
+- **Keyboard Support**: Escape to close, Enter to confirm
+- **Click Outside**: Close modal by clicking overlay
+
+**New File:** frontend/static/js/modal-system.js (global modal manager)
+
+---
+
+## 🔧 UI/UX Improvements
+
+### Button System Fixes
+Fixed 33 buttons across 5 pages with missing base btn class:
+- WebAuthn page (9 buttons)
+- Certificate list (5 buttons)
+- Certificate detail (3 buttons)
+- CA list (6 buttons)
+- CA detail (10 buttons)
+
+**Issues Fixed:**
+- Incorrect colors (pink/salmon instead of theme colors)
+- Missing padding and borders
+- Invisible or poorly visible icons
+- Inconsistent theming across pages
+
+### Icon System Standardization
+Complete migration to native UCM SVG icon system:
+- **Method**: SVG symbols with <use href="#icon-name"/>
+- **Replaced**: FontAwesome classes
+- **Benefits**:
+  - Better performance (no JS replacement needed)
+  - Consistent with UCM design
+  - No timing issues with HTMX
+  - Theme-aware gradient support
+
+### Form Style Unification
+Standardized form inputs across all pages:
+- Consistent padding and spacing
+- Theme-aware borders and backgrounds
+- Hover and focus states
+- Label positioning and typography
+- Error state styling
+
+### Certificate Display Improvements
+- Better certificate selection highlighting
+- Improved visual hierarchy in certificate lists
+- Enhanced certificate metadata display
+- Icon filtering for certificate operations
+
+### Settings Page Reorganization
+Clear separation of user and admin settings:
+- **User Preferences Section**: Profile, password, theme, session
+- **Administrator Settings Section**: System, HTTPS, proxy, PKI reset
+- Visual headers with icons for each section
+- Admin-only sections hidden from regular users
+
+---
+
+## 📦 Installation
+
+### Debian/Ubuntu (.deb)
+```bash
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.7.0/ucm_1.7.0_all.deb
+sudo dpkg -i ucm_1.7.0_all.deb
+sudo systemctl restart ucm
+```
+
+### RHEL/CentOS/Fedora (.rpm)
+```bash
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.7.0/ucm-1.7.0-1.noarch.rpm
+sudo rpm -ivh ucm-1.7.0-1.noarch.rpm
+sudo systemctl restart ucm
+```
+
+### Docker
+```bash
+docker pull neyslim/ultimate-ca-manager:1.7.0
+docker pull neyslim/ultimate-ca-manager:latest
+```
+
+### From Source
+```bash
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.7.0/ucm-1.7.0.tar.gz
+tar xzf ucm-1.7.0.tar.gz
+cd ucm-1.7.0
+# Follow installation instructions in README.md
+```
+
+---
+
+## 🔄 Upgrade from v1.6.2
+
+### 1. Backup Current Installation
+```bash
+sudo systemctl stop ucm
+sudo tar czf /tmp/ucm-backup-$(date +%Y%m%d).tar.gz /opt/ucm /var/lib/ucm
+```
+
+### 2. Run Database Migrations
+```bash
+cd /opt/ucm
+python3 migrations/migrate_email_notifications.py
+python3 migrations/migrate_webauthn.py
+python3 migrations/migrate_mtls.py
+```
+
+### 3. Restart Service
+```bash
+sudo systemctl start ucm
+sudo systemctl status ucm
+```
+
+---
+
+## 🎨 Theme Compatibility
+
+All changes fully compatible with UCM's 8 themes:
+- ✅ Sentinel Light/Dark
+- ✅ Amber Light/Dark
+- ✅ Blossom Light/Dark
+- ✅ Nebula Light/Dark
+
+---
+
+## 🔗 Links
+
+- **Wiki**: https://github.com/NeySlim/ultimate-ca-manager/wiki
+- **Release Notes**: https://github.com/NeySlim/ultimate-ca-manager/wiki/Release-Notes-v1.7.0
+- **Changelog**: https://github.com/NeySlim/ultimate-ca-manager/blob/main/CHANGELOG.md
+- **Documentation**: https://github.com/NeySlim/ultimate-ca-manager/wiki/User-Manual
+
+---
+
+## 📊 What's Changed
+
+**Full Changelog**: https://github.com/NeySlim/ultimate-ca-manager/compare/v1.6.2...v1.7.0
+
+**Previous Release**: v1.6.2 - Bugfix Release (January 7, 2026)
+
+---
+
+**Prepared By**: UCM Development Team  
+**Release Date**: January 8, 2026

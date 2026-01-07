@@ -9,27 +9,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.7.0] - 2026-01-08
 
-### ✨ Enhanced UI Navigation & Organization
+### 🎉 Major Feature Release
 
-This release focuses on improving sidebar navigation with collapsible submenus, optimized layout, and better user account organization.
+This release introduces three major authentication methods (Email Notifications, WebAuthn/FIDO2, mTLS), enhanced UI navigation, and significant UX improvements.
 
-### Added
+### Added - Major Features
+
+#### 📧 Email Notifications System
+- **SMTP Configuration**: Full SMTP server setup with TLS/SSL support
+- **Alert Rules**: Configurable notifications for certificate and CRL expiration
+  - Customizable threshold in days before expiration
+  - Per-rule recipient email lists
+- **Notification History**: Complete log of sent notifications with success/failure tracking
+- **Statistics Dashboard**: View sent/failed counts for last 30 days
+- **Test Email Function**: Verify SMTP configuration before deployment
+- **Manual Check**: Trigger immediate expiration checks on-demand
+- **New UI Page**: `/config/notifications` for complete notification management
+- **New API Endpoints**: 7 endpoints for SMTP config, rules, history, and stats
+- **Database Tables**: `smtp_config`, `notification_config`, `notification_log`
+
+#### 🔐 WebAuthn/FIDO2 Support
+- **Passwordless Authentication**: Login with security keys (YubiKey, Windows Hello, Touch ID, Face ID)
+- **Multiple Credentials**: Register and manage multiple security keys per user
+- **Credential Management**:
+  - View all registered keys with metadata (name, registration date, last used, sign counter)
+  - Enable/disable individual credentials
+  - Delete unused credentials
+- **Security Features**:
+  - Challenge-response authentication protocol
+  - Replay protection via sign counter
+  - Domain-scoped credentials (RP ID)
+  - User verification support (PIN/biometrics)
+- **Hardware Token Support**: YubiKey, Titan Key, all FIDO2-compliant devices
+- **Browser Biometric Support**: Windows Hello, Touch ID, Face ID
+- **New UI Page**: `/config/webauthn` for security key management
+- **Enhanced Login**: "Sign in with Security Key" button on login page
+- **New API Endpoints**: 7 endpoints for registration, authentication, and credential management
+- **Database Table**: `webauthn_credentials`
+
+#### 🛡️ mTLS Client Certificate Authentication
+- **Certificate-Based Login**: Authenticate using X.509 client certificates
+- **Auto-Login**: Automatic authentication when valid certificate is detected
+- **Hybrid Mode**: Simultaneous support for mTLS and password authentication
+- **Certificate Management**:
+  - Associate certificates with user accounts
+  - Enable/disable individual certificates
+  - View certificate details (issuer, subject, serial, expiration)
+  - Auto-detect current client certificate
+- **Reverse Proxy Integration**:
+  - Nginx configuration generator with copy-to-clipboard
+  - Apache configuration generator with copy-to-clipboard
+  - Automatic header parsing (X-SSL-Client-*)
+- **Security Features**:
+  - Certificate chain validation
+  - CRL/OCSP revocation checking
+  - Subject DN validation
+  - Serial number tracking
+- **New UI Page**: `/config/mtls` for certificate management
+- **New API Endpoints**: 5 endpoints for certificate management and auto-detection
+- **Database Table**: `auth_certificates`
+
+#### 🎨 Enhanced UI Navigation & Organization
 - **Collapsible Sidebar Submenus**:
-  - Certificate Authorities, Certificates, and SCEP sections now have expandable/collapsible submenus
+  - Certificate Authorities, Certificates, and SCEP sections with expandable/collapsible submenus
   - Smooth chevron rotation animations (0deg → 180deg)
-  - Submenu state persisted in localStorage (`sidebar-{section}-expanded`)
+  - State persisted in localStorage (`sidebar-{section}-expanded`)
   - Auto-expand when child page is active
-  - HTMX-aware: submenus reinitialize after content swaps
-- **Submenu Icons**: 14×14px SVG icons for all submenu items (smaller than main menu 20×20px)
-  - Certificate Authorities: icon-certificate-authority, icon-plus, icon-file-import
-  - Certificates: icon-certificate, icon-plus, icon-file-import
-  - SCEP: icon-settings
-- **My Account Section**: User-specific settings now grouped at bottom of sidebar
-  - Email Notifications
-  - mTLS Authentication
-  - Security Keys (WebAuthn/FIDO2)
+  - HTMX-aware: reinitialize after content swaps
+- **Submenu Icons**: 14×14px SVG icons for all submenu items with hover effects
+- **My Account Section**: User-specific settings grouped at bottom of sidebar
+  - Email Notifications, mTLS Authentication, Security Keys
   - Visual separator with border-top for clear distinction
-- **Tooltip Preparation**: Added data-tooltip attributes to all sidebar links (prepared for future features)
+- **My Account Page**: New dedicated `/my-account` page
+  - Profile information (username, role)
+  - Password change form
+  - Theme preferences (8 themes × 2 variants)
+  - Session configuration (duration, login method, logout)
+- **Settings Page Reorganization**: 
+  - Now reserved for administrators only
+  - Clear separation of user preferences and admin settings
+  - Visual headers with icons for each section
+
+#### 🎭 Themed Modal System
+- **Custom Modals**: Replace browser native `alert()`, `confirm()`, `prompt()`
+- **Theme Integration**: Automatic adaptation to all 8 UCM themes
+- **Promise-Based API**: Modern async/await support
+- **Customizable Options**: Custom buttons, danger mode, icons, multi-step confirmations
+- **Animations**: Smooth fade-in/slide-in animations
+- **Keyboard Support**: Escape to close, Enter to confirm
+- **Click Outside**: Close modal by clicking overlay
+- **New File**: `frontend/static/js/modal-system.js`
+
+### Added - UI/UX Improvements
+- **Button System Fixes**: Fixed 33 buttons across 5 pages with missing base `btn` class
+  - Corrected colors (was pink/salmon, now theme colors)
+  - Added missing padding and borders
+  - Fixed invisible icons
+- **Icon System Standardization**: Complete migration to native UCM SVG icons
+  - Replaced FontAwesome classes with `<use href="#icon-name"/>`
+  - Better performance (no JS replacement)
+  - Theme-aware gradient support
+  - New icon classes: `.btn-icon`, `.btn-icon-primary/danger/success/warning`
+- **Form Style Unification**: Standardized form inputs across all pages
+  - Consistent padding, spacing, borders, backgrounds
+  - Theme-aware hover and focus states
+  - Unified label positioning and typography
+- **Certificate Display Improvements**:
+  - Better certificate selection highlighting
+  - Improved visual hierarchy in lists
+  - Enhanced metadata display
+  - Icon filtering for operations
+- **Tooltip Preparation**: Added `data-tooltip` attributes to all sidebar links
 
 ### Changed
 - **Optimized Sidebar Width**: Reduced from 240-260px to uniform 220px across all 8 themes
@@ -37,21 +127,53 @@ This release focuses on improving sidebar navigation with collapsible submenus, 
   - Standardized width improves consistency
 - **Improved Sidebar Layout**: Flexbox-based layout with spacer to push My Account section to bottom
 - **JavaScript Architecture**: New `sidebar-toggle.js` module for submenu management (165 lines)
+- **Navigation Structure**: Reorganized sidebar with user settings at bottom
 
 ### Fixed
 - Sidebar submenu persistence across page navigations
 - Submenu icon opacity on hover (0.7 → 1.0 transition)
+- Button theming inconsistencies across multiple pages
+- HTMX content swap duplicate token error (wrapped scripts in IIFE)
+- Icon visibility issues in various UI components
 
 ### Technical Details
-- **New Files**: `frontend/static/js/sidebar-toggle.js`
-- **Modified CSS**: ~150 lines added to `components.css` for submenu animations
-- **Theme Updates**: All 8 themes updated with consistent 220px sidebar width
-- **State Management**: localStorage keys for submenu states and future sidebar collapse
+- **New Files Created** (16 files):
+  - `frontend/static/js/sidebar-toggle.js` - Submenu management
+  - `frontend/static/js/modal-system.js` - Modal system
+  - `frontend/templates/my_account.html` - User account page
+  - `frontend/templates/config/notifications.html` - Email notifications UI
+  - `frontend/templates/config/webauthn.html` - WebAuthn management UI
+  - `frontend/templates/config/mtls.html` - mTLS configuration UI
+  - `backend/models/email_notification.py` - Email models
+  - `backend/models/webauthn.py` - WebAuthn model
+  - `backend/models/auth_certificate.py` - mTLS model
+  - `backend/services/email_service.py` - SMTP service
+  - `backend/services/notification_service.py` - Notification scheduler
+  - `backend/api/notification_api.py` - Notification API
+  - `backend/api/webauthn_api.py` - WebAuthn API
+  - `backend/api/mtls_api.py` - mTLS API
+  - `migrations/migrate_email_notifications.py`
+  - `migrations/migrate_webauthn.py`
+  - `migrations/migrate_mtls.py`
+- **Modified Files**: `base.html`, `settings.html`, `login.html`, `components.css`, all theme CSS files, `ui_routes.py`, `settings.py`
+- **Database**: 5 new tables (smtp_config, notification_config, notification_log, webauthn_credentials, auth_certificates)
+- **Modified CSS**: ~300 lines added to `components.css`
+- **Theme Updates**: All 8 themes updated with 220px sidebar width
+- **State Management**: localStorage keys for submenu states and theme preferences
+
+### Security
+- WebAuthn FIDO2 compliance with challenge-response protocol
+- mTLS certificate chain validation with CRL/OCSP support
+- Replay protection via sign counter tracking
+- Domain-scoped credential storage
 
 ### Notes
-- Sidebar collapse feature (icon-only mode with flyout menus) was explored but disabled due to layout complexity
-- Code for collapse feature preserved in comments for future implementation
-- All changes tested across 8 color schemes (Sentinel, Amber, Blossom, Nebula - Light/Dark)
+- Sidebar collapse feature (icon-only mode) explored but disabled due to layout complexity
+- Code preserved in comments for future implementation
+- All changes tested across 8 themes (Sentinel, Amber, Blossom, Nebula - Light/Dark)
+- Email notifications require SMTP server configuration and database migration
+- WebAuthn requires HTTPS and modern browser support
+- mTLS requires reverse proxy configuration (Nginx/Apache)
 
 ---
 
