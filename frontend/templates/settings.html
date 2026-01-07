@@ -423,6 +423,75 @@
         </div>
     </div>
     
+    {% if session.get('role') == 'admin' %}
+    <!-- PKI Database Management (Admin Only) -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-database" style="color: var(--primary-color);"></i>
+                PKI Database Management
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Reset the PKI database to start fresh. This will delete all CAs, certificates, CRLs, and OCSP records, but <strong>will preserve users and authentication settings</strong>.
+            </p>
+            
+            <!-- PKI Statistics -->
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;">
+                <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem;">Current PKI Data</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">CAs</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-cas">-</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Certificates</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-certs">-</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">CRLs</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-crls">-</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">OCSP Records</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-ocsp">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Warning Box -->
+            <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                    <i class="fas fa-exclamation-triangle" style="color: #d97706; font-size: 1.25rem; margin-top: 0.25rem;"></i>
+                    <div style="font-size: 0.875rem; color: #92400e;">
+                        <p style="font-weight: 600; margin-bottom: 0.5rem;">⚠️ Danger Zone</p>
+                        <ul style="list-style: disc; margin-left: 1.25rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                            <li>This action <strong>cannot be undone</strong></li>
+                            <li>All Certificate Authorities will be deleted</li>
+                            <li>All certificates will be deleted</li>
+                            <li>All CRLs and OCSP records will be deleted</li>
+                            <li>A backup will be created automatically</li>
+                            <li><strong>Users and sessions will NOT be affected</strong></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Reset Button -->
+            <div style="padding-top: 0.5rem;">
+                <button onclick="confirmPKIReset()" class="btn" style="background: #dc2626; color: white; border: none;">
+                    <i class="fas fa-trash-alt" style="margin-right: 0.5rem;"></i>
+                    Reset PKI Database
+                </button>
+            </div>
+            
+            <!-- Status Message -->
+            <div id="pki-reset-status" style="display: none; margin-top: 1rem;"></div>
+        </div>
+    </div>
+    {% endif %}
+    
     <!-- Session Info -->
     <div class="bg-white rounded-lg shadow border border-gray-200">
         <div class="p-6 border-b border-gray-200">
@@ -771,6 +840,111 @@
     window.toggleHTTPSCertSelection = toggleHTTPSCertSelection;
     window.applyHTTPSCertificate = applyHTTPSCertificate;
     window.selectCertificate = selectCertificate;
+    
+    // ====================================================
+    // PKI Database Management Functions
+    // ====================================================
+    
+    // Load PKI statistics
+    function loadPKIStats() {
+        fetch('/api/ui/system/pki-stats', {
+            credentials: 'same-origin'  // Include session cookie
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('pki-stat-cas').textContent = data.cas || data.certificate_authorities || 0;
+            document.getElementById('pki-stat-certs').textContent = data.certificates || 0;
+            document.getElementById('pki-stat-crls').textContent = data.crls || data.crl_distribution_points || 0;
+            document.getElementById('pki-stat-ocsp').textContent = data.ocsp_responses || 0;
+        })
+        .catch(err => {
+            console.error('Failed to load PKI stats:', err);
+        });
+    }
+    
+    // Confirm PKI reset (modal)
+    function confirmPKIReset() {
+        const confirmed = confirm(
+            '⚠️ DANGER: Reset PKI Database?\n\n' +
+            'This will DELETE:\n' +
+            '• All Certificate Authorities\n' +
+            '• All Certificates\n' +
+            '• All CRLs and OCSP records\n\n' +
+            'This will KEEP:\n' +
+            '✓ Users and authentication data\n\n' +
+            'A backup will be created automatically.\n\n' +
+            'Type "RESET PKI DATA" in the next prompt to confirm.'
+        );
+        
+        if (!confirmed) return;
+        
+        const confirmation = prompt('Type exactly: RESET PKI DATA');
+        if (confirmation !== 'RESET PKI DATA') {
+            alert('❌ Confirmation failed. PKI reset cancelled.');
+            return;
+        }
+        
+        performPKIReset();
+    }
+    
+    // Perform PKI reset
+    function performPKIReset() {
+        showPKIStatus('info', '🔄 Resetting PKI database... Please wait...');
+        
+        fetch('/api/ui/system/pki-reset', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin',  // Include session cookie
+            body: JSON.stringify({
+                confirmation: 'RESET PKI DATA'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showPKIStatus('success', 
+                    `✅ PKI database reset successfully!\n\n` +
+                    `Deleted:\n` +
+                    `• ${data.stats.cas_deleted || 0} CAs\n` +
+                    `• ${data.stats.certificates_deleted || 0} Certificates\n` +
+                    `• ${data.stats.crls_deleted || 0} CRLs\n` +
+                    `• ${data.stats.ocsp_records_deleted || 0} OCSP records\n\n` +
+                    `Backup: ${data.stats.backup_path || 'N/A'}`
+                );
+                // Reload stats
+                setTimeout(() => loadPKIStats(), 1000);
+            } else {
+                showPKIStatus('error', '❌ Failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            showPKIStatus('error', '❌ Network error: ' + err.message);
+        });
+    }
+    
+    // Show PKI status message
+    function showPKIStatus(type, message) {
+        const statusDiv = document.getElementById('pki-reset-status');
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'p-4 rounded-lg ' + (
+            type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
+            type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' :
+            'bg-blue-50 text-blue-800 border border-blue-200'
+        );
+        statusDiv.innerHTML = '<pre style="white-space: pre-wrap; font-family: monospace; font-size: 0.875rem;">' + 
+            message + '</pre>';
+    }
+    
+    // Load PKI stats on page load (if admin)
+    if (document.getElementById('pki-stat-cas')) {
+        loadPKIStats();
+    }
+    
+    // Make PKI functions globally accessible
+    window.confirmPKIReset = confirmPKIReset;
+    window.loadPKIStats = loadPKIStats;
     
 })(); // End IIFE
 </script>

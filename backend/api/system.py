@@ -7,6 +7,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, User, SystemConfig, AuditLog
 from middleware.auth_middleware import admin_required
 from config.https_manager import HTTPSManager
+from services.pki_reset_service import PKIResetService
 from pathlib import Path
 import json
 
@@ -643,6 +644,71 @@ def regenerate_https_certificate():
         subprocess.Popen(['systemctl', 'restart', 'ucm'])
         
         return jsonify({'success': True}), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@system_bp.route('/pki/stats', methods=['GET'])
+@jwt_required()
+def get_pki_stats():
+    """
+    Get PKI statistics
+    ---
+    GET /api/v1/system/pki/stats
+    
+    Returns counts of CAs, certificates, CRLs, etc.
+    """
+    try:
+        stats = PKIResetService.get_pki_stats()
+        return jsonify(stats), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@system_bp.route('/pki/reset', methods=['POST'])
+@jwt_required()
+@admin_required
+def reset_pki():
+    """
+    Reset PKI data (dangerous!)
+    ---
+    POST /api/v1/system/pki/reset
+    
+    Body:
+    {
+        "confirmation": "RESET PKI DATA"
+    }
+    
+    This will:
+    - Delete all CAs and certificates
+    - Delete CRLs and OCSP records
+    - Create backup first
+    - KEEP users and auth data intact
+    """
+    try:
+        admin = User.query.filter_by(username=get_jwt_identity()).first()
+        
+        # Require explicit confirmation
+        data = request.get_json()
+        if not data or data.get('confirmation') != 'RESET PKI DATA':
+            return jsonify({
+                'success': False,
+                'error': 'Invalid confirmation. Must be exactly: RESET PKI DATA'
+            }), 400
+        
+        # Perform reset
+        stats = PKIResetService.reset_pki_data()
+        
+        # Log audit
+        log_audit('pki_reset', admin.username,
+                 details=f"Reset PKI data. Backup: {stats['backup_path']}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'PKI data reset successfully',
+            'stats': stats
+        }), 200
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
