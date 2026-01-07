@@ -1878,7 +1878,24 @@ def import_config_form():
                     if (d.error) {{
                         showToast('Import failed: ' + d.error, 'error');
                     }} else {{
-                        showToast('Import complete: ' + (d.cas?.imported || 0) + ' CAs, ' + (d.certs?.imported || 0) + ' certs', 'success');
+                        const casImported = d.cas?.imported || 0;
+                        const casSkipped = d.cas?.skipped || 0;
+                        const certsImported = d.certs?.imported || 0;
+                        const certsSkipped = d.certs?.skipped || 0;
+                        
+                        let message = 'Import complete: ';
+                        if (casImported > 0 || certsImported > 0) {{
+                            message += casImported + ' CAs, ' + certsImported + ' certs imported';
+                            if (casSkipped > 0 || certsSkipped > 0) {{
+                                message += ' (' + (casSkipped + certsSkipped) + ' skipped)';
+                            }}
+                        }} else if (casSkipped > 0 || certsSkipped > 0) {{
+                            message += 'All items already exist (' + casSkipped + ' CAs, ' + certsSkipped + ' certs skipped)';
+                        }} else {{
+                            message += 'No items found';
+                        }}
+                        
+                        showToast(message, 'success');
                         htmx.trigger('body', 'refreshCAs');
                         htmx.trigger('body', 'refreshCerts');
                     }}
