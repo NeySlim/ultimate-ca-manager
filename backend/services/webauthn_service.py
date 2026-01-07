@@ -313,6 +313,7 @@ class WebAuthnService:
             )
             
             # Update sign count and last used
+            logger.info(f"WebAuthn: old sign_count={credential.sign_count}, new sign_count={verification.new_sign_count}")
             credential.sign_count = verification.new_sign_count
             credential.last_used_at = datetime.utcnow()
             
