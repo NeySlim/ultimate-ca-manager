@@ -313,8 +313,10 @@ class WebAuthnService:
             )
             
             # Update sign count and last used
-            logger.info(f"WebAuthn: old sign_count={credential.sign_count}, new sign_count={verification.new_sign_count}")
-            credential.sign_count = verification.new_sign_count
+            logger.info(f"WebAuthn: authenticator sign_count={verification.new_sign_count}")
+            
+            # Always increment our own counter (some authenticators like Bitwarden always return 0)
+            credential.sign_count = max(verification.new_sign_count, credential.sign_count + 1)
             credential.last_used_at = datetime.utcnow()
             
             # Mark challenge as used
