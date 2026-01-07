@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.0] - 2026-01-08
+
+### ✨ Enhanced UI Navigation & Organization
+
+This release focuses on improving sidebar navigation with collapsible submenus, optimized layout, and better user account organization.
+
+### Added
+- **Collapsible Sidebar Submenus**:
+  - Certificate Authorities, Certificates, and SCEP sections now have expandable/collapsible submenus
+  - Smooth chevron rotation animations (0deg → 180deg)
+  - Submenu state persisted in localStorage (`sidebar-{section}-expanded`)
+  - Auto-expand when child page is active
+  - HTMX-aware: submenus reinitialize after content swaps
+- **Submenu Icons**: 14×14px SVG icons for all submenu items (smaller than main menu 20×20px)
+  - Certificate Authorities: icon-certificate-authority, icon-plus, icon-file-import
+  - Certificates: icon-certificate, icon-plus, icon-file-import
+  - SCEP: icon-settings
+- **My Account Section**: User-specific settings now grouped at bottom of sidebar
+  - Email Notifications
+  - mTLS Authentication
+  - Security Keys (WebAuthn/FIDO2)
+  - Visual separator with border-top for clear distinction
+- **Tooltip Preparation**: Added data-tooltip attributes to all sidebar links (prepared for future features)
+
+### Changed
+- **Optimized Sidebar Width**: Reduced from 240-260px to uniform 220px across all 8 themes
+  - Provides 20-40px more space for main content
+  - Standardized width improves consistency
+- **Improved Sidebar Layout**: Flexbox-based layout with spacer to push My Account section to bottom
+- **JavaScript Architecture**: New `sidebar-toggle.js` module for submenu management (165 lines)
+
+### Fixed
+- Sidebar submenu persistence across page navigations
+- Submenu icon opacity on hover (0.7 → 1.0 transition)
+
+### Technical Details
+- **New Files**: `frontend/static/js/sidebar-toggle.js`
+- **Modified CSS**: ~150 lines added to `components.css` for submenu animations
+- **Theme Updates**: All 8 themes updated with consistent 220px sidebar width
+- **State Management**: localStorage keys for submenu states and future sidebar collapse
+
+### Notes
+- Sidebar collapse feature (icon-only mode with flyout menus) was explored but disabled due to layout complexity
+- Code for collapse feature preserved in comments for future implementation
+- All changes tested across 8 color schemes (Sentinel, Amber, Blossom, Nebula - Light/Dark)
+
+---
+
 ## [1.6.2] - 2026-01-07
 
 ### 🐛 Critical Bugfixes
