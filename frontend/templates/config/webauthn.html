@@ -13,6 +13,23 @@
         </button>
     </div>
 
+    <!-- Hostname Warning (shown only if hostname is not WebAuthn-compatible) -->
+    <div id="hostname-warning" style="display: none; background: var(--bg-warning); border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1.5rem;">
+        <div style="display: flex; align-items: start; gap: 1rem;">
+            <i data-icon="alert-triangle" style="color: #f59e0b; flex-shrink: 0; margin-top: 0.25rem;"></i>
+            <div style="flex: 1;">
+                <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">⚠️ Incompatible Hostname Detected</strong>
+                <p style="color: var(--text-secondary); margin: 0 0 0.75rem 0; font-size: 0.875rem;">
+                    WebAuthn requires a valid domain name or IP address. You are currently accessing UCM via "<span id="current-hostname" style="font-family: monospace; font-weight: 600;"></span>" which is not compatible.
+                </p>
+                <p style="color: var(--text-secondary); margin: 0 0 0.75rem 0; font-size: 0.875rem;">
+                    <strong>To use WebAuthn, please access UCM using one of these URLs:</strong>
+                </p>
+                <div id="valid-urls" style="font-size: 0.875rem; margin-left: 1rem;"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Info Alert -->
     <div style="background: var(--bg-info); border-left: 4px solid var(--primary-color); padding: 1rem; border-radius: 0.25rem;">
         <strong style="color: var(--text-primary);">🔐 Passwordless Authentication</strong>
@@ -165,6 +182,117 @@ function showToast(message, type = 'info') {
     toast.textContent = message;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
+}
+
+// Check if hostname is WebAuthn-compatible
+function isWebAuthnCompatibleHostname(hostname) {
+    // WebAuthn requires:
+    // 1. localhost or 127.0.0.1
+    // 2. A valid IP address (IPv4 or IPv6)
+    // 3. A domain with a TLD (e.g., .com, .local, .lan, .pet)
+    
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+        return true;
+    }
+    
+    // Check if it's an IP address
+    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (ipv4Regex.test(hostname)) {
+        return true;
+    }
+    
+    // Check if it has a TLD (contains at least one dot)
+    if (hostname.includes('.')) {
+        return true;
+    }
+    
+    return false;
+}
+
+// Get the proper FQDN for this server
+async function getServerFQDN() {
+    try {
+        // Try to get server info from API
+        const response = await fetch('/api/v1/system/info', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.fqdn) {
+                return data.fqdn;
+            }
+        }
+    } catch (e) {
+        // Fallback: construct from current hostname
+    }
+    
+    // Fallback: if hostname is just "netsuit", append common TLD
+    const hostname = window.location.hostname;
+    if (!hostname.includes('.')) {
+        // Common patterns: hostname.local or hostname.lan.domain
+        return `${hostname}.lan.pew.pet`;
+    }
+    
+    return hostname;
+}
+
+// Show hostname warning and suggest valid URLs or auto-redirect
+async function checkHostnameCompatibility() {
+    const hostname = window.location.hostname;
+    
+    if (!isWebAuthnCompatibleHostname(hostname)) {
+        const warning = document.getElementById('hostname-warning');
+        document.getElementById('current-hostname').textContent = hostname;
+        
+        // Get the proper FQDN
+        const fqdn = await getServerFQDN();
+        const port = window.location.port;
+        const protocol = window.location.protocol;
+        const currentPath = window.location.pathname;
+        
+        // Build the redirect URL
+        const redirectUrl = `${protocol}//${fqdn}:${port}${currentPath}`;
+        
+        // Build valid URL suggestions
+        const validUrls = document.getElementById('valid-urls');
+        validUrls.innerHTML = `
+            <div style="margin-bottom: 1rem;">
+                <strong style="color: var(--text-primary);">Recommended URL:</strong>
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <a href="${redirectUrl}" 
+                   style="color: var(--primary-color); text-decoration: none; font-weight: 600; font-size: 1rem;">
+                    ${protocol}//${fqdn}:${port}
+                </a>
+                <button onclick="window.location.href='${redirectUrl}'" 
+                        class="btn-primary" 
+                        style="margin-left: 1rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
+                    <i data-icon="arrow-right"></i> Switch to this URL
+                </button>
+            </div>
+            <div style="color: var(--text-secondary); margin-top: 0.75rem; font-size: 0.8125rem;">
+                <strong>Alternative options:</strong><br>
+                • Access via server IP address<br>
+                • Use localhost if on the server itself
+            </div>
+        `;
+        
+        warning.style.display = 'block';
+        
+        // Disable register button
+        const registerBtn = document.querySelector('button[onclick="showRegistrationModal()"]');
+        if (registerBtn) {
+            registerBtn.disabled = true;
+            registerBtn.title = 'WebAuthn not available with current hostname';
+            registerBtn.style.opacity = '0.5';
+            registerBtn.style.cursor = 'not-allowed';
+        }
+        
+        return false;
+    }
+    
+    return true;
 }
 
 // Convert base64url to ArrayBuffer
@@ -349,20 +477,38 @@ window.startRegistration = async function() {
         }
         
         const options = await optionsResponse.json();
+        console.log('WebAuthn registration options received:', options);
+        console.log('Current window.location:', {
+            hostname: window.location.hostname,
+            host: window.location.host,
+            origin: window.location.origin
+        });
         
         // Convert base64url strings to ArrayBuffers
-        options.publicKey.challenge = base64urlToBuffer(options.publicKey.challenge);
-        options.publicKey.user.id = base64urlToBuffer(options.publicKey.user.id);
-        
-        if (options.publicKey.excludeCredentials) {
-            options.publicKey.excludeCredentials = options.publicKey.excludeCredentials.map(cred => ({
-                ...cred,
-                id: base64urlToBuffer(cred.id)
-            }));
-        }
+        // WORKAROUND: Use localhost as RP ID since "netsuit" has no TLD
+        const publicKeyOptions = {
+            publicKey: {
+                ...options,
+                rp: {
+                    ...options.rp,
+                    id: 'localhost'  // Force localhost for WebAuthn compatibility
+                },
+                challenge: base64urlToBuffer(options.challenge),
+                user: {
+                    ...options.user,
+                    id: base64urlToBuffer(options.user.id)
+                },
+                excludeCredentials: options.excludeCredentials ? 
+                    options.excludeCredentials.map(cred => ({
+                        ...cred,
+                        id: base64urlToBuffer(cred.id)
+                    })) : []
+            }
+        };
+        console.log('Converted publicKeyOptions (forced localhost):', publicKeyOptions);
         
         // Step 2: Call WebAuthn API
-        const credential = await navigator.credentials.create(options);
+        const credential = await navigator.credentials.create(publicKeyOptions);
         
         if (!credential) {
             throw new Error('Registration was cancelled');
@@ -458,6 +604,7 @@ window.deleteCredential = async function(credentialId) {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    checkHostnameCompatibility();
     loadCredentials();
 });
 })();

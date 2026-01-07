@@ -3716,3 +3716,25 @@ def config_mtls_page():
 def config_webauthn_page():
     """WebAuthn/FIDO2 security keys management page"""
     return render_template('config/webauthn.html')
+
+@ui_bp.route('/api/v1/system/info')
+@login_required
+def system_info():
+    """Get system information including FQDN"""
+    import socket
+    try:
+        fqdn = socket.getfqdn()
+        hostname = socket.gethostname()
+        
+        return jsonify({
+            'fqdn': fqdn,
+            'hostname': hostname,
+            'success': True
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'fqdn': None,
+            'hostname': None,
+            'error': str(e),
+            'success': False
+        }), 500
