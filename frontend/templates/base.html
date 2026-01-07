@@ -70,48 +70,48 @@
             <!-- Theme Selector Dropdown -->
             <div class="dropdown" x-data="{ open: false }">
                 <button @click="open = !open" class="btn btn-secondary">
-                    <i class="fas fa-palette"></i>
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-theme-palette"/></svg>
                     <span>Theme</span>
-                    <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+                    <svg class="ucm-icon" width="10" height="10"><use href="#icon-chevron-down"/></svg>
                 </button>
                 
                 <div x-show="open" @click.away="open = false" x-cloak class="dropdown-menu">
                     <div class="dropdown-header">Sentinel</div>
                     <a href="#" onclick="setTheme('sentinel-light'); return false;" class="dropdown-item">
-                        <i class="fas fa-sun"></i> Light
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
                     </a>
                     <a href="#" onclick="setTheme('sentinel-dark'); return false;" class="dropdown-item">
-                        <i class="fas fa-moon"></i> Dark
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
                     </a>
                     
                     <div class="dropdown-divider"></div>
                     
                     <div class="dropdown-header">Amber</div>
                     <a href="#" onclick="setTheme('amber-light'); return false;" class="dropdown-item">
-                        <i class="fas fa-sun"></i> Light
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
                     </a>
                     <a href="#" onclick="setTheme('amber-dark'); return false;" class="dropdown-item">
-                        <i class="fas fa-moon"></i> Dark
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
                     </a>
                     
                     <div class="dropdown-divider"></div>
                     
                     <div class="dropdown-header">Blossom</div>
                     <a href="#" onclick="setTheme('blossom-light'); return false;" class="dropdown-item">
-                        <i class="fas fa-sun"></i> Light
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
                     </a>
                     <a href="#" onclick="setTheme('blossom-dark'); return false;" class="dropdown-item">
-                        <i class="fas fa-moon"></i> Dark
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
                     </a>
                     
                     <div class="dropdown-divider"></div>
                     
                     <div class="dropdown-header">Nebula</div>
                     <a href="#" onclick="setTheme('nebula-light'); return false;" class="dropdown-item">
-                        <i class="fas fa-sun"></i> Light
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
                     </a>
                     <a href="#" onclick="setTheme('nebula-dark'); return false;" class="dropdown-item">
-                        <i class="fas fa-moon"></i> Dark
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
                     </a>
                 </div>
             </div>
@@ -126,17 +126,22 @@
             <!-- User Menu with Dropdown -->
             <div class="dropdown" x-data="{ open: false }">
                 <button @click="open = !open" class="btn btn-secondary">
-                    <i class="fas fa-user"></i>
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-user"/></svg>
                     <span>{{ session.get('username', 'User') }}</span>
-                    <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+                    <svg class="ucm-icon" width="10" height="10"><use href="#icon-chevron-down"/></svg>
                 </button>
                 
                 <div x-show="open" @click.away="open = false" x-cloak class="dropdown-menu" style="right: 0; left: auto;">
                     <div class="dropdown-header">My Account</div>
+                    <a href="/my-account" class="dropdown-item"
+                       hx-get="/my-account" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+                       @click="open = false">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-user"/></svg> Account Settings
+                    </a>
                     <a href="/config/notifications" class="dropdown-item"
                        hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
                        @click="open = false">
-                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-bell"/></svg> Notifications
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-bell"/></svg> Email Notifications
                     </a>
                     <a href="/config/mtls" class="dropdown-item"
                        hx-get="/config/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
@@ -159,93 +164,136 @@
             
             <!-- Logout -->
             <a href="/logout" class="btn btn-secondary" title="Logout">
-                <i class="fas fa-right-from-bracket"></i>
+                <svg class="ucm-icon" width="16" height="16"><use href="#icon-logout"/></svg>
             </a>
         </div>
     </nav>
     
     <!-- Sidebar -->
-    <aside>
+    <aside id="sidebar">
         <div class="sidebar-nav">
             <a href="/dashboard" class="sidebar-link {% if request.path == '/dashboard' or request.path == '/sentinel-demo' %}active{% endif %}"
+               data-tooltip="Dashboard"
                hx-get="/dashboard" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-gauge-high"></i>
                 <span>Dashboard</span>
             </a>
             
-            <a href="/ca" class="sidebar-link {% if request.path.startswith('/ca') or request.path.startswith('/import-ca') %}active{% endif %}"
+            <!-- Certificate Authorities (collapsible) -->
+            <a href="/ca" class="sidebar-link sidebar-link-parent {% if request.path.startswith('/ca') or request.path.startswith('/import-ca') %}active{% endif %}"
+               data-tooltip="Certificate Authorities"
                hx-get="/ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-lock"></i>
                 <span>Certificate Authorities</span>
+                <svg class="sidebar-chevron ucm-icon" width="16" height="16" style="margin-left: auto; transition: transform 0.2s;"><use href="#icon-chevron-down"/></svg>
             </a>
-            <div class="sidebar-submenu">
-                <a href="/ca" class="sidebar-link" hx-get="/ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">All CAs</a>
-                <a href="/ca/new" class="sidebar-link" hx-get="/ca/new" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Create CA</a>
-                <a href="/import-ca" class="sidebar-link" hx-get="/import-ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Import CA</a>
+            <div class="sidebar-submenu" data-parent="ca">
+                <a href="/ca" class="sidebar-link" hx-get="/ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-certificate-authority"/></svg>
+                    <span>All CAs</span>
+                </a>
+                <a href="/ca/new" class="sidebar-link" hx-get="/ca/new" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-plus"/></svg>
+                    <span>Create CA</span>
+                </a>
+                <a href="/import-ca" class="sidebar-link" hx-get="/import-ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-file-import"/></svg>
+                    <span>Import CA</span>
+                </a>
             </div>
             
-            <a href="/certificates" class="sidebar-link {% if request.path.startswith('/certificates') or request.path.startswith('/import') %}active{% endif %}"
+            <!-- Certificates (collapsible) -->
+            <a href="/certificates" class="sidebar-link sidebar-link-parent {% if request.path.startswith('/certificates') or request.path.startswith('/import') %}active{% endif %}"
+               data-tooltip="Certificates"
                hx-get="/certificates" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-certificate"></i>
                 <span>Certificates</span>
+                <svg class="sidebar-chevron ucm-icon" width="16" height="16" style="margin-left: auto; transition: transform 0.2s;"><use href="#icon-chevron-down"/></svg>
             </a>
-            <div class="sidebar-submenu">
-                <a href="/certificates" class="sidebar-link" hx-get="/certificates" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">All Certificates</a>
-                <a href="/certificates/new" class="sidebar-link" hx-get="/certificates/new" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Create Certificate</a>
-                <a href="/import" class="sidebar-link" hx-get="/import" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Import Certificate</a>
+            <div class="sidebar-submenu" data-parent="certificates">
+                <a href="/certificates" class="sidebar-link" hx-get="/certificates" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-certificate"/></svg>
+                    <span>All Certificates</span>
+                </a>
+                <a href="/certificates/new" class="sidebar-link" hx-get="/certificates/new" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-plus"/></svg>
+                    <span>Create Certificate</span>
+                </a>
+                <a href="/import" class="sidebar-link" hx-get="/import" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-file-import"/></svg>
+                    <span>Import Certificate</span>
+                </a>
             </div>
             
-            <a href="/scep" class="sidebar-link {% if request.path.startswith('/scep') %}active{% endif %}"
+            <!-- SCEP (collapsible) -->
+            <a href="/scep" class="sidebar-link sidebar-link-parent {% if request.path.startswith('/scep') %}active{% endif %}"
+               data-tooltip="SCEP"
                hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-server"></i>
                 <span>SCEP</span>
+                <svg class="sidebar-chevron ucm-icon" width="16" height="16" style="margin-left: auto; transition: transform 0.2s;"><use href="#icon-chevron-down"/></svg>
             </a>
-            <div class="sidebar-submenu">
-                <a href="/scep" class="sidebar-link" hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Configuration</a>
+            <div class="sidebar-submenu" data-parent="scep">
+                <a href="/scep" class="sidebar-link" hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-settings"/></svg>
+                    <span>Configuration</span>
+                </a>
             </div>
             
             <a href="/crl" class="sidebar-link {% if request.path.startswith('/crl') %}active{% endif %}"
+               data-tooltip="CRL Management"
                hx-get="/crl" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-file-contract"></i>
                 <span>CRL Management</span>
             </a>
             
             <a href="/ocsp" class="sidebar-link {% if request.path.startswith('/ocsp') %}active{% endif %}"
+               data-tooltip="OCSP Status"
                hx-get="/ocsp" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-circle-check"></i>
                 <span>OCSP Status</span>
             </a>
             
             <a href="/users" class="sidebar-link {% if request.path.startswith('/users') %}active{% endif %}"
+               data-tooltip="Users"
                hx-get="/users" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-user-group"></i>
                 <span>Users</span>
             </a>
             
+            {% if session.get('role') == 'admin' %}
             <a href="/settings" class="sidebar-link {% if request.path.startswith('/settings') %}active{% endif %}"
+               data-tooltip="Settings"
                hx-get="/settings" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-gear"></i>
                 <span>Settings</span>
             </a>
+            {% endif %}
             
-            <!-- User Settings Submenu -->
-            <div class="sidebar-section-title" style="padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-top: 1rem;">
+            <!-- Spacer to push My Account to bottom -->
+            <div style="flex-grow: 1;"></div>
+            
+            <!-- My Account Section at Bottom -->
+            <div class="sidebar-section-title" style="padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
                 My Account
             </div>
             
             <a href="/config/notifications" class="sidebar-link {% if request.path.startswith('/config/notifications') %}active{% endif %}"
+               data-tooltip="Email Notifications"
                hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-bell"/></svg>
-                <span>Notifications</span>
+                <span>Email Notifications</span>
             </a>
             
             <a href="/config/mtls" class="sidebar-link {% if request.path.startswith('/config/mtls') %}active{% endif %}"
+               data-tooltip="mTLS Auth"
                hx-get="/config/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-shield-check"/></svg>
                 <span>mTLS Auth</span>
             </a>
             
             <a href="/config/webauthn" class="sidebar-link {% if request.path.startswith('/config/webauthn') %}active{% endif %}"
+               data-tooltip="Security Keys"
                hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-key"/></svg>
                 <span>Security Keys</span>
@@ -270,6 +318,8 @@
     <script src="{{ url_for('static', filename='vendor/js/alpine.min.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/modal-utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/icon-system.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modal-system.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sidebar-toggle.js') }}"></script>
     <script src="{{ url_for('static', filename='js/theme-switcher.js') }}"></script>
     <script src="{{ url_for('static', filename='js/spa-navigation.js') }}"></script>
     {% if request.endpoint and request.endpoint != 'ui.login' %}

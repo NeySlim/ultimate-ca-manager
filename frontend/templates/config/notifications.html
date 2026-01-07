@@ -486,12 +486,18 @@ async function testNotifications() {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+function init() {
     loadSMTPConfig();
     loadNotificationRules();
     loadNotificationHistory();
     loadNotificationStats();
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
 })();
 </script>
 {% endblock %}

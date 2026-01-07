@@ -559,10 +559,16 @@ async function deleteCertificate(certId) {
 }
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+function init() {
     loadMTLSSettings();
     loadCertificates();
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
 })();
 </script>
 {% endblock %}

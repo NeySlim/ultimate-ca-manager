@@ -1005,6 +1005,82 @@
           "stroke-linejoin": "round"
         }
       ]
+    },
+    "file": {
+      "viewBox": "0 0 24 24",
+      "paths": [
+        {
+          "d": "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z",
+          "fill": "none",
+          "stroke": "currentColor",
+          "stroke-width": "2",
+          "gradient": "primary"
+        },
+        {
+          "d": "M14 2v6h6",
+          "fill": "none",
+          "stroke": "currentColor",
+          "stroke-width": "2",
+          "gradient": "accent"
+        }
+      ]
+    },
+    "copy": {
+      "viewBox": "0 0 24 24",
+      "paths": [
+        {
+          "d": "M16 8V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4",
+          "fill": "none",
+          "stroke": "currentColor",
+          "stroke-width": "2",
+          "gradient": "primary"
+        },
+        {
+          "d": "M8 8h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z",
+          "fill": "none",
+          "stroke": "currentColor",
+          "stroke-width": "2",
+          "gradient": "accent"
+        }
+      ]
+    },
+    "shield": {
+      "viewBox": "0 0 24 24",
+      "paths": [
+        {
+          "d": "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+          "fill": "none",
+          "stroke": "currentColor",
+          "stroke-width": "2",
+          "gradient": "primary"
+        }
+      ]
+    },
+    "database": {
+      "viewBox": "0 0 24 24",
+      "paths": [
+        {
+          "d": "M12 2C6.5 2 2 3.8 2 6v12c0 2.2 4.5 4 10 4s10-1.8 10-4V6c0-2.2-4.5-4-10-4z",
+          "fill": "none",
+          "stroke": "currentColor",
+          "stroke-width": "2",
+          "gradient": "primary"
+        },
+        {
+          "d": "M2 12c0 2.2 4.5 4 10 4s10-1.8 10-4",
+          "fill": "none",
+          "stroke": "currentColor",
+          "stroke-width": "2",
+          "gradient": "accent"
+        },
+        {
+          "d": "M2 6c0 2.2 4.5 4 10 4s10-1.8 10-4",
+          "fill": "none",
+          "stroke": "currentColor",
+          "stroke-width": "2",
+          "gradient": "accent"
+        }
+      ]
     }
   },
   "gradients": {

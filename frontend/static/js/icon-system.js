@@ -16,7 +16,7 @@ class IconSystem {
             // Try to load from localStorage cache first
             const cachedData = localStorage.getItem('ucm-icons-data');
             const cachedVersion = localStorage.getItem('ucm-icons-version');
-            const currentVersion = '2.7'; // Increment this when icons.json changes
+            const currentVersion = '2.8'; // Increment this when icons.json changes
             
             if (cachedData && cachedVersion === currentVersion) {
                 // Use cached data for instant load
@@ -245,6 +245,14 @@ class IconSystem {
             'fa-file-contract': 'crl',
             'fa-circle-check': 'ocsp',
             'fa-check-double': 'ocsp',
+            'fa-file': 'file',
+            'fa-copy': 'copy',
+            'fa-clone': 'copy',
+            'fa-shield': 'shield',
+            'fa-shield-alt': 'shield-check',
+            'fa-database': 'database',
+            'fa-rotate': 'refresh',
+            'fa-trash-alt': 'trash',
             'fa-bell': 'bell',
             'fa-envelope': 'envelope',
             'fa-mail': 'envelope',

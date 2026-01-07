@@ -165,7 +165,7 @@ aside {
     top: 65px;
     left: 0;
     bottom: 0;
-    width: 250px;
+    width: 220px;
     background: var(--sidebar-bg);
     border-right: 1px solid var(--border);
     overflow-y: auto;
@@ -256,7 +256,7 @@ aside {
 
 /* ===== MAIN ===== */
 main {
-    margin-left: 250px;
+    margin-left: 220px;
     margin-top: 65px;
     padding: 24px;
     min-height: calc(100vh - 65px);

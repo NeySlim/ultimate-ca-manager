@@ -13,10 +13,10 @@
             <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Certificate Authority Details</p>
         </div>
         <div style="display: flex; gap: 0.75rem;">
-            <a href="/ca" class="btn-secondary">
+            <a href="/ca" class="btn btn-secondary">
                 <i class="fas fa-arrow-left" style="margin-right: 0.5rem;"></i>Back to List
             </a>
-            <button onclick="downloadCRL('{{ ca.id }}')" class="btn-primary">
+            <button onclick="downloadCRL('{{ ca.id }}')" class="btn btn-primary">
                 <i class="fas fa-ban" style="margin-right: 0.5rem;"></i>Download CRL
             </button>
             <div style="position: relative; display: inline-block;">
@@ -153,7 +153,7 @@
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
                 <i class="fas fa-file-contract" style="margin-right: 0.5rem;"></i>CRL Distribution Points (CDP)
             </h2>
-            <button onclick="toggleCDPEdit()" id="cdp-edit-btn" class="btn-secondary" style="padding: 0.375rem 0.75rem; font-size: 0.875rem;">
+            <button onclick="toggleCDPEdit()" id="cdp-edit-btn" class="btn btn-secondary" style="padding: 0.375rem 0.75rem; font-size: 0.875rem;">
                 <i class="fas fa-edit" style="margin-right: 0.25rem;"></i>Configure
             </button>
         </div>
@@ -241,10 +241,10 @@
                     </div>
                     
                     <div style="display: flex; gap: 0.75rem; padding-top: 0.75rem;">
-                        <button type="button" onclick="saveCDPConfig()" class="btn-primary">
+                        <button type="button" onclick="saveCDPConfig()" class="btn btn-primary">
                             <i class="fas fa-save" style="margin-right: 0.25rem;"></i>Save Configuration
                         </button>
-                        <button type="button" onclick="cancelCDPEdit()" class="btn-secondary">
+                        <button type="button" onclick="cancelCDPEdit()" class="btn btn-secondary">
                             <i class="fas fa-times" style="margin-right: 0.25rem;"></i>Cancel
                         </button>
                     </div>
@@ -259,7 +259,7 @@
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">
                 <i class="fas fa-circle-check" style="margin-right: 0.5rem;"></i>OCSP (Online Certificate Status Protocol)
             </h2>
-            <button onclick="toggleOCSPEdit()" id="ocsp-edit-btn" class="btn-secondary" style="padding: 0.375rem 0.75rem; font-size: 0.875rem;">
+            <button onclick="toggleOCSPEdit()" id="ocsp-edit-btn" class="btn btn-secondary" style="padding: 0.375rem 0.75rem; font-size: 0.875rem;">
                 <i class="fas fa-edit" style="margin-right: 0.25rem;"></i>Configure
             </button>
         </div>
@@ -333,10 +333,10 @@
                     </div>
                     
                     <div style="display: flex; gap: 0.75rem; padding-top: 0.75rem;">
-                        <button type="button" onclick="saveOCSPConfig()" class="btn-primary">
+                        <button type="button" onclick="saveOCSPConfig()" class="btn btn-primary">
                             <i class="fas fa-save" style="margin-right: 0.25rem;"></i>Save Configuration
                         </button>
-                        <button type="button" onclick="cancelOCSPEdit()" class="btn-secondary">
+                        <button type="button" onclick="cancelOCSPEdit()" class="btn btn-secondary">
                             <i class="fas fa-times" style="margin-right: 0.25rem;"></i>Cancel
                         </button>
                     </div>
@@ -389,10 +389,10 @@
             </div>
             <div id="pkcs12-error" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background: var(--danger-bg); color: var(--danger-color); border-radius: 0.25rem; font-size: 0.875rem;"></div>
             <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
-                <button onclick="closePKCS12Modal()" class="btn-secondary">
+                <button onclick="closePKCS12Modal()" class="btn btn-secondary">
                     Cancel
                 </button>
-                <button onclick="exportPKCS12()" class="btn-primary">
+                <button onclick="exportPKCS12()" class="btn btn-primary">
                     <i class="fas fa-download" style="margin-right: 0.5rem;"></i>Export
                 </button>
             </div>

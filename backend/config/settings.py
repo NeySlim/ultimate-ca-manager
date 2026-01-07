@@ -31,7 +31,7 @@ class Config:
     
     # Application
     APP_NAME = os.getenv("APP_NAME", "Ultimate CA Manager")
-    APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
+    APP_VERSION = os.getenv("APP_VERSION", "1.7.0")
     SECRET_KEY = os.getenv("SECRET_KEY", os.urandom(32).hex())
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     

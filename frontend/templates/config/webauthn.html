@@ -8,8 +8,8 @@
         <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
             <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-key"/></svg> WebAuthn / FIDO2 Security Keys
         </h1>
-        <button onclick="showRegistrationModal()" class="btn-primary">
-            <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Register New Key
+        <button onclick="showRegistrationModal()" class="btn btn-primary">
+            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-plus"/></svg> Register New Key
         </button>
     </div>
 
@@ -112,8 +112,8 @@
                 </div>
 
                 <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
-                    <button onclick="hideRegistrationModal()" class="btn-secondary">Cancel</button>
-                    <button onclick="startRegistration()" class="btn-primary">
+                    <button onclick="hideRegistrationModal()" class="btn btn-secondary">Cancel</button>
+                    <button onclick="startRegistration()" class="btn btn-primary">
                         <svg class="ucm-icon" width="16" height="16"><use href="#icon-shield-check"/></svg> Start Registration
                     </button>
                 </div>
@@ -129,7 +129,7 @@
                         Follow your browser's prompts to complete registration
                     </p>
                 </div>
-                <button onclick="cancelRegistration()" class="btn-secondary">Cancel</button>
+                <button onclick="cancelRegistration()" class="btn btn-secondary">Cancel</button>
             </div>
 
             <div id="registration-step-3" style="display: none; text-align: center;">
@@ -144,7 +144,7 @@
                         Your security key has been registered and is ready to use
                     </p>
                 </div>
-                <button onclick="hideRegistrationModal(); loadCredentials();" class="btn-primary">Done</button>
+                <button onclick="hideRegistrationModal(); loadCredentials();" class="btn btn-primary">Done</button>
             </div>
 
             <div id="registration-step-error" style="display: none; text-align: center;">
@@ -158,8 +158,8 @@
                     <p id="registration-error-message" style="color: var(--text-secondary); font-size: 0.875rem;"></p>
                 </div>
                 <div style="display: flex; gap: 0.75rem; justify-content: center;">
-                    <button onclick="hideRegistrationModal()" class="btn-secondary">Close</button>
-                    <button onclick="resetRegistrationModal()" class="btn-primary">Try Again</button>
+                    <button onclick="hideRegistrationModal()" class="btn btn-secondary">Close</button>
+                    <button onclick="resetRegistrationModal()" class="btn btn-primary">Try Again</button>
                 </div>
             </div>
         </div>
@@ -266,7 +266,7 @@ async function checkHostnameCompatibility() {
                     ${protocol}//${fqdn}:${port}
                 </a>
                 <button onclick="window.location.href='${redirectUrl}'" 
-                        class="btn-primary" 
+                        class="btn btn-primary" 
                         style="margin-left: 1rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
                     <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg> Switch to this URL
                 </button>
@@ -359,7 +359,7 @@ function renderCredentials(credentials) {
             <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
                 <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem;"><use href="#icon-key"/></svg>
                 <p>No security keys registered yet</p>
-                <button onclick="showRegistrationModal()" class="btn-primary" style="margin-top: 1rem;">
+                <button onclick="showRegistrationModal()" class="btn btn-primary" style="margin-top: 1rem;">
                     <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Register Your First Key
                 </button>
             </div>
@@ -391,7 +391,7 @@ function renderCredentials(credentials) {
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
                     <button onclick="toggleCredential('${cred.id}', ${!cred.enabled})"
-                            class="btn-secondary" style="padding: 0.5rem 0.75rem;">
+                            class="btn btn-secondary" style="padding: 0.5rem 0.75rem;">
                         <svg class="ucm-icon" width="16" height="16">
                             <use href="#icon-eye${cred.enabled ? '-slash' : ''}"/>
                         </svg>

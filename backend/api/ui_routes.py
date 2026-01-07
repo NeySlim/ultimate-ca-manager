@@ -416,6 +416,16 @@ def users():
     return render_template('users.html')
 
 
+@ui_bp.route('/users/create')
+@login_required
+def users_create():
+    """Create user page - returns users list with trigger to open modal"""
+    response = make_response(render_template('users.html'))
+    # Send trigger after swap to open modal if needed
+    response.headers['HX-Trigger-After-Swap'] = 'openCreateUserModal'
+    return response
+
+
 # CA Management
 @ui_bp.route('/ca')
 @login_required

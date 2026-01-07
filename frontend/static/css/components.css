@@ -485,13 +485,14 @@ a.btn-primary .ucm-icon path {
     transition: all 0.2s ease !important;
     text-decoration: none !important;
     white-space: nowrap !important;
-    background: var(--bg-secondary) !important;
+    background: transparent !important;
     color: var(--text-primary) !important;
     border: 1px solid var(--border-color) !important;
 }
 
 .btn-secondary:hover:not(:disabled) {
-    background: var(--sidebar-hover) !important;
+    background: var(--bg-hover, var(--sidebar-hover)) !important;
+    border-color: var(--primary-color) !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
@@ -505,8 +506,12 @@ a.btn-primary .ucm-icon path {
 .btn-secondary i.far,
 .btn-secondary i.fab,
 .btn-secondary svg,
-.btn-secondary .ucm-icon {
+.btn-secondary svg path,
+.btn-secondary .ucm-icon,
+.btn-secondary .ucm-icon path {
     color: var(--text-primary) !important;
+    fill: var(--text-primary) !important;
+    stroke: var(--text-primary) !important;
     opacity: 1 !important;
 }
 
@@ -522,13 +527,13 @@ a.btn-primary .ucm-icon path {
     transition: all 0.2s ease !important;
     text-decoration: none !important;
     white-space: nowrap !important;
-    background: var(--bg-secondary) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border-color) !important;
+    background: var(--status-danger, #ef4444) !important;
+    color: white !important;
+    border: 1px solid var(--status-danger, #ef4444) !important;
 }
 
 .btn-danger:hover:not(:disabled) {
-    background: var(--sidebar-hover) !important;
+    background: var(--danger-hover, #dc2626) !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
@@ -542,8 +547,12 @@ a.btn-primary .ucm-icon path {
 .btn-danger i.far,
 .btn-danger i.fab,
 .btn-danger svg,
-.btn-danger .ucm-icon {
-    color: var(--status-danger) !important;
+.btn-danger svg path,
+.btn-danger .ucm-icon,
+.btn-danger .ucm-icon path {
+    color: white !important;
+    fill: white !important;
+    stroke: white !important;
     opacity: 1 !important;
 }
 
@@ -559,13 +568,13 @@ a.btn-primary .ucm-icon path {
     transition: all 0.2s ease !important;
     text-decoration: none !important;
     white-space: nowrap !important;
-    background: var(--bg-secondary) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border-color) !important;
+    background: var(--status-success, #10b981) !important;
+    color: white !important;
+    border: 1px solid var(--status-success, #10b981) !important;
 }
 
 .btn-success:hover:not(:disabled) {
-    background: var(--sidebar-hover) !important;
+    background: var(--success-hover, #059669) !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
@@ -579,8 +588,12 @@ a.btn-primary .ucm-icon path {
 .btn-success i.far,
 .btn-success i.fab,
 .btn-success svg,
-.btn-success .ucm-icon {
-    color: var(--status-success) !important;
+.btn-success svg path,
+.btn-success .ucm-icon,
+.btn-success .ucm-icon path {
+    color: white !important;
+    fill: white !important;
+    stroke: white !important;
     opacity: 1 !important;
 }
 
@@ -592,6 +605,158 @@ a.btn-primary .ucm-icon path {
 .btn-lg {
     padding: 12px 24px;
     font-size: 16px;
+}
+
+/* Outline Button Variants - Transparent background with colored border */
+.btn-outline-primary {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+    background: transparent !important;
+    color: var(--primary-color) !important;
+    border: 1px solid var(--primary-color) !important;
+}
+
+.btn-outline-primary:hover:not(:disabled) {
+    background: var(--primary-color) !important;
+    color: white !important;
+}
+
+.btn-outline-primary:hover:not(:disabled) svg,
+.btn-outline-primary:hover:not(:disabled) svg path,
+.btn-outline-primary:hover:not(:disabled) .ucm-icon,
+.btn-outline-primary:hover:not(:disabled) .ucm-icon path {
+    color: white !important;
+    fill: white !important;
+    stroke: white !important;
+}
+
+.btn-outline-primary svg,
+.btn-outline-primary svg path,
+.btn-outline-primary .ucm-icon,
+.btn-outline-primary .ucm-icon path {
+    color: var(--primary-color) !important;
+    fill: var(--primary-color) !important;
+    stroke: var(--primary-color) !important;
+}
+
+.btn-outline-secondary {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+    background: transparent !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.btn-outline-secondary:hover:not(:disabled) {
+    background: var(--bg-hover) !important;
+    border-color: var(--primary-color) !important;
+}
+
+.btn-outline-secondary svg,
+.btn-outline-secondary svg path,
+.btn-outline-secondary .ucm-icon,
+.btn-outline-secondary .ucm-icon path {
+    color: var(--text-primary) !important;
+    fill: var(--text-primary) !important;
+    stroke: var(--text-primary) !important;
+}
+
+.btn-outline-danger {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+    background: transparent !important;
+    color: var(--status-danger, #ef4444) !important;
+    border: 1px solid var(--status-danger, #ef4444) !important;
+}
+
+.btn-outline-danger:hover:not(:disabled) {
+    background: var(--status-danger, #ef4444) !important;
+    color: white !important;
+}
+
+.btn-outline-danger:hover:not(:disabled) svg,
+.btn-outline-danger:hover:not(:disabled) svg path,
+.btn-outline-danger:hover:not(:disabled) .ucm-icon,
+.btn-outline-danger:hover:not(:disabled) .ucm-icon path {
+    color: white !important;
+    fill: white !important;
+    stroke: white !important;
+}
+
+.btn-outline-danger svg,
+.btn-outline-danger svg path,
+.btn-outline-danger .ucm-icon,
+.btn-outline-danger .ucm-icon path {
+    color: var(--status-danger, #ef4444) !important;
+    fill: var(--status-danger, #ef4444) !important;
+    stroke: var(--status-danger, #ef4444) !important;
+}
+
+.btn-outline-success {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+    background: transparent !important;
+    color: var(--status-success, #10b981) !important;
+    border: 1px solid var(--status-success, #10b981) !important;
+}
+
+.btn-outline-success:hover:not(:disabled) {
+    background: var(--status-success, #10b981) !important;
+    color: white !important;
+}
+
+.btn-outline-success:hover:not(:disabled) svg,
+.btn-outline-success:hover:not(:disabled) svg path,
+.btn-outline-success:hover:not(:disabled) .ucm-icon,
+.btn-outline-success:hover:not(:disabled) .ucm-icon path {
+    color: white !important;
+    fill: white !important;
+    stroke: white !important;
+}
+
+.btn-outline-success svg,
+.btn-outline-success svg path,
+.btn-outline-success .ucm-icon,
+.btn-outline-success .ucm-icon path {
+    color: var(--status-success, #10b981) !important;
+    fill: var(--status-success, #10b981) !important;
+    stroke: var(--status-success, #10b981) !important;
 }
 
 .btn-icon {
@@ -609,6 +774,14 @@ a.btn-primary .ucm-icon path {
     margin-bottom: 20px;
 }
 
+/* ===========================
+   FORMS - UNIFIED STYLES
+   =========================== */
+
+.form-group {
+    margin-bottom: 20px;
+}
+
 .form-label {
     display: block;
     margin-bottom: 6px;
@@ -617,7 +790,21 @@ a.btn-primary .ucm-icon path {
     color: var(--text-primary);
 }
 
-.form-control {
+/* Unified input styles - applies to all input types and selects */
+.form-control,
+.form-input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="url"],
+input[type="tel"],
+input[type="search"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+textarea,
+select {
     width: 100%;
     padding: 10px 14px;
     font-size: 14px;
@@ -625,24 +812,70 @@ a.btn-primary .ucm-icon path {
     background: var(--content-bg);
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    transition: border-color 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.form-control:focus {
+/* Focus state */
+.form-control:focus,
+.form-input:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="url"]:focus,
+input[type="tel"]:focus,
+input[type="search"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="datetime-local"]:focus,
+textarea:focus,
+select:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px var(--primary-light, rgba(59, 130, 246, 0.1));
 }
 
-.form-control::placeholder {
+/* Placeholder */
+.form-control::placeholder,
+.form-input::placeholder,
+input::placeholder,
+textarea::placeholder {
     color: var(--text-muted, var(--text-secondary));
+    opacity: 0.7;
 }
 
-.form-select {
-    width: 100%;
-    padding: 10px 36px 10px 14px;
-    font-size: 14px;
+/* Select specific styles */
+.form-select,
+select {
+    padding-right: 36px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23666' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px;
+}
+
+select option {
+    background: var(--card-bg);
     color: var(--text-primary);
+}
+
+/* Textarea specific */
+textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+/* Checkbox and Radio */
+.form-checkbox,
+input[type="checkbox"],
+input[type="radio"] {
+    width: auto;
+    padding: 0;
+    margin-right: 8px;
+}
     background: var(--content-bg);
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -1712,47 +1945,7 @@ table td:last-child .btn-icon {
 .bg-blue-50\/20 { background: rgba(59, 130, 246, 0.04); }
 
 /* Form controls */
-.form-input,
-.form-checkbox {
-    border: 1px solid var(--border-color);
-    background: var(--card-bg);
-    color: var(--text-primary);
-}
-
-.form-input:focus,
-.form-checkbox:focus {
-    border-color: var(--primary-color);
-    outline: none;
-}
-
-.form-label {
-    display: block;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-    margin-bottom: 0.5rem;
-}
-
-.form-group {
-    margin-bottom: 1rem;
-}
-
-/* Select dropdown styling */
-select {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-}
-
-select:focus {
-    outline: none;
-    border-color: var(--primary-color) !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-select option {
-    background: var(--card-bg);
-    color: var(--text-primary);
+/* Removed - now unified in main FORMS section above */
     padding: 8px;
 }
 
@@ -1823,7 +2016,345 @@ body::-webkit-scrollbar-thumb:hover,
     background: var(--scrollbar-thumb-hover);
 }
 
+/* Force SVG icons in colored buttons to be white/currentColor 
+   This overrides gradient fills defined in SVG symbols */
+.btn-primary .ucm-icon,
+.btn-danger .ucm-icon,
+.btn-success .ucm-icon {
+    filter: brightness(0) invert(1); /* Convert any color to white */
+}
+
+.btn-secondary .ucm-icon,
+.btn-outline-primary .ucm-icon,
+.btn-outline-secondary .ucm-icon,
+.btn-outline-danger .ucm-icon,
+.btn-outline-success .ucm-icon {
+    /* Icons will use theme colors naturally */
+    filter: none;
+}
+
+/* On hover for outline buttons, icons should become white */
+.btn-outline-primary:hover .ucm-icon,
+.btn-outline-danger:hover .ucm-icon,
+.btn-outline-success:hover .ucm-icon {
+    filter: brightness(0) invert(1); /* Convert to white on hover */
+}
+
 /* Prevent body scroll when modal is open */
 body.modal-open {
     overflow: hidden;
 }
+
+/* ===========================
+   UCM MODAL SYSTEM
+   =========================== */
+
+.ucm-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: ucm-modal-fade-in 0.2s ease-out;
+    padding: 1rem;
+}
+
+.ucm-modal {
+    animation: ucm-modal-slide-in 0.3s ease-out;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.ucm-modal-header {
+    background: var(--card-bg);
+}
+
+.ucm-modal-body {
+    background: var(--card-bg);
+}
+
+.ucm-modal-footer {
+    background: var(--card-bg);
+}
+
+@keyframes ucm-modal-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes ucm-modal-slide-in {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Modal close animation */
+.ucm-modal-closing .ucm-modal-overlay {
+    animation: ucm-modal-fade-out 0.2s ease-out;
+}
+
+.ucm-modal-closing .ucm-modal {
+    animation: ucm-modal-slide-out 0.2s ease-out;
+}
+
+@keyframes ucm-modal-fade-out {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes ucm-modal-slide-out {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+}
+
+/* ===========================
+   SIDEBAR COLLAPSIBLE SUBMENUS
+   =========================== */
+
+/* Sidebar nav container with flex to push content to bottom */
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.sidebar-link-parent {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+}
+
+.sidebar-chevron {
+    opacity: 0.6;
+    flex-shrink: 0;
+    cursor: pointer !important;
+}
+
+.sidebar-chevron:hover {
+    opacity: 1;
+}
+
+.sidebar-submenu {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+    opacity: 0;
+    padding-left: 2.5rem;
+}
+
+.sidebar-submenu.expanded {
+    max-height: 500px;
+    opacity: 1;
+    transition: max-height 0.3s ease-in, opacity 0.3s ease-in;
+}
+
+.sidebar-submenu .sidebar-link {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.sidebar-submenu .sidebar-link:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.sidebar-submenu .sidebar-link.active {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+/* Submenu link layout with icons */
+.sidebar-submenu .sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sidebar-submenu .sidebar-link .ucm-icon {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.sidebar-submenu .sidebar-link:hover .ucm-icon {
+    opacity: 1;
+}
+
+.sidebar-submenu .sidebar-link.active .ucm-icon {
+    opacity: 1;
+}
+
+/* ===========================
+   SIDEBAR COLLAPSE & FLYOUT - DISABLED FOR NOW
+   =========================== */
+
+/*
+/* Sidebar toggle button */
+/*.sidebar-toggle-btn {
+    position: fixed;
+    top: 1.25rem;
+    left: 210px;
+    width: 28px;
+    height: 28px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.sidebar-toggle-btn:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.sidebar-toggle-btn:hover .ucm-icon {
+    filter: brightness(0) invert(1);
+}
+
+.sidebar-toggle-btn .ucm-icon {
+    transform: rotate(-90deg);
+    transition: transform 0.3s ease;
+}
+
+/* Collapsed sidebar */
+/*aside#sidebar {
+    position: relative;
+    transition: width 0.3s ease, min-width 0.3s ease;
+    overflow-x: hidden;
+}
+
+aside#sidebar.collapsed {
+    width: 70px !important;
+    min-width: 70px !important;
+}
+
+aside#sidebar.collapsed ~ .sidebar-toggle-btn {
+    left: 50px;
+}
+
+aside#sidebar.collapsed .sidebar-toggle-btn .ucm-icon {
+    transform: rotate(90deg);
+}
+
+/* Hide text and chevrons when collapsed */
+/*aside#sidebar.collapsed .sidebar-link span,
+aside#sidebar.collapsed .sidebar-chevron,
+aside#sidebar.collapsed .sidebar-section-title {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    transition: opacity 0.2s ease;
+}
+
+/* Center icons in collapsed state */
+/*aside#sidebar.collapsed .sidebar-link {
+    justify-content: center;
+    padding: 0.75rem 0;
+}
+
+/* Hide submenus in collapsed state (unless flyout) */
+/*aside#sidebar.collapsed .sidebar-submenu:not(.flyout) {
+    display: none;
+}
+
+/* Flyout submenu (appears on hover when collapsed) */
+/*.sidebar-submenu.flyout {
+    display: block !important;
+    position: fixed;
+    left: 70px;
+    top: var(--flyout-top, auto);
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    padding: 0.5rem 0;
+    min-width: 200px;
+    z-index: 1000;
+    opacity: 1 !important;
+    max-height: none !important;
+    animation: flyout-slide-in 0.2s ease;
+}
+
+@keyframes flyout-slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.sidebar-submenu.flyout .sidebar-link {
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sidebar-submenu.flyout .sidebar-link:hover {
+    background: var(--bg-hover);
+}
+
+/* Tooltip for collapsed sidebar items */
+/*aside#sidebar.collapsed .sidebar-link[data-tooltip] {
+    position: relative;
+}
+
+aside#sidebar.collapsed .sidebar-link[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: fixed;
+    left: 80px;
+    top: var(--tooltip-top, 50%);
+    transform: translateY(-50%);
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    z-index: 1001;
+}
+
+aside#sidebar.collapsed .sidebar-link[data-tooltip]:hover::after {
+    opacity: 1;
+}
+*/

@@ -13,7 +13,7 @@
             <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Certificate Details</p>
         </div>
         <div style="display: flex; gap: 0.75rem;">
-            <a href="/certificates" class="btn-secondary">
+            <a href="/certificates" class="btn btn-secondary">
                 <i class="fas fa-arrow-left" style="margin-right: 0.5rem;"></i>Back to List
             </a>
             {% if not cert.revoked %}
@@ -192,10 +192,10 @@
             </div>
             <div id="pkcs12-error" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background: var(--danger-bg-light); color: var(--status-danger); border-radius: 0.25rem; font-size: 0.875rem;"></div>
             <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
-                <button onclick="closePKCS12Modal()" class="btn-secondary">
+                <button onclick="closePKCS12Modal()" class="btn btn-secondary">
                     Cancel
                 </button>
-                <button onclick="exportPKCS12()" class="btn-primary">
+                <button onclick="exportPKCS12()" class="btn btn-primary">
                     <i class="fas fa-download mr-2"></i>Export
                 </button>
             </div>
