@@ -1,6 +1,6 @@
 # Ultimate CA Manager - Wiki
 
-![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.6.1-blue.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 
 Welcome to the **Ultimate CA Manager (UCM)** documentation! This wiki provides comprehensive guides for all features.
@@ -50,15 +50,22 @@ Welcome to the **Ultimate CA Manager (UCM)** documentation! This wiki provides c
 
 ## 🚀 Quick Links
 
-- **Installation**: `sudo dpkg -i ucm_1.6.0_all.deb`
+- **Installation**: `sudo dpkg -i ucm_1.6.1_all.deb`
 - **Web UI**: `https://your-server:8443`
-- **Default Credentials**: `admin` / `admin` ⚠️ Change immediately!
+- **Default Credentials**: `admin` / `changeme123` ⚠️ Change immediately!
 - **GitHub**: [NeySlim/ultimate-ca-manager](https://github.com/NeySlim/ultimate-ca-manager)
 
 ---
 
-## 📖 What's New in v1.6.0
+## 📖 What's New
 
+### v1.6.1 (Latest)
+- 🐛 Fixed missing Docker files (Dockerfile, entrypoint.sh, wsgi.py, gunicorn.conf.py)
+- ✅ All 4 GitHub Actions workflows now passing
+- 🐳 Docker Hub multi-arch builds (amd64/arm64)
+- 📦 Automated .deb and .rpm package builds
+
+### v1.6.0
 - ✨ Complete Tailwind CSS removal (~827 classes)
 - 🎨 Custom themed scrollbars
 - 🔐 CRL Information pages (public & integrated)
@@ -78,5 +85,5 @@ Welcome to the **Ultimate CA Manager (UCM)** documentation! This wiki provides c
 
 ---
 
-**Last Updated**: 2026-01-05  
+**Last Updated**: 2026-01-07  
 **Maintained By**: NeySlim

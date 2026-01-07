@@ -215,4 +215,4 @@ Complete guide to managing Certificate Authorities in UCM.
 
 ---
 
-**Last Updated**: 2026-01-05
+**Last Updated**: 2026-01-07
