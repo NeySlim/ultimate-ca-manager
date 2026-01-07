@@ -287,3 +287,69 @@ def delete_user(user_id):
              details=f'Deleted user: {username}')
     
     return jsonify({"message": "User deleted successfully"}), 200
+
+
+@auth_bp.route('/methods', methods=['GET'])
+def get_auth_methods():
+    """
+    Get available authentication methods for a user
+    Returns methods in order of security priority: mTLS > WebAuthn > Password
+    ---
+    GET /api/v1/auth/methods?username=admin
+    """
+    username = request.args.get('username')
+    
+    if not username:
+        return jsonify({'error': 'Username required'}), 400
+    
+    user = User.query.filter_by(username=username).first()
+    
+    if not user:
+        # Don't reveal if user exists - return generic response
+        return jsonify({
+            'methods': ['password'],
+            'preferred': 'password',
+            'username': username
+        }), 200
+    
+    methods = []
+    preferred = None
+    
+    # Check mTLS (highest priority)
+    from models.auth_certificate import AuthCertificate
+    mtls_certs = AuthCertificate.query.filter_by(
+        user_id=user.id,
+        enabled=True
+    ).count()
+    
+    if mtls_certs > 0:
+        methods.append('mtls')
+        if not preferred:
+            preferred = 'mtls'
+    
+    # Check WebAuthn (second priority)
+    from models.webauthn import WebAuthnCredential
+    webauthn_creds = WebAuthnCredential.query.filter_by(
+        user_id=user.id,
+        enabled=True
+    ).count()
+    
+    if webauthn_creds > 0:
+        methods.append('webauthn')
+        if not preferred:
+            preferred = 'webauthn'
+    
+    # Password always available as fallback
+    methods.append('password')
+    if not preferred:
+        preferred = 'password'
+    
+    return jsonify({
+        'methods': methods,
+        'preferred': preferred,
+        'username': username,
+        'counts': {
+            'mtls': mtls_certs if mtls_certs > 0 else 0,
+            'webauthn': webauthn_creds if webauthn_creds > 0 else 0
+        }
+    }), 200

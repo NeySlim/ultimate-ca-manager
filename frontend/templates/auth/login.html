@@ -353,46 +353,35 @@
         
         <!-- Login Card -->
         <div class="login-card">
-            <form action="/login" method="POST">
+            <!-- Step 1: Username Entry -->
+            <div id="step-username">
                 <div class="form-group">
                     <label class="form-label" for="username">Username</label>
-                    <input class="form-input" id="username" name="username" type="text" required placeholder="Enter your username" autofocus>
+                    <input class="form-input" id="username" type="text" required placeholder="Enter your username" autofocus 
+                           onkeypress="if(event.key === 'Enter') checkAuthMethods()">
                 </div>
                 
-                <div class="form-group">
-                    <label class="form-label" for="password">Password</label>
-                    <input class="form-input" id="password" name="password" type="password" required placeholder="Enter your password">
-                </div>
-                
-                <div class="form-checkbox">
-                    <input id="remember" name="remember" type="checkbox">
-                    <label for="remember">Remember me</label>
-                </div>
-                
-                <button type="submit" class="btn-login">
-                    <i class="fas fa-right-from-bracket"></i>
-                    <span>Sign In</span>
+                <button type="button" onclick="checkAuthMethods()" class="btn-login">
+                    <i class="fas fa-arrow-right"></i>
+                    <span>Continue</span>
                 </button>
-            </form>
+            </div>
             
-            <!-- WebAuthn Login Option -->
-            <div id="webauthn-section" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
-                <div style="text-align: center; margin-bottom: 12px;">
-                    <span style="font-size: 13px; color: var(--text-secondary);">Or sign in with</span>
+            <!-- Step 2: Authentication Methods (hidden initially) -->
+            <div id="step-auth-methods" style="display: none;">
+                <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-user-circle" style="color: var(--primary-color);"></i>
+                        <span id="display-username" style="font-weight: 600; color: var(--text-primary);"></span>
+                    </div>
+                    <button onclick="resetLogin()" style="background: none; border: none; color: var(--primary-color); font-size: 0.875rem; cursor: pointer; padding: 0; margin-top: 0.25rem;">
+                        Not you? Change account
+                    </button>
                 </div>
-                <button id="webauthn-login-btn" onclick="startWebAuthnLogin()" class="btn-login" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border);">
-                    <i class="fas fa-key"></i>
-                    <span>Security Key</span>
-                </button>
-                <div id="webauthn-status" style="margin-top: 12px; text-align: center; font-size: 13px; color: var(--text-secondary); display: none;"></div>
                 
-                <!-- Hostname warning for login page -->
-                <div id="webauthn-hostname-warning" style="display: none; margin-top: 12px; padding: 8px; background: var(--bg-warning); border-radius: 4px; font-size: 12px; text-align: left;">
-                    <strong style="color: var(--text-primary);">⚠️ WebAuthn unavailable</strong>
-                    <p style="margin: 4px 0 0 0; color: var(--text-secondary);">
-                        Access via <a id="suggested-url" href="#" style="color: var(--primary-color); font-weight: 600;"></a> to use security keys.
-                    </p>
-                </div>
+                <div id="auth-methods-container"></div>
+                
+                <div id="auth-status" style="margin-top: 12px; text-align: center; font-size: 13px; display: none;"></div>
             </div>
         </div>
         
@@ -447,6 +436,154 @@
         });
     </script>
     
+    <!-- Smart Authentication System -->
+    <script>
+        let currentUsername = null;
+        let availableMethods = [];
+        
+        // Check available authentication methods
+        async function checkAuthMethods() {
+            const username = document.getElementById('username').value.trim();
+            
+            if (!username) {
+                showAuthStatus('Please enter your username', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/auth/methods?username=${encodeURIComponent(username)}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showAuthStatus(data.error || 'Failed to check authentication methods', 'error');
+                    return;
+                }
+                
+                currentUsername = username;
+                availableMethods = data.methods;
+                
+                // Show username
+                document.getElementById('display-username').textContent = username;
+                document.getElementById('step-username').style.display = 'none';
+                document.getElementById('step-auth-methods').style.display = 'block';
+                
+                // Auto-try secure methods in priority order
+                await autoAuthenticateSecure(data);
+                
+            } catch (error) {
+                showAuthStatus('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function autoAuthenticateSecure(data) {
+            const methods = data.methods;
+            const container = document.getElementById('auth-methods-container');
+            
+            // Priority 1: Try mTLS (if available)
+            if (methods.includes('mtls') && data.counts.mtls > 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 2rem;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-color);"></i><p style="margin-top: 1rem; color: var(--text-secondary);">Checking for client certificate...</p></div>';
+                
+                // mTLS is handled by reverse proxy - if user has cert, they'd already be logged in
+                // Wait a moment to simulate check
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            // Priority 2: Try WebAuthn (if available and compatible)
+            if (methods.includes('webauthn') && data.counts.webauthn > 0) {
+                const isCompatible = checkWebAuthnCompatibility();
+                
+                if (isCompatible) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem;"><i class="fas fa-key" style="font-size: 2rem; color: var(--primary-color);"></i><p style="margin-top: 1rem; color: var(--text-primary); font-weight: 600;">Touch your security key</p><p style="color: var(--text-secondary); font-size: 0.875rem;">Follow your browser prompts to sign in</p></div>';
+                    
+                    try {
+                        await startWebAuthnLogin();
+                        return; // Success - will redirect
+                    } catch (error) {
+                        console.log('WebAuthn failed, falling back to password:', error);
+                        showAuthStatus('Security key authentication failed', 'error');
+                    }
+                }
+            }
+            
+            // Fallback: Show password form
+            showPasswordFallback();
+        }
+        
+        function showPasswordFallback() {
+            const container = document.getElementById('auth-methods-container');
+            
+            container.innerHTML = `
+                <div style="animation: fadeIn 0.3s;">
+                    <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 0.25rem; margin-bottom: 1rem; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-lock" style="color: var(--text-secondary);"></i>
+                        <span style="color: var(--text-secondary);">Please enter your password</span>
+                    </div>
+                    <form action="/login" method="POST">
+                        <input type="hidden" name="username" value="${currentUsername}">
+                        <div class="form-group">
+                            <label class="form-label" for="password">Password</label>
+                            <input class="form-input" id="password" name="password" type="password" required placeholder="Enter your password" autofocus>
+                        </div>
+                        <div class="form-checkbox">
+                            <input id="remember" name="remember" type="checkbox">
+                            <label for="remember">Remember me</label>
+                        </div>
+                        <button type="submit" class="btn-login" style="width: 100%;">
+                            <i class="fas fa-right-from-bracket"></i>
+                            <span>Sign In</span>
+                        </button>
+                    </form>
+                </div>
+            `;
+            
+            // Focus password field
+            setTimeout(() => {
+                const pwdField = document.getElementById('password');
+                if (pwdField) pwdField.focus();
+            }, 100);
+        }
+        
+        function checkWebAuthnCompatibility() {
+            const hostname = window.location.hostname;
+            return hostname === 'localhost' || 
+                   hostname === '127.0.0.1' || 
+                   hostname === '::1' ||
+                   /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
+                   hostname.includes('.');
+        }
+        
+        function resetLogin() {
+            document.getElementById('step-auth-methods').style.display = 'none';
+            document.getElementById('step-username').style.display = 'block';
+            document.getElementById('username').value = '';
+            document.getElementById('username').focus();
+            hideAuthStatus();
+        }
+        
+        function showAuthStatus(message, type = 'info') {
+            const status = document.getElementById('auth-status');
+            if (status) {
+                status.textContent = message;
+                status.style.display = 'block';
+                status.style.color = type === 'error' ? 'var(--error-color)' : type === 'success' ? 'var(--success-color)' : 'var(--primary-color)';
+            }
+        }
+        
+        function hideAuthStatus() {
+            const status = document.getElementById('auth-status');
+            if (status) {
+                status.style.display = 'none';
+            }
+        }
+    </script>
+    
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    
     <!-- WebAuthn Login -->
     <script>
         // Convert base64url to ArrayBuffer
@@ -476,33 +613,16 @@
             return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
         }
         
-        function showWebAuthnStatus(message, isError = false) {
-            const status = document.getElementById('webauthn-status');
-            status.textContent = message;
-            status.style.display = 'block';
-            status.style.color = isError ? 'var(--error-color)' : 'var(--primary-color)';
-        }
-        
-        function hideWebAuthnStatus() {
-            document.getElementById('webauthn-status').style.display = 'none';
-        }
-        
         async function startWebAuthnLogin() {
-            const btn = document.getElementById('webauthn-login-btn');
-            const originalHTML = btn.innerHTML;
+            showAuthStatus('🔑 Touch your security key...', 'info');
             
             try {
-                // Get username from form
-                const username = document.getElementById('username').value.trim();
+                // Use the stored username from step 1
+                const username = currentUsername || document.getElementById('username').value.trim();
                 if (!username) {
-                    showWebAuthnStatus('✗ Please enter your username first', true);
+                    showAuthStatus('✗ Username required', 'error');
                     return;
                 }
-                
-                // Disable button
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Preparing...</span>';
-                hideWebAuthnStatus();
                 
                 // Step 1: Get authentication options from server
                 const optionsResponse = await fetch('/api/v1/webauthn/authenticate/options', {
@@ -533,8 +653,7 @@
                 };
                 
                 // Step 2: Show "Touch your key" message
-                btn.innerHTML = '<i class="fas fa-key"></i> <span>Touch your security key...</span>';
-                showWebAuthnStatus('Follow your browser prompts to authenticate');
+                showAuthStatus('🔑 Touch your security key now...', 'info');
                 
                 // Step 3: Call WebAuthn API
                 const credential = await navigator.credentials.get(publicKeyOptions);
@@ -544,8 +663,7 @@
                 }
                 
                 // Step 4: Send credential to server
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Verifying...</span>';
-                showWebAuthnStatus('Verifying credential...');
+                showAuthStatus('✓ Verifying credential...', 'success');
                 
                 const verifyResponse = await fetch('/api/v1/webauthn/authenticate/verify', {
                     method: 'POST',
@@ -572,7 +690,7 @@
                 }
                 
                 // Success! Redirect to dashboard
-                showWebAuthnStatus('✓ Authentication successful! Redirecting...');
+                showAuthStatus('✓ Authentication successful! Redirecting...');
                 setTimeout(() => {
                     window.location.href = '/';
                 }, 500);
@@ -593,57 +711,13 @@
                     errorMessage = 'WebAuthn not supported in this browser';
                 }
                 
-                showWebAuthnStatus('✗ ' + errorMessage, true);
+                showAuthStatus('✗ ' + errorMessage, true);
             }
         }
         
-        // Check WebAuthn support and hostname compatibility
-        document.addEventListener('DOMContentLoaded', async () => {
-            const hostname = window.location.hostname;
-            const isCompatible = hostname === 'localhost' || 
-                                hostname === '127.0.0.1' || 
-                                hostname === '::1' ||
-                                /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
-                                hostname.includes('.');
-            
-            if (!window.PublicKeyCredential) {
-                const btn = document.getElementById('webauthn-login-btn');
-                btn.disabled = true;
-                btn.title = 'WebAuthn is not supported in this browser';
-                btn.style.opacity = '0.5';
-            } else if (!isCompatible) {
-                // Hostname not compatible with WebAuthn
-                const btn = document.getElementById('webauthn-login-btn');
-                btn.disabled = true;
-                btn.title = 'WebAuthn not available with current hostname';
-                btn.style.opacity = '0.5';
-                
-                // Try to get FQDN, fallback to .lan.pew.pet
-                let fqdn = `${hostname}.lan.pew.pet`;
-                
-                // Show warning with redirect button
-                const warning = document.getElementById('webauthn-hostname-warning');
-                const port = window.location.port;
-                const protocol = window.location.protocol;
-                const redirectUrl = `${protocol}//${fqdn}:${port}`;
-                
-                warning.innerHTML = `
-                    <strong style="color: var(--text-primary);">⚠️ WebAuthn unavailable</strong>
-                    <p style="margin: 4px 0; color: var(--text-secondary);">
-                        Access via 
-                        <a href="${redirectUrl}" style="color: var(--primary-color); font-weight: 600; text-decoration: none;">
-                            ${fqdn}:${port}
-                        </a> 
-                        to use security keys.
-                    </p>
-                    <button onclick="window.location.href='${redirectUrl}'" 
-                            style="margin-top: 8px; padding: 6px 12px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">
-                        <i class="fas fa-arrow-right"></i> Switch to ${fqdn}
-                    </button>
-                `;
-                
-                warning.style.display = 'block';
-            }
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('username').focus();
         });
     </script>
 </body>

@@ -374,7 +374,7 @@ function renderCredentials(credentials) {
                     <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
                         <i data-icon="key" style="color: var(--primary-color);"></i>
                         <h4 style="font-weight: 600; color: var(--text-primary); margin: 0;">${cred.name}</h4>
-                        ${cred.is_active ? 
+                        ${cred.enabled ? 
                             '<span class="badge-outline badge-success">Active</span>' : 
                             '<span class="badge-outline badge-secondary">Disabled</span>'
                         }
@@ -390,10 +390,10 @@ function renderCredentials(credentials) {
                     </div>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button onclick="toggleCredential('${cred.id}', ${!cred.is_active})" 
+                    <button onclick="toggleCredential('${cred.id}', ${!cred.enabled})" 
                             class="btn-secondary" style="padding: 0.5rem 0.75rem;">
-                        <i data-icon="${cred.is_active ? 'eye-off' : 'eye'}"></i>
-                        ${cred.is_active ? 'Disable' : 'Enable'}
+                        <i data-icon="${cred.enabled ? 'eye-off' : 'eye'}"></i>
+                        ${cred.enabled ? 'Disable' : 'Enable'}
                     </button>
                     <button onclick="deleteCredential('${cred.id}')" 
                             class="btn-danger" style="padding: 0.5rem 0.75rem;">
@@ -564,7 +564,7 @@ window.toggleCredential = async function(credentialId, newState) {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ is_active: newState })
+            body: JSON.stringify({ enabled: newState })
         });
         
         const result = await response.json();
