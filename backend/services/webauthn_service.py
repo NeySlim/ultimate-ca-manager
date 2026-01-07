@@ -219,18 +219,21 @@ class WebAuthnService:
         if not user:
             return None, None
         
-        # Generate challenge
-        challenge = secrets.token_urlsafe(32)
+        # Generate challenge (as random bytes)
+        challenge_bytes = secrets.token_bytes(32)
+        challenge_b64 = base64.urlsafe_b64encode(challenge_bytes).decode('utf-8').rstrip('=')
         
         # Store challenge
         challenge_record = WebAuthnChallenge(
             user_id=user.id,
-            challenge=challenge,
+            challenge=challenge_b64,
             challenge_type='authentication',
             expires_at=datetime.utcnow() + timedelta(minutes=WebAuthnService.CHALLENGE_TIMEOUT_MINUTES)
         )
         db.session.add(challenge_record)
         db.session.commit()
+        
+        logger.info(f"Generated auth challenge (b64): {challenge_b64[:20]}...")
         
         # Get user's credentials
         credentials = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
@@ -246,7 +249,7 @@ class WebAuthnService:
         # Generate authentication options
         options = generate_authentication_options(
             rp_id=WebAuthnService.RP_ID,
-            challenge=challenge.encode('utf-8'),
+            challenge=challenge_bytes,  # Pass raw bytes
             allow_credentials=allow_credentials,
             user_verification=UserVerificationRequirement.PREFERRED,
         )
@@ -299,10 +302,10 @@ class WebAuthnService:
             if not challenge_record or not challenge_record.is_valid():
                 return False, "Invalid or expired challenge", None
             
-            # Verify authentication response
+            # Verify authentication response with ORIGINAL challenge from database
             verification = verify_authentication_response(
                 credential=credential_data,
-                expected_challenge=challenge.encode('utf-8'),
+                expected_challenge=base64.urlsafe_b64decode(challenge_record.challenge + '==='),  # Add padding and decode
                 expected_rp_id=WebAuthnService.RP_ID,
                 expected_origin=f"https://{hostname}",
                 credential_public_key=credential.public_key,

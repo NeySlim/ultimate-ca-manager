@@ -492,6 +492,13 @@
             const originalHTML = btn.innerHTML;
             
             try {
+                // Get username from form
+                const username = document.getElementById('username').value.trim();
+                if (!username) {
+                    showWebAuthnStatus('✗ Please enter your username first', true);
+                    return;
+                }
+                
                 // Disable button
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Preparing...</span>';
@@ -500,7 +507,8 @@
                 // Step 1: Get authentication options from server
                 const optionsResponse = await fetch('/api/v1/webauthn/authenticate/options', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username })
                 });
                 
                 if (!optionsResponse.ok) {
