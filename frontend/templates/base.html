@@ -186,6 +186,12 @@
                 <span>OCSP Status</span>
             </a>
             
+            <a href="/config/notifications" class="sidebar-link {% if request.path.startswith('/config/notifications') %}active{% endif %}"
+               hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i data-icon="bell"></i>
+                <span>Notifications</span>
+            </a>
+            
             <a href="/users" class="sidebar-link {% if request.path.startswith('/users') %}active{% endif %}"
                hx-get="/users" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-user-group"></i>
