@@ -59,6 +59,10 @@ def create_app(config_name=None):
     # Initialize auth middleware
     init_auth_middleware(jwt)
     
+    # Initialize mTLS middleware
+    from middleware.mtls_middleware import init_mtls_middleware
+    init_mtls_middleware(app)
+    
     # Create database tables
     with app.app_context():
         db.create_all()
@@ -149,6 +153,7 @@ def register_blueprints(app):
     from api.system import system_bp
     from api.import_api import import_bp
     from api.notification_api import notification_bp
+    from api.mtls_api import mtls_bp
     from api.ui_routes import ui_bp
     
     # Register UI routes (no prefix - serve from root)
@@ -167,6 +172,7 @@ def register_blueprints(app):
     app.register_blueprint(system_bp, url_prefix='/api/v1/system')
     app.register_blueprint(import_bp, url_prefix='/api/v1/import')
     app.register_blueprint(notification_bp, url_prefix='/api/v1/notifications')
+    app.register_blueprint(mtls_bp, url_prefix='/api/v1/mtls')
     
     # Public endpoints (no auth, no /api prefix - standard paths)
     app.register_blueprint(scep_bp, url_prefix='/scep')  # SCEP protocol
