@@ -247,8 +247,31 @@ document.getElementById('smtp-form').addEventListener('submit', async (e) => {
 
 // Test SMTP
 async function testSMTP() {
+    // First check if SMTP is configured
+    const smtpEnabled = document.getElementById('smtp_enabled').checked;
+    const smtpHost = document.getElementById('smtp_host').value;
+    
+    if (!smtpHost) {
+        showToast('Please configure SMTP host first', 'error');
+        return;
+    }
+    
+    if (!smtpEnabled) {
+        showToast('Please enable SMTP first by checking "Enable SMTP" and saving', 'error');
+        return;
+    }
+    
     const email = prompt('Enter email address to send test email:');
     if (!email) return;
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        showToast('Invalid email address format', 'error');
+        return;
+    }
+    
+    showToast('Sending test email...', 'info');
     
     try {
         const response = await fetch('/api/v1/notifications/smtp/test', {
@@ -263,12 +286,12 @@ async function testSMTP() {
         const result = await response.json();
         
         if (response.ok) {
-            showToast('Test email sent successfully to ' + email, 'success');
+            showToast('✓ Test email sent successfully to ' + email, 'success');
         } else {
-            showToast(result.error || 'Failed to send test email', 'error');
+            showToast('✗ ' + (result.error || 'Failed to send test email'), 'error');
         }
     } catch (error) {
-        showToast('Error: ' + error.message, 'error');
+        showToast('✗ Network error: ' + error.message, 'error');
     }
 }
 
