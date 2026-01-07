@@ -107,7 +107,7 @@ class IconSystem {
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 if (pathData.d) path.setAttribute('d', pathData.d);
                 
-                // Set stroke/fill
+                // Set stroke/fill based on path data
                 if (pathData.fill && pathData.fill !== 'none') {
                     if (pathData.fill === 'currentColor') {
                         path.setAttribute('fill', 'currentColor');
@@ -118,11 +118,14 @@ class IconSystem {
                     path.setAttribute('fill', 'none');
                 }
                 
-                if (pathData.stroke !== false && iconData.stroke) {
-                    path.setAttribute('stroke', 'currentColor');
-                    if (pathData['stroke-width']) path.setAttribute('stroke-width', pathData['stroke-width']);
+                // Handle stroke - use gradient if stroke-width is defined
+                if (pathData['stroke-width']) {
+                    path.setAttribute('stroke', `url(#ucm-gradient-${pathData.gradient})`);
+                    path.setAttribute('stroke-width', pathData['stroke-width']);
                     if (pathData['stroke-linecap']) path.setAttribute('stroke-linecap', pathData['stroke-linecap']);
                     if (pathData['stroke-linejoin']) path.setAttribute('stroke-linejoin', pathData['stroke-linejoin']);
+                } else if (iconData.stroke) {
+                    path.setAttribute('stroke', 'currentColor');
                 }
                 
                 symbol.appendChild(path);
