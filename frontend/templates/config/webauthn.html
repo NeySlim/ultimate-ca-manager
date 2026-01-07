@@ -6,17 +6,17 @@
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
-            <i class="fas fa-key" style="margin-right: 0.5rem;"></i> WebAuthn / FIDO2 Security Keys
+            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-key"/></svg> WebAuthn / FIDO2 Security Keys
         </h1>
         <button onclick="showRegistrationModal()" class="btn-primary">
-            <i class="fas fa-plus"></i> Register New Key
+            <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Register New Key
         </button>
     </div>
 
     <!-- Hostname Warning (shown only if hostname is not WebAuthn-compatible) -->
     <div id="hostname-warning" style="display: none; background: var(--bg-warning); border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1.5rem;">
         <div style="display: flex; align-items: start; gap: 1rem;">
-            <i class="fas fa-exclamation-triangle" style="color: #f59e0b; flex-shrink: 0; margin-top: 0.25rem;"></i>
+            <svg class="ucm-icon" width="16" height="16" style="color: #f59e0b; flex-shrink: 0; margin-top: 0.25rem;"><use href="#icon-warning-triangle"/></svg>
             <div style="flex: 1;">
                 <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">⚠️ Incompatible Hostname Detected</strong>
                 <p style="color: var(--text-secondary); margin: 0 0 0.75rem 0; font-size: 0.875rem;">
@@ -43,13 +43,13 @@
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                <i class="fas fa-key" style="color: var(--primary-color);"></i>
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
                 My Registered Keys
             </h2>
         </div>
         <div id="credentials-list" style="padding: 1.5rem;">
             <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                <i class="fas fa-spinner fa-spin" style="width: 2rem; height: 2rem; margin-bottom: 0.5rem;"></i>
+                <svg class="ucm-icon" width="32" height="32" style="  margin-bottom: 0.5rem;"><use href="#icon-spinner"/></svg>
                 <p>Loading credentials...</p>
             </div>
         </div>
@@ -59,7 +59,7 @@
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                <i class="fas fa-chart-bar" style="color: var(--primary-color);"></i>
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-chart-bar"/></svg>
                 Usage Statistics
             </h2>
         </div>
@@ -88,7 +88,7 @@
                 Register Security Key
             </h3>
             <button onclick="hideRegistrationModal()" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.25rem;">
-                <i class="fas fa-times" style="width: 1.5rem; height: 1.5rem;"></i>
+                <svg class="ucm-icon" width="24" height="24" style=" "><use href="#icon-times"/></svg>
             </button>
         </div>
         <div style="padding: 1.5rem;">
@@ -114,14 +114,14 @@
                 <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
                     <button onclick="hideRegistrationModal()" class="btn-secondary">Cancel</button>
                     <button onclick="startRegistration()" class="btn-primary">
-                        <i class="fas fa-shield-alt"></i> Start Registration
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-shield-check"/></svg> Start Registration
                     </button>
                 </div>
             </div>
 
             <div id="registration-step-2" style="display: none; text-align: center;">
                 <div style="padding: 2rem;">
-                    <i class="fas fa-spinner fa-spin" style="width: 3rem; height: 3rem; color: var(--primary-color); margin-bottom: 1rem;"></i>
+                    <svg class="ucm-icon" width="48" height="48" style="  color: var(--primary-color); margin-bottom: 1rem;"><use href="#icon-spinner"/></svg>
                     <h4 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
                         Touch Your Security Key
                     </h4>
@@ -135,7 +135,7 @@
             <div id="registration-step-3" style="display: none; text-align: center;">
                 <div style="padding: 2rem;">
                     <div style="width: 4rem; height: 4rem; background: var(--success-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-                        <i class="fas fa-check-circle" style="width: 2rem; height: 2rem; color: white;"></i>
+                        <svg class="ucm-icon" width="32" height="32" style="  color: white;"><use href="#icon-check-circle"/></svg>
                     </div>
                     <h4 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
                         Registration Successful!
@@ -150,7 +150,7 @@
             <div id="registration-step-error" style="display: none; text-align: center;">
                 <div style="padding: 2rem;">
                     <div style="width: 4rem; height: 4rem; background: var(--error-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-                        <i class="fas fa-times" style="width: 2rem; height: 2rem; color: white;"></i>
+                        <svg class="ucm-icon" width="32" height="32" style="  color: white;"><use href="#icon-times"/></svg>
                     </div>
                     <h4 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
                         Registration Failed
@@ -268,7 +268,7 @@ async function checkHostnameCompatibility() {
                 <button onclick="window.location.href='${redirectUrl}'" 
                         class="btn-primary" 
                         style="margin-left: 1rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
-                    <i class="fas fa-arrow-right"></i> Switch to this URL
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg> Switch to this URL
                 </button>
             </div>
             <div style="color: var(--text-secondary); margin-top: 0.75rem; font-size: 0.8125rem;">
@@ -336,7 +336,7 @@ window.loadCredentials = async function() {
         } else {
             document.getElementById('credentials-list').innerHTML = `
                 <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                    <i class="fas fa-exclamation-circle" style="width: 3rem; height: 3rem; margin-bottom: 0.5rem; color: var(--error-color);"></i>
+                    <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
                     <p>${result.error || 'Failed to load credentials'}</p>
                 </div>
             `;
@@ -344,7 +344,7 @@ window.loadCredentials = async function() {
     } catch (error) {
         document.getElementById('credentials-list').innerHTML = `
             <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                <i class="fas fa-exclamation-circle" style="width: 3rem; height: 3rem; margin-bottom: 0.5rem; color: var(--error-color);"></i>
+                <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
                 <p>Error: ${error.message}</p>
             </div>
         `;
@@ -357,10 +357,10 @@ function renderCredentials(credentials) {
     if (credentials.length === 0) {
         container.innerHTML = `
             <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                <i class="fas fa-key" style="width: 3rem; height: 3rem; margin-bottom: 0.5rem;"></i>
+                <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem;"><use href="#icon-key"/></svg>
                 <p>No security keys registered yet</p>
                 <button onclick="showRegistrationModal()" class="btn-primary" style="margin-top: 1rem;">
-                    <i class="fas fa-plus"></i> Register Your First Key
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Register Your First Key
                 </button>
             </div>
         `;
@@ -372,7 +372,7 @@ function renderCredentials(credentials) {
             <div style="display: flex; justify-content: space-between; align-items: start;">
                 <div style="flex: 1;">
                     <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-                        <i class="fas fa-key" style="color: var(--primary-color);"></i>
+                        <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
                         <h4 style="font-weight: 600; color: var(--text-primary); margin: 0;">${cred.name}</h4>
                         ${cred.enabled ? 
                             '<span class="badge-outline badge-success">Active</span>' : 
@@ -390,14 +390,18 @@ function renderCredentials(credentials) {
                     </div>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
-                    <button onclick="toggleCredential('${cred.id}', ${!cred.enabled})" 
+                    <button onclick="toggleCredential('${cred.id}', ${!cred.enabled})"
                             class="btn-secondary" style="padding: 0.5rem 0.75rem;">
-                        <i class="fas fa-eye${cred.enabled ? '-slash' : ''}"></i>
+                        <svg class="ucm-icon" width="16" height="16">
+                            <use href="#icon-eye${cred.enabled ? '-slash' : ''}"/>
+                        </svg>
                         ${cred.enabled ? 'Disable' : 'Enable'}
                     </button>
                     <button onclick="deleteCredential('${cred.id}')" 
-                            class="btn-danger" style="padding: 0.5rem 0.75rem;">
-                        <i class="fas fa-trash"></i>
+                            class="btn-icon btn-icon-danger" title="Delete">
+                        <svg class="ucm-icon" width="16" height="16">
+                            <use href="#icon-trash"/>
+                        </svg>
                     </button>
                 </div>
             </div>
