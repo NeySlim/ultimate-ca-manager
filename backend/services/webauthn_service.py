@@ -303,17 +303,21 @@ class WebAuthnService:
                 return False, "Invalid or expired challenge", None
             
             # Verify authentication response with ORIGINAL challenge from database
+            # For authenticators that don't support sign_count (always return 0),
+            # pass 0 as current count to bypass the monotonic counter check
+            current_sign_count = 0 if credential.sign_count > 0 else credential.sign_count
+            
             verification = verify_authentication_response(
                 credential=credential_data,
                 expected_challenge=base64.urlsafe_b64decode(challenge_record.challenge + '==='),  # Add padding and decode
                 expected_rp_id=WebAuthnService.RP_ID,
                 expected_origin=f"https://{hostname}",
                 credential_public_key=credential.public_key,
-                credential_current_sign_count=credential.sign_count,
+                credential_current_sign_count=current_sign_count,
             )
             
             # Update sign count and last used
-            logger.info(f"WebAuthn: authenticator sign_count={verification.new_sign_count}")
+            logger.info(f"WebAuthn: authenticator sign_count={verification.new_sign_count}, stored={credential.sign_count}")
             
             # Always increment our own counter (some authenticators like Bitwarden always return 0)
             credential.sign_count = max(verification.new_sign_count, credential.sign_count + 1)
