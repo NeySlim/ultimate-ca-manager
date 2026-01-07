@@ -106,7 +106,7 @@ GET https://your-server:8443/cdp/{ca_refid}/info
   "ca_name": "Intermediate CA",
   "ca_refid": "a1b2c3d4",
   "crl_number": 42,
-  "last_update": "2026-01-05T14:30:00Z",
+  "last_update": "2026-01-07T14:30:00Z",
   "next_update": "2026-01-12T14:30:00Z",
   "revoked_count": 3,
   "status": "up-to-date",
@@ -358,4 +358,4 @@ openssl x509 -in certificate.pem -text -noout | grep -A3 "CRL Distribution"
 
 ---
 
-**Last Updated**: 2026-01-05
+**Last Updated**: 2026-01-07
