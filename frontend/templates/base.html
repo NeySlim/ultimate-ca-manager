@@ -198,6 +198,12 @@
                 <span>mTLS Authentication</span>
             </a>
             
+            <a href="/config/webauthn" class="sidebar-link {% if request.path.startswith('/config/webauthn') %}active{% endif %}"
+               hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <i data-icon="key"></i>
+                <span>WebAuthn / FIDO2</span>
+            </a>
+            
             <a href="/users" class="sidebar-link {% if request.path.startswith('/users') %}active{% endif %}"
                hx-get="/users" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-user-group"></i>

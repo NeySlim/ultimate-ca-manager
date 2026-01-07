@@ -3710,3 +3710,9 @@ def config_notifications_page():
 def config_mtls_page():
     """mTLS authentication configuration page"""
     return render_template('config/mtls.html')
+
+@ui_bp.route('/config/webauthn')
+@login_required
+def config_webauthn_page():
+    """WebAuthn/FIDO2 security keys management page"""
+    return render_template('config/webauthn.html')

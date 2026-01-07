@@ -374,6 +374,18 @@
                     <span>Sign In</span>
                 </button>
             </form>
+            
+            <!-- WebAuthn Login Option -->
+            <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border);">
+                <div style="text-align: center; margin-bottom: 12px;">
+                    <span style="font-size: 13px; color: var(--text-secondary);">Or sign in with</span>
+                </div>
+                <button id="webauthn-login-btn" onclick="startWebAuthnLogin()" class="btn-login" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border);">
+                    <i class="fas fa-key"></i>
+                    <span>Security Key</span>
+                </button>
+                <div id="webauthn-status" style="margin-top: 12px; text-align: center; font-size: 13px; color: var(--text-secondary); display: none;"></div>
+            </div>
         </div>
         
         <!-- Footer -->
@@ -424,6 +436,149 @@
         // Set correct icon on load
         document.addEventListener('DOMContentLoaded', () => {
             updateToggleIcon();
+        });
+    </script>
+    
+    <!-- WebAuthn Login -->
+    <script>
+        // Convert base64url to ArrayBuffer
+        function base64urlToBuffer(base64url) {
+            const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+        
+        // Convert ArrayBuffer to base64url
+        function bufferToBase64url(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+        
+        function showWebAuthnStatus(message, isError = false) {
+            const status = document.getElementById('webauthn-status');
+            status.textContent = message;
+            status.style.display = 'block';
+            status.style.color = isError ? 'var(--error-color)' : 'var(--primary-color)';
+        }
+        
+        function hideWebAuthnStatus() {
+            document.getElementById('webauthn-status').style.display = 'none';
+        }
+        
+        async function startWebAuthnLogin() {
+            const btn = document.getElementById('webauthn-login-btn');
+            const originalHTML = btn.innerHTML;
+            
+            try {
+                // Disable button
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Preparing...</span>';
+                hideWebAuthnStatus();
+                
+                // Step 1: Get authentication options from server
+                const optionsResponse = await fetch('/api/v1/webauthn/authenticate/options', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!optionsResponse.ok) {
+                    const error = await optionsResponse.json();
+                    throw new Error(error.error || 'Failed to get authentication options');
+                }
+                
+                const options = await optionsResponse.json();
+                
+                // Convert base64url strings to ArrayBuffers
+                options.publicKey.challenge = base64urlToBuffer(options.publicKey.challenge);
+                
+                if (options.publicKey.allowCredentials) {
+                    options.publicKey.allowCredentials = options.publicKey.allowCredentials.map(cred => ({
+                        ...cred,
+                        id: base64urlToBuffer(cred.id)
+                    }));
+                }
+                
+                // Step 2: Show "Touch your key" message
+                btn.innerHTML = '<i class="fas fa-key"></i> <span>Touch your security key...</span>';
+                showWebAuthnStatus('Follow your browser prompts to authenticate');
+                
+                // Step 3: Call WebAuthn API
+                const credential = await navigator.credentials.get(options);
+                
+                if (!credential) {
+                    throw new Error('Authentication was cancelled');
+                }
+                
+                // Step 4: Send credential to server
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Verifying...</span>';
+                showWebAuthnStatus('Verifying credential...');
+                
+                const verifyResponse = await fetch('/api/v1/webauthn/authenticate/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        credential: {
+                            id: credential.id,
+                            rawId: bufferToBase64url(credential.rawId),
+                            type: credential.type,
+                            response: {
+                                clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                                authenticatorData: bufferToBase64url(credential.response.authenticatorData),
+                                signature: bufferToBase64url(credential.response.signature),
+                                userHandle: credential.response.userHandle ? 
+                                    bufferToBase64url(credential.response.userHandle) : null
+                            }
+                        }
+                    })
+                });
+                
+                if (!verifyResponse.ok) {
+                    const error = await verifyResponse.json();
+                    throw new Error(error.error || 'Authentication failed');
+                }
+                
+                // Success! Redirect to dashboard
+                showWebAuthnStatus('✓ Authentication successful! Redirecting...');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 500);
+                
+            } catch (error) {
+                console.error('WebAuthn login error:', error);
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+                
+                let errorMessage = error.message;
+                
+                // Provide helpful error messages
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = 'Authentication was cancelled or timed out';
+                } else if (error.name === 'InvalidStateError') {
+                    errorMessage = 'Security key not recognized. Please register it first.';
+                } else if (error.name === 'NotSupportedError') {
+                    errorMessage = 'WebAuthn not supported in this browser';
+                }
+                
+                showWebAuthnStatus('✗ ' + errorMessage, true);
+            }
+        }
+        
+        // Check WebAuthn support
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!window.PublicKeyCredential) {
+                const btn = document.getElementById('webauthn-login-btn');
+                btn.disabled = true;
+                btn.title = 'WebAuthn is not supported in this browser';
+                btn.style.opacity = '0.5';
+            }
         });
     </script>
 </body>
