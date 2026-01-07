@@ -3703,3 +3703,10 @@ def pki_reset_ui():
 def config_notifications_page():
     """Email notifications configuration page"""
     return render_template('config/notifications.html')
+
+
+@ui_bp.route('/config/mtls')
+@login_required
+def config_mtls_page():
+    """mTLS authentication configuration page"""
+    return render_template('config/mtls.html')
