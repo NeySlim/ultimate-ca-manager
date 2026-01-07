@@ -6,11 +6,11 @@
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
-            <i data-icon="shield-check" style="margin-right: 0.5rem;"></i> mTLS Authentication
+            <i class="fas fa-shield-alt" style="margin-right: 0.5rem;"></i> mTLS Authentication
         </h1>
         {% if session.get('role') == 'admin' %}
         <span id="mtls-status-badge" class="badge-outline badge-secondary">
-            <i data-icon="circle" style="width: 10px; height: 10px;"></i>
+            <i class="fas fa-circle" style="width: 10px; height: 10px;"></i>
             Checking...
         </span>
         {% endif %}
@@ -21,7 +21,7 @@
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                <i data-icon="settings" style="color: var(--primary-color);"></i>
+                <i class="fas fa-cog" style="color: var(--primary-color);"></i>
                 Global mTLS Settings
             </h2>
         </div>
@@ -71,7 +71,7 @@
 
                     <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
                         <button type="submit" class="btn btn-primary">
-                            <i data-icon="save" style="margin-right: 0.5rem;"></i> Save mTLS Settings
+                            <i class="fas fa-save" style="margin-right: 0.5rem;"></i> Save mTLS Settings
                         </button>
                     </div>
                 </div>
@@ -83,7 +83,7 @@
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                <i data-icon="book-open" style="color: var(--primary-color);"></i>
+                <i class="fas fa-book-open" style="color: var(--primary-color);"></i>
                 Reverse Proxy Configuration
             </h2>
         </div>
@@ -92,7 +92,7 @@
                 <!-- Nginx Config -->
                 <div>
                     <h3 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i data-icon="server" style="color: var(--success-color);"></i>
+                        <i class="fas fa-server" style="color: var(--success-color);"></i>
                         Nginx Configuration
                     </h3>
                     <pre style="background: var(--card-bg-secondary); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.875rem; color: var(--text-primary);"><code>server {
@@ -122,7 +122,7 @@
                 <!-- Apache Config -->
                 <div>
                     <h3 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i data-icon="server" style="color: var(--danger-color);"></i>
+                        <i class="fas fa-server" style="color: var(--danger-color);"></i>
                         Apache Configuration
                     </h3>
                     <pre style="background: var(--card-bg-secondary); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.875rem; color: var(--text-primary);"><code>&lt;VirtualHost *:8443&gt;
@@ -156,11 +156,11 @@
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                <i data-icon="key" style="color: var(--primary-color);"></i>
+                <i class="fas fa-key" style="color: var(--primary-color);"></i>
                 My Certificates
             </h2>
             <button onclick="showEnrollModal()" class="btn btn-primary">
-                <i data-icon="plus" style="margin-right: 0.5rem;"></i> Enroll Certificate
+                <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> Enroll Certificate
             </button>
         </div>
         <div style="padding: 1.5rem;">
@@ -179,7 +179,7 @@
                     <tbody id="certificates-tbody">
                         <tr>
                             <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                                <i data-icon="key" style="font-size: 2rem; opacity: 0.5;"></i>
+                                <i class="fas fa-key" style="font-size: 2rem; opacity: 0.5;"></i>
                                 <p style="margin-top: 0.5rem;">Loading certificates...</p>
                             </td>
                         </tr>
@@ -223,10 +223,10 @@
 
                     <div style="display: flex; gap: 1rem; padding-top: 1rem;">
                         <button type="button" onclick="validateCertificate()" class="btn btn-outline-secondary">
-                            <i data-icon="check-circle" style="margin-right: 0.5rem;"></i> Validate
+                            <i class="fas fa-check-circle" style="margin-right: 0.5rem;"></i> Validate
                         </button>
                         <button type="submit" class="btn btn-primary">
-                            <i data-icon="save" style="margin-right: 0.5rem;"></i> Enroll Certificate
+                            <i class="fas fa-save" style="margin-right: 0.5rem;"></i> Enroll Certificate
                         </button>
                         <button type="button" onclick="hideEnrollModal()" class="btn btn-outline-secondary">
                             Cancel
@@ -276,10 +276,10 @@ async function loadMTLSSettings() {
             const badge = document.getElementById('mtls-status-badge');
             if (settings.enabled) {
                 badge.className = 'badge-outline badge-success';
-                badge.innerHTML = '<i data-icon="check-circle" style="width: 10px;"></i> Enabled';
+                badge.innerHTML = '<i class="fas fa-check-circle" style="width: 10px;"></i> Enabled';
             } else {
                 badge.className = 'badge-outline badge-secondary';
-                badge.innerHTML = '<i data-icon="circle" style="width: 10px;"></i> Disabled';
+                badge.innerHTML = '<i class="fas fa-circle" style="width: 10px;"></i> Disabled';
             }
         }
     } catch (error) {
@@ -338,10 +338,10 @@ async function loadCertificates() {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                            <i data-icon="key" style="font-size: 2rem; opacity: 0.5;"></i>
+                            <i class="fas fa-key" style="font-size: 2rem; opacity: 0.5;"></i>
                             <p style="margin-top: 0.5rem;">No certificates enrolled</p>
                             <button onclick="showEnrollModal()" class="btn btn-sm btn-primary" style="margin-top: 1rem;">
-                                <i data-icon="plus" style="margin-right: 0.5rem;"></i> Enroll Your First Certificate
+                                <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> Enroll Your First Certificate
                             </button>
                         </td>
                     </tr>
@@ -366,9 +366,9 @@ async function loadCertificates() {
                         <td>
                             ${cert.enabled 
                                 ? (isExpired 
-                                    ? '<span class="badge-outline badge-danger"><i data-icon="x" style="width: 10px;"></i> Expired</span>'
-                                    : '<span class="badge-outline badge-success"><i data-icon="check" style="width: 10px;"></i> Active</span>')
-                                : '<span class="badge-outline badge-secondary"><i data-icon="x" style="width: 10px;"></i> Disabled</span>'
+                                    ? '<span class="badge-outline badge-danger"><i class="fas fa-times" style="width: 10px;"></i> Expired</span>'
+                                    : '<span class="badge-outline badge-success"><i class="fas fa-check" style="width: 10px;"></i> Active</span>')
+                                : '<span class="badge-outline badge-secondary"><i class="fas fa-times" style="width: 10px;"></i> Disabled</span>'
                             }
                         </td>
                         <td>

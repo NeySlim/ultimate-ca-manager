@@ -6,10 +6,10 @@
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
-            <i data-icon="envelope" style="margin-right: 0.5rem;"></i> Email Notifications
+            <i class="fas fa-envelope" style="margin-right: 0.5rem;"></i> Email Notifications
         </h1>
         <button onclick="testNotifications()" class="btn btn-outline-primary">
-            <i data-icon="play" style="margin-right: 0.5rem;"></i> Run Manual Check
+            <i class="fas fa-play" style="margin-right: 0.5rem;"></i> Run Manual Check
         </button>
     </div>
 
@@ -17,11 +17,11 @@
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                <i data-icon="server" style="color: var(--primary-color);"></i>
+                <i class="fas fa-server" style="color: var(--primary-color);"></i>
                 SMTP Server Configuration
             </h2>
             <span id="smtp-status-badge" class="badge-outline badge-secondary">
-                <i data-icon="circle" style="width: 10px; height: 10px;"></i>
+                <i class="fas fa-circle" style="width: 10px; height: 10px;"></i>
                 Not Configured
             </span>
         </div>
@@ -87,10 +87,10 @@
                 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
                     <button type="submit" class="btn btn-primary">
-                        <i data-icon="save" style="margin-right: 0.5rem;"></i> Save SMTP Configuration
+                        <i class="fas fa-save" style="margin-right: 0.5rem;"></i> Save SMTP Configuration
                     </button>
                     <button type="button" onclick="testSMTP()" class="btn btn-outline-success">
-                        <i data-icon="mail" style="margin-right: 0.5rem;"></i> Send Test Email
+                        <i class="fas fa-envelope" style="margin-right: 0.5rem;"></i> Send Test Email
                     </button>
                 </div>
             </form>
@@ -101,7 +101,7 @@
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-                <i data-icon="bell" style="color: var(--primary-color);"></i>
+                <i class="fas fa-bell" style="color: var(--primary-color);"></i>
                 Notification Rules
             </h2>
         </div>
@@ -116,7 +116,7 @@
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                <i data-icon="clock" style="color: var(--primary-color);"></i>
+                <i class="fas fa-clock" style="color: var(--primary-color);"></i>
                 Notification History
             </h2>
             <div id="notification-stats" style="display: flex; gap: 1rem;">
@@ -138,7 +138,7 @@
                     <tbody id="notification-history-tbody">
                         <tr>
                             <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                                <i data-icon="inbox" style="font-size: 2rem; opacity: 0.5;"></i>
+                                <i class="fas fa-inbox" style="font-size: 2rem; opacity: 0.5;"></i>
                                 <p style="margin-top: 0.5rem;">Loading history...</p>
                             </td>
                         </tr>
@@ -190,10 +190,10 @@ async function loadSMTPConfig() {
             const badge = document.getElementById('smtp-status-badge');
             if (config.enabled) {
                 badge.className = 'badge-outline badge-success';
-                badge.innerHTML = '<i data-icon="check-circle" style="width: 10px; height: 10px;"></i> Enabled';
+                badge.innerHTML = '<i class="fas fa-check-circle" style="width: 10px; height: 10px;"></i> Enabled';
             } else {
                 badge.className = 'badge-outline badge-secondary';
-                badge.innerHTML = '<i data-icon="circle" style="width: 10px; height: 10px;"></i> Disabled';
+                badge.innerHTML = '<i class="fas fa-circle" style="width: 10px; height: 10px;"></i> Disabled';
             }
         }
     } catch (error) {
@@ -342,7 +342,7 @@ async function loadNotificationRules() {
                         
                         <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
                             <button onclick="updateRule('${config.type}')" class="btn btn-sm btn-primary">
-                                <i data-icon="save" style="margin-right: 0.5rem;"></i> Save Rule
+                                <i class="fas fa-save" style="margin-right: 0.5rem;"></i> Save Rule
                             </button>
                         </div>
                     </div>
@@ -404,7 +404,7 @@ async function loadNotificationHistory() {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                            <i data-icon="inbox" style="font-size: 2rem; opacity: 0.5;"></i>
+                            <i class="fas fa-inbox" style="font-size: 2rem; opacity: 0.5;"></i>
                             <p style="margin-top: 0.5rem;">No notifications sent yet</p>
                         </td>
                     </tr>
@@ -420,8 +420,8 @@ async function loadNotificationHistory() {
                     <td>${log.subject || 'N/A'}</td>
                     <td>
                         ${log.status === 'sent' 
-                            ? '<span class="badge-outline badge-success"><i data-icon="check" style="width: 10px;"></i> Sent</span>'
-                            : '<span class="badge-outline badge-danger"><i data-icon="x" style="width: 10px;"></i> Failed</span>'
+                            ? '<span class="badge-outline badge-success"><i class="fas fa-check" style="width: 10px;"></i> Sent</span>'
+                            : '<span class="badge-outline badge-danger"><i class="fas fa-times" style="width: 10px;"></i> Failed</span>'
                         }
                     </td>
                 </tr>
@@ -445,11 +445,11 @@ async function loadNotificationStats() {
             
             container.innerHTML = `
                 <span class="badge-outline badge-success">
-                    <i data-icon="check" style="width: 10px;"></i> ${stats.recent_sent_30d} sent (30d)
+                    <i class="fas fa-check" style="width: 10px;"></i> ${stats.recent_sent_30d} sent (30d)
                 </span>
                 ${stats.recent_failed_30d > 0 ? `
                     <span class="badge-outline badge-danger">
-                        <i data-icon="x" style="width: 10px;"></i> ${stats.recent_failed_30d} failed (30d)
+                        <i class="fas fa-times" style="width: 10px;"></i> ${stats.recent_failed_30d} failed (30d)
                     </span>
                 ` : ''}
             `;
