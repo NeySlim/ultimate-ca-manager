@@ -62,18 +62,21 @@ class WebAuthnService:
         """
         WebAuthnService.set_rp_id(hostname)
         
-        # Generate challenge
-        challenge = secrets.token_urlsafe(32)
+        # Generate challenge (as random bytes)
+        challenge_bytes = secrets.token_bytes(32)
+        challenge_b64 = base64.urlsafe_b64encode(challenge_bytes).decode('utf-8').rstrip('=')
         
-        # Store challenge in database
+        # Store challenge in database (as base64url string for easy comparison)
         challenge_record = WebAuthnChallenge(
             user_id=user.id,
-            challenge=challenge,
+            challenge=challenge_b64,
             challenge_type='registration',
             expires_at=datetime.utcnow() + timedelta(minutes=WebAuthnService.CHALLENGE_TIMEOUT_MINUTES)
         )
         db.session.add(challenge_record)
         db.session.commit()
+        
+        logger.info(f"Generated challenge (b64): {challenge_b64[:20]}...")
         
         # Get existing credentials to exclude
         existing_creds = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
@@ -89,7 +92,7 @@ class WebAuthnService:
             user_id=str(user.id).encode('utf-8'),
             user_name=user.username,
             user_display_name=user.full_name or user.username,
-            challenge=challenge.encode('utf-8'),
+            challenge=challenge_bytes,  # Pass raw bytes
             exclude_credentials=exclude_credentials,
             authenticator_selection=AuthenticatorSelectionCriteria(
                 user_verification=UserVerificationRequirement.PREFERRED,
@@ -120,13 +123,25 @@ class WebAuthnService:
         WebAuthnService.set_rp_id(hostname)
         
         try:
+            logger.info(f"Verifying registration for user {user_id}")
+            logger.info(f"Credential data keys: {list(credential_data.keys())}")
+            logger.info(f"Response keys: {list(credential_data.get('response', {}).keys())}")
+            
             # Get and verify challenge
-            challenge_str = base64.urlsafe_b64decode(
-                credential_data['response']['clientDataJSON']
-            ).decode('utf-8')
+            client_data_b64 = credential_data['response']['clientDataJSON']
+            logger.info(f"clientDataJSON length: {len(client_data_b64)}, sample: {client_data_b64[:50]}...")
+            
+            # Add padding if needed (base64url to base64)
+            padding = '=' * (4 - len(client_data_b64) % 4)
+            if padding != '====':
+                client_data_b64 += padding
+            
+            challenge_str = base64.urlsafe_b64decode(client_data_b64).decode('utf-8')
+            logger.info(f"Decoded clientDataJSON successfully")
             
             challenge_json = json.loads(challenge_str)
             challenge = challenge_json['challenge']
+            logger.info(f"Challenge from client: {challenge[:20]}...")
             
             challenge_record = WebAuthnChallenge.query.filter_by(
                 challenge=challenge,
@@ -134,13 +149,25 @@ class WebAuthnService:
                 challenge_type='registration'
             ).first()
             
-            if not challenge_record or not challenge_record.is_valid():
+            if not challenge_record:
+                logger.error(f"No challenge record found for: {challenge[:20]}...")
+                # Debug: show all challenges for this user
+                all_challenges = WebAuthnChallenge.query.filter_by(user_id=user_id, challenge_type='registration').all()
+                logger.error(f"Found {len(all_challenges)} registration challenges for user {user_id}")
+                for c in all_challenges[:3]:
+                    logger.error(f"  - {c.challenge[:20]}... (valid: {c.is_valid()})")
                 return False, "Invalid or expired challenge", None
             
-            # Verify registration response
+            if not challenge_record.is_valid():
+                logger.error(f"Challenge expired or already used")
+                return False, "Invalid or expired challenge", None
+            
+            logger.info(f"Challenge verified successfully")
+            
+            # Verify registration response with the ORIGINAL challenge from database
             verification = verify_registration_response(
                 credential=credential_data,
-                expected_challenge=challenge.encode('utf-8'),
+                expected_challenge=base64.urlsafe_b64decode(challenge_record.challenge + '==='),  # Add padding and decode
                 expected_rp_id=WebAuthnService.RP_ID,
                 expected_origin=f"https://{hostname}",
             )

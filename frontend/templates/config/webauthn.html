@@ -297,7 +297,13 @@ async function checkHostnameCompatibility() {
 
 // Convert base64url to ArrayBuffer
 function base64urlToBuffer(base64url) {
-    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    // Convert base64url to base64
+    let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    
+    // Add padding if needed
+    const padLength = (4 - (base64.length % 4)) % 4;
+    base64 += '='.repeat(padLength);
+    
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
@@ -485,14 +491,10 @@ window.startRegistration = async function() {
         });
         
         // Convert base64url strings to ArrayBuffers
-        // WORKAROUND: Use localhost as RP ID since "netsuit" has no TLD
+        // Use server's RP ID (should match current hostname)
         const publicKeyOptions = {
             publicKey: {
                 ...options,
-                rp: {
-                    ...options.rp,
-                    id: 'localhost'  // Force localhost for WebAuthn compatibility
-                },
                 challenge: base64urlToBuffer(options.challenge),
                 user: {
                     ...options.user,
@@ -505,7 +507,8 @@ window.startRegistration = async function() {
                     })) : []
             }
         };
-        console.log('Converted publicKeyOptions (forced localhost):', publicKeyOptions);
+        console.log('Converted publicKeyOptions:', publicKeyOptions);
+        console.log('RP ID from server:', options.rp.id);
         
         // Step 2: Call WebAuthn API
         const credential = await navigator.credentials.create(publicKeyOptions);
