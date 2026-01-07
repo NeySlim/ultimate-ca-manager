@@ -148,6 +148,7 @@ def register_blueprints(app):
     from api.scep import scep_bp
     from api.system import system_bp
     from api.import_api import import_bp
+    from api.notification_api import notification_bp
     from api.ui_routes import ui_bp
     
     # Register UI routes (no prefix - serve from root)
@@ -165,6 +166,7 @@ def register_blueprints(app):
     
     app.register_blueprint(system_bp, url_prefix='/api/v1/system')
     app.register_blueprint(import_bp, url_prefix='/api/v1/import')
+    app.register_blueprint(notification_bp, url_prefix='/api/v1/notifications')
     
     # Public endpoints (no auth, no /api prefix - standard paths)
     app.register_blueprint(scep_bp, url_prefix='/scep')  # SCEP protocol

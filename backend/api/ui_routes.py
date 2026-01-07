@@ -3696,3 +3696,10 @@ def pki_reset_ui():
         logger.error(f"PKI reset error: {e}")
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@ui_bp.route('/config/notifications')
+@login_required
+def config_notifications_page():
+    """Email notifications configuration page"""
+    return render_template('config/notifications.html')
