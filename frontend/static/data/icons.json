@@ -991,6 +991,20 @@
           "stroke-linejoin": "round"
         }
       ]
+    },
+    "arrow-right": {
+      "viewBox": "0 0 24 24",
+      "stroke": true,
+      "paths": [
+        {
+          "d": "M5 12h14m-7-7l7 7-7 7",
+          "gradient": "primary",
+          "fill": "none",
+          "stroke-width": "1.5",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      ]
     }
   },
   "gradients": {
