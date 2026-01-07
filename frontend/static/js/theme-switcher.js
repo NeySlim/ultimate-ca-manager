@@ -63,7 +63,11 @@ function updateThemeIcon() {
     const icon = document.getElementById('theme-icon');
     
     if (icon) {
-        icon.className = variant === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        // Update SVG use href instead of className
+        const useElement = icon.querySelector('use');
+        if (useElement) {
+            useElement.setAttribute('href', variant === 'dark' ? '#icon-sun' : '#icon-moon');
+        }
     }
 }
 
