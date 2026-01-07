@@ -123,11 +123,39 @@
                 </svg>
             </button>
             
-            <!-- User Menu -->
-            <button class="btn btn-secondary">
-                <i class="fas fa-user"></i>
-                <span>{{ session.get('username', 'User') }}</span>
-            </button>
+            <!-- User Menu with Dropdown -->
+            <div class="dropdown" x-data="{ open: false }">
+                <button @click="open = !open" class="btn btn-secondary">
+                    <i class="fas fa-user"></i>
+                    <span>{{ session.get('username', 'User') }}</span>
+                    <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+                </button>
+                
+                <div x-show="open" @click.away="open = false" x-cloak class="dropdown-menu" style="right: 0; left: auto;">
+                    <div class="dropdown-header">My Account</div>
+                    <a href="/config/notifications" class="dropdown-item"
+                       hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+                       @click="open = false">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-bell"/></svg> Notifications
+                    </a>
+                    <a href="/config/mtls" class="dropdown-item"
+                       hx-get="/config/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+                       @click="open = false">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-shield-check"/></svg> mTLS Auth
+                    </a>
+                    <a href="/config/webauthn" class="dropdown-item"
+                       hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+                       @click="open = false">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-key"/></svg> Security Keys
+                    </a>
+                    
+                    <div class="dropdown-divider"></div>
+                    
+                    <a href="/logout" class="dropdown-item">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-logout"/></svg> Logout
+                    </a>
+                </div>
+            </div>
             
             <!-- Logout -->
             <a href="/logout" class="btn btn-secondary" title="Logout">
@@ -188,24 +216,6 @@
                 <span>OCSP Status</span>
             </a>
             
-            <a href="/config/notifications" class="sidebar-link {% if request.path.startswith('/config/notifications') %}active{% endif %}"
-               hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <svg class="ucm-icon" width="20" height="20"><use href="#icon-bell"/></svg>
-                <span>Notifications</span>
-            </a>
-            
-            <a href="/config/mtls" class="sidebar-link {% if request.path.startswith('/config/mtls') %}active{% endif %}"
-               hx-get="/config/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <svg class="ucm-icon" width="20" height="20"><use href="#icon-shield-check"/></svg>
-                <span>mTLS Authentication</span>
-            </a>
-            
-            <a href="/config/webauthn" class="sidebar-link {% if request.path.startswith('/config/webauthn') %}active{% endif %}"
-               hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <svg class="ucm-icon" width="20" height="20"><use href="#icon-key"/></svg>
-                <span>WebAuthn / FIDO2</span>
-            </a>
-            
             <a href="/users" class="sidebar-link {% if request.path.startswith('/users') %}active{% endif %}"
                hx-get="/users" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-user-group"></i>
@@ -216,6 +226,29 @@
                hx-get="/settings" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-gear"></i>
                 <span>Settings</span>
+            </a>
+            
+            <!-- User Settings Submenu -->
+            <div class="sidebar-section-title" style="padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-top: 1rem;">
+                My Account
+            </div>
+            
+            <a href="/config/notifications" class="sidebar-link {% if request.path.startswith('/config/notifications') %}active{% endif %}"
+               hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-bell"/></svg>
+                <span>Notifications</span>
+            </a>
+            
+            <a href="/config/mtls" class="sidebar-link {% if request.path.startswith('/config/mtls') %}active{% endif %}"
+               hx-get="/config/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-shield-check"/></svg>
+                <span>mTLS Auth</span>
+            </a>
+            
+            <a href="/config/webauthn" class="sidebar-link {% if request.path.startswith('/config/webauthn') %}active{% endif %}"
+               hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-key"/></svg>
+                <span>Security Keys</span>
             </a>
         </div>
     </aside>
