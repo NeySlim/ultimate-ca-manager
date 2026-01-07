@@ -261,9 +261,20 @@ class IconSystem {
                     const className = Array.from(icon.classList).filter(c => !c.startsWith('fa')).join(' ');
                     const svgHTML = this.getIcon(iconName, className, size);
                     
+                    // Skip if icon not found
+                    if (!svgHTML) {
+                        console.warn(`Skipping replacement for ${faClass} -> ${iconName} (icon not found)`);
+                        continue;
+                    }
+                    
                     const temp = document.createElement('div');
                     temp.innerHTML = svgHTML;
                     const svgElement = temp.firstChild;
+                    
+                    if (!svgElement) {
+                        console.warn(`Failed to create SVG element for ${iconName}`);
+                        continue;
+                    }
                     
                     // Copy any inline styles
                     if (icon.style.cssText) {
