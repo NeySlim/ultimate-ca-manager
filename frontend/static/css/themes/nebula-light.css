@@ -182,7 +182,7 @@ aside {
     top: 58px;
     left: 0;
     bottom: 0;
-    width: 245px;
+    width: 220px;
     background: var(--sidebar-bg);
     border-right: 1px solid var(--border-color);
     overflow-y: auto;
@@ -196,7 +196,7 @@ aside {
     position: fixed;
     top: 0;
     left: 0;
-    width: 245px;
+    width: 220px;
     height: 100vh;
     background: var(--sidebar-bg);
     border-right: 1px solid var(--border-color);
@@ -468,7 +468,7 @@ aside {
    =========================== */
 
 main {
-    margin-left: 245px;
+    margin-left: 220px;
     margin-top: 58px;
     padding: 24px;
     min-height: calc(100vh - 58px);
@@ -478,7 +478,7 @@ main {
 }
 
 .main-content {
-    margin-left: 245px;
+    margin-left: 220px;
     margin-top: 58px;
     padding: 24px;
     min-height: calc(100vh - 58px);
