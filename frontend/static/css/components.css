@@ -2135,6 +2135,14 @@ body.modal-open {
    SIDEBAR COLLAPSIBLE SUBMENUS
    =========================== */
 
+/* Sidebar nav container with flex to push content to bottom */
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
 .sidebar-link-parent {
     display: flex;
     align-items: center;
