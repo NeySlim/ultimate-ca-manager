@@ -5,7 +5,8 @@ Implements the ACME server endpoints for automated certificate management
 from flask import Blueprint, request, jsonify, make_response
 from datetime import datetime
 import json
-from typing import Dict, Any
+import base64
+from typing import Dict, Any, Tuple, Optional
 
 from models import db
 from services.acme import AcmeService
@@ -74,6 +75,71 @@ def acme_error(error_type: str, detail: str, status_code: int = 400) -> Any:
     return acme_response(error_data, status_code)
 
 
+def verify_jws(jws_data: Dict[str, Any], expected_url: str) -> Tuple[bool, Optional[Dict], Optional[Dict], Optional[str]]:
+    """Verify JWS (JSON Web Signature) for ACME requests
+    
+    Args:
+        jws_data: JWS object with protected, payload, signature
+        expected_url: Expected URL in protected header
+        
+    Returns:
+        Tuple of (is_valid, payload_dict, jwk, error_message)
+    """
+    try:
+        # Decode protected header (base64url)
+        if 'protected' not in jws_data:
+            return False, None, None, "Missing 'protected' field in JWS"
+        
+        protected_b64 = jws_data['protected']
+        # Add padding if needed
+        protected_b64 += '=' * (4 - len(protected_b64) % 4)
+        protected_json = base64.urlsafe_b64decode(protected_b64).decode('utf-8')
+        protected = json.loads(protected_json)
+        
+        # Verify URL matches expected
+        if protected.get('url') != expected_url:
+            return False, None, None, f"URL mismatch: expected {expected_url}, got {protected.get('url')}"
+        
+        # Verify nonce
+        nonce = protected.get('nonce')
+        if not nonce:
+            return False, None, None, "Missing nonce in protected header"
+        
+        service = get_acme_service()
+        if not service.validate_nonce(nonce):
+            return False, None, None, "Invalid or expired nonce"
+        
+        # Get JWK or KID
+        jwk = protected.get('jwk')
+        kid = protected.get('kid')
+        
+        if not jwk and not kid:
+            return False, None, None, "Must provide either 'jwk' or 'kid' in protected header"
+        
+        # Decode payload
+        if 'payload' not in jws_data:
+            return False, None, None, "Missing 'payload' field in JWS"
+        
+        payload_b64 = jws_data['payload']
+        if payload_b64:  # Payload can be empty string for some requests
+            payload_b64 += '=' * (4 - len(payload_b64) % 4)
+            payload_json = base64.urlsafe_b64decode(payload_b64).decode('utf-8')
+            payload = json.loads(payload_json) if payload_json else {}
+        else:
+            payload = {}
+        
+        # TODO: Verify signature with josepy
+        # For now, we accept the JWS structure but don't verify crypto signature
+        # This will be implemented in next iteration
+        
+        return True, payload, jwk, None
+        
+    except json.JSONDecodeError as e:
+        return False, None, None, f"Invalid JSON in JWS: {str(e)}"
+    except Exception as e:
+        return False, None, None, f"JWS verification error: {str(e)}"
+
+
 # ==================== ACME Directory ====================
 
 @acme_bp.route('/directory', methods=['GET'])
@@ -140,24 +206,15 @@ def new_account():
         if not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
-        # TODO: Validate JWS signature
-        # For MVP, we'll extract payload directly
+        # Verify JWS
+        expected_url = f"{service.base_url}/acme/new-account"
+        is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
         
-        # Decode protected header
-        import base64
-        protected_b64 = jws_data.get('protected', '')
-        protected_json = base64.urlsafe_b64decode(protected_b64 + '==').decode()
-        protected = json.loads(protected_json)
+        if not is_valid:
+            return acme_error('malformed', f'Invalid JWS: {error}')
         
-        # Get JWK from protected header
-        jwk = protected.get('jwk')
         if not jwk:
-            return acme_error('malformed', 'JWK required in protected header')
-        
-        # Decode payload
-        payload_b64 = jws_data.get('payload', '')
-        payload_json = base64.urlsafe_b64decode(payload_b64 + '==').decode()
-        payload = json.loads(payload_json) if payload_json else {}
+            return acme_error('malformed', 'JWK required in protected header for new-account')
         
         # Extract account details
         contact = payload.get('contact', [])
@@ -234,10 +291,20 @@ def new_order():
     try:
         jws_data = request.get_json()
         
-        # Decode protected header to get account
-        import base64
+        if not jws_data:
+            return acme_error('malformed', 'Request body must be JWS')
+        
+        # Verify JWS
+        expected_url = f"{service.base_url}/acme/new-order"
+        is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
+        
+        if not is_valid:
+            return acme_error('malformed', f'Invalid JWS: {error}')
+        
+        # Extract account from protected header (need to re-decode for kid)
         protected_b64 = jws_data.get('protected', '')
-        protected_json = base64.urlsafe_b64decode(protected_b64 + '==').decode()
+        protected_b64 += '=' * (4 - len(protected_b64) % 4)
+        protected_json = base64.urlsafe_b64decode(protected_b64).decode()
         protected = json.loads(protected_json)
         
         # Get account ID from kid (Key ID)
@@ -245,19 +312,14 @@ def new_order():
         account_id = kid.split('/')[-1] if kid else None
         
         if not account_id:
-            return acme_error('malformed', 'Account kid required')
+            return acme_error('malformed', 'Account kid required in protected header')
         
         # Verify account exists
         account = service.get_account_by_kid(account_id)
         if not account:
             return acme_error('accountDoesNotExist', 'Account not found', 404)
         
-        # Decode payload
-        payload_b64 = jws_data.get('payload', '')
-        payload_json = base64.urlsafe_b64decode(payload_b64 + '==').decode()
-        payload = json.loads(payload_json)
-        
-        # Extract order details
+        # Extract order details from payload
         identifiers = payload.get('identifiers', [])
         if not identifiers:
             return acme_error('malformed', 'At least one identifier required')
@@ -511,6 +573,70 @@ def respond_to_challenge(challenge_id: str):
         
     except Exception as e:
         return acme_error('serverInternal', f'Internal error: {str(e)}', 500)
+
+
+# ==================== Certificate Download ====================
+
+@acme_bp.route('/cert/<order_id>', methods=['POST', 'GET'])
+def download_certificate(order_id: str):
+    """Download certificate (RFC 8555 Section 7.4.2)
+    
+    Returns certificate chain in PEM format
+    """
+    service = get_acme_service()
+    
+    # Get order
+    order = service.get_order(order_id)
+    if not order:
+        return acme_error('notFound', 'Order not found', 404)
+    
+    if order.status != 'valid':
+        return acme_error('orderNotReady', f'Order status is {order.status}, certificate not available', 403)
+    
+    if not order.certificate_id:
+        return acme_error('serverInternal', 'Certificate not generated', 500)
+    
+    # Get certificate from database
+    from models import Certificate, CA
+    cert = Certificate.query.get(order.certificate_id)
+    if not cert or not cert.crt:
+        return acme_error('serverInternal', 'Certificate not found in database', 500)
+    
+    # Build certificate chain (cert + intermediate CAs + root)
+    chain_pems = []
+    
+    # Add end-entity certificate
+    cert_pem = base64.b64decode(cert.crt).decode('utf-8')
+    chain_pems.append(cert_pem.strip())
+    
+    # Add CA chain
+    current_caref = cert.caref
+    seen_cas = set()  # Prevent loops
+    
+    while current_caref and current_caref not in seen_cas:
+        seen_cas.add(current_caref)
+        ca = CA.query.filter_by(refid=current_caref).first()
+        
+        if not ca:
+            break
+        
+        ca_cert_pem = base64.b64decode(ca.crt).decode('utf-8')
+        chain_pems.append(ca_cert_pem.strip())
+        
+        # Move up the chain
+        current_caref = ca.caref
+    
+    # Join with double newline
+    pem_chain = '\n\n'.join(chain_pems)
+    
+    # Return PEM chain
+    response = make_response(pem_chain, 200)
+    response.headers['Content-Type'] = 'application/pem-certificate-chain'
+    
+    # Add Replay-Nonce for ACME compliance
+    response.headers['Replay-Nonce'] = service.generate_nonce()
+    
+    return response
 
 
 # ==================== Health Check ====================
