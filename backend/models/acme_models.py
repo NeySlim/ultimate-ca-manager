@@ -3,7 +3,7 @@ ACME Protocol Models (RFC 8555)
 Automatic Certificate Management Environment
 """
 from datetime import datetime, timedelta
-from models import db
+from . import db
 import secrets
 import json
 
