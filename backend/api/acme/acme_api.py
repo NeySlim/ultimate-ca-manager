@@ -7,9 +7,9 @@ from datetime import datetime
 import json
 from typing import Dict, Any
 
-from backend.models import db
-from backend.services.acme import AcmeService
-from backend.models.acme_models import AcmeAccount, AcmeOrder, AcmeChallenge
+from models import db
+from services.acme import AcmeService
+from models.acme_models import AcmeAccount, AcmeOrder, AcmeChallenge
 
 # Create blueprint
 acme_bp = Blueprint('acme', __name__, url_prefix='/acme')
