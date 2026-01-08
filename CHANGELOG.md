@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.3] - 2026-01-08
+
+### Fixed
+- **Database Migration**: Missing webauthn_credentials table when upgrading from v1.6.x (#4)
+  - Enhanced migrate_v1_7_0_auth.py to create WebAuthn tables
+  - Added automatic detection of missing tables on startup
+  - Application now displays migration instructions in logs
+  - Created comprehensive MIGRATION_GUIDE_v1.7.0.md
+
+### Added
+- **Migration Detection**: Startup check for missing database tables
+  - Helpful error messages with Docker and system install instructions
+  - Links to migration guide and GitHub issue
+- **Documentation**: Complete migration guide for v1.7.0 upgrades
+  - Docker and system installation instructions
+  - Troubleshooting common migration issues
+  - Database backup recommendations
+
+---
+
 ## [1.7.2] - 2026-01-08
 
 ### Fixed

@@ -110,6 +110,34 @@ def init_database(app):
     """Initialize database with default data"""
     from datetime import datetime
     from sqlalchemy.exc import IntegrityError
+    import sqlite3
+    
+    # Check for missing tables (migration needed)
+    try:
+        connection = db.engine.raw_connection()
+        cursor = connection.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in cursor.fetchall()]
+        cursor.close()
+        connection.close()
+        
+        required_tables = ['webauthn_credentials', 'webauthn_challenges', 'auth_certificates']
+        missing_tables = [t for t in required_tables if t not in tables]
+        
+        if missing_tables:
+            print("\n" + "=" * 70)
+            print("⚠️  WARNING: Missing database tables detected!")
+            print("=" * 70)
+            print(f"Missing tables: {', '.join(missing_tables)}")
+            print("\nThis usually happens when upgrading from UCM v1.6.x to v1.7.x")
+            print("\nTo fix this issue, run the migration script:")
+            print("  Docker:  docker exec <container-name> python3 /app/migrate_v1_7_0_auth.py")
+            print("  System:  cd /opt/ucm && python3 migrate_v1_7_0_auth.py")
+            print("\nFor detailed instructions, see: MIGRATION_GUIDE_v1.7.0.md")
+            print("GitHub Issue: https://github.com/NeySlim/ultimate-ca-manager/issues/4")
+            print("=" * 70 + "\n")
+    except Exception as e:
+        print(f"[WARNING] Could not check database tables: {e}")
     
     # Create initial admin user if none exists
     if User.query.count() == 0:
