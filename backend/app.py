@@ -156,6 +156,7 @@ def register_blueprints(app):
     from api.mtls_api import mtls_bp
     from api.webauthn_api import webauthn_bp
     from api.ui_routes import ui_bp
+    from api.acme import acme_bp
     
     # Register UI routes (no prefix - serve from root)
     app.register_blueprint(ui_bp)
@@ -180,6 +181,7 @@ def register_blueprints(app):
     app.register_blueprint(scep_bp, url_prefix='/scep')  # SCEP protocol
     app.register_blueprint(cdp_bp, url_prefix='/cdp')     # CRL Distribution Points
     app.register_blueprint(ocsp_bp)                        # OCSP Responder (/ocsp)
+    app.register_blueprint(acme_bp)                        # ACME protocol (/acme)
 
 
 def main():

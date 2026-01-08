@@ -22,6 +22,10 @@ cbor2==5.8.0
 # SCEP Support
 pycryptodome==3.23.0
 
+# ACME Support
+josepy==1.14.0
+dnspython==2.8.0
+
 # HTTP & Utils
 requests==2.32.5
 python-dotenv==1.2.1
