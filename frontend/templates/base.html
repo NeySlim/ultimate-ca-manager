@@ -132,7 +132,16 @@
                 </button>
                 
                 <div x-show="open" @click.away="open = false" x-cloak class="dropdown-menu" style="right: 0; left: auto;">
-                    <div class="dropdown-header">My Account</div>
+                    <div class="dropdown-header">{{ session.get('username', 'User') }}</div>
+                    <a href="/my-account" class="dropdown-item"
+                       hx-get="/my-account" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+                       @click="open = false">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-user"/></svg> My Account
+                    </a>
+                    
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-header">Quick Access</div>
+                    
                     <a href="/config/notifications" class="dropdown-item"
                        hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
                        @click="open = false">
@@ -222,21 +231,29 @@
                 <span>Users</span>
             </a>
             
+            {% if session.get('role') == 'admin' %}
             <a href="/settings" class="sidebar-link {% if request.path.startswith('/settings') %}active{% endif %}"
                hx-get="/settings" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <i class="fas fa-gear"></i>
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-settings"/></svg>
                 <span>Settings</span>
             </a>
+            {% endif %}
             
-            <!-- User Settings Submenu -->
+            <!-- User Settings Section -->
             <div class="sidebar-section-title" style="padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-top: 1rem;">
                 My Account
             </div>
             
+            <a href="/my-account" class="sidebar-link {% if request.path.startswith('/my-account') %}active{% endif %}"
+               hx-get="/my-account" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-user"/></svg>
+                <span>Profile & Settings</span>
+            </a>
+            
             <a href="/config/notifications" class="sidebar-link {% if request.path.startswith('/config/notifications') %}active{% endif %}"
                hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-bell"/></svg>
-                <span>Notifications</span>
+                <span>Email Notifications</span>
             </a>
             
             <a href="/config/mtls" class="sidebar-link {% if request.path.startswith('/config/mtls') %}active{% endif %}"

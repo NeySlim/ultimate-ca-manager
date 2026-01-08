@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}My Account - UCM{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
+            <svg class="ucm-icon" width="24" height="24" style="margin-right: 0.5rem;"><use href="#icon-user"/></svg> My Account
+        </h1>
+    </div>
+    
+    <!-- User Profile -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-user"/></svg>
+                Profile Information
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">Username</label>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <svg class="ucm-icon" width="24" height="24" style="color: var(--primary-color);"><use href="#icon-user"/></svg>
+                        <span style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary);">{{ session.get('username', 'N/A') }}</span>
+                    </div>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">Role</label>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        {% if session.get('role') == 'admin' %}
+                        <span class="badge-outline badge-primary">
+                            <svg class="ucm-icon" width="12" height="12"><use href="#icon-shield-check"/></svg>
+                            Administrator
+                        </span>
+                        {% else %}
+                        <span class="badge-outline badge-info">
+                            <svg class="ucm-icon" width="12" height="12"><use href="#icon-eye"/></svg>
+                            {{ session.get('role', 'viewer').title() }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Password Change -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
+                Change Password
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form id="change-password-form" style="display: flex; flex-direction: column; gap: 1rem;">
+                <div>
+                    <label class="form-label">Current Password</label>
+                    <input type="password" id="current-password" class="form-input" placeholder="Enter current password" required>
+                </div>
+                <div>
+                    <label class="form-label">New Password</label>
+                    <input type="password" id="new-password" class="form-input" placeholder="Enter new password" required minlength="8">
+                </div>
+                <div>
+                    <label class="form-label">Confirm New Password</label>
+                    <input type="password" id="confirm-password" class="form-input" placeholder="Confirm new password" required>
+                </div>
+                <div style="padding-top: 0.5rem;">
+                    <button type="submit" class="btn btn-primary">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
+                        Update Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Theme Preferences -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-theme-palette"/></svg>
+                Theme Preferences
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                Current theme: <span id="current-theme-name" style="font-weight: 600; color: var(--text-primary);"></span>
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+                <!-- Sentinel Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Sentinel</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button onclick="setTheme('sentinel-light')" class="btn btn-sm" style="justify-content: flex-start;">
+                            <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-sun"/></svg>
+                            Light
+                        </button>
+                        <button onclick="setTheme('sentinel-dark')" class="btn btn-sm" style="justify-content: flex-start;">
+                            <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-moon"/></svg>
+                            Dark
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Amber Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: linear-gradient(135deg, #f97316, #ea580c);"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Amber</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button onclick="setTheme('amber-light')" class="btn btn-sm" style="justify-content: flex-start;">
+                            <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-sun"/></svg>
+                            Light
+                        </button>
+                        <button onclick="setTheme('amber-dark')" class="btn btn-sm" style="justify-content: flex-start;">
+                            <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-moon"/></svg>
+                            Dark
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Blossom Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: linear-gradient(135deg, #ec4899, #db2777);"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Blossom</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button onclick="setTheme('blossom-light')" class="btn btn-sm" style="justify-content: flex-start;">
+                            <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-sun"/></svg>
+                            Light
+                        </button>
+                        <button onclick="setTheme('blossom-dark')" class="btn btn-sm" style="justify-content: flex-start;">
+                            <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-moon"/></svg>
+                            Dark
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Nebula Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Nebula</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <button onclick="setTheme('nebula-light')" class="btn btn-sm" style="justify-content: flex-start;">
+                            <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-sun"/></svg>
+                            Light
+                        </button>
+                        <button onclick="setTheme('nebula-dark')" class="btn btn-sm" style="justify-content: flex-start;">
+                            <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-moon"/></svg>
+                            Dark
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Session Information -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-clock"/></svg>
+                Session Information
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 500; color: var(--text-secondary);">Session Status</span>
+                    <span class="badge-outline badge-success">
+                        <svg class="ucm-icon" width="12" height="12"><use href="#icon-check"/></svg>
+                        Active
+                    </span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 500; color: var(--text-secondary);">Login Method</span>
+                    <span style="font-weight: 600; color: var(--text-primary);">Password</span>
+                </div>
+                <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                    <a href="/logout" class="btn btn-danger" style="width: 100%;">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-logout"/></svg>
+                        Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Display current theme
+document.addEventListener('DOMContentLoaded', function() {
+    const theme = localStorage.getItem('ucm-theme') || 'sentinel-light';
+    const [base, variant] = theme.split('-');
+    const themeName = base.charAt(0).toUpperCase() + base.slice(1) + ' ' + 
+                     variant.charAt(0).toUpperCase() + variant.slice(1);
+    document.getElementById('current-theme-name').textContent = themeName;
+});
+
+// Handle password change form
+document.getElementById('change-password-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const currentPassword = document.getElementById('current-password').value;
+    const newPassword = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+    
+    if (newPassword !== confirmPassword) {
+        alert('New passwords do not match!');
+        return;
+    }
+    
+    if (newPassword.length < 8) {
+        alert('Password must be at least 8 characters long!');
+        return;
+    }
+    
+    // TODO: Implement password change API call
+    fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            current_password: currentPassword,
+            new_password: newPassword
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Password changed successfully!');
+            document.getElementById('change-password-form').reset();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to change password'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while changing password');
+    });
+});
+</script>
+{% endblock %}
