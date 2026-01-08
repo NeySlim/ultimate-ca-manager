@@ -386,6 +386,29 @@
         `;
         document.head.appendChild(toastStyle);
     }
+    
+    // Global session expiration handler for fetch requests
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        const response = await originalFetch(...args);
+        
+        // Check for 401 Unauthorized (session expired)
+        if (response.status === 401) {
+            // Show modal and redirect to login
+            if (typeof ucmAlert !== 'undefined') {
+                ucmAlert('Your session has expired due to inactivity. Please log in again.', 'Session Expired').then(() => {
+                    window.location.href = '/login?expired=1';
+                });
+            } else {
+                // Fallback if modal system not loaded
+                alert('Your session has expired. Please log in again.');
+                window.location.href = '/login?expired=1';
+            }
+            // Return the response anyway for proper error handling
+        }
+        
+        return response;
+    };
     </script>
     
     {% block extra_body %}{% endblock %}
