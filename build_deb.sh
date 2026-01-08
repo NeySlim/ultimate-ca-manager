@@ -97,7 +97,7 @@ pip install --upgrade pip
 pip install -r backend/requirements.txt
 
 # Create data directories
-mkdir -p /opt/ucm/data/{ca,certs,crl,ocsp,scep}
+bash -c 'mkdir -p /opt/ucm/data/{ca,certs,crl,ocsp,scep}'
 chown -R ucm:ucm /opt/ucm/data
 
 # Initialize database if not exists
