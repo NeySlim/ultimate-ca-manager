@@ -241,6 +241,7 @@ background: var(--bg-hover) !important;
     border-radius: 8px;
     box-shadow: var(--shadow-sm);
     margin-bottom: 24px;
+    padding: 1.5rem;
     overflow: hidden;
 }
 
