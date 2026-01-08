@@ -158,6 +158,12 @@
                         <svg class="ucm-icon" width="16" height="16"><use href="#icon-key"/></svg> Security Keys
                     </a>
                     
+                    <a href="/config/acme" class="dropdown-item"
+                       hx-get="/config/acme" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+                       @click="open = false">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-shield"/></svg> ACME Protocol
+                    </a>
+                    
                     <div class="dropdown-divider"></div>
                     
                     <a href="/logout" class="dropdown-item">
@@ -266,6 +272,12 @@
                hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-key"/></svg>
                 <span>Security Keys</span>
+            </a>
+            
+            <a href="/config/acme" class="sidebar-link {% if request.path.startswith('/config/acme') %}active{% endif %}"
+               hx-get="/config/acme" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-shield"/></svg>
+                <span>ACME Protocol</span>
             </a>
         </div>
     </aside>
