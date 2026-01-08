@@ -14,8 +14,8 @@ from cryptography.x509.oid import NameOID, ExtensionOID
 import base64
 import hashlib
 
-from backend.models import db
-from backend.models.acme_models import (
+from models import db
+from models.acme_models import (
     AcmeAccount, AcmeOrder, AcmeAuthorization, 
     AcmeChallenge, AcmeNonce
 )
