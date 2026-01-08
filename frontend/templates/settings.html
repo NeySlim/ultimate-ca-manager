@@ -235,24 +235,41 @@ function loadHTTPSCertInfo() {
     fetch('/api/ui/system/https-cert-info')
         .then(response => response.json())
         .then(data => {
+            console.log('[DEBUG] HTTPS Cert Info loaded:', data);
+            
             if (data.subject) document.getElementById('cert-subject').textContent = data.subject;
             if (data.expires) document.getElementById('cert-expiry').textContent = data.expires;
             if (data.type) document.getElementById('cert-type').textContent = data.type;
             
             // Set radio button based on source
+            console.log('[DEBUG] Source:', data.source, 'Cert ID:', data.cert_id);
+            
             if (data.source === 'managed' && data.cert_id) {
-                document.querySelector('input[name="cert-source"][value="managed"]').checked = true;
+                console.log('[DEBUG] Setting managed radio button');
+                const managedRadio = document.querySelector('input[name="cert-source"][value="managed"]');
+                if (managedRadio) {
+                    managedRadio.checked = true;
+                    console.log('[DEBUG] Managed radio checked:', managedRadio.checked);
+                }
+                
                 // Pre-select certificate in dropdown
                 const select = document.getElementById('managed-cert-id');
                 if (select) {
+                    console.log('[DEBUG] Cert selector found, will select ID:', data.cert_id);
                     // Wait a bit for certificates to load, then select
                     setTimeout(() => {
-                        select.value = data.cert_id;
+                        // Try both string and number comparison
+                        select.value = String(data.cert_id);
+                        console.log('[DEBUG] Selected value set to:', select.value);
+                        console.log('[DEBUG] Available options:', Array.from(select.options).map(o => o.value));
                         select.dispatchEvent(new Event('change'));
-                    }, 500);
+                    }, 800); // Increased delay to ensure certs are loaded
+                } else {
+                    console.warn('[DEBUG] Cert selector not found!');
                 }
                 toggleCertSelector();
             } else {
+                console.log('[DEBUG] Setting auto radio button');
                 document.querySelector('input[name="cert-source"][value="auto"]').checked = true;
                 toggleCertSelector();
             }
