@@ -219,6 +219,12 @@
                 <a href="/scep" class="sidebar-link" hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Configuration</a>
             </div>
             
+            <a href="/config/acme" class="sidebar-link {% if request.path.startswith('/config/acme') %}active{% endif %}"
+               hx-get="/config/acme" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-shield"/></svg>
+                <span>ACME</span>
+            </a>
+            
             <a href="/crl" class="sidebar-link {% if request.path.startswith('/crl') %}active{% endif %}"
                hx-get="/crl" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <i class="fas fa-file-contract"></i>
@@ -245,15 +251,15 @@
             </a>
             {% endif %}
             
-            <!-- Configuration Section -->
+            <!-- User Settings Section -->
             <div class="sidebar-section-title" style="padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-top: 1rem;">
-                Configuration
+                My Account
             </div>
             
-            <a href="/config/acme" class="sidebar-link {% if request.path.startswith('/config/acme') %}active{% endif %}"
-               hx-get="/config/acme" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <svg class="ucm-icon" width="20" height="20"><use href="#icon-shield"/></svg>
-                <span>ACME Protocol</span>
+            <a href="/my-account" class="sidebar-link {% if request.path.startswith('/my-account') %}active{% endif %}"
+               hx-get="/my-account" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-user"/></svg>
+                <span>Profile & Settings</span>
             </a>
             
             <a href="/config/notifications" class="sidebar-link {% if request.path.startswith('/config/notifications') %}active{% endif %}"
@@ -272,17 +278,6 @@
                hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-key"/></svg>
                 <span>Security Keys</span>
-            </a>
-            
-            <!-- User Settings Section -->
-            <div class="sidebar-section-title" style="padding: 0.75rem 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-top: 1rem;">
-                My Account
-            </div>
-            
-            <a href="/my-account" class="sidebar-link {% if request.path.startswith('/my-account') %}active{% endif %}"
-               hx-get="/my-account" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <svg class="ucm-icon" width="20" height="20"><use href="#icon-user"/></svg>
-                <span>Profile & Settings</span>
             </a>
         </div>
     </aside>
