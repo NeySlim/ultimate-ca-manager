@@ -2258,6 +2258,7 @@ def config_https_cert():
         import os
         from cryptography import x509
         from cryptography.hazmat.backends import default_backend
+        from models import SystemConfig
         
         cert_path = str(Config.HTTPS_CERT_PATH)
         
@@ -2274,7 +2275,18 @@ def config_https_cert():
         not_after = cert.not_valid_after.strftime('%Y-%m-%d %H:%M:%S UTC')
         serial = hex(cert.serial_number)[2:].upper()
         
+        # Check certificate source
+        cert_source_config = SystemConfig.query.filter_by(key='https_cert_source').first()
+        if cert_source_config and cert_source_config.value.startswith('managed:'):
+            cert_id = cert_source_config.value.split(':')[1]
+            source_badge = f'<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 500; background-color: var(--success-bg); color: var(--success-color);"><i class="fas fa-certificate" style="margin-right: 0.375rem;"></i>Managed Certificate (ID: {cert_id})</span>'
+        else:
+            source_badge = '<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 500; background-color: var(--warning-bg); color: var(--warning-color);"><i class="fas fa-tools" style="margin-right: 0.375rem;"></i>Auto-generated</span>'
+        
         return f'''
+        <div style="margin-bottom: 1rem;">
+            {source_badge}
+        </div>
         <dl class="grid grid-cols-1 gap-4">
             <div>
                 <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Subject</dt>
@@ -2310,9 +2322,19 @@ def config_regenerate_https():
     """Regenerate HTTPS certificate"""
     try:
         from config.https_manager import HTTPSManager
+        from models import SystemConfig
         
         https_mgr = HTTPSManager()
         https_mgr.setup_https()
+        
+        # Mark as auto-generated
+        config = SystemConfig.query.filter_by(key='https_cert_source').first()
+        if not config:
+            config = SystemConfig(key='https_cert_source')
+        config.value = 'auto-generated'
+        config.description = 'Auto-generated self-signed certificate'
+        db.session.add(config)
+        db.session.commit()
         
         flash('HTTPS certificate regenerated. Please restart the server.', 'success')
         return '', 200
@@ -2908,6 +2930,16 @@ def upload_https_cert():
             with open(key_path, 'w') as f:
                 f.write(private_key)
             
+            # Mark as imported
+            from models import SystemConfig
+            config = SystemConfig.query.filter_by(key='https_cert_source').first()
+            if not config:
+                config = SystemConfig(key='https_cert_source')
+            config.value = 'imported'
+            config.description = 'Imported certificate chain'
+            db.session.add(config)
+            db.session.commit()
+            
             flash('HTTPS certificate imported successfully. Please restart the server.', 'success')
             return '', 200
         except Exception as e:
@@ -3139,6 +3171,16 @@ def use_managed_cert(cert_id):
                 f.write(full_chain)
             with open(key_path, 'w') as f:
                 f.write(key_pem)
+            
+            # Store certificate source in database
+            from models import SystemConfig
+            config = SystemConfig.query.filter_by(key='https_cert_source').first()
+            if not config:
+                config = SystemConfig(key='https_cert_source')
+            config.value = f'managed:{cert_id}'
+            config.description = f'Managed certificate ID: {cert_id}'
+            db.session.add(config)
+            db.session.commit()
             
             flash('HTTPS certificate updated successfully. Please restart the server.', 'success')
             return '', 200
