@@ -134,25 +134,35 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
             import josepy as jose
             
             # Determine which key to use for verification
+            key_to_verify = None
             if jwk:
                 # New account - JWK in protected header
                 key_to_verify = jwk
-            elif kid and account_key:
-                # Existing account - use stored account key
-                key_to_verify = account_key
-            else:
-                # KID provided but no account key available
-                # This happens when we need to fetch the account first
-                # For now, accept it (will be validated when account is fetched)
-                return True, payload, None, None
+            elif kid:
+                if account_key:
+                    # Existing account - use stored account key
+                    key_to_verify = account_key
+                else:
+                    # KID provided but no account key available
+                    # This happens when we need to fetch the account first
+                    # For now, accept it (will be validated when account is fetched)
+                    return True, payload, jwk, None
+            
+            if not key_to_verify:
+                return False, None, None, "No key available for verification"
             
             # Convert JWK dict to josepy JWK object
-            if key_to_verify.get('kty') == 'RSA':
-                public_key = jose.JWKRSA.fields_from_json(key_to_verify)
-            elif key_to_verify.get('kty') == 'EC':
-                public_key = jose.JWKEC.fields_from_json(key_to_verify)
+            import json as json_module
+            if not isinstance(key_to_verify, dict):
+                return False, None, None, f"Key is not a dict, it's a {type(key_to_verify)}: {key_to_verify}"
+            
+            kty = key_to_verify.get('kty')
+            if kty == 'RSA':
+                public_key = jose.JWKRSA.json_loads(json_module.dumps(key_to_verify))
+            elif isinstance(key_to_verify, dict) and kty == 'EC':
+                public_key = jose.JWKEC.json_loads(json_module.dumps(key_to_verify))
             else:
-                return False, None, None, f"Unsupported key type: {key_to_verify.get('kty')}"
+                return False, None, None, f"Unsupported key type: {kty}"
             
             # Reconstruct JWS for verification
             # Format: base64url(protected).base64url(payload)
