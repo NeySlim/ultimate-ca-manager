@@ -3844,22 +3844,23 @@ def acme_statistics():
     """Get ACME statistics"""
     try:
         from models import db
+        from sqlalchemy import text
         
         # Query ACME database for statistics
         total_accounts = db.session.execute(
-            "SELECT COUNT(*) FROM acme_accounts"
+            text("SELECT COUNT(*) FROM acme_accounts")
         ).scalar() or 0
         
         active_orders = db.session.execute(
-            "SELECT COUNT(*) FROM acme_orders WHERE status IN ('pending', 'ready', 'processing')"
+            text("SELECT COUNT(*) FROM acme_orders WHERE status IN ('pending', 'ready', 'processing')")
         ).scalar() or 0
         
         completed_orders = db.session.execute(
-            "SELECT COUNT(*) FROM acme_orders WHERE status = 'valid'"
+            text("SELECT COUNT(*) FROM acme_orders WHERE status = 'valid'")
         ).scalar() or 0
         
         issued_certs = db.session.execute(
-            "SELECT COUNT(*) FROM acme_orders WHERE status = 'valid' AND certificate_id IS NOT NULL"
+            text("SELECT COUNT(*) FROM acme_orders WHERE status = 'valid' AND certificate_id IS NOT NULL")
         ).scalar() or 0
         
         return jsonify({
@@ -3886,13 +3887,14 @@ def acme_accounts_list():
     try:
         from models import db
         from datetime import datetime
+        from sqlalchemy import text
         
-        accounts = db.session.execute("""
+        accounts = db.session.execute(text("""
             SELECT id, account_id, status, contacts, created, 
                    SUBSTR(jwk_thumbprint, 1, 16) as thumbprint_short
             FROM acme_accounts 
             ORDER BY created DESC
-        """).fetchall()
+        """)).fetchall()
         
         if not accounts:
             return '''
@@ -3952,15 +3954,16 @@ def acme_orders_list():
     try:
         from models import db
         from datetime import datetime
+        from sqlalchemy import text
         
-        orders = db.session.execute("""
+        orders = db.session.execute(text("""
             SELECT o.id, o.order_id, o.status, o.identifiers, o.created,
                    a.account_id
             FROM acme_orders o
             LEFT JOIN acme_accounts a ON o.account_id = a.id
             ORDER BY o.created DESC
             LIMIT 50
-        """).fetchall()
+        """)).fetchall()
         
         if not orders:
             return '''
@@ -4017,3 +4020,63 @@ def acme_orders_list():
         
     except Exception as e:
         return f'<div class="alert alert-danger">Error: {str(e)}</div>'
+
+
+@ui_bp.route('/api/ui/acme/settings', methods=['POST'])
+@login_required
+def acme_save_settings():
+    """Save ACME configuration settings"""
+    try:
+        from models import db, SystemConfig
+        
+        default_ca = request.form.get('default_ca')
+        cert_validity = request.form.get('cert_validity', '90')
+        
+        # Save default CA
+        if default_ca:
+            config = SystemConfig.query.filter_by(key='acme_default_ca').first()
+            if not config:
+                config = SystemConfig(key='acme_default_ca')
+            config.value = default_ca
+            config.description = 'Default CA for ACME certificate signing'
+            db.session.add(config)
+        
+        # Save certificate validity
+        config_validity = SystemConfig.query.filter_by(key='acme_cert_validity').first()
+        if not config_validity:
+            config_validity = SystemConfig(key='acme_cert_validity')
+        config_validity.value = cert_validity
+        config_validity.description = 'Default validity period for ACME certificates (days)'
+        db.session.add(config_validity)
+        
+        db.session.commit()
+        
+        flash('ACME settings saved successfully', 'success')
+        return '', 200
+        
+    except Exception as e:
+        flash(f'Error saving ACME settings: {str(e)}', 'error')
+        return str(e), 500
+
+
+@ui_bp.route('/api/ui/acme/settings/load')
+@login_required
+def acme_load_settings():
+    """Load current ACME configuration"""
+    try:
+        from models import SystemConfig
+        
+        default_ca = SystemConfig.query.filter_by(key='acme_default_ca').first()
+        cert_validity = SystemConfig.query.filter_by(key='acme_cert_validity').first()
+        
+        return jsonify({
+            'default_ca': default_ca.value if default_ca else None,
+            'cert_validity': cert_validity.value if cert_validity else '90'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'default_ca': None,
+            'cert_validity': '90',
+            'error': str(e)
+        }), 200
