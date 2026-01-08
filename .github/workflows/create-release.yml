@@ -1,0 +1,165 @@
+name: Create GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  discussions: write
+
+jobs:
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog generation
+      
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "Building release for version: ${VERSION}"
+      
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          
+          # Extract section from CHANGELOG.md for this version
+          if grep -q "\[${VERSION}\]" CHANGELOG.md; then
+            # Extract the section between [VERSION] and next version or end
+            NOTES=$(sed -n "/## \[${VERSION}\]/,/## \[/p" CHANGELOG.md | sed '$d' | tail -n +2)
+            
+            # Save to file for multiline handling
+            echo "$NOTES" > /tmp/changelog_section.md
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "No changelog entry found for version ${VERSION}"
+            echo "found=false" >> $GITHUB_OUTPUT
+            echo "" > /tmp/changelog_section.md
+          fi
+      
+      - name: Determine release type
+        id: release_type
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          
+          # Parse semantic version
+          if [[ $VERSION =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+            
+            if [ "$PATCH" != "0" ]; then
+              echo "type=patch" >> $GITHUB_OUTPUT
+              echo "emoji=🔧" >> $GITHUB_OUTPUT
+              echo "title=Patch Release" >> $GITHUB_OUTPUT
+            elif [ "$MINOR" != "0" ]; then
+              echo "type=minor" >> $GITHUB_OUTPUT
+              echo "emoji=✨" >> $GITHUB_OUTPUT
+              echo "title=Feature Release" >> $GITHUB_OUTPUT
+            else
+              echo "type=major" >> $GITHUB_OUTPUT
+              echo "emoji=🎉" >> $GITHUB_OUTPUT
+              echo "title=Major Release" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "type=patch" >> $GITHUB_OUTPUT
+            echo "emoji=🔧" >> $GITHUB_OUTPUT
+            echo "title=Release" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          TAG="${{ steps.get_version.outputs.TAG }}"
+          EMOJI="${{ steps.release_type.outputs.emoji }}"
+          TITLE="${{ steps.release_type.outputs.title }}"
+          
+          # Get previous tag for comparison
+          PREV_TAG=$(git describe --tags --abbrev=0 ${TAG}^ 2>/dev/null || echo "")
+          
+          cat > /tmp/release_notes.md << EOF
+## ${EMOJI} ${TITLE} v${VERSION}
+
+$(cat /tmp/changelog_section.md)
+
+### Installation
+
+#### Docker (Recommended)
+\`\`\`bash
+docker pull neyslim/ultimate-ca-manager:${VERSION}
+docker pull neyslim/ultimate-ca-manager:latest
+\`\`\`
+
+#### Debian/Ubuntu
+\`\`\`bash
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v${VERSION}/ucm_${VERSION}_amd64.deb
+sudo dpkg -i ucm_${VERSION}_amd64.deb
+\`\`\`
+
+#### RHEL/CentOS/Rocky/AlmaLinux
+\`\`\`bash
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v${VERSION}/ucm-${VERSION}-1.noarch.rpm
+sudo rpm -ivh ucm-${VERSION}-1.noarch.rpm
+\`\`\`
+
+### Upgrade Guide
+
+#### Docker
+\`\`\`bash
+docker pull neyslim/ultimate-ca-manager:latest
+docker-compose down
+docker-compose up -d
+\`\`\`
+
+#### Linux (systemd)
+\`\`\`bash
+sudo systemctl stop ucm
+sudo dpkg -i ucm_${VERSION}_amd64.deb  # Debian/Ubuntu
+# OR
+sudo rpm -U ucm-${VERSION}-1.noarch.rpm  # RHEL/CentOS
+sudo systemctl start ucm
+\`\`\`
+
+### Full Changelog
+See [CHANGELOG.md](https://github.com/NeySlim/ultimate-ca-manager/blob/main/CHANGELOG.md) for complete details.
+
+---
+
+**What's Changed**
+
+EOF
+          
+          # Add commit list since previous tag
+          if [ -n "$PREV_TAG" ]; then
+            echo "Full Changelog: https://github.com/NeySlim/ultimate-ca-manager/compare/${PREV_TAG}...${TAG}" >> /tmp/release_notes.md
+          fi
+          
+          cat /tmp/release_notes.md
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: /tmp/release_notes.md
+          draft: false
+          prerelease: false
+          generate_release_notes: true  # Auto-generate commit list
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Summary
+        run: |
+          echo "✅ GitHub Release created for v${{ steps.get_version.outputs.VERSION }}"
+          echo "📝 Release notes generated from CHANGELOG.md"
+          echo "🔗 https://github.com/NeySlim/ultimate-ca-manager/releases/tag/${{ steps.get_version.outputs.TAG }}"
