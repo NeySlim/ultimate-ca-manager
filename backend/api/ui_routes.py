@@ -3531,6 +3531,18 @@ def https_cert_apply_ui():
             
             logger.info(f"HTTPS certificate applied: {cert.common_name} (ID: {cert_id}) by {user.username}")
         
+        elif source == 'auto':
+            # Switch back to auto-generated self-signed certificate
+            config = SystemConfig.query.filter_by(key='https_cert_source').first()
+            if not config:
+                config = SystemConfig(key='https_cert_source', value='auto')
+                db.session.add(config)
+            else:
+                config.value = 'auto'
+            
+            db.session.commit()
+            logger.info(f"HTTPS certificate source set to auto (self-signed) by {user.username}")
+        
         # Restart UCM service
         subprocess.Popen(['systemctl', 'restart', 'ucm'])
         

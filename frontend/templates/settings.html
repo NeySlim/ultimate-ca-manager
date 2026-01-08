@@ -101,14 +101,14 @@
                 <p style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem; font-size: 0.875rem;">Certificate Source</p>
                 <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                     <label style="display: flex; align-items: start; gap: 0.75rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="cert-source" value="selfsigned" checked style="margin-top: 0.25rem;">
+                        <input type="radio" name="cert-source" value="auto" checked style="margin-top: 0.25rem;">
                         <div>
                             <div style="font-weight: 600; color: var(--text-primary);">Auto-generated (Self-signed)</div>
                             <div style="font-size: 0.75rem; color: var(--text-secondary);">Use the automatically generated self-signed certificate (default)</div>
                         </div>
                     </label>
                     <label style="display: flex; align-items: start; gap: 0.75rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="cert-source" value="ucm" style="margin-top: 0.25rem;">
+                        <input type="radio" name="cert-source" value="managed" style="margin-top: 0.25rem;">
                         <div>
                             <div style="font-weight: 600; color: var(--text-primary);">UCM Managed Certificate</div>
                             <div style="font-size: 0.75rem; color: var(--text-secondary);">Use a certificate from UCM's certificate store</div>
@@ -242,7 +242,7 @@ function applyHTTPSCertificate() {
         
         const source = document.querySelector('input[name="cert-source"]:checked').value;
         
-        fetch('/api/system/apply-https-cert', {
+        fetch('/api/ui/system/https-cert-apply', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ source: source })
@@ -271,7 +271,7 @@ function regenerateSelfSigned() {
     ).then(confirmed => {
         if (!confirmed) return;
         
-        fetch('/api/system/regenerate-selfsigned', {
+        fetch('/api/ui/system/https-cert-regenerate', {
             method: 'POST'
         })
         .then(response => response.json())
@@ -346,7 +346,7 @@ function executePKIReset() {
     
     document.getElementById('ucm-modal-container').innerHTML = '';
     
-    fetch('/api/pki/reset', {
+    fetch('/api/ui/system/pki-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirmation: 'RESET PKI DATA' })
