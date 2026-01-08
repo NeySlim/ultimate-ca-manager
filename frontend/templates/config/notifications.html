@@ -247,7 +247,7 @@ document.getElementById('smtp-form').addEventListener('submit', async (e) => {
 });
 
 // Test SMTP
-async function testSMTP() {
+window.testSMTP = async function() {
     // First check if SMTP is configured
     const smtpEnabled = document.getElementById('smtp_enabled').checked;
     const smtpHost = document.getElementById('smtp_host').value;
