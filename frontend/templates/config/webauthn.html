@@ -586,9 +586,13 @@ window.toggleCredential = async function(credentialId, newState) {
 
 // Delete credential
 window.deleteCredential = async function(credentialId) {
-    if (!confirm('Are you sure you want to delete this security key? This cannot be undone.')) {
-        return;
-    }
+    const confirmed = await ucmConfirm(
+        'Are you sure you want to delete this security key? This cannot be undone.',
+        'Delete Security Key',
+        { danger: true, confirmText: 'Delete', icon: 'trash' }
+    );
+    
+    if (!confirmed) return;
     
     try {
         const response = await fetch(`/api/v1/webauthn/credentials/${credentialId}`, {

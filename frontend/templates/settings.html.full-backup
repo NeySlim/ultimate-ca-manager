@@ -1,0 +1,964 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - UCM{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
+            <i class="fas fa-user-gear" style="margin-right: 0.5rem;"></i> User Settings
+        </h1>
+    </div>
+    
+    <!-- User Profile -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-user" style="color: var(--primary-color);"></i>
+                Profile Information
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">Username</label>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <i class="fas fa-user-circle" style="color: var(--primary-color); font-size: 1.5rem;"></i>
+                        <span style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary);">{{ session.get('username', 'N/A') }}</span>
+                    </div>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">Role</label>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        {% if session.get('role') == 'admin' %}
+                        <span class="badge-outline badge-primary">
+                            <i class="fas fa-crown" style="width: 10px; height: 10px;"></i>
+                            Administrator
+                        </span>
+                        {% else %}
+                        <span class="badge-outline badge-info">
+                            <i class="fas fa-eye" style="width: 10px; height: 10px;"></i>
+                            {{ session.get('role', 'viewer').title() }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Password Change -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-key" style="color: var(--primary-color);"></i>
+                Change Password
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form style="display: flex; flex-direction: column; gap: 1rem;">
+                <div>
+                    <label class="form-label">Current Password</label>
+                    <input type="password" class="form-input" placeholder="Enter current password">
+                </div>
+                <div>
+                    <label class="form-label">New Password</label>
+                    <input type="password" class="form-input" placeholder="Enter new password">
+                </div>
+                <div>
+                    <label class="form-label">Confirm New Password</label>
+                    <input type="password" class="form-input" placeholder="Confirm new password">
+                </div>
+                <div style="padding-top: 0.5rem;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save" style="margin-right: 0.5rem;"></i> Update Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Theme Preferences -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-palette" style="color: var(--primary-color);"></i>
+                Theme Preferences
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">Current theme: <span id="current-theme-name" style="font-weight: 600; color: var(--text-primary);"></span></p>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
+                <!-- Sentinel Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: #3b82f6;"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Sentinel</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Light Preview -->
+                        <button onclick="setTheme('sentinel-light')" class="theme-preview-btn" style="padding: 0; border: 2px solid transparent; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; overflow: hidden; height: 80px;">
+                            <div style="background: #f8fafc; height: 100%; display: flex; flex-direction: column;">
+                                <div style="background: #ffffff; height: 24px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 8px;">
+                                    <div style="width: 4px; height: 4px; border-radius: 50%; background: #3b82f6; margin-right: 6px;"></div>
+                                    <div style="width: 30px; height: 3px; background: #cbd5e1; border-radius: 2px;"></div>
+                                </div>
+                                <div style="flex: 1; padding: 8px; display: flex; gap: 4px;">
+                                    <div style="width: 40%; background: #ffffff; border-radius: 3px; border: 1px solid #e2e8f0;"></div>
+                                    <div style="flex: 1; background: #ffffff; border-radius: 3px; border: 1px solid #e2e8f0;"></div>
+                                </div>
+                                <div style="text-align: center; font-size: 11px; color: #64748b; padding: 4px;">Light</div>
+                            </div>
+                        </button>
+                        <!-- Dark Preview -->
+                        <button onclick="setTheme('sentinel-dark')" class="theme-preview-btn" style="padding: 0; border: 2px solid transparent; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; overflow: hidden; height: 80px;">
+                            <div style="background: #0f172a; height: 100%; display: flex; flex-direction: column;">
+                                <div style="background: #1e293b; height: 24px; border-bottom: 1px solid #334155; display: flex; align-items: center; padding: 0 8px;">
+                                    <div style="width: 4px; height: 4px; border-radius: 50%; background: #3b82f6; margin-right: 6px;"></div>
+                                    <div style="width: 30px; height: 3px; background: #475569; border-radius: 2px;"></div>
+                                </div>
+                                <div style="flex: 1; padding: 8px; display: flex; gap: 4px;">
+                                    <div style="width: 40%; background: #1e293b; border-radius: 3px; border: 1px solid #334155;"></div>
+                                    <div style="flex: 1; background: #1e293b; border-radius: 3px; border: 1px solid #334155;"></div>
+                                </div>
+                                <div style="text-align: center; font-size: 11px; color: #94a3b8; padding: 4px;">Dark</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Amber Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: #f97316;"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Amber</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Light Preview -->
+                        <button onclick="setTheme('amber-light')" class="theme-preview-btn" style="padding: 0; border: 2px solid transparent; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; overflow: hidden; height: 80px;">
+                            <div style="background: #fffbeb; height: 100%; display: flex; flex-direction: column;">
+                                <div style="background: #ffffff; height: 24px; border-bottom: 1px solid #fde68a; display: flex; align-items: center; padding: 0 8px;">
+                                    <div style="width: 4px; height: 4px; border-radius: 50%; background: #f97316; margin-right: 6px;"></div>
+                                    <div style="width: 30px; height: 3px; background: #fcd34d; border-radius: 2px;"></div>
+                                </div>
+                                <div style="flex: 1; padding: 8px; display: flex; gap: 4px;">
+                                    <div style="width: 40%; background: #ffffff; border-radius: 3px; border: 1px solid #fde68a;"></div>
+                                    <div style="flex: 1; background: #ffffff; border-radius: 3px; border: 1px solid #fde68a;"></div>
+                                </div>
+                                <div style="text-align: center; font-size: 11px; color: #92400e; padding: 4px;">Light</div>
+                            </div>
+                        </button>
+                        <!-- Dark Preview -->
+                        <button onclick="setTheme('amber-dark')" class="theme-preview-btn" style="padding: 0; border: 2px solid transparent; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; overflow: hidden; height: 80px;">
+                            <div style="background: #1c1917; height: 100%; display: flex; flex-direction: column;">
+                                <div style="background: #292524; height: 24px; border-bottom: 1px solid #44403c; display: flex; align-items: center; padding: 0 8px;">
+                                    <div style="width: 4px; height: 4px; border-radius: 50%; background: #f97316; margin-right: 6px;"></div>
+                                    <div style="width: 30px; height: 3px; background: #57534e; border-radius: 2px;"></div>
+                                </div>
+                                <div style="flex: 1; padding: 8px; display: flex; gap: 4px;">
+                                    <div style="width: 40%; background: #292524; border-radius: 3px; border: 1px solid #44403c;"></div>
+                                    <div style="flex: 1; background: #292524; border-radius: 3px; border: 1px solid #44403c;"></div>
+                                </div>
+                                <div style="text-align: center; font-size: 11px; color: #a8a29e; padding: 4px;">Dark</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Blossom Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: #ec4899;"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Blossom</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Light Preview -->
+                        <button onclick="setTheme('blossom-light')" class="theme-preview-btn" style="padding: 0; border: 2px solid transparent; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; overflow: hidden; height: 80px;">
+                            <div style="background: #fdf2f8; height: 100%; display: flex; flex-direction: column;">
+                                <div style="background: #ffffff; height: 24px; border-bottom: 1px solid #fbcfe8; display: flex; align-items: center; padding: 0 8px;">
+                                    <div style="width: 4px; height: 4px; border-radius: 50%; background: #ec4899; margin-right: 6px;"></div>
+                                    <div style="width: 30px; height: 3px; background: #f9a8d4; border-radius: 2px;"></div>
+                                </div>
+                                <div style="flex: 1; padding: 8px; display: flex; gap: 4px;">
+                                    <div style="width: 40%; background: #ffffff; border-radius: 3px; border: 1px solid #fbcfe8;"></div>
+                                    <div style="flex: 1; background: #ffffff; border-radius: 3px; border: 1px solid #fbcfe8;"></div>
+                                </div>
+                                <div style="text-align: center; font-size: 11px; color: #831843; padding: 4px;">Light</div>
+                            </div>
+                        </button>
+                        <!-- Dark Preview -->
+                        <button onclick="setTheme('blossom-dark')" class="theme-preview-btn" style="padding: 0; border: 2px solid transparent; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; overflow: hidden; height: 80px;">
+                            <div style="background: #1f1729; height: 100%; display: flex; flex-direction: column;">
+                                <div style="background: #2d1f3a; height: 24px; border-bottom: 1px solid #4a3456; display: flex; align-items: center; padding: 0 8px;">
+                                    <div style="width: 4px; height: 4px; border-radius: 50%; background: #ec4899; margin-right: 6px;"></div>
+                                    <div style="width: 30px; height: 3px; background: #5e4567; border-radius: 2px;"></div>
+                                </div>
+                                <div style="flex: 1; padding: 8px; display: flex; gap: 4px;">
+                                    <div style="width: 40%; background: #2d1f3a; border-radius: 3px; border: 1px solid #4a3456;"></div>
+                                    <div style="flex: 1; background: #2d1f3a; border-radius: 3px; border: 1px solid #4a3456;"></div>
+                                </div>
+                                <div style="text-align: center; font-size: 11px; color: #d8b4fe; padding: 4px;">Dark</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Nebula Themes -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="width: 1.25rem; height: 1.25rem; border-radius: 0.25rem; background: #3b82f6;"></div>
+                        <span style="font-weight: 600; color: var(--text-primary);">Nebula</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Light Preview -->
+                        <button onclick="setTheme('nebula-light')" class="theme-preview-btn" style="padding: 0; border: 2px solid transparent; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; overflow: hidden; height: 80px;">
+                            <div style="background: #f0f9ff; height: 100%; display: flex; flex-direction: column;">
+                                <div style="background: #ffffff; height: 24px; border-bottom: 1px solid #bae6fd; display: flex; align-items: center; padding: 0 8px;">
+                                    <div style="width: 4px; height: 4px; border-radius: 50%; background: #3b82f6; margin-right: 6px;"></div>
+                                    <div style="width: 30px; height: 3px; background: #7dd3fc; border-radius: 2px;"></div>
+                                </div>
+                                <div style="flex: 1; padding: 8px; display: flex; gap: 4px;">
+                                    <div style="width: 40%; background: #ffffff; border-radius: 3px; border: 1px solid #bae6fd;"></div>
+                                    <div style="flex: 1; background: #ffffff; border-radius: 3px; border: 1px solid #bae6fd;"></div>
+                                </div>
+                                <div style="text-align: center; font-size: 11px; color: #075985; padding: 4px;">Light</div>
+                            </div>
+                        </button>
+                        <!-- Dark Preview -->
+                        <button onclick="setTheme('nebula-dark')" class="theme-preview-btn" style="padding: 0; border: 2px solid transparent; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; overflow: hidden; height: 80px;">
+                            <div style="background: #0c1222; height: 100%; display: flex; flex-direction: column;">
+                                <div style="background: #1a1f35; height: 24px; border-bottom: 1px solid #2d3548; display: flex; align-items: center; padding: 0 8px;">
+                                    <div style="width: 4px; height: 4px; border-radius: 50%; background: #3b82f6; margin-right: 6px;"></div>
+                                    <div style="width: 30px; height: 3px; background: #3e4a5e; border-radius: 2px;"></div>
+                                </div>
+                                <div style="flex: 1; padding: 8px; display: flex; gap: 4px;">
+                                    <div style="width: 40%; background: #1a1f35; border-radius: 3px; border: 1px solid #2d3548;"></div>
+                                    <div style="flex: 1; background: #1a1f35; border-radius: 3px; border: 1px solid #2d3548;"></div>
+                                </div>
+                                <div style="text-align: center; font-size: 11px; color: #7dd3fc; padding: 4px;">Dark</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+                            Dark
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Information -->
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-server text-primary-color"></i>
+                System Information
+            </h2>
+        </div>
+        <div class="p-6">
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span class="font-medium text-gray-700">Version</span>
+                    <span class="text-gray-900 font-semibold">1.5.0</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span class="font-medium text-gray-700">HTTPS Port</span>
+                    <span class="text-gray-900 font-semibold">8443</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span class="font-medium text-gray-700">Database</span>
+                    <span class="text-gray-900 font-semibold">SQLite</span>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span class="font-medium text-gray-700">Features</span>
+                    <div class="flex gap-2">
+                        <span class="badge-outline badge-success" style="font-size: 10px;">
+                            <i class="fas fa-file-contract" style="width: 8px; height: 8px;"></i>
+                            CRL
+                        </span>
+                        <span class="badge-outline badge-success" style="font-size: 10px;">
+                            <i class="fas fa-circle-check" style="width: 8px; height: 8px;"></i>
+                            OCSP
+                        </span>
+                        <span class="badge-outline badge-info" style="font-size: 10px;">
+                            <i class="fas fa-shield" style="width: 8px; height: 8px;"></i>
+                            SCEP
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- HTTPS Certificate Configuration -->
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-lock text-primary-color"></i>
+                HTTPS Certificate
+            </h2>
+        </div>
+        <div class="p-6">
+            <p class="text-sm text-gray-500 mb-4">
+                Configure the certificate used for the UCM web interface (HTTPS on port 8443).
+            </p>
+            
+            <!-- Current Certificate Info -->
+            <div class="mb-6">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-info-circle text-blue-600 text-lg mt-1"></i>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-blue-900 mb-2">Current Certificate</p>
+                            <div id="current-https-cert-info" class="text-sm text-blue-800 space-y-1">
+                                <div class="flex justify-between">
+                                    <span>Type:</span>
+                                    <span class="font-semibold" id="https-cert-type">Loading...</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Subject:</span>
+                                    <span class="font-semibold font-mono text-xs" id="https-cert-subject">Loading...</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Valid Until:</span>
+                                    <span class="font-semibold" id="https-cert-expires">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Certificate Selection -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Certificate Source
+                </label>
+                <div class="space-y-3">
+                    <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                        <input type="radio" name="https-cert-source" value="auto" checked 
+                               class="mr-3" onchange="toggleHTTPSCertSelection()">
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-900">Auto-generated (Self-signed)</div>
+                            <div class="text-sm text-gray-500">Use the automatically generated self-signed certificate (default)</div>
+                        </div>
+                    </label>
+                    
+                    <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition">
+                        <input type="radio" name="https-cert-source" value="managed" 
+                               class="mr-3" onchange="toggleHTTPSCertSelection()">
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-900">UCM Managed Certificate</div>
+                            <div class="text-sm text-gray-500">Use a certificate from UCM's certificate store</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Managed Certificate Selection -->
+            <div id="managed-cert-selection" class="hidden mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-3">
+                    Select Certificate
+                </label>
+                
+                <!-- Certificate Table -->
+                <div class="overflow-x-auto" style="max-width: 900px;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Certificate</th>
+                                <th>Expires</th>
+                                <th>Days Left</th>
+                                <th>Subject Alternative Names</th>
+                                <th>Issued By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="https-cert-table">
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-gray-500">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>Loading certificates...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <p class="mt-3 text-sm text-gray-500">
+                    <i class="fas fa-info-circle text-blue-600"></i>
+                    Only valid certificates with Server Authentication usage are shown. Click a row to select (highlighted in blue).
+                </p>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex gap-3 pt-4 border-t border-gray-200">
+                <button onclick="applyHTTPSCertificate()" class="btn btn-primary">
+                    <i class="fas fa-save mr-2"></i>
+                    Apply Certificate
+                </button>
+                <button onclick="regenerateSelfSigned()" class="btn btn-secondary">
+                    <i class="fas fa-rotate mr-2"></i>
+                    Regenerate Self-Signed
+                </button>
+            </div>
+            
+            <!-- Status Message -->
+            <div id="https-cert-status" class="hidden mt-4"></div>
+            
+            <!-- Warning -->
+            <div class="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div class="flex items-start gap-3">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 text-lg mt-1"></i>
+                    <div class="text-sm text-yellow-800">
+                        <p class="font-medium mb-1">Important Notes:</p>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>Changing the certificate will restart the UCM service</li>
+                            <li>You will be disconnected and need to reload the page</li>
+                            <li>The certificate must be valid and match the server's hostname/IP</li>
+                            <li>The private key must be available in UCM's keystore</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if session.get('role') == 'admin' %}
+    <!-- PKI Database Management (Admin Only) -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-database" style="color: var(--primary-color);"></i>
+                PKI Database Management
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Reset the PKI database to start fresh. This will delete all CAs, certificates, CRLs, and OCSP records, but <strong>will preserve users and authentication settings</strong>.
+            </p>
+            
+            <!-- PKI Statistics -->
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;">
+                <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem;">Current PKI Data</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">CAs</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-cas">-</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Certificates</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-certs">-</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">CRLs</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-crls">-</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">OCSP Records</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-ocsp">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Warning Box -->
+            <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                    <i class="fas fa-exclamation-triangle" style="color: #d97706; font-size: 1.25rem; margin-top: 0.25rem;"></i>
+                    <div style="font-size: 0.875rem; color: #92400e;">
+                        <p style="font-weight: 600; margin-bottom: 0.5rem;">⚠️ Danger Zone</p>
+                        <ul style="list-style: disc; margin-left: 1.25rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                            <li>This action <strong>cannot be undone</strong></li>
+                            <li>All Certificate Authorities will be deleted</li>
+                            <li>All certificates will be deleted</li>
+                            <li>All CRLs and OCSP records will be deleted</li>
+                            <li>A backup will be created automatically</li>
+                            <li><strong>Users and sessions will NOT be affected</strong></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Reset Button -->
+            <div style="padding-top: 0.5rem;">
+                <button onclick="confirmPKIReset()" class="btn" style="background: #dc2626; color: white; border: none;">
+                    <i class="fas fa-trash-alt" style="margin-right: 0.5rem;"></i>
+                    Reset PKI Database
+                </button>
+            </div>
+            
+            <!-- Status Message -->
+            <div id="pki-reset-status" style="display: none; margin-top: 1rem;"></div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Session Info -->
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-clock text-primary-color"></i>
+                Session Configuration
+            </h2>
+        </div>
+        <div class="p-6">
+            <!-- Session Duration -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Session Duration</label>
+                <p class="text-sm text-gray-500 mb-3">Choose how long you want to stay logged in before being automatically disconnected.</p>
+                
+                <div style="max-width: 300px; position: relative;">
+                    <select id="session-duration-select" onchange="setSessionDuration(this.value)" 
+                            style="width: 100%; padding: 10px 40px 10px 12px; font-size: 14px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--card-bg); color: var(--text-primary); cursor: pointer; transition: all 0.2s; appearance: none; -webkit-appearance: none; -moz-appearance: none;">
+                        <option value="5">5 minutes (Quick session)</option>
+                        <option value="15">15 minutes (Short session)</option>
+                        <option value="30" selected>30 minutes (Default)</option>
+                        <option value="60">1 hour (Long session)</option>
+                        <option value="120">2 hours (Extended session)</option>
+                    </select>
+                    <div style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--text-secondary);">
+                        <i class="fas fa-chevron-down" style="font-size: 12px;"></i>
+                    </div>
+                </div>
+                
+                <div id="session-duration-status" class="mt-3 text-sm" style="color: var(--status-success); display: none;">
+                    <i class="fas fa-check-circle"></i> 
+                    <span id="session-duration-message"></span>
+                </div>
+            </div>
+            
+            <!-- Session Info -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="text-sm font-medium text-gray-700">Session Active</span>
+                    <span class="badge-outline badge-success">
+                        <i class="fas fa-check-circle" style="width: 10px; height: 10px;"></i>
+                        Yes
+                    </span>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span class="text-sm font-medium text-gray-700">Login Method</span>
+                    <span class="text-sm text-gray-900">Password</span>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <a href="/logout" class="btn btn-danger">
+                    <i class="fas fa-sign-out mr-2"></i> Logout
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Wrap all code in IIFE to avoid variable conflicts when HTMX reloads
+    
+    // Store selected certificate
+    let selectedCertId = null;
+    function getCurrentSessionDuration() {
+        return parseInt(localStorage.getItem('ucm-session-duration')) || 30;
+    }
+    
+    // Set session duration
+    function setSessionDuration(minutes) {
+        minutes = parseInt(minutes);
+        localStorage.setItem('ucm-session-duration', minutes);
+        
+        // Update session manager if it exists
+        if (window.sessionManager) {
+            window.sessionManager.sessionDuration = minutes * 60 * 1000;
+            window.sessionManager.resetTimers();
+            console.log('Session duration updated to', minutes, 'minutes');
+        }
+        
+        // Show status message
+        const statusDiv = document.getElementById('session-duration-status');
+        const messageSpan = document.getElementById('session-duration-message');
+        
+        let durationText = minutes + ' minutes';
+        if (minutes === 60) durationText = '1 hour';
+        if (minutes === 120) durationText = '2 hours';
+        
+        messageSpan.textContent = `Session duration set to ${durationText}. Changes apply immediately.`;
+        statusDiv.style.display = 'block';
+        
+        setTimeout(() => {
+            statusDiv.style.display = 'none';
+        }, 3000);
+    }
+    
+    // Initialize session duration display
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentDuration = getCurrentSessionDuration();
+        const select = document.getElementById('session-duration-select');
+        if (select) {
+            select.value = currentDuration;
+        }
+    });
+    
+    // Initialize settings page
+    function initializeSettingsPage() {
+        const theme = getCurrentTheme();
+        const themeName = theme.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        const themeNameEl = document.getElementById('current-theme-name');
+        if (themeNameEl) {
+            themeNameEl.textContent = themeName;
+        }
+        
+        // Load HTTPS certificate info
+        loadHTTPSCertInfo();
+        loadManagedCertificates();
+    }
+    
+    // Initialize on both DOMContentLoaded (first load) and htmx:afterSettle (SPA navigation)
+    document.addEventListener('DOMContentLoaded', initializeSettingsPage);
+    document.body.addEventListener('htmx:afterSettle', function(evt) {
+        // Only run if we're on the settings page
+        if (document.getElementById('https-cert-type')) {
+            initializeSettingsPage();
+        }
+    });
+    
+    // Load current HTTPS certificate information
+    function loadHTTPSCertInfo() {
+        console.log('Loading HTTPS cert info...');
+        fetch('/api/ui/system/https-cert-info')
+            .then(response => {
+                console.log('Cert info response status:', response.status);
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Cert info data:', data);
+                document.getElementById('https-cert-type').textContent = data.type || 'Unknown';
+                document.getElementById('https-cert-subject').textContent = data.subject || 'N/A';
+                document.getElementById('https-cert-expires').textContent = data.expires || 'N/A';
+                
+                // Set radio button based on current source
+                if (data.source === 'managed') {
+                    document.querySelector('input[value="managed"]').checked = true;
+                    toggleHTTPSCertSelection();
+                }
+            })
+            .catch(err => {
+                console.error('Failed to load HTTPS cert info:', err);
+                document.getElementById('https-cert-type').textContent = 'Error loading';
+                document.getElementById('https-cert-subject').textContent = err.message;
+                document.getElementById('https-cert-expires').textContent = 'N/A';
+            });
+    }
+    
+    // Load available managed certificates
+    function loadManagedCertificates() {
+        console.log('Loading managed certificates...');
+        fetch('/api/ui/system/https-cert-candidates')
+            .then(response => {
+                console.log('Response status:', response.status);
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Certificates data:', data);
+                const tbody = document.getElementById('https-cert-table');
+                
+                if (data.certificates && data.certificates.length > 0) {
+                    tbody.innerHTML = '';
+                    data.certificates.forEach(cert => {
+                        const row = document.createElement('tr');
+                        row.className = 'cert-row cursor-pointer transition-colors hover:bg-gray-50';
+                        row.setAttribute('data-cert-id', cert.id);
+                        
+                        if (cert.is_current) {
+                            row.classList.add('bg-blue-50');
+                        }
+                        
+                        // Days left color coding
+                        let expiryBadge = 'badge-success';
+                        if (cert.days_left < 30) expiryBadge = 'badge-danger';
+                        else if (cert.days_left < 90) expiryBadge = 'badge-warning';
+                        
+                        row.innerHTML = `
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-certificate text-blue-600"></i>
+                                    <span class="font-semibold">${cert.common_name}</span>
+                                    ${cert.is_current ? '<span class="badge-outline badge-primary"><i class="fas fa-check"></i> Current</span>' : ''}
+                                </div>
+                            </td>
+                            <td>${cert.expires}</td>
+                            <td>
+                                <span class="badge-outline ${expiryBadge}">
+                                    <i class="fas fa-clock"></i>
+                                    ${cert.days_left}d
+                                </span>
+                            </td>
+                            <td class="text-sm text-gray-600">
+                                ${cert.san ? cert.san : '<span class="text-gray-400">—</span>'}
+                            </td>
+                            <td>
+                                <div class="flex items-center justify-end gap-1">
+                                    <i class="fas fa-shield-alt text-gray-500"></i>
+                                    <span class="text-sm">${cert.ca_name}</span>
+                                </div>
+                            </td>
+                        `;
+                        
+                        row.onclick = () => selectCertificate(cert.id, row);
+                        tbody.appendChild(row);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">No suitable certificates found</td></tr>';
+                }
+            })
+            .catch(err => {
+                console.error('Failed to load certificates:', err);
+                const tbody = document.getElementById('https-cert-table');
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-red-600"><i class="fas fa-exclamation-circle mr-2"></i>Error loading certificates</td></tr>';
+            });
+    }
+    
+    // Select certificate
+    function selectCertificate(certId, rowElement) {
+        selectedCertId = certId;
+        
+        // Remove selection from all rows
+        document.querySelectorAll('.cert-row').forEach(row => {
+            row.classList.remove('bg-blue-50');
+        });
+        
+        // Highlight selected row
+        if (!rowElement.querySelector('.badge-primary')) {
+            rowElement.classList.add('bg-blue-50');
+        }
+    }
+    
+    // Toggle certificate selection visibility
+    function toggleHTTPSCertSelection() {
+        const source = document.querySelector('input[name="https-cert-source"]:checked').value;
+        const managedDiv = document.getElementById('managed-cert-selection');
+        
+        if (source === 'managed') {
+            managedDiv.classList.remove('hidden');
+        } else {
+            managedDiv.classList.add('hidden');
+        }
+    }
+    
+    // Apply HTTPS certificate
+    function applyHTTPSCertificate() {
+        const source = document.querySelector('input[name="https-cert-source"]:checked').value;
+        const statusDiv = document.getElementById('https-cert-status');
+        
+        let certId = null;
+        if (source === 'managed') {
+            certId = selectedCertId;
+            if (!certId) {
+                showHTTPSStatus('error', 'Please select a certificate');
+                return;
+            }
+        }
+        
+        if (!confirm('Applying a new certificate will restart UCM and disconnect your session. Continue?')) {
+            return;
+        }
+        
+        showHTTPSStatus('info', 'Applying certificate and restarting service...');
+        
+        fetch('/api/ui/system/https-cert-apply', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                source: source,
+                cert_id: certId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showHTTPSStatus('success', 'Certificate applied! Service restarting... Please reload the page in 5 seconds.');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 5000);
+            } else {
+                showHTTPSStatus('error', data.error || 'Failed to apply certificate');
+            }
+        })
+        .catch(err => {
+            showHTTPSStatus('error', 'Failed to apply certificate: ' + err.message);
+        });
+    }
+    
+    // Regenerate self-signed certificate
+    function regenerateSelfSigned() {
+        if (!confirm('This will generate a new self-signed certificate and restart UCM. Continue?')) {
+            return;
+        }
+        
+        showHTTPSStatus('info', 'Generating new certificate and restarting service...');
+        
+        fetch('/api/ui/system/https-cert-regenerate', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showHTTPSStatus('success', 'Certificate regenerated! Service restarting... Please reload the page in 5 seconds.');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 5000);
+            } else {
+                showHTTPSStatus('error', data.error || 'Failed to regenerate certificate');
+            }
+        })
+        .catch(err => {
+            showHTTPSStatus('error', 'Failed to regenerate certificate: ' + err.message);
+        });
+    }
+    
+    // Show status message
+    function showHTTPSStatus(type, message) {
+        const statusDiv = document.getElementById('https-cert-status');
+        statusDiv.className = 'mt-4 p-4 rounded-lg ' + (
+            type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
+            type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' :
+            'bg-blue-50 text-blue-800 border border-blue-200'
+        );
+        statusDiv.innerHTML = '<i class="fas fa-' + 
+            (type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle') + 
+            ' mr-2"></i>' + message;
+        statusDiv.classList.remove('hidden');
+    }
+    
+    // Make functions globally accessible for onclick handlers
+    window.setSessionDuration = setSessionDuration;
+    window.toggleHTTPSCertSelection = toggleHTTPSCertSelection;
+    window.applyHTTPSCertificate = applyHTTPSCertificate;
+    window.selectCertificate = selectCertificate;
+    
+    // ====================================================
+    // PKI Database Management Functions
+    // ====================================================
+    
+    // Load PKI statistics
+    function loadPKIStats() {
+        fetch('/api/ui/system/pki-stats', {
+            credentials: 'same-origin'  // Include session cookie
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('pki-stat-cas').textContent = data.cas || data.certificate_authorities || 0;
+            document.getElementById('pki-stat-certs').textContent = data.certificates || 0;
+            document.getElementById('pki-stat-crls').textContent = data.crls || data.crl_distribution_points || 0;
+            document.getElementById('pki-stat-ocsp').textContent = data.ocsp_responses || 0;
+        })
+        .catch(err => {
+            console.error('Failed to load PKI stats:', err);
+        });
+    }
+    
+    // Confirm PKI reset (modal)
+    function confirmPKIReset() {
+        const confirmed = confirm(
+            '⚠️ DANGER: Reset PKI Database?\n\n' +
+            'This will DELETE:\n' +
+            '• All Certificate Authorities\n' +
+            '• All Certificates\n' +
+            '• All CRLs and OCSP records\n\n' +
+            'This will KEEP:\n' +
+            '✓ Users and authentication data\n\n' +
+            'A backup will be created automatically.\n\n' +
+            'Type "RESET PKI DATA" in the next prompt to confirm.'
+        );
+        
+        if (!confirmed) return;
+        
+        const confirmation = prompt('Type exactly: RESET PKI DATA');
+        if (confirmation !== 'RESET PKI DATA') {
+            alert('❌ Confirmation failed. PKI reset cancelled.');
+            return;
+        }
+        
+        performPKIReset();
+    }
+    
+    // Perform PKI reset
+    function performPKIReset() {
+        showPKIStatus('info', '🔄 Resetting PKI database... Please wait...');
+        
+        fetch('/api/ui/system/pki-reset', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin',  // Include session cookie
+            body: JSON.stringify({
+                confirmation: 'RESET PKI DATA'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showPKIStatus('success', 
+                    `✅ PKI database reset successfully!\n\n` +
+                    `Deleted:\n` +
+                    `• ${data.stats.cas_deleted || 0} CAs\n` +
+                    `• ${data.stats.certificates_deleted || 0} Certificates\n` +
+                    `• ${data.stats.crls_deleted || 0} CRLs\n` +
+                    `• ${data.stats.ocsp_records_deleted || 0} OCSP records\n\n` +
+                    `Backup: ${data.stats.backup_path || 'N/A'}`
+                );
+                // Reload stats
+                setTimeout(() => loadPKIStats(), 1000);
+            } else {
+                showPKIStatus('error', '❌ Failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            showPKIStatus('error', '❌ Network error: ' + err.message);
+        });
+    }
+    
+    // Show PKI status message
+    function showPKIStatus(type, message) {
+        const statusDiv = document.getElementById('pki-reset-status');
+        statusDiv.style.display = 'block';
+        statusDiv.className = 'p-4 rounded-lg ' + (
+            type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
+            type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' :
+            'bg-blue-50 text-blue-800 border border-blue-200'
+        );
+        statusDiv.innerHTML = '<pre style="white-space: pre-wrap; font-family: monospace; font-size: 0.875rem;">' + 
+            message + '</pre>';
+    }
+    
+    // Load PKI stats on page load (if admin)
+    if (document.getElementById('pki-stat-cas')) {
+        loadPKIStats();
+    }
+    
+    // Make PKI functions globally accessible
+    window.confirmPKIReset = confirmPKIReset;
+    window.loadPKIStats = loadPKIStats;
+    
+})(); // End IIFE
+</script>
+
+<style>
+.theme-preview-btn:hover {
+    border-color: var(--primary-color) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.theme-preview-btn:active {
+    transform: translateY(0);
+}
+</style>
+
+{% endblock %}

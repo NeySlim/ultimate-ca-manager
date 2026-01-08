@@ -365,30 +365,35 @@ function exportCertDER(certId) {
 }
 
 function revokeCert(certId) {
-    if (!confirm('Are you sure you want to revoke this certificate? This action cannot be undone.')) {
-        return;
-    }
-    
-    const token = '{{ session.get("access_token") }}';
-    fetch(`/api/v1/certificates/${certId}/revoke`, {
-        method: 'POST',
-        headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ reason: 'unspecified' })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            alert('Failed to revoke certificate: ' + data.error);
-        } else {
-            alert('Certificate revoked successfully');
-            location.reload();
-        }
-    })
-    .catch(error => {
-        alert('Failed to revoke certificate: ' + error.message);
+    ucmConfirm(
+        'Are you sure you want to revoke this certificate? This action cannot be undone.',
+        'Revoke Certificate',
+        { danger: true, confirmText: 'Revoke', icon: 'warning-triangle' }
+    ).then(confirmed => {
+        if (!confirmed) return;
+        
+        const token = '{{ session.get("access_token") }}';
+        fetch(`/api/v1/certificates/${certId}/revoke`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ reason: 'unspecified' })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                ucmAlert('Failed to revoke certificate: ' + data.error, 'Error');
+            } else {
+                ucmAlert('Certificate revoked successfully', 'Success').then(() => {
+                    location.reload();
+                });
+            }
+        })
+        .catch(error => {
+            ucmAlert('Failed to revoke certificate: ' + error.message, 'Error');
+        });
     });
 }
 
@@ -456,7 +461,7 @@ function exportWithToken(url) {
         window.URL.revokeObjectURL(downloadUrl);
     })
     .catch(error => {
-        alert('Export failed: ' + error.message);
+        ucmAlert('Export failed: ' + error.message, 'Error');
     });
 }
 </script>

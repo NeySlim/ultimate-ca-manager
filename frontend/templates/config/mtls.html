@@ -489,9 +489,13 @@ document.getElementById('enroll-form').addEventListener('submit', async (e) => {
 
 // Revoke certificate
 async function revokeCertificate(certId) {
-    if (!confirm('Are you sure you want to revoke this certificate? You can re-enable it later.')) {
-        return;
-    }
+    const confirmed = await ucmConfirm(
+        'Are you sure you want to revoke this certificate? You can re-enable it later.',
+        'Revoke Certificate',
+        { danger: true, confirmText: 'Revoke', icon: 'warning-triangle' }
+    );
+    
+    if (!confirmed) return;
     
     try {
         const response = await fetch(`/api/v1/mtls/certificates/${certId}/revoke`, {
@@ -535,9 +539,13 @@ async function enableCertificate(certId) {
 
 // Delete certificate
 async function deleteCertificate(certId) {
-    if (!confirm('Are you sure you want to permanently delete this certificate? This action cannot be undone.')) {
-        return;
-    }
+    const confirmed = await ucmConfirm(
+        'Are you sure you want to permanently delete this certificate? This action cannot be undone.',
+        'Delete Certificate',
+        { danger: true, confirmText: 'Delete', icon: 'trash' }
+    );
+    
+    if (!confirmed) return;
     
     try {
         const response = await fetch(`/api/v1/mtls/certificates/${certId}`, {
