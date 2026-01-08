@@ -462,13 +462,15 @@ class AcmeService:
     def finalize_order(
         self,
         order_id: str,
-        csr_pem: str
+        csr_pem: str,
+        ca_refid: str = None
     ) -> Tuple[bool, Optional[str]]:
         """Finalize order and issue certificate
         
         Args:
             order_id: Order identifier
             csr_pem: PEM-encoded Certificate Signing Request
+            ca_refid: CA to sign with (optional, uses default if not provided)
             
         Returns:
             Tuple of (success, error_message)
@@ -490,15 +492,134 @@ class AcmeService:
         except Exception as e:
             return False, f"Invalid CSR: {str(e)}"
         
-        # TODO: Validate CSR matches order identifiers
-        # TODO: Sign certificate with UCM CA
-        # For now, just update status
+        # Validate CSR matches order identifiers
+        csr_domains = self._extract_domains_from_csr(csr)
+        order_identifiers = json.loads(order.identifiers)
+        order_domains = [id['value'] for id in order_identifiers if id.get('type') == 'dns']
         
-        order.status = "processing"
+        if set(csr_domains) != set(order_domains):
+            return False, f"CSR domains {csr_domains} don't match order domains {order_domains}"
+        
+        # Sign certificate with UCM CA
+        success, cert_id, error = self._sign_certificate_with_ca(
+            order=order,
+            csr_pem=csr_pem,
+            ca_refid=ca_refid
+        )
+        
+        if not success:
+            order.status = "invalid"
+            order.error = json.dumps({
+                "type": "urn:ietf:params:acme:error:serverInternal",
+                "detail": error
+            })
+            db.session.commit()
+            return False, error
+        
+        # Update order status
+        order.status = "valid"
         order.csr = csr_pem
+        order.certificate_id = cert_id
+        order.certificate_url = f"{self.base_url}/acme/cert/{order.order_id}"
         db.session.commit()
         
         return True, None
+    
+    def _extract_domains_from_csr(self, csr) -> List[str]:
+        """Extract domain names from CSR
+        
+        Args:
+            csr: x509.CertificateSigningRequest object
+            
+        Returns:
+            List of domain names
+        """
+        from cryptography import x509
+        
+        domains = []
+        
+        # Get CN from subject
+        try:
+            cn = csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value
+            domains.append(cn)
+        except:
+            pass
+        
+        # Get SANs
+        try:
+            san_ext = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            for name in san_ext.value:
+                if isinstance(name, x509.DNSName):
+                    if name.value not in domains:
+                        domains.append(name.value)
+        except:
+            pass
+        
+        return domains
+    
+    def _sign_certificate_with_ca(
+        self,
+        order: AcmeOrder,
+        csr_pem: str,
+        ca_refid: str = None
+    ) -> Tuple[bool, Optional[int], Optional[str]]:
+        """Sign CSR with UCM CA
+        
+        Args:
+            order: AcmeOrder object
+            csr_pem: PEM-encoded CSR
+            ca_refid: CA refid (optional)
+            
+        Returns:
+            Tuple of (success, certificate_id, error_message)
+        """
+        from models import CA, Certificate
+        import secrets
+        import base64
+        
+        # Get CA (use first available if not specified)
+        if ca_refid:
+            ca = CA.query.filter_by(refid=ca_refid).first()
+        else:
+            # Find first CA with private key
+            ca = CA.query.filter(CA.prv.isnot(None)).first()
+        
+        if not ca:
+            return False, None, "No CA available for signing"
+        
+        if not ca.prv:
+            return False, None, f"CA {ca.refid} has no private key"
+        
+        # Create certificate record with CSR
+        cert = Certificate(
+            refid=secrets.token_urlsafe(16),
+            descr=f"ACME Certificate - Order {order.order_id}",
+            caref=ca.refid,
+            csr=base64.b64encode(csr_pem.encode()).decode('utf-8'),
+            cert_type='server_cert',
+            created_by='acme'
+        )
+        db.session.add(cert)
+        db.session.flush()  # Get cert.id
+        
+        # Sign CSR using existing CertificateService
+        try:
+            from services.cert_service import CertificateService
+            
+            signed_cert = CertificateService.sign_csr(
+                cert_id=cert.id,
+                caref=ca.refid,
+                cert_type='server_cert',
+                validity_days=90,  # ACME certificates typically 90 days
+                digest='sha256',
+                username='acme'
+            )
+            
+            return True, signed_cert.id, None
+            
+        except Exception as e:
+            db.session.rollback()
+            return False, None, f"Certificate signing failed: {str(e)}"
     
     # ==================== Utility Methods ====================
     
