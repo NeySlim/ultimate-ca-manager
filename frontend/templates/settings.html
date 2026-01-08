@@ -238,6 +238,25 @@ function loadHTTPSCertInfo() {
             if (data.subject) document.getElementById('cert-subject').textContent = data.subject;
             if (data.expires) document.getElementById('cert-expiry').textContent = data.expires;
             if (data.type) document.getElementById('cert-type').textContent = data.type;
+            
+            // Set radio button based on source
+            if (data.source && data.source.startsWith('managed:')) {
+                document.querySelector('input[name="cert-source"][value="managed"]').checked = true;
+                // Extract cert ID and pre-select it
+                const certId = data.source.split(':')[1];
+                const select = document.getElementById('managed-cert-id');
+                if (select && certId) {
+                    // Wait a bit for certificates to load, then select
+                    setTimeout(() => {
+                        select.value = certId;
+                        select.dispatchEvent(new Event('change'));
+                    }, 500);
+                }
+                toggleCertSelector();
+            } else {
+                document.querySelector('input[name="cert-source"][value="auto"]').checked = true;
+                toggleCertSelector();
+            }
         })
         .catch(error => console.error('Error loading HTTPS cert info:', error));
 }
