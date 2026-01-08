@@ -7,13 +7,13 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
         <div>
             <h1 style="font-size: 28px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
-                <i class="fas fa-users" style="margin-right: 8px;"></i>Users
+                <svg class="ucm-icon" width="24" height="24" style="margin-right: 8px;"><use href="#icon-users"/></svg>Users
             </h1>
             <p style="color: var(--text-secondary); font-size: 14px;">Manage user accounts and permissions</p>
         </div>
-        <button onclick="window.location.href='/users/create'" class="btn btn-primary">
-            <i class="fas fa-plus"></i>
-            <span>Add User</span>
+        <button onclick="openCreateUserModal()" class="btn btn-primary">
+            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-plus"/></svg>
+            Add User
         </button>
     </div>
     
@@ -21,16 +21,164 @@
     <div class="card">
         <div class="card-body" style="padding: 0;">
             <div hx-get="/api/ui/config/users" 
-                 hx-trigger="load"
+                 hx-trigger="load, refreshUsers from:body"
                  hx-indicator="#users-loading">
                 <div id="users-loading" class="htmx-indicator" style="padding: 60px; text-align: center;">
-                    <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: var(--text-secondary);"></i>
+                    <svg class="ucm-icon" width="32" height="32" style="color: var(--text-secondary);"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 12px; color: var(--text-secondary);">Loading users...</p>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Create User Modal -->
+<div id="createUserModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);" onclick="event.stopPropagation();">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary); margin: 0;">
+                <svg class="ucm-icon" width="20" height="20" style="margin-right: 0.5rem;"><use href="#icon-user"/></svg> Create User
+            </h2>
+            <button onclick="closeCreateUserModal()" style="color: var(--text-secondary); cursor: pointer; background: none; border: none; padding: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-times"/></svg>
+            </button>
+        </div>
+        
+        <form id="createUserForm" style="padding: 1.5rem;">
+            <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+                <!-- Username -->
+                <div>
+                    <label class="form-label">Username *</label>
+                    <input type="text" id="username" class="form-input" required placeholder="john.doe">
+                </div>
+                
+                <!-- Email -->
+                <div>
+                    <label class="form-label">Email *</label>
+                    <input type="email" id="email" class="form-input" required placeholder="john.doe@example.com">
+                </div>
+                
+                <!-- Full Name -->
+                <div>
+                    <label class="form-label">Full Name</label>
+                    <input type="text" id="full_name" class="form-input" placeholder="John Doe">
+                </div>
+                
+                <!-- Password -->
+                <div>
+                    <label class="form-label">Password *</label>
+                    <input type="password" id="password" class="form-input" required placeholder="••••••••">
+                    <small style="color: var(--text-secondary); font-size: 0.75rem;">Minimum 8 characters</small>
+                </div>
+                
+                <!-- Confirm Password -->
+                <div>
+                    <label class="form-label">Confirm Password *</label>
+                    <input type="password" id="confirm_password" class="form-input" required placeholder="••••••••">
+                </div>
+                
+                <!-- Role -->
+                <div>
+                    <label class="form-label">Role *</label>
+                    <select id="role" class="form-input" required>
+                        <option value="viewer">Viewer - Read-only access</option>
+                        <option value="operator">Operator - Can create certificates</option>
+                        <option value="admin">Administrator - Full access</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                <button type="button" onclick="closeCreateUserModal()" class="btn btn-secondary">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-user"/></svg>
+                    Create User
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openCreateUserModal() {
+    const modal = document.getElementById('createUserModal');
+    modal.style.display = 'flex';
+    document.getElementById('createUserForm').reset();
+}
+
+function closeCreateUserModal() {
+    const modal = document.getElementById('createUserModal');
+    modal.style.display = 'none';
+}
+
+// Close modal when clicking outside
+document.getElementById('createUserModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeCreateUserModal();
+    }
+});
+
+// Handle HTMX trigger to open modal
+document.addEventListener('openCreateUserModal', function() {
+    openCreateUserModal();
+});
+
+// Create user form submission
+document.getElementById('createUserForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('username').value;
+    const email = document.getElementById('email').value;
+    const full_name = document.getElementById('full_name').value;
+    const password = document.getElementById('password').value;
+    const confirm_password = document.getElementById('confirm_password').value;
+    const role = document.getElementById('role').value;
+    
+    // Validation
+    if (password !== confirm_password) {
+        alert('❌ Passwords do not match');
+        return;
+    }
+    
+    if (password.length < 8) {
+        alert('❌ Password must be at least 8 characters');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/v1/auth/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer {{ session.get("access_token") }}'
+            },
+            body: JSON.stringify({
+                username: username,
+                email: email,
+                full_name: full_name,
+                password: password,
+                role: role,
+                active: true
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('✅ User created successfully!');
+            closeCreateUserModal();
+            // Refresh users list
+            htmx.trigger(document.body, 'refreshUsers');
+        } else {
+            alert('❌ Error: ' + (data.error || data.message || 'Failed to create user'));
+        }
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+});
+</script>
 
 <style>
 .htmx-indicator {

@@ -3,33 +3,33 @@
 {% block title %}Settings - UCM{% endblock %}
 
 {% block content %}
-<div style="display: flex; flex-direction: column; gap: 1.5rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
-            <i class="fas fa-user-gear" style="margin-right: 0.5rem;"></i> User Settings
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-3xl font-bold text-gray-900">
+            <i class="fas fa-user-gear mr-2"></i> User Settings
         </h1>
     </div>
     
     <!-- User Profile -->
-    <div class="card">
-        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-user" style="color: var(--primary-color);"></i>
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-user text-primary-color"></i>
                 Profile Information
             </h2>
         </div>
-        <div style="padding: 1.5rem;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">Username</label>
-                    <div style="display: flex; align-items: center; gap: 0.75rem;">
-                        <i class="fas fa-user-circle" style="color: var(--primary-color); font-size: 1.5rem;"></i>
-                        <span style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary);">{{ session.get('username', 'N/A') }}</span>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-user-circle text-primary-color text-2xl"></i>
+                        <span class="text-lg font-semibold text-gray-900">{{ session.get('username', 'N/A') }}</span>
                     </div>
                 </div>
                 <div>
-                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">Role</label>
-                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                    <div class="flex items-center gap-3">
                         {% if session.get('role') == 'admin' %}
                         <span class="badge-outline badge-primary">
                             <i class="fas fa-crown" style="width: 10px; height: 10px;"></i>
@@ -48,30 +48,30 @@
     </div>
     
     <!-- Password Change -->
-    <div class="card">
-        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-key" style="color: var(--primary-color);"></i>
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-key text-primary-color"></i>
                 Change Password
             </h2>
         </div>
-        <div style="padding: 1.5rem;">
-            <form style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="p-6">
+            <form class="space-y-4">
                 <div>
-                    <label class="form-label">Current Password</label>
-                    <input type="password" class="form-input" placeholder="Enter current password">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+                    <input type="password" class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900" placeholder="Enter current password">
                 </div>
                 <div>
-                    <label class="form-label">New Password</label>
-                    <input type="password" class="form-input" placeholder="Enter new password">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                    <input type="password" class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900" placeholder="Enter new password">
                 </div>
                 <div>
-                    <label class="form-label">Confirm New Password</label>
-                    <input type="password" class="form-input" placeholder="Confirm new password">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+                    <input type="password" class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-gray-900" placeholder="Confirm new password">
                 </div>
-                <div style="padding-top: 0.5rem;">
+                <div class="pt-2">
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save" style="margin-right: 0.5rem;"></i> Update Password
+                        <i class="fas fa-save mr-2"></i> Update Password
                     </button>
                 </div>
             </form>
@@ -79,15 +79,15 @@
     </div>
     
     <!-- Theme Preferences -->
-    <div class="card">
-        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-palette" style="color: var(--primary-color);"></i>
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <i class="fas fa-palette text-primary-color"></i>
                 Theme Preferences
             </h2>
         </div>
-        <div style="padding: 1.5rem;">
-            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">Current theme: <span id="current-theme-name" style="font-weight: 600; color: var(--text-primary);"></span></p>
+        <div class="p-6">
+            <p class="text-sm text-gray-500 mb-4">Current theme: <span id="current-theme-name" class="font-semibold text-gray-900"></span></p>
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;">
                 <!-- Sentinel Themes -->
                 <div>
@@ -423,148 +423,6 @@
         </div>
     </div>
     
-    {% if session.get('role') == 'admin' %}
-    <!-- Reverse Proxy Configuration (Admin Only) -->
-    <div class="card">
-        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-server"/></svg>
-                Reverse Proxy Configuration
-            </h2>
-        </div>
-        <div style="padding: 1.5rem;">
-            <div style="background: var(--bg-info); border-left: 4px solid var(--primary-color); padding: 1rem; margin-bottom: 1.5rem; border-radius: 0.25rem;">
-                <strong style="color: var(--text-primary);">ℹ️ Info:</strong>
-                <p style="margin: 0.5rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);">
-                    UCM runs on HTTPS port 8443. To use with a reverse proxy (Nginx/Apache) for mTLS authentication,
-                    use the configuration generator below.
-                </p>
-            </div>
-
-            <!-- Current Configuration -->
-            <div style="margin-bottom: 1.5rem;">
-                <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem;">Current Settings</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem;">
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">UCM Backend</div>
-                        <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);">https://0.0.0.0:8443</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Hostname</div>
-                        <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);" id="proxy-hostname">netsuit.lan.pew.pet</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">mTLS CA Bundle</div>
-                        <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);" id="proxy-ca-path">/opt/ucm/backend/data/mtls-ca-bundle.pem</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Config Generator -->
-            <div style="margin-bottom: 1.5rem;">
-                <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem;">Configuration Generator</h3>
-                <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                    <button onclick="generateNginxConfig()" class="btn btn-primary">
-                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-file"/></svg> Generate Nginx Config
-                    </button>
-                    <button onclick="generateApacheConfig()" class="btn btn-outline-primary">
-                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-file"/></svg> Generate Apache Config
-                    </button>
-                    <button onclick="copyProxyConfig()" class="btn btn-outline-secondary">
-                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-copy"/></svg> Copy to Clipboard
-                    </button>
-                </div>
-
-                <!-- Config Display -->
-                <div style="position: relative;">
-                    <pre id="proxy-config-display" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.875rem; line-height: 1.5; color: var(--text-primary); max-height: 500px;"><code id="proxy-config-code"># Click a button above to generate configuration</code></pre>
-                </div>
-            </div>
-
-            <!-- Instructions -->
-            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem;">
-                <h3 style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem;">
-                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.25rem;"><use href="#icon-book-open"/></svg> Setup Instructions
-                </h3>
-                <ol style="margin: 0; padding-left: 1.5rem; font-size: 0.875rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 0.5rem;">
-                    <li>Generate and save the configuration file to your web server</li>
-                    <li>Configure mTLS settings in the <a href="/config/mtls" style="color: var(--primary-color); text-decoration: underline;">mTLS Authentication</a> page</li>
-                    <li>Ensure the CA bundle path matches the configuration (<code style="background: var(--bg-secondary); padding: 0.125rem 0.375rem; border-radius: 0.25rem;">mtls_trusted_ca_path</code>)</li>
-                    <li>Reload/restart your web server (Nginx/Apache)</li>
-                    <li>Test mTLS authentication by enrolling a client certificate</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-    
-    <!-- PKI Database Management (Admin Only) -->
-    <div class="card">
-        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-database" style="color: var(--primary-color);"></i>
-                PKI Database Management
-            </h2>
-        </div>
-        <div style="padding: 1.5rem;">
-            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Reset the PKI database to start fresh. This will delete all CAs, certificates, CRLs, and OCSP records, but <strong>will preserve users and authentication settings</strong>.
-            </p>
-            
-            <!-- PKI Statistics -->
-            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;">
-                <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem;">Current PKI Data</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">CAs</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-cas">-</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Certificates</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-certs">-</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">CRLs</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-crls">-</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">OCSP Records</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-ocsp">-</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Warning Box -->
-            <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;">
-                <div style="display: flex; align-items: start; gap: 0.75rem;">
-                    <i class="fas fa-exclamation-triangle" style="color: #d97706; font-size: 1.25rem; margin-top: 0.25rem;"></i>
-                    <div style="font-size: 0.875rem; color: #92400e;">
-                        <p style="font-weight: 600; margin-bottom: 0.5rem;">⚠️ Danger Zone</p>
-                        <ul style="list-style: disc; margin-left: 1.25rem; display: flex; flex-direction: column; gap: 0.25rem;">
-                            <li>This action <strong>cannot be undone</strong></li>
-                            <li>All Certificate Authorities will be deleted</li>
-                            <li>All certificates will be deleted</li>
-                            <li>All CRLs and OCSP records will be deleted</li>
-                            <li>A backup will be created automatically</li>
-                            <li><strong>Users and sessions will NOT be affected</strong></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Reset Button -->
-            <div style="padding-top: 0.5rem;">
-                <button onclick="confirmPKIReset()" class="btn" style="background: #dc2626; color: white; border: none;">
-                    <i class="fas fa-trash-alt" style="margin-right: 0.5rem;"></i>
-                    Reset PKI Database
-                </button>
-            </div>
-            
-            <!-- Status Message -->
-            <div id="pki-reset-status" style="display: none; margin-top: 1rem;"></div>
-        </div>
-    </div>
-    {% endif %}
-    
     <!-- Session Info -->
     <div class="bg-white rounded-lg shadow border border-gray-200">
         <div class="p-6 border-b border-gray-200">
@@ -623,11 +481,7 @@
 </div>
 
 <script>
-(function() {
-    // Wrap all code in IIFE to avoid variable conflicts when HTMX reloads
-    
-    // Store selected certificate
-    let selectedCertId = null;
+    // Get current session duration
     function getCurrentSessionDuration() {
         return parseInt(localStorage.getItem('ucm-session-duration')) || 30;
     }
@@ -669,27 +523,15 @@
         }
     });
     
-    // Initialize settings page
-    function initializeSettingsPage() {
+    // Display current theme name
+    document.addEventListener('DOMContentLoaded', function() {
         const theme = getCurrentTheme();
         const themeName = theme.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-        const themeNameEl = document.getElementById('current-theme-name');
-        if (themeNameEl) {
-            themeNameEl.textContent = themeName;
-        }
+        document.getElementById('current-theme-name').textContent = themeName;
         
         // Load HTTPS certificate info
         loadHTTPSCertInfo();
         loadManagedCertificates();
-    }
-    
-    // Initialize on both DOMContentLoaded (first load) and htmx:afterSettle (SPA navigation)
-    document.addEventListener('DOMContentLoaded', initializeSettingsPage);
-    document.body.addEventListener('htmx:afterSettle', function(evt) {
-        // Only run if we're on the settings page
-        if (document.getElementById('https-cert-type')) {
-            initializeSettingsPage();
-        }
     });
     
     // Load current HTTPS certificate information
@@ -794,28 +636,22 @@
             });
     }
     
+    // Store selected certificate
+    let selectedCertId = null;
+    
     // Select certificate
     function selectCertificate(certId, rowElement) {
         selectedCertId = certId;
         
-        // Remove selection from all rows and their cells
+        // Remove selection from all rows
         document.querySelectorAll('.cert-row').forEach(row => {
-            row.classList.remove('cert-selected');
-            row.style.removeProperty('background');
-            // Remove background from all cells too
-            row.querySelectorAll('td').forEach(td => {
-                td.style.removeProperty('background');
-                td.style.removeProperty('color');
-            });
+            row.classList.remove('bg-blue-50');
         });
         
-        // Highlight selected row - apply background to row AND all cells with high contrast
-        rowElement.classList.add('cert-selected');
-        rowElement.style.setProperty('background', 'var(--primary-color)', 'important');
-        rowElement.querySelectorAll('td').forEach(td => {
-            td.style.setProperty('background', 'var(--primary-color)', 'important');
-            td.style.setProperty('color', 'white', 'important');
-        });
+        // Highlight selected row
+        if (!rowElement.querySelector('.badge-primary')) {
+            rowElement.classList.add('bg-blue-50');
+        }
     }
     
     // Toggle certificate selection visibility
@@ -916,298 +752,6 @@
             ' mr-2"></i>' + message;
         statusDiv.classList.remove('hidden');
     }
-    
-    // Make functions globally accessible for onclick handlers
-    window.setSessionDuration = setSessionDuration;
-    window.toggleHTTPSCertSelection = toggleHTTPSCertSelection;
-    window.applyHTTPSCertificate = applyHTTPSCertificate;
-    window.selectCertificate = selectCertificate;
-    
-    // ====================================================
-    // PKI Database Management Functions
-    // ====================================================
-    
-    // Load PKI statistics
-    function loadPKIStats() {
-        fetch('/api/ui/system/pki-stats', {
-            credentials: 'same-origin'  // Include session cookie
-        })
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('pki-stat-cas').textContent = data.cas || data.certificate_authorities || 0;
-            document.getElementById('pki-stat-certs').textContent = data.certificates || 0;
-            document.getElementById('pki-stat-crls').textContent = data.crls || data.crl_distribution_points || 0;
-            document.getElementById('pki-stat-ocsp').textContent = data.ocsp_responses || 0;
-        })
-        .catch(err => {
-            console.error('Failed to load PKI stats:', err);
-        });
-    }
-    
-    // Confirm PKI reset (modal)
-    function confirmPKIReset() {
-        const confirmed = confirm(
-            '⚠️ DANGER: Reset PKI Database?\n\n' +
-            'This will DELETE:\n' +
-            '• All Certificate Authorities\n' +
-            '• All Certificates\n' +
-            '• All CRLs and OCSP records\n\n' +
-            'This will KEEP:\n' +
-            '✓ Users and authentication data\n\n' +
-            'A backup will be created automatically.\n\n' +
-            'Type "RESET PKI DATA" in the next prompt to confirm.'
-        );
-        
-        if (!confirmed) return;
-        
-        const confirmation = prompt('Type exactly: RESET PKI DATA');
-        if (confirmation !== 'RESET PKI DATA') {
-            alert('❌ Confirmation failed. PKI reset cancelled.');
-            return;
-        }
-        
-        performPKIReset();
-    }
-    
-    // Perform PKI reset
-    function performPKIReset() {
-        showPKIStatus('info', '🔄 Resetting PKI database... Please wait...');
-        
-        fetch('/api/ui/system/pki-reset', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            credentials: 'same-origin',  // Include session cookie
-            body: JSON.stringify({
-                confirmation: 'RESET PKI DATA'
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showPKIStatus('success', 
-                    `✅ PKI database reset successfully!\n\n` +
-                    `Deleted:\n` +
-                    `• ${data.stats.cas_deleted || 0} CAs\n` +
-                    `• ${data.stats.certificates_deleted || 0} Certificates\n` +
-                    `• ${data.stats.crls_deleted || 0} CRLs\n` +
-                    `• ${data.stats.ocsp_records_deleted || 0} OCSP records\n\n` +
-                    `Backup: ${data.stats.backup_path || 'N/A'}`
-                );
-                // Reload stats
-                setTimeout(() => loadPKIStats(), 1000);
-            } else {
-                showPKIStatus('error', '❌ Failed: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(err => {
-            showPKIStatus('error', '❌ Network error: ' + err.message);
-        });
-    }
-    
-    // Show PKI status message
-    function showPKIStatus(type, message) {
-        const statusDiv = document.getElementById('pki-reset-status');
-        statusDiv.style.display = 'block';
-        statusDiv.className = 'p-4 rounded-lg ' + (
-            type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
-            type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' :
-            'bg-blue-50 text-blue-800 border border-blue-200'
-        );
-        statusDiv.innerHTML = '<pre style="white-space: pre-wrap; font-family: monospace; font-size: 0.875rem;">' + 
-            message + '</pre>';
-    }
-    
-    // Load PKI stats on page load (if admin)
-    if (document.getElementById('pki-stat-cas')) {
-        loadPKIStats();
-    }
-    
-    // Make PKI functions globally accessible
-    window.confirmPKIReset = confirmPKIReset;
-    window.loadPKIStats = loadPKIStats;
-    
-})(); // End IIFE
-
-// Reverse Proxy Configuration Generator
-(function() {
-    let currentConfig = '';
-    let currentType = '';
-
-    function generateNginxConfig() {
-        const hostname = document.getElementById('proxy-hostname').textContent;
-        const caPath = document.getElementById('proxy-ca-path').textContent;
-        
-        currentType = 'nginx';
-        currentConfig = `# Nginx Reverse Proxy Configuration for UCM with mTLS
-# Save this as: /etc/nginx/sites-available/ucm.conf
-# Enable with: ln -s /etc/nginx/sites-available/ucm.conf /etc/nginx/sites-enabled/
-# Test with: nginx -t
-# Reload with: systemctl reload nginx
-
-upstream ucm_backend {
-    server 127.0.0.1:8443;
-}
-
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name ${hostname};
-
-    # SSL Certificate (your publicly trusted cert)
-    ssl_certificate /etc/nginx/ssl/${hostname}.crt;
-    ssl_certificate_key /etc/nginx/ssl/${hostname}.key;
-
-    # SSL Security
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-
-    # Client Certificate Verification (mTLS)
-    ssl_client_certificate ${caPath};
-    ssl_verify_client optional;  # 'optional' allows both cert and password auth
-    ssl_verify_depth 3;
-
-    # Pass client certificate info to backend
-    proxy_set_header X-SSL-Client-Verify $ssl_client_verify;
-    proxy_set_header X-SSL-Client-S-DN $ssl_client_s_dn;
-    proxy_set_header X-SSL-Client-I-DN $ssl_client_i_dn;
-    proxy_set_header X-SSL-Client-Serial $ssl_client_serial;
-    proxy_set_header X-SSL-Client-Fingerprint $ssl_client_fingerprint;
-    proxy_set_header X-SSL-Client-Cert $ssl_client_escaped_cert;
-
-    # Standard proxy headers
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-
-    # Proxy settings
-    proxy_ssl_verify off;  # UCM uses self-signed cert
-    proxy_ssl_server_name on;
-    proxy_buffering off;
-    proxy_request_buffering off;
-
-    # WebSocket support (for HTMX, live updates, etc.)
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-
-    location / {
-        proxy_pass https://ucm_backend;
-    }
-}
-
-# Optional: HTTP to HTTPS redirect
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${hostname};
-    return 301 https://$server_name$request_uri;
-}`;
-
-        displayConfig(currentConfig);
-    }
-
-    function generateApacheConfig() {
-        const hostname = document.getElementById('proxy-hostname').textContent;
-        const caPath = document.getElementById('proxy-ca-path').textContent;
-        
-        currentType = 'apache';
-        currentConfig = `# Apache Reverse Proxy Configuration for UCM with mTLS
-# Save this as: /etc/apache2/sites-available/ucm.conf
-# Enable with: a2ensite ucm.conf
-# Enable required modules: a2enmod ssl proxy proxy_http headers rewrite
-# Test with: apache2ctl configtest
-# Reload with: systemctl reload apache2
-
-<VirtualHost *:443>
-    ServerName ${hostname}
-    
-    # SSL Certificate (your publicly trusted cert)
-    SSLEngine on
-    SSLCertificateFile /etc/apache2/ssl/${hostname}.crt
-    SSLCertificateKeyFile /etc/apache2/ssl/${hostname}.key
-    
-    # SSL Security
-    SSLProtocol all -SSLv3 -TLSv1 -TLSv1.1
-    SSLCipherSuite HIGH:!aNULL:!MD5
-    SSLHonorCipherOrder on
-    
-    # Client Certificate Verification (mTLS)
-    SSLCACertificateFile ${caPath}
-    SSLVerifyClient optional
-    SSLVerifyDepth 3
-    SSLOptions +StdEnvVars +ExportCertData
-    
-    # Pass client certificate info to backend
-    RequestHeader set X-SSL-Client-Verify "%{SSL_CLIENT_VERIFY}s"
-    RequestHeader set X-SSL-Client-S-DN "%{SSL_CLIENT_S_DN}s"
-    RequestHeader set X-SSL-Client-I-DN "%{SSL_CLIENT_I_DN}s"
-    RequestHeader set X-SSL-Client-Serial "%{SSL_CLIENT_M_SERIAL}s"
-    RequestHeader set X-SSL-Client-Fingerprint "%{SSL_CLIENT_CERT_RFC4514_DN}s"
-    RequestHeader set X-SSL-Client-Cert "%{SSL_CLIENT_CERT}s"
-    
-    # Reverse Proxy Configuration
-    ProxyPreserveHost On
-    ProxyRequests Off
-    SSLProxyEngine On
-    SSLProxyVerify none
-    SSLProxyCheckPeerName off
-    
-    # WebSocket support
-    RewriteEngine On
-    RewriteCond %{HTTP:Upgrade} websocket [NC]
-    RewriteCond %{HTTP:Connection} upgrade [NC]
-    RewriteRule ^/?(.*) wss://127.0.0.1:8443/$1 [P,L]
-    
-    # Standard headers
-    RequestHeader set X-Forwarded-Proto "https"
-    RequestHeader set X-Forwarded-Port "443"
-    
-    # Proxy to UCM backend
-    ProxyPass / https://127.0.0.1:8443/
-    ProxyPassReverse / https://127.0.0.1:8443/
-    
-    # Logging
-    ErrorLog \${APACHE_LOG_DIR}/ucm-error.log
-    CustomLog \${APACHE_LOG_DIR}/ucm-access.log combined
-</VirtualHost>
-
-# Optional: HTTP to HTTPS redirect
-<VirtualHost *:80>
-    ServerName ${hostname}
-    Redirect permanent / https://${hostname}/
-</VirtualHost>`;
-
-        displayConfig(currentConfig);
-    }
-
-    function displayConfig(config) {
-        const codeElement = document.getElementById('proxy-config-code');
-        codeElement.textContent = config;
-    }
-
-    function copyProxyConfig() {
-        if (!currentConfig) {
-            alert('⚠️ Please generate a configuration first');
-            return;
-        }
-        
-        navigator.clipboard.writeText(currentConfig).then(() => {
-            alert(`✅ ${currentType === 'nginx' ? 'Nginx' : 'Apache'} configuration copied to clipboard!`);
-        }).catch(err => {
-            console.error('Copy failed:', err);
-            alert('❌ Failed to copy. Please select and copy manually.');
-        });
-    }
-
-    // Make functions globally accessible
-    window.generateNginxConfig = generateNginxConfig;
-    window.generateApacheConfig = generateApacheConfig;
-    window.copyProxyConfig = copyProxyConfig;
-})();
 </script>
 
 <style>
@@ -1219,20 +763,6 @@ server {
 
 .theme-preview-btn:active {
     transform: translateY(0);
-}
-
-/* Certificate row selection */
-.cert-row {
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-.cert-row:hover:not(.cert-selected) {
-    background: var(--bg-hover) !important;
-}
-
-.cert-row.cert-selected {
-    background: var(--primary-light) !important;
 }
 </style>
 

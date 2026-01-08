@@ -353,27 +353,36 @@
         
         <!-- Login Card -->
         <div class="login-card">
-            <form action="/login" method="POST">
+            <!-- Step 1: Username Entry -->
+            <div id="step-username">
                 <div class="form-group">
                     <label class="form-label" for="username">Username</label>
-                    <input class="form-input" id="username" name="username" type="text" required placeholder="Enter your username" autofocus>
+                    <input class="form-input" id="username" type="text" required placeholder="Enter your username" autofocus 
+                           onkeypress="if(event.key === 'Enter') checkAuthMethods()">
                 </div>
                 
-                <div class="form-group">
-                    <label class="form-label" for="password">Password</label>
-                    <input class="form-input" id="password" name="password" type="password" required placeholder="Enter your password">
-                </div>
-                
-                <div class="form-checkbox">
-                    <input id="remember" name="remember" type="checkbox">
-                    <label for="remember">Remember me</label>
-                </div>
-                
-                <button type="submit" class="btn-login">
-                    <i class="fas fa-right-from-bracket"></i>
-                    <span>Sign In</span>
+                <button type="button" onclick="checkAuthMethods()" class="btn-login">
+                    <i class="fas fa-arrow-right"></i>
+                    <span>Continue</span>
                 </button>
-            </form>
+            </div>
+            
+            <!-- Step 2: Authentication Methods (hidden initially) -->
+            <div id="step-auth-methods" style="display: none;">
+                <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-user-circle" style="color: var(--primary-color);"></i>
+                        <span id="display-username" style="font-weight: 600; color: var(--text-primary);"></span>
+                    </div>
+                    <button onclick="resetLogin()" style="background: none; border: none; color: var(--primary-color); font-size: 0.875rem; cursor: pointer; padding: 0; margin-top: 0.25rem;">
+                        Not you? Change account
+                    </button>
+                </div>
+                
+                <div id="auth-methods-container"></div>
+                
+                <div id="auth-status" style="margin-top: 12px; text-align: center; font-size: 13px; display: none;"></div>
+            </div>
         </div>
         
         <!-- Footer -->
@@ -424,6 +433,291 @@
         // Set correct icon on load
         document.addEventListener('DOMContentLoaded', () => {
             updateToggleIcon();
+        });
+    </script>
+    
+    <!-- Smart Authentication System -->
+    <script>
+        let currentUsername = null;
+        let availableMethods = [];
+        
+        // Check available authentication methods
+        async function checkAuthMethods() {
+            const username = document.getElementById('username').value.trim();
+            
+            if (!username) {
+                showAuthStatus('Please enter your username', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/auth/methods?username=${encodeURIComponent(username)}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showAuthStatus(data.error || 'Failed to check authentication methods', 'error');
+                    return;
+                }
+                
+                currentUsername = username;
+                availableMethods = data.methods;
+                
+                // Show username
+                document.getElementById('display-username').textContent = username;
+                document.getElementById('step-username').style.display = 'none';
+                document.getElementById('step-auth-methods').style.display = 'block';
+                
+                // Auto-try secure methods in priority order
+                await autoAuthenticateSecure(data);
+                
+            } catch (error) {
+                showAuthStatus('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function autoAuthenticateSecure(data) {
+            const methods = data.methods;
+            const container = document.getElementById('auth-methods-container');
+            
+            // Priority 1: Try mTLS (if available)
+            if (methods.includes('mtls') && data.counts.mtls > 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 2rem;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-color);"></i><p style="margin-top: 1rem; color: var(--text-secondary);">Checking for client certificate...</p></div>';
+                
+                // mTLS is handled by reverse proxy - if user has cert, they'd already be logged in
+                // Wait a moment to simulate check
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            // Priority 2: Try WebAuthn (if available and compatible)
+            if (methods.includes('webauthn') && data.counts.webauthn > 0) {
+                const isCompatible = checkWebAuthnCompatibility();
+                
+                if (isCompatible) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem;"><i class="fas fa-key" style="font-size: 2rem; color: var(--primary-color);"></i><p style="margin-top: 1rem; color: var(--text-primary); font-weight: 600;">Touch your security key</p><p style="color: var(--text-secondary); font-size: 0.875rem;">Follow your browser prompts to sign in</p></div>';
+                    
+                    try {
+                        await startWebAuthnLogin();
+                        return; // Success - will redirect
+                    } catch (error) {
+                        console.log('WebAuthn failed, falling back to password:', error);
+                        showAuthStatus('Security key authentication failed', 'error');
+                    }
+                }
+            }
+            
+            // Fallback: Show password form
+            showPasswordFallback();
+        }
+        
+        function showPasswordFallback() {
+            const container = document.getElementById('auth-methods-container');
+            
+            container.innerHTML = `
+                <div style="animation: fadeIn 0.3s;">
+                    <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 0.25rem; margin-bottom: 1rem; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-lock" style="color: var(--text-secondary);"></i>
+                        <span style="color: var(--text-secondary);">Please enter your password</span>
+                    </div>
+                    <form action="/login" method="POST">
+                        <input type="hidden" name="username" value="${currentUsername}">
+                        <div class="form-group">
+                            <label class="form-label" for="password">Password</label>
+                            <input class="form-input" id="password" name="password" type="password" required placeholder="Enter your password" autofocus>
+                        </div>
+                        <div class="form-checkbox">
+                            <input id="remember" name="remember" type="checkbox">
+                            <label for="remember">Remember me</label>
+                        </div>
+                        <button type="submit" class="btn-login" style="width: 100%;">
+                            <i class="fas fa-right-from-bracket"></i>
+                            <span>Sign In</span>
+                        </button>
+                    </form>
+                </div>
+            `;
+            
+            // Focus password field
+            setTimeout(() => {
+                const pwdField = document.getElementById('password');
+                if (pwdField) pwdField.focus();
+            }, 100);
+        }
+        
+        function checkWebAuthnCompatibility() {
+            const hostname = window.location.hostname;
+            return hostname === 'localhost' || 
+                   hostname === '127.0.0.1' || 
+                   hostname === '::1' ||
+                   /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
+                   hostname.includes('.');
+        }
+        
+        function resetLogin() {
+            document.getElementById('step-auth-methods').style.display = 'none';
+            document.getElementById('step-username').style.display = 'block';
+            document.getElementById('username').value = '';
+            document.getElementById('username').focus();
+            hideAuthStatus();
+        }
+        
+        function showAuthStatus(message, type = 'info') {
+            const status = document.getElementById('auth-status');
+            if (status) {
+                status.textContent = message;
+                status.style.display = 'block';
+                status.style.color = type === 'error' ? 'var(--error-color)' : type === 'success' ? 'var(--success-color)' : 'var(--primary-color)';
+            }
+        }
+        
+        function hideAuthStatus() {
+            const status = document.getElementById('auth-status');
+            if (status) {
+                status.style.display = 'none';
+            }
+        }
+    </script>
+    
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    
+    <!-- WebAuthn Login -->
+    <script>
+        // Convert base64url to ArrayBuffer
+        function base64urlToBuffer(base64url) {
+            // Convert base64url to base64
+            let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+            
+            // Add padding if needed
+            const padLength = (4 - (base64.length % 4)) % 4;
+            base64 += '='.repeat(padLength);
+            
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+        
+        // Convert ArrayBuffer to base64url
+        function bufferToBase64url(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+        
+        async function startWebAuthnLogin() {
+            showAuthStatus('🔑 Touch your security key...', 'info');
+            
+            try {
+                // Use the stored username from step 1
+                const username = currentUsername || document.getElementById('username').value.trim();
+                if (!username) {
+                    showAuthStatus('✗ Username required', 'error');
+                    return;
+                }
+                
+                // Step 1: Get authentication options from server
+                const optionsResponse = await fetch('/api/v1/webauthn/authenticate/options', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username })
+                });
+                
+                if (!optionsResponse.ok) {
+                    const error = await optionsResponse.json();
+                    throw new Error(error.error || 'Failed to get authentication options');
+                }
+                
+                const options = await optionsResponse.json();
+                
+                // Convert base64url strings to ArrayBuffers
+                // Note: API returns the options object directly, not wrapped in {publicKey: ...}
+                const publicKeyOptions = {
+                    publicKey: {
+                        ...options,
+                        challenge: base64urlToBuffer(options.challenge),
+                        allowCredentials: options.allowCredentials ?
+                            options.allowCredentials.map(cred => ({
+                                ...cred,
+                                id: base64urlToBuffer(cred.id)
+                            })) : []
+                    }
+                };
+                
+                // Step 2: Show "Touch your key" message
+                showAuthStatus('🔑 Touch your security key now...', 'info');
+                
+                // Step 3: Call WebAuthn API
+                const credential = await navigator.credentials.get(publicKeyOptions);
+                
+                if (!credential) {
+                    throw new Error('Authentication was cancelled');
+                }
+                
+                // Step 4: Send credential to server
+                showAuthStatus('✓ Verifying credential...', 'success');
+                
+                const verifyResponse = await fetch('/api/v1/webauthn/authenticate/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        credential: {
+                            id: credential.id,
+                            rawId: bufferToBase64url(credential.rawId),
+                            type: credential.type,
+                            response: {
+                                clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                                authenticatorData: bufferToBase64url(credential.response.authenticatorData),
+                                signature: bufferToBase64url(credential.response.signature),
+                                userHandle: credential.response.userHandle ? 
+                                    bufferToBase64url(credential.response.userHandle) : null
+                            }
+                        }
+                    })
+                });
+                
+                if (!verifyResponse.ok) {
+                    const error = await verifyResponse.json();
+                    throw new Error(error.error || 'Authentication failed');
+                }
+                
+                // Success! Redirect to dashboard
+                showAuthStatus('✓ Authentication successful! Redirecting...');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 500);
+                
+            } catch (error) {
+                console.error('WebAuthn login error:', error);
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+                
+                let errorMessage = error.message;
+                
+                // Provide helpful error messages
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = 'Authentication was cancelled or timed out';
+                } else if (error.name === 'InvalidStateError') {
+                    errorMessage = 'Security key not recognized. Please register it first.';
+                } else if (error.name === 'NotSupportedError') {
+                    errorMessage = 'WebAuthn not supported in this browser';
+                }
+                
+                showAuthStatus('✗ ' + errorMessage, true);
+            }
+        }
+        
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('username').focus();
         });
     </script>
 </body>

@@ -16,7 +16,7 @@ class IconSystem {
             // Try to load from localStorage cache first
             const cachedData = localStorage.getItem('ucm-icons-data');
             const cachedVersion = localStorage.getItem('ucm-icons-version');
-            const currentVersion = '2.3'; // Increment this when icons.json changes
+            const currentVersion = '2.8'; // Increment this when icons.json changes
             
             if (cachedData && cachedVersion === currentVersion) {
                 // Use cached data for instant load
@@ -107,7 +107,7 @@ class IconSystem {
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 if (pathData.d) path.setAttribute('d', pathData.d);
                 
-                // Set stroke/fill
+                // Set stroke/fill based on path data
                 if (pathData.fill && pathData.fill !== 'none') {
                     if (pathData.fill === 'currentColor') {
                         path.setAttribute('fill', 'currentColor');
@@ -118,11 +118,14 @@ class IconSystem {
                     path.setAttribute('fill', 'none');
                 }
                 
-                if (pathData.stroke !== false && iconData.stroke) {
-                    path.setAttribute('stroke', 'currentColor');
-                    if (pathData['stroke-width']) path.setAttribute('stroke-width', pathData['stroke-width']);
+                // Handle stroke - use gradient if stroke-width is defined
+                if (pathData['stroke-width']) {
+                    path.setAttribute('stroke', `url(#ucm-gradient-${pathData.gradient})`);
+                    path.setAttribute('stroke-width', pathData['stroke-width']);
                     if (pathData['stroke-linecap']) path.setAttribute('stroke-linecap', pathData['stroke-linecap']);
                     if (pathData['stroke-linejoin']) path.setAttribute('stroke-linejoin', pathData['stroke-linejoin']);
+                } else if (iconData.stroke) {
+                    path.setAttribute('stroke', 'currentColor');
                 }
                 
                 symbol.appendChild(path);
@@ -191,7 +194,7 @@ class IconSystem {
             'fa-file-certificate': 'certificate',
             'fa-file-binary': 'certificate',
             'fa-truck': 'scep',
-            'fa-server': 'scep',
+            'fa-server': 'server',
             'fa-network-wired': 'scep',
             'fa-users': 'users',
             'fa-user-group': 'users',
@@ -200,6 +203,7 @@ class IconSystem {
             'fa-user': 'user',
             'fa-user-circle': 'user',
             'fa-user-gear': 'settings',
+            'fa-user-check': 'user-check',
             'fa-sync': 'refresh',
             'fa-refresh': 'refresh',
             'fa-palette': 'theme-palette',
@@ -208,8 +212,9 @@ class IconSystem {
             'fa-right-from-bracket': 'logout',
             'fa-sign-out': 'logout',
             'fa-check-circle': 'check-circle',
-            'fa-check': 'check-circle',
+            'fa-check': 'check',
             'fa-exclamation-triangle': 'warning-triangle',
+            'fa-exclamation-circle': 'exclamation-circle',
             'fa-warning': 'warning-triangle',
             'fa-chevron-down': 'chevron-down',
             'fa-trash': 'trash',
@@ -223,6 +228,7 @@ class IconSystem {
             'fa-file-import': 'file-import',
             'fa-file-signature': 'file-signature',
             'fa-arrow-left': 'arrow-left',
+            'fa-arrow-right': 'arrow-right',
             'fa-times': 'times',
             'fa-info-circle': 'info-circle',
             'fa-key': 'key',
@@ -233,11 +239,29 @@ class IconSystem {
             'fa-clock': 'clock',
             'fa-crown': 'crown',
             'fa-eye': 'eye',
+            'fa-eye-slash': 'eye-slash',
             'fa-spinner': 'spinner',
             'fa-spin': 'spinner',
             'fa-file-contract': 'crl',
             'fa-circle-check': 'ocsp',
-            'fa-check-double': 'ocsp'
+            'fa-check-double': 'ocsp',
+            'fa-file': 'file',
+            'fa-copy': 'copy',
+            'fa-clone': 'copy',
+            'fa-shield': 'shield',
+            'fa-shield-alt': 'shield-check',
+            'fa-database': 'database',
+            'fa-rotate': 'refresh',
+            'fa-trash-alt': 'trash',
+            'fa-bell': 'bell',
+            'fa-envelope': 'envelope',
+            'fa-mail': 'envelope',
+            'fa-shield-alt': 'shield-check',
+            'fa-book-open': 'book-open',
+            'fa-chart-bar': 'chart-bar',
+            'fa-inbox': 'inbox',
+            'fa-play': 'play',
+            'fa-circle': 'circle'
         };
 
         document.querySelectorAll('i.fas, i.far, i.fab').forEach(icon => {
@@ -248,9 +272,20 @@ class IconSystem {
                     const className = Array.from(icon.classList).filter(c => !c.startsWith('fa')).join(' ');
                     const svgHTML = this.getIcon(iconName, className, size);
                     
+                    // Skip if icon not found
+                    if (!svgHTML) {
+                        console.warn(`Skipping replacement for ${faClass} -> ${iconName} (icon not found)`);
+                        continue;
+                    }
+                    
                     const temp = document.createElement('div');
                     temp.innerHTML = svgHTML;
                     const svgElement = temp.firstChild;
+                    
+                    if (!svgElement) {
+                        console.warn(`Failed to create SVG element for ${iconName}`);
+                        continue;
+                    }
                     
                     // Copy any inline styles
                     if (icon.style.cssText) {

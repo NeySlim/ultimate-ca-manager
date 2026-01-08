@@ -1,0 +1,503 @@
+{% extends "base.html" %}
+
+{% block title %}Email Notifications - UCM{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
+            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-envelope"/></svg> Email Notifications
+        </h1>
+        <button onclick="testNotifications()" class="btn btn-outline-primary">
+            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-play"/></svg> Run Manual Check
+        </button>
+    </div>
+
+    <!-- SMTP Configuration -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-server"/></svg>
+                SMTP Server Configuration
+            </h2>
+            <span id="smtp-status-badge" class="badge-outline badge-secondary">
+                <svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg>
+                Not Configured
+            </span>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form id="smtp-form">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                    <!-- SMTP Host -->
+                    <div>
+                        <label class="form-label">SMTP Host *</label>
+                        <input type="text" id="smtp_host" class="form-input" placeholder="smtp.gmail.com" required>
+                    </div>
+                    
+                    <!-- SMTP Port -->
+                    <div>
+                        <label class="form-label">SMTP Port *</label>
+                        <input type="number" id="smtp_port" class="form-input" placeholder="587" value="587" required>
+                    </div>
+                    
+                    <!-- SMTP User -->
+                    <div>
+                        <label class="form-label">Username</label>
+                        <input type="text" id="smtp_user" class="form-input" placeholder="user@gmail.com">
+                    </div>
+                    
+                    <!-- SMTP Password -->
+                    <div>
+                        <label class="form-label">Password</label>
+                        <input type="password" id="smtp_password" class="form-input" placeholder="••••••••">
+                        <small style="color: var(--text-secondary); font-size: 0.75rem;">Leave blank to keep current password</small>
+                    </div>
+                    
+                    <!-- From Email -->
+                    <div>
+                        <label class="form-label">From Email *</label>
+                        <input type="email" id="smtp_from" class="form-input" placeholder="noreply@ucm.local" required>
+                    </div>
+                    
+                    <!-- From Name -->
+                    <div>
+                        <label class="form-label">From Name</label>
+                        <input type="text" id="smtp_from_name" class="form-input" placeholder="UCM Notifications" value="UCM Notifications">
+                    </div>
+                    
+                    <!-- Security Options -->
+                    <div style="grid-column: 1 / -1;">
+                        <label class="form-label">Security</label>
+                        <div style="display: flex; gap: 2rem; margin-top: 0.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="smtp_use_tls" checked>
+                                Use TLS (STARTTLS)
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="smtp_use_ssl">
+                                Use SSL
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="smtp_enabled">
+                                <strong>Enable SMTP</strong>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                    <button type="submit" class="btn btn-primary">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-save"/></svg> Save SMTP Configuration
+                    </button>
+                    <button type="button" onclick="testSMTP()" class="btn btn-outline-success">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-envelope"/></svg> Send Test Email
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Rules -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-bell"/></svg>
+                Notification Rules
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div id="notification-rules" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Rules will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification History -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-clock"/></svg>
+                Notification History
+            </h2>
+            <div id="notification-stats" style="display: flex; gap: 1rem;">
+                <!-- Stats will be loaded here -->
+            </div>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Recipient</th>
+                            <th>Subject</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="notification-history-tbody">
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                                <svg class="ucm-icon" width="32" height="32" style=" opacity: 0.5;"><use href="#icon-inbox"/></svg>
+                                <p style="margin-top: 0.5rem;">Loading history...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+// Get JWT token from session
+const token = '{{ session.get("access_token") }}';
+
+// Toast notification helper
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 10000;
+        padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+        color: white; font-weight: 500; max-width: 400px;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+// Load SMTP configuration
+async function loadSMTPConfig() {
+    try {
+        const response = await fetch('/api/v1/notifications/smtp/config', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const config = await response.json();
+            document.getElementById('smtp_host').value = config.smtp_host || '';
+            document.getElementById('smtp_port').value = config.smtp_port || 587;
+            document.getElementById('smtp_user').value = config.smtp_user || '';
+            document.getElementById('smtp_from').value = config.smtp_from || '';
+            document.getElementById('smtp_from_name').value = config.smtp_from_name || 'UCM Notifications';
+            document.getElementById('smtp_use_tls').checked = config.smtp_use_tls !== false;
+            document.getElementById('smtp_use_ssl').checked = config.smtp_use_ssl === true;
+            document.getElementById('smtp_enabled').checked = config.enabled === true;
+            
+            // Update status badge
+            const badge = document.getElementById('smtp-status-badge');
+            if (config.enabled) {
+                badge.className = 'badge-outline badge-success';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-check-circle"/></svg> Enabled';
+            } else {
+                badge.className = 'badge-outline badge-secondary';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg> Disabled';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading SMTP config:', error);
+    }
+}
+
+// Save SMTP configuration
+document.getElementById('smtp-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        smtp_host: document.getElementById('smtp_host').value,
+        smtp_port: parseInt(document.getElementById('smtp_port').value),
+        smtp_user: document.getElementById('smtp_user').value,
+        smtp_from: document.getElementById('smtp_from').value,
+        smtp_from_name: document.getElementById('smtp_from_name').value,
+        smtp_use_tls: document.getElementById('smtp_use_tls').checked,
+        smtp_use_ssl: document.getElementById('smtp_use_ssl').checked,
+        enabled: document.getElementById('smtp_enabled').checked
+    };
+    
+    // Only include password if it's been changed
+    const password = document.getElementById('smtp_password').value;
+    if (password) {
+        data.smtp_password = password;
+    }
+    
+    try {
+        const response = await fetch('/api/v1/notifications/smtp/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('SMTP configuration saved successfully', 'success');
+            document.getElementById('smtp_password').value = ''; // Clear password field
+            loadSMTPConfig(); // Reload to update status
+        } else {
+            showToast(result.error || 'Failed to save configuration', 'error');
+        }
+    } catch (error) {
+        showToast('Error saving configuration: ' + error.message, 'error');
+    }
+});
+
+// Test SMTP
+async function testSMTP() {
+    // First check if SMTP is configured
+    const smtpEnabled = document.getElementById('smtp_enabled').checked;
+    const smtpHost = document.getElementById('smtp_host').value;
+    
+    if (!smtpHost) {
+        showToast('Please configure SMTP host first', 'error');
+        return;
+    }
+    
+    if (!smtpEnabled) {
+        showToast('Please enable SMTP first by checking "Enable SMTP" and saving', 'error');
+        return;
+    }
+    
+    const email = prompt('Enter email address to send test email:');
+    if (!email) return;
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        showToast('Invalid email address format', 'error');
+        return;
+    }
+    
+    showToast('Sending test email...', 'info');
+    
+    try {
+        const response = await fetch('/api/v1/notifications/smtp/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({email})
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Test email sent successfully to ' + email, 'success');
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to send test email'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Network error: ' + error.message, 'error');
+    }
+}
+
+// Load notification rules
+async function loadNotificationRules() {
+    try {
+        const response = await fetch('/api/v1/notifications/config', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const configs = await response.json();
+            const container = document.getElementById('notification-rules');
+            
+            container.innerHTML = configs.map((config, index) => `
+                <div class="card" style="background: var(--card-bg-secondary);">
+                    <div style="padding: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                            <div>
+                                <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">
+                                    ${config.type === 'cert_expiring' ? 'Certificate Expiration' : 'CRL Expiration'}
+                                </h3>
+                                <p style="color: var(--text-secondary); font-size: 0.875rem;">${config.description || ''}</p>
+                            </div>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="rule-enabled-${index}" ${config.enabled ? 'checked' : ''} 
+                                       onchange="toggleRule('${config.type}', this.checked)">
+                                <strong>Enabled</strong>
+                            </label>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                            <div>
+                                <label class="form-label">Alert Days Before</label>
+                                <input type="number" id="rule-days-${index}" class="form-input" 
+                                       value="${config.days_before || 30}" min="1" max="365"
+                                       onchange="updateRule('${config.type}')">
+                            </div>
+                            <div style="grid-column: 1 / -1;">
+                                <label class="form-label">Recipients (comma-separated emails)</label>
+                                <input type="text" id="rule-recipients-${index}" class="form-input" 
+                                       value="${(config.recipients || []).join(', ')}" 
+                                       placeholder="admin@example.com, ops@example.com"
+                                       onchange="updateRule('${config.type}')">
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                            <button onclick="updateRule('${config.type}')" class="btn btn-sm btn-primary">
+                                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-save"/></svg> Save Rule
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error loading notification rules:', error);
+    }
+}
+
+// Toggle rule enabled/disabled
+async function toggleRule(type, enabled) {
+    await updateRule(type);
+}
+
+// Update notification rule
+async function updateRule(type) {
+    const index = type === 'cert_expiring' ? 0 : 1;
+    const enabled = document.getElementById(`rule-enabled-${index}`).checked;
+    const days = parseInt(document.getElementById(`rule-days-${index}`).value);
+    const recipientsStr = document.getElementById(`rule-recipients-${index}`).value;
+    const recipients = recipientsStr.split(',').map(e => e.trim()).filter(e => e);
+    
+    try {
+        const response = await fetch(`/api/v1/notifications/config/${type}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({enabled, days_before: days, recipients})
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('Notification rule updated', 'success');
+        } else {
+            showToast(result.error || 'Failed to update rule', 'error');
+        }
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+// Load notification history
+async function loadNotificationHistory() {
+    try {
+        const response = await fetch('/api/v1/notifications/history?limit=20', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const tbody = document.getElementById('notification-history-tbody');
+            
+            if (data.logs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                            <svg class="ucm-icon" width="32" height="32" style=" opacity: 0.5;"><use href="#icon-inbox"/></svg>
+                            <p style="margin-top: 0.5rem;">No notifications sent yet</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = data.logs.map(log => `
+                <tr>
+                    <td>${new Date(log.sent_at).toLocaleString()}</td>
+                    <td><span class="badge-outline badge-info">${log.type}</span></td>
+                    <td>${log.recipient}</td>
+                    <td>${log.subject || 'N/A'}</td>
+                    <td>
+                        ${log.status === 'sent' 
+                            ? '<span class="badge-outline badge-success"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> Sent</span>'
+                            : '<span class="badge-outline badge-danger"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> Failed</span>'
+                        }
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error loading notification history:', error);
+    }
+}
+
+// Load notification stats
+async function loadNotificationStats() {
+    try {
+        const response = await fetch('/api/v1/notifications/stats', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const stats = await response.json();
+            const container = document.getElementById('notification-stats');
+            
+            container.innerHTML = `
+                <span class="badge-outline badge-success">
+                    <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> ${stats.recent_sent_30d} sent (30d)
+                </span>
+                ${stats.recent_failed_30d > 0 ? `
+                    <span class="badge-outline badge-danger">
+                        <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> ${stats.recent_failed_30d} failed (30d)
+                    </span>
+                ` : ''}
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+// Manual notification check
+async function testNotifications() {
+    if (!confirm('This will check for expiring certificates and CRLs and send notifications if configured. Continue?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/v1/notifications/check', {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('Notification check completed', 'success');
+            loadNotificationHistory();
+            loadNotificationStats();
+        } else {
+            showToast(result.error || 'Check failed', 'error');
+        }
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+// Initialize
+function init() {
+    loadSMTPConfig();
+    loadNotificationRules();
+    loadNotificationHistory();
+    loadNotificationStats();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+})();
+</script>
+{% endblock %}
