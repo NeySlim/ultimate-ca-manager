@@ -167,9 +167,38 @@
                 <div class="card-body">
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle"></i>
-                        <strong>Info:</strong> ACME server is currently always enabled. 
-                        Advanced configuration options will be added in future releases.
+                        <strong>Info:</strong> Configure the Certificate Authority used to sign ACME certificates.
                     </div>
+
+                    <form id="acme-settings-form" hx-post="/api/ui/acme/settings" hx-swap="none">
+                        <div class="form-group mb-3">
+                            <label class="form-label">Default CA for ACME</label>
+                            <select name="default_ca" class="form-select" id="acme-default-ca"
+                                    hx-get="/api/ui/ca/options" 
+                                    hx-trigger="load"
+                                    hx-swap="innerHTML">
+                                <option>Loading CAs...</option>
+                            </select>
+                            <small class="form-text text-muted">
+                                Select which CA will sign certificates requested via ACME protocol
+                            </small>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label class="form-label">Certificate Validity (days)</label>
+                            <input type="number" name="cert_validity" class="form-control" 
+                                   value="90" min="1" max="397">
+                            <small class="form-text text-muted">
+                                ACME certificates validity period (default: 90 days, max: 397 days)
+                            </small>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Save Settings
+                        </button>
+                    </form>
+
+                    <hr class="my-4">
 
                     <div class="form-group mb-3">
                         <label class="form-label">Directory URL</label>
