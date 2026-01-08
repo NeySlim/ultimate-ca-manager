@@ -3,208 +3,183 @@
 {% block title %}ACME Configuration{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
+<div style="max-width: 80rem; margin: 0 auto;">
     <!-- Page Header -->
-    <div class="page-header mb-3">
-        <div class="row align-items-center">
-            <div class="col">
-                <h1 class="page-title mb-1">
-                    <i class="bi bi-shield-lock"></i> ACME Protocol
-                </h1>
-                <p class="text-muted mb-0 small">Automatic Certificate Management Environment (RFC 8555)</p>
+    <div style="margin-bottom: 1.5rem;">
+        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
+            <i class="bi bi-shield-lock" style="margin-right: 0.5rem;"></i>ACME Protocol
+        </h1>
+        <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">
+            Automatic Certificate Management Environment (RFC 8555)
+        </p>
+    </div>
+
+    <!-- ACME Status Overview -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+            <!-- Status -->
+            <div>
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                    <span class="badge badge-success" id="acme-status-badge" style="font-size: 0.875rem; padding: 0.375rem 0.75rem;">
+                        <i class="bi bi-check-circle-fill"></i> Active
+                    </span>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">ACME Server</div>
+                        <div style="font-weight: 600; color: var(--text-primary);" id="acme-ca-display">Loading CA...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Directory URL -->
+            <div>
+                <label style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.5rem;">
+                    Directory URL
+                </label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" class="form-control" readonly 
+                           value="https://{{ request.host }}/acme/directory" 
+                           id="acme-url"
+                           style="font-family: monospace; font-size: 0.875rem;">
+                    <button class="btn btn-outline-secondary" type="button" 
+                            onclick="copyToClipboard('https://{{ request.host }}/acme/directory')"
+                            title="Copy to clipboard">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Features -->
+            <div>
+                <label style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.5rem;">
+                    Supported Features
+                </label>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                    <span class="badge bg-secondary" title="Account registration">new-account</span>
+                    <span class="badge bg-secondary" title="Order creation">new-order</span>
+                    <span class="badge bg-secondary" title="HTTP-01 validation">HTTP-01</span>
+                    <span class="badge bg-secondary" title="DNS-01 validation">DNS-01</span>
+                    <span class="badge bg-secondary" title="JWS signatures">JWS</span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- ACME Status Card - Compact -->
-    <div class="card mb-3">
-        <div class="card-body p-3">
-            <div class="row align-items-center">
-                <div class="col-md-3">
-                    <div class="d-flex align-items-center">
-                        <span class="badge badge-success fs-6 me-2" id="acme-status-badge">
-                            <i class="bi bi-check-circle-fill"></i> Active
-                        </span>
-                        <div>
-                            <small class="text-muted d-block">ACME Server</small>
-                            <small class="fw-bold" id="acme-ca-display">Loading CA...</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-5">
-                    <small class="text-muted d-block mb-1">Directory URL</small>
-                    <div class="input-group input-group-sm">
-                        <input type="text" class="form-control form-control-sm" readonly 
-                               value="https://{{ request.host }}/acme/directory" id="acme-url">
-                        <button class="btn btn-outline-secondary btn-sm" type="button" 
-                                onclick="copyToClipboard('https://{{ request.host }}/acme/directory')">
-                            <i class="bi bi-clipboard"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <small class="text-muted d-block mb-1">Supported Features</small>
-                    <div class="d-flex flex-wrap gap-1">
-                        <span class="badge bg-secondary" title="Account registration">new-account</span>
-                        <span class="badge bg-secondary" title="Order creation">new-order</span>
-                        <span class="badge bg-secondary" title="HTTP-01 validation">HTTP-01</span>
-                        <span class="badge bg-secondary" title="DNS-01 validation">DNS-01</span>
-                        <span class="badge bg-secondary" title="JWS signatures">JWS</span>
-                    </div>
-                </div>
-            </div>
+    <!-- Statistics Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="card" style="text-align: center;">
+            <i class="bi bi-person-badge" style="font-size: 2rem; color: var(--primary-color);"></i>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0; color: var(--text-primary);" id="total-accounts">-</div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">Accounts</div>
         </div>
-    </div>
-
-    <!-- Statistics Cards - Compact -->
-    <div class="row mb-3 g-2">
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-body p-3 text-center">
-                    <i class="bi bi-person-badge fs-3 text-primary"></i>
-                    <h4 class="mt-1 mb-0" id="total-accounts">-</h4>
-                    <small class="text-muted">Accounts</small>
-                </div>
-            </div>
+        <div class="card" style="text-align: center;">
+            <i class="bi bi-hourglass-split" style="font-size: 2rem; color: #f59e0b;"></i>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0; color: var(--text-primary);" id="active-orders">-</div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">Active Orders</div>
         </div>
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-body p-3 text-center">
-                    <i class="bi bi-hourglass-split fs-3 text-warning"></i>
-                    <h4 class="mt-1 mb-0" id="active-orders">-</h4>
-                    <small class="text-muted">Active Orders</small>
-                </div>
-            </div>
+        <div class="card" style="text-align: center;">
+            <i class="bi bi-check-circle" style="font-size: 2rem; color: #10b981;"></i>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0; color: var(--text-primary);" id="completed-orders">-</div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">Completed</div>
         </div>
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-body p-3 text-center">
-                    <i class="bi bi-check-circle fs-3 text-success"></i>
-                    <h4 class="mt-1 mb-0" id="completed-orders">-</h4>
-                    <small class="text-muted">Completed</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card">
-                <div class="card-body p-3 text-center">
-                    <i class="bi bi-award fs-3 text-info"></i>
-                    <h4 class="mt-1 mb-0" id="issued-certs">-</h4>
-                    <small class="text-muted">Certificates</small>
-                </div>
-            </div>
+        <div class="card" style="text-align: center;">
+            <i class="bi bi-award" style="font-size: 2rem; color: #06b6d4;"></i>
+            <div style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0; color: var(--text-primary);" id="issued-certs">-</div>
+            <div style="font-size: 0.875rem; color: var(--text-secondary);">Certificates</div>
         </div>
     </div>
 
     <!-- Tabs -->
-    <ul class="nav nav-tabs mb-3" role="tablist">
-        <li class="nav-item">
-            <a class="nav-link active" id="accounts-tab" data-bs-toggle="tab" href="#accounts" role="tab">
+    <div style="border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;" x-data="{ activeTab: 'accounts' }">
+        <nav style="margin-bottom: -1px; display: flex; gap: 2rem;">
+            <button @click="activeTab = 'accounts'" 
+                    :style="activeTab === 'accounts' ? 'border-bottom-color: var(--primary-color); color: var(--primary-color);' : 'border-bottom-color: transparent; color: var(--text-secondary);'" 
+                    style="white-space: nowrap; padding: 1rem 0.25rem; border-bottom: 2px solid; font-weight: 500; font-size: 0.875rem; background: none; cursor: pointer;">
                 <i class="bi bi-person-badge"></i> Accounts
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" id="orders-tab" data-bs-toggle="tab" href="#orders" role="tab">
+            </button>
+            <button @click="activeTab = 'orders'" 
+                    :style="activeTab === 'orders' ? 'border-bottom-color: var(--primary-color); color: var(--primary-color);' : 'border-bottom-color: transparent; color: var(--text-secondary);'" 
+                    style="white-space: nowrap; padding: 1rem 0.25rem; border-bottom: 2px solid; font-weight: 500; font-size: 0.875rem; background: none; cursor: pointer;">
                 <i class="bi bi-file-earmark-text"></i> Orders
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" id="settings-tab" data-bs-toggle="tab" href="#settings" role="tab">
+            </button>
+            <button @click="activeTab = 'settings'" 
+                    :style="activeTab === 'settings' ? 'border-bottom-color: var(--primary-color); color: var(--primary-color);' : 'border-bottom-color: transparent; color: var(--text-secondary);'" 
+                    style="white-space: nowrap; padding: 1rem 0.25rem; border-bottom: 2px solid; font-weight: 500; font-size: 0.875rem; background: none; cursor: pointer;">
                 <i class="bi bi-gear"></i> Settings
-            </a>
-        </li>
-    </ul>
+            </button>
+        </nav>
 
-    <!-- Tab Content -->
-    <div class="tab-content">
         <!-- Accounts Tab -->
-        <div class="tab-pane fade show active" id="accounts" role="tabpanel">
+        <div x-show="activeTab === 'accounts'" style="padding: 1.5rem 0;">
             <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">ACME Accounts</h5>
-                </div>
-                <div class="card-body">
-                    <div id="accounts-table" 
-                         hx-get="/api/ui/acme/accounts" 
-                         hx-trigger="load"
-                         hx-indicator="#accounts-loading">
-                        <div id="accounts-loading" class="text-center p-4">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-2 text-muted">Loading accounts...</p>
-                        </div>
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">ACME Accounts</h2>
+                <div id="accounts-table" 
+                     hx-get="/api/ui/acme/accounts" 
+                     hx-trigger="load"
+                     hx-indicator="#accounts-loading">
+                    <div id="accounts-loading" style="text-align: center; padding: 2rem 0;">
+                        <div class="spinner" style="margin: 0 auto;"></div>
+                        <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading accounts...</p>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Orders Tab -->
-        <div class="tab-pane fade" id="orders" role="tabpanel">
+        <div x-show="activeTab === 'orders'" style="padding: 1.5rem 0;">
             <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">ACME Orders</h5>
-                </div>
-                <div class="card-body">
-                    <div id="orders-table" 
-                         hx-get="/api/ui/acme/orders" 
-                         hx-trigger="load, from:#orders-tab:click"
-                         hx-indicator="#orders-loading">
-                        <div id="orders-loading" class="text-center p-4">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-2 text-muted">Loading orders...</p>
-                        </div>
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">ACME Orders</h2>
+                <div id="orders-table" 
+                     hx-get="/api/ui/acme/orders" 
+                     hx-trigger="load delay:100ms, from:body:tabChanged"
+                     hx-indicator="#orders-loading">
+                    <div id="orders-loading" style="text-align: center; padding: 2rem 0;">
+                        <div class="spinner" style="margin: 0 auto;"></div>
+                        <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading orders...</p>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Settings Tab -->
-        <div class="tab-pane fade" id="settings" role="tabpanel">
+        <div x-show="activeTab === 'settings'" style="padding: 1.5rem 0;">
             <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">ACME Configuration</h5>
-                </div>
-                <div class="card-body">
-                    <form id="acme-settings-form" 
-                          hx-post="/api/ui/acme/settings" 
-                          hx-swap="none"
-                          hx-on::after-request="if(event.detail.successful) { showToast('ACME settings saved successfully', 'success'); loadAcmeCA(); }">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group mb-3">
-                                    <label class="form-label fw-bold">Default CA for ACME</label>
-                                    <select name="default_ca" class="form-select" id="acme-default-ca"
-                                            hx-get="/api/ui/ca/options" 
-                                            hx-trigger="load"
-                                            hx-swap="innerHTML">
-                                        <option>Loading CAs...</option>
-                                    </select>
-                                    <small class="form-text text-muted">
-                                        CA used to sign ACME certificates
-                                    </small>
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <div class="form-group mb-3">
-                                    <label class="form-label fw-bold">Certificate Validity (days)</label>
-                                    <input type="number" name="cert_validity" class="form-control" 
-                                           value="90" min="1" max="397">
-                                    <small class="form-text text-muted">
-                                        Default: 90 days, Max: 397 days
-                                    </small>
-                                </div>
-                            </div>
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">ACME Configuration</h2>
+                <form id="acme-settings-form" 
+                      hx-post="/api/ui/acme/settings" 
+                      hx-swap="none"
+                      hx-on::after-request="if(event.detail.successful) { showToast('ACME settings saved successfully', 'success'); loadAcmeCA(); }">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
+                                Default CA for ACME
+                            </label>
+                            <select name="default_ca" class="form-control" id="acme-default-ca"
+                                    hx-get="/api/ui/ca/options" 
+                                    hx-trigger="load"
+                                    hx-swap="innerHTML">
+                                <option>Loading CAs...</option>
+                            </select>
+                            <small style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
+                                CA used to sign ACME certificates
+                            </small>
                         </div>
 
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-circle"></i> Save Settings
-                        </button>
-                    </form>
-                </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
+                                Certificate Validity (days)
+                            </label>
+                            <input type="number" name="cert_validity" class="form-control" 
+                                   value="90" min="1" max="397">
+                            <small style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
+                                Default: 90 days, Max: 397 days
+                            </small>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Save Settings
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -258,7 +233,9 @@ function loadAcmeCA() {
         .then(data => {
             if (data.default_ca) {
                 // CA configured - show Active (green)
-                badge.className = 'badge badge-success fs-6 me-2';
+                badge.className = 'badge badge-success';
+                badge.style.fontSize = '0.875rem';
+                badge.style.padding = '0.375rem 0.75rem';
                 badge.innerHTML = '<i class="bi bi-check-circle-fill"></i> Active';
                 
                 // Get CA name
@@ -274,14 +251,18 @@ function loadAcmeCA() {
                 });
             } else {
                 // No CA configured - show Not Configured (red)
-                badge.className = 'badge badge-danger fs-6 me-2';
+                badge.className = 'badge badge-danger';
+                badge.style.fontSize = '0.875rem';
+                badge.style.padding = '0.375rem 0.75rem';
                 badge.innerHTML = '<i class="bi bi-x-circle-fill"></i> Not Configured';
                 document.getElementById('acme-ca-display').textContent = 'No CA configured';
             }
         })
         .catch(error => {
             // Error - show as disabled (red)
-            badge.className = 'badge badge-danger fs-6 me-2';
+            badge.className = 'badge badge-danger';
+            badge.style.fontSize = '0.875rem';
+            badge.style.padding = '0.375rem 0.75rem';
             badge.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> Error';
             document.getElementById('acme-ca-display').textContent = 'Error loading CA';
             console.error('Error:', error);
