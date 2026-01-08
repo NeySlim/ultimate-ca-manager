@@ -58,26 +58,33 @@ function refreshCRLs() {
 }
 
 function generateCRL(caId, caName) {
-    if (!confirm(`Generate new CRL for ${caName}?`)) return;
-    
-    fetch(`/api/v1/crl/${caId}/generate`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            alert(`Error: ${data.error}`);
-        } else {
-            alert(`CRL #${data.crl.crl_number} generated successfully`);
-            refreshCRLs();
-        }
-    })
-    .catch(error => {
-        alert(`Failed to generate CRL: ${error.message}`);
+    ucmConfirm(
+        `Generate new CRL for ${caName}?`,
+        'Generate CRL',
+        { confirmText: 'Generate', icon: 'refresh' }
+    ).then(confirmed => {
+        if (!confirmed) return;
+        
+        fetch(`/api/v1/crl/${caId}/generate`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                ucmAlert(`Error: ${data.error}`, 'Error');
+            } else {
+                ucmAlert(`CRL #${data.crl.crl_number} generated successfully`, 'Success').then(() => {
+                    refreshCRLs();
+                });
+            }
+        })
+        .catch(error => {
+            ucmAlert(`Failed to generate CRL: ${error.message}`, 'Error');
+        });
     });
 }
 

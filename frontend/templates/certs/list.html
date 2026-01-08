@@ -599,56 +599,64 @@ function exportWithToken(url) {
 
 // Delete and revoke certificate functions
 function deleteCert(refid, descr) {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer le certificat "${descr}" ?\n\nCette action est irréversible.`)) {
-        return;
-    }
-    
-    const token = '{{ session.get("access_token") }}';
-    fetch(`/api/v1/certificates/by-refid/${refid}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-    })
-    .then(response => {
-        if (response.ok) {
-            showToast('Certificat supprimé avec succès', 'success');
-            htmx.trigger('body', 'refreshCerts');
-        } else {
-            return response.json().then(data => {
-                throw new Error(data.error || 'Erreur lors de la suppression');
-            });
-        }
-    })
-    .catch(error => {
-        showToast('Erreur: ' + error.message, 'error');
+    ucmConfirm(
+        `Êtes-vous sûr de vouloir supprimer le certificat "${descr}" ?\n\nCette action est irréversible.`,
+        'Supprimer le certificat',
+        { danger: true, confirmText: 'Supprimer', icon: 'trash' }
+    ).then(confirmed => {
+        if (!confirmed) return;
+        
+        const token = '{{ session.get("access_token") }}';
+        fetch(`/api/v1/certificates/by-refid/${refid}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(response => {
+            if (response.ok) {
+                showToast('Certificat supprimé avec succès', 'success');
+                htmx.trigger('body', 'refreshCerts');
+            } else {
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Erreur lors de la suppression');
+                });
+            }
+        })
+        .catch(error => {
+            showToast('Erreur: ' + error.message, 'error');
+        });
     });
 }
 
 function revokeCert(refid, descr) {
-    if (!confirm(`Êtes-vous sûr de vouloir révoquer le certificat "${descr}" ?\n\nLe certificat sera marqué comme révoqué mais ne sera pas supprimé.`)) {
-        return;
-    }
-    
-    const token = '{{ session.get("access_token") }}';
-    fetch(`/api/v1/certificates/by-refid/${refid}/revoke`, {
-        method: 'POST',
-        headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ reason: 'unspecified' })
-    })
-    .then(response => {
-        if (response.ok) {
-            showToast('Certificat révoqué avec succès', 'success');
-            htmx.trigger('body', 'refreshCerts');
-        } else {
-            return response.json().then(data => {
-                throw new Error(data.error || 'Erreur lors de la révocation');
-            });
-        }
-    })
-    .catch(error => {
-        showToast('Erreur: ' + error.message, 'error');
+    ucmConfirm(
+        `Êtes-vous sûr de vouloir révoquer le certificat "${descr}" ?\n\nLe certificat sera marqué comme révoqué mais ne sera pas supprimé.`,
+        'Révoquer le certificat',
+        { danger: true, confirmText: 'Révoquer', icon: 'warning-triangle' }
+    ).then(confirmed => {
+        if (!confirmed) return;
+        
+        const token = '{{ session.get("access_token") }}';
+        fetch(`/api/v1/certificates/by-refid/${refid}/revoke`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ reason: 'unspecified' })
+        })
+        .then(response => {
+            if (response.ok) {
+                showToast('Certificat révoqué avec succès', 'success');
+                htmx.trigger('body', 'refreshCerts');
+            } else {
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Erreur lors de la révocation');
+                });
+            }
+        })
+        .catch(error => {
+            showToast('Erreur: ' + error.message, 'error');
+        });
     });
 }
 

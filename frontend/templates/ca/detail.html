@@ -614,7 +614,7 @@ function exportWithToken(url) {
         window.URL.revokeObjectURL(downloadUrl);
     })
     .catch(error => {
-        alert('Export failed: ' + error.message);
+        ucmAlert('Export failed: ' + error.message, 'Error');
     });
 }
 
@@ -662,12 +662,12 @@ function saveCDPConfig() {
     const url = document.getElementById('cdp_url').value;
     
     if (enabled && !url) {
-        alert('CDP URL is required when CDP is enabled');
+        ucmAlert('CDP URL is required when CDP is enabled', 'Error');
         return;
     }
     
     if (enabled && !url.includes('{ca_refid}')) {
-        alert('CDP URL must contain {ca_refid} placeholder');
+        ucmAlert('CDP URL must contain {ca_refid} placeholder', 'Error');
         return;
     }
     
@@ -692,11 +692,11 @@ function saveCDPConfig() {
         return response.json();
     })
     .then(() => {
-        alert('CDP configuration updated successfully');
+        ucmAlert('CDP configuration updated successfully', 'Success');
         location.reload();
     })
     .catch(error => {
-        alert('Failed to update CDP configuration: ' + error.message);
+        ucmAlert('Failed to update CDP configuration: ' + error.message, 'Error');
     });
 }
 
@@ -728,7 +728,7 @@ function saveOCSPConfig() {
     const url = document.getElementById('ocsp_url').value;
     
     if (enabled && !url) {
-        alert('Please provide an OCSP Responder URL');
+        ucmAlert('Please provide an OCSP Responder URL', 'Error');
         return;
     }
     
@@ -750,12 +750,12 @@ function saveOCSPConfig() {
         if (data.message) {
             location.reload();
         } else {
-            alert('Failed to update OCSP configuration');
+            ucmAlert('Failed to update OCSP configuration', 'Error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Failed to update OCSP configuration');
+        ucmAlert('Failed to update OCSP configuration', 'Error');
     });
 }
 

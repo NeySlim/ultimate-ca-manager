@@ -347,8 +347,7 @@ function handleCAImportResponse(event) {
 }
 
 function showNotification(message, type) {
-    // Simple notification (you can enhance this)
-    alert(message);
+    ucmAlert(message, type === 'error' ? 'Error' : 'Notification');
 }
 
 // PKCS#12 Modal Functions
@@ -369,12 +368,12 @@ function downloadPKCS12WithPassword() {
     const confirm = document.getElementById('pkcs12PasswordConfirm').value;
     
     if (!password || password.length < 4) {
-        alert('Password must be at least 4 characters');
+        ucmAlert('Password must be at least 4 characters', 'Error');
         return;
     }
     
     if (password !== confirm) {
-        alert('Passwords do not match');
+        ucmAlert('Passwords do not match', 'Error');
         return;
     }
     
@@ -467,7 +466,13 @@ function exportCADER(id) {
 }
 
 function deleteCA(refid, name) {
-    if (confirm('Delete CA "' + name + '"? This will also delete all certificates signed by this CA!')) {
+    ucmConfirm(
+        'Delete CA "' + name + '"? This will also delete all certificates signed by this CA!',
+        'Delete CA',
+        { danger: true, confirmText: 'Delete', icon: 'trash' }
+    ).then(confirmed => {
+        if (!confirmed) return;
+        
         fetch('/api/v1/ca/' + refid, {
             method: 'DELETE',
             headers: { 
@@ -478,20 +483,21 @@ function deleteCA(refid, name) {
         .then(r => r.json())
         .then(data => {
             if (data.error) {
-                alert('Error: ' + data.error);
+                ucmAlert('Error: ' + data.error, 'Error');
             } else {
-                alert('CA deleted successfully');
-                htmx.trigger('body', 'refreshCAs');
+                ucmAlert('CA deleted successfully', 'Success').then(() => {
+                    htmx.trigger('body', 'refreshCAs');
+                });
             }
         })
-        .catch(e => alert('Error deleting CA: ' + e));
-    }
+        .catch(e => ucmAlert('Error deleting CA: ' + e, 'Error'));
+    });
 }
 
 function exportWithToken(url) {
     const token = localStorage.getItem('access_token');
     if (!token) {
-        alert('Not authenticated');
+        ucmAlert('Not authenticated', 'Error');
         return;
     }
     
@@ -513,7 +519,7 @@ function exportWithToken(url) {
         window.URL.revokeObjectURL(downloadUrl);
     })
     .catch(error => {
-        alert('Export failed: ' + error.message);
+        ucmAlert('Export failed: ' + error.message, 'Error');
     });
 }
 

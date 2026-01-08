@@ -461,9 +461,13 @@ async function loadNotificationStats() {
 
 // Manual notification check
 async function testNotifications() {
-    if (!confirm('This will check for expiring certificates and CRLs and send notifications if configured. Continue?')) {
-        return;
-    }
+    const confirmed = await ucmConfirm(
+        'This will check for expiring certificates and CRLs and send notifications if configured. Continue?',
+        'Test Notifications',
+        { confirmText: 'Continue', icon: 'check' }
+    );
+    
+    if (!confirmed) return;
     
     try {
         const response = await fetch('/api/v1/notifications/check', {

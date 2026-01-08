@@ -83,7 +83,7 @@
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-theme-palette"/></svg>
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-palette"/></svg>
                 Theme Preferences
             </h2>
         </div>
@@ -218,12 +218,12 @@ document.getElementById('change-password-form').addEventListener('submit', funct
     const confirmPassword = document.getElementById('confirm-password').value;
     
     if (newPassword !== confirmPassword) {
-        alert('New passwords do not match!');
+        ucmAlert('New passwords do not match!', 'Error');
         return;
     }
     
     if (newPassword.length < 8) {
-        alert('Password must be at least 8 characters long!');
+        ucmAlert('Password must be at least 8 characters long!', 'Error');
         return;
     }
     
@@ -241,15 +241,16 @@ document.getElementById('change-password-form').addEventListener('submit', funct
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Password changed successfully!');
-            document.getElementById('change-password-form').reset();
+            ucmAlert('Password changed successfully!', 'Success').then(() => {
+                document.getElementById('change-password-form').reset();
+            });
         } else {
-            alert('Error: ' + (data.message || 'Failed to change password'));
+            ucmAlert('Error: ' + (data.message || 'Failed to change password'), 'Error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('An error occurred while changing password');
+        ucmAlert('An error occurred while changing password', 'Error');
     });
 });
 </script>
