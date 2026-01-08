@@ -3828,3 +3828,192 @@ def system_info():
             'error': str(e),
             'success': False
         }), 500
+
+
+# ACME Management Routes
+@ui_bp.route('/config/acme')
+@login_required
+def config_acme_page():
+    """ACME configuration and management page"""
+    return render_template('config/acme.html')
+
+
+@ui_bp.route('/api/ui/acme/statistics')
+@login_required
+def acme_statistics():
+    """Get ACME statistics"""
+    try:
+        from models import db
+        
+        # Query ACME database for statistics
+        total_accounts = db.session.execute(
+            "SELECT COUNT(*) FROM acme_accounts"
+        ).scalar() or 0
+        
+        active_orders = db.session.execute(
+            "SELECT COUNT(*) FROM acme_orders WHERE status IN ('pending', 'ready', 'processing')"
+        ).scalar() or 0
+        
+        completed_orders = db.session.execute(
+            "SELECT COUNT(*) FROM acme_orders WHERE status = 'valid'"
+        ).scalar() or 0
+        
+        issued_certs = db.session.execute(
+            "SELECT COUNT(*) FROM acme_orders WHERE status = 'valid' AND certificate_id IS NOT NULL"
+        ).scalar() or 0
+        
+        return jsonify({
+            'total_accounts': total_accounts,
+            'active_orders': active_orders,
+            'completed_orders': completed_orders,
+            'issued_certs': issued_certs
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'total_accounts': 0,
+            'active_orders': 0,
+            'completed_orders': 0,
+            'issued_certs': 0,
+            'error': str(e)
+        }), 200
+
+
+@ui_bp.route('/api/ui/acme/accounts')
+@login_required
+def acme_accounts_list():
+    """Get ACME accounts list"""
+    try:
+        from models import db
+        from datetime import datetime
+        
+        accounts = db.session.execute("""
+            SELECT id, account_id, status, contacts, created, 
+                   SUBSTR(jwk_thumbprint, 1, 16) as thumbprint_short
+            FROM acme_accounts 
+            ORDER BY created DESC
+        """).fetchall()
+        
+        if not accounts:
+            return '''
+            <div class="text-center p-8">
+                <i class="bi bi-person-badge fs-1 text-muted"></i>
+                <p class="mt-3 text-muted">No ACME accounts yet</p>
+                <small>Accounts will appear here when ACME clients register</small>
+            </div>
+            '''
+        
+        html = '''
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Account ID</th>
+                        <th>Status</th>
+                        <th>Contacts</th>
+                        <th>JWK Thumbprint</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+        '''
+        
+        for account in accounts:
+            status_badge = 'success' if account[2] == 'valid' else 'secondary'
+            contacts = account[3] or '[]'
+            created = datetime.fromisoformat(account[4]).strftime('%Y-%m-%d %H:%M')
+            
+            html += f'''
+                <tr>
+                    <td><code class="small">{account[1][:24]}...</code></td>
+                    <td><span class="badge bg-{status_badge}">{account[2]}</span></td>
+                    <td class="small">{contacts}</td>
+                    <td><code class="small">{account[5]}...</code></td>
+                    <td>{created}</td>
+                </tr>
+            '''
+        
+        html += '''
+                </tbody>
+            </table>
+        </div>
+        '''
+        
+        return html
+        
+    except Exception as e:
+        return f'<div class="alert alert-danger">Error: {str(e)}</div>'
+
+
+@ui_bp.route('/api/ui/acme/orders')
+@login_required
+def acme_orders_list():
+    """Get ACME orders list"""
+    try:
+        from models import db
+        from datetime import datetime
+        
+        orders = db.session.execute("""
+            SELECT o.id, o.order_id, o.status, o.identifiers, o.created,
+                   a.account_id
+            FROM acme_orders o
+            LEFT JOIN acme_accounts a ON o.account_id = a.id
+            ORDER BY o.created DESC
+            LIMIT 50
+        """).fetchall()
+        
+        if not orders:
+            return '''
+            <div class="text-center p-8">
+                <i class="bi bi-file-earmark-text fs-1 text-muted"></i>
+                <p class="mt-3 text-muted">No ACME orders yet</p>
+                <small>Orders will appear here when certificates are requested</small>
+            </div>
+            '''
+        
+        html = '''
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Status</th>
+                        <th>Identifiers</th>
+                        <th>Account</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+        '''
+        
+        for order in orders:
+            status_colors = {
+                'pending': 'warning',
+                'ready': 'info',
+                'processing': 'primary',
+                'valid': 'success',
+                'invalid': 'danger'
+            }
+            status_badge = status_colors.get(order[2], 'secondary')
+            created = datetime.fromisoformat(order[4]).strftime('%Y-%m-%d %H:%M')
+            
+            html += f'''
+                <tr>
+                    <td><code class="small">{order[1][:24]}...</code></td>
+                    <td><span class="badge bg-{status_badge}">{order[2]}</span></td>
+                    <td class="small">{order[3]}</td>
+                    <td><code class="small">{order[5][:16] if order[5] else 'N/A'}...</code></td>
+                    <td>{created}</td>
+                </tr>
+            '''
+        
+        html += '''
+                </tbody>
+            </table>
+        </div>
+        '''
+        
+        return html
+        
+    except Exception as e:
+        return f'<div class="alert alert-danger">Error: {str(e)}</div>'

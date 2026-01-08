@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}ACME Configuration{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="page-title">
+                    <i class="bi bi-shield-lock"></i> ACME Protocol
+                </h1>
+                <p class="text-muted mb-0">Automatic Certificate Management Environment (RFC 8555)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACME Status Card -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-gear-fill"></i> ACME Server Status
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label">ACME Server Status</label>
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-success fs-6 me-3">
+                                <i class="bi bi-check-circle"></i> Active
+                            </span>
+                            <small class="text-muted">ACME protocol is enabled and accepting requests</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label class="form-label">Directory Endpoint</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" readonly 
+                                   value="https://{{ request.host }}/acme/directory">
+                            <button class="btn btn-outline-secondary" type="button" 
+                                    onclick="copyToClipboard('https://{{ request.host }}/acme/directory')">
+                                <i class="bi bi-clipboard"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="bi bi-person-badge fs-1 text-primary"></i>
+                    <h3 class="mt-2 mb-0" id="total-accounts">-</h3>
+                    <p class="text-muted mb-0">Total Accounts</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="bi bi-file-earmark-text fs-1 text-info"></i>
+                    <h3 class="mt-2 mb-0" id="active-orders">-</h3>
+                    <p class="text-muted mb-0">Active Orders</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="bi bi-check-circle fs-1 text-success"></i>
+                    <h3 class="mt-2 mb-0" id="completed-orders">-</h3>
+                    <p class="text-muted mb-0">Completed</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="bi bi-award fs-1 text-warning"></i>
+                    <h3 class="mt-2 mb-0" id="issued-certs">-</h3>
+                    <p class="text-muted mb-0">Certificates Issued</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="accounts-tab" data-bs-toggle="tab" href="#accounts" role="tab">
+                <i class="bi bi-person-badge"></i> Accounts
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="orders-tab" data-bs-toggle="tab" href="#orders" role="tab">
+                <i class="bi bi-file-earmark-text"></i> Orders
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="settings-tab" data-bs-toggle="tab" href="#settings" role="tab">
+                <i class="bi bi-gear"></i> Settings
+            </a>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- Accounts Tab -->
+        <div class="tab-pane fade show active" id="accounts" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">ACME Accounts</h5>
+                </div>
+                <div class="card-body">
+                    <div id="accounts-table" 
+                         hx-get="/api/ui/acme/accounts" 
+                         hx-trigger="load"
+                         hx-indicator="#accounts-loading">
+                        <div id="accounts-loading" class="text-center p-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Loading accounts...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Orders Tab -->
+        <div class="tab-pane fade" id="orders" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">ACME Orders</h5>
+                </div>
+                <div class="card-body">
+                    <div id="orders-table" 
+                         hx-get="/api/ui/acme/orders" 
+                         hx-trigger="load, from:#orders-tab:click"
+                         hx-indicator="#orders-loading">
+                        <div id="orders-loading" class="text-center p-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2 text-muted">Loading orders...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div class="tab-pane fade" id="settings" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">ACME Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Info:</strong> ACME server is currently always enabled. 
+                        Advanced configuration options will be added in future releases.
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="form-label">Directory URL</label>
+                        <code class="d-block p-2 bg-light rounded">https://{{ request.host }}/acme/directory</code>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="form-label">Supported Features</label>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check-circle text-success"></i> Account registration (new-account)</li>
+                            <li><i class="bi bi-check-circle text-success"></i> Order creation (new-order)</li>
+                            <li><i class="bi bi-check-circle text-success"></i> HTTP-01 challenge</li>
+                            <li><i class="bi bi-check-circle text-success"></i> DNS-01 challenge</li>
+                            <li><i class="bi bi-check-circle text-success"></i> Certificate finalization</li>
+                            <li><i class="bi bi-check-circle text-success"></i> JWS cryptographic verification</li>
+                        </ul>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="form-label">Documentation</label>
+                        <p class="text-muted">
+                            For client configuration examples (certbot, acme.sh), see:
+                            <code>/root/ACME_CLIENT_TESTING_GUIDE.md</code>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied to clipboard!', 'success');
+    });
+}
+
+// Load statistics on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadStatistics();
+});
+
+function loadStatistics() {
+    fetch('/api/ui/acme/statistics')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('total-accounts').textContent = data.total_accounts || 0;
+            document.getElementById('active-orders').textContent = data.active_orders || 0;
+            document.getElementById('completed-orders').textContent = data.completed_orders || 0;
+            document.getElementById('issued-certs').textContent = data.issued_certs || 0;
+        })
+        .catch(error => {
+            console.error('Error loading statistics:', error);
+        });
+}
+</script>
+{% endblock %}
