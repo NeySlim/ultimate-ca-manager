@@ -56,7 +56,7 @@ COPY --chown=ucm:ucm gunicorn.conf.py /app/gunicorn.conf.py
 COPY --chown=ucm:ucm .env.example /app/.env.example
 
 # Create necessary directories with proper permissions
-RUN mkdir -p /app/backend/data/{ca,certs,private,crl,scep,backups} && \
+RUN bash -c 'mkdir -p /app/backend/data/{ca,certs,private,crl,scep,backups}' && \
     chown -R ucm:ucm /app
 
 # Set environment variables
