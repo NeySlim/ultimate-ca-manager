@@ -3890,10 +3890,10 @@ def acme_accounts_list():
         from sqlalchemy import text
         
         accounts = db.session.execute(text("""
-            SELECT id, account_id, status, contacts, created, 
+            SELECT id, account_id, status, contact, created_at, 
                    SUBSTR(jwk_thumbprint, 1, 16) as thumbprint_short
             FROM acme_accounts 
-            ORDER BY created DESC
+            ORDER BY created_at DESC
         """)).fetchall()
         
         if not accounts:
@@ -3957,11 +3957,11 @@ def acme_orders_list():
         from sqlalchemy import text
         
         orders = db.session.execute(text("""
-            SELECT o.id, o.order_id, o.status, o.identifiers, o.created,
+            SELECT o.id, o.order_id, o.status, o.identifiers, o.created_at,
                    a.account_id
             FROM acme_orders o
-            LEFT JOIN acme_accounts a ON o.account_id = a.id
-            ORDER BY o.created DESC
+            LEFT JOIN acme_accounts a ON o.account_id = a.account_id
+            ORDER BY o.created_at DESC
             LIMIT 50
         """)).fetchall()
         
