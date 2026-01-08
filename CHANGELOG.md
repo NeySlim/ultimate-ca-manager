@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.4] - 2026-01-08
+
+### Fixed
+- **First Install**: Database tables not created on fresh installation (#4)
+  - Import all models in models/__init__.py so db.create_all() creates all tables
+  - Fixes "no such table: webauthn_credentials" error on first Docker run
+  - Previously only User and SystemConfig models were imported
+  - Now imports WebAuthn, AuthCertificate, and Email notification models
+
+---
+
 ## [1.7.3] - 2026-01-08
 
 ### Fixed
