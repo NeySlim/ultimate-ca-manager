@@ -215,11 +215,20 @@
 </div>
 
 <script>
-// Load HTTPS cert info on page load
+// Load data immediately when script runs (for HTMX navigation)
+(function() {
+    loadHTTPSCertInfo();
+    loadPKIStats();
+    loadCertificateCandidates();
+    setupCertSelectorListener();
+})();
+
+// Also load on DOMContentLoaded (for direct page access)
 document.addEventListener('DOMContentLoaded', function() {
     loadHTTPSCertInfo();
     loadPKIStats();
     loadCertificateCandidates();
+    setupCertSelectorListener();
 });
 
 function loadHTTPSCertInfo() {
@@ -234,10 +243,12 @@ function loadHTTPSCertInfo() {
 }
 
 function loadCertificateCandidates() {
+    const select = document.getElementById('managed-cert-id');
+    if (!select) return; // Element not found yet
+    
     fetch('/api/ui/system/https-cert-candidates')
         .then(response => response.json())
         .then(data => {
-            const select = document.getElementById('managed-cert-id');
             select.innerHTML = '';
             
             if (!data.certificates || data.certificates.length === 0) {
@@ -257,7 +268,7 @@ function loadCertificateCandidates() {
         })
         .catch(error => {
             console.error('Error loading certificate candidates:', error);
-            document.getElementById('managed-cert-id').innerHTML = '<option value="">Error loading certificates</option>';
+            select.innerHTML = '<option value="">Error loading certificates</option>';
         });
 }
 
@@ -271,9 +282,12 @@ function toggleCertSelector() {
     }
 }
 
-// Show cert details when a certificate is selected
-document.addEventListener('DOMContentLoaded', function() {
+// Setup cert selector change listener (call only once)
+function setupCertSelectorListener() {
     const select = document.getElementById('managed-cert-id');
+    if (!select || select.dataset.listenerAdded) return;
+    
+    select.dataset.listenerAdded = 'true';
     select.addEventListener('change', function() {
         const details = document.getElementById('cert-details');
         if (this.value && this.selectedOptions[0].dataset.subject) {
@@ -284,7 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
             details.style.display = 'none';
         }
     });
-});
+}
 
 function loadPKIStats() {
     fetch('/api/ui/system/pki-stats')
