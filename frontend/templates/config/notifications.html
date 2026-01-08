@@ -150,10 +150,10 @@
 </div>
 
 <script>
-(function() {
-// Get JWT token from session
+// Get JWT token from session (global scope for all functions)
 const token = '{{ session.get("access_token") }}';
 
+(function() {
 // Toast notification helper
 function showToast(message, type = 'info') {
     const toast = document.createElement('div');
