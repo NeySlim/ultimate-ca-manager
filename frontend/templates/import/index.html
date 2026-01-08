@@ -3,7 +3,7 @@
 {% block title %}Import Certificates - UCM{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <!-- Page Header -->
     <div class="page-header" style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
         <div>
@@ -140,7 +140,7 @@
              hx-get="/api/ui/import/config-form"
              hx-trigger="load"
              hx-swap="innerHTML">
-            <div class="animate-pulse h-40 bg-gray-200 rounded"></div>
+            <div style="height: 10rem; background: var(--bg-secondary); border-radius: 0.375rem; animation: pulse 2s infinite;"></div>
         </div>
     </div>
     
@@ -154,7 +154,7 @@
         <div hx-get="/api/ui/import/history"
              hx-trigger="load"
              hx-swap="innerHTML">
-            <div class="p-8"><div class="animate-pulse h-20 bg-gray-200 rounded"></div></div>
+            <div style="padding: 2rem;"><div style="height: 5rem; background: var(--bg-secondary); border-radius: 0.375rem; animation: pulse 2s infinite;"></div></div>
         </div>
     </div>
 </div>
