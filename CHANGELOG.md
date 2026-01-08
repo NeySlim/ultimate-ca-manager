@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.1] - 2026-01-08
+
+### Fixed
+- **Database Initialization**: Prevent UNIQUE constraint violation on first startup in multi-worker environments (#2)
+  - Added IntegrityError handling for concurrent initialization
+  - Check existing SystemConfig entries before creation
+  - Early constraint detection with flush() before commit
+
+---
+
 ## [1.7.0] - 2026-01-08
 
 ### 🎉 Major Feature Release
