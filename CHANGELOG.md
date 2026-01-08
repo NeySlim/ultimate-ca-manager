@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.4.1] - 2026-01-08
+
+### Fixed
+- **CI/CD**: Prevent create-release workflow from triggering on non-tag pushes
+  - Added explicit check to only run when pushing tags
+  - Eliminates false workflow failure notifications
+  - Workflow now properly skips execution on main branch commits
+
+---
+
 ## [1.7.4] - 2026-01-08
 
 ### Fixed
@@ -15,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixes "no such table: webauthn_credentials" error on first Docker run
   - Previously only User and SystemConfig models were imported
   - Now imports WebAuthn, AuthCertificate, and Email notification models
+- **Auto-Migration**: Automatic database migration now works seamlessly
+  - Removed manual migration detection warnings
+  - db.create_all() automatically creates missing tables
+  - Works for both fresh installs and v1.6.x → v1.7.x upgrades
 
 ---
 
