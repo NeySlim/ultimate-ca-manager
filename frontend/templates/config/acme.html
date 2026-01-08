@@ -5,89 +5,92 @@
 {% block content %}
 <div class="container-fluid">
     <!-- Page Header -->
-    <div class="page-header">
+    <div class="page-header mb-3">
         <div class="row align-items-center">
             <div class="col">
-                <h1 class="page-title">
+                <h1 class="page-title mb-1">
                     <i class="bi bi-shield-lock"></i> ACME Protocol
                 </h1>
-                <p class="text-muted mb-0">Automatic Certificate Management Environment (RFC 8555)</p>
+                <p class="text-muted mb-0 small">Automatic Certificate Management Environment (RFC 8555)</p>
             </div>
         </div>
     </div>
 
-    <!-- ACME Status Card -->
-    <div class="card mb-4">
-        <div class="card-header bg-primary text-white">
-            <h5 class="card-title mb-0">
-                <i class="bi bi-gear-fill"></i> ACME Server Status
-            </h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label">ACME Server Status</label>
-                        <div class="d-flex align-items-center">
-                            <span class="badge bg-success fs-6 me-3">
-                                <i class="bi bi-check-circle"></i> Active
-                            </span>
-                            <small class="text-muted">ACME protocol is enabled and accepting requests</small>
+    <!-- ACME Status Card - Compact -->
+    <div class="card mb-3">
+        <div class="card-body p-3">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-success fs-6 me-2">
+                            <i class="bi bi-check-circle-fill"></i> Active
+                        </span>
+                        <div>
+                            <small class="text-muted d-block">ACME Server</small>
+                            <small class="fw-bold" id="acme-ca-display">Loading CA...</small>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label class="form-label">Directory Endpoint</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" readonly 
-                                   value="https://{{ request.host }}/acme/directory">
-                            <button class="btn btn-outline-secondary" type="button" 
-                                    onclick="copyToClipboard('https://{{ request.host }}/acme/directory')">
-                                <i class="bi bi-clipboard"></i> Copy
-                            </button>
-                        </div>
+                <div class="col-md-5">
+                    <small class="text-muted d-block mb-1">Directory URL</small>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control form-control-sm" readonly 
+                               value="https://{{ request.host }}/acme/directory" id="acme-url">
+                        <button class="btn btn-outline-secondary btn-sm" type="button" 
+                                onclick="copyToClipboard('https://{{ request.host }}/acme/directory')">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <small class="text-muted d-block mb-1">Supported Features</small>
+                    <div class="d-flex flex-wrap gap-1">
+                        <span class="badge bg-secondary" title="Account registration">new-account</span>
+                        <span class="badge bg-secondary" title="Order creation">new-order</span>
+                        <span class="badge bg-secondary" title="HTTP-01 validation">HTTP-01</span>
+                        <span class="badge bg-secondary" title="DNS-01 validation">DNS-01</span>
+                        <span class="badge bg-secondary" title="JWS signatures">JWS</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Statistics Cards -->
-    <div class="row mb-4">
+    <!-- Statistics Cards - Compact -->
+    <div class="row mb-3 g-2">
         <div class="col-md-3">
             <div class="card">
-                <div class="card-body text-center">
-                    <i class="bi bi-person-badge fs-1 text-primary"></i>
-                    <h3 class="mt-2 mb-0" id="total-accounts">-</h3>
-                    <p class="text-muted mb-0">Total Accounts</p>
+                <div class="card-body p-3 text-center">
+                    <i class="bi bi-person-badge fs-3 text-primary"></i>
+                    <h4 class="mt-1 mb-0" id="total-accounts">-</h4>
+                    <small class="text-muted">Accounts</small>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card">
-                <div class="card-body text-center">
-                    <i class="bi bi-file-earmark-text fs-1 text-info"></i>
-                    <h3 class="mt-2 mb-0" id="active-orders">-</h3>
-                    <p class="text-muted mb-0">Active Orders</p>
+                <div class="card-body p-3 text-center">
+                    <i class="bi bi-hourglass-split fs-3 text-warning"></i>
+                    <h4 class="mt-1 mb-0" id="active-orders">-</h4>
+                    <small class="text-muted">Active Orders</small>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card">
-                <div class="card-body text-center">
-                    <i class="bi bi-check-circle fs-1 text-success"></i>
-                    <h3 class="mt-2 mb-0" id="completed-orders">-</h3>
-                    <p class="text-muted mb-0">Completed</p>
+                <div class="card-body p-3 text-center">
+                    <i class="bi bi-check-circle fs-3 text-success"></i>
+                    <h4 class="mt-1 mb-0" id="completed-orders">-</h4>
+                    <small class="text-muted">Completed</small>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="card">
-                <div class="card-body text-center">
-                    <i class="bi bi-award fs-1 text-warning"></i>
-                    <h3 class="mt-2 mb-0" id="issued-certs">-</h3>
-                    <p class="text-muted mb-0">Certificates Issued</p>
+                <div class="card-body p-3 text-center">
+                    <i class="bi bi-award fs-3 text-info"></i>
+                    <h4 class="mt-1 mb-0" id="issued-certs">-</h4>
+                    <small class="text-muted">Certificates</small>
                 </div>
             </div>
         </div>
@@ -165,65 +168,42 @@
                     <h5 class="card-title mb-0">ACME Configuration</h5>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i>
-                        <strong>Info:</strong> Configure the Certificate Authority used to sign ACME certificates.
-                    </div>
+                    <form id="acme-settings-form" 
+                          hx-post="/api/ui/acme/settings" 
+                          hx-swap="none"
+                          hx-on::after-request="if(event.detail.successful) { showToast('ACME settings saved successfully', 'success'); loadAcmeCA(); }">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label class="form-label fw-bold">Default CA for ACME</label>
+                                    <select name="default_ca" class="form-select" id="acme-default-ca"
+                                            hx-get="/api/ui/ca/options" 
+                                            hx-trigger="load"
+                                            hx-swap="innerHTML">
+                                        <option>Loading CAs...</option>
+                                    </select>
+                                    <small class="form-text text-muted">
+                                        CA used to sign ACME certificates
+                                    </small>
+                                </div>
+                            </div>
 
-                    <form id="acme-settings-form" hx-post="/api/ui/acme/settings" hx-swap="none">
-                        <div class="form-group mb-3">
-                            <label class="form-label">Default CA for ACME</label>
-                            <select name="default_ca" class="form-select" id="acme-default-ca"
-                                    hx-get="/api/ui/ca/options" 
-                                    hx-trigger="load"
-                                    hx-swap="innerHTML">
-                                <option>Loading CAs...</option>
-                            </select>
-                            <small class="form-text text-muted">
-                                Select which CA will sign certificates requested via ACME protocol
-                            </small>
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label class="form-label">Certificate Validity (days)</label>
-                            <input type="number" name="cert_validity" class="form-control" 
-                                   value="90" min="1" max="397">
-                            <small class="form-text text-muted">
-                                ACME certificates validity period (default: 90 days, max: 397 days)
-                            </small>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label class="form-label fw-bold">Certificate Validity (days)</label>
+                                    <input type="number" name="cert_validity" class="form-control" 
+                                           value="90" min="1" max="397">
+                                    <small class="form-text text-muted">
+                                        Default: 90 days, Max: 397 days
+                                    </small>
+                                </div>
+                            </div>
                         </div>
 
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-circle"></i> Save Settings
                         </button>
                     </form>
-
-                    <hr class="my-4">
-
-                    <div class="form-group mb-3">
-                        <label class="form-label">Directory URL</label>
-                        <code class="d-block p-2 bg-light rounded">https://{{ request.host }}/acme/directory</code>
-                    </div>
-
-                    <div class="form-group mb-3">
-                        <label class="form-label">Supported Features</label>
-                        <ul class="list-unstyled">
-                            <li><i class="bi bi-check-circle text-success"></i> Account registration (new-account)</li>
-                            <li><i class="bi bi-check-circle text-success"></i> Order creation (new-order)</li>
-                            <li><i class="bi bi-check-circle text-success"></i> HTTP-01 challenge</li>
-                            <li><i class="bi bi-check-circle text-success"></i> DNS-01 challenge</li>
-                            <li><i class="bi bi-check-circle text-success"></i> Certificate finalization</li>
-                            <li><i class="bi bi-check-circle text-success"></i> JWS cryptographic verification</li>
-                        </ul>
-                    </div>
-
-                    <div class="form-group mb-3">
-                        <label class="form-label">Documentation</label>
-                        <p class="text-muted">
-                            For client configuration examples (certbot, acme.sh), see:
-                            <code>/root/ACME_CLIENT_TESTING_GUIDE.md</code>
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>
@@ -237,9 +217,23 @@ function copyToClipboard(text) {
     });
 }
 
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} position-fixed top-0 end-0 m-3`;
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+        <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+        ${message}
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
 // Load statistics on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadStatistics();
+    loadAcmeCA();
+    loadSettings();
 });
 
 function loadStatistics() {
@@ -253,6 +247,49 @@ function loadStatistics() {
         })
         .catch(error => {
             console.error('Error loading statistics:', error);
+        });
+}
+
+function loadAcmeCA() {
+    fetch('/api/ui/acme/settings/load')
+        .then(response => response.json())
+        .then(data => {
+            if (data.default_ca) {
+                // Get CA name
+                fetch(`/api/v1/ca/${data.default_ca}`, {
+                    headers: { 'Authorization': 'Bearer ' + '{{ session.get("access_token") }}' }
+                })
+                .then(r => r.json())
+                .then(ca => {
+                    document.getElementById('acme-ca-display').textContent = ca.descr || 'Default CA';
+                })
+                .catch(() => {
+                    document.getElementById('acme-ca-display').textContent = 'CA: ' + data.default_ca;
+                });
+            } else {
+                document.getElementById('acme-ca-display').textContent = 'No CA configured';
+            }
+        })
+        .catch(error => {
+            document.getElementById('acme-ca-display').textContent = 'Error loading CA';
+            console.error('Error:', error);
+        });
+}
+
+function loadSettings() {
+    fetch('/api/ui/acme/settings/load')
+        .then(response => response.json())
+        .then(data => {
+            if (data.default_ca) {
+                const select = document.getElementById('acme-default-ca');
+                // Wait for options to load, then select
+                setTimeout(() => {
+                    select.value = data.default_ca;
+                }, 500);
+            }
+            if (data.cert_validity) {
+                document.querySelector('input[name="cert_validity"]').value = data.cert_validity;
+            }
         });
 }
 </script>
