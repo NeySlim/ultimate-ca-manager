@@ -3047,6 +3047,7 @@ def managed_certs_list():
                         <button hx-post="/api/ui/config/use-managed-cert/{cert['id']}" 
                                 hx-confirm="Use this certificate for HTTPS? The server will restart."
                                 hx-swap="none"
+                                @htmx:after-request="if($event.detail.successful) {{ alert('Certificate applied successfully! Please restart the server.'); $dispatch('close-modal'); }}"
                                 class="btn btn-success text-xs">
                             <i class="fas fa-check mr-1"></i>Use This
                         </button>
