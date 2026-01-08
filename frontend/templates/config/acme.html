@@ -22,7 +22,7 @@
             <div class="row align-items-center">
                 <div class="col-md-3">
                     <div class="d-flex align-items-center">
-                        <span class="badge bg-success fs-6 me-2">
+                        <span class="badge badge-success fs-6 me-2" id="acme-status-badge">
                             <i class="bi bi-check-circle-fill"></i> Active
                         </span>
                         <div>
@@ -251,10 +251,16 @@ function loadStatistics() {
 }
 
 function loadAcmeCA() {
+    const badge = document.getElementById('acme-status-badge');
+    
     fetch('/api/ui/acme/settings/load')
         .then(response => response.json())
         .then(data => {
             if (data.default_ca) {
+                // CA configured - show Active (green)
+                badge.className = 'badge badge-success fs-6 me-2';
+                badge.innerHTML = '<i class="bi bi-check-circle-fill"></i> Active';
+                
                 // Get CA name
                 fetch(`/api/v1/ca/${data.default_ca}`, {
                     headers: { 'Authorization': 'Bearer ' + '{{ session.get("access_token") }}' }
@@ -267,10 +273,16 @@ function loadAcmeCA() {
                     document.getElementById('acme-ca-display').textContent = 'CA: ' + data.default_ca;
                 });
             } else {
+                // No CA configured - show Not Configured (red)
+                badge.className = 'badge badge-danger fs-6 me-2';
+                badge.innerHTML = '<i class="bi bi-x-circle-fill"></i> Not Configured';
                 document.getElementById('acme-ca-display').textContent = 'No CA configured';
             }
         })
         .catch(error => {
+            // Error - show as disabled (red)
+            badge.className = 'badge badge-danger fs-6 me-2';
+            badge.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> Error';
             document.getElementById('acme-ca-display').textContent = 'Error loading CA';
             console.error('Error:', error);
         });
