@@ -291,9 +291,9 @@ function loadPKIStats() {
         .then(response => response.json())
         .then(data => {
             if (data.cas !== undefined) document.getElementById('pki-stat-cas').textContent = data.cas;
-            if (data.certs !== undefined) document.getElementById('pki-stat-certs').textContent = data.certs;
+            if (data.certificates !== undefined) document.getElementById('pki-stat-certs').textContent = data.certificates;
             if (data.crls !== undefined) document.getElementById('pki-stat-crls').textContent = data.crls;
-            if (data.ocsp !== undefined) document.getElementById('pki-stat-ocsp').textContent = data.ocsp;
+            if (data.ocsp_responses !== undefined) document.getElementById('pki-stat-ocsp').textContent = data.ocsp_responses;
         })
         .catch(error => console.error('Error loading PKI stats:', error));
 }
