@@ -1597,43 +1597,42 @@ def scep_config_form():
             ca_options += f'<option value="{ca["refid"]}" {selected}>{ca["descr"]}</option>'
         
         return f'''
-        <form hx-post="/api/ui/scep/save" hx-on::after-request="showToast('SCEP config saved', 'success')">
-            <div class="space-y-4">
-                <div class="flex items-center">
-                    <input type="checkbox" name="enabled" {"checked" if enabled else ""} 
-                           class="h-4 w-4 text-primary-600 rounded">
-                    <label class="ml-2 text-gray-900 dark:text-white font-medium">Enable SCEP Server</label>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">CA</label>
-                    <select name="ca_refid" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                        {ca_options}
-                    </select>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Challenge Password</label>
-                    <input type="text" name="challenge_password" value="{config.get('challenge_password', '')}"
-                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                </div>
-                
-                <div class="flex items-center">
-                    <input type="checkbox" name="auto_approve" {"checked" if config.get('auto_approve') else ""}
-                           class="h-4 w-4 text-primary-600 rounded">
-                    <label class="ml-2 text-gray-700 dark:text-gray-300">Auto-approve enrollment requests</label>
-                </div>
-                
-                <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save mr-2"></i> Save Configuration
-                    </button>
-                </div>
+        <form hx-post="/api/ui/scep/save" hx-on::after-request="showToast('SCEP config saved', 'success')" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                <input type="checkbox" name="enabled" {"checked" if enabled else ""} 
+                       style="width: 1.125rem; height: 1.125rem; cursor: pointer;">
+                <label style="font-weight: 600; color: var(--text-primary); cursor: pointer;">Enable SCEP Server</label>
+            </div>
+            
+            <div>
+                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.5rem;">CA</label>
+                <select name="ca_refid" class="form-input" style="width: 100%; padding: 0.625rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--card-bg); color: var(--text-primary);">
+                    {ca_options}
+                </select>
+            </div>
+            
+            <div>
+                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.5rem;">Challenge Password</label>
+                <input type="text" name="challenge_password" value="{config.get('challenge_password', '')}" placeholder="None"
+                       class="form-input" style="width: 100%; padding: 0.625rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--card-bg); color: var(--text-primary);">
+            </div>
+            
+            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                <input type="checkbox" name="auto_approve" {"checked" if config.get('auto_approve') else ""}
+                       style="width: 1.125rem; height: 1.125rem; cursor: pointer;">
+                <label style="color: var(--text-primary); cursor: pointer;">Auto-approve enrollment requests</label>
+            </div>
+            
+            <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                <button type="submit" class="btn btn-primary">
+                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
+                    Save Configuration
+                </button>
             </div>
         </form>
         '''
     except Exception as e:
-        return f'<p class="text-red-600">Error: {str(e)}</p>'
+        return f'<p style="color: var(--status-danger); padding: 1rem;">Error: {str(e)}</p>'
 
 
 @ui_bp.route('/api/ui/scep/save', methods=['POST'])
