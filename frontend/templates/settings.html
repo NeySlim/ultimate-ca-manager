@@ -210,18 +210,18 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadHTTPSCertInfo() {
-    fetch('/api/system/https-cert-info')
+    fetch('/api/ui/system/https-cert-info')
         .then(response => response.json())
         .then(data => {
             if (data.subject) document.getElementById('cert-subject').textContent = data.subject;
-            if (data.expiry) document.getElementById('cert-expiry').textContent = data.expiry;
+            if (data.expires) document.getElementById('cert-expiry').textContent = data.expires;
             if (data.type) document.getElementById('cert-type').textContent = data.type;
         })
         .catch(error => console.error('Error loading HTTPS cert info:', error));
 }
 
 function loadPKIStats() {
-    fetch('/api/system/pki-stats')
+    fetch('/api/ui/system/pki-stats')
         .then(response => response.json())
         .then(data => {
             if (data.cas !== undefined) document.getElementById('pki-stat-cas').textContent = data.cas;
