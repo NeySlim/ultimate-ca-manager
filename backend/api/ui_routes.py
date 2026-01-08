@@ -405,8 +405,18 @@ def dashboard_scep_status():
 @ui_bp.route('/settings')
 @login_required
 def settings():
-    """Settings page"""
-    return render_template('settings.html')
+    """System settings page (admin only)"""
+    from config.settings import Config
+    return render_template('settings.html', 
+                         version=Config.APP_VERSION,
+                         port=Config.HTTPS_PORT)
+
+
+@ui_bp.route('/my-account')
+@login_required
+def my_account():
+    """User account settings page"""
+    return render_template('my_account.html')
 
 
 @ui_bp.route('/users')

@@ -468,9 +468,13 @@ a.btn-primary svg path,
 a.btn-primary .ucm-icon,
 a.btn-primary .ucm-icon path {
     color: #ffffff !important;
-    fill: #ffffff !important;
-    stroke: #ffffff !important;
     opacity: 1 !important;
+}
+
+.btn-primary .ucm-icon,
+.btn-danger .ucm-icon,
+.btn-success .ucm-icon {
+    filter: brightness(0) invert(1);
 }
 
 .btn-secondary {
@@ -505,7 +509,9 @@ a.btn-primary .ucm-icon path {
 .btn-secondary i.far,
 .btn-secondary i.fab,
 .btn-secondary svg,
-.btn-secondary .ucm-icon {
+.btn-secondary svg path,
+.btn-secondary .ucm-icon,
+.btn-secondary .ucm-icon path {
     color: var(--text-primary) !important;
     opacity: 1 !important;
 }
@@ -542,7 +548,9 @@ a.btn-primary .ucm-icon path {
 .btn-danger i.far,
 .btn-danger i.fab,
 .btn-danger svg,
-.btn-danger .ucm-icon {
+.btn-danger svg path,
+.btn-danger .ucm-icon,
+.btn-danger .ucm-icon path {
     color: var(--status-danger) !important;
     opacity: 1 !important;
 }
@@ -579,7 +587,9 @@ a.btn-primary .ucm-icon path {
 .btn-success i.far,
 .btn-success i.fab,
 .btn-success svg,
-.btn-success .ucm-icon {
+.btn-success svg path,
+.btn-success .ucm-icon,
+.btn-success .ucm-icon path {
     color: var(--status-success) !important;
     opacity: 1 !important;
 }
