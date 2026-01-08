@@ -519,5 +519,13 @@ class AuditLog(db.Model):
 # Import CRL metadata model
 from .crl import CRLMetadata
 from .ocsp import OCSPResponse
+from .webauthn import WebAuthnCredential, WebAuthnChallenge
+from .auth_certificate import AuthCertificate
+from .email_notification import SMTPConfig, NotificationConfig, NotificationLog
 
-__all__ = ["db", "User", "SystemConfig", "CA", "Certificate", "CRL", "SCEPRequest", "AuditLog", "CRLMetadata", "OCSPResponse"]
+__all__ = [
+    "db", "User", "SystemConfig", "CA", "Certificate", "CRL", "SCEPRequest", 
+    "AuditLog", "CRLMetadata", "OCSPResponse", "WebAuthnCredential", 
+    "WebAuthnChallenge", "AuthCertificate", "SMTPConfig", "NotificationConfig", 
+    "NotificationLog"
+]
