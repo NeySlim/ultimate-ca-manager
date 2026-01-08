@@ -240,15 +240,14 @@ function loadHTTPSCertInfo() {
             if (data.type) document.getElementById('cert-type').textContent = data.type;
             
             // Set radio button based on source
-            if (data.source && data.source.startsWith('managed:')) {
+            if (data.source === 'managed' && data.cert_id) {
                 document.querySelector('input[name="cert-source"][value="managed"]').checked = true;
-                // Extract cert ID and pre-select it
-                const certId = data.source.split(':')[1];
+                // Pre-select certificate in dropdown
                 const select = document.getElementById('managed-cert-id');
-                if (select && certId) {
+                if (select) {
                     // Wait a bit for certificates to load, then select
                     setTimeout(() => {
-                        select.value = certId;
+                        select.value = data.cert_id;
                         select.dispatchEvent(new Event('change'));
                     }, 500);
                 }

@@ -2277,9 +2277,13 @@ def config_https_cert():
         
         # Check certificate source
         cert_source_config = SystemConfig.query.filter_by(key='https_cert_source').first()
-        if cert_source_config and cert_source_config.value.startswith('managed:'):
-            cert_id = cert_source_config.value.split(':')[1]
+        if cert_source_config and cert_source_config.value == 'managed':
+            # Get cert ID
+            cert_id_config = SystemConfig.query.filter_by(key='https_cert_id').first()
+            cert_id = cert_id_config.value if cert_id_config else 'Unknown'
             source_badge = f'<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 500; background-color: var(--success-bg); color: var(--success-color);"><i class="fas fa-certificate" style="margin-right: 0.375rem;"></i>Managed Certificate (ID: {cert_id})</span>'
+        elif cert_source_config and cert_source_config.value == 'imported':
+            source_badge = '<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 500; background-color: var(--info-bg); color: var(--info-color);"><i class="fas fa-file-import" style="margin-right: 0.375rem;"></i>Imported</span>'
         else:
             source_badge = '<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 500; background-color: var(--warning-bg); color: var(--warning-color);"><i class="fas fa-tools" style="margin-right: 0.375rem;"></i>Auto-generated</span>'
         
@@ -3172,14 +3176,22 @@ def use_managed_cert(cert_id):
             with open(key_path, 'w') as f:
                 f.write(key_pem)
             
-            # Store certificate source in database
+            # Store certificate source in database (use same format as settings page)
             from models import SystemConfig
-            config = SystemConfig.query.filter_by(key='https_cert_source').first()
-            if not config:
-                config = SystemConfig(key='https_cert_source')
-            config.value = f'managed:{cert_id}'
-            config.description = f'Managed certificate ID: {cert_id}'
-            db.session.add(config)
+            cert_source_config = SystemConfig.query.filter_by(key='https_cert_source').first()
+            if not cert_source_config:
+                cert_source_config = SystemConfig(key='https_cert_source')
+            cert_source_config.value = 'managed'
+            cert_source_config.description = f'Managed certificate ID: {cert_id}'
+            db.session.add(cert_source_config)
+            
+            # Store cert ID separately
+            cert_id_config = SystemConfig.query.filter_by(key='https_cert_id').first()
+            if not cert_id_config:
+                cert_id_config = SystemConfig(key='https_cert_id')
+            cert_id_config.value = str(cert_id)
+            db.session.add(cert_id_config)
+            
             db.session.commit()
             
             flash('HTTPS certificate updated successfully. Please restart the server.', 'success')
@@ -3353,8 +3365,15 @@ def https_cert_info_ui():
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
         
         # Determine certificate source
-        config = SystemConfig.query.filter_by(key='https_cert_source').first()
-        source = config.value if config else 'auto'
+        source_config = SystemConfig.query.filter_by(key='https_cert_source').first()
+        source = source_config.value if source_config else 'auto'
+        
+        # Get cert ID if managed
+        cert_id = None
+        if source == 'managed':
+            cert_id_config = SystemConfig.query.filter_by(key='https_cert_id').first()
+            if cert_id_config:
+                cert_id = cert_id_config.value
         
         # Extract subject
         subject_parts = []
@@ -3367,13 +3386,19 @@ def https_cert_info_ui():
         
         cert_type = 'Self-Signed' if source == 'auto' else 'UCM Managed'
         
-        return jsonify({
+        result = {
             'type': cert_type,
             'subject': subject_str,
             'expires': expires,
             'source': source,
             'issuer': cert.issuer.rfc4514_string()
-        }), 200
+        }
+        
+        # Add cert_id if managed
+        if source == 'managed' and cert_id:
+            result['cert_id'] = cert_id
+        
+        return jsonify(result), 200
         
     except Exception as e:
         logger.error(f"Error loading HTTPS cert info: {e}")
