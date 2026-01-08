@@ -13,6 +13,7 @@ Flask-Limiter==3.5.0
 cryptography==41.0.7
 pyOpenSSL==23.3.0
 asn1crypto==1.5.1
+cbor2==5.6.5
 
 # SCEP Support
 pycryptodome==3.19.0
@@ -26,6 +27,9 @@ psutil==5.9.6
 
 # Password Hashing
 bcrypt==4.1.1
+
+# WebAuthn/FIDO2 Support
+webauthn==2.2.0
 
 # Production Server
 gunicorn==21.2.0
