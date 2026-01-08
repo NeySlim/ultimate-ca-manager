@@ -169,11 +169,11 @@ jobs:
           %changelog
           * $(date "+%a %b %d %Y") UCM Team <support@ucm.local> - ${VERSION}-1
           - Release ${VERSION}
-          - Complete Tailwind CSS removal
-          - Custom themed scrollbars
-          - Modal improvements
-          - CRL info page
-          - Theme consistency improvements
+          - Dependency updates (Python 3.13 compatible)
+          - Security updates: cryptography 46.0.3, pyOpenSSL 25.3.0
+          - WebAuthn 2.7.0 with FIDO2 improvements
+          - Certificate management improvements
+          - Bug fixes and UI enhancements
           EOF
       
       - name: Build RPM
@@ -214,15 +214,15 @@ jobs:
             sudo rpm -ivh ucm-${{ steps.get_version.outputs.VERSION }}-1.noarch.rpm
             \`\`\`
             
-            ### What's New
-            - Complete Tailwind CSS removal - now using custom CSS with theme variables
-            - Custom styled scrollbars for all themes
-            - Modal body scroll lock
-            - Fixed modal z-index issues
-            - Fixed HTMX modal triggers from sidebar
-            - Fixed JavaScript variable conflicts
-            - CRL info page (public and integrated)
-            - Improved theme consistency across all pages
+            ### What's New in v1.7.5
+            - **Dependency Updates**: All Python dependencies updated to latest versions (Python 3.13 compatible)
+            - **Security**: cryptography 46.0.3, pyOpenSSL 25.3.0 with important security fixes
+            - **WebAuthn**: Updated to 2.7.0 with FIDO2 improvements
+            - **Certificate Management**: Fixed HTTPS certificate source selector state management
+            - **UI Improvements**: Added certificate source tracking badges (Managed/Imported/Auto-generated)
+            - **Bug Fixes**: Fixed Dockerfile bash expansion, certificate selector pre-selection
+            
+            See [RELEASE_NOTES_v1.7.5.md](https://github.com/${{ github.repository }}/blob/main/RELEASE_NOTES_v1.7.5.md) for full details.
           draft: false
           prerelease: false
         env:
