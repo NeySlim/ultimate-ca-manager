@@ -140,8 +140,7 @@
                 <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">ACME Configuration</h2>
                 <form id="acme-settings-form" 
                       hx-post="/api/ui/acme/settings" 
-                      hx-swap="none"
-                      hx-on::after-request="if(event.detail.successful) { showToast('ACME settings saved successfully', 'success'); loadAcmeCA(); }">
+                      hx-swap="none">
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
                         <div>
                             <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
@@ -203,6 +202,17 @@ document.addEventListener('DOMContentLoaded', function() {
     loadStatistics();
     loadAcmeCA();
     loadSettings();
+    
+    // Handle form submission success
+    const form = document.getElementById('acme-settings-form');
+    if (form) {
+        form.addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.successful) {
+                showToast('ACME settings saved successfully', 'success');
+                loadAcmeCA();
+            }
+        });
+    }
 });
 
 function loadStatistics() {
