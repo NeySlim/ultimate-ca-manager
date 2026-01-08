@@ -158,8 +158,8 @@ docker pull neyslim/ultimate-ca-manager:latest  # Multi-arch (amd64, arm64)
 ```
 
 **Tags**:
-- `latest` - Latest stable release (v1.7.1)
-- `1.7.1`, `1.7`, `1` - Semantic versions
+- `latest` - Latest stable release (v1.7.2)
+- `1.7.2`, `1.7`, `1` - Semantic versions
 - `v*.*.*` - Specific releases
 
 **Image Details**:
@@ -296,6 +296,6 @@ If you find UCM useful, please consider giving it a star! ⭐
 
 ---
 
-**Version**: 1.7.1  
+**Version**: 1.7.2  
 **Status**: Production Ready ✅  
 **Last Updated**: 2026-01-08

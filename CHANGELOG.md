@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.2] - 2026-01-08
+
+### Fixed
+- **Docker Startup**: Add missing webauthn and cbor2 dependencies (#3)
+  - Application now starts correctly in Docker
+  - Fixes ModuleNotFoundError for webauthn module
+  - Added webauthn==2.2.0 and cbor2==5.6.5 to requirements.txt
+
+---
+
 ## [1.7.1] - 2026-01-08
 
 ### Fixed
