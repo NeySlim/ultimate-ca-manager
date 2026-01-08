@@ -3443,6 +3443,7 @@ def https_cert_candidates_ui():
             'id': cert.id,
             'cert_id': cert.refid,
             'common_name': cn or cert.descr,
+            'subject': cert.subject or f'CN={cn}',
             'san': ', '.join(san_list) if san_list else '',
             'expires': cert.valid_to.strftime('%Y-%m-%d') if cert.valid_to else 'N/A',
             'days_left': days_left,
