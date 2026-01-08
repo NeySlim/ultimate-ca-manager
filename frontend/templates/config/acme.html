@@ -88,7 +88,7 @@
         </div>
     </div>
 
-    <!-- Tabs -->
+    <!-- Tabs Navigation -->
     <div style="border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
         <nav style="margin-bottom: -1px; display: flex; gap: 2rem;" id="acme-tabs">
             <button onclick="switchTab('accounts')" 
@@ -110,80 +110,81 @@
                 <i class="bi bi-gear"></i> Settings
             </button>
         </nav>
+    </div>
 
-        <!-- Accounts Tab -->
-        <div id="content-accounts" class="acme-tab-content" style="padding: 1.5rem 0;">
-            <div class="card">
-                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">ACME Accounts</h2>
-                <div id="accounts-table" 
-                     hx-get="/api/ui/acme/accounts" 
-                     hx-trigger="load"
-                     hx-indicator="#accounts-loading">
-                    <div id="accounts-loading" style="text-align: center; padding: 2rem 0;">
-                        <div class="spinner" style="margin: 0 auto;"></div>
-                        <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading accounts...</p>
-                    </div>
+    <!-- Tab Contents -->
+    <!-- Accounts Tab -->
+    <div id="content-accounts" class="acme-tab-content">
+        <div class="card">
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">ACME Accounts</h2>
+            <div id="accounts-table" 
+                 hx-get="/api/ui/acme/accounts" 
+                 hx-trigger="load"
+                 hx-indicator="#accounts-loading">
+                <div id="accounts-loading" style="text-align: center; padding: 2rem 0;">
+                    <div class="spinner" style="margin: 0 auto;"></div>
+                    <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading accounts...</p>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Orders Tab -->
-        <div id="content-orders" class="acme-tab-content" style="padding: 1.5rem 0; display: none;">
-            <div class="card">
-                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">ACME Orders</h2>
-                <div id="orders-table" 
-                     hx-get="/api/ui/acme/orders" 
-                     hx-trigger="load delay:100ms"
-                     hx-indicator="#orders-loading">
-                    <div id="orders-loading" style="text-align: center; padding: 2rem 0;">
-                        <div class="spinner" style="margin: 0 auto;"></div>
-                        <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading orders...</p>
-                    </div>
+    <!-- Orders Tab -->
+    <div id="content-orders" class="acme-tab-content" style="display: none;">
+        <div class="card">
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">ACME Orders</h2>
+            <div id="orders-table" 
+                 hx-get="/api/ui/acme/orders" 
+                 hx-trigger="revealed"
+                 hx-indicator="#orders-loading">
+                <div id="orders-loading" style="text-align: center; padding: 2rem 0;">
+                    <div class="spinner" style="margin: 0 auto;"></div>
+                    <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading orders...</p>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Settings Tab -->
-        <div id="content-settings" class="acme-tab-content" style="padding: 1.5rem 0; display: none;">
-            <div class="card">
-                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">ACME Configuration</h2>
-                <form id="acme-settings-form" 
-                      hx-post="/api/ui/acme/settings" 
-                      hx-swap="none"
-                      hx-on::after-request="if(event.detail.successful) { showToast('ACME settings saved successfully', 'success'); loadAcmeCA(); }">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
-                        <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
-                                Default CA for ACME
-                            </label>
-                            <select name="default_ca" class="form-control" id="acme-default-ca"
-                                    hx-get="/api/ui/ca/options" 
-                                    hx-trigger="load"
-                                    hx-swap="innerHTML">
-                                <option>Loading CAs...</option>
-                            </select>
-                            <small style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
-                                CA used to sign ACME certificates
-                            </small>
-                        </div>
-
-                        <div>
-                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
-                                Certificate Validity (days)
-                            </label>
-                            <input type="number" name="cert_validity" class="form-control" 
-                                   value="90" min="1" max="397">
-                            <small style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
-                                Default: 90 days, Max: 397 days
-                            </small>
-                        </div>
+    <!-- Settings Tab -->
+    <div id="content-settings" class="acme-tab-content" style="display: none;">
+        <div class="card">
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">ACME Configuration</h2>
+            <form id="acme-settings-form" 
+                  hx-post="/api/ui/acme/settings" 
+                  hx-swap="none"
+                  hx-on::after-request="if(event.detail.successful) { showToast('ACME settings saved successfully', 'success'); loadAcmeCA(); }">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
+                            Default CA for ACME
+                        </label>
+                        <select name="default_ca" class="form-control" id="acme-default-ca"
+                                hx-get="/api/ui/ca/options" 
+                                hx-trigger="load"
+                                hx-swap="innerHTML">
+                            <option>Loading CAs...</option>
+                        </select>
+                        <small style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
+                            CA used to sign ACME certificates
+                        </small>
                     </div>
 
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle"></i> Save Settings
-                    </button>
-                </form>
-            </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">
+                            Certificate Validity (days)
+                        </label>
+                        <input type="number" name="cert_validity" class="form-control" 
+                               value="90" min="1" max="397">
+                        <small style="display: block; margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-secondary);">
+                            Default: 90 days, Max: 397 days
+                        </small>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Save Settings
+                </button>
+            </form>
         </div>
     </div>
 </div>
