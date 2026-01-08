@@ -101,17 +101,29 @@
                 <p style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem; font-size: 0.875rem;">Certificate Source</p>
                 <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                     <label style="display: flex; align-items: start; gap: 0.75rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="cert-source" value="auto" checked style="margin-top: 0.25rem;">
+                        <input type="radio" name="cert-source" value="auto" checked style="margin-top: 0.25rem;" onchange="toggleCertSelector()">
                         <div>
                             <div style="font-weight: 600; color: var(--text-primary);">Auto-generated (Self-signed)</div>
                             <div style="font-size: 0.75rem; color: var(--text-secondary);">Use the automatically generated self-signed certificate (default)</div>
                         </div>
                     </label>
                     <label style="display: flex; align-items: start; gap: 0.75rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; cursor: pointer;">
-                        <input type="radio" name="cert-source" value="managed" style="margin-top: 0.25rem;">
-                        <div>
+                        <input type="radio" name="cert-source" value="managed" style="margin-top: 0.25rem;" onchange="toggleCertSelector()">
+                        <div style="flex: 1;">
                             <div style="font-weight: 600; color: var(--text-primary);">UCM Managed Certificate</div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary);">Use a certificate from UCM's certificate store</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Use a certificate from UCM's certificate store</div>
+                            <div id="cert-selector-container" style="display: none; margin-top: 0.75rem;">
+                                <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Select Server Certificate:</label>
+                                <select id="managed-cert-id" class="form-input" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--card-bg); color: var(--text-primary);">
+                                    <option value="">Loading certificates...</option>
+                                </select>
+                                <div id="cert-details" style="margin-top: 0.5rem; padding: 0.5rem; background: var(--bg-secondary); border-radius: 0.375rem; font-size: 0.75rem; display: none;">
+                                    <div style="color: var(--text-secondary);">
+                                        <div><strong>Subject:</strong> <span id="selected-cert-subject">-</span></div>
+                                        <div><strong>Expires:</strong> <span id="selected-cert-expiry">-</span></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </label>
                 </div>
@@ -207,6 +219,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     loadHTTPSCertInfo();
     loadPKIStats();
+    loadCertificateCandidates();
 });
 
 function loadHTTPSCertInfo() {
@@ -219,6 +232,59 @@ function loadHTTPSCertInfo() {
         })
         .catch(error => console.error('Error loading HTTPS cert info:', error));
 }
+
+function loadCertificateCandidates() {
+    fetch('/api/ui/system/https-cert-candidates')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('managed-cert-id');
+            select.innerHTML = '';
+            
+            if (!data.certificates || data.certificates.length === 0) {
+                select.innerHTML = '<option value="">No suitable server certificates found</option>';
+                return;
+            }
+            
+            select.innerHTML = '<option value="">-- Select a certificate --</option>';
+            data.certificates.forEach(cert => {
+                const option = document.createElement('option');
+                option.value = cert.id;
+                option.textContent = `${cert.common_name} (expires: ${cert.expires})`;
+                option.dataset.subject = cert.subject;
+                option.dataset.expires = cert.expires;
+                select.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading certificate candidates:', error);
+            document.getElementById('managed-cert-id').innerHTML = '<option value="">Error loading certificates</option>';
+        });
+}
+
+function toggleCertSelector() {
+    const source = document.querySelector('input[name="cert-source"]:checked').value;
+    const container = document.getElementById('cert-selector-container');
+    if (source === 'managed') {
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+// Show cert details when a certificate is selected
+document.addEventListener('DOMContentLoaded', function() {
+    const select = document.getElementById('managed-cert-id');
+    select.addEventListener('change', function() {
+        const details = document.getElementById('cert-details');
+        if (this.value && this.selectedOptions[0].dataset.subject) {
+            document.getElementById('selected-cert-subject').textContent = this.selectedOptions[0].dataset.subject;
+            document.getElementById('selected-cert-expiry').textContent = this.selectedOptions[0].dataset.expires;
+            details.style.display = 'block';
+        } else {
+            details.style.display = 'none';
+        }
+    });
+});
 
 function loadPKIStats() {
     fetch('/api/ui/system/pki-stats')
@@ -233,6 +299,17 @@ function loadPKIStats() {
 }
 
 function applyHTTPSCertificate() {
+    const source = document.querySelector('input[name="cert-source"]:checked').value;
+    
+    // Validate managed cert selection
+    if (source === 'managed') {
+        const certId = document.getElementById('managed-cert-id').value;
+        if (!certId) {
+            ucmAlert('Please select a certificate from the list', 'Error');
+            return;
+        }
+    }
+    
     ucmConfirm(
         'Applying a new certificate will restart UCM and disconnect your session. Continue?',
         'Apply Certificate',
@@ -240,12 +317,15 @@ function applyHTTPSCertificate() {
     ).then(confirmed => {
         if (!confirmed) return;
         
-        const source = document.querySelector('input[name="cert-source"]:checked').value;
+        const requestBody = { source: source };
+        if (source === 'managed') {
+            requestBody.cert_id = parseInt(document.getElementById('managed-cert-id').value);
+        }
         
         fetch('/api/ui/system/https-cert-apply', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ source: source })
+            body: JSON.stringify(requestBody)
         })
         .then(response => response.json())
         .then(data => {
@@ -253,7 +333,7 @@ function applyHTTPSCertificate() {
                 ucmAlert('Certificate applied. UCM is restarting...', 'Success');
                 setTimeout(() => window.location.reload(), 3000);
             } else {
-                ucmAlert('Error: ' + data.message, 'Error');
+                ucmAlert('Error: ' + (data.error || data.message || 'Unknown error'), 'Error');
             }
         })
         .catch(error => {
