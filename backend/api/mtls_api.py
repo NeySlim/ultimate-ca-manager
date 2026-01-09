@@ -270,10 +270,11 @@ def create_certificate():
         if isinstance(cert_pem, str):
             cert_pem_bytes = cert_pem.encode('utf-8')
         
-        # Create AuthCertificate record (metadata only, cert will be presented by client)
+        # Create AuthCertificate record
         auth_cert = AuthCertificate(
             user_id=user.id,
             name=cert_name,
+            cert_pem=cert_pem.encode('utf-8') if isinstance(cert_pem, str) else cert_pem,
             cert_serial=cert_info['serial'],
             cert_fingerprint=cert_info['fingerprint_sha256'],
             cert_subject=cert_info['subject_dn'],

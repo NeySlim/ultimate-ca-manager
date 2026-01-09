@@ -13,6 +13,9 @@ class AuthCertificate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
+    # Certificate data
+    cert_pem = db.Column(db.LargeBinary)  # Store certificate PEM for re-download
+    
     # Certificate identification
     cert_serial = db.Column(db.String(128), unique=True, nullable=False, index=True)
     cert_subject = db.Column(db.Text, nullable=False)  # Full DN
