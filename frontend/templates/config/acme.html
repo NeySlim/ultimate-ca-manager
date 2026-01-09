@@ -163,13 +163,26 @@ function showToast(message, type = 'success') {
 
 // Load statistics and settings on page load
 document.addEventListener('DOMContentLoaded', function() {
+    initAcmePage();
+});
+
+// Also trigger on HTMX content swap (when clicking ACME in sidebar)
+document.addEventListener('htmx:afterSwap', function(event) {
+    // Only run if this is the ACME page being loaded
+    if (event.detail.target.id === 'main-content' || document.getElementById('acme-status-badge')) {
+        initAcmePage();
+    }
+});
+
+function initAcmePage() {
     loadStatistics();
     loadAcmeCA();
     loadSettings();
     
     // Handle form submission success - ONLY when form is submitted
     const form = document.getElementById('acme-settings-form');
-    if (form) {
+    if (form && !form.hasAttribute('data-listener-added')) {
+        form.setAttribute('data-listener-added', 'true');
         form.addEventListener('htmx:afterRequest', function(event) {
             // Check if this is a POST request (form submission)
             if (event.detail.successful && event.detail.requestConfig.verb === 'post') {
@@ -178,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-});
+}
 
 function loadStatistics() {
     fetch('/api/ui/acme/statistics')
