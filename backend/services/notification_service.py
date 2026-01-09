@@ -1,3 +1,4 @@
+import json
 """
 Notification Service for certificate and CRL expiration alerts
 """

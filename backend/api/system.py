@@ -10,6 +10,8 @@ from config.https_manager import HTTPSManager
 from services.pki_reset_service import PKIResetService
 from pathlib import Path
 import json
+import os
+import shutil
 
 system_bp = Blueprint('system', __name__)
 
