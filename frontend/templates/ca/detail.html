@@ -181,13 +181,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                 </div>
                 {% if ca.cdp_enabled and ca.cdp_url %}
                 <div>
-                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">CDP URL Template</dt>
-                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem;">
-                        {{ ca.cdp_url }}
-                    </dd>
-                </div>
-                <div>
-                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Resolved CDP URL</dt>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">CDP URL</dt>
                     <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--primary-color); font-family: monospace; background: var(--info-bg); padding: 0.5rem; border-radius: 0.25rem;">
                         {{ ca.cdp_url.replace('{ca_refid}', ca.refid) }}
                     </dd>
@@ -227,22 +221,16 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                     
                     <div id="cdp-url-field" {% if not ca.cdp_enabled %}class="hidden"{% endif %}>
                         <label for="cdp_url" style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary);">
-                            CDP URL Template
+                            CDP URL
                         </label>
                         <input type="text" id="cdp_url" name="cdp_url" 
-                               value="{{ ca.cdp_url or '' }}"
-                               placeholder="https://your-domain:8443/cdp/{ca_refid}/crl.pem"
+                               value="{{ ca.cdp_url.replace('{ca_refid}', ca.refid) if ca.cdp_url else '' }}"
+                               placeholder="{{ 'https://' + request.host + '/cdp/' + ca.refid + '/crl.pem' }}"
                                style="margin-top: 0.25rem; display: block; width: 100%; border-radius: 0.375rem; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-primary); padding: 0.5rem; font-size: 0.875rem; font-family: monospace;">
                         <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">
                             <i class="fas fa-info-circle" style="margin-right: 0.25rem;"></i>
-                            Use <code style="background: var(--bg-secondary); padding: 0 0.25rem; border-radius: 0.125rem;">{ ca_refid}</code> as placeholder for CA reference ID. 
-                            This URL will be included in issued certificates.
+                            This URL will be embedded in certificates issued by this CA. You can customize the hostname if needed.
                         </p>
-                        <div style="margin-top: 0.5rem; background: var(--info-bg); border: 1px solid var(--info-border, var(--border-color)); border-radius: 0.25rem; padding: 0.75rem;">
-                            <p style="font-size: 0.75rem; color: var(--info-color, var(--text-primary));">
-                                <strong>Preview:</strong> <span id="cdp-preview" style="font-family: monospace;"></span>
-                            </p>
-                        </div>
                     </div>
                     
                     <div style="display: flex; gap: 0.75rem; padding-top: 0.75rem;">
@@ -323,11 +311,11 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                         </label>
                         <input type="text" id="ocsp_url" name="ocsp_url" 
                                value="{{ ca.ocsp_url or '' }}"
-                               placeholder="https://your-domain:8443/ocsp"
+                               placeholder="{{ 'https://' + request.host + '/ocsp' }}"
                                style="margin-top: 0.25rem; display: block; width: 100%; border-radius: 0.375rem; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-primary); padding: 0.5rem; font-size: 0.875rem; font-family: monospace;">
                         <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">
                             <i class="fas fa-info-circle" style="margin-right: 0.25rem;"></i>
-                            This URL will be included in the AuthorityInfoAccess extension of issued certificates.
+                            This URL will be embedded in certificates. You can customize the hostname if needed.
                         </p>
                         <div style="margin-top: 0.5rem; background: var(--warning-bg); border: 1px solid var(--warning-border, var(--border-color)); border-radius: 0.25rem; padding: 0.75rem;">
                             <p style="font-size: 0.75rem; color: var(--warning-color, var(--text-primary));">
