@@ -181,7 +181,7 @@ jobs:
             ucm_*.md5
             ucm_*.sha256
       
-      - name: Create Release
+      - name: Upload to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
@@ -189,25 +189,5 @@ jobs:
             ucm_*.deb
             ucm_*.md5
             ucm_*.sha256
-          body: |
-            ## UCM ${{ steps.get_version.outputs.VERSION }}
-            
-            ### Installation
-            ```bash
-            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/ucm_${{ steps.get_version.outputs.VERSION }}_all.deb
-            sudo dpkg -i ucm_${{ steps.get_version.outputs.VERSION }}_all.deb
-            ```
-            
-            ### What's New in v1.7.5
-            - **Dependency Updates**: All Python dependencies updated to latest versions (Python 3.13 compatible)
-            - **Security**: cryptography 46.0.3, pyOpenSSL 25.3.0 with important security fixes
-            - **WebAuthn**: Updated to 2.7.0 with FIDO2 improvements
-            - **Certificate Management**: Fixed HTTPS certificate source selector state management
-            - **UI Improvements**: Added certificate source tracking badges (Managed/Imported/Auto-generated)
-            - **Bug Fixes**: Fixed Dockerfile bash expansion, certificate selector pre-selection
-            
-            See [RELEASE_NOTES_v1.7.5.md](https://github.com/${{ github.repository }}/blob/main/RELEASE_NOTES_v1.7.5.md) for full details.
-          draft: false
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
