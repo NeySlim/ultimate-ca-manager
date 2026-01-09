@@ -112,6 +112,34 @@ def create_app(config_name=None):
         
         return response
     
+    # FQDN redirect middleware (redirect IP to FQDN if configured)
+    @app.before_request
+    def redirect_to_fqdn():
+        # Skip for health checks and static files
+        if request.path in ['/api/health', '/health'] or request.path.startswith('/static/'):
+            return None
+        
+        # Get configured FQDN
+        fqdn = config.FQDN
+        if not fqdn or fqdn in ['localhost', '127.0.0.1', 'ucm.example.com', 'ucm.local', 'test.local']:
+            return None  # Skip if FQDN is default/localhost
+        
+        # Get current host
+        current_host = request.host.split(':')[0]  # Remove port
+        
+        # If accessing via IP or non-FQDN hostname, redirect to FQDN
+        if current_host != fqdn:
+            # Check if current host is an IP address
+            import re
+            if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', current_host):
+                # It's an IP, redirect to FQDN
+                scheme = 'https' if request.is_secure else 'http'
+                port = request.host.split(':')[1] if ':' in request.host else (config.HTTPS_PORT if request.is_secure else config.HTTP_PORT)
+                new_url = f"{scheme}://{fqdn}:{port}{request.full_path.rstrip('?')}"
+                return redirect(new_url, code=302)
+        
+        return None
+    
     # HTTPS redirect middleware (if enabled)
     if config.HTTP_REDIRECT:
         @app.before_request
