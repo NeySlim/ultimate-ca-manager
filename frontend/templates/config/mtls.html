@@ -27,12 +27,54 @@
             </h2>
         </div>
         <div style="padding: 1.5rem;">
-            <div style="background: var(--info-bg); border-left: 4px solid var(--primary-color); padding: 1rem; margin-bottom: 1.5rem; border-radius: 0.25rem;">
-                <strong style="color: var(--text-primary);">⚠️ Configuration Required:</strong>
-                <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
-                    mTLS requires a reverse proxy (Nginx/Apache) configured to validate client certificates.
-                    After enabling, export the CA certificate and configure your reverse proxy.
-                </p>
+            <!-- Warning box - shown when mTLS is disabled -->
+            <div id="mtls-disabled-warning" style="background: var(--warning-bg); border-left: 4px solid var(--warning-color); padding: 1.25rem; margin-bottom: 1.5rem; border-radius: 0.25rem; display: none;">
+                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                    <svg class="ucm-icon" width="20" height="20" style="color: var(--warning-color); flex-shrink: 0; margin-top: 2px;"><use href="#icon-alert-triangle"/></svg>
+                    <div style="flex: 1;">
+                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">⚠️ Important: Reverse Proxy Required</strong>
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.875rem; line-height: 1.6;">
+                            mTLS client certificate authentication <strong>requires a reverse proxy</strong> (Nginx or Apache) to function properly.
+                            The UCM application server cannot request client certificates from browsers directly.
+                        </p>
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--card-bg); border-radius: 0.25rem;">
+                            <p style="color: var(--text-primary); margin: 0 0 0.5rem 0; font-size: 0.875rem; font-weight: 500;">Without reverse proxy:</p>
+                            <ul style="margin: 0; padding-left: 1.25rem; color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6;">
+                                <li>✅ Users can still <strong>create</strong> and <strong>manage</strong> client certificates</li>
+                                <li>✅ Certificates work for <strong>API authentication</strong> (curl, scripts)</li>
+                                <li>❌ Browsers will <strong>not be prompted</strong> for certificates</li>
+                                <li>❌ Auto-login via certificate will <strong>not work</strong> in browsers</li>
+                                <li>✅ Password authentication remains <strong>fully functional</strong></li>
+                            </ul>
+                        </div>
+                        <p style="color: var(--text-secondary); margin: 0.75rem 0 0 0; font-size: 0.875rem;">
+                            <strong>After enabling:</strong> See the configuration guide below for complete Nginx/Apache setup instructions.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Success box - shown when mTLS is enabled with CA configured -->
+            <div id="mtls-enabled-info" style="background: var(--success-bg); border-left: 4px solid var(--success-color); padding: 1.25rem; margin-bottom: 1.5rem; border-radius: 0.25rem; display: none;">
+                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                    <svg class="ucm-icon" width="20" height="20" style="color: var(--success-color); flex-shrink: 0; margin-top: 2px;"><use href="#icon-check-circle"/></svg>
+                    <div style="flex: 1;">
+                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">✓ mTLS Enabled</strong>
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.875rem; line-height: 1.6;">
+                            Client certificate authentication is enabled. See the <strong>Reverse Proxy Configuration</strong> section below for setup instructions.
+                        </p>
+                        <div id="ca-download-section" style="margin-top: 0.75rem; padding: 0.75rem; background: var(--card-bg); border-radius: 0.25rem; display: none;">
+                            <p style="color: var(--text-primary); margin: 0 0 0.5rem 0; font-size: 0.875rem; font-weight: 500;">Trusted CA:</p>
+                            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                                <span id="ca-name" style="color: var(--text-primary); font-weight: 500;"></span>
+                                <button type="button" id="download-ca-btn" class="btn-outline btn-sm" style="font-size: 0.8125rem;">
+                                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-download"/></svg>
+                                    Download CA Certificate
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <form id="mtls-settings-form">
@@ -98,44 +140,51 @@
             <div style="display: grid; gap: 1.5rem;">
                 <!-- Nginx -->
                 <div>
-                    <h3 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <svg class="ucm-icon" width="16" height="16" style="color: var(--success-color);"><use href="#icon-server"/></svg>
-                        Nginx Configuration
-                    </h3>
-                    <pre style="background: var(--card-bg-secondary); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.875rem; color: var(--text-primary);"><code>server {
-    listen 8443 ssl;
-    
-    # Server certificate
-    ssl_certificate /path/to/server.crt;
-    ssl_certificate_key /path/to/server.key;
-    
-    # Client certificate validation
-    # Export your trusted CA from UCM and reference it here
-    ssl_client_certificate /path/to/trusted-ca.pem;
-    ssl_verify_client optional;  # or 'on' to require
-    ssl_verify_depth 2;
-    
-    location / {
-        proxy_pass https://127.0.0.1:5000;
-        
-        # Forward client certificate info
-        proxy_set_header X-SSL-Client-Cert $ssl_client_cert;
-        proxy_set_header X-SSL-Client-Verify $ssl_client_verify;
-        proxy_set_header X-SSL-Client-S-DN $ssl_client_s_dn;
-        proxy_set_header X-SSL-Client-Serial $ssl_client_serial;
-    }
-}</code></pre>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <h3 style="font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg class="ucm-icon" width="16" height="16" style="color: var(--success-color);"><use href="#icon-server"/></svg>
+                            Nginx Configuration
+                        </h3>
+                        <button type="button" onclick="copyToClipboard('nginx-config-code', 'Nginx config')" class="btn-outline btn-sm">
+                            <svg class="ucm-icon" width="14" height="14"><use href="#icon-copy"/></svg>
+                            Copy
+                        </button>
+                    </div>
+                    <pre style="background: var(--card-bg-secondary); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.875rem; color: var(--text-primary);"><code id="nginx-config-code">Loading...</code></pre>
+                    <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--info-bg); border-radius: 0.25rem;">
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.8125rem; line-height: 1.5;">
+                            <strong>Steps:</strong><br>
+                            1. Download the CA certificate above<br>
+                            2. Save as <code>/etc/ssl/certs/ucm-client-ca.pem</code><br>
+                            3. Add this configuration to Nginx<br>
+                            4. Reload Nginx: <code>sudo nginx -s reload</code>
+                        </p>
+                    </div>
                 </div>
 
                 <!-- Apache -->
                 <div>
-                    <h3 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <svg class="ucm-icon" width="16" height="16" style="color: var(--danger-color);"><use href="#icon-server"/></svg>
-                        Apache Configuration
-                    </h3>
-                    <pre style="background: var(--card-bg-secondary); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.875rem; color: var(--text-primary);"><code>&lt;VirtualHost *:8443&gt;
-    SSLEngine on
-    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <h3 style="font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg class="ucm-icon" width="16" height="16" style="color: var(--danger-color);"><use href="#icon-server"/></svg>
+                            Apache Configuration
+                        </h3>
+                        <button type="button" onclick="copyToClipboard('apache-config-code', 'Apache config')" class="btn-outline btn-sm">
+                            <svg class="ucm-icon" width="14" height="14"><use href="#icon-copy"/></svg>
+                            Copy
+                        </button>
+                    </div>
+                    <pre style="background: var(--card-bg-secondary); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.875rem; color: var(--text-primary);"><code id="apache-config-code">Loading...</code></pre>
+                    <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--info-bg); border-radius: 0.25rem;">
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.8125rem; line-height: 1.5;">
+                            <strong>Steps:</strong><br>
+                            1. Download the CA certificate above<br>
+                            2. Save as <code>/etc/ssl/certs/ucm-client-ca.pem</code><br>
+                            3. Add this configuration to Apache<br>
+                            4. Reload Apache: <code>sudo systemctl reload apache2</code>
+                        </p>
+                    </div>
+                </div>
     # Server certificate
     SSLCertificateFile /path/to/server.crt
     SSLCertificateKeyFile /path/to/server.key
@@ -389,6 +438,18 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 4000);
 }
 
+// Copy to clipboard
+function copyToClipboard(elementId, name) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    navigator.clipboard.writeText(element.textContent).then(() => {
+        showToast(`✓ ${name} copied to clipboard`, 'success');
+    }).catch(err => {
+        showToast(`✗ Failed to copy: ${err.message}`, 'error');
+    });
+}
+
 // Tab switching
 document.querySelectorAll('.tab-button').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -477,11 +538,158 @@ async function loadMTLSSettings() {
 // Toggle admin fields based on enabled state
 function toggleMTLSFields() {
     const enabled = document.getElementById('mtls_enabled').checked;
+    const trustedCaId = document.getElementById('mtls_trusted_ca_id').value;
+    
+    // Show/hide dependent fields
     document.getElementById('mtls-require-wrapper').style.display = enabled ? 'block' : 'none';
     document.getElementById('mtls-ca-wrapper').style.display = enabled ? 'block' : 'none';
+    
+    // Show/hide warning boxes
+    const disabledWarning = document.getElementById('mtls-disabled-warning');
+    const enabledInfo = document.getElementById('mtls-enabled-info');
+    const caDownloadSection = document.getElementById('ca-download-section');
+    
+    if (enabled) {
+        disabledWarning.style.display = 'none';
+        enabledInfo.style.display = 'block';
+        
+        // Show CA download if CA is selected
+        if (trustedCaId) {
+            caDownloadSection.style.display = 'block';
+            // Update CA name
+            const selectedOption = document.getElementById('mtls_trusted_ca_id').selectedOptions[0];
+            if (selectedOption) {
+                document.getElementById('ca-name').textContent = selectedOption.textContent;
+            }
+        } else {
+            caDownloadSection.style.display = 'none';
+        }
+    } else {
+        disabledWarning.style.display = 'block';
+        enabledInfo.style.display = 'none';
+    }
+    
+    // Update configuration examples
+    updateConfigExamples();
+}
+
+// Update configuration examples with real values
+function updateConfigExamples() {
+    const enabled = document.getElementById('mtls_enabled').checked;
+    const required = document.getElementById('mtls_required').checked;
+    const trustedCaId = document.getElementById('mtls_trusted_ca_id').value;
+    
+    // Get current hostname and port
+    const hostname = window.location.hostname;
+    const port = window.location.port || '8443';
+    
+    // Determine verify mode
+    const nginxVerifyMode = required ? 'on' : 'optional';
+    const apacheVerifyMode = required ? 'require' : 'optional';
+    
+    // Update Nginx example
+    const nginxCode = document.getElementById('nginx-config-code');
+    if (nginxCode) {
+        nginxCode.textContent = `server {
+    listen ${port} ssl;
+    server_name ${hostname};
+    
+    # Server SSL certificate
+    ssl_certificate /etc/ssl/certs/ucm-server.crt;
+    ssl_certificate_key /etc/ssl/private/ucm-server.key;
+    
+    # Client certificate verification${trustedCaId ? '' : ' (DISABLED - No CA selected)'}
+    ${trustedCaId ? `ssl_client_certificate /etc/ssl/certs/ucm-client-ca.pem;
+    ssl_verify_client ${nginxVerifyMode};` : '# ssl_client_certificate /path/to/client-ca.pem;\n    # ssl_verify_client optional;'}
+    ssl_verify_depth 2;
+    
+    location / {
+        # Proxy to UCM backend
+        proxy_pass https://127.0.0.1:8443;
+        proxy_ssl_verify off;  # Backend uses self-signed cert
+        
+        # Forward client certificate information
+        proxy_set_header X-SSL-Client-Verify $ssl_client_verify;
+        proxy_set_header X-SSL-Client-S-DN $ssl_client_s_dn;
+        proxy_set_header X-SSL-Client-I-DN $ssl_client_i_dn;
+        proxy_set_header X-SSL-Client-Serial $ssl_client_serial;
+        proxy_set_header X-SSL-Client-Cert $ssl_client_escaped_cert;
+        
+        # Standard proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}`;
+    }
+    
+    // Update Apache example
+    const apacheCode = document.getElementById('apache-config-code');
+    if (apacheCode) {
+        apacheCode.textContent = `<VirtualHost *:${port}>
+    ServerName ${hostname}
+    
+    # Server SSL certificate
+    SSLEngine on
+    SSLCertificateFile /etc/ssl/certs/ucm-server.crt
+    SSLCertificateKeyFile /etc/ssl/private/ucm-server.key
+    
+    # Client certificate verification${trustedCaId ? '' : ' (DISABLED - No CA selected)'}
+    ${trustedCaId ? `SSLCACertificateFile /etc/ssl/certs/ucm-client-ca.pem
+    SSLVerifyClient ${apacheVerifyMode}` : '# SSLCACertificateFile /path/to/client-ca.pem\n    # SSLVerifyClient optional'}
+    SSLVerifyDepth 2
+    
+    # Proxy to UCM backend
+    ProxyPass / https://127.0.0.1:8443/
+    ProxyPassReverse / https://127.0.0.1:8443/
+    SSLProxyEngine on
+    SSLProxyVerify none
+    
+    # Forward client certificate information
+    RequestHeader set X-SSL-Client-Verify "%{SSL_CLIENT_VERIFY}s"
+    RequestHeader set X-SSL-Client-S-DN "%{SSL_CLIENT_S_DN}s"
+    RequestHeader set X-SSL-Client-I-DN "%{SSL_CLIENT_I_DN}s"
+    RequestHeader set X-SSL-Client-Serial "%{SSL_CLIENT_M_SERIAL}s"
+    RequestHeader set X-SSL-Client-Cert "%{SSL_CLIENT_CERT}s"
+</VirtualHost>`;
+    }
 }
 
 document.getElementById('mtls_enabled')?.addEventListener('change', toggleMTLSFields);
+document.getElementById('mtls_trusted_ca_id')?.addEventListener('change', toggleMTLSFields);
+
+// Download CA certificate
+document.getElementById('download-ca-btn')?.addEventListener('click', async () => {
+    const caId = document.getElementById('mtls_trusted_ca_id').value;
+    if (!caId) {
+        showToast('✗ No CA selected', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/v1/ca/${caId}/export?format=pem`, {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ucm-client-ca.pem';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            showToast('✓ CA certificate downloaded', 'success');
+        } else {
+            showToast('✗ Failed to download CA', 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+});
 
 // Update user section visibility and content
 async function updateUserSection() {
