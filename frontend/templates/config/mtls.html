@@ -30,7 +30,7 @@
                 <strong style="color: var(--text-primary);">⚠️ Important:</strong>
                 <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
                     mTLS requires a reverse proxy (Nginx/Apache) configured to validate client certificates.
-                    Without proper reverse proxy configuration, enabling mTLS will have no effect.
+                    Export the trusted CA certificate and configure it in your reverse proxy.
                 </p>
             </div>
 
@@ -61,11 +61,12 @@
                     </div>
 
                     <div>
-                        <label class="form-label">Trusted CA Bundle Path (Optional)</label>
-                        <input type="text" id="mtls_trusted_ca_path" class="form-input" 
-                               placeholder="/etc/ssl/certs/ca-bundle.pem">
+                        <label class="form-label">Trusted CA for Client Certificates (Optional)</label>
+                        <select id="mtls_trusted_ca_id" class="form-control">
+                            <option value="">None (Accept any valid certificate)</option>
+                        </select>
                         <small style="color: var(--text-secondary); font-size: 0.75rem;">
-                            Path on reverse proxy server to trusted CA certificate bundle
+                            Select a CA to validate client certificates against. If none selected, all valid certificates will be accepted.
                         </small>
                     </div>
 
@@ -103,7 +104,8 @@
     ssl_certificate_key /path/to/server.key;
     
     # Client certificate validation
-    ssl_client_certificate /path/to/ca-bundle.pem;
+    # Export your trusted CA certificate from UCM and reference it here
+    ssl_client_certificate /path/to/trusted-ca.pem;
     ssl_verify_client optional;  # or 'on' to require
     ssl_verify_depth 2;
     
@@ -133,7 +135,8 @@
     SSLCertificateKeyFile /path/to/server.key
     
     # Client certificate validation
-    SSLCACertificateFile /path/to/ca-bundle.pem
+    # Export your trusted CA certificate from UCM and reference it here
+    SSLCACertificateFile /path/to/trusted-ca.pem
     SSLVerifyClient optional  # or 'require'
     SSLVerifyDepth 2
     
@@ -262,6 +265,25 @@ function showToast(message, type = 'info') {
 async function loadMTLSSettings() {
     {% if session.get('role') == 'admin' %}
     try {
+        // Load CA list for dropdown
+        const casResponse = await fetch('/api/v1/cas', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (casResponse.ok) {
+            const casData = await casResponse.json();
+            const select = document.getElementById('mtls_trusted_ca_id');
+            
+            // Add CA options
+            casData.cas.forEach(ca => {
+                const option = document.createElement('option');
+                option.value = ca.refid;
+                option.textContent = `${ca.descr} (${ca.is_ca ? 'CA' : 'Intermediate'})`;
+                select.appendChild(option);
+            });
+        }
+        
+        // Load current settings
         const response = await fetch('/api/v1/mtls/settings', {
             headers: {'Authorization': `Bearer ${token}`}
         });
@@ -270,7 +292,7 @@ async function loadMTLSSettings() {
             const settings = await response.json();
             document.getElementById('mtls_enabled').checked = settings.enabled;
             document.getElementById('mtls_required').checked = settings.required;
-            document.getElementById('mtls_trusted_ca_path').value = settings.trusted_ca_path || '';
+            document.getElementById('mtls_trusted_ca_id').value = settings.trusted_ca_id || '';
             
             // Update status badge
             const badge = document.getElementById('mtls-status-badge');
@@ -296,7 +318,7 @@ document.getElementById('mtls-settings-form')?.addEventListener('submit', async 
     const data = {
         enabled: document.getElementById('mtls_enabled').checked,
         required: document.getElementById('mtls_required').checked,
-        trusted_ca_path: document.getElementById('mtls_trusted_ca_path').value
+        trusted_ca_id: document.getElementById('mtls_trusted_ca_id').value
     };
     
     try {
