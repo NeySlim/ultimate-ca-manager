@@ -595,10 +595,10 @@ def apply_https_certificate():
             pass
         
         # Restart UCM service
-        import subprocess
-        subprocess.Popen(['systemctl', 'restart', 'ucm'])
+        from config.settings import restart_ucm_service
+        success, message = restart_ucm_service()
         
-        return jsonify({'success': True}), 200
+        return jsonify({'success': True, 'message': message}), 200
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -643,10 +643,10 @@ def regenerate_https_certificate():
                  details='Regenerated self-signed HTTPS certificate')
         
         # Restart UCM service
-        import subprocess
-        subprocess.Popen(['systemctl', 'restart', 'ucm'])
+        from config.settings import restart_ucm_service
+        success, message = restart_ucm_service()
         
-        return jsonify({'success': True}), 200
+        return jsonify({'success': True, 'message': message}), 200
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

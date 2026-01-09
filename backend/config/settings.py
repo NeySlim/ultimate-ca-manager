@@ -3,6 +3,7 @@ Ultimate CA Manager - Configuration Management
 Handles all application settings with web UI configuration support
 """
 import os
+import subprocess
 from pathlib import Path
 from typing import Optional
 from datetime import timedelta
@@ -24,6 +25,45 @@ DATA_DIR.mkdir(exist_ok=True)
 
 # Load environment variables
 load_dotenv(BASE_DIR / ".env")
+
+
+def is_docker():
+    """Detect if running in Docker container"""
+    return os.path.exists('/.dockerenv') or os.environ.get('UCM_DOCKER') == '1'
+
+
+def restart_ucm_service():
+    """
+    Restart UCM service - handles Docker vs native installation
+    Returns: (success: bool, message: str)
+    """
+    if is_docker():
+        # In Docker, don't restart - container manages lifecycle
+        # Just log that a restart is recommended
+        return True, "Configuration updated. Container restart recommended for changes to take effect."
+    
+    # Native installation - try systemctl
+    try:
+        subprocess.Popen(['systemctl', 'restart', 'ucm'], 
+                        stdout=subprocess.DEVNULL, 
+                        stderr=subprocess.DEVNULL)
+        return True, "Service restart initiated"
+    except FileNotFoundError:
+        # systemctl not available - could be SysV, OpenRC, etc.
+        # Try common init systems
+        for cmd in [
+            ['service', 'ucm', 'restart'],  # SysV
+            ['rc-service', 'ucm', 'restart'],  # OpenRC (Alpine, Gentoo)
+        ]:
+            try:
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True, "Service restart initiated"
+            except FileNotFoundError:
+                continue
+        
+        return False, "Could not restart service. Please restart manually."
+    except Exception as e:
+        return False, f"Failed to restart service: {str(e)}"
 
 
 class Config:
