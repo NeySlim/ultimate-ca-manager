@@ -8,11 +8,11 @@ URL:            https://github.com/kerberosmansour/ultimate-ca-manager
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch
-BuildRequires:  python3 >= 3.10
+BuildRequires:  python3 >= 3.9
 BuildRequires:  python3-pip
 BuildRequires:  systemd-rpm-macros
 
-Requires:       python3 >= 3.10
+Requires:       python3 >= 3.9
 Requires:       python3-pip
 Requires:       systemd
 Requires:       openssl >= 1.1.1
