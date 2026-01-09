@@ -293,6 +293,34 @@
         }
       ]
     },
+    "chevron-left": {
+      "viewBox": "0 0 24 24",
+      "stroke": true,
+      "paths": [
+        {
+          "d": "M15 18l-6-6 6-6",
+          "gradient": "primary",
+          "fill": "none",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      ]
+    },
+    "chevron-right": {
+      "viewBox": "0 0 24 24",
+      "stroke": true,
+      "paths": [
+        {
+          "d": "M9 18l6-6-6-6",
+          "gradient": "primary",
+          "fill": "none",
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      ]
+    },
     "download": {
       "viewBox": "0 0 24 24",
       "stroke": true,
