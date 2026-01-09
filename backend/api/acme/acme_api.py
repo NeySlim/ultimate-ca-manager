@@ -617,7 +617,13 @@ def authorization_info(authorization_id: str):
         "expires": auth.expires.isoformat() + 'Z'
     }
     
-    return acme_response(response_data)
+    response = acme_response(response_data)
+    
+    # Add Link header pointing to parent order (rel="up")
+    order_url = f"{service.base_url}/acme/order/{auth.order_id}"
+    response.headers.add('Link', f'<{order_url}>;rel="up"')
+    
+    return response
 
 
 @acme_bp.route('/challenge/<challenge_id>', methods=['POST'])
