@@ -211,7 +211,7 @@
         </div>
     </div>
     
-    <!-- mTLS Authentication (Admin Configuration) -->
+    <!-- mTLS Authentication (Link to dedicated page) -->
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -220,95 +220,46 @@
                     mTLS Authentication
                 </h2>
                 <span id="mtls-status-badge" class="badge-outline badge-secondary">
-                    <svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Disabled
+                    <svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Checking...
                 </span>
             </div>
         </div>
         <div style="padding: 1.5rem;">
             <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Configure mutual TLS (mTLS) authentication to require client certificates for accessing UCM.
+                Configure mutual TLS (mTLS) authentication to allow users to authenticate using client certificates.
             </p>
             
-            <form id="mtls-settings-form">
-                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                    <!-- Enable mTLS -->
+            <!-- Warning about reverse proxy requirement -->
+            <div style="background: var(--info-bg); border-left: 4px solid var(--primary-color); padding: 1rem; margin-bottom: 1.5rem; border-radius: 0.25rem;">
+                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                    <svg class="ucm-icon" width="18" height="18" style="color: var(--primary-color); flex-shrink: 0; margin-top: 2px;"><use href="#icon-info"/></svg>
                     <div>
-                        <label class="form-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" id="mtls_enabled" style="width: 1.25rem; height: 1.25rem; cursor: pointer;">
-                            <span>Enable mTLS Authentication</span>
-                        </label>
-                        <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 0.25rem; margin-left: 1.75rem;">
-                            Requires client certificates for authentication
-                        </small>
+                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.25rem;">Reverse Proxy Required for Browser Support</strong>
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.8125rem; line-height: 1.5;">
+                            mTLS requires a reverse proxy (Nginx/Apache) for browsers to prompt for client certificates.
+                            Without a proxy, certificates work for API authentication only.
+                        </p>
                     </div>
-                    
-                    <!-- Require mTLS -->
-                    <div id="mtls-require-wrapper" style="display: none;">
-                        <label class="form-label" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" id="mtls_required" style="width: 1.25rem; height: 1.25rem; cursor: pointer;">
-                            <span>Require mTLS (disable password login)</span>
-                        </label>
-                        <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 0.25rem; margin-left: 1.75rem;">
-                            ⚠️ Warning: Only enable if you have enrolled a valid client certificate
-                        </small>
-                    </div>
-                    
-                    <!-- Trusted CA Selection -->
-                    <div id="mtls-ca-wrapper" style="display: none;">
-                        <label class="form-label">Trusted CA for Client Certificates</label>
-                        <select id="mtls_trusted_ca_id" class="form-input">
-                            <option value="">No CA (allow self-signed certificates)</option>
-                        </select>
-                        <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 0.5rem;">
-                            If selected, only certificates signed by this CA will be accepted
-                        </small>
-                    </div>
-                    
-                    <!-- Save Button -->
-                    <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
-                        <button type="submit" class="btn-primary">
-                            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
-                            Save mTLS Settings
-                        </button>
-                    </div>
-                </div>
-            </form>
-            
-            <!-- Reverse Proxy Configuration Guide -->
-            <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
-                <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
-                    Reverse Proxy Configuration
-                </h3>
-                <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
-                    Configure your reverse proxy to pass client certificate information to UCM via headers.
-                </p>
-                
-                <div style="margin-bottom: 1rem;">
-                    <strong style="font-size: 0.875rem; color: var(--text-primary);">Nginx Configuration:</strong>
-                    <pre style="background: var(--bg-secondary); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.75rem; margin-top: 0.5rem;"><code>ssl_client_certificate /path/to/ca.crt;
-ssl_verify_client optional;
-
-location / {
-    proxy_pass https://127.0.0.1:8443;
-    proxy_set_header X-SSL-Client-Cert $ssl_client_cert;
-    proxy_set_header X-SSL-Client-Verify $ssl_client_verify;
-    proxy_set_header X-SSL-Client-S-DN $ssl_client_s_dn;
-}</code></pre>
-                </div>
-                
-                <div>
-                    <strong style="font-size: 0.875rem; color: var(--text-primary);">Apache Configuration:</strong>
-                    <pre style="background: var(--bg-secondary); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.75rem; margin-top: 0.5rem;"><code>SSLCACertificateFile /path/to/ca.crt
-SSLVerifyClient optional
-
-ProxyPass / https://127.0.0.1:8443/
-ProxyPassReverse / https://127.0.0.1:8443/
-
-RequestHeader set X-SSL-Client-Cert "%{SSL_CLIENT_CERT}s"
-RequestHeader set X-SSL-Client-Verify "%{SSL_CLIENT_VERIFY}s"
-RequestHeader set X-SSL-Client-S-DN "%{SSL_CLIENT_S_DN}s"</code></pre>
                 </div>
             </div>
+            
+            <!-- Link to detailed configuration page -->
+            <a href="/config/mtls" class="btn-primary" style="display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+                <svg class="ucm-icon" width="16" height="16"><use href="#icon-settings"/></svg>
+                Configure mTLS Authentication
+                <svg class="ucm-icon" width="14" height="14" style="margin-left: auto;"><use href="#icon-arrow-right"/></svg>
+            </a>
+            
+            <p style="margin-top: 1rem; font-size: 0.8125rem; color: var(--text-secondary);">
+                The configuration page includes:
+            </p>
+            <ul style="margin: 0.5rem 0 0 1.25rem; font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.6;">
+                <li>Enable/disable mTLS authentication</li>
+                <li>Trusted CA configuration</li>
+                <li>Auto-generated Nginx/Apache configuration</li>
+                <li>CA certificate download</li>
+                <li>Complete setup instructions</li>
+            </ul>
         </div>
     </div>
     
@@ -325,7 +276,7 @@ const getToken = () => document.querySelector('meta[name="access-token"]')?.cont
     loadPKIStats();
     loadCertificateCandidates();
     setupCertSelectorListener();
-    loadMTLSSettings();
+    updateMTLSBadge();
 })();
 
 // Also load on DOMContentLoaded (for direct page access)
@@ -334,7 +285,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadPKIStats();
     loadCertificateCandidates();
     setupCertSelectorListener();
-    loadMTLSSettings();
+    updateMTLSBadge();
 });
 
 function loadHTTPSCertInfo() {
@@ -611,102 +562,29 @@ function executePKIReset() {
 }
 
 // ========================================
-// mTLS Configuration
+// mTLS Status Badge
 // ========================================
-function loadMTLSSettings() {
+function updateMTLSBadge() {
     const token = getToken();
     
-    // Load CA list
-    fetch('/api/v1/ca', {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    })
-        .then(response => response.json())
-        .then(casData => {
-            const select = document.getElementById('mtls_trusted_ca_id');
-            if (select && Array.isArray(casData)) {
-                casData.forEach(ca => {
-                    const option = document.createElement('option');
-                    option.value = ca.refid;
-                    option.textContent = ca.descr;
-                    select.appendChild(option);
-                });
-            }
-        })
-        .catch(error => console.error('Error loading CAs:', error));
-    
-    // Load current mTLS settings
     fetch('/api/v1/mtls/settings', {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    })
-        .then(response => response.json())
-        .then(data => {
-            const enabledCheckbox = document.getElementById('mtls_enabled');
-            const requiredCheckbox = document.getElementById('mtls_required');
-            const caSelect = document.getElementById('mtls_trusted_ca_id');
-            
-            if (enabledCheckbox) enabledCheckbox.checked = data.enabled || false;
-            if (requiredCheckbox) requiredCheckbox.checked = data.required || false;
-            if (caSelect) caSelect.value = data.trusted_ca_id || '';
-            
-            toggleMTLSFields();
-            updateMTLSBadge(data.enabled);
-        })
-        .catch(error => console.error('Error loading mTLS settings:', error));
-}
-
-function toggleMTLSFields() {
-    const enabled = document.getElementById('mtls_enabled')?.checked;
-    const requireWrapper = document.getElementById('mtls-require-wrapper');
-    const caWrapper = document.getElementById('mtls-ca-wrapper');
-    
-    if (requireWrapper) requireWrapper.style.display = enabled ? 'block' : 'none';
-    if (caWrapper) caWrapper.style.display = enabled ? 'block' : 'none';
-}
-
-function updateMTLSBadge(enabled) {
-    const badge = document.getElementById('mtls-status-badge');
-    if (badge) {
-        if (enabled) {
-            badge.className = 'badge-outline badge-success';
-            badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Enabled';
-        } else {
-            badge.className = 'badge-outline badge-secondary';
-            badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Disabled';
-        }
-    }
-}
-
-// Event listener for enable checkbox
-document.getElementById('mtls_enabled')?.addEventListener('change', toggleMTLSFields);
-
-// Handle mTLS form submission
-document.getElementById('mtls-settings-form')?.addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const token = getToken();
-    const data = {
-        enabled: document.getElementById('mtls_enabled').checked,
-        required: document.getElementById('mtls_required').checked,
-        trusted_ca_id: document.getElementById('mtls_trusted_ca_id').value || null
-    };
-    
-    fetch('/api/v1/mtls/settings', {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(data)
+        headers: { 'Authorization': `Bearer ${token}` }
     })
     .then(response => response.json())
-    .then(result => {
-        if (result.success || result.message) {
-            ucmAlert('✓ mTLS settings saved successfully', 'Success');
-            updateMTLSBadge(data.enabled);
+    .then(data => {
+        const badge = document.getElementById('mtls-status-badge');
+        if (badge) {
+            if (data.enabled) {
+                badge.className = 'badge-outline badge-success';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Enabled';
+            } else {
+                badge.className = 'badge-outline badge-secondary';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Disabled';
+            }
+        }
+    })
+    .catch(error => console.error('Error loading mTLS status:', error));
+}
         } else {
             ucmAlert('✗ ' + (result.error || 'Failed to save settings'), 'Error');
         }
