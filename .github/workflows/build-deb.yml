@@ -60,7 +60,8 @@ jobs:
           # Copy application files
           cp -r backend frontend debian/${PKG_NAME}/opt/ucm/
           cp .env.example debian/${PKG_NAME}/opt/ucm/
-          cp README.md INSTALLATION.md debian/${PKG_NAME}/usr/share/doc/ucm/
+          cp README.md CHANGELOG.md debian/${PKG_NAME}/usr/share/doc/ucm/
+          cp -r docs debian/${PKG_NAME}/usr/share/doc/ucm/
           
           # Create control file
           cat > debian/${PKG_NAME}/DEBIAN/control << EOF
