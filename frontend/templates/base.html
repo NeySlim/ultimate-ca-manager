@@ -331,6 +331,14 @@
     
     <!-- Global HTMX event handlers -->
     <script>
+    // Handle HTMX swap errors gracefully (e.g., when navigating away during a request)
+    document.body.addEventListener('htmx:swapError', function(evt) {
+        // Silently ignore swap errors when target element no longer exists
+        // This happens when user navigates away while HTMX request is in flight
+        console.warn('HTMX swap error (likely due to navigation):', evt.detail);
+        evt.preventDefault(); // Prevent error from propagating
+    });
+    
     // Listen for specific modal triggers from server
     document.body.addEventListener('openCreateCAModal', function() {
         console.log('openCreateCAModal event received');
