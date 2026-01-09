@@ -42,12 +42,12 @@ def get_mtls_settings():
     """
     enabled = SystemConfig.query.filter_by(key='mtls_enabled').first()
     required = SystemConfig.query.filter_by(key='mtls_required').first()
-    trusted_ca = SystemConfig.query.filter_by(key='mtls_trusted_ca_path').first()
+    trusted_ca_id = SystemConfig.query.filter_by(key='mtls_trusted_ca_id').first()
     
     return jsonify({
         'enabled': enabled.value.lower() in ('true', '1', 'yes') if enabled else False,
         'required': required.value.lower() in ('true', '1', 'yes') if required else False,
-        'trusted_ca_path': trusted_ca.value if trusted_ca else ''
+        'trusted_ca_id': trusted_ca_id.value if trusted_ca_id else ''
     }), 200
 
 
@@ -62,7 +62,7 @@ def update_mtls_settings():
     Body: {
         "enabled": true,
         "required": false,
-        "trusted_ca_path": "/path/to/ca-bundle.pem"
+        "trusted_ca_id": "ca_refid_123" (optional)
     }
     """
     try:
@@ -75,7 +75,7 @@ def update_mtls_settings():
         settings = {
             'mtls_enabled': str(data.get('enabled', False)).lower(),
             'mtls_required': str(data.get('required', False)).lower(),
-            'mtls_trusted_ca_path': data.get('trusted_ca_path', '')
+            'mtls_trusted_ca_id': data.get('trusted_ca_id', '')
         }
         
         for key, value in settings.items():
