@@ -207,10 +207,15 @@ function loadStatistics() {
     fetch('/api/ui/acme/statistics')
         .then(response => response.json())
         .then(data => {
-            document.getElementById('total-accounts').textContent = data.total_accounts || 0;
-            document.getElementById('active-orders').textContent = data.active_orders || 0;
-            document.getElementById('completed-orders').textContent = data.completed_orders || 0;
-            document.getElementById('issued-certs').textContent = data.issued_certs || 0;
+            const totalAccounts = document.getElementById('total-accounts');
+            const activeOrders = document.getElementById('active-orders');
+            const completedOrders = document.getElementById('completed-orders');
+            const issuedCerts = document.getElementById('issued-certs');
+            
+            if (totalAccounts) totalAccounts.textContent = data.total_accounts || 0;
+            if (activeOrders) activeOrders.textContent = data.active_orders || 0;
+            if (completedOrders) completedOrders.textContent = data.completed_orders || 0;
+            if (issuedCerts) issuedCerts.textContent = data.issued_certs || 0;
         })
         .catch(error => {
             console.error('Error loading statistics:', error);
@@ -220,6 +225,12 @@ function loadStatistics() {
 function loadAcmeCA() {
     const badge = document.getElementById('acme-status-badge');
     const caDisplay = document.getElementById('acme-ca-display');
+    
+    // Check if elements exist
+    if (!badge || !caDisplay) {
+        console.warn('ACME status elements not found, skipping loadAcmeCA');
+        return;
+    }
     
     fetch('/api/ui/acme/settings/load')
         .then(response => response.json())
@@ -261,11 +272,13 @@ function loadAcmeCA() {
         })
         .catch(error => {
             // Error - show as disabled (red)
-            badge.className = 'badge badge-danger';
-            badge.style.fontSize = '14px';
-            badge.style.padding = '6px 12px';
-            badge.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> Error';
-            caDisplay.textContent = 'Error loading CA';
+            if (badge && caDisplay) {
+                badge.className = 'badge badge-danger';
+                badge.style.fontSize = '14px';
+                badge.style.padding = '6px 12px';
+                badge.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> Error';
+                caDisplay.textContent = 'Error loading CA';
+            }
             console.error('Error:', error);
         });
 }
@@ -276,12 +289,17 @@ function loadSettings() {
         .then(data => {
             if (data.default_ca) {
                 const select = document.getElementById('acme-default-ca');
-                setTimeout(() => {
-                    select.value = data.default_ca;
-                }, 500);
+                if (select) {
+                    setTimeout(() => {
+                        select.value = data.default_ca;
+                    }, 500);
+                }
             }
             if (data.cert_validity) {
-                document.querySelector('input[name="cert_validity"]').value = data.cert_validity;
+                const validityInput = document.querySelector('input[name="cert_validity"]');
+                if (validityInput) {
+                    validityInput.value = data.cert_validity;
+                }
             }
         });
 }
