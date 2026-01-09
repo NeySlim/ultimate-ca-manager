@@ -1,13 +1,16 @@
 # Ultimate CA Manager
 
-![Docker Pulls](https://img.shields.io/docker/pulls/neyslim/ultimate-ca-manager)
-![Docker Image Size](https://img.shields.io/docker/image-size/neyslim/ultimate-ca-manager/latest)
+![Version](https://img.shields.io/badge/version-1.8.0--beta-blue.svg)
+![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)
 ![GitHub release](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager)
-[![Complete Release Pipeline](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/release-complete.yml/badge.svg)](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/release-complete.yml)
+[![CI/CD](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/docker-multiarch.yml/badge.svg)](https://github.com/NeySlim/ultimate-ca-manager/actions/workflows/docker-multiarch.yml)
 
 🔐 **Enterprise-grade Certificate Authority Management System**
 
-Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Certificate Authorities, issuing certificates, and providing industry-standard protocols (SCEP, OCSP, CRL) with a modern, intuitive interface.
+Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Certificate Authorities, issuing certificates, and providing industry-standard protocols (SCEP, OCSP, ACME, CRL) with multi-factor authentication and a modern, intuitive interface.
+
+**Multi-arch support:** `amd64`, `arm64`  
+**Registry:** GitHub Container Registry (GHCR)
 
 ## 📸 Dashboard Preview
 
@@ -21,8 +24,8 @@ Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Cer
 ### Docker (Recommended)
 
 ```bash
-# Pull from Docker Hub
-docker pull neyslim/ultimate-ca-manager:latest
+# Pull from GHCR (GitHub Container Registry)
+docker pull ghcr.io/ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
 
 # Run with SQLite
 docker run -d \
@@ -30,10 +33,10 @@ docker run -d \
   -p 8443:8443 \
   -v ucm-data:/app/backend/data \
   --restart unless-stopped \
-  neyslim/ultimate-ca-manager:latest
+  ghcr.io/ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
 
 # Access: https://localhost:8443
-# Default login: admin / changeme123
+# Default login: admin / changeme123 ⚠️ CHANGE IMMEDIATELY!
 ```
 
 ### Docker Compose
@@ -145,16 +148,16 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/in
 
 ```bash
 # Latest stable
-docker pull neyslim/ultimate-ca-manager:latest
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
 
 # Specific version
-docker pull neyslim/ultimate-ca-manager:1.0.1
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1.0.1
 
 # Major version
-docker pull neyslim/ultimate-ca-manager:1
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1
 
 # Architecture-specific
-docker pull neyslim/ultimate-ca-manager:latest  # Multi-arch (amd64, arm64)
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta  # Multi-arch (amd64, arm64)
 ```
 
 **Tags**:
@@ -286,7 +289,7 @@ BSD 3-Clause License - see [LICENSE](LICENSE) for details.
 - **Issues**: [GitHub Issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/NeySlim/ultimate-ca-manager/discussions)
 - **Documentation**: [Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
-- **Docker Hub**: [neyslim/ultimate-ca-manager](https://hub.docker.com/r/neyslim/ultimate-ca-manager)
+- **Docker Hub**: [ghcr.io/neyslim/ultimate-ca-manager](https://hub.docker.com/r/ghcr.io/neyslim/ultimate-ca-manager)
 
 ---
 
