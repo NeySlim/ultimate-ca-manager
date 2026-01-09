@@ -83,7 +83,11 @@ def create_app(config_name=None):
             app.logger.error(f"Database creation error: {e}")
             raise
         
-        # Initialize default data
+        # Run database health check and repair
+        from database_health import check_and_repair_database
+        check_and_repair_database(app)
+        
+        # Initialize default data (legacy, kept for compatibility)
         init_database(app)
     
     # Register blueprints
