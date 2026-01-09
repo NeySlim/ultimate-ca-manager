@@ -209,13 +209,16 @@ def create_certificate():
                 dn['emailAddress'] = email
             
             subject = TrustStoreService.build_subject(dn)
-            cert_pem, key_pem = TrustStoreService.create_self_signed_cert(
+            cert_pem_bytes, key_pem_bytes = TrustStoreService.create_self_signed_cert(
                 subject=subject,
                 validity_days=validity_days,
                 key_type=str(key_size),
                 digest='sha256'
             )
             
+            # Convert to string for parsing
+            cert_pem = cert_pem_bytes.decode('utf-8') if isinstance(cert_pem_bytes, bytes) else cert_pem_bytes
+            key_pem = key_pem_bytes.decode('utf-8') if isinstance(key_pem_bytes, bytes) else key_pem_bytes
             cert_name = f"Self-Signed - {cn}"
             
         else:
@@ -251,22 +254,27 @@ def create_certificate():
             )
             
             # Decode certificate and key from base64
-            cert_pem = base64.b64decode(cert.crt)
-            key_pem = base64.b64decode(cert.prv) if cert.prv else None
+            cert_pem_bytes = base64.b64decode(cert.crt)
+            cert_pem = cert_pem_bytes.decode('utf-8')
+            key_pem = base64.b64decode(cert.prv).decode('utf-8') if cert.prv else None
             cert_name = f"Managed - {cn}"
         
-        # Parse certificate to extract info
+        # Parse certificate to extract info (cert_pem is string here)
         cert_obj = CertificateParser.parse_pem_certificate(cert_pem)
         if not cert_obj:
             raise ValueError("Failed to parse generated certificate")
         
         cert_info = CertificateParser.extract_certificate_info(cert_obj)
         
+        # Store cert_pem as bytes for database
+        if isinstance(cert_pem, str):
+            cert_pem_bytes = cert_pem.encode('utf-8')
+        
         # Create AuthCertificate record
         auth_cert = AuthCertificate(
             user_id=user.id,
             name=cert_name,
-            cert_pem=cert_pem,
+            cert_pem=cert_pem_bytes,  # Store as bytes
             cert_serial=cert_info['serial'],
             cert_fingerprint=cert_info['fingerprint_sha256'],
             cert_subject=cert_info['subject_dn'],
