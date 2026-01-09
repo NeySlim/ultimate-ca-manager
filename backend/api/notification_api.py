@@ -362,3 +362,74 @@ def manual_notification_check():
     except Exception as e:
         logger.error(f"Error running notification check: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ==================== User Notification Settings ====================
+
+@notification_bp.route('/user/settings', methods=['GET'])
+@jwt_required()
+def get_user_notification_settings():
+    """
+    Get current user's notification settings
+    ---
+    GET /api/v1/notifications/user/settings
+    """
+    try:
+        from models import User
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({
+            'email': user.email or '',
+            'enabled': user.notifications_enabled if hasattr(user, 'notifications_enabled') else True
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting user notification settings: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@notification_bp.route('/user/settings', methods=['POST'])
+@jwt_required()
+def update_user_notification_settings():
+    """
+    Update current user's notification settings
+    ---
+    POST /api/v1/notifications/user/settings
+    Body: {"email": "user@example.com", "enabled": true}
+    """
+    try:
+        from models import User
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        data = request.get_json()
+        
+        if 'email' in data:
+            user.email = data['email']
+        
+        if 'enabled' in data and hasattr(user, 'notifications_enabled'):
+            user.notifications_enabled = data['enabled']
+        
+        db.session.commit()
+        
+        log_audit('update_notification_settings', user.username, 
+                 f"Updated notification settings: email={user.email}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Notification settings updated successfully',
+            'email': user.email,
+            'enabled': user.notifications_enabled if hasattr(user, 'notifications_enabled') else True
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error updating user notification settings: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
