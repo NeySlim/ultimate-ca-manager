@@ -1201,6 +1201,10 @@ def cert_list_content():
             is_acme = cert.get('created_by') == 'acme'
             acme_badge = '<span class="badge-outline badge-success"><i class="fas fa-robot"></i> ACME</span>' if is_acme else ''
             
+            # Check if SCEP certificate
+            is_scep = cert.get('created_by') == 'scep'
+            scep_badge = '<span class="badge-outline badge-info"><i class="fas fa-network-wired"></i> SCEP</span>' if is_scep else ''
+            
             # Get issuer name
             issuer_name = ca_names.get(cert.get('caref', ''), 'Unknown')
             
@@ -1235,6 +1239,7 @@ def cert_list_content():
                                 {crt_badge}
                                 {key_badge}
                                 {acme_badge}
+                                {scep_badge}
                             </div>
                         </div>
                     </td>
@@ -1887,39 +1892,102 @@ def scep_requests():
         )
         
         if response.status_code != 200:
-            return '<div class="p-8 text-center text-gray-500">No requests</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">Failed to load requests</div>'
         
         requests_list = response.json()
-        pending = [r for r in requests_list if r['status'] == 'pending']
         
-        if not pending:
-            return '<div class="p-8 text-center text-gray-500 dark:text-gray-400">No pending requests</div>'
-        
-        html = '<div class="divide-y divide-gray-200 dark:divide-gray-700">'
-        for req in pending:
-            safe_txid = escape_js(req['transaction_id'])
-            html += f'''
-            <div class="p-4">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="font-medium text-gray-900 dark:text-white">{req['subject']}</p>
-                        <p class="text-sm text-gray-500">From: {req['client_ip']}</p>
-                        <p class="text-xs text-gray-400">{req['created_at']}</p>
-                    </div>
-                    <div class="flex space-x-2">
-                        <button data-action="approve-scep" data-txid="{safe_txid}"
-                                class="btn btn-success text-sm">
-                            Approve
-                        </button>
-                        <button data-action="reject-scep" data-txid="{safe_txid}"
-                                class="btn btn-danger text-sm">
-                            Reject
-                        </button>
-                    </div>
-                </div>
+        if not requests_list:
+            return '''
+            <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                <i class="fas fa-inbox" style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                <p style="font-size: 1rem; font-weight: 500; margin-bottom: 0.5rem;">No SCEP Requests</p>
+                <p style="font-size: 0.875rem;">Enrollment requests will appear here</p>
             </div>
             '''
-        html += '</div>'
+        
+        # Separate by status
+        pending = [r for r in requests_list if r['status'] == 'pending']
+        approved = [r for r in requests_list if r['status'] == 'approved']
+        rejected = [r for r in requests_list if r['status'] == 'rejected']
+        
+        html = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse;">'
+        html += '''
+        <thead style="background: var(--bg-secondary);">
+            <tr style="border-bottom: 2px solid var(--border-color);">
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--text-primary);">Status</th>
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--text-primary);">Subject</th>
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--text-primary);">Client IP</th>
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--text-primary);">Date</th>
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--text-primary);">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        '''
+        
+        # Show pending first
+        for req in pending:
+            safe_txid = escape_js(req['transaction_id'])
+            created_date = req['created_at'][:19] if req.get('created_at') else 'N/A'
+            html += f'''
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;">
+                    <span class="badge-outline badge-warning"><i class="fas fa-clock"></i> Pending</span>
+                </td>
+                <td style="padding: 0.75rem; color: var(--text-primary); font-weight: 500;">{req['subject']}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{req.get('client_ip', 'N/A')}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{created_date}</td>
+                <td style="padding: 0.75rem;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button data-action="approve-scep" data-txid="{safe_txid}"
+                                class="btn-primary" style="padding: 0.375rem 0.75rem; font-size: 0.875rem;">
+                            <i class="fas fa-check" style="margin-right: 0.25rem;"></i> Approve
+                        </button>
+                        <button data-action="reject-scep" data-txid="{safe_txid}"
+                                class="btn-secondary" style="padding: 0.375rem 0.75rem; font-size: 0.875rem; color: var(--danger-color);">
+                            <i class="fas fa-times" style="margin-right: 0.25rem;"></i> Reject
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            '''
+        
+        # Then approved
+        for req in approved:
+            created_date = req['created_at'][:19] if req.get('created_at') else 'N/A'
+            approved_date = req['approved_at'][:19] if req.get('approved_at') else 'N/A'
+            html += f'''
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;">
+                    <span class="badge-outline badge-success"><i class="fas fa-check"></i> Approved</span>
+                </td>
+                <td style="padding: 0.75rem; color: var(--text-primary);">{req['subject']}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{req.get('client_ip', 'N/A')}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{created_date}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">
+                    Approved: {approved_date}
+                </td>
+            </tr>
+            '''
+        
+        # Then rejected
+        for req in rejected:
+            created_date = req['created_at'][:19] if req.get('created_at') else 'N/A'
+            reason = req.get('rejection_reason', 'No reason provided')
+            html += f'''
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;">
+                    <span class="badge-outline badge-danger"><i class="fas fa-ban"></i> Rejected</span>
+                </td>
+                <td style="padding: 0.75rem; color: var(--text-primary);">{req['subject']}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{req.get('client_ip', 'N/A')}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{created_date}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">
+                    {reason}
+                </td>
+            </tr>
+            '''
+        
+        html += '</tbody></table></div>'
         
         html += f'''
         <script>
