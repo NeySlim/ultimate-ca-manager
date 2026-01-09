@@ -74,7 +74,7 @@ def scep_endpoint():
                 client_ip = request.remote_addr
                 
                 # Debug: save request for analysis
-                debug_path = '/opt/ucm/backend/data/scep_request_debug.p7'
+                debug_path = str(current_app.config['DATA_DIR']) + '/scep_request_debug.p7'
                 with open(debug_path, 'wb') as f:
                     f.write(pkcs7_data)
                 print(f"DEBUG: Saved SCEP request to {debug_path} ({len(pkcs7_data)} bytes)", flush=True)
@@ -85,7 +85,7 @@ def scep_endpoint():
                 
                 # Debug: save response
                 if response_data:
-                    with open('/opt/ucm/backend/data/scep_response_debug.p7', 'wb') as f:
+                    with open(str(current_app.config['DATA_DIR']) + '/scep_response_debug.p7', 'wb') as f:
                         f.write(response_data)
                     print(f"DEBUG: Saved SCEP response to scep_response_debug.p7 ({len(response_data)} bytes)", flush=True)
                 

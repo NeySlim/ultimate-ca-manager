@@ -412,7 +412,7 @@ def https_cert_info():
     from cryptography.hazmat.backends import default_backend
     from datetime import datetime
     
-    cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
+    cert_path = current_app.config['HTTPS_CERT_PATH']
     
     try:
         with open(cert_path, 'rb') as f:
@@ -482,10 +482,10 @@ def https_cert_candidates():
     candidates = []
     for cert in certificates:
         # Check if private key exists
-        key_path = Path(f'/opt/ucm/backend/data/private/cert_{cert.cert_id}.key')
+        key_path = current_app.config['PRIVATE_DIR'] / f'cert_{cert.cert_id}.key'
         if not key_path.exists():
-            # Try old format
-            key_path = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
+            # Try refid-based naming
+            key_path = current_app.config['PRIVATE_DIR'] / f'{cert.refid}.key'
             if not key_path.exists():
                 continue
         
@@ -536,21 +536,24 @@ def apply_https_certificate():
                 return jsonify({'success': False, 'error': 'Certificate not found'}), 404
             
             # Load certificate and key
-            cert_file = Path(f'/opt/ucm/backend/data/certs/{cert.cert_id}.crt')
-            if not cert_file.exists():
-                cert_file = Path(f'/opt/ucm/backend/data/certs/{cert.refid}.crt')
+            cert_dir = current_app.config['CERT_DIR']
+            private_dir = current_app.config['PRIVATE_DIR']
             
-            key_file = Path(f'/opt/ucm/backend/data/private/cert_{cert.cert_id}.key')
+            cert_file = cert_dir / f'{cert.cert_id}.crt'
+            if not cert_file.exists():
+                cert_file = cert_dir / f'{cert.refid}.crt'
+            
+            key_file = private_dir / f'cert_{cert.cert_id}.key'
             if not key_file.exists():
-                key_file = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
+                key_file = private_dir / f'{cert.refid}.key'
             
             if not cert_file.exists() or not key_file.exists():
                 return jsonify({'success': False, 'error': 'Certificate or key file not found'}), 404
             
             # Copy to HTTPS location
             import shutil
-            https_cert = Path('/opt/ucm/backend/data/https_cert.pem')
-            https_key = Path('/opt/ucm/backend/data/https_key.pem')
+            https_cert = current_app.config['HTTPS_CERT_PATH']
+            https_key = current_app.config['HTTPS_KEY_PATH']
             
             # Backup current cert
             if https_cert.exists():
@@ -613,8 +616,8 @@ def regenerate_https_certificate():
     admin = User.query.filter_by(username=get_jwt_identity()).first()
     
     try:
-        cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
-        key_path = Path('/opt/ucm/backend/data/https_key.pem')
+        cert_path = current_app.config['HTTPS_CERT_PATH']
+        key_path = current_app.config['HTTPS_KEY_PATH']
         
         # Backup current
         import shutil
