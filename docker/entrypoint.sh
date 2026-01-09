@@ -58,52 +58,52 @@ validate_email() {
 # ENVIRONMENT VARIABLE DEFAULTS
 # =============================================================================
 
-# shellcheck disable=SC2223
 # Core Settings
-: "${UCM_FQDN:="ucm.local"}"
-: "${UCM_HTTPS_PORT:=8443}"
-: "${UCM_HTTP_PORT:=8080}"
-: "${UCM_DEBUG:=false}"
-: "${UCM_LOG_LEVEL:="INFO"}"
+# shellcheck disable=SC2223
+: ${UCM_FQDN:="ucm.local"}
+: ${UCM_HTTPS_PORT:=8443}
+: ${UCM_HTTP_PORT:=8080}
+: ${UCM_DEBUG:=false}
+: ${UCM_LOG_LEVEL:="INFO"}
 
 # Security
-: "${UCM_SECRET_KEY:=$(generate_secret)}"
-: "${UCM_JWT_SECRET:=$(generate_secret)}"
-: "${UCM_SESSION_TIMEOUT:=3600}"
-: "${UCM_JWT_EXPIRATION:=86400}"
+: ${UCM_SECRET_KEY:=$(generate_secret)}
+: ${UCM_JWT_SECRET:=$(generate_secret)}
+: ${UCM_SESSION_TIMEOUT:=3600}
+: ${UCM_JWT_EXPIRATION:=86400}
 
 # Database
-: "${UCM_DATABASE_PATH:="/app/backend/data/ucm.db"}"
-: "${UCM_BACKUP_ENABLED:=true}"
-: "${UCM_BACKUP_RETENTION_DAYS:=30}"
+: ${UCM_DATABASE_PATH:="/app/backend/data/ucm.db"}
+: ${UCM_BACKUP_ENABLED:=true}
+: ${UCM_BACKUP_RETENTION_DAYS:=30}
 
 # SMTP Configuration
-: "${UCM_SMTP_ENABLED:=false}"
-: "${UCM_SMTP_SERVER:=""}"
-: "${UCM_SMTP_PORT:=587}"
-: "${UCM_SMTP_USERNAME:=""}"
-: "${UCM_SMTP_PASSWORD:=""}"
-: "${UCM_SMTP_FROM:="noreply@${UCM_FQDN}""}
-: "${UCM_SMTP_TLS:=true}"
+: ${UCM_SMTP_ENABLED:=false}
+: ${UCM_SMTP_SERVER:=""}
+: ${UCM_SMTP_PORT:=587}
+: ${UCM_SMTP_USERNAME:=""}
+: ${UCM_SMTP_PASSWORD:=""}
+: ${UCM_SMTP_FROM:="noreply@${UCM_FQDN}"}
+: ${UCM_SMTP_TLS:=true}
 
 # Caching
-: "${UCM_CACHE_ENABLED:=true}"
-: "${UCM_CACHE_TYPE:="simple"}"
-: "${UCM_CACHE_DEFAULT_TIMEOUT:=300}"
+: ${UCM_CACHE_ENABLED:=true}
+: ${UCM_CACHE_TYPE:="simple"}
+: ${UCM_CACHE_DEFAULT_TIMEOUT:=300}
 
 # mTLS Configuration
-: "${UCM_MTLS_ENABLED:=false}"
-: "${UCM_MTLS_CA_ID:=""}"
-: "${UCM_MTLS_REQUIRE_CERT:=false}"
+: ${UCM_MTLS_ENABLED:=false}
+: ${UCM_MTLS_CA_ID:=""}
+: ${UCM_MTLS_REQUIRE_CERT:=false}
 
 # Certificate Settings
-: "${UCM_DEFAULT_VALIDITY_DAYS:=365}"
-: "${UCM_DEFAULT_KEY_SIZE:=4096}"
-: "${UCM_DEFAULT_HASH_ALGO:="SHA256"}"
+: ${UCM_DEFAULT_VALIDITY_DAYS:=365}
+: ${UCM_DEFAULT_KEY_SIZE:=4096}
+: ${UCM_DEFAULT_HASH_ALGO:="SHA256"}
 
 # ACME Settings
-: "${UCM_ACME_ENABLED:=true}"
-: "${UCM_ACME_DIRECTORY_URL:="https://${UCM_FQDN}":${UCM_HTTPS_PORT}/acme/directory"}
+: ${UCM_ACME_ENABLED:=true}
+: ${UCM_ACME_DIRECTORY_URL:="https://${UCM_FQDN}:${UCM_HTTPS_PORT}/acme/directory"}
 
 # =============================================================================
 # VALIDATION

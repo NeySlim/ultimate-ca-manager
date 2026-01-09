@@ -130,7 +130,7 @@ if [ "$MULTIARCH" = true ]; then
         --platform "$PLATFORMS" \
         --tag "$FULL_IMAGE_NAME:$IMAGE_TAG" \
         --tag "$FULL_IMAGE_NAME:$VERSION" \
-        $([ "$PUSH" = true ] && echo "--push" || echo "--load") \
+        "$([ "$PUSH" = true ] && echo "--push" || echo "--load")" \
         .
 else
     # Single architecture build
@@ -141,7 +141,7 @@ else
         .
 fi
 
-if docker tag; then
+if [ $? -eq 0 ]; then
     echo ""
     echo -e "${GREEN}✅ Build successful!${NC}"
     echo ""
