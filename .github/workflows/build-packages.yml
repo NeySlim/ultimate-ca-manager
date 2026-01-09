@@ -101,11 +101,23 @@ jobs:
         id: version
         run: |
           if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+            FULL_VERSION="${{ github.event.inputs.version }}"
           else
-            VERSION=${GITHUB_REF#refs/tags/v}
+            FULL_VERSION=${GITHUB_REF#refs/tags/v}
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Split version for RPM (1.8.0-beta -> version=1.8.0, release=0.1.beta)
+          if [[ "$FULL_VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-(.+)$ ]]; then
+            RPM_VERSION="${BASH_REMATCH[1]}"
+            RPM_RELEASE="0.1.${BASH_REMATCH[2]}"
+          else
+            RPM_VERSION="$FULL_VERSION"
+            RPM_RELEASE="1"
+          fi
+          
+          echo "full_version=$FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "rpm_version=$RPM_VERSION" >> $GITHUB_OUTPUT
+          echo "rpm_release=$RPM_RELEASE" >> $GITHUB_OUTPUT
       
       - name: Build RPM in container
         run: |
@@ -114,17 +126,17 @@ jobs:
             cd /workspace && \
             # Create RPM build structure
             mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} && \
-            # Create tarball
-            tar czf ~/rpmbuild/SOURCES/ucm-${{ steps.version.outputs.version }}.tar.gz \
-              --transform 's,^,ucm-${{ steps.version.outputs.version }}/,' \
+            # Create tarball using base version
+            tar czf ~/rpmbuild/SOURCES/ucm-${{ steps.version.outputs.rpm_version }}.tar.gz \
+              --transform 's,^,ucm-${{ steps.version.outputs.rpm_version }}/,' \
               --exclude='.git' \
               --exclude='*.pyc' \
               --exclude='__pycache__' \
               . && \
-            # Build RPM
+            # Build RPM with proper version and release
             rpmbuild -ba packaging/rpm/ucm.spec \
-              --define '_version ${{ steps.version.outputs.version }}' \
-              --define '_release 1'
+              --define '_version ${{ steps.version.outputs.rpm_version }}' \
+              --define '_release ${{ steps.version.outputs.rpm_release }}'
           "
       
       - name: Copy RPM package
