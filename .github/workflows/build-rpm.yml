@@ -3,7 +3,7 @@ name: Build RPM Package
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*'
   workflow_dispatch:
 
 permissions:

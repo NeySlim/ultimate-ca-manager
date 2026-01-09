@@ -3,13 +3,13 @@ name: Build Packages
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*'
   repository_dispatch:
     types: [package-build]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g., 1.8.0)'
+        description: 'Version to build (e.g., 1.8.0 or 1.8.0-beta)'
         required: true
         type: string
 

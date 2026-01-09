@@ -3,7 +3,7 @@ name: Docker Multi-Arch Build
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*'
   repository_dispatch:
     types: [docker-build]
   workflow_dispatch:
