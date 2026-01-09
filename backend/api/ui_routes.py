@@ -1924,24 +1924,36 @@ def scep_requests():
         html += f'''
         <script>
         function approveSCEP(txid) {{
+            if (!txid) return;
             fetch('/scep/requests/' + txid + '/approve', {{
                 method: 'POST',
                 headers: {{ 'Authorization': 'Bearer {token}', 'Content-Type': 'application/json' }}
             }})
             .then(r => r.json())
-            .then(() => {{ showToast('Request approved', 'success'); htmx.trigger('body', 'refreshSCEP'); }})
-            .catch(e => showToast('Error: ' + e, 'error'));
+            .then(() => {{ 
+                if (typeof showToast === 'function') showToast('Request approved', 'success'); 
+                htmx.trigger('body', 'refreshSCEP'); 
+            }})
+            .catch(e => {{ 
+                if (typeof showToast === 'function') showToast('Error: ' + e, 'error'); 
+            }});
         }}
         
         function rejectSCEP(txid) {{
+            if (!txid) return;
             fetch('/scep/requests/' + txid + '/reject', {{
                 method: 'POST',
                 headers: {{ 'Authorization': 'Bearer {token}', 'Content-Type': 'application/json' }},
                 body: JSON.stringify({{ reason: 'Rejected by administrator' }})
             }})
             .then(r => r.json())
-            .then(() => {{ showToast('Request rejected', 'success'); htmx.trigger('body', 'refreshSCEP'); }})
-            .catch(e => showToast('Error: ' + e, 'error'));
+            .then(() => {{ 
+                if (typeof showToast === 'function') showToast('Request rejected', 'success'); 
+                htmx.trigger('body', 'refreshSCEP'); 
+            }})
+            .catch(e => {{ 
+                if (typeof showToast === 'function') showToast('Error: ' + e, 'error'); 
+            }});
         }}
         </script>
         '''
