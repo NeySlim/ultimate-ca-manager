@@ -1,0 +1,53 @@
+#!/usr/bin/make -f
+
+# UCM Debian Build Rules
+
+export DH_VERBOSE=1
+export PYBUILD_NAME=ucm
+export PYBUILD_DISABLE=test
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_install:
+	# Install Python application
+	dh_auto_install
+	
+	# Create directory structure
+	install -d debian/ucm/opt/ucm
+	install -d debian/ucm/opt/ucm/backend
+	install -d debian/ucm/opt/ucm/frontend
+	install -d debian/ucm/var/lib/ucm
+	install -d debian/ucm/etc/ucm
+	install -d debian/ucm/var/log/ucm
+	install -d debian/ucm/usr/share/doc/ucm
+	
+	# Copy application files
+	cp -r backend/* debian/ucm/opt/ucm/backend/
+	cp -r frontend/* debian/ucm/opt/ucm/frontend/
+	
+	# Copy documentation
+	cp README.md debian/ucm/usr/share/doc/ucm/
+	cp DOCKER_QUICKSTART.md debian/ucm/usr/share/doc/ucm/ || true
+	cp LICENSE debian/ucm/usr/share/doc/ucm/ || true
+	
+	# Install systemd service
+	install -d debian/ucm/lib/systemd/system
+	install -m 644 packaging/debian/ucm.service debian/ucm/lib/systemd/system/
+	
+	# Set permissions
+	find debian/ucm/opt/ucm -type f -exec chmod 644 {} \;
+	find debian/ucm/opt/ucm -type d -exec chmod 755 {} \;
+	chmod +x debian/ucm/opt/ucm/backend/app.py || true
+
+override_dh_installinit:
+	dh_installinit --name=ucm
+
+override_dh_installsystemd:
+	dh_installsystemd --name=ucm
+
+override_dh_fixperms:
+	dh_fixperms
+	# Ensure correct permissions for sensitive directories
+	chmod 750 debian/ucm/var/lib/ucm || true
+	chmod 755 debian/ucm/var/log/ucm || true
