@@ -640,15 +640,16 @@ def ca_list_content():
                     </div>
                 '''
             
-            # Alternating family background colors - use theme-aware colors  
+            # Alternating family background colors - disabled for now to avoid confusion
             # Different color per family using modulo patterns
-            family_colors = [
-                'var(--info-color)',      # Violet/Blue
-                'transparent',            # None
-                'var(--success-color)',   # Green
-                'transparent',            # None
-            ]
-            family_border_left = f'border-left: 4px solid {family_colors[family_index % 4]};'
+            # family_colors = [
+            #     'var(--info-color)',      # Violet/Blue
+            #     'transparent',            # None
+            #     'var(--success-color)',   # Green
+            #     'transparent',            # None
+            # ]
+            # family_border_left = f'border-left: 4px solid {family_colors[family_index % 4]};'
+            family_border_left = ''  # No colored border to avoid confusion
             
             # Add class for styling
             row_class = 'ca-parent-row' if indent_level == 0 and len(ca_children.get(ca['refid'], [])) > 0 else ''
