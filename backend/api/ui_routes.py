@@ -1,7 +1,7 @@
 """
 UI Routes - Flask templates with HTMX
 """
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, make_response
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, make_response, current_app
 from flask_jwt_extended import create_access_token, set_access_cookies
 from functools import wraps
 from datetime import datetime, timedelta

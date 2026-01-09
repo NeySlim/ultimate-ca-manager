@@ -2,7 +2,7 @@
 System Configuration API
 Web-based configuration for HTTPS, SCEP, and all system settings
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, User, SystemConfig, AuditLog
 from middleware.auth_middleware import admin_required
