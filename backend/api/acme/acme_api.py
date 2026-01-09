@@ -726,6 +726,9 @@ def download_certificate(order_id: str):
     
     # Add end-entity certificate
     cert_pem = base64.b64decode(cert.crt).decode('utf-8')
+    if not cert_pem.strip().startswith('-----BEGIN CERTIFICATE-----'):
+        # Certificate might be raw DER, wrap it
+        cert_pem = f"-----BEGIN CERTIFICATE-----\n{cert_pem}\n-----END CERTIFICATE-----"
     chain_pems.append(cert_pem.strip())
     
     # Add CA chain
@@ -740,13 +743,16 @@ def download_certificate(order_id: str):
             break
         
         ca_cert_pem = base64.b64decode(ca.crt).decode('utf-8')
+        if not ca_cert_pem.strip().startswith('-----BEGIN CERTIFICATE-----'):
+            # CA cert might be raw DER, wrap it
+            ca_cert_pem = f"-----BEGIN CERTIFICATE-----\n{ca_cert_pem}\n-----END CERTIFICATE-----"
         chain_pems.append(ca_cert_pem.strip())
         
         # Move up the chain
         current_caref = ca.caref
     
-    # Join with double newline
-    pem_chain = '\n\n'.join(chain_pems)
+    # Join with single newline (standard PEM chain format)
+    pem_chain = '\n'.join(chain_pems) + '\n'
     
     # Return PEM chain
     response = make_response(pem_chain, 200)
