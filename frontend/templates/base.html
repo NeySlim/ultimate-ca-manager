@@ -194,9 +194,18 @@
                 <span>Certificate Authorities</span>
             </a>
             <div class="sidebar-submenu">
-                <a href="/ca" class="sidebar-link" hx-get="/ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">All CAs</a>
-                <a href="/ca/new" class="sidebar-link" hx-get="/ca/new" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Create CA</a>
-                <a href="/import-ca" class="sidebar-link" hx-get="/import-ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Import CA</a>
+                <a href="/ca" class="sidebar-link" hx-get="/ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-list"/></svg>
+                    <span>All CAs</span>
+                </a>
+                <a href="/ca/new" class="sidebar-link" hx-get="/ca/new" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-plus"/></svg>
+                    <span>Create CA</span>
+                </a>
+                <a href="/import-ca" class="sidebar-link" hx-get="/import-ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-upload"/></svg>
+                    <span>Import CA</span>
+                </a>
             </div>
             
             <a href="/certificates" class="sidebar-link {% if request.path.startswith('/certificates') or request.path.startswith('/import') %}active{% endif %}"
@@ -205,9 +214,18 @@
                 <span>Certificates</span>
             </a>
             <div class="sidebar-submenu">
-                <a href="/certificates" class="sidebar-link" hx-get="/certificates" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">All Certificates</a>
-                <a href="/certificates/new" class="sidebar-link" hx-get="/certificates/new" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Create Certificate</a>
-                <a href="/import" class="sidebar-link" hx-get="/import" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Import Certificate</a>
+                <a href="/certificates" class="sidebar-link" hx-get="/certificates" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-list"/></svg>
+                    <span>All Certificates</span>
+                </a>
+                <a href="/certificates/new" class="sidebar-link" hx-get="/certificates/new" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-plus"/></svg>
+                    <span>Create Certificate</span>
+                </a>
+                <a href="/import" class="sidebar-link" hx-get="/import" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-upload"/></svg>
+                    <span>Import Certificate</span>
+                </a>
             </div>
             
             <a href="/scep" class="sidebar-link {% if request.path.startswith('/scep') %}active{% endif %}"
@@ -216,7 +234,10 @@
                 <span>SCEP</span>
             </a>
             <div class="sidebar-submenu">
-                <a href="/scep" class="sidebar-link" hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">Configuration</a>
+                <a href="/scep" class="sidebar-link" hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-settings"/></svg>
+                    <span>Configuration</span>
+                </a>
             </div>
             
             <a href="/config/acme" class="sidebar-link {% if request.path.startswith('/config/acme') %}active{% endif %}"
