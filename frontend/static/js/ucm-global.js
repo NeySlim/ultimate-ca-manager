@@ -584,6 +584,10 @@ if (typeof window.sortDirectionCert === 'undefined') {
     window.sortDirectionCert = {};
 }
 
+if (typeof window.sortDirectionCA === 'undefined') {
+    window.sortDirectionCA = {};
+}
+
 function sortTable(columnIndex) {
     const table = document.getElementById('ca-table');
     if (!table) return;
@@ -634,6 +638,60 @@ function sortTableCert(columnIndex) {
     });
     
     rows.forEach(row => tbody.appendChild(row));
+}
+
+function sortTableCA(columnIndex) {
+    const table = document.getElementById('ca-table');
+    if (!table) return;
+    
+    const tbody = table.querySelector('tbody');
+    const allRows = Array.from(tbody.querySelectorAll('tr'));
+    
+    // Separate ROOT CAs (parent rows) from intermediate CAs (children)
+    const rootRows = allRows.filter(row => !row.classList.contains('ca-child-row'));
+    const childMap = new Map(); // Map parent row to its children
+    
+    // Build map of children for each parent
+    allRows.forEach((row, index) => {
+        if (row.classList.contains('ca-child-row')) {
+            // Find previous ROOT CA (parent)
+            for (let i = index - 1; i >= 0; i--) {
+                if (!allRows[i].classList.contains('ca-child-row')) {
+                    if (!childMap.has(allRows[i])) {
+                        childMap.set(allRows[i], []);
+                    }
+                    childMap.get(allRows[i]).push(row);
+                    break;
+                }
+            }
+        }
+    });
+    
+    const currentDirection = window.sortDirectionCA[columnIndex] || 'asc';
+    const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+    window.sortDirectionCA[columnIndex] = newDirection;
+    
+    // Sort only ROOT CAs
+    rootRows.sort((a, b) => {
+        let aValue = a.cells[columnIndex].textContent.trim();
+        let bValue = b.cells[columnIndex].textContent.trim();
+        
+        if (aValue < bValue) return newDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return newDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    // Rebuild table: each ROOT CA followed by its children
+    tbody.innerHTML = '';
+    rootRows.forEach(rootRow => {
+        tbody.appendChild(rootRow);
+        // Append children if any
+        if (childMap.has(rootRow)) {
+            childMap.get(rootRow).forEach(childRow => {
+                tbody.appendChild(childRow);
+            });
+        }
+    });
 }
 
 function filterTableCA() {
@@ -1105,6 +1163,19 @@ document.addEventListener('click', (e) => {
         return;
     }
     
+    // Navigate to Certificate detail page
+    const navigateCertRow = e.target.closest('[data-action="navigate-cert"]');
+    if (navigateCertRow) {
+        // Don't trigger if clicking on a button inside the row
+        if (e.target.closest('button')) {
+            return;
+        }
+        e.preventDefault();
+        const certId = navigateCertRow.dataset.certId;
+        window.location.href = `/certificates/${certId}`;
+        return;
+    }
+    
     // Download CRL (from CRL list page)
     const downloadCRLListBtn = e.target.closest('[data-action="download-crl"]');
     if (downloadCRLListBtn) {
@@ -1174,6 +1245,16 @@ document.addEventListener('click', (e) => {
         e.stopPropagation();
         const column = parseInt(sortTableCertBtn.dataset.column);
         sortTableCert(column);
+        return;
+    }
+    
+    // Sort CA table (only ROOT CAs, not intermediates)
+    const sortTableCABtn = e.target.closest('[data-action="sort-table-ca"]');
+    if (sortTableCABtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const column = parseInt(sortTableCABtn.dataset.column);
+        sortTableCA(column);
         return;
     }
     

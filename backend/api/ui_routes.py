@@ -718,11 +718,21 @@ def ca_list_content():
                                 </div>
                             </div>
                         </th>
-                        <th style="padding: 0.75rem; text-align: left;">Émetteur</th>
-                        <th style="padding: 0.75rem; text-align: left;">Nom</th>
-                        <th style="padding: 0.75rem; text-align: left;">Utilisations</th>
-                        <th style="padding: 0.75rem; text-align: left;">Début validité</th>
-                        <th style="padding: 0.75rem; text-align: left;">Fin validité</th>
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="1">
+                            Émetteur <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        </th>
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="2">
+                            Nom <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        </th>
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="3">
+                            Utilisations <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        </th>
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="4">
+                            Début validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        </th>
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="5">
+                            Fin validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        </th>
                         <th style="padding: 0.75rem; text-align: left;">Commandes</th>
                     </tr>
                 </thead>
@@ -975,42 +985,40 @@ def cert_list_content():
                 ca_names[ca['refid']] = ca['descr']
         
         html = '''
-        <!-- Cert list v2.0 with CRT/KEY badges -->
-        <div class="overflow-x-auto" style="overflow-y: visible;">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" id="cert-table">
-                <thead class="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                        <th data-action="sort-table-cert" data-column="0" style="position: relative; cursor: pointer;">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="overflow-x: auto; overflow-y: visible;">
+            <table id="cert-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;" data-action="sort-table-cert" data-column="0">
+                            <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
                                 <span>Description <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i></span>
                                 <div style="position: relative; margin-left: 12px;">
                                     <input type="text" id="searchCert" placeholder="Recherche..." 
-                                           class="form-control"
-                                           style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px;"
+                                           style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);"
                                            onkeyup="filterTableCert()"
                                            onclick="event.stopPropagation()">
                                     <i class="fas fa-search" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: 0.5; pointer-events: none;"></i>
                                 </div>
                             </div>
                         </th>
-                        <th data-action="sort-table-cert" data-column="1" style="cursor: pointer;">
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="1">
                             Émetteur <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th data-action="sort-table-cert" data-column="2" style="cursor: pointer;">
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="2">
                             Type <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th data-action="sort-table-cert" data-column="3" style="cursor: pointer;">
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="3">
                             Début validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th data-action="sort-table-cert" data-column="4" style="cursor: pointer;">
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="4">
                             Fin validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th>
+                        <th style="padding: 0.75rem; text-align: left;">
                             Commandes
                         </th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody>
         '''
         
         for cert in certs:
@@ -1063,8 +1071,8 @@ def cert_list_content():
             safe_descr = escape_js(cert['descr'])
             
             html += f'''
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onclick="window.location.href='/certificates/{cert['id']}'">
-                    <td>
+                <tr data-action="navigate-cert" data-cert-id="{cert['id']}">
+                    <td style="padding: 0.75rem; color: var(--text-primary);">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <span>{cert['descr']}</span>
                             <div style="display: flex; gap: 4px;">
@@ -1075,19 +1083,19 @@ def cert_list_content():
                             </div>
                         </div>
                     </td>
-                    <td>
+                    <td style="padding: 0.75rem; color: var(--text-primary);">
                         {issuer_name}
                     </td>
-                    <td>
+                    <td style="padding: 0.75rem; color: var(--text-primary);">
                         {cert_type_display}
                     </td>
-                    <td>
+                    <td style="padding: 0.75rem; color: var(--text-primary);">
                         {valid_from}
                     </td>
-                    <td>
+                    <td style="padding: 0.75rem; color: var(--text-primary);">
                         {valid_to}
                     </td>
-                    <td>
+                    <td style="padding: 0.75rem;">
             '''
             
             # Unified export button for both CSR and certificates

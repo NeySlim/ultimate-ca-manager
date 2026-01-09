@@ -2034,3 +2034,31 @@ body.modal-open {
     margin-bottom: 10px;
     flex-shrink: 0;
 }
+
+/* ===========================
+   CERTIFICATE LIST TABLE
+   =========================== */
+
+/* Certificate table structure */
+#cert-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+/* Remove default borders */
+#cert-table thead tr,
+#cert-table thead th,
+#cert-table tbody,
+#cert-table tbody tr {
+    border: none !important;
+}
+
+/* Hover effect */
+#cert-table tbody tr:hover td {
+    background-color: var(--bg-hover) !important;
+}
+
+/* Cursor pointer for clickable rows */
+#cert-table tbody tr {
+    cursor: pointer;
+}
