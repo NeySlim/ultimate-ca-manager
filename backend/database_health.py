@@ -25,8 +25,11 @@ def check_and_repair_database(app):
             if missing_tables:
                 logger.warning(f"Missing tables detected: {missing_tables}")
                 logger.info("Creating missing tables...")
-                db.create_all()
-                logger.info("Missing tables created")
+                try:
+                    db.create_all(checkfirst=True)
+                    logger.info("Missing tables created")
+                except Exception as e:
+                    logger.warning(f"Error creating tables (may already exist): {e}")
             
             # 2. Verify system_config table has basic entries
             ensure_system_config_defaults(app)
@@ -67,6 +70,11 @@ def ensure_system_config_defaults(app):
 def ensure_admin_user(app):
     """Ensure admin user exists"""
     try:
+        # Check if admin already exists
+        admin_exists = User.query.filter_by(username=app.config.get("INITIAL_ADMIN_USERNAME", "admin")).first()
+        if admin_exists:
+            return  # Admin already exists, skip
+        
         if User.query.count() == 0:
             logger.info("No users found, creating admin user")
             admin = User(
