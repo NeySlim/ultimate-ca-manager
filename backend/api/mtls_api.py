@@ -256,19 +256,23 @@ def create_certificate():
             cert_name = f"Managed - {cn}"
         
         # Parse certificate to extract info
-        cert_info = CertificateParser.parse_certificate(cert_pem)
+        cert_obj = CertificateParser.parse_pem_certificate(cert_pem)
+        if not cert_obj:
+            raise ValueError("Failed to parse generated certificate")
+        
+        cert_info = CertificateParser.extract_certificate_info(cert_obj)
         
         # Create AuthCertificate record
         auth_cert = AuthCertificate(
             user_id=user.id,
             name=cert_name,
             cert_pem=cert_pem,
-            cert_serial=cert_info.get('serial'),
-            cert_fingerprint=cert_info.get('fingerprint'),
-            cert_subject=cert_info.get('subject'),
-            cert_issuer=cert_info.get('issuer'),
-            valid_from=cert_info.get('valid_from'),
-            valid_until=cert_info.get('valid_until'),
+            cert_serial=cert_info['serial'],
+            cert_fingerprint=cert_info['fingerprint_sha256'],
+            cert_subject=cert_info['subject_dn'],
+            cert_issuer=cert_info['issuer_dn'],
+            valid_from=cert_info['valid_from'],
+            valid_until=cert_info['valid_until'],
             enabled=True
         )
         
