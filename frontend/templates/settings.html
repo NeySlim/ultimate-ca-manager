@@ -130,11 +130,11 @@
             </div>
             
             <div style="display: flex; gap: 1rem; padding-top: 0.5rem;">
-                <button onclick="applyHTTPSCertificate()" class="btn btn-primary">
+                <button onclick="applyHTTPSCertificate()" class="btn-primary">
                     <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
                     Apply Certificate
                 </button>
-                <button onclick="regenerateSelfSigned()" class="btn btn-secondary">
+                <button onclick="regenerateSelfSigned()" class="btn-secondary">
                     <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-refresh"/></svg>
                     Regenerate Self-Signed
                 </button>
@@ -204,7 +204,7 @@
                 </div>
             </div>
             
-            <button onclick="confirmPKIReset()" class="btn btn-danger">
+            <button onclick="confirmPKIReset()" class="btn-danger">
                 <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-trash"/></svg>
                 Reset PKI Database
             </button>
@@ -435,10 +435,10 @@ function confirmPKIReset() {
                         <input type="text" id="pki-reset-confirmation" class="form-input" placeholder="RESET PKI DATA" style="width: 100%;">
                     </div>
                     <div class="ucm-modal-footer">
-                        <button class="btn btn-secondary" onclick="document.getElementById('ucm-modal-container').innerHTML = ''">
+                        <button class="btn-secondary" onclick="document.getElementById('ucm-modal-container').innerHTML = ''">
                             Cancel
                         </button>
-                        <button class="btn btn-danger" onclick="executePKIReset()">
+                        <button class="btn-danger" onclick="executePKIReset()">
                             Reset Database
                         </button>
                     </div>

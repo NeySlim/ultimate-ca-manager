@@ -51,13 +51,13 @@
 
                 <!-- Actions -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                    <button @click="$dispatch('open-modal', 'uploadHttpsModal')" class="btn btn-primary">
+                    <button @click="$dispatch('open-modal', 'uploadHttpsModal')" class="btn-primary">
                         <i class="fas fa-upload" style="margin-right: 0.5rem;"></i>Import Certificate Chain
                     </button>
-                    <button @click="$dispatch('open-modal', 'selectManagedCertModal')" class="btn btn-success">
+                    <button @click="$dispatch('open-modal', 'selectManagedCertModal')" class="btn-success">
                         <i class="fas fa-certificate" style="margin-right: 0.5rem;"></i>Use Managed Certificate
                     </button>
-                    <button hx-post="/api/ui/config/regenerate-https" hx-confirm="Are you sure you want to regenerate the HTTPS certificate? The server will restart." class="btn btn-warning">
+                    <button hx-post="/api/ui/config/regenerate-https" hx-confirm="Are you sure you want to regenerate the HTTPS certificate? The server will restart." class="btn-warning">
                         <i class="fas fa-refresh" style="margin-right: 0.5rem;"></i>Regenerate Self-Signed
                     </button>
                 </div>
@@ -69,7 +69,7 @@
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">Users</h2>
-                    <button @click="$dispatch('open-modal', 'addUserModal')" class="btn btn-primary">
+                    <button @click="$dispatch('open-modal', 'addUserModal')" class="btn-primary">
                         Add User
                     </button>
                 </div>
@@ -116,7 +116,7 @@
                             <option value="true">Auto-approve</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn-primary">
                         Save Settings
                     </button>
                 </form>
@@ -146,10 +146,10 @@
                     <div>
                         <h3 style="font-size: 1.125rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-primary);">Actions</h3>
                         <div style="display: flex; gap: 0.5rem;">
-                            <button hx-post="/api/ui/config/backup-db" hx-swap="none" class="btn btn-primary">
+                            <button hx-post="/api/ui/config/backup-db" hx-swap="none" class="btn-primary">
                                 Create Backup
                             </button>
-                            <button hx-post="/api/ui/config/vacuum-db" hx-confirm="Vacuum the database? This may take a moment." hx-swap="none" class="btn btn-success">
+                            <button hx-post="/api/ui/config/vacuum-db" hx-confirm="Vacuum the database? This may take a moment." hx-swap="none" class="btn-success">
                                 Vacuum Database
                             </button>
                         </div>
@@ -230,10 +230,10 @@
                     </div>
                 </div>
                 <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
-                    <button type="button" @click="open = false" class="btn btn-secondary">
+                    <button type="button" @click="open = false" class="btn-secondary">
                         Cancel
                     </button>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn-primary">
                         <i class="fas fa-upload" style="margin-right: 0.5rem;"></i>Import & Restart
                     </button>
                 </div>
@@ -263,7 +263,7 @@
                 </div>
             </div>
             <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end;">
-                <button type="button" @click="open = false" class="btn btn-secondary">
+                <button type="button" @click="open = false" class="btn-secondary">
                     Close
                 </button>
             </div>
@@ -305,10 +305,10 @@
                     </div>
                 </div>
                 <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
-                    <button type="button" @click="open = false" class="btn btn-secondary">
+                    <button type="button" @click="open = false" class="btn-secondary">
                         Cancel
                     </button>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn-primary">
                         Add User
                     </button>
                 </div>
@@ -336,10 +336,10 @@
                     </div>
                 </div>
                 <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
-                    <button type="button" @click="open = false" class="btn btn-secondary">
+                    <button type="button" @click="open = false" class="btn-secondary">
                         Cancel
                     </button>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn-primary">
                         Change Password
                     </button>
                 </div>

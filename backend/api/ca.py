@@ -281,6 +281,11 @@ def export_ca_advanced(ca_id):
     password = request.args.get('password')
     
     try:
+        # Get CA for filename
+        ca = CA.query.get(ca_id)
+        if not ca:
+            return jsonify({"error": "CA not found"}), 404
+        
         cert_bytes = CAService.export_ca_with_options(
             ca_id=ca_id,
             export_format=export_format,
@@ -300,11 +305,16 @@ def export_ca_advanced(ca_id):
             mimetype = 'application/x-pem-file'
             extension = 'pem'
         
+        # Create human-readable filename from description
+        safe_descr = ''.join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in ca.descr)
+        safe_descr = safe_descr.replace(' ', '_')[:50]  # Limit length
+        filename = f'{safe_descr}.{extension}'
+        
         return send_file(
             BytesIO(cert_bytes),
             mimetype=mimetype,
             as_attachment=True,
-            download_name=f'ca_{ca_id}.{extension}'
+            download_name=filename
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400

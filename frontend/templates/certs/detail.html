@@ -17,33 +17,33 @@
                 <i class="fas fa-arrow-left" style="margin-right: 0.5rem;"></i>Back to List
             </a>
             {% if not cert.revoked %}
-            <button onclick="revokeCert('{{ cert.id }}')" class="btn btn-danger">
+            <button data-action="revoke-cert" data-refid="{{ cert.refid }}" data-name="{{ cert.descr }}" class="btn-danger">
                 <i class="fas fa-ban" style="margin-right: 0.5rem;"></i>Revoke
             </button>
             {% endif %}
             <div style="position: relative; display: inline-block;">
-                <button onclick="toggleExportMenu()" class="btn btn-primary">
+                <button data-action="toggle-export-menu" class="btn-primary">
                     <i class="fas fa-download" style="margin-right: 0.5rem;"></i>Export
                     <i class="fas fa-chevron-down" style="margin-left: 0.5rem;"></i>
                 </button>
                 <div id="export-menu" class="hidden" style="position: absolute; right: 0; margin-top: 0.5rem; width: 14rem; border-radius: 0.375rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); background: var(--card-bg); border: 1px solid var(--border-color); z-index: 10;">
                     <div style="padding: 0.25rem;">
-                        <button onclick="exportCertSimple('{{ cert.id }}')" class="dropdown-item">
+                        <button data-action="export-cert-simple" data-id="{{ cert.id }}" class="dropdown-item">
                             <i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i>Certificate only (PEM)
                         </button>
-                        <button onclick="exportCertWithKey('{{ cert.id }}')" class="dropdown-item">
+                        <button data-action="export-cert-key" data-id="{{ cert.id }}" class="dropdown-item">
                             <i class="fas fa-key" style="margin-right: 0.5rem;"></i>Certificate + Key (PEM)
                         </button>
-                        <button onclick="exportCertWithChain('{{ cert.id }}')" class="dropdown-item">
+                        <button data-action="export-cert-chain" data-id="{{ cert.id }}" class="dropdown-item">
                             <i class="fas fa-link" style="margin-right: 0.5rem;"></i>Certificate + CA Chain (PEM)
                         </button>
-                        <button onclick="exportCertFull('{{ cert.id }}')" class="dropdown-item">
+                        <button data-action="export-cert-full" data-id="{{ cert.id }}" class="dropdown-item">
                             <i class="fas fa-archive" style="margin-right: 0.5rem;"></i>Full Chain + Key (PEM)
                         </button>
-                        <button onclick="exportCertDER('{{ cert.id }}')" class="dropdown-item">
+                        <button data-action="export-cert-der" data-id="{{ cert.id }}" class="dropdown-item">
                             <i class="fas fa-file-binary" style="margin-right: 0.5rem;"></i>Certificate (DER)
                         </button>
-                        <button onclick="showPKCS12Modal('{{ cert.id }}', 'cert')" class="dropdown-item">
+                        <button data-action="show-pkcs12-modal" data-id="{{ cert.id }}" data-type="cert" class="dropdown-item">
                             <i class="fas fa-lock" style="margin-right: 0.5rem;"></i>PKCS#12 (.p12/.pfx)
                         </button>
                     </div>
@@ -192,10 +192,10 @@
             </div>
             <div id="pkcs12-error" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background: var(--danger-bg-light); color: var(--status-danger); border-radius: 0.25rem; font-size: 0.875rem;"></div>
             <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
-                <button onclick="closePKCS12Modal()" class="btn-secondary">
+                <button data-action="close-pkcs12-modal" class="btn-secondary">
                     Cancel
                 </button>
-                <button onclick="exportPKCS12()" class="btn-primary">
+                <button data-action="export-pkcs12" class="btn-primary">
                     <i class="fas fa-download mr-2"></i>Export
                 </button>
             </div>
@@ -398,10 +398,19 @@ function revokeCert(certId) {
 }
 
 function showPKCS12Modal(id, type) {
+    const passwordField = document.getElementById('pkcs12-password');
+    const confirmField = document.getElementById('pkcs12-password-confirm');
+    
+    // Safety check
+    if (!passwordField || !confirmField) {
+        console.error('PKCS12 modal elements not found');
+        return;
+    }
+    
     window.pkcs12ExportId = id;
     window.pkcs12ExportType = type;
-    document.getElementById('pkcs12-password').value = '';
-    document.getElementById('pkcs12-password-confirm').value = '';
+    passwordField.value = '';
+    confirmField.value = '';
     closeModal('pkcs12-error');
     openModal('pkcs12-modal');
 }
@@ -411,31 +420,37 @@ function closePKCS12Modal() {
 }
 
 function exportPKCS12() {
-    const password = document.getElementById('pkcs12-password').value;
-    const confirm = document.getElementById('pkcs12-password-confirm').value;
+    const password = document.getElementById('pkcs12-password');
+    const confirm = document.getElementById('pkcs12-password-confirm');
     const errorDiv = document.getElementById('pkcs12-error');
     
-    if (!password) {
+    // Safety check - elements might not exist on all pages
+    if (!password || !confirm || !errorDiv) {
+        console.error('PKCS12 export elements not found');
+        return;
+    }
+    
+    if (!password.value) {
         errorDiv.textContent = 'Password is required';
         errorDiv.classList.remove('hidden');
         return;
     }
     
-    if (password !== confirm) {
+    if (password.value !== confirm.value) {
         errorDiv.textContent = 'Passwords do not match';
         errorDiv.classList.remove('hidden');
         return;
     }
     
-    if (password.length < 4) {
+    if (password.value.length < 4) {
         errorDiv.textContent = 'Password must be at least 4 characters';
         errorDiv.classList.remove('hidden');
         return;
     }
     
     const url = window.window.pkcs12ExportType === 'ca' 
-        ? `/api/v1/ca/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`
-        : `/api/v1/certificates/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`;
+        ? `/api/v1/ca/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password.value)}`
+        : `/api/v1/certificates/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password.value)}`;
     
     exportWithToken(url);
     closePKCS12Modal();
