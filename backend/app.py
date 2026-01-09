@@ -199,11 +199,65 @@ def main():
     config = get_config()
     app = create_app()
     
-    # Get SSL context
-    ssl_context = (
+    # Get SSL context with optional client certificate verification
+    import ssl
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ssl_context.load_cert_chain(
         str(config.HTTPS_CERT_PATH),
         str(config.HTTPS_KEY_PATH)
     )
+    
+    # Check if mTLS is enabled and configure client cert verification
+    from models import SystemConfig
+    import tempfile
+    import os
+    
+    ca_cert_path = None
+    with app.app_context():
+        mtls_enabled = SystemConfig.query.filter_by(key='mtls_enabled').first()
+        mtls_required = SystemConfig.query.filter_by(key='mtls_required').first()
+        mtls_ca_id = SystemConfig.query.filter_by(key='mtls_trusted_ca_id').first()
+        
+        if mtls_enabled and mtls_enabled.value == 'true' and mtls_ca_id:
+            # Load trusted CA for client certificate verification
+            from models import CA
+            ca = CA.query.filter_by(refid=mtls_ca_id.value).first()
+            if ca and ca.crt:
+                # CA certificate is base64 encoded in database - decode it
+                import base64
+                try:
+                    ca_pem = base64.b64decode(ca.crt).decode('utf-8')
+                except:
+                    # If decode fails, assume it's already in PEM format
+                    ca_pem = ca.crt
+                
+                # Create temp CA file (kept for app lifetime)
+                ca_file = tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False)
+                ca_file.write(ca_pem)
+                ca_file.flush()
+                ca_cert_path = ca_file.name
+                ca_file.close()
+                
+                # Verify file exists and is readable
+                if not os.path.exists(ca_cert_path):
+                    print(f"  ERROR: CA cert file not found at {ca_cert_path}")
+                    ca_cert_path = None
+                else:
+                    # Configure client cert verification
+                    if mtls_required and mtls_required.value == 'true':
+                        ssl_context.verify_mode = ssl.CERT_REQUIRED
+                        print(f"  mTLS: REQUIRED (client cert mandatory)")
+                    else:
+                        ssl_context.verify_mode = ssl.CERT_OPTIONAL
+                        print(f"  mTLS: OPTIONAL (client cert enhances security)")
+                    
+                    try:
+                        ssl_context.load_verify_locations(ca_cert_path)
+                        print(f"  mTLS CA: {ca.descr}")
+                        print(f"  mTLS CA file: {ca_cert_path}")
+                    except Exception as e:
+                        print(f"  ERROR loading mTLS CA: {e}")
+                        ca_cert_path = None
     
     print(f"\n{'='*60}")
     print(f"  {config.APP_NAME} v{config.APP_VERSION}")
@@ -219,13 +273,21 @@ def main():
         print(f"{'='*60}\n")
     
     # Run HTTPS server
-    app.run(
-        host=config.HOST,
-        port=config.HTTPS_PORT,
-        ssl_context=ssl_context,
-        debug=config.DEBUG,
-        threaded=True
-    )
+    try:
+        app.run(
+            host=config.HOST,
+            port=config.HTTPS_PORT,
+            ssl_context=ssl_context,
+            debug=config.DEBUG,
+            threaded=True
+        )
+    finally:
+        # Cleanup temp CA file
+        if ca_cert_path and os.path.exists(ca_cert_path):
+            try:
+                os.unlink(ca_cert_path)
+            except:
+                pass
 
 
 if __name__ == "__main__":

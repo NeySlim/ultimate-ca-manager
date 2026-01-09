@@ -1,20 +1,25 @@
 """
 mTLS Authentication Middleware
-Intercept and process client certificates from reverse proxy headers
+HYBRID: Supports both native Flask and reverse proxy certificate extraction
 """
 from flask import request, session, g
 from functools import wraps
 from services.certificate_parser import CertificateParser
 from services.mtls_auth_service import MTLSAuthService
 import logging
+import ssl
 
 logger = logging.getLogger(__name__)
 
 
 def process_client_certificate():
     """
-    Process client certificate from reverse proxy headers
-    This should be called before each request to check for client cert
+    Process client certificate from multiple sources (HYBRID MODE):
+    1. Native Flask/werkzeug (request.environ['peercert'])
+    2. Nginx reverse proxy headers (X-SSL-Client-*)
+    3. Apache reverse proxy headers (X-SSL-Client-S-DN)
+    
+    This allows UCM to work both standalone and behind reverse proxy.
     """
     # Skip if user already authenticated via session
     if session.get('user_id'):
@@ -24,22 +29,38 @@ def process_client_certificate():
     if not MTLSAuthService.is_mtls_enabled():
         return
     
-    # Get request headers
-    headers = dict(request.headers)
-    
-    # Try to extract certificate info from headers
+    # Try to extract certificate info
     cert_info = None
     
-    # Try Nginx headers first
-    if 'X-SSL-Client-Verify' in headers:
-        cert_info = CertificateParser.extract_from_nginx_headers(headers)
+    # METHOD 1: Native Flask (standalone mode)
+    # Try to get peer certificate from werkzeug environ
+    try:
+        peercert = request.environ.get('peercert')
+        if peercert:
+            cert_info = CertificateParser.extract_from_flask_native(peercert)
+            if cert_info:
+                logger.debug("Certificate extracted from native Flask (standalone mode)")
+    except Exception as e:
+        logger.debug(f"Native Flask cert extraction failed: {e}")
     
-    # Try Apache headers if Nginx failed
-    if not cert_info and 'X-SSL-Client-S-DN' in headers:
-        cert_info = CertificateParser.extract_from_apache_headers(headers)
+    # METHOD 2: Reverse Proxy Headers
+    if not cert_info:
+        headers = dict(request.headers)
+        
+        # Try Nginx headers
+        if 'X-SSL-Client-Verify' in headers:
+            cert_info = CertificateParser.extract_from_nginx_headers(headers)
+            if cert_info:
+                logger.debug("Certificate extracted from Nginx headers (proxy mode)")
+        
+        # Try Apache headers if Nginx failed
+        if not cert_info and 'X-SSL-Client-S-DN' in headers:
+            cert_info = CertificateParser.extract_from_apache_headers(headers)
+            if cert_info:
+                logger.debug("Certificate extracted from Apache headers (proxy mode)")
     
     if not cert_info:
-        # No client certificate present
+        # No client certificate present in any source
         return
     
     # Authenticate via certificate
