@@ -4,6 +4,9 @@
 
 set -e
 
+# Error handler
+trap 'echo "❌ Error on line $LINENO. Exiting."; exit 1' ERR
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -382,6 +385,8 @@ touch /app/.docker-ready
 
 echo -e "${GREEN}🚀 Starting UCM v1.8.0-beta...${NC}"
 echo -e "${CYAN}   Access: https://${UCM_FQDN}:${UCM_HTTPS_PORT}${NC}"
+echo ""
+echo -e "${BLUE}📋 Executing command: $@${NC}"
 echo ""
 
 # Execute the main command
