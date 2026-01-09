@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for Ultimate CA Manager
-# Version: 1.6.1
+# Version: 1.8.0-beta
 # Optimized for production with security and minimal size
 
 # Stage 1: Builder - Install dependencies and build environment
@@ -29,7 +29,7 @@ FROM python:3.11-slim-bookworm
 
 LABEL maintainer="NeySlim <https://github.com/NeySlim>" \
       description="Ultimate CA Manager - Certificate Authority Management System" \
-      version="1.6.1" \
+      version="1.8.0-beta" \
       org.opencontainers.image.source="https://github.com/NeySlim/ultimate-ca-manager"
 
 # Install only runtime dependencies
@@ -49,15 +49,16 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 
 # Copy application files
+# Copy application files with proper ownership
 COPY --chown=ucm:ucm backend/ /app/backend/
 COPY --chown=ucm:ucm frontend/ /app/frontend/
 COPY --chown=ucm:ucm wsgi.py /app/wsgi.py
-COPY --chown=ucm:ucm gunicorn.conf.py /app/gunicorn.conf.py
 COPY --chown=ucm:ucm .env.example /app/.env.example
 
 # Create necessary directories with proper permissions
-RUN bash -c 'mkdir -p /app/backend/data/{ca,certs,private,crl,scep,backups}' && \
-    chown -R ucm:ucm /app
+# Using bash for brace expansion
+RUN bash -c 'mkdir -p /app/backend/data/{cas,certs,backups,logs,temp}' && \
+    chown -R ucm:ucm /app/backend/data
 
 # Set environment variables
 ENV PATH="/opt/venv/bin:$PATH" \
@@ -73,14 +74,13 @@ EXPOSE 8443
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f -k https://localhost:8443/api/health || exit 1
 
+# Copy Gunicorn configuration and entrypoint before switching user
+COPY --chown=ucm:ucm gunicorn.conf.py /app/gunicorn.conf.py
+COPY --chown=ucm:ucm docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Switch to non-root user
 USER ucm
-
-# Copy Gunicorn configuration
-COPY --chown=ucm:ucm gunicorn.conf.py /app/gunicorn.conf.py
-
-# Copy entrypoint script
-COPY --chown=ucm:ucm docker/entrypoint.sh /entrypoint.sh
 
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
