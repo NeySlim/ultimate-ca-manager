@@ -143,8 +143,9 @@
             <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
                 <p style="margin-bottom: 0.25rem;"><strong>Important Notes:</strong></p>
                 <ul style="list-style: disc; margin-left: 1.25rem;">
-                    <li>Changing the certificate will restart the UCM service</li>
-                    <li>You will be disconnected and need to reload the page</li>
+                    <li>Changing the certificate requires restarting UCM to take effect</li>
+                    <li>In Docker: you need to manually restart the container</li>
+                    <li>Native installation: service will restart automatically</li>
                     <li>The certificate must be valid and match the server's hostname/IP</li>
                     <li>The private key must be available in UCM's keystore</li>
                 </ul>
@@ -426,7 +427,7 @@ function applyHTTPSCertificate() {
     }
     
     ucmConfirm(
-        'Applying a new certificate will restart UCM and disconnect your session. Continue?',
+        'Applying a new certificate will require restarting UCM. Continue?',
         'Apply Certificate',
         { danger: true, confirmText: 'Apply', icon: 'warning-triangle' }
     ).then(confirmed => {
@@ -445,8 +446,17 @@ function applyHTTPSCertificate() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                ucmAlert('Certificate applied. UCM is restarting...', 'Success');
-                setTimeout(() => window.location.reload(), 3000);
+                // Show appropriate message based on restart message
+                const message = data.message || 'Certificate applied';
+                ucmAlert(message, 'Success');
+                
+                // If message indicates container restart needed, don't auto-reload
+                if (message.includes('Container restart') || message.includes('container restart')) {
+                    // Stay on page - user needs to manually restart container
+                } else {
+                    // Native installation - service will restart
+                    setTimeout(() => window.location.reload(), 3000);
+                }
             } else {
                 ucmAlert('Error: ' + (data.error || data.message || 'Unknown error'), 'Error');
             }
@@ -460,7 +470,7 @@ function applyHTTPSCertificate() {
 
 function regenerateSelfSigned() {
     ucmConfirm(
-        'This will generate a new self-signed certificate and restart UCM. Continue?',
+        'This will generate a new self-signed certificate. Continue?',
         'Regenerate Certificate',
         { danger: true, confirmText: 'Regenerate', icon: 'warning-triangle' }
     ).then(confirmed => {
@@ -472,8 +482,14 @@ function regenerateSelfSigned() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                ucmAlert('Certificate regenerated. UCM is restarting...', 'Success');
-                setTimeout(() => window.location.reload(), 3000);
+                const message = data.message || 'Certificate regenerated';
+                ucmAlert(message, 'Success');
+                
+                // If message indicates container restart needed, don't auto-reload
+                if (message.includes('Container restart') || message.includes('container restart')) {
+                    // Stay on page
+                } else {
+                    setTimeout(() => window.location.reload(), 3000);
             } else {
                 ucmAlert('Error: ' + data.message, 'Error');
             }
