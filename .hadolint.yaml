@@ -1,21 +1,6 @@
 # Hadolint configuration for UCM Dockerfile
 # See: https://github.com/hadolint/hadolint
 
-# Ignore specific rules
 ignored:
-  # DL3008: Allow unpinned apt-get packages for build tools
-  # Rationale: build-essential, libssl-dev, etc. are system packages
-  # that should use the latest stable version from Debian repos
   - DL3008
-  
-  # DL3013: Allow pip install without explicit versions when using requirements.txt
-  # Rationale: We use requirements.txt with pinned versions
   - DL3013
-
-# Treat as warnings instead of errors
-failure-threshold: error
-
-# Label schema validation
-label-schema:
-  author: ignore
-  maintainer: ignore
