@@ -1,3 +1,4 @@
+import json
 """
 Database Models for Ultimate CA Manager
 """

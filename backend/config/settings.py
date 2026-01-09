@@ -39,15 +39,15 @@ def restart_ucm_service():
     """
     if is_docker():
         # In Docker, don't restart - container manages lifecycle
-        # Just log that a restart is recommended
-        return True, "Configuration updated. Container restart recommended for changes to take effect."
+        # Certificate changes require container restart
+        return True, "✅ Certificate updated successfully. ⚠️ You MUST restart the Docker container for changes to take effect: docker restart ucm"
     
     # Native installation - try systemctl
     try:
         subprocess.Popen(['systemctl', 'restart', 'ucm'], 
                         stdout=subprocess.DEVNULL, 
                         stderr=subprocess.DEVNULL)
-        return True, "Service restart initiated"
+        return True, "Service restart initiated. Please wait 10 seconds and reload the page."
     except FileNotFoundError:
         # systemctl not available - could be SysV, OpenRC, etc.
         # Try common init systems

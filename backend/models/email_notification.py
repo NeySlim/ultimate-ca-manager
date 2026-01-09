@@ -1,3 +1,4 @@
+import json
 """
 Email Notification Models for UCM
 """
