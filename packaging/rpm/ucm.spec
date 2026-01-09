@@ -43,6 +43,7 @@ install -d %{buildroot}%{_datadir}/%{name}
 install -d %{buildroot}%{_sharedstatedir}/%{name}/{cas,certs,backups,logs,temp}
 install -d %{buildroot}%{_localstatedir}/log/%{name}
 install -d %{buildroot}%{_unitdir}
+install -d %{buildroot}%{_bindir}
 
 # Install application files
 cp -r backend %{buildroot}%{_datadir}/%{name}/
