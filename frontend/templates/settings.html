@@ -316,8 +316,8 @@ RequestHeader set X-SSL-Client-S-DN "%{SSL_CLIENT_S_DN}s"</code></pre>
 </div>
 
 <script>
-// Get JWT token from session
-const token = '{{ session.get("access_token") }}';
+// Get JWT token from meta tag (defined in base.html)
+const getToken = () => document.querySelector('meta[name="access-token"]')?.content || '';
 
 // Load data immediately when script runs (for HTMX navigation)
 (function() {
@@ -614,6 +614,8 @@ function executePKIReset() {
 // mTLS Configuration
 // ========================================
 function loadMTLSSettings() {
+    const token = getToken();
+    
     // Load CA list
     fetch('/api/v1/ca', {
         headers: {
@@ -685,6 +687,7 @@ document.getElementById('mtls_enabled')?.addEventListener('change', toggleMTLSFi
 document.getElementById('mtls-settings-form')?.addEventListener('submit', function(e) {
     e.preventDefault();
     
+    const token = getToken();
     const data = {
         enabled: document.getElementById('mtls_enabled').checked,
         required: document.getElementById('mtls_required').checked,

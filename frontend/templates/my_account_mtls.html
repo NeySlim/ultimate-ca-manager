@@ -230,7 +230,8 @@
 
 <script>
 (function() {
-const token = '{{ session.get("access_token") }}';
+// Get token from meta tag
+const getToken = () => document.querySelector('meta[name="access-token"]')?.content || '';
 let currentSettings = {};
 
 // Toast helper
@@ -279,7 +280,7 @@ document.querySelectorAll('.mtls-tab-button').forEach(btn => {
 async function loadMTLSSettings() {
     try {
         const response = await fetch('/api/v1/mtls/settings', {
-            headers: {'Authorization': `Bearer ${token}`}
+            headers: {'Authorization': `Bearer ${getToken()}`}
         });
         
         if (response.ok) {
@@ -324,7 +325,7 @@ async function updateUserSection() {
         // Fetch CA details
         try {
             const response = await fetch(`/api/v1/ca/${trustedCAId}`, {
-                headers: {'Authorization': `Bearer ${token}`}
+                headers: {'Authorization': `Bearer ${getToken()}`}
             });
             if (response.ok) {
                 const ca = await response.json();
@@ -362,7 +363,7 @@ document.getElementById('create-managed-cert-form')?.addEventListener('submit', 
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${getToken()}`
             },
             body: JSON.stringify(data)
         });
@@ -398,7 +399,7 @@ document.getElementById('create-selfsigned-cert-form')?.addEventListener('submit
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${getToken()}`
             },
             body: JSON.stringify(data)
         });
@@ -431,7 +432,7 @@ window.validateImportedCert = async function() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${getToken()}`
             },
             body: JSON.stringify({certificate: certPem})
         });
@@ -482,7 +483,7 @@ document.getElementById('import-cert-form')?.addEventListener('submit', async (e
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${getToken()}`
             },
             body: JSON.stringify(data)
         });
@@ -506,7 +507,7 @@ document.getElementById('import-cert-form')?.addEventListener('submit', async (e
 async function loadCertificates() {
     try {
         const response = await fetch('/api/v1/mtls/certificates', {
-            headers: {'Authorization': `Bearer ${token}`}
+            headers: {'Authorization': `Bearer ${getToken()}`}
         });
         
         if (response.ok) {
@@ -581,7 +582,7 @@ async function loadCertificates() {
 window.downloadCertificate = async function(certId) {
     try {
         const response = await fetch(`/api/v1/mtls/certificates/${certId}/download`, {
-            headers: {'Authorization': `Bearer ${token}`}
+            headers: {'Authorization': `Bearer ${getToken()}`}
         });
         
         if (response.ok) {
@@ -612,7 +613,7 @@ window.revokeCertificate = async function(certId) {
     try {
         const response = await fetch(`/api/v1/mtls/certificates/${certId}/revoke`, {
             method: 'POST',
-            headers: {'Authorization': `Bearer ${token}`}
+            headers: {'Authorization': `Bearer ${getToken()}`}
         });
         
         if (response.ok) {
@@ -630,7 +631,7 @@ window.enableCertificate = async function(certId) {
     try {
         const response = await fetch(`/api/v1/mtls/certificates/${certId}/enable`, {
             method: 'POST',
-            headers: {'Authorization': `Bearer ${token}`}
+            headers: {'Authorization': `Bearer ${getToken()}`}
         });
         
         if (response.ok) {
@@ -656,7 +657,7 @@ window.deleteCertificate = async function(certId) {
     try {
         const response = await fetch(`/api/v1/mtls/certificates/${certId}`, {
             method: 'DELETE',
-            headers: {'Authorization': `Bearer ${token}`}
+            headers: {'Authorization': `Bearer ${getToken()}`}
         });
         
         if (response.ok) {
