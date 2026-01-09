@@ -161,7 +161,7 @@
                     <a href="/config/acme" class="dropdown-item"
                        hx-get="/config/acme" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
                        @click="open = false">
-                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-shield"/></svg> ACME Protocol
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-acme"/></svg> ACME Protocol
                     </a>
                     
                     <div class="dropdown-divider"></div>
@@ -221,7 +221,7 @@
             
             <a href="/config/acme" class="sidebar-link {% if request.path.startswith('/config/acme') %}active{% endif %}"
                hx-get="/config/acme" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <svg class="ucm-icon" width="20" height="20"><use href="#icon-shield"/></svg>
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-acme"/></svg>
                 <span>ACME</span>
             </a>
             
