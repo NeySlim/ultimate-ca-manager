@@ -195,6 +195,40 @@ def dashboard():
             # Sort by created_at and take top 5
             recent_list.sort(key=lambda x: x.get('created_at', ''), reverse=True)
             certificates = recent_list[:5]
+        
+        # Get SCEP requests
+        scep_response = requests.get(f"{request.url_root}scep/requests", headers=headers, verify=False)
+        if scep_response.status_code == 200:
+            scep_data = scep_response.json()
+            
+            # Get CA names for display
+            ca_names = {}
+            if ca_response.status_code == 200:
+                for ca in ca_response.json():
+                    ca_names[ca['refid']] = ca['descr']
+            
+            # Process SCEP requests
+            for req in scep_data:
+                # Extract common name from subject
+                subject = req.get('subject', '')
+                common_name = subject
+                if 'CN=' in subject:
+                    # Extract CN from subject string
+                    parts = subject.split(',')
+                    for part in parts:
+                        if part.strip().startswith('CN='):
+                            common_name = part.strip()[3:]
+                            break
+                
+                scep_requests.append({
+                    'common_name': common_name,
+                    'status': req.get('status', 'unknown'),
+                    'ca_name': 'SCEP',  # Could enhance this by linking to actual CA
+                    'created_at': datetime.fromisoformat(req['created_at'].replace('Z', '+00:00')) if req.get('created_at') else None
+                })
+            
+            # Sort by created_at (newest first) and limit to 5
+            scep_requests.sort(key=lambda x: x.get('created_at') or datetime.min, reverse=True)
             
     except Exception as e:
         print(f"⚠️  Dashboard error: {e}")
