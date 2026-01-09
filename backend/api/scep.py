@@ -66,15 +66,30 @@ def scep_endpoint():
                 return jsonify({"error": str(e)}), 500
     
     elif request.method == 'POST':
-        if operation == 'PKCSReq':
+        if operation in ('PKCSReq', 'PKIOperation'):
             # Process PKCS#7 enrollment request
+            # Support both PKCSReq (legacy) and PKIOperation (modern)
             try:
                 pkcs7_data = request.data
                 client_ip = request.remote_addr
                 
+                # Debug: save request for analysis
+                debug_path = '/opt/ucm/backend/data/scep_request_debug.p7'
+                with open(debug_path, 'wb') as f:
+                    f.write(pkcs7_data)
+                print(f"DEBUG: Saved SCEP request to {debug_path} ({len(pkcs7_data)} bytes)", flush=True)
+                
                 response_data, status_code = service.process_pkcs_req(
                     pkcs7_data, client_ip
                 )
+                
+                # Debug: save response
+                if response_data:
+                    with open('/opt/ucm/backend/data/scep_response_debug.p7', 'wb') as f:
+                        f.write(response_data)
+                    print(f"DEBUG: Saved SCEP response to scep_response_debug.p7 ({len(response_data)} bytes)", flush=True)
+                
+                print(f"DEBUG: Response length = {len(response_data) if response_data else 0}, status = {status_code}", flush=True)
                 
                 return Response(
                     response_data,

@@ -18,6 +18,8 @@ from Crypto.Protocol.KDF import PBKDF2
 import asn1crypto.core
 import asn1crypto.cms
 import asn1crypto.x509
+from pyasn1.codec.der import decoder as pyasn1_decoder
+from pyasn1_modules import rfc5652
 
 from models import db, CA, Certificate, SCEPRequest
 
@@ -128,10 +130,84 @@ class SCEPService:
             
             # Extract CSR from encapsulated content
             encap_content = signed_data['encap_content_info']
-            csr_data = encap_content['content'].native
+            
+            # The content is an OctetString containing encrypted data
+            encrypted_content = encap_content['content']
+            encrypted_bytes = encrypted_content.native if hasattr(encrypted_content, 'native') else bytes(encrypted_content)
+            
+            # The encrypted content is a PKCS#7 envelopedData containing the CSR
+            # We need to decrypt it using our CA private key
+            try:
+                # Parse the enveloped data with asn1crypto first to check type
+                envdata = asn1crypto.cms.ContentInfo.load(encrypted_bytes)
+                
+                if envdata['content_type'].native == 'enveloped_data':
+                    # This is envelopedData - use pyasn1 to handle constructed OctetString
+                    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+                    
+                    # Parse with pyasn1 to handle BER constructed OctetString
+                    content_info_inner, _ = pyasn1_decoder.decode(encrypted_bytes, asn1Spec=rfc5652.ContentInfo())
+                    env_data, _ = pyasn1_decoder.decode(bytes(content_info_inner['content']), asn1Spec=rfc5652.EnvelopedData())
+                    
+                    # Get recipient info - it's a CHOICE, need to get the component
+                    recipient_info = env_data['recipientInfos'][0]
+                    recipient_ktri = recipient_info.getComponent()  # Get KeyTransRecipientInfo from CHOICE
+                    encrypted_key_bytes = bytes(recipient_ktri['encryptedKey'])
+                    
+                    # Decrypt the content encryption key with CA private key
+                    content_encryption_key = self.ca_key.decrypt(
+                        encrypted_key_bytes,
+                        padding.PKCS1v15()
+                    )
+                    
+                    # Get encrypted content and algorithm
+                    enc_info = env_data['encryptedContentInfo']
+                    encrypted_content_bytes = bytes(enc_info['encryptedContent'])
+                    alg_oid = str(enc_info['contentEncryptionAlgorithm']['algorithm'])
+                    alg_params = enc_info['contentEncryptionAlgorithm']['parameters']
+                    
+                    # Extract IV from parameters (ASN.1 encoded OctetString)
+                    if alg_params and alg_params.hasValue():
+                        params_bytes = bytes(alg_params)
+                        # Parameters are DER-encoded OctetString
+                        from pyasn1.type import univ
+                        iv_octets, _ = pyasn1_decoder.decode(params_bytes, asn1Spec=univ.OctetString())
+                        iv = bytes(iv_octets)
+                    else:
+                        iv = b'\x00' * 8  # Default IV
+                    
+                    # Decrypt the encrypted content to get CSR
+                    if '1.3.14.3.2.7' in alg_oid:  # DES
+                        # DES-CBC
+                        from Crypto.Cipher import DES
+                        cipher = DES.new(content_encryption_key, DES.MODE_CBC, iv)
+                        csr_data = cipher.decrypt(encrypted_content_bytes)
+                        # Remove PKCS#7 padding
+                        pad_len = csr_data[-1]
+                        csr_data = csr_data[:-pad_len]
+                    elif '1.2.840.113549.3.7' in alg_oid:  # 3DES
+                        cipher = DES3.new(content_encryption_key, DES3.MODE_CBC, iv)
+                        csr_data = cipher.decrypt(encrypted_content_bytes)
+                        # Remove PKCS#7 padding
+                        pad_len = csr_data[-1]
+                        csr_data = csr_data[:-pad_len]
+                    else:
+                        raise ValueError(f"Unsupported encryption algorithm: {alg_oid}")
+                else:
+                    # Not enveloped, use as-is (shouldn't happen in modern SCEP)
+                    csr_data = encrypted_bytes
+                    
+            except Exception as e:
+                # If decryption fails, try using the data as-is
+                import traceback
+                print(f"Warning: Could not decrypt envelopedData: {e}", flush=True)
+                traceback.print_exc()
+                csr_data = encrypted_bytes
             
             # Parse CSR
             csr = x509.load_der_x509_csr(csr_data, default_backend())
+            
+            print(f"DEBUG: CSR parsed successfully, subject = {csr.subject.rfc4514_string()}", flush=True)
             
             # Extract attributes from SCEP message
             attrs = self._extract_scep_attributes(signed_data)
@@ -139,6 +215,8 @@ class SCEPService:
             message_type = attrs.get('messageType')
             sender_nonce = attrs.get('senderNonce')
             challenge_pwd = attrs.get('challengePassword')
+            
+            print(f"DEBUG: Extracted attributes: txn_id={transaction_id}, msg_type={message_type}, challenge_pwd={'***' if challenge_pwd else None}", flush=True)
             
             if not transaction_id:
                 return self._create_error_response(
@@ -168,8 +246,11 @@ class SCEPService:
                         cert_obj = x509.load_pem_x509_certificate(
                             base64.b64decode(cert.crt), default_backend()
                         )
+                        # Load CSR from existing request
+                        existing_csr_data = base64.b64decode(existing.csr)
+                        existing_csr = x509.load_der_x509_csr(existing_csr_data, default_backend())
                         return self._create_cert_rep_success(
-                            cert_obj, transaction_id, sender_nonce
+                            cert_obj, transaction_id, sender_nonce, existing_csr
                         ), 200
                 
                 elif existing.status == "rejected":
@@ -196,8 +277,11 @@ class SCEPService:
             db.session.add(scep_req)
             
             # Auto-approve if configured
+            print(f"DEBUG: auto_approve = {self.auto_approve}, challenge_password = {self.challenge_password}", flush=True)
             if self.auto_approve:
+                print(f"DEBUG: Auto-approve enabled, creating certificate...", flush=True)
                 cert_refid = self._auto_approve_request(scep_req, csr)
+                print(f"DEBUG: Certificate created with refid: {cert_refid}", flush=True)
                 scep_req.status = "approved"
                 scep_req.cert_refid = cert_refid
                 scep_req.approved_by = "auto"
@@ -210,12 +294,14 @@ class SCEPService:
                 cert_obj = x509.load_pem_x509_certificate(
                     base64.b64decode(cert.crt), default_backend()
                 )
+                print(f"DEBUG: Returning SUCCESS response", flush=True)
                 return self._create_cert_rep_success(
-                    cert_obj, transaction_id, sender_nonce
+                    cert_obj, transaction_id, sender_nonce, csr
                 ), 200
             
             else:
                 # Manual approval required
+                print(f"DEBUG: auto_approve is FALSE, returning PENDING", flush=True)
                 db.session.commit()
                 return self._create_cert_rep_pending(
                     transaction_id, sender_nonce
@@ -451,15 +537,19 @@ class SCEPService:
     
     def _create_cert_rep_success(self, cert: x509.Certificate,
                                 transaction_id: str,
-                                sender_nonce: Optional[bytes]) -> bytes:
-        """Create successful CertRep PKCS#7 response"""
+                                sender_nonce: Optional[bytes],
+                                client_csr: x509.CertificateSigningRequest) -> bytes:
+        """Create successful CertRep PKCS#7 response with encrypted certificate"""
         # Create degenerate PKCS#7 with issued certificate and CA cert
         certs = [cert, self.ca_cert]
         pkcs7_data = self._create_degenerate_pkcs7(certs)
         
+        # Encrypt the PKCS#7 data with client's public key (from CSR)
+        encrypted_data = self._encrypt_for_client(pkcs7_data, client_csr)
+        
         # Wrap in signed CertRep
         return self._create_cert_rep(
-            self.STATUS_SUCCESS, pkcs7_data, transaction_id, sender_nonce
+            self.STATUS_SUCCESS, encrypted_data, transaction_id, sender_nonce
         )
     
     def _create_cert_rep_pending(self, transaction_id: str,
@@ -479,23 +569,154 @@ class SCEPService:
                         transaction_id: str,
                         recipient_nonce: Optional[bytes]) -> bytes:
         """
-        Create CertRep PKCS#7 response
+        Create CertRep PKCS#7 response with proper SCEP signature
         
-        This is a simplified implementation - full SCEP would sign the response
+        Args:
+            status: SCEP status (SUCCESS, PENDING, FAILURE)
+            data: Content data (certificates for success, empty for others)
+            transaction_id: SCEP transaction ID
+            recipient_nonce: Recipient nonce for response
+            
+        Returns:
+            Signed PKCS#7 CertRep message
         """
-        # For success with certificate, return the degenerate PKCS#7
-        if status == self.STATUS_SUCCESS and data:
-            return data
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+        import secrets
         
-        # For pending/failure, return minimal response
-        # In production, this should be a proper signed PKCS#7 with status attributes
-        # For now, return a simple indicator
-        if status == self.STATUS_PENDING:
-            # Return empty PKCS#7 to indicate pending
-            return self._create_degenerate_pkcs7([])
+        # Create recipient nonce if not provided
+        if recipient_nonce is None:
+            recipient_nonce = secrets.token_bytes(16)
         
-        # Failure
-        return b''
+        # Prepare SCEP attributes for SignerInfo
+        scep_attrs = []
+        
+        # transactionID (required)
+        if transaction_id:
+            scep_attrs.append({
+                'type': '2.16.840.1.113733.1.9.7',  # transactionID
+                'values': [asn1crypto.core.PrintableString(transaction_id)]
+            })
+        
+        # messageType = 3 (CertRep)
+        scep_attrs.append({
+            'type': '2.16.840.1.113733.1.9.2',  # messageType
+            'values': [asn1crypto.core.PrintableString('3')]
+        })
+        
+        # pkiStatus
+        print(f"DEBUG _create_cert_rep: status={status}, data_len={len(data) if data else 0}", flush=True)
+        scep_attrs.append({
+            'type': '2.16.840.1.113733.1.9.3',  # pkiStatus
+            'values': [asn1crypto.core.PrintableString(str(status))]
+        })
+        
+        # senderNonce (our nonce)
+        sender_nonce = secrets.token_bytes(16)
+        scep_attrs.append({
+            'type': '2.16.840.1.113733.1.9.5',  # senderNonce
+            'values': [asn1crypto.core.OctetString(sender_nonce)]
+        })
+        
+        # recipientNonce (echo back the sender's nonce)
+        if recipient_nonce:
+            scep_attrs.append({
+                'type': '2.16.840.1.113733.1.9.6',  # recipientNonce
+                'values': [asn1crypto.core.OctetString(recipient_nonce)]
+            })
+        
+        # Create encapsulated content
+        if data:
+            encap_content = {
+                'content_type': 'data',
+                'content': asn1crypto.core.OctetString(data)
+            }
+        else:
+            encap_content = {
+                'content_type': 'data',
+            }
+        
+        # Sign the content with CA key
+        # For SCEP, we sign the hash of the encapsulated content + signed attributes
+        digest_algo = hashes.SHA256()
+        
+        # Compute message digest of content (the encrypted/enveloped data for SUCCESS)
+        if data:
+            from cryptography.hazmat.primitives import hashes as crypto_hashes
+            digest_obj = crypto_hashes.Hash(crypto_hashes.SHA256())
+            digest_obj.update(data)
+            message_digest = digest_obj.finalize()
+        else:
+            # Empty data - hash of empty string
+            from cryptography.hazmat.primitives import hashes as crypto_hashes
+            digest_obj = crypto_hashes.Hash(crypto_hashes.SHA256())
+            message_digest = digest_obj.finalize()
+        
+        # Build SignedAttributes structure with correct message digest
+        from datetime import datetime
+        import pytz
+        
+        signed_attrs = asn1crypto.cms.CMSAttributes(scep_attrs + [
+            {
+                'type': 'content_type',
+                'values': ['data']
+            },
+            {
+                'type': 'message_digest',
+                'values': [asn1crypto.core.OctetString(message_digest)]
+            },
+            {
+                'type': 'signing_time',
+                'values': [asn1crypto.core.UTCTime(datetime.now(pytz.UTC))]
+            }
+        ])
+        
+        # Sign the DER-encoded signed attributes
+        signed_attrs_der = signed_attrs.dump()
+        # Replace the outer tag from SET to [0] IMPLICIT SET for signing
+        signed_attrs_for_signing = b'\x31' + signed_attrs_der[1:]
+        
+        signature = self.ca_key.sign(
+            signed_attrs_for_signing,
+            asym_padding.PKCS1v15(),
+            hashes.SHA256()
+        )
+        
+        # Get CA certificate for SignerInfo
+        ca_cert_der = self.ca_cert.public_bytes(serialization.Encoding.DER)
+        ca_cert_asn1 = asn1crypto.x509.Certificate.load(ca_cert_der)
+        
+        # Create SignerInfo
+        signer_info = asn1crypto.cms.SignerInfo({
+            'version': 'v1',
+            'sid': asn1crypto.cms.SignerIdentifier({
+                'issuer_and_serial_number': {
+                    'issuer': ca_cert_asn1.issuer,
+                    'serial_number': ca_cert_asn1.serial_number
+                }
+            }),
+            'digest_algorithm': {'algorithm': 'sha256'},
+            'signed_attrs': signed_attrs,
+            'signature_algorithm': {'algorithm': 'rsassa_pkcs1v15'},
+            'signature': asn1crypto.core.OctetString(signature),
+        })
+        
+        # Create SignedData
+        signed_data = asn1crypto.cms.SignedData({
+            'version': 'v1',
+            'digest_algorithms': [{'algorithm': 'sha256'}],
+            'encap_content_info': encap_content,
+            'certificates': [ca_cert_asn1],
+            'signer_infos': [signer_info],
+        })
+        
+        # Wrap in ContentInfo
+        content_info = asn1crypto.cms.ContentInfo({
+            'content_type': 'signed_data',
+            'content': signed_data,
+        })
+        
+        return content_info.dump()
     
     def _create_degenerate_pkcs7(self, certs: list) -> bytes:
         """
@@ -528,6 +749,94 @@ class SCEPService:
         content_info = asn1crypto.cms.ContentInfo({
             'content_type': 'signed_data',
             'content': signed_data,
+        })
+        
+        return content_info.dump()
+    
+    def _encrypt_for_client(self, data: bytes, client_csr: x509.CertificateSigningRequest) -> bytes:
+        """
+        Encrypt data for SCEP client using EnvelopedData
+        
+        Args:
+            data: Data to encrypt (usually the degenerate PKCS#7 with certificates)
+            client_csr: Client's CSR
+            
+        Returns:
+            PKCS#7 EnvelopedData structure
+        """
+        from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+        from Crypto.Cipher import DES
+        import secrets
+        
+        client_public_key = client_csr.public_key()
+        
+        # Generate random content encryption key (DES = 8 bytes)
+        content_key = secrets.token_bytes(8)
+        
+        # Generate random IV for DES-CBC
+        iv = secrets.token_bytes(8)
+        
+        # Encrypt data with DES-CBC
+        cipher = DES.new(content_key, DES.MODE_CBC, iv)
+        
+        # Pad data to DES block size (8 bytes) using PKCS#7 padding
+        block_size = 8
+        padding_len = block_size - (len(data) % block_size)
+        padded_data = data + bytes([padding_len] * padding_len)
+        
+        encrypted_content = cipher.encrypt(padded_data)
+        
+        # Encrypt the content key with client's public key
+        encrypted_key = client_public_key.encrypt(
+            content_key,
+            asym_padding.PKCS1v15()
+        )
+        
+        # RecipientInfo - use CSR subject as issuer
+        from cryptography.x509.oid import NameOID
+        from cryptography import x509 as crypto_x509
+        
+        # Use CSR subject for recipient identifier
+        csr_subject_der = client_csr.subject.public_bytes(serialization.Encoding.DER)
+        recipient_name = asn1crypto.x509.Name.load(csr_subject_der)
+        
+        recipient_info = asn1crypto.cms.RecipientInfo({
+            'ktri': {
+                'version': 'v0',
+                'rid': {
+                    'issuer_and_serial_number': {
+                        'issuer': recipient_name,  # Use CSR subject
+                        'serial_number': 1  # Use 1 as dummy serial
+                    }
+                },
+                'key_encryption_algorithm': {
+                    'algorithm': 'rsaes_pkcs1v15'
+                },
+                'encrypted_key': asn1crypto.core.OctetString(encrypted_key)
+            }
+        })
+        
+        # Create EncryptedContentInfo
+        encrypted_content_info = {
+            'content_type': 'data',
+            'content_encryption_algorithm': {
+                'algorithm': '1.3.14.3.2.7',  # DES-CBC
+                'parameters': asn1crypto.core.OctetString(iv)
+            },
+            'encrypted_content': asn1crypto.core.OctetString(encrypted_content)
+        }
+        
+        # Create EnvelopedData
+        enveloped_data = asn1crypto.cms.EnvelopedData({
+            'version': 'v0',
+            'recipient_infos': [recipient_info],
+            'encrypted_content_info': encrypted_content_info
+        })
+        
+        # Wrap in ContentInfo
+        content_info = asn1crypto.cms.ContentInfo({
+            'content_type': 'enveloped_data',
+            'content': enveloped_data
         })
         
         return content_info.dump()
