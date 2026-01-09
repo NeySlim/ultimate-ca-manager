@@ -70,8 +70,8 @@ jobs:
           ```
           
           ## 📚 Documentation
-          - [Installation Guide](https://github.com/NeySlim/ultimate-ca-manager/blob/main/INSTALLATION.md)
-          - [Docker Quick Start](https://github.com/NeySlim/ultimate-ca-manager/blob/main/DOCKER_QUICKSTART.md)
+          - [Installation Guide](https://github.com/NeySlim/ultimate-ca-manager/blob/main/docs/installation/README.md)
+          - [Docker Guide](https://github.com/NeySlim/ultimate-ca-manager/blob/main/docs/installation/docker.md)
           - [Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
           
           ## 🔐 Default Credentials
