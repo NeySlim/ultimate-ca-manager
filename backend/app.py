@@ -73,9 +73,17 @@ def create_app(config_name=None):
     from middleware.mtls_middleware import init_mtls_middleware
     init_mtls_middleware(app)
     
-    # Create database tables
+    # Create database tables and auto-migrate
     with app.app_context():
-        db.create_all()
+        try:
+            # Always run create_all to ensure all tables exist
+            db.create_all()
+            app.logger.info("Database tables created/verified")
+        except Exception as e:
+            app.logger.error(f"Database creation error: {e}")
+            raise
+        
+        # Initialize default data
         init_database(app)
     
     # Register blueprints
@@ -117,9 +125,24 @@ def create_app(config_name=None):
 
 
 def init_database(app):
-    """Initialize database with default data"""
+    """Initialize database with default data and verify schema"""
     from datetime import datetime
-    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.exc import IntegrityError, OperationalError
+    from sqlalchemy import inspect
+    
+    # Verify all tables exist, create if missing
+    inspector = inspect(db.engine)
+    existing_tables = inspector.get_table_names()
+    
+    # Get all model tables
+    expected_tables = db.Model.metadata.tables.keys()
+    missing_tables = [table for table in expected_tables if table not in existing_tables]
+    
+    if missing_tables:
+        app.logger.warning(f"Missing database tables detected: {missing_tables}")
+        app.logger.info("Running automatic schema migration...")
+        db.create_all()
+        app.logger.info("Schema migration completed successfully")
     
     # Create initial admin user if none exists
     # Use try/except to handle race conditions with multiple workers
