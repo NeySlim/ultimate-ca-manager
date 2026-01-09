@@ -3794,6 +3794,32 @@ def https_cert_info_ui():
         source_config = SystemConfig.query.filter_by(key='https_cert_source').first()
         source = source_config.value if source_config else 'auto'
         
+        # Check if running in Docker and cert needs restart
+        needs_restart = False
+        restart_warning = None
+        from config.settings import is_docker
+        if is_docker() and source == 'managed':
+            # In Docker, compare cert on disk vs what Gunicorn is serving
+            # If they differ, container needs restart
+            try:
+                import socket
+                import ssl
+                # Get currently served cert
+                context = ssl.create_default_context()
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                with socket.create_connection(('localhost', 8443), timeout=2) as sock:
+                    with context.wrap_socket(sock, server_hostname='localhost') as ssock:
+                        served_cert_der = ssock.getpeercert(binary_form=True)
+                        served_cert = x509.load_der_x509_certificate(served_cert_der, default_backend())
+                        
+                        # Compare with cert on disk
+                        if cert.serial_number != served_cert.serial_number:
+                            needs_restart = True
+                            restart_warning = "⚠️ Certificate has been changed. Please restart the Docker container for changes to take effect."
+            except:
+                pass  # Ignore errors, just won't show warning
+        
         # Get cert ID if managed
         cert_id = None
         if source == 'managed':
@@ -3817,8 +3843,12 @@ def https_cert_info_ui():
             'subject': subject_str,
             'expires': expires,
             'source': source,
-            'issuer': cert.issuer.rfc4514_string()
+            'issuer': cert.issuer.rfc4514_string(),
+            'needs_restart': needs_restart
         }
+        
+        if restart_warning:
+            result['restart_warning'] = restart_warning
         
         # Add cert_id if managed
         if source == 'managed' and cert_id:
