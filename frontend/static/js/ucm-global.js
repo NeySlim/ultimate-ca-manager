@@ -725,6 +725,121 @@ function filterTableCert() {
 }
 
 // ============================================================================
+// CERTIFICATE PAGINATION FUNCTIONS
+// ============================================================================
+
+if (typeof window.certCurrentPage === 'undefined') {
+    window.certCurrentPage = 1;
+}
+if (typeof window.certPerPage === 'undefined') {
+    window.certPerPage = 10;
+}
+if (typeof window.certTotalRows === 'undefined') {
+    window.certTotalRows = 0;
+}
+
+function initCertPagination() {
+    const table = document.getElementById('cert-table');
+    if (!table) return;
+    
+    const tbody = table.querySelector('tbody');
+    window.certTotalRows = tbody.querySelectorAll('tr').length;
+    
+    const totalEl = document.getElementById('cert-total');
+    if (totalEl) totalEl.textContent = window.certTotalRows;
+    updateCertPagination();
+}
+
+function updateCertPagination() {
+    const perPageSelect = document.getElementById('cert-per-page');
+    if (!perPageSelect) return;
+    
+    window.certPerPage = parseInt(perPageSelect.value);
+    const totalPages = Math.ceil(window.certTotalRows / window.certPerPage);
+    
+    showCertPage(window.certCurrentPage, totalPages);
+    renderCertPaginationButtons(totalPages);
+}
+
+function showCertPage(page, totalPages) {
+    const table = document.getElementById('cert-table');
+    if (!table) return;
+    
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    const start = (page - 1) * window.certPerPage;
+    const end = start + window.certPerPage;
+    
+    rows.forEach((row, index) => {
+        row.style.display = (index >= start && index < end) ? '' : 'none';
+    });
+    
+    // Update info
+    const actualStart = Math.min(start + 1, window.certTotalRows);
+    const actualEnd = Math.min(end, window.certTotalRows);
+    
+    const startEl = document.getElementById('cert-start');
+    const endEl = document.getElementById('cert-end');
+    if (startEl) startEl.textContent = actualStart;
+    if (endEl) endEl.textContent = actualEnd;
+}
+
+function renderCertPaginationButtons(totalPages) {
+    const container = document.getElementById('cert-pagination-buttons');
+    if (!container) return;
+    
+    let html = '';
+    
+    // Previous button
+    html += `<button class="pagination-btn" onclick="goToCertPage(${window.certCurrentPage - 1}, ${totalPages})" ${window.certCurrentPage === 1 ? 'disabled' : ''}>
+        <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-left"/></svg>
+    </button>`;
+    
+    // Page numbers
+    const maxButtons = 7;
+    let startPage = Math.max(1, window.certCurrentPage - Math.floor(maxButtons / 2));
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+    
+    if (endPage - startPage < maxButtons - 1) {
+        startPage = Math.max(1, endPage - maxButtons + 1);
+    }
+    
+    if (startPage > 1) {
+        html += `<button class="pagination-btn" onclick="goToCertPage(1, ${totalPages})">1</button>`;
+        if (startPage > 2) {
+            html += `<span class="pagination-ellipsis">...</span>`;
+        }
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="pagination-btn ${i === window.certCurrentPage ? 'active' : ''}" 
+                 onclick="goToCertPage(${i}, ${totalPages})">${i}</button>`;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += `<span class="pagination-ellipsis">...</span>`;
+        }
+        html += `<button class="pagination-btn" onclick="goToCertPage(${totalPages}, ${totalPages})">${totalPages}</button>`;
+    }
+    
+    // Next button
+    html += `<button class="pagination-btn" onclick="goToCertPage(${window.certCurrentPage + 1}, ${totalPages})" ${window.certCurrentPage === totalPages ? 'disabled' : ''}>
+        <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-right"/></svg>
+    </button>`;
+    
+    container.innerHTML = html;
+}
+
+function goToCertPage(page, totalPages) {
+    if (page < 1 || page > totalPages) return;
+    window.certCurrentPage = page;
+    showCertPage(page, totalPages);
+    renderCertPaginationButtons(totalPages);
+}
+
+// ============================================================================
 // THEME SWITCHER FUNCTIONS
 // ============================================================================
 
@@ -1255,6 +1370,13 @@ document.addEventListener('click', (e) => {
         e.stopPropagation();
         const column = parseInt(sortTableCABtn.dataset.column);
         sortTableCA(column);
+        return;
+    }
+    
+    // Update Certificate Pagination
+    const updateCertPaginationSelect = e.target.closest('[data-action="update-cert-pagination"]');
+    if (updateCertPaginationSelect) {
+        updateCertPagination();
         return;
     }
     

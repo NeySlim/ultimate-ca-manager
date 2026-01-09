@@ -1299,7 +1299,7 @@ def cert_list_content():
                 <span>Affichage <span id="cert-start">1</span>-<span id="cert-end">10</span> sur <span id="cert-total"></span> certificats</span>
             </div>
             <div class="pagination-controls">
-                <select class="pagination-select" id="cert-per-page" onchange="updateCertPagination()">
+                <select class="pagination-select" id="cert-per-page" data-action="update-cert-pagination">
                     <option value="10" selected>10 par page</option>
                     <option value="25">25 par page</option>
                     <option value="50">50 par page</option>
@@ -1310,110 +1310,7 @@ def cert_list_content():
         </div>
         
         <script>
-        // Certificate Table Pagination - Use window object to avoid redeclaration in HTMX
-        if (typeof window.window.certCurrentPage === 'undefined') {
-            window.window.certCurrentPage = 1;
-            window.window.certPerPage = 10;
-            window.window.certTotalRows = 0;
-        }
-        
-        function initCertPagination() {
-            const table = document.getElementById('cert-table');
-            if (!table) return;
-            
-            const tbody = table.querySelector('tbody');
-            window.window.certTotalRows = tbody.querySelectorAll('tr').length;
-            
-            document.getElementById('cert-total').textContent = window.window.certTotalRows;
-            updateCertPagination();
-        }
-        
-        function updateCertPagination() {
-            const perPageSelect = document.getElementById('cert-per-page');
-            window.certPerPage = parseInt(perPageSelect.value);
-            const totalPages = Math.ceil(window.certTotalRows / window.certPerPage);
-            
-            showCertPage(window.certCurrentPage, totalPages);
-            renderCertPaginationButtons(totalPages);
-        }
-        
-        function showCertPage(page, totalPages) {
-            const table = document.getElementById('cert-table');
-            if (!table) return;
-            
-            const tbody = table.querySelector('tbody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            
-            const start = (page - 1) * window.certPerPage;
-            const end = start + window.certPerPage;
-            
-            rows.forEach((row, index) => {
-                row.style.display = (index >= start && index < end) ? '' : 'none';
-            });
-            
-            // Update info
-            const actualStart = Math.min(start + 1, window.certTotalRows);
-            const actualEnd = Math.min(end, window.certTotalRows);
-            document.getElementById('cert-start').textContent = actualStart;
-            document.getElementById('cert-end').textContent = actualEnd;
-        }
-        
-        function renderCertPaginationButtons(totalPages) {
-            const container = document.getElementById('cert-pagination-buttons');
-            if (!container) return;
-            
-            let html = '';
-            
-            // Previous button
-            html += `<button class="pagination-btn" onclick="goToCertPage(${window.certCurrentPage - 1}, ${totalPages})" ${window.certCurrentPage === 1 ? 'disabled' : ''}>
-                <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-left"/></svg>
-            </button>`;
-            
-            // Page numbers
-            const maxButtons = 7;
-            let startPage = Math.max(1, window.certCurrentPage - Math.floor(maxButtons / 2));
-            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-            
-            if (endPage - startPage < maxButtons - 1) {
-                startPage = Math.max(1, endPage - maxButtons + 1);
-            }
-            
-            if (startPage > 1) {
-                html += `<button class="pagination-btn" onclick="goToCertPage(1, ${totalPages})">1</button>`;
-                if (startPage > 2) {
-                    html += `<span class="pagination-ellipsis">...</span>`;
-                }
-            }
-            
-            for (let i = startPage; i <= endPage; i++) {
-                html += `<button class="pagination-btn ${i === window.certCurrentPage ? 'active' : ''}" 
-                         onclick="goToCertPage(${i}, ${totalPages})">${i}</button>`;
-            }
-            
-            if (endPage < totalPages) {
-                if (endPage < totalPages - 1) {
-                    html += `<span class="pagination-ellipsis">...</span>`;
-                }
-                html += `<button class="pagination-btn" onclick="goToCertPage(${totalPages}, ${totalPages})">${totalPages}</button>`;
-            }
-            
-            // Next button
-            html += `<button class="pagination-btn" onclick="goToCertPage(${window.certCurrentPage + 1}, ${totalPages})" ${window.certCurrentPage === totalPages ? 'disabled' : ''}>
-                <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-right"/></svg>
-            </button>`;
-            </button>`;
-            
-            container.innerHTML = html;
-        }
-        
-        function goToCertPage(page, totalPages) {
-            if (page < 1 || page > totalPages) return;
-            window.certCurrentPage = page;
-            showCertPage(page, totalPages);
-            renderCertPaginationButtons(totalPages);
-        }
-        
-        // Initialize immediately (HTMX content already loaded)
+        // Initialize certificate pagination on HTMX load
         setTimeout(initCertPagination, 100);
         </script>
         
