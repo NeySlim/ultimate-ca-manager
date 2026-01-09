@@ -293,20 +293,24 @@ IP.1 = 127.0.0.1
 EOF
     
     # Generate certificate
-    openssl req -x509 -newkey rsa:4096 -nodes \
+    if openssl req -x509 -newkey rsa:4096 -nodes \
         -keyout "$KEY_PATH" \
         -out "$CERT_PATH" \
         -days 365 \
         -config /tmp/openssl.cnf \
-        -extensions v3_req \
-        2>/dev/null
-    
-    chmod 600 "$KEY_PATH"
-    chmod 644 "$CERT_PATH"
-    rm /tmp/openssl.cnf
-    
-    echo -e "${GREEN}✅ Self-signed certificate generated${NC}"
-    echo -e "${YELLOW}   ⚠️  For production, use a trusted certificate!${NC}"
+        -extensions v3_req 2>&1; then
+        
+        chmod 600 "$KEY_PATH"
+        chmod 644 "$CERT_PATH"
+        rm -f /tmp/openssl.cnf
+        
+        echo -e "${GREEN}✅ Self-signed certificate generated${NC}"
+        echo -e "${YELLOW}   ⚠️  For production, use a trusted certificate!${NC}"
+    else
+        echo -e "${RED}❌ Failed to generate certificate${NC}"
+        rm -f /tmp/openssl.cnf
+        exit 1
+    fi
 fi
 
 # =============================================================================
