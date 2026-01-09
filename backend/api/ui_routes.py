@@ -599,17 +599,10 @@ def ca_list_content():
             # Build tree connector visual
             tree_connector = ''
             if indent_level > 0:
-                # Create L-shaped connector using box-drawing characters or CSS
-                tree_connector = f'''
+                # Create L-shaped connector using CSS class
+                tree_connector = '''
                     <div style="display: flex; align-items: center; margin-right: 0.5rem;">
-                        <div style="
-                            width: 20px;
-                            height: 20px;
-                            border-left: 2px solid var(--border-color);
-                            border-bottom: 2px solid var(--border-color);
-                            border-bottom-left-radius: 6px;
-                            margin-bottom: 10px;
-                        "></div>
+                        <div class="ca-tree-connector"></div>
                     </div>
                 '''
             
@@ -709,48 +702,8 @@ def ca_list_content():
         
         # Build HTML with hierarchy
         html = '''
-        <style>
-        /* Remove table borders but preserve connector borders */
-        #ca-table {
-            border-collapse: collapse;
-        }
-        #ca-table thead tr {
-            border: none !important;
-        }
-        #ca-table thead th {
-            border: none !important;
-        }
-        #ca-table tbody {
-            border: none !important;
-        }
-        #ca-table tbody tr {
-            border: none !important;
-        }
-        /* Remove default borders from all cells */
-        #ca-table tbody tr:not(.ca-standalone):not(.ca-last-child) td {
-            border: none !important;
-        }
-        /* Separator for standalone ROOT CAs - MUST OVERRIDE */
-        #ca-table tbody tr.ca-standalone > td {
-            padding-bottom: 0.5rem !important;
-            border-bottom: 3px solid var(--border-color) !important;
-        }
-        /* Separator for last child of a family - MUST OVERRIDE */
-        #ca-table tbody tr.ca-last-child > td {
-            padding-bottom: 0.5rem !important;
-            border-bottom: 3px solid var(--border-color) !important;
-        }
-        /* Hover effect - change background of entire row */
-        #ca-table tbody tr:hover td {
-            background-color: var(--bg-secondary) !important;
-        }
-        /* Tighter spacing for children rows */
-        #ca-table tbody tr.ca-child-row {
-            line-height: 1.2;
-        }
-        </style>
         <div style="overflow-x: auto; overflow-y: visible;">
-            <table id="ca-table" style="width: 100%; border-collapse: collapse;">
+            <table id="ca-table">
                 <thead style="background: var(--bg-secondary);">
                     <tr style="border-bottom: 2px solid var(--border-color);">
                         <th style="padding: 0.75rem; text-align: left;">
@@ -773,7 +726,7 @@ def ca_list_content():
                         <th style="padding: 0.75rem; text-align: left;">Commandes</th>
                     </tr>
                 </thead>
-                <tbody style="background: var(--card-bg);">
+                <tbody>
         '''
         
         # Render ROOT CAs with their children

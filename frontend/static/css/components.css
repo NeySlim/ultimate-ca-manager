@@ -1978,3 +1978,59 @@ body.modal-open {
         transform: translateY(-20px) scale(0.95);
     }
 }
+
+/* ===========================
+   CA LIST TABLE
+   =========================== */
+
+/* CA table structure */
+#ca-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+/* Remove default borders */
+#ca-table thead tr,
+#ca-table thead th,
+#ca-table tbody,
+#ca-table tbody tr {
+    border: none !important;
+}
+
+/* Remove borders from regular cells */
+#ca-table tbody tr:not(.ca-standalone):not(.ca-last-child) td {
+    border: none !important;
+}
+
+/* Separator for standalone ROOT CAs */
+#ca-table tbody tr.ca-standalone > td {
+    padding-bottom: 0.5rem !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+/* Separator for last child of a family */
+#ca-table tbody tr.ca-last-child > td {
+    padding-bottom: 0.5rem !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+/* Hover effect - change background of entire row */
+#ca-table tbody tr:hover td {
+    background-color: var(--bg-hover) !important;
+}
+
+/* Tighter spacing for children rows */
+#ca-table tbody tr.ca-child-row {
+    line-height: 1.2;
+}
+
+/* Tree connector for hierarchical display */
+.ca-tree-connector {
+    width: 20px;
+    height: 20px;
+    border-left: 2px solid var(--border-color);
+    border-bottom: 2px solid var(--border-color);
+    border-bottom-left-radius: 6px;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+}
