@@ -1,0 +1,63 @@
+[Unit]
+Description=Ultimate CA Manager (UCM)
+Documentation=https://github.com/NeySlim/ultimate-ca-manager
+After=network.target
+
+[Service]
+Type=notify
+User=ucm
+Group=ucm
+WorkingDirectory=/opt/ucm
+
+# Environment
+EnvironmentFile=/etc/ucm/ucm.env
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/ucm /var/log/ucm
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=512
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitInterval=60s
+StartLimitBurst=3
+
+# Execution
+ExecStartPre=/usr/bin/python3 -c "import sys; assert sys.version_info >= (3,10), 'Python 3.10+ required'"
+ExecStart=/usr/bin/python3 -m gunicorn \
+    --bind 0.0.0.0:${HTTPS_PORT} \
+    --workers 4 \
+    --worker-class sync \
+    --timeout 120 \
+    --access-logfile /var/log/ucm/access.log \
+    --error-logfile /var/log/ucm/error.log \
+    --log-level info \
+    --certfile /var/lib/ucm/https_cert.pem \
+    --keyfile /var/lib/ucm/https_key.pem \
+    --chdir /opt/ucm/backend \
+    "app:create_app()"
+
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Standard output
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ucm
+
+[Install]
+WantedBy=multi-user.target

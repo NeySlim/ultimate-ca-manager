@@ -1,0 +1,58 @@
+Source: ucm
+Section: admin
+Priority: optional
+Maintainer: UCM Development Team <dev@ucm-project.org>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-all,
+               python3-setuptools,
+               python3-pip
+Standards-Version: 4.6.0
+Homepage: https://github.com/NeySlim/ultimate-ca-manager
+Vcs-Browser: https://github.com/NeySlim/ultimate-ca-manager
+Vcs-Git: https://github.com/NeySlim/ultimate-ca-manager.git
+
+Package: ucm
+Architecture: all
+Depends: ${misc:Depends},
+         ${python3:Depends},
+         python3 (>= 3.10),
+         python3-flask (>= 2.3.0),
+         python3-cryptography (>= 41.0.0),
+         python3-sqlalchemy (>= 2.0.0),
+         python3-jwt,
+         python3-flask-cors,
+         python3-bcrypt,
+         python3-werkzeug,
+         openssl (>= 1.1.1),
+         adduser,
+         systemd
+Recommends: nginx | apache2,
+            python3-flask-caching,
+            python3-redis
+Suggests: certbot,
+          python3-gunicorn
+Description: Ultimate CA Manager - Certificate Authority Management System
+ UCM (Ultimate CA Manager) is a comprehensive web-based Certificate Authority
+ management system designed for organizations that need to manage their own PKI
+ infrastructure.
+ .
+ Features:
+  * Complete CA lifecycle management
+  * Certificate issuance and revocation
+  * CRL (Certificate Revocation List) generation
+  * ACME protocol support (RFC 8555)
+  * SCEP protocol support
+  * mTLS authentication
+  * WebAuthn/FIDO2 support
+  * REST API
+  * Email notifications
+  * Dark mode UI
+  * Multi-language support
+ .
+ This package includes:
+  * Flask-based web application
+  * Systemd service configuration
+  * Automatic database setup
+  * HTTPS certificate generation
+  * Interactive configuration wizard
