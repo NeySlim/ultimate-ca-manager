@@ -58,6 +58,7 @@ validate_email() {
 # ENVIRONMENT VARIABLE DEFAULTS
 # =============================================================================
 
+# shellcheck disable=SC2223
 # Core Settings
 : "${UCM_FQDN:="ucm.local"}"
 : "${UCM_HTTPS_PORT:=8443}"
