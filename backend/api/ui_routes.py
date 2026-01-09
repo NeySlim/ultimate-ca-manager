@@ -1597,7 +1597,10 @@ def scep_config_form():
             ca_options += f'<option value="{ca["refid"]}" {selected}>{ca["descr"]}</option>'
         
         return f'''
-        <form hx-post="/api/ui/scep/save" hx-on::after-request="showToast('SCEP config saved', 'success')" style="display: flex; flex-direction: column; gap: 1.25rem;">
+        <form hx-post="/api/ui/scep/save" 
+              hx-swap="none"
+              hx-on::after-request="if(event.detail.successful) {{ showToast('SCEP configuration saved', 'success'); htmx.trigger('#scep-config-card', 'reload'); }}" 
+              style="display: flex; flex-direction: column; gap: 1.25rem;">
             <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
                 <input type="checkbox" name="enabled" {"checked" if enabled else ""} 
                        style="width: 1.125rem; height: 1.125rem; cursor: pointer;">
