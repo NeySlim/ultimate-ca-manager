@@ -54,7 +54,7 @@ jobs:
       - name: Build RPM in container
         run: |
           docker run --rm -v $(pwd):/workspace rockylinux:9 bash -c "
-            dnf install -y rpm-build python3 python3-pip python3-devel gcc openssl-devel && \
+            dnf install -y rpm-build python3 python3-pip python3-devel gcc openssl-devel systemd-rpm-macros && \
             cd /workspace && \
             # Create RPM build structure
             mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} && \
@@ -74,7 +74,7 @@ jobs:
       - name: Copy RPM package
         run: |
           docker run --rm -v $(pwd):/workspace -v /tmp:/output rockylinux:9 bash -c "
-            dnf install -y rpm-build && \
+            dnf install -y rpm-build python3 systemd-rpm-macros && \
             mkdir -p ~/rpmbuild && \
             cd /workspace && \
             tar czf ~/rpmbuild/SOURCES/ucm-${{ steps.version.outputs.rpm_version }}.tar.gz \
