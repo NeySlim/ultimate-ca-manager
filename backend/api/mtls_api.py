@@ -406,9 +406,10 @@ def download_certificate(cert_id):
         # Extract CN from subject for filename
         cn = "unknown"
         if auth_cert.cert_subject:
-            # Parse subject DN (e.g., "CN=admin,O=MyOrg")
+            # Parse subject DN (supports both "CN=" and "commonName=" formats)
             for part in auth_cert.cert_subject.split(','):
-                if part.strip().startswith('CN='):
+                part_lower = part.strip().lower()
+                if part_lower.startswith('cn=') or part_lower.startswith('commonname='):
                     cn = part.split('=', 1)[1].strip()
                     # Sanitize filename
                     cn = cn.replace(' ', '_').replace('/', '_').replace('\\', '_')
