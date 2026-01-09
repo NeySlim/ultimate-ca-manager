@@ -29,57 +29,67 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/}
           
           # Get previous tag
-          PREV_TAG=$(git tag --sort=-v:refname | grep -A1 "^${VERSION}$" | tail -1)
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${VERSION}$" | head -1)
           
-          # Generate changelog
+          # Generate changelog from commits
+          echo "## 📦 What's New" > notes.md
+          echo "" >> notes.md
+          
           if [ -z "$PREV_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"- %s (%h)" ${VERSION})
+            git log --pretty=format:"- %s" ${VERSION} | head -20 >> notes.md
           else
-            COMMITS=$(git log --pretty=format:"- %s (%h)" ${PREV_TAG}..${VERSION})
+            echo "Changes since ${PREV_TAG}:" >> notes.md
+            echo "" >> notes.md
+            git log --pretty=format:"- %s" ${PREV_TAG}..${VERSION} >> notes.md
           fi
           
-          # Create release notes
-          cat > release_notes.md << 'EOF'
-          ## What's New in ${VERSION}
+          # Add installation instructions
+          cat >> notes.md << 'NOTES'
           
-          ${COMMITS}
+          ---
           
-          ## Installation
+          ## 🚀 Installation
           
-          ### Docker (Multi-arch: AMD64, ARM64)
+          ### Docker (Recommended)
           ```bash
-          docker pull ghcr.io/neyslim/ultimate-ca-manager:${VERSION}
+          docker pull ghcr.io/neyslim/ultimate-ca-manager:VERSION_TAG
+          docker run -d -p 8443:8443 --name ucm ghcr.io/neyslim/ultimate-ca-manager:VERSION_TAG
           ```
           
-          ### RPM (RHEL 9/Rocky 9/Alma 9/Fedora)
+          ### RPM (RHEL/Rocky/Alma/Fedora)
+          Download the `.rpm` file from assets below, then:
           ```bash
-          # Download from releases
-          wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/${VERSION}/ucm-${VERSION#v}-*.rpm
-          sudo dnf install ./ucm-${VERSION#v}-*.rpm
+          sudo dnf install ./ucm-*.rpm
           ```
           
           ### DEB (Debian/Ubuntu)
+          Download the `.deb` file from assets below, then:
           ```bash
-          # Download from releases
-          wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/${VERSION}/ucm_${VERSION#v}_all.deb
-          sudo dpkg -i ucm_${VERSION#v}_all.deb
+          sudo dpkg -i ucm_*.deb
           sudo apt-get install -f
           ```
           
-          ## Documentation
+          ## 📚 Documentation
           - [Installation Guide](https://github.com/NeySlim/ultimate-ca-manager/blob/main/INSTALLATION.md)
+          - [Docker Quick Start](https://github.com/NeySlim/ultimate-ca-manager/blob/main/DOCKER_QUICKSTART.md)
           - [Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
-          - [Quick Start](https://github.com/NeySlim/ultimate-ca-manager/blob/main/DOCKER_QUICKSTART.md)
-          EOF
           
-          # Expand variables
-          eval "cat <<EVALEOF
-          $(<release_notes.md)
-          EVALEOF" > release_notes_expanded.md
+          ## 🔐 Default Credentials
+          - Username: `admin`
+          - Password: `changeme123`
           
-          echo "notes<<NOTESEOF" >> $GITHUB_OUTPUT
-          cat release_notes_expanded.md >> $GITHUB_OUTPUT
-          echo "NOTESEOF" >> $GITHUB_OUTPUT
+          ⚠️ **CHANGE THE PASSWORD IMMEDIATELY AFTER FIRST LOGIN!**
+          NOTES
+          
+          # Replace VERSION_TAG
+          sed -i "s/VERSION_TAG/${VERSION}/g" notes.md
+          
+          # Output for GitHub
+          {
+            echo 'notes<<NOTES_EOF'
+            cat notes.md
+            echo 'NOTES_EOF'
+          } >> $GITHUB_OUTPUT
       
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
