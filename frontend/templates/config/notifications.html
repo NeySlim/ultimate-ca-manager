@@ -1,24 +1,26 @@
 {% extends "base.html" %}
 
-{% block title %}Email Notifications - UCM{% endblock %}
+{% block title %}Notifications - UCM{% endblock %}
 
 {% block content %}
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
-            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-envelope"/></svg> Email Notifications
+            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-bell"/></svg> Notifications
         </h1>
         <button onclick="testNotifications()" class="btn btn-outline-primary">
             <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-play"/></svg> Run Manual Check
         </button>
     </div>
 
-    <!-- SMTP Configuration -->
+    <!-- SMTP Configuration (Admin Only) -->
+    {% if session.get('role') == 'admin' %}
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                 <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-server"/></svg>
                 SMTP Server Configuration
+                <span class="badge-outline badge-warning" style="margin-left: 0.5rem; font-size: 0.75rem;">Admin Only</span>
             </h2>
             <span id="smtp-status-badge" class="badge-outline badge-secondary">
                 <svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg>
@@ -86,11 +88,53 @@
                 </div>
                 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn-primary">
                         <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-save"/></svg> Save SMTP Configuration
                     </button>
                     <button type="button" onclick="testSMTP()" class="btn btn-outline-success">
                         <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-envelope"/></svg> Send Test Email
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- My Notification Settings -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-user"/></svg>
+                My Notification Settings
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form id="user-notification-form">
+                <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; max-width: 600px;">
+                    <div>
+                        <label class="form-label">
+                            <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.25rem;"><use href="#icon-envelope"/></svg>
+                            Email Address for Notifications
+                        </label>
+                        <input type="email" id="user_notification_email" class="form-input" 
+                               placeholder="your.email@example.com" 
+                               value="{{ session.get('email', '') }}">
+                        <small style="color: var(--text-secondary); font-size: 0.875rem; display: block; margin-top: 0.5rem;">
+                            All certificate expiration and system notifications will be sent to this email address.
+                        </small>
+                    </div>
+                    
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="user_notifications_enabled" checked>
+                            <strong>Enable email notifications for my account</strong>
+                        </label>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                    <button type="submit" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-save"/></svg> Save My Settings
                     </button>
                 </div>
             </form>
@@ -245,6 +289,55 @@ document.getElementById('smtp-form').addEventListener('submit', async (e) => {
         showToast('Error saving configuration: ' + error.message, 'error');
     }
 });
+
+// Save user notification settings
+document.getElementById('user-notification-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        email: document.getElementById('user_notification_email').value,
+        enabled: document.getElementById('user_notifications_enabled').checked
+    };
+    
+    try {
+        const response = await fetch('/api/v1/notifications/user/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Notification settings saved', 'success');
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to save settings'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+});
+
+// Load user notification settings
+async function loadUserNotificationSettings() {
+    try {
+        const response = await fetch('/api/v1/notifications/user/settings', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const settings = await response.json();
+            document.getElementById('user_notification_email').value = settings.email || '';
+            document.getElementById('user_notifications_enabled').checked = settings.enabled !== false;
+        }
+    } catch (error) {
+        console.error('Error loading user notification settings:', error);
+    }
+}
+
 
 // Test SMTP
 window.testSMTP = async function() {
@@ -412,12 +505,18 @@ async function loadNotificationHistory() {
                 return;
             }
             
-            tbody.innerHTML = data.logs.map(log => `
+            tbody.innerHTML = data.logs.map(log => {
+                // Escape user-controlled data to prevent XSS
+                const safeType = escapeHtml(log.type);
+                const safeRecipient = escapeHtml(log.recipient);
+                const safeSubject = escapeHtml(log.subject || 'N/A');
+                
+                return `
                 <tr>
                     <td>${new Date(log.sent_at).toLocaleString()}</td>
-                    <td><span class="badge-outline badge-info">${log.type}</span></td>
-                    <td>${log.recipient}</td>
-                    <td>${log.subject || 'N/A'}</td>
+                    <td><span class="badge-outline badge-info">${safeType}</span></td>
+                    <td>${safeRecipient}</td>
+                    <td>${safeSubject}</td>
                     <td>
                         ${log.status === 'sent' 
                             ? '<span class="badge-outline badge-success"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> Sent</span>'
@@ -425,7 +524,7 @@ async function loadNotificationHistory() {
                         }
                     </td>
                 </tr>
-            `).join('');
+            `}).join('');
         }
     } catch (error) {
         console.error('Error loading notification history:', error);
@@ -491,6 +590,7 @@ async function testNotifications() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    loadUserNotificationSettings();
     loadSMTPConfig();
     loadNotificationRules();
     loadNotificationHistory();

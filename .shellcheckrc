@@ -1,0 +1,6 @@
+# ShellCheck configuration for UCM
+# Disabled warnings:
+# - SC2223: Parameter expansion defaults are safe (controlled values, not user input)
+# - SC2181: Checking $? is clearer in some contexts
+# - SC2012: Using ls is acceptable for simple cases with known filenames
+disable=SC2223,SC2181,SC2012

@@ -7,7 +7,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class CertificateParser:
@@ -107,12 +107,13 @@ class CertificateParser:
             'subject_dn': subject_dn,
             'issuer_dn': issuer_dn,
             'serial': serial,
-            'fingerprint': fingerprint,
+            'fingerprint_sha256': fingerprint,
+            'fingerprint': fingerprint,  # Backward compatibility
             'common_name': cn,
             'email': email,
             'valid_from': valid_from,
             'valid_until': valid_until,
-            'is_valid': datetime.utcnow() >= valid_from and datetime.utcnow() <= valid_until
+            'is_valid': datetime.now(timezone.utc) >= valid_from and datetime.now(timezone.utc) <= valid_until
         }
     
     @staticmethod
@@ -244,5 +245,72 @@ class CertificateParser:
                 'valid_until': None,
                 'is_valid': True
             }
+        
+        return None
+    
+    @staticmethod
+    def extract_from_flask_native(peercert) -> Optional[Dict[str, any]]:
+        """
+        Extract certificate info from native Flask/werkzeug peercert
+        
+        This method handles certificates extracted directly from the SSL layer
+        when Flask is running with client cert verification enabled.
+        
+        Args:
+            peercert: DER-encoded certificate bytes or dict from request.environ['peercert']
+        
+        Returns:
+            Dict with certificate information or None
+        """
+        try:
+            # peercert can be bytes (DER) or dict
+            if isinstance(peercert, bytes):
+                # DER format - parse it
+                from cryptography.x509 import load_der_x509_certificate
+                from cryptography.hazmat.backends import default_backend
+                
+                cert = load_der_x509_certificate(peercert, default_backend())
+                
+                # Extract subject
+                subject_parts = {}
+                for attr in cert.subject:
+                    subject_parts[attr.oid._name.upper()] = attr.value
+                
+                # Build DN string
+                subject_dn = ', '.join([f'{k}={v}' for k, v in subject_parts.items()])
+                
+                # Get serial as hex
+                serial = format(cert.serial_number, 'X')
+                
+                # Calculate fingerprint
+                import hashlib
+                fingerprint = hashlib.sha256(peercert).hexdigest().upper()
+                
+                return {
+                    'cert_pem': cert.public_bytes(encoding=serialization.Encoding.PEM).decode('utf-8'),
+                    'subject_dn': subject_dn,
+                    'issuer_dn': ', '.join([f'{attr.oid._name.upper()}={attr.value}' for attr in cert.issuer]),
+                    'serial': serial,
+                    'fingerprint': fingerprint,
+                    'common_name': subject_parts.get('COMMONNAME') or subject_parts.get('CN'),
+                    'email': subject_parts.get('EMAILADDRESS'),
+                    'valid_from': cert.not_valid_before_utc,
+                    'valid_until': cert.not_valid_after_utc,
+                    'is_valid': True
+                }
+            
+            elif isinstance(peercert, dict):
+                # Already parsed dict (older Python SSL)
+                subject_dn = ', '.join([f'{k}={v}' for k, v in peercert.get('subject', [])][0])
+                return {
+                    'subject_dn': subject_dn,
+                    'serial': peercert.get('serialNumber', '').upper(),
+                    'common_name': dict(peercert.get('subject', [])[0]).get('commonName'),
+                    'is_valid': True
+                }
+                
+        except Exception as e:
+            logger.error(f"Error extracting native Flask certificate: {e}")
+            return None
         
         return None

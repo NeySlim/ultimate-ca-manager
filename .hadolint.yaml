@@ -1,0 +1,6 @@
+# Hadolint configuration for UCM Dockerfile
+# See: https://github.com/hadolint/hadolint
+
+ignored:
+  - DL3008
+  - DL3013

@@ -1,0 +1,45 @@
+[Unit]
+Description=Ultimate CA Manager (UCM) with Gunicorn
+After=network.target
+
+[Service]
+Type=notify
+User=ucm
+Group=ucm
+WorkingDirectory=/opt/ucm/backend
+Environment="PATH=/opt/ucm/venv/bin:/usr/local/bin:/usr/bin:/bin"
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=false
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ucm/backend/data /tmp
+
+# Pre-start: Extract CA certificate from database
+ExecStartPre=/opt/ucm/extract_mtls_ca.sh
+
+# Start Gunicorn with mTLS support
+ExecStart=/opt/ucm/venv/bin/gunicorn \
+  --workers 4 \
+  --bind 0.0.0.0:8443 \
+  --certfile=/opt/ucm/backend/data/https_cert.pem \
+  --keyfile=/opt/ucm/backend/data/https_key.pem \
+  --ca-certs=/tmp/ucm_mtls_ca.pem \
+  --cert-reqs=1 \
+  --timeout 120 \
+  --access-logfile - \
+  --error-logfile - \
+  wsgi:app
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ucm-gunicorn
+
+[Install]
+WantedBy=multi-user.target

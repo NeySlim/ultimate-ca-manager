@@ -2,14 +2,17 @@
 mTLS Authentication API
 Manage client certificates and mTLS settings
 """
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from middleware.auth_middleware import admin_required
-from models import db, User, SystemConfig, AuditLog
+from models import db, User, SystemConfig, AuditLog, CA
 from models.auth_certificate import AuthCertificate
 from services.mtls_auth_service import MTLSAuthService
 from services.certificate_parser import CertificateParser
+from services.cert_service import CertificateService
 import logging
+import io
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -42,12 +45,12 @@ def get_mtls_settings():
     """
     enabled = SystemConfig.query.filter_by(key='mtls_enabled').first()
     required = SystemConfig.query.filter_by(key='mtls_required').first()
-    trusted_ca = SystemConfig.query.filter_by(key='mtls_trusted_ca_path').first()
+    trusted_ca_id = SystemConfig.query.filter_by(key='mtls_trusted_ca_id').first()
     
     return jsonify({
         'enabled': enabled.value.lower() in ('true', '1', 'yes') if enabled else False,
         'required': required.value.lower() in ('true', '1', 'yes') if required else False,
-        'trusted_ca_path': trusted_ca.value if trusted_ca else ''
+        'trusted_ca_id': trusted_ca_id.value if trusted_ca_id else ''
     }), 200
 
 
@@ -62,7 +65,7 @@ def update_mtls_settings():
     Body: {
         "enabled": true,
         "required": false,
-        "trusted_ca_path": "/path/to/ca-bundle.pem"
+        "trusted_ca_id": "ca_refid_123" (optional)
     }
     """
     try:
@@ -75,7 +78,7 @@ def update_mtls_settings():
         settings = {
             'mtls_enabled': str(data.get('enabled', False)).lower(),
             'mtls_required': str(data.get('required', False)).lower(),
-            'mtls_trusted_ca_path': data.get('trusted_ca_path', '')
+            'mtls_trusted_ca_id': data.get('trusted_ca_id', '')
         }
         
         for key, value in settings.items():
@@ -151,6 +154,155 @@ def get_all_certificates():
     }), 200
 
 
+@mtls_bp.route('/certificates/create', methods=['POST'])
+@jwt_required()
+def create_certificate():
+    """
+    Create a new client certificate (managed or self-signed)
+    ---
+    POST /api/v1/mtls/certificates/create
+    Body: {
+        "cn": "john.doe",
+        "email": "john@example.com",
+        "validity_days": 365,
+        "key_size": 4096,  # Only for self-signed
+        "self_signed": false  # true = self-signed, false = signed by trusted CA
+    }
+    """
+    try:
+        data = request.get_json()
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        username = user.username if user else None
+        
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+        cn = data.get('cn')
+        email = data.get('email', '')
+        validity_days = data.get('validity_days', 365)
+        self_signed = data.get('self_signed', False)
+        key_size = data.get('key_size', 4096)
+        
+        if not cn:
+            return jsonify({'success': False, 'error': 'Common Name (CN) required'}), 400
+        
+        # Get mTLS settings
+        trusted_ca_config = SystemConfig.query.filter_by(key='mtls_trusted_ca_id').first()
+        trusted_ca_id = trusted_ca_config.value if trusted_ca_config else None
+        
+        if self_signed:
+            # Create self-signed certificate
+            if trusted_ca_id:
+                return jsonify({'success': False, 'error': 'Self-signed certificates not allowed when CA is configured'}), 400
+            
+            # Generate self-signed cert using TrustStoreService
+            from services.trust_store import TrustStoreService
+            from cryptography.hazmat.primitives import hashes
+            
+            dn = {
+                'CN': cn,
+                'O': 'UCM mTLS',
+                'OU': 'Client Certificate'
+            }
+            if email:
+                dn['emailAddress'] = email
+            
+            subject = TrustStoreService.build_subject(dn)
+            cert_pem_bytes, key_pem_bytes = TrustStoreService.create_self_signed_cert(
+                subject=subject,
+                validity_days=validity_days,
+                key_type=str(key_size),
+                digest='sha256'
+            )
+            
+            # Convert to string for parsing
+            cert_pem = cert_pem_bytes.decode('utf-8') if isinstance(cert_pem_bytes, bytes) else cert_pem_bytes
+            key_pem = key_pem_bytes.decode('utf-8') if isinstance(key_pem_bytes, bytes) else key_pem_bytes
+            cert_name = f"Self-Signed - {cn}"
+            
+        else:
+            # Create managed certificate signed by trusted CA
+            if not trusted_ca_id:
+                return jsonify({'success': False, 'error': 'No trusted CA configured. Use self-signed option instead.'}), 400
+            
+            ca = CA.query.filter_by(refid=trusted_ca_id).first()
+            if not ca:
+                return jsonify({'success': False, 'error': 'Configured CA not found'}), 404
+            
+            # Build DN
+            dn = {
+                'CN': cn,
+                'O': 'UCM mTLS',
+                'OU': 'Client Certificate'
+            }
+            if email:
+                dn['emailAddress'] = email
+            
+            # Create certificate using CertificateService
+            cert = CertificateService.create_certificate(
+                descr=f"mTLS Client - {cn}",
+                caref=trusted_ca_id,
+                dn=dn,
+                cert_type='usr_cert',
+                key_type=str(key_size),
+                validity_days=validity_days,
+                digest='sha256',
+                san_email=[email] if email else None,
+                private_key_location='stored',
+                username=username
+            )
+            
+            # Decode certificate and key from base64
+            cert_pem_bytes = base64.b64decode(cert.crt)
+            cert_pem = cert_pem_bytes.decode('utf-8')
+            key_pem = base64.b64decode(cert.prv).decode('utf-8') if cert.prv else None
+            cert_name = f"Managed - {cn}"
+        
+        # Parse certificate to extract info (cert_pem is string here)
+        cert_obj = CertificateParser.parse_pem_certificate(cert_pem)
+        if not cert_obj:
+            raise ValueError("Failed to parse generated certificate")
+        
+        cert_info = CertificateParser.extract_certificate_info(cert_obj)
+        
+        # Store cert_pem as bytes for database
+        if isinstance(cert_pem, str):
+            cert_pem_bytes = cert_pem.encode('utf-8')
+        
+        # Create AuthCertificate record
+        auth_cert = AuthCertificate(
+            user_id=user.id,
+            name=cert_name,
+            cert_pem=cert_pem.encode('utf-8') if isinstance(cert_pem, str) else cert_pem,
+            cert_serial=cert_info['serial'],
+            cert_fingerprint=cert_info['fingerprint_sha256'],
+            cert_subject=cert_info['subject_dn'],
+            cert_issuer=cert_info['issuer_dn'],
+            valid_from=cert_info['valid_from'],
+            valid_until=cert_info['valid_until'],
+            enabled=True
+        )
+        
+        db.session.add(auth_cert)
+        db.session.commit()
+        
+        log_audit('create_certificate', username, f"Created {'self-signed' if self_signed else 'managed'} certificate: {cn}")
+        
+        # Return certificate and private key for download
+        return jsonify({
+            'success': True,
+            'message': 'Certificate created successfully',
+            'certificate': auth_cert.to_dict(),
+            'cert_pem': cert_pem,  # Return PEM for user to download
+            'key_pem': key_pem  # Return private key for download
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error creating certificate: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @mtls_bp.route('/certificates/enroll', methods=['POST'])
 @jwt_required()
 def enroll_certificate():
@@ -224,6 +376,58 @@ def revoke_certificate(cert_id):
     except Exception as e:
         logger.error(f"Error revoking certificate: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@mtls_bp.route('/certificates/<int:cert_id>/download', methods=['GET'])
+@jwt_required()
+def download_certificate(cert_id):
+    """
+    Download certificate PEM file
+    ---
+    GET /api/v1/mtls/certificates/<cert_id>/download
+    """
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        
+        # Get certificate (user can only download their own, admin can download any)
+        auth_cert = AuthCertificate.query.filter_by(id=cert_id).first()
+        
+        if not auth_cert:
+            return jsonify({'error': 'Certificate not found'}), 404
+        
+        # Check ownership
+        if auth_cert.user_id != user.id and user.role != 'admin':
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        # Create PEM file (cert_pem is already bytes from LargeBinary field)
+        cert_data = auth_cert.cert_pem
+        
+        # Extract CN from subject for filename
+        cn = "unknown"
+        if auth_cert.cert_subject:
+            # Parse subject DN (supports both "CN=" and "commonName=" formats)
+            for part in auth_cert.cert_subject.split(','):
+                part_lower = part.strip().lower()
+                if part_lower.startswith('cn=') or part_lower.startswith('commonname='):
+                    cn = part.split('=', 1)[1].strip()
+                    # Sanitize filename
+                    cn = cn.replace(' ', '_').replace('/', '_').replace('\\', '_')
+                    break
+        
+        filename = f'mtls-{cn}.pem'
+        print(f"[DEBUG] Downloading certificate {cert_id}: filename={filename}, subject={auth_cert.cert_subject}", flush=True)
+        
+        return send_file(
+            io.BytesIO(cert_data),
+            mimetype='application/x-pem-file',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        logger.error(f"Error downloading certificate: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 
 @mtls_bp.route('/certificates/<int:cert_id>', methods=['DELETE'])

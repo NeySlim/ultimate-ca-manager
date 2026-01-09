@@ -10,19 +10,19 @@
             <i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i> Certificates
         </h1>
         <div style="display: flex; gap: 0.5rem;">
-            <button onclick="openCreateCertModal()" 
-                    class="btn btn-primary">
+            <button data-action="open-create-cert-modal"
+                    class="btn-primary">
                 <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> Create Certificate
             </button>
-            <button onclick="openCSRModal()" 
-                    class="btn btn-secondary">
+            <button data-action="open-csr-modal"
+                    class="btn-secondary">
                 <i class="fas fa-file-signature" style="margin-right: 0.5rem; color: var(--success-color);"></i> Generate CSR
             </button>
         </div>
     </div>
     
     <!-- Certificate List -->
-    <div class="card">
+    <div class="card" style="padding: 0;">
         <div id="cert-list" 
              hx-get="/api/ui/cert/list" 
              hx-trigger="load, refreshCerts from:body"
@@ -46,14 +46,16 @@
                 <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">
                     <i class="fas fa-plus-circle" style="margin-right: 0.5rem;"></i> Create Certificate
                 </h2>
-                <button onclick="closeCertModal()" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
+                <button data-action="close-cert-modal" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
                     <i class="fas fa-times" style="font-size: 1.25rem;"></i>
                 </button>
             </div>
         </div>
         
-        <form hx-post="/api/ui/cert/create" 
-              hx-on::after-request="handleCertCreateResponse(event)">
+        <form hx-post="/api/ui/cert/create"
+              hx-trigger="submit"
+              hx-disabled-elt="find button[type='submit']"
+              hx-on::after-request="if(event.detail.successful){closeCertModal();htmx.trigger('body','refreshCerts');if(typeof showToast==='function')showToast('Certificate created','success');}">
             <div style="padding: 1.5rem;">
                 
                 <!-- Basic Information -->
@@ -109,7 +111,7 @@
                     <div class="modal-form-grid-2">
                         <div>
                             <label class="modal-form-label">
-                                Key Type <span class="style="color: var(--danger-color);"">*</span>
+                                Key Type <span style="color: var(--danger-color);">*</span>
                             </label>
                             <select name="key_type" required
                                     class="modal-form-input">
@@ -121,7 +123,7 @@
                         </div>
                         <div>
                             <label class="modal-form-label">
-                                Digest Algorithm <span class="style="color: var(--danger-color);"">*</span>
+                                Digest Algorithm <span style="color: var(--danger-color);">*</span>
                             </label>
                             <select name="digest_alg"
                                     class="modal-form-input">
@@ -138,19 +140,17 @@
                     <h3 class="modal-form-heading">Issuer</h3>
                     <div style="margin-bottom: 1rem;">
                         <label class="modal-form-label">
-                            Certificate Authority <span class="style="color: var(--danger-color);"">*</span>
+                            Certificate Authority <span style="color: var(--danger-color);">*</span>
                         </label>
                         <select name="caref" required id="ca-select"
-                                hx-get="/api/ui/ca/options"
-                                hx-trigger="load"
                                 class="modal-form-input">
-                            <option>Loading...</option>
+                            <option>Loading CAs...</option>
                         </select>
                     </div>
                     
                     <div style="margin-bottom: 1rem;">
                         <label class="modal-form-label">
-                            Lifetime (days) <span class="style="color: var(--danger-color);"">*</span>
+                            Lifetime (days) <span style="color: var(--danger-color);">*</span>
                         </label>
                         <input type="number" name="lifetime" value="397" required min="1" max="36500"
                                class="modal-form-input">
@@ -211,7 +211,7 @@
                     
                     <div class="mt-4">
                         <label class="modal-form-label">
-                            Common Name (CN) <span class="style="color: var(--danger-color);"">*</span>
+                            Common Name (CN) <span style="color: var(--danger-color);">*</span>
                         </label>
                         <input type="text" name="common_name" required placeholder="server.example.com"
                                class="modal-form-input">
@@ -268,7 +268,7 @@
                         <label class="modal-form-label">
                             OCSP URI
                         </label>
-                        <input type="url" name="ocsp_uri" placeholder="http://ocsp.example.com"
+                        <input type="url" name="ocsp_uri" id="ocsp-uri-input" placeholder="http://ocsp.example.com"
                                class="modal-form-input">
                         <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
                             URL where the OCSP responder can be reached for certificate status checking
@@ -279,7 +279,7 @@
             </div>
             
             <div class="modal-form-footer">
-                <button type="button" onclick="closeCertModal()"
+                <button type="button" data-action="close-cert-modal"
                         class="btn-secondary">
                     Cancel
                 </button>
@@ -301,18 +301,18 @@
                 <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">
                     <i class="fas fa-file-signature mr-2"></i> Generate CSR
                 </h2>
-                <button onclick="closeCSRModal()" style="color: var(--text-secondary); cursor: pointer;">
+                <button data-action="close-csr-modal" style="color: var(--text-secondary); cursor: pointer;">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
         </div>
         
         <form hx-post="/api/ui/cert/csr" 
-              hx-on::after-request="handleCSRResponse(event)">
+              hx-on::after-request="if(event.detail.successful){closeCSRModal();htmx.trigger('body','refreshCerts');if(typeof showToast==='function')showToast('CSR generated','success');}">
             <div class="p-6 space-y-4">
                 <div>
                     <label class="modal-form-label">
-                        Description <span class="style="color: var(--danger-color);"">*</span>
+                        Description <span style="color: var(--danger-color);">*</span>
                     </label>
                     <input type="text" name="descr" required
                            class="modal-form-input">
@@ -320,7 +320,7 @@
                 
                 <div>
                     <label class="modal-form-label">
-                        Common Name <span class="style="color: var(--danger-color);"">*</span>
+                        Common Name <span style="color: var(--danger-color);">*</span>
                     </label>
                     <input type="text" name="common_name" required
                            class="modal-form-input">
@@ -328,7 +328,7 @@
                 
                 <div>
                     <label class="modal-form-label">
-                        Key Type <span class="style="color: var(--danger-color);"">*</span>
+                        Key Type <span style="color: var(--danger-color);">*</span>
                     </label>
                     <select name="key_type" required
                             class="modal-form-input">
@@ -339,8 +339,8 @@
             </div>
             
             <div class="modal-form-footer">
-                <button type="button" onclick="closeCSRModal()"
-                        class="btn btn-secondary">
+                <button type="button" data-action="close-csr-modal"
+                        class="btn-secondary">
                     Cancel
                 </button>
                 <button type="submit"
@@ -353,90 +353,32 @@
 </div>
 
 <script>
-function openCreateCertModal() {
-    openModal('createCertModal');
-}
+// ============================================================================
+// NOTE: Global functions (openCreateCertModal, handleCertCreateResponse, etc.)
+// are now defined in /static/js/ucm-global.js and loaded globally.
+// Local overrides only if needed for page-specific behavior.
+// ============================================================================
 
-function closeCertModal() {
-    closeModal('createCertModal');
-}
-
-function updateCertTypeHints(certType) {
-    const hints = {
-        'server_cert': 'For web servers, VPNs, and other services',
-        'client_cert': 'For user authentication (VPN, email, etc.)',
-        'combined_cert': 'Can be used for both server and client authentication',
-        'ca_cert': 'For creating an intermediate Certificate Authority'
-    };
-    const hintEl = document.getElementById('cert-type-hint');
-    if (hintEl) {
-        hintEl.textContent = hints[certType] || '';
-    }
-}
-
-function openCSRModal() {
-    openModal('csrModal');
-}
-
-function closeCSRModal() {
-    closeModal('csrModal');
-}
-
-// Auto-open create modal if hash is #create
-document.addEventListener('DOMContentLoaded', checkCreateHash);
-
-function checkCreateHash() {
-    if (window.location.hash === '#create') {
-        setTimeout(() => {
-            openCreateCertModal();
-            // Remove hash from URL after opening modal
-            history.replaceState(null, null, window.location.pathname);
-        }, 100);
-    }
-}
-
-function showToast(message, type) {
-    console.log('🔔 showToast called:', message, 'type:', type);
-    console.trace('Call stack:');
-    const toast = document.createElement('div');
-    toast.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-        type === 'success' ? 'bg-green-500' : 'bg-red-500'
-    } text-white`;
-    toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} mr-2"></i>${message}`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
-}
-
-// Handle certificate creation form submit
-function handleCertCreateResponse(event) {
-    console.log('Form submitted, success:', event.detail.successful, 'target:', event.detail.target);
-    if (event.detail.successful && event.detail.target && event.detail.target.tagName === 'FORM') {
-        closeCertModal();
-        htmx.trigger('body', 'refreshCerts');
-        showToast('Certificate created', 'success');
-    }
-}
-
-// Handle CSR generation form submit
-function handleCSRResponse(event) {
-    if (event.detail.successful && event.detail.target && event.detail.target.tagName === 'FORM') {
-        closeCSRModal();
-        htmx.trigger('body', 'refreshCerts');
-        showToast('CSR generated', 'success');
-    }
-}
-
-// PKCS#12 Modal Functions (scoped to avoid conflicts)
+// PKCS#12 Modal Functions (page-specific implementation)
 if (typeof window.pkcs12ExportId === 'undefined') {
     window.pkcs12ExportId = null;
     window.pkcs12ExportType = null;
 }
 
 function showPKCS12ModalTable(id, type) {
+    const passwordField = document.getElementById('pkcs12-password');
+    const confirmField = document.getElementById('pkcs12-password-confirm');
+    
+    // Safety check
+    if (!passwordField || !confirmField) {
+        console.error('PKCS12 modal elements not found');
+        return;
+    }
+    
     window.pkcs12ExportId = id;
     window.pkcs12ExportType = type;
-    document.getElementById('pkcs12-password').value = '';
-    document.getElementById('pkcs12-password-confirm').value = '';
+    passwordField.value = '';
+    confirmField.value = '';
     closeModal('pkcs12-error');
     openModal('pkcs12-modal');
     
@@ -450,17 +392,23 @@ function closePKCS12Modal() {
 }
 
 function exportPKCS12() {
-    const password = document.getElementById('pkcs12-password').value;
-    const confirm = document.getElementById('pkcs12-password-confirm').value;
+    const password = document.getElementById('pkcs12-password');
+    const confirm = document.getElementById('pkcs12-password-confirm');
     const errorDiv = document.getElementById('pkcs12-error');
     
-    if (!password) {
+    // Safety check - elements might not exist on all pages
+    if (!password || !confirm || !errorDiv) {
+        console.error('PKCS12 export elements not found');
+        return;
+    }
+    
+    if (!password.value) {
         errorDiv.textContent = 'Le mot de passe est requis';
         errorDiv.classList.remove('hidden');
         return;
     }
     
-    if (password !== confirm) {
+    if (password.value !== confirm.value) {
         errorDiv.textContent = 'Les mots de passe ne correspondent pas';
         errorDiv.classList.remove('hidden');
         return;
@@ -478,7 +426,8 @@ function exportPKCS12() {
     
     const token = '{{ session.get("access_token") }}';
     fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'same-origin',
+        headers: { }
     })
     .then(response => {
         if (!response.ok) throw new Error('Export failed');
@@ -501,164 +450,8 @@ function exportPKCS12() {
     });
 }
 
-// Export certificate functions
-function exportCert(id, event, isCSR) {
-    event.stopPropagation();
-    
-    // Remove existing menu
-    const existingMenu = document.getElementById('export-cert-menu-' + id);
-    if (existingMenu) {
-        existingMenu.remove();
-        return;
-    }
-    
-    // Remove all other menus
-    document.querySelectorAll('[id^="export-menu-"]').forEach(m => m.remove());
-    document.querySelectorAll('[id^="export-cert-menu-"]').forEach(m => m.remove());
-    
-    // Create menu
-    const menu = document.createElement('div');
-    menu.id = 'export-cert-menu-' + id;
-    menu.className = 'absolute right-0 mt-1 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50';
-    
-    if (isCSR) {
-        // CSR only has simple PEM export
-        menu.innerHTML = '<div class="py-1" role="menu">' +
-            '<button onclick="exportCertSimple(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">' +
-                '<i class="fas fa-file-certificate mr-2"></i>CSR (PEM)' +
-            '</button>' +
-        '</div>';
-    } else {
-        // Full certificate has all export options
-        menu.innerHTML = '<div class="py-1" role="menu">' +
-            '<button onclick="exportCertSimple(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">' +
-                '<i class="fas fa-file-certificate mr-2"></i>Certificate only (PEM)' +
-            '</button>' +
-            '<button onclick="exportCertWithKey(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">' +
-                '<i class="fas fa-key mr-2"></i>Certificate + Key (PEM)' +
-            '</button>' +
-            '<button onclick="exportCertWithChain(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">' +
-                '<i class="fas fa-link mr-2"></i>Certificate + CA Chain (PEM)' +
-            '</button>' +
-            '<button onclick="exportCertFull(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">' +
-                '<i class="fas fa-archive mr-2"></i>Full Chain + Key (PEM)' +
-            '</button>' +
-            '<button onclick="exportCertDER(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">' +
-                '<i class="fas fa-file-binary mr-2"></i>Certificate (DER)' +
-            '</button>' +
-            '<button onclick="showPKCS12ModalTable(' + id + ', &quot;cert&quot;)" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">' +
-                '<i class="fas fa-lock mr-2"></i>PKCS#12 (.p12/.pfx)' +
-            '</button>' +
-        '</div>';
-    }
-    
-    // Position menu next to button
-    const button = event.target.closest('button');
-    const td = button.closest('td');
-    td.style.position = 'relative';
-    td.appendChild(menu);
-}
-
-function exportCertSimple(id) {
-    exportWithToken(`/api/v1/certificates/${id}/export/advanced?format=pem`);
-}
-
-function exportCertWithKey(id) {
-    exportWithToken(`/api/v1/certificates/${id}/export/advanced?format=pem&key=true`);
-}
-
-function exportCertWithChain(id) {
-    exportWithToken(`/api/v1/certificates/${id}/export/advanced?format=pem&chain=true`);
-}
-
-function exportCertFull(id) {
-    exportWithToken(`/api/v1/certificates/${id}/export/advanced?format=pem&key=true&chain=true`);
-}
-
-function exportCertDER(id) {
-    exportWithToken(`/api/v1/certificates/${id}/export/advanced?format=der`);
-}
-
-function exportWithToken(url) {
-    const token = '{{ session.get("access_token") }}';
-    fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
-    })
-    .then(response => response.blob())
-    .then(blob => {
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = '';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(downloadUrl);
-    });
-}
-
-// Delete and revoke certificate functions
-function deleteCert(refid, descr) {
-    ucmConfirm(
-        `Êtes-vous sûr de vouloir supprimer le certificat "${descr}" ?\n\nCette action est irréversible.`,
-        'Supprimer le certificat',
-        { danger: true, confirmText: 'Supprimer', icon: 'trash' }
-    ).then(confirmed => {
-        if (!confirmed) return;
-        
-        const token = '{{ session.get("access_token") }}';
-        fetch(`/api/v1/certificates/by-refid/${refid}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        })
-        .then(response => {
-            if (response.ok) {
-                showToast('Certificat supprimé avec succès', 'success');
-                htmx.trigger('body', 'refreshCerts');
-            } else {
-                return response.json().then(data => {
-                    throw new Error(data.error || 'Erreur lors de la suppression');
-                });
-            }
-        })
-        .catch(error => {
-            showToast('Erreur: ' + error.message, 'error');
-        });
-    });
-}
-
-function revokeCert(refid, descr) {
-    ucmConfirm(
-        `Êtes-vous sûr de vouloir révoquer le certificat "${descr}" ?\n\nLe certificat sera marqué comme révoqué mais ne sera pas supprimé.`,
-        'Révoquer le certificat',
-        { danger: true, confirmText: 'Révoquer', icon: 'warning-triangle' }
-    ).then(confirmed => {
-        if (!confirmed) return;
-        
-        const token = '{{ session.get("access_token") }}';
-        fetch(`/api/v1/certificates/by-refid/${refid}/revoke`, {
-            method: 'POST',
-            headers: { 
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ reason: 'unspecified' })
-        })
-        .then(response => {
-            if (response.ok) {
-                showToast('Certificat révoqué avec succès', 'success');
-                htmx.trigger('body', 'refreshCerts');
-            } else {
-                return response.json().then(data => {
-                    throw new Error(data.error || 'Erreur lors de la révocation');
-                });
-            }
-        })
-        .catch(error => {
-            showToast('Erreur: ' + error.message, 'error');
-        });
-    });
-}
+// Note: All export functions (exportCert, exportCertSimple, etc.) are now in ucm-global.js
+// and defined in ui_routes.py for HTMX content. No need to duplicate here.
 
 </script>
 
@@ -674,28 +467,32 @@ function revokeCert(refid, descr) {
                 Le format PKCS#12 inclut le certificat et la clé privée dans un fichier protégé par mot de passe (.p12 ou .pfx). 
                 Ce format est compatible avec Windows, macOS et la plupart des navigateurs.
             </p>
+            <form autocomplete="off">
             <div style="margin-bottom: 1rem;">
                 <label class="modal-form-label">
-                    Mot de passe <span class="style="color: var(--danger-color);"">*</span>
+                    Mot de passe <span style="color: var(--danger-color);">*</span>
                 </label>
                 <input type="password" id="pkcs12-password" 
                     class="form-input" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--card-bg); color: var(--text-primary);"
-                    placeholder="Entrez le mot de passe pour le fichier PKCS#12" />
+                    placeholder="Entrez le mot de passe pour le fichier PKCS#12"
+                    autocomplete="new-password" />
             </div>
             <div style="margin-bottom: 1rem;">
                 <label class="modal-form-label">
-                    Confirmation <span class="style="color: var(--danger-color);"">*</span>
+                    Confirmation <span style="color: var(--danger-color);">*</span>
                 </label>
                 <input type="password" id="pkcs12-password-confirm" 
                     class="form-input" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--card-bg); color: var(--text-primary);"
-                    placeholder="Confirmez le mot de passe" />
+                    placeholder="Confirmez le mot de passe"
+                    autocomplete="new-password" />
             </div>
+            </form>
             <div id="pkcs12-error" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); color: var(--status-danger); border-radius: 0.375rem; font-size: 0.875rem;"></div>
             <div class="flex justify-end space-x-3">
-                <button onclick="closePKCS12Modal()" class="btn-secondary">
+                <button data-action="close-pkcs12-modal" class="btn-secondary">
                     Annuler
                 </button>
-                <button onclick="exportPKCS12()" class="btn-primary">
+                <button data-action="export-pkcs12" class="btn-primary">
                     <i class="fas fa-download" style="margin-right: 0.5rem;"></i>Exporter
                 </button>
             </div>

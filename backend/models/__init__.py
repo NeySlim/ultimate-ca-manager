@@ -520,4 +520,11 @@ class AuditLog(db.Model):
 from .crl import CRLMetadata
 from .ocsp import OCSPResponse
 
-__all__ = ["db", "User", "SystemConfig", "CA", "Certificate", "CRL", "SCEPRequest", "AuditLog", "CRLMetadata", "OCSPResponse"]
+# Import ACME models
+from .acme_models import AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, AcmeNonce
+
+__all__ = [
+    "db", "User", "SystemConfig", "CA", "Certificate", "CRL", "SCEPRequest", 
+    "AuditLog", "CRLMetadata", "OCSPResponse",
+    "AcmeAccount", "AcmeOrder", "AcmeAuthorization", "AcmeChallenge", "AcmeNonce"
+]
