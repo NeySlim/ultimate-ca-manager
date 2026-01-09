@@ -381,18 +381,18 @@ function revokeCert(certId) {
             },
             body: JSON.stringify({ reason: 'unspecified' })
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                ucmAlert('Failed to revoke certificate: ' + data.error, 'Error');
+        .then(response => {
+            if (response.ok) {
+                showToast('Certificate revoked successfully', 'success');
+                setTimeout(() => location.reload(), 1000);
             } else {
-                ucmAlert('Certificate revoked successfully', 'Success').then(() => {
-                    location.reload();
+                return response.json().then(data => {
+                    throw new Error(data.error || 'Revoke failed');
                 });
             }
         })
         .catch(error => {
-            ucmAlert('Failed to revoke certificate: ' + error.message, 'Error');
+            showToast('Failed to revoke certificate: ' + error.message, 'error');
         });
     });
 }

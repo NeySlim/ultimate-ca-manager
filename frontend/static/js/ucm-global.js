@@ -187,6 +187,51 @@ function performCertDelete(refid, token) {
     });
 }
 
+function revokeCert(refid, name) {
+    // Get token from session
+    const tokenMeta = document.querySelector('meta[name="access-token"]');
+    const token = tokenMeta ? tokenMeta.content : '';
+    
+    if (typeof ucmConfirm !== 'undefined') {
+        ucmConfirm(
+            `Revoke certificate "${name}"?\n\nThis cannot be undone. The certificate will be marked as revoked.`,
+            'Revoke Certificate',
+            { danger: true, confirmText: 'Revoke', icon: 'warning-triangle' }
+        ).then(confirmed => {
+            if (!confirmed) return;
+            performCertRevoke(refid, token);
+        });
+    } else {
+        if (confirm(`Revoke certificate "${name}"?`)) {
+            performCertRevoke(refid, token);
+        }
+    }
+}
+
+function performCertRevoke(refid, token) {
+    fetch(`/api/v1/certificates/by-refid/${refid}/revoke`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason: 'unspecified' })
+    })
+    .then(response => {
+        if (response.ok) {
+            showToast('Certificate revoked successfully', 'success');
+            htmx.trigger('body', 'refreshCerts');
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Revoke failed');
+            });
+        }
+    })
+    .catch(e => {
+        showToast('Error: ' + e.message, 'error');
+    });
+}
+
 // ============================================================================
 // PKCS#12 FUNCTIONS
 // ============================================================================

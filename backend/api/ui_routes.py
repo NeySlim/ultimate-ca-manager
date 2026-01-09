@@ -726,7 +726,7 @@ def ca_list_content():
                 window.URL.revokeObjectURL(downloadUrl);
             })
             .catch(error => {
-                alert('Export failed: ' + error.message);
+                showToast('Export failed: ' + error.message, 'error');
             });
         }
         
@@ -1224,7 +1224,7 @@ def cert_list_content():
                 window.URL.revokeObjectURL(downloadUrl);
             })
             .catch(error => {
-                alert('Export failed: ' + error.message);
+                showToast('Export failed: ' + error.message, 'error');
             });
         }
         
@@ -1251,8 +1251,14 @@ def cert_list_content():
         }
         
         function revokeCert(refid, name) {
-            if (confirm('Revoke certificate "' + name + '"? This cannot be undone!')) {
-                fetch('/api/v1/certificates/' + refid + '/revoke', {
+            ucmConfirm(
+                'Revoke certificate "' + name + '"?\\n\\nThis cannot be undone. The certificate will be marked as revoked.',
+                'Revoke Certificate',
+                { danger: true, confirmText: 'Revoke', icon: 'warning-triangle' }
+            ).then(confirmed => {
+                if (!confirmed) return;
+                
+                fetch('/api/v1/certificates/by-refid/' + refid + '/revoke', {
                     method: 'POST',
                     headers: { 
                         'Authorization': 'Bearer ' + ''' + f"'{token}'" + ''',
@@ -1260,13 +1266,18 @@ def cert_list_content():
                     },
                     body: JSON.stringify({ reason: 'unspecified' })
                 })
-                .then(r => r.json())
-                .then(data => {
-                    alert('Certificate revoked successfully');
-                    htmx.trigger('body', 'refreshCerts');
+                .then(response => {
+                    if (response.ok) {
+                        showToast('Certificate revoked successfully', 'success');
+                        htmx.trigger('body', 'refreshCerts');
+                    } else {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Revoke failed');
+                        });
+                    }
                 })
-                .catch(e => alert('Error: ' + e));
-            }
+                .catch(e => showToast('Error: ' + e.message, 'error'));
+            });
         }
         
         function deleteCert(refid, name) {
@@ -3112,7 +3123,7 @@ def managed_certs_list():
                         <button hx-post="/api/ui/config/use-managed-cert/{cert['id']}" 
                                 hx-confirm="Use this certificate for HTTPS? The server will restart."
                                 hx-swap="none"
-                                @htmx:after-request="if($event.detail.successful) {{ alert('Certificate applied successfully! Please restart the server.'); $dispatch('close-modal'); }}"
+                                @htmx:after-request="if($event.detail.successful) {{ showToast('Certificate applied successfully! Please restart the server.', 'success'); $dispatch('close-modal'); }}"
                                 class="btn btn-success text-xs">
                             <i class="fas fa-check mr-1"></i>Use This
                         </button>
