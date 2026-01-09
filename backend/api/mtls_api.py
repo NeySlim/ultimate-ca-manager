@@ -400,8 +400,8 @@ def download_certificate(cert_id):
         if auth_cert.user_id != user.id and user.role != 'admin':
             return jsonify({'error': 'Unauthorized'}), 403
         
-        # Create PEM file
-        cert_data = auth_cert.cert_pem.encode('utf-8')
+        # Create PEM file (cert_pem is already bytes from LargeBinary field)
+        cert_data = auth_cert.cert_pem
         
         return send_file(
             io.BytesIO(cert_data),
