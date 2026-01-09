@@ -9,6 +9,7 @@ Flask-Migrate==4.1.0
 Flask-JWT-Extended==4.7.1
 Flask-CORS==6.0.2
 Flask-Limiter==4.1.1
+Flask-Caching==2.3.0
 
 # Cryptography & OpenSSL
 cryptography==46.0.3
@@ -21,6 +22,8 @@ cbor2==5.8.0
 
 # SCEP Support
 pycryptodome==3.23.0
+pyasn1==0.6.1
+pyasn1-modules==0.4.1
 
 # ACME Support
 josepy==1.14.0
