@@ -773,5 +773,13 @@ function cancelOCSPEdit() {
     toggleOCSPURLField();
     toggleOCSPEdit();
 }
+
+// Replace {ca_refid} placeholder in CDP URL on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const cdpUrlInput = document.getElementById('cdp_url');
+    if (cdpUrlInput && cdpUrlInput.value) {
+        cdpUrlInput.value = cdpUrlInput.value.replace('{ca_refid}', '{{ ca.refid }}');
+    }
+});
 </script>
 {% endblock %}
