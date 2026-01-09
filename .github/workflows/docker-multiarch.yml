@@ -24,11 +24,6 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
     
     steps:
       - name: Checkout code
@@ -72,11 +67,11 @@ jobs:
       #     password: ${{ secrets.DOCKERHUB_TOKEN }}
       #   continue-on-error: true
       
-      - name: Build and push
+      - name: Build and push multi-arch
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -87,58 +82,8 @@ jobs:
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             VCS_REF=${{ github.sha }}
   
-  manifest:
-    needs: build
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Set image name to lowercase
-        id: image
-        run: echo "name=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-      
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY_GHCR }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      # - name: Log in to Docker Hub
-      #   uses: docker/login-action@v3
-      #   with:
-      #     registry: ${{ env.REGISTRY_DOCKERHUB }}
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-      #   continue-on-error: true
-      
-      - name: Create and push manifest
-        run: |
-          # Extract version from tag
-          VERSION=${GITHUB_REF#refs/tags/v}
-          IMAGE_NAME="${{ steps.image.outputs.name }}"
-          
-          # GitHub Container Registry
-          docker buildx imagetools create -t ${{ env.REGISTRY_GHCR }}/${IMAGE_NAME}:${VERSION} \
-            ${{ env.REGISTRY_GHCR }}/${IMAGE_NAME}:${VERSION}-amd64 \
-            ${{ env.REGISTRY_GHCR }}/${IMAGE_NAME}:${VERSION}-arm64
-          
-          docker buildx imagetools create -t ${{ env.REGISTRY_GHCR }}/${IMAGE_NAME}:latest \
-            ${{ env.REGISTRY_GHCR }}/${IMAGE_NAME}:${VERSION}-amd64 \
-            ${{ env.REGISTRY_GHCR }}/${IMAGE_NAME}:${VERSION}-arm64
-          
-          # Docker Hub (if credentials are available)
-          if [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-            # docker buildx imagetools create -t # ${{ env.REGISTRY_DOCKERHUB }}/neyslim/ultimate-ca-manager:${VERSION} \
-              # ${{ env.REGISTRY_DOCKERHUB }}/neyslim/ultimate-ca-manager:${VERSION}-amd64 \
-              # ${{ env.REGISTRY_DOCKERHUB }}/neyslim/ultimate-ca-manager:${VERSION}-arm64
-            
-            # docker buildx imagetools create -t ${{ env.REGISTRY_DOCKERHUB }}/neyslim/ultimate-ca-manager:latest \
-              # ${{ env.REGISTRY_DOCKERHUB }}/neyslim/ultimate-ca-manager:${VERSION}-amd64 \
-              # ${{ env.REGISTRY_DOCKERHUB }}/neyslim/ultimate-ca-manager:${VERSION}-arm64
-          fi
-  
   scan:
-    needs: manifest
+    needs: build
     runs-on: ubuntu-latest
     
     steps:
