@@ -612,17 +612,19 @@ def ca_list_content():
         
         <script>
         (function() {
-            // Isolated scope for CA list
-            var sortDirection = {};
+            // Use window object for CA list sorting
+            if (typeof window.sortDirectionCA === 'undefined') {
+                window.sortDirectionCA = {};
+            }
             
             window.sortTable = function(columnIndex) {
                 const table = document.getElementById('ca-table');
                 const tbody = table.querySelector('tbody');
                 const rows = Array.from(tbody.querySelectorAll('tr'));
                 
-                const currentDirection = sortDirection[columnIndex] || 'asc';
+                const currentDirection = window.sortDirectionCA[columnIndex] || 'asc';
                 const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
-                sortDirection[columnIndex] = newDirection;
+                window.sortDirectionCA[columnIndex] = newDirection;
                 
                 rows.sort((a, b) => {
                     let aValue = a.cells[columnIndex].textContent.trim();
@@ -1075,8 +1077,9 @@ def cert_list_content():
         </div>
         
         <script>
-        if (typeof sortDirectionCert === 'undefined') {
-            var sortDirectionCert = {};
+        // Use window object to avoid var in HTMX-loaded content
+        if (typeof window.sortDirectionCert === 'undefined') {
+            window.sortDirectionCert = {};
         }
         
         function sortTableCert(columnIndex) {
@@ -1084,9 +1087,9 @@ def cert_list_content():
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
             
-            const currentDirection = sortDirectionCert[columnIndex] || 'asc';
+            const currentDirection = window.sortDirectionCert[columnIndex] || 'asc';
             const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
-            sortDirectionCert[columnIndex] = newDirection;
+            window.sortDirectionCert[columnIndex] = newDirection;
             
             rows.sort((a, b) => {
                 let aValue = a.cells[columnIndex].textContent.trim();
@@ -1157,7 +1160,7 @@ def cert_list_content():
                     '<button onclick="exportCertDER(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
                         '<i class="fas fa-file-binary mr-2"></i>Certificate (DER)' +
                     '</button>' +
-                    '<button onclick="showPKCS12ModalTable(' + id + ', \'cert\')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
+                    '<button onclick="showPKCS12ModalTable(' + id + ', &apos;cert&apos;)" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
                         '<i class="fas fa-lock mr-2"></i>PKCS#12 (.p12/.pfx)' +
                     '</button>' +
                 '</div>';
