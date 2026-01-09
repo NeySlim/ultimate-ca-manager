@@ -4,51 +4,54 @@
 
 {% block content %}
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <!-- Page Header -->
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
             <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-shield-check"/></svg> mTLS Authentication
         </h1>
-        {% if session.get('role') == 'admin' %}
         <span id="mtls-status-badge" class="badge-outline badge-secondary">
-            <svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg>
+            <svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg>
             Checking...
         </span>
-        {% endif %}
     </div>
 
     {% if session.get('role') == 'admin' %}
-    <!-- mTLS Configuration (Admin Only) -->
+    <!-- ========================================= -->
+    <!-- SECTION 1: ADMIN CONFIGURATION -->
+    <!-- ========================================= -->
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                 <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-settings"/></svg>
-                Global mTLS Settings
+                Administrator Settings
             </h2>
         </div>
         <div style="padding: 1.5rem;">
-            <div style="background: var(--bg-info); border-left: 4px solid var(--primary-color); padding: 1rem; margin-bottom: 1.5rem; border-radius: 0.25rem;">
-                <strong style="color: var(--text-primary);">⚠️ Important:</strong>
+            <div style="background: var(--info-bg); border-left: 4px solid var(--primary-color); padding: 1rem; margin-bottom: 1.5rem; border-radius: 0.25rem;">
+                <strong style="color: var(--text-primary);">⚠️ Configuration Required:</strong>
                 <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
                     mTLS requires a reverse proxy (Nginx/Apache) configured to validate client certificates.
-                    Export the trusted CA certificate and configure it in your reverse proxy.
+                    After enabling, export the CA certificate and configure your reverse proxy.
                 </p>
             </div>
 
             <form id="mtls-settings-form">
                 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <!-- Enable mTLS -->
                     <div>
                         <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; font-weight: 500;">
                             <input type="checkbox" id="mtls_enabled">
                             <div>
                                 <div style="color: var(--text-primary);">Enable mTLS Authentication</div>
                                 <div style="color: var(--text-secondary); font-size: 0.875rem; font-weight: normal;">
-                                    Allow users to authenticate with client certificates
+                                    Allow users to authenticate using client certificates
                                 </div>
                             </div>
                         </label>
                     </div>
 
-                    <div>
+                    <!-- Require Certificate -->
+                    <div id="mtls-require-wrapper" style="display: none;">
                         <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; font-weight: 500;">
                             <input type="checkbox" id="mtls_required">
                             <div>
@@ -60,19 +63,22 @@
                         </label>
                     </div>
 
-                    <div>
-                        <label class="form-label">Trusted CA for Client Certificates (Optional)</label>
+                    <!-- Trusted CA Selection -->
+                    <div id="mtls-ca-wrapper" style="display: none;">
+                        <label class="form-label">Trusted CA for Client Certificates</label>
                         <select id="mtls_trusted_ca_id" class="form-control">
-                            <option value="">None (Accept any valid certificate)</option>
+                            <option value="">None - Users can use self-signed or any valid certificate</option>
                         </select>
-                        <small style="color: var(--text-secondary); font-size: 0.75rem;">
-                            Select a CA to validate client certificates against. If none selected, all valid certificates will be accepted.
+                        <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 0.5rem;">
+                            <strong>If CA selected:</strong> Users must create/import certificates signed by this CA<br>
+                            <strong>If None:</strong> Users can create self-signed certificates or import any valid certificate
                         </small>
                     </div>
 
                     <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
                         <button type="submit" class="btn-primary">
-                            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-save"/></svg> Save mTLS Settings
+                            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-save"/></svg> 
+                            Save Settings
                         </button>
                     </div>
                 </div>
@@ -85,12 +91,12 @@
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                 <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-book-open"/></svg>
-                Reverse Proxy Configuration
+                Reverse Proxy Configuration Guide
             </h2>
         </div>
         <div style="padding: 1.5rem;">
             <div style="display: grid; gap: 1.5rem;">
-                <!-- Nginx Config -->
+                <!-- Nginx -->
                 <div>
                     <h3 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
                         <svg class="ucm-icon" width="16" height="16" style="color: var(--success-color);"><use href="#icon-server"/></svg>
@@ -104,7 +110,7 @@
     ssl_certificate_key /path/to/server.key;
     
     # Client certificate validation
-    # Export your trusted CA certificate from UCM and reference it here
+    # Export your trusted CA from UCM and reference it here
     ssl_client_certificate /path/to/trusted-ca.pem;
     ssl_verify_client optional;  # or 'on' to require
     ssl_verify_depth 2;
@@ -121,7 +127,7 @@
 }</code></pre>
                 </div>
 
-                <!-- Apache Config -->
+                <!-- Apache -->
                 <div>
                     <h3 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
                         <svg class="ucm-icon" width="16" height="16" style="color: var(--danger-color);"><use href="#icon-server"/></svg>
@@ -135,7 +141,7 @@
     SSLCertificateKeyFile /path/to/server.key
     
     # Client certificate validation
-    # Export your trusted CA certificate from UCM and reference it here
+    # Export your trusted CA from UCM and reference it here
     SSLCACertificateFile /path/to/trusted-ca.pem
     SSLVerifyClient optional  # or 'require'
     SSLVerifyDepth 2
@@ -155,90 +161,211 @@
     </div>
     {% endif %}
 
-    <!-- User Certificate Management -->
-    <div class="card">
-        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
-                My Certificates
-            </h2>
-            <button onclick="showEnrollModal()" class="btn-primary">
-                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-plus"/></svg> Enroll Certificate
-            </button>
-        </div>
-        <div style="padding: 1.5rem;">
-            <div class="table-responsive">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Subject</th>
-                            <th>Serial</th>
-                            <th>Valid Until</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="certificates-tbody">
-                        <tr>
-                            <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                                <svg class="ucm-icon" width="32" height="32" style=" opacity: 0.5;"><use href="#icon-key"/></svg>
-                                <p style="margin-top: 0.5rem;">Loading certificates...</p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+    <!-- ========================================= -->
+    <!-- SECTION 2: USER CERTIFICATES -->
+    <!-- ========================================= -->
+    <div id="user-section" style="display: none;">
+        <div class="card">
+            <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+                <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                    <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
+                    My Client Certificates
+                </h2>
+            </div>
+
+            <!-- Tabs -->
+            <div style="border-bottom: 1px solid var(--border-color); padding: 0 1.5rem; display: flex; gap: 0.5rem;">
+                <button class="tab-button active" data-tab="create" style="padding: 1rem 1.5rem; border: none; background: none; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500;">
+                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-plus"/></svg>
+                    Create
+                </button>
+                <button class="tab-button" data-tab="import" style="padding: 1rem 1.5rem; border: none; background: none; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500;">
+                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-upload"/></svg>
+                    Import
+                </button>
+                <button class="tab-button" data-tab="manage" style="padding: 1rem 1.5rem; border: none; background: none; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500;">
+                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-list"/></svg>
+                    Manage
+                </button>
+            </div>
+
+            <!-- Tab Content -->
+            <div style="padding: 1.5rem;">
+                <!-- TAB 1: Create Certificate -->
+                <div id="tab-create" class="tab-content">
+                    <div id="create-with-ca" style="display: none;">
+                        <div style="background: var(--success-bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--success-color);">
+                            <strong style="color: var(--text-primary);">✓ Managed Certificate</strong>
+                            <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
+                                Your certificate will be signed by: <strong id="ca-name-display"></strong>
+                            </p>
+                        </div>
+
+                        <form id="create-managed-cert-form">
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <div>
+                                    <label class="form-label">Common Name (CN) *</label>
+                                    <input type="text" id="create_cn" class="form-control" placeholder="john.doe" required>
+                                    <small style="color: var(--text-secondary); font-size: 0.75rem;">Your username or identifier</small>
+                                </div>
+
+                                <div>
+                                    <label class="form-label">Email Address</label>
+                                    <input type="email" id="create_email" class="form-control" placeholder="john.doe@company.com">
+                                </div>
+
+                                <div>
+                                    <label class="form-label">Validity (days)</label>
+                                    <input type="number" id="create_validity" class="form-control" value="365" min="1" max="3650">
+                                </div>
+
+                                <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                                    <button type="submit" class="btn-primary">
+                                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-key"/></svg>
+                                        Generate Certificate
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div id="create-self-signed" style="display: none;">
+                        <div style="background: var(--warning-bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--warning-color);">
+                            <strong style="color: var(--text-primary);">⚠️ Self-Signed Certificate</strong>
+                            <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
+                                Your certificate will be self-signed and not managed by UCM
+                            </p>
+                        </div>
+
+                        <form id="create-selfsigned-cert-form">
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <div>
+                                    <label class="form-label">Common Name (CN) *</label>
+                                    <input type="text" id="selfsigned_cn" class="form-control" placeholder="john.doe" required>
+                                </div>
+
+                                <div>
+                                    <label class="form-label">Email Address</label>
+                                    <input type="email" id="selfsigned_email" class="form-control" placeholder="john.doe@company.com">
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                    <div>
+                                        <label class="form-label">Validity (days)</label>
+                                        <input type="number" id="selfsigned_validity" class="form-control" value="365" min="1" max="3650">
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Key Size</label>
+                                        <select id="selfsigned_keysize" class="form-control">
+                                            <option value="2048">2048 bits</option>
+                                            <option value="3072">3072 bits</option>
+                                            <option value="4096" selected>4096 bits</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                                    <button type="submit" class="btn-primary">
+                                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-key"/></svg>
+                                        Generate Self-Signed Certificate
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- TAB 2: Import Certificate -->
+                <div id="tab-import" class="tab-content" style="display: none;">
+                    <div id="import-info-ca" style="display: none; background: var(--info-bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--info-color);">
+                        <strong style="color: var(--text-primary);">ℹ️ Validation Required</strong>
+                        <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
+                            Imported certificates must be signed by: <strong id="import-ca-name-display"></strong>
+                        </p>
+                    </div>
+
+                    <div id="import-info-any" style="display: none; background: var(--warning-bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--warning-color);">
+                        <strong style="color: var(--text-primary);">⚠️ Any Valid Certificate</strong>
+                        <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
+                            You can import any valid X.509 certificate
+                        </p>
+                    </div>
+
+                    <form id="import-cert-form">
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <div>
+                                <label class="form-label">Certificate Name (Optional)</label>
+                                <input type="text" id="import_name" class="form-control" placeholder="My YubiKey Certificate">
+                                <small style="color: var(--text-secondary); font-size: 0.75rem;">Friendly name to identify this certificate</small>
+                            </div>
+
+                            <div>
+                                <label class="form-label">Certificate (PEM format) *</label>
+                                <textarea id="import_cert_pem" class="form-control" rows="12" 
+                                          placeholder="-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----" required></textarea>
+                            </div>
+
+                            <div style="display: flex; gap: 1rem;">
+                                <button type="button" onclick="validateImportedCert()" class="btn btn-outline-secondary">
+                                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check-circle"/></svg>
+                                    Validate Certificate
+                                </button>
+                                <button type="submit" class="btn-primary">
+                                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-upload"/></svg>
+                                    Import Certificate
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div id="import-validation-result" style="margin-top: 1rem; display: none;"></div>
+                </div>
+
+                <!-- TAB 3: Manage Certificates -->
+                <div id="tab-manage" class="tab-content" style="display: none;">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Subject</th>
+                                    <th>Serial</th>
+                                    <th>Valid Until</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="certificates-tbody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                                        <svg class="ucm-icon" width="32" height="32" style="opacity: 0.5;"><use href="#icon-key"/></svg>
+                                        <p style="margin-top: 0.5rem;">Loading certificates...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Enroll Certificate Modal -->
-<div id="enroll-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-    <div class="card" style="width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; margin: 2rem;">
-        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0;">
-                Enroll Client Certificate
-            </h3>
-            <button onclick="hideEnrollModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">×</button>
-        </div>
-        <div style="padding: 1.5rem;">
-            <form id="enroll-form">
-                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    <div>
-                        <label class="form-label">Certificate Name</label>
-                        <input type="text" id="cert_name" class="form-input" placeholder="My YubiKey Certificate">
-                        <small style="color: var(--text-secondary); font-size: 0.75rem;">
-                            Friendly name to identify this certificate
-                        </small>
-                    </div>
-
-                    <div>
-                        <label class="form-label">Certificate (PEM format) *</label>
-                        <textarea id="cert_pem" class="form-input" rows="10" 
-                                  placeholder="-----BEGIN CERTIFICATE-----
-...
------END CERTIFICATE-----" required></textarea>
-                        <small style="color: var(--text-secondary); font-size: 0.75rem;">
-                            Paste your PEM-encoded X.509 certificate here
-                        </small>
-                    </div>
-
-                    <div style="display: flex; gap: 1rem; padding-top: 1rem;">
-                        <button type="button" onclick="validateCertificate()" class="btn btn-outline-secondary">
-                            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check-circle"/></svg> Validate
-                        </button>
-                        <button type="submit" class="btn-primary">
-                            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-save"/></svg> Enroll Certificate
-                        </button>
-                        <button type="button" onclick="hideEnrollModal()" class="btn btn-outline-secondary">
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            </form>
-
-            <div id="cert-validation-result" style="margin-top: 1rem; display: none;"></div>
+    <!-- mTLS Disabled Message -->
+    <div id="mtls-disabled-message" style="display: none;">
+        <div class="card">
+            <div style="padding: 3rem; text-align: center;">
+                <svg class="ucm-icon" width="64" height="64" style="opacity: 0.3; margin-bottom: 1rem;"><use href="#icon-shield-check"/></svg>
+                <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">mTLS Authentication is Disabled</h3>
+                <p style="color: var(--text-secondary);">
+                    {% if session.get('role') == 'admin' %}
+                    Enable mTLS in the settings above to allow certificate-based authentication.
+                    {% else %}
+                    Contact your administrator to enable mTLS authentication.
+                    {% endif %}
+                </p>
+            </div>
         </div>
     </div>
 </div>
@@ -246,6 +373,7 @@
 <script>
 (function() {
 const token = '{{ session.get("access_token") }}';
+let currentSettings = {};
 
 // Toast helper
 function showToast(message, type = 'info') {
@@ -253,7 +381,7 @@ function showToast(message, type = 'info') {
     toast.style.cssText = `
         position: fixed; top: 20px; right: 20px; z-index: 10000;
         padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+        background: ${type === 'success' ? 'var(--success-color)' : type === 'error' ? 'var(--danger-color)' : 'var(--info-color)'};
         color: white; font-weight: 500; max-width: 400px;
     `;
     toast.textContent = message;
@@ -261,11 +389,39 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 4000);
 }
 
-// Load mTLS settings (admin only)
+// Tab switching
+document.querySelectorAll('.tab-button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const tabName = btn.dataset.tab;
+        
+        // Update buttons
+        document.querySelectorAll('.tab-button').forEach(b => {
+            b.classList.remove('active');
+            b.style.color = 'var(--text-secondary)';
+            b.style.borderBottomColor = 'transparent';
+        });
+        btn.classList.add('active');
+        btn.style.color = 'var(--text-primary)';
+        btn.style.borderBottomColor = 'var(--primary-color)';
+        
+        // Update content
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.style.display = 'none';
+        });
+        document.getElementById(`tab-${tabName}`).style.display = 'block';
+        
+        // Load certificates when switching to manage tab
+        if (tabName === 'manage') {
+            loadCertificates();
+        }
+    });
+});
+
+// Load mTLS settings
 async function loadMTLSSettings() {
-    {% if session.get('role') == 'admin' %}
     try {
-        // Load CA list for dropdown
+        {% if session.get('role') == 'admin' %}
+        // Load CA list
         const casResponse = await fetch('/api/v1/cas', {
             headers: {'Authorization': `Bearer ${token}`}
         });
@@ -274,14 +430,14 @@ async function loadMTLSSettings() {
             const casData = await casResponse.json();
             const select = document.getElementById('mtls_trusted_ca_id');
             
-            // Add CA options
             casData.cas.forEach(ca => {
                 const option = document.createElement('option');
                 option.value = ca.refid;
-                option.textContent = `${ca.descr} (${ca.is_ca ? 'CA' : 'Intermediate'})`;
+                option.textContent = `${ca.descr}`;
                 select.appendChild(option);
             });
         }
+        {% endif %}
         
         // Load current settings
         const response = await fetch('/api/v1/mtls/settings', {
@@ -289,28 +445,88 @@ async function loadMTLSSettings() {
         });
         
         if (response.ok) {
-            const settings = await response.json();
-            document.getElementById('mtls_enabled').checked = settings.enabled;
-            document.getElementById('mtls_required').checked = settings.required;
-            document.getElementById('mtls_trusted_ca_id').value = settings.trusted_ca_id || '';
+            currentSettings = await response.json();
+            
+            {% if session.get('role') == 'admin' %}
+            document.getElementById('mtls_enabled').checked = currentSettings.enabled;
+            document.getElementById('mtls_required').checked = currentSettings.required;
+            document.getElementById('mtls_trusted_ca_id').value = currentSettings.trusted_ca_id || '';
+            
+            // Show/hide dependent fields
+            toggleMTLSFields();
             
             // Update status badge
             const badge = document.getElementById('mtls-status-badge');
-            if (settings.enabled) {
+            if (currentSettings.enabled) {
                 badge.className = 'badge-outline badge-success';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check-circle"/></svg> Enabled';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Enabled';
             } else {
                 badge.className = 'badge-outline badge-secondary';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-circle"/></svg> Disabled';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Disabled';
             }
+            {% endif %}
+            
+            // Show/hide user section
+            updateUserSection();
         }
     } catch (error) {
         console.error('Error loading mTLS settings:', error);
     }
-    {% endif %}
 }
 
-// Save mTLS settings
+// Toggle admin fields based on enabled state
+function toggleMTLSFields() {
+    const enabled = document.getElementById('mtls_enabled').checked;
+    document.getElementById('mtls-require-wrapper').style.display = enabled ? 'block' : 'none';
+    document.getElementById('mtls-ca-wrapper').style.display = enabled ? 'block' : 'none';
+}
+
+document.getElementById('mtls_enabled')?.addEventListener('change', toggleMTLSFields);
+
+// Update user section visibility and content
+async function updateUserSection() {
+    const userSection = document.getElementById('user-section');
+    const disabledMessage = document.getElementById('mtls-disabled-message');
+    
+    if (currentSettings.enabled) {
+        userSection.style.display = 'block';
+        disabledMessage.style.display = 'none';
+        
+        // Show appropriate create form
+        const trustedCAId = currentSettings.trusted_ca_id;
+        const createWithCA = document.getElementById('create-with-ca');
+        const createSelfSigned = document.getElementById('create-self-signed');
+        
+        if (trustedCAId) {
+            // Fetch CA details
+            try {
+                const response = await fetch(`/api/v1/cas/${trustedCAId}`, {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                if (response.ok) {
+                    const ca = await response.json();
+                    document.getElementById('ca-name-display').textContent = ca.descr;
+                    document.getElementById('import-ca-name-display').textContent = ca.descr;
+                }
+            } catch (e) {}
+            
+            createWithCA.style.display = 'block';
+            createSelfSigned.style.display = 'none';
+            document.getElementById('import-info-ca').style.display = 'block';
+            document.getElementById('import-info-any').style.display = 'none';
+        } else {
+            createWithCA.style.display = 'none';
+            createSelfSigned.style.display = 'block';
+            document.getElementById('import-info-ca').style.display = 'none';
+            document.getElementById('import-info-any').style.display = 'block';
+        }
+    } else {
+        userSection.style.display = 'none';
+        disabledMessage.style.display = 'block';
+    }
+}
+
+// Save mTLS settings (admin)
 {% if session.get('role') == 'admin' %}
 document.getElementById('mtls-settings-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -334,10 +550,10 @@ document.getElementById('mtls-settings-form')?.addEventListener('submit', async 
         const result = await response.json();
         
         if (response.ok) {
-            showToast('✓ mTLS settings saved successfully', 'success');
+            showToast('✓ Settings saved successfully', 'success');
             loadMTLSSettings();
         } else {
-            showToast('✗ ' + (result.error || 'Failed to save settings'), 'error');
+            showToast('✗ ' + (result.error || 'Failed to save'), 'error');
         }
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
@@ -345,7 +561,162 @@ document.getElementById('mtls-settings-form')?.addEventListener('submit', async 
 });
 {% endif %}
 
-// Load user certificates
+// Create managed certificate
+document.getElementById('create-managed-cert-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        cn: document.getElementById('create_cn').value,
+        email: document.getElementById('create_email').value,
+        validity_days: parseInt(document.getElementById('create_validity').value)
+    };
+    
+    try {
+        const response = await fetch('/api/v1/mtls/certificates/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Certificate created successfully', 'success');
+            // Switch to manage tab
+            document.querySelector('.tab-button[data-tab="manage"]').click();
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+});
+
+// Create self-signed certificate
+document.getElementById('create-selfsigned-cert-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        cn: document.getElementById('selfsigned_cn').value,
+        email: document.getElementById('selfsigned_email').value,
+        validity_days: parseInt(document.getElementById('selfsigned_validity').value),
+        key_size: parseInt(document.getElementById('selfsigned_keysize').value),
+        self_signed: true
+    };
+    
+    try {
+        const response = await fetch('/api/v1/mtls/certificates/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Self-signed certificate created', 'success');
+            document.querySelector('.tab-button[data-tab="manage"]').click();
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+});
+
+// Validate imported certificate
+async function validateImportedCert() {
+    const certPem = document.getElementById('import_cert_pem').value;
+    
+    if (!certPem) {
+        showToast('Please paste a certificate first', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/v1/mtls/validate-certificate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({certificate: certPem})
+        });
+        
+        const result = await response.json();
+        const resultDiv = document.getElementById('import-validation-result');
+        
+        if (response.ok && result.success) {
+            const info = result.info;
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+                <div style="background: ${result.valid ? 'var(--success-bg)' : 'var(--danger-bg)'}; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid ${result.valid ? 'var(--success-color)' : 'var(--danger-color)'};">
+                    <strong>${result.valid ? '✓ Valid Certificate' : '✗ Invalid Certificate'}</strong>
+                    ${result.already_enrolled ? '<p style="color: var(--warning-color); margin-top: 0.5rem;"><strong>⚠️ Certificate already enrolled</strong></p>' : ''}
+                    <div style="margin-top: 1rem; font-size: 0.875rem;">
+                        <p><strong>Subject:</strong> ${info.subject}</p>
+                        <p><strong>Issuer:</strong> ${info.issuer}</p>
+                        <p><strong>Serial:</strong> <code>${info.serial}</code></p>
+                        <p><strong>Valid Until:</strong> ${info.valid_until ? new Date(info.valid_until).toLocaleString() : 'N/A'}</p>
+                    </div>
+                </div>
+            `;
+        } else {
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+                <div style="background: var(--danger-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--danger-color);">
+                    <strong>✗ Validation Failed</strong>
+                    <p style="margin-top: 0.5rem;">${result.error || 'Unknown error'}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        showToast('✗ Validation error: ' + error.message, 'error');
+    }
+}
+window.validateImportedCert = validateImportedCert;
+
+// Import certificate
+document.getElementById('import-cert-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        certificate: document.getElementById('import_cert_pem').value,
+        name: document.getElementById('import_name').value
+    };
+    
+    try {
+        const response = await fetch('/api/v1/mtls/certificates/enroll', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Certificate imported successfully', 'success');
+            document.getElementById('import-cert-form').reset();
+            document.getElementById('import-validation-result').style.display = 'none';
+            document.querySelector('.tab-button[data-tab="manage"]').click();
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to import certificate'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+});
+
+// Load certificates
 async function loadCertificates() {
     try {
         const response = await fetch('/api/v1/mtls/certificates', {
@@ -360,10 +731,10 @@ async function loadCertificates() {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                            <svg class="ucm-icon" width="32" height="32" style=" opacity: 0.5;"><use href="#icon-key"/></svg>
+                            <svg class="ucm-icon" width="32" height="32" style="opacity: 0.5;"><use href="#icon-key"/></svg>
                             <p style="margin-top: 0.5rem;">No certificates enrolled</p>
-                            <button onclick="showEnrollModal()" class="btn btn-sm btn-primary" style="margin-top: 1rem;">
-                                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-plus"/></svg> Enroll Your First Certificate
+                            <button onclick="document.querySelector('.tab-button[data-tab=\\'create\\']').click()" class="btn btn-sm btn-primary" style="margin-top: 1rem;">
+                                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-plus"/></svg> Create Your First Certificate
                             </button>
                         </td>
                     </tr>
@@ -388,18 +759,27 @@ async function loadCertificates() {
                         <td>
                             ${cert.enabled 
                                 ? (isExpired 
-                                    ? '<span class="badge-outline badge-danger"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> Expired</span>'
-                                    : '<span class="badge-outline badge-success"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> Active</span>')
-                                : '<span class="badge-outline badge-secondary"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> Disabled</span>'
+                                    ? '<span class="badge-outline badge-danger"><svg class="ucm-icon" width="10" height="10"><use href="#icon-times"/></svg> Expired</span>'
+                                    : '<span class="badge-outline badge-success"><svg class="ucm-icon" width="10" height="10"><use href="#icon-check"/></svg> Active</span>')
+                                : '<span class="badge-outline badge-secondary"><svg class="ucm-icon" width="10" height="10"><use href="#icon-times"/></svg> Disabled</span>'
                             }
                         </td>
                         <td>
                             <div style="display: flex; gap: 0.5rem;">
+                                <button onclick="downloadCertificate(${cert.id})" class="btn btn-sm btn-outline-secondary" title="Download">
+                                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
+                                </button>
                                 ${cert.enabled 
-                                    ? `<button onclick="revokeCertificate(${cert.id})" class="btn btn-sm btn-outline-warning">Revoke</button>`
-                                    : `<button onclick="enableCertificate(${cert.id})" class="btn btn-sm btn-outline-success">Enable</button>`
+                                    ? `<button onclick="revokeCertificate(${cert.id})" class="btn btn-sm btn-outline-warning" title="Revoke">
+                                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-times"/></svg>
+                                    </button>`
+                                    : `<button onclick="enableCertificate(${cert.id})" class="btn btn-sm btn-outline-success" title="Enable">
+                                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-check"/></svg>
+                                    </button>`
                                 }
-                                <button onclick="deleteCertificate(${cert.id})" class="btn btn-sm btn-outline-danger">Delete</button>
+                                <button onclick="deleteCertificate(${cert.id})" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -411,105 +791,30 @@ async function loadCertificates() {
     }
 }
 
-// Modal functions
-function showEnrollModal() {
-    document.getElementById('enroll-modal').style.display = 'flex';
-    document.getElementById('cert-validation-result').style.display = 'none';
-}
-
-function hideEnrollModal() {
-    document.getElementById('enroll-modal').style.display = 'none';
-    document.getElementById('enroll-form').reset();
-    document.getElementById('cert-validation-result').style.display = 'none';
-}
-
-// Validate certificate
-async function validateCertificate() {
-    const certPem = document.getElementById('cert_pem').value;
-    
-    if (!certPem) {
-        showToast('Please paste a certificate first', 'error');
-        return;
-    }
-    
+// Certificate actions
+async function downloadCertificate(certId) {
     try {
-        const response = await fetch('/api/v1/mtls/validate-certificate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({certificate: certPem})
+        const response = await fetch(`/api/v1/mtls/certificates/${certId}/download`, {
+            headers: {'Authorization': `Bearer ${token}`}
         });
-        
-        const result = await response.json();
-        const resultDiv = document.getElementById('cert-validation-result');
-        
-        if (response.ok && result.success) {
-            const info = result.info;
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = `
-                <div style="background: ${result.valid ? 'var(--bg-success)' : 'var(--bg-danger)'}; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid ${result.valid ? 'var(--success-color)' : 'var(--danger-color)'};">
-                    <strong>${result.valid ? '✓ Valid Certificate' : '✗ Invalid Certificate'}</strong>
-                    ${result.already_enrolled ? '<p style="color: var(--warning-color); margin-top: 0.5rem;"><strong>⚠️ Certificate already enrolled</strong></p>' : ''}
-                    <div style="margin-top: 1rem; font-size: 0.875rem;">
-                        <p><strong>Subject:</strong> ${info.subject}</p>
-                        <p><strong>Issuer:</strong> ${info.issuer}</p>
-                        <p><strong>Serial:</strong> <code>${info.serial}</code></p>
-                        <p><strong>Valid From:</strong> ${info.valid_from ? new Date(info.valid_from).toLocaleString() : 'N/A'}</p>
-                        <p><strong>Valid Until:</strong> ${info.valid_until ? new Date(info.valid_until).toLocaleString() : 'N/A'}</p>
-                    </div>
-                </div>
-            `;
-        } else {
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = `
-                <div style="background: var(--bg-danger); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--danger-color);">
-                    <strong>✗ Validation Failed</strong>
-                    <p style="margin-top: 0.5rem;">${result.error || 'Unknown error'}</p>
-                </div>
-            `;
-        }
-    } catch (error) {
-        showToast('✗ Validation error: ' + error.message, 'error');
-    }
-}
-
-// Enroll certificate
-document.getElementById('enroll-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const certPem = document.getElementById('cert_pem').value;
-    const name = document.getElementById('cert_name').value;
-    
-    try {
-        const response = await fetch('/api/v1/mtls/certificates/enroll', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                certificate: certPem,
-                name: name
-            })
-        });
-        
-        const result = await response.json();
         
         if (response.ok) {
-            showToast('✓ Certificate enrolled successfully', 'success');
-            hideEnrollModal();
-            loadCertificates();
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `client-cert-${certId}.pem`;
+            a.click();
+            window.URL.revokeObjectURL(url);
         } else {
-            showToast('✗ ' + (result.error || 'Failed to enroll certificate'), 'error');
+            showToast('✗ Failed to download certificate', 'error');
         }
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
-});
+}
+window.downloadCertificate = downloadCertificate;
 
-// Revoke certificate
 async function revokeCertificate(certId) {
     const confirmed = await ucmConfirm(
         'Are you sure you want to revoke this certificate? You can re-enable it later.',
@@ -525,20 +830,18 @@ async function revokeCertificate(certId) {
             headers: {'Authorization': `Bearer ${token}`}
         });
         
-        const result = await response.json();
-        
         if (response.ok) {
             showToast('✓ Certificate revoked', 'success');
             loadCertificates();
         } else {
-            showToast('✗ ' + (result.error || 'Failed to revoke'), 'error');
+            showToast('✗ Failed to revoke', 'error');
         }
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
 }
+window.revokeCertificate = revokeCertificate;
 
-// Enable certificate
 async function enableCertificate(certId) {
     try {
         const response = await fetch(`/api/v1/mtls/certificates/${certId}/enable`, {
@@ -546,20 +849,18 @@ async function enableCertificate(certId) {
             headers: {'Authorization': `Bearer ${token}`}
         });
         
-        const result = await response.json();
-        
         if (response.ok) {
             showToast('✓ Certificate enabled', 'success');
             loadCertificates();
         } else {
-            showToast('✗ ' + (result.error || 'Failed to enable'), 'error');
+            showToast('✗ Failed to enable', 'error');
         }
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
 }
+window.enableCertificate = enableCertificate;
 
-// Delete certificate
 async function deleteCertificate(certId) {
     const confirmed = await ucmConfirm(
         'Are you sure you want to permanently delete this certificate? This action cannot be undone.',
@@ -575,23 +876,21 @@ async function deleteCertificate(certId) {
             headers: {'Authorization': `Bearer ${token}`}
         });
         
-        const result = await response.json();
-        
         if (response.ok) {
             showToast('✓ Certificate deleted', 'success');
             loadCertificates();
         } else {
-            showToast('✗ ' + (result.error || 'Failed to delete'), 'error');
+            showToast('✗ Failed to delete', 'error');
         }
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
 }
+window.deleteCertificate = deleteCertificate;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadMTLSSettings();
-    loadCertificates();
 });
 })();
 </script>
