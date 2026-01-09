@@ -353,80 +353,13 @@
 </div>
 
 <script>
-function openCreateCertModal() {
-    openModal('createCertModal');
-}
+// ============================================================================
+// NOTE: Global functions (openCreateCertModal, handleCertCreateResponse, etc.)
+// are now defined in /static/js/ucm-global.js and loaded globally.
+// Local overrides only if needed for page-specific behavior.
+// ============================================================================
 
-function closeCertModal() {
-    closeModal('createCertModal');
-}
-
-function updateCertTypeHints(certType) {
-    const hints = {
-        'server_cert': 'For web servers, VPNs, and other services',
-        'client_cert': 'For user authentication (VPN, email, etc.)',
-        'combined_cert': 'Can be used for both server and client authentication',
-        'ca_cert': 'For creating an intermediate Certificate Authority'
-    };
-    const hintEl = document.getElementById('cert-type-hint');
-    if (hintEl) {
-        hintEl.textContent = hints[certType] || '';
-    }
-}
-
-function openCSRModal() {
-    openModal('csrModal');
-}
-
-function closeCSRModal() {
-    closeModal('csrModal');
-}
-
-// Auto-open create modal if hash is #create
-document.addEventListener('DOMContentLoaded', checkCreateHash);
-
-function checkCreateHash() {
-    if (window.location.hash === '#create') {
-        setTimeout(() => {
-            openCreateCertModal();
-            // Remove hash from URL after opening modal
-            history.replaceState(null, null, window.location.pathname);
-        }, 100);
-    }
-}
-
-function showToast(message, type) {
-    console.log('🔔 showToast called:', message, 'type:', type);
-    console.trace('Call stack:');
-    const toast = document.createElement('div');
-    toast.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
-        type === 'success' ? 'bg-green-500' : 'bg-red-500'
-    } text-white`;
-    toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} mr-2"></i>${message}`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
-}
-
-// Handle certificate creation form submit
-function handleCertCreateResponse(event) {
-    console.log('Form submitted, success:', event.detail.successful, 'target:', event.detail.target);
-    if (event.detail.successful && event.detail.target && event.detail.target.tagName === 'FORM') {
-        closeCertModal();
-        htmx.trigger('body', 'refreshCerts');
-        showToast('Certificate created', 'success');
-    }
-}
-
-// Handle CSR generation form submit
-function handleCSRResponse(event) {
-    if (event.detail.successful && event.detail.target && event.detail.target.tagName === 'FORM') {
-        closeCSRModal();
-        htmx.trigger('body', 'refreshCerts');
-        showToast('CSR generated', 'success');
-    }
-}
-
-// PKCS#12 Modal Functions (scoped to avoid conflicts)
+// PKCS#12 Modal Functions (page-specific implementation)
 if (typeof window.pkcs12ExportId === 'undefined') {
     window.pkcs12ExportId = null;
     window.pkcs12ExportType = null;
