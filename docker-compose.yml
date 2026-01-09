@@ -2,10 +2,7 @@ version: '3.8'
 
 services:
   ucm:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: ucm:1.8.0-beta
+    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
     container_name: ucm
     restart: unless-stopped
     

@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  ucm:
+    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+    container_name: ucm
+    restart: unless-stopped
+    ports:
+      - "8444:8443"
+    volumes:
+      - /mnt/disk2/appdata/ucm/data:/app/backend/data
+    environment:
+      # Optional: Customize these if needed
+      - UCM_FQDN=ucm.example.com
+      - UCM_ADMIN_EMAIL=admin@example.com
+      # - UCM_DB_PATH=/app/backend/data/ucm.db
+      # - UCM_LOG_LEVEL=INFO
+    networks:
+      - ucm_network
+    # Optional: Add health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:8443/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  ucm_network:
+    driver: bridge
+
+# Optional: Named volume instead of bind mount
+# volumes:
+#   ucm_data:
+#     driver: local
