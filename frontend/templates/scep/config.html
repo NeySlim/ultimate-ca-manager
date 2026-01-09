@@ -9,9 +9,9 @@
     </h1>
     
     <!-- Configuration Form -->
-    <div class="card"
+    <div id="scep-config-card" class="card"
          hx-get="/api/ui/scep/config-form"
-         hx-trigger="load"
+         hx-trigger="load, reload"
          hx-swap="innerHTML">
         <div style="height: 8rem; background: var(--bg-secondary); border-radius: 0.25rem; animation: pulse 2s infinite;"></div>
     </div>
