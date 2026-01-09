@@ -68,7 +68,7 @@ getent passwd %{name} >/dev/null || \
 # Backup existing installation
 if [ $1 -eq 2 ]; then
     # Upgrade - create backup
-    BACKUP_DIR="/var/backups/ucm/upgrade-$(date +%Y%m%d-%H%M%S)"
+    BACKUP_DIR="/var/backups/ucm/upgrade-$(date +%%Y%%m%%d-%%H%%M%%S)"
     mkdir -p "$BACKUP_DIR"
     if [ -d "%{_sharedstatedir}/%{name}" ]; then
         cp -r %{_sharedstatedir}/%{name} "$BACKUP_DIR/"
