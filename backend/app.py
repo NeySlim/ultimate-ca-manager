@@ -119,35 +119,42 @@ def create_app(config_name=None):
 def init_database(app):
     """Initialize database with default data"""
     from datetime import datetime
+    from sqlalchemy.exc import IntegrityError
     
     # Create initial admin user if none exists
-    if User.query.count() == 0:
-        admin = User(
-            username=app.config["INITIAL_ADMIN_USERNAME"],
-            email=app.config["INITIAL_ADMIN_EMAIL"],
-            role="admin",
-            active=True
-        )
-        admin.set_password(app.config["INITIAL_ADMIN_PASSWORD"])
-        db.session.add(admin)
-        
-        # Add initial system config
-        configs = [
-            SystemConfig(key="app.initialized", value="true", 
-                        description="Application initialized"),
-            SystemConfig(key="app.version", value=app.config["APP_VERSION"],
-                        description="Application version"),
-            SystemConfig(key="https.enabled", value="true",
-                        description="HTTPS enforcement enabled"),
-        ]
-        
-        for config in configs:
-            db.session.add(config)
-        
-        db.session.commit()
-        print(f"\n[SETUP] Initial admin user created: {admin.username}")
-        print(f"[SETUP] Default password: {app.config['INITIAL_ADMIN_PASSWORD']}")
-        print(f"[SETUP] CHANGE THIS PASSWORD IMMEDIATELY!\n")
+    # Use try/except to handle race conditions with multiple workers
+    try:
+        if User.query.count() == 0:
+            admin = User(
+                username=app.config["INITIAL_ADMIN_USERNAME"],
+                email=app.config["INITIAL_ADMIN_EMAIL"],
+                role="admin",
+                active=True
+            )
+            admin.set_password(app.config["INITIAL_ADMIN_PASSWORD"])
+            db.session.add(admin)
+            
+            # Add initial system config
+            configs = [
+                SystemConfig(key="app.initialized", value="true", 
+                            description="Application initialized"),
+                SystemConfig(key="app.version", value=app.config["APP_VERSION"],
+                            description="Application version"),
+                SystemConfig(key="https.enabled", value="true",
+                            description="HTTPS enforcement enabled"),
+            ]
+            
+            for config in configs:
+                db.session.add(config)
+            
+            db.session.commit()
+            print(f"\n[SETUP] Initial admin user created: {admin.username}")
+            print(f"[SETUP] Default password: {app.config['INITIAL_ADMIN_PASSWORD']}")
+            print(f"[SETUP] CHANGE THIS PASSWORD IMMEDIATELY!\n")
+    except IntegrityError:
+        # Another worker already created the initial data
+        db.session.rollback()
+        pass
 
 
 def register_blueprints(app):
