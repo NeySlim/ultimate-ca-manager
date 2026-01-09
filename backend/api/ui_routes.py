@@ -16,7 +16,9 @@ def escape_js(text):
     """Escape text for safe use in JavaScript strings"""
     if text is None:
         return ''
-    return html.escape(str(text)).replace("'", "&#39;").replace('"', '&quot;')
+    # Escape backslashes first, then quotes
+    text = str(text).replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
+    return text
 
 # Helper to check if user is logged in
 def login_required(f):
@@ -593,7 +595,8 @@ def ca_list_content():
                                 title="Export CA">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
                         </button>
-                        <button onclick="deleteCA('{safe_refid}', '{safe_descr}')" 
+                        <button data-refid="{ca['refid']}" data-descr="{html.escape(ca['descr'])}"
+                                onclick="deleteCA(this.dataset.refid, this.dataset.descr)"
                                 class="btn-icon btn-icon-danger"
                                 title="Delete CA">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
@@ -1047,7 +1050,8 @@ def cert_list_content():
                 
             if not is_revoked and not is_csr:
                 html += f'''
-                        <button onclick="revokeCert('{safe_refid}', '{safe_descr}')" 
+                        <button data-refid="{cert['refid']}" data-descr="{html.escape(cert['descr'])}" 
+                                onclick="revokeCert(this.dataset.refid, this.dataset.descr)"
                                 class="btn-icon btn-icon-danger"
                                 title="Revoke Certificate">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-ban"/></svg>
@@ -1055,7 +1059,8 @@ def cert_list_content():
                 '''
             
             html += f'''
-                        <button onclick="deleteCert('{safe_refid}', '{safe_descr}')" 
+                        <button data-refid="{cert['refid']}" data-descr="{html.escape(cert['descr'])}"
+                                onclick="deleteCert(this.dataset.refid, this.dataset.descr)"
                                 class="btn-icon btn-icon-danger"
                                 title="Delete {'CSR' if is_csr else 'Certificate'}">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
@@ -1152,7 +1157,7 @@ def cert_list_content():
                     '<button onclick="exportCertDER(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
                         '<i class="fas fa-file-binary mr-2"></i>Certificate (DER)' +
                     '</button>' +
-                    '<button onclick="showPKCS12ModalTable(' + id + ', &quot;cert&quot;)" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
+                    '<button onclick="showPKCS12ModalTable(' + id + ', \'cert\')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
                         '<i class="fas fa-lock mr-2"></i>PKCS#12 (.p12/.pfx)' +
                     '</button>' +
                 '</div>';
