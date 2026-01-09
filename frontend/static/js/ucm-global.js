@@ -105,6 +105,88 @@ function handleCAImportResponse(event) {
     }
 }
 
+function deleteCA(refid, name) {
+    // Get token from session
+    const tokenMeta = document.querySelector('meta[name="access-token"]');
+    const token = tokenMeta ? tokenMeta.content : '';
+    
+    if (typeof ucmConfirm !== 'undefined') {
+        ucmConfirm(
+            `Delete CA "${name}"?\n\nThis cannot be undone! All certificates signed by this CA will be affected.`,
+            'Delete CA',
+            { danger: true, confirmText: 'Delete', icon: 'trash' }
+        ).then(confirmed => {
+            if (!confirmed) return;
+            performCADelete(refid, token);
+        });
+    } else {
+        if (confirm(`Delete CA "${name}"? This cannot be undone!`)) {
+            performCADelete(refid, token);
+        }
+    }
+}
+
+function performCADelete(refid, token) {
+    fetch(`/api/v1/ca/${refid}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(response => {
+        if (response.ok) {
+            showToast('CA deleted successfully', 'success');
+            htmx.trigger('body', 'refreshCAs');
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Delete failed');
+            });
+        }
+    })
+    .catch(e => {
+        showToast('Error: ' + e.message, 'error');
+    });
+}
+
+function deleteCert(refid, name) {
+    // Get token from session
+    const tokenMeta = document.querySelector('meta[name="access-token"]');
+    const token = tokenMeta ? tokenMeta.content : '';
+    
+    if (typeof ucmConfirm !== 'undefined') {
+        ucmConfirm(
+            `Delete certificate "${name}"?\n\nThis action cannot be undone.`,
+            'Delete Certificate',
+            { danger: true, confirmText: 'Delete', icon: 'trash' }
+        ).then(confirmed => {
+            if (!confirmed) return;
+            performCertDelete(refid, token);
+        });
+    } else {
+        if (confirm(`Delete certificate "${name}"?`)) {
+            performCertDelete(refid, token);
+        }
+    }
+}
+
+function performCertDelete(refid, token) {
+    fetch(`/api/v1/certificates/by-refid/${refid}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(response => {
+        if (response.ok) {
+            showToast('Certificate deleted successfully', 'success');
+            htmx.trigger('body', 'refreshCerts');
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Delete failed');
+            });
+        }
+    })
+    .catch(e => {
+        showToast('Error: ' + e.message, 'error');
+    });
+}
+
 // ============================================================================
 // PKCS#12 FUNCTIONS
 // ============================================================================
