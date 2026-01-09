@@ -18,6 +18,11 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Wait for build workflows
+        run: |
+          echo "Waiting for DEB and RPM builds to complete..."
+          sleep 30
+      
       - name: Generate Release Notes
         id: notes
         run: |
@@ -34,35 +39,47 @@ jobs:
           fi
           
           # Create release notes
-          cat > release_notes.md << EOF
+          cat > release_notes.md << 'EOF'
           ## What's New in ${VERSION}
           
           ${COMMITS}
           
           ## Installation
           
-          ### Docker
-          \`\`\`bash
+          ### Docker (Multi-arch: AMD64, ARM64)
+          ```bash
           docker pull ghcr.io/neyslim/ultimate-ca-manager:${VERSION}
-          \`\`\`
+          ```
           
-          ### RPM (RHEL/Rocky/Alma/Fedora)
-          \`\`\`bash
-          sudo yum install ./ultimate-ca-manager-${VERSION#v}-1.el9.noarch.rpm
-          \`\`\`
+          ### RPM (RHEL 9/Rocky 9/Alma 9/Fedora)
+          ```bash
+          # Download from releases
+          wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/${VERSION}/ucm-${VERSION#v}-*.rpm
+          sudo dnf install ./ucm-${VERSION#v}-*.rpm
+          ```
           
           ### DEB (Debian/Ubuntu)
-          \`\`\`bash
-          sudo dpkg -i ultimate-ca-manager_${VERSION#v}_all.deb
+          ```bash
+          # Download from releases
+          wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/${VERSION}/ucm_${VERSION#v}_all.deb
+          sudo dpkg -i ucm_${VERSION#v}_all.deb
           sudo apt-get install -f
-          \`\`\`
+          ```
           
-          See [Documentation](https://github.com/NeySlim/ultimate-ca-manager/wiki) for more details.
+          ## Documentation
+          - [Installation Guide](https://github.com/NeySlim/ultimate-ca-manager/blob/main/INSTALLATION.md)
+          - [Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)
+          - [Quick Start](https://github.com/NeySlim/ultimate-ca-manager/blob/main/DOCKER_QUICKSTART.md)
           EOF
           
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          cat release_notes.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Expand variables
+          eval "cat <<EVALEOF
+          $(<release_notes.md)
+          EVALEOF" > release_notes_expanded.md
+          
+          echo "notes<<NOTESEOF" >> $GITHUB_OUTPUT
+          cat release_notes_expanded.md >> $GITHUB_OUTPUT
+          echo "NOTESEOF" >> $GITHUB_OUTPUT
       
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
