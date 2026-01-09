@@ -415,11 +415,14 @@ def download_certificate(cert_id):
                     cn = cn.replace(' ', '_').replace('/', '_').replace('\\', '_')
                     break
         
+        filename = f'mtls-{cn}.pem'
+        print(f"[DEBUG] Downloading certificate {cert_id}: filename={filename}, subject={auth_cert.cert_subject}", flush=True)
+        
         return send_file(
             io.BytesIO(cert_data),
             mimetype='application/x-pem-file',
             as_attachment=True,
-            download_name=f'mtls-{cn}.pem'
+            download_name=filename
         )
         
     except Exception as e:
