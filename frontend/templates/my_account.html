@@ -736,11 +736,16 @@ async function loadCertificates() {
                 const isExpired = validUntil && validUntil < new Date();
                 const daysLeft = validUntil ? Math.ceil((validUntil - new Date()) / (1000 * 60 * 60 * 24)) : null;
                 
+                // Escape user-controlled data to prevent XSS
+                const safeName = escapeHtml(cert.name || 'Unnamed');
+                const safeSubject = escapeHtml(cert.cert_subject);
+                const safeSerial = escapeHtml(cert.cert_serial.substring(0, 16));
+                
                 return `
                     <tr>
-                        <td><strong>${cert.name || 'Unnamed'}</strong></td>
-                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${cert.cert_subject}</td>
-                        <td><code style="font-size: 0.875rem;">${cert.cert_serial.substring(0, 16)}...</code></td>
+                        <td><strong>${safeName}</strong></td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${safeSubject}</td>
+                        <td><code style="font-size: 0.875rem;">${safeSerial}...</code></td>
                         <td>
                             ${validUntil ? validUntil.toLocaleDateString() : 'N/A'}
                             ${daysLeft !== null && daysLeft < 30 ? `<br><small style="color: var(--warning-color);">${daysLeft} days left</small>` : ''}
