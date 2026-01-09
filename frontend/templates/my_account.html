@@ -789,7 +789,18 @@ window.downloadCertificate = async function(certId) {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `client-cert-${certId}.pem`;
+            
+            // Extract filename from Content-Disposition header
+            const disposition = response.headers.get('Content-Disposition');
+            let filename = `client-cert-${certId}.pem`; // fallback
+            if (disposition) {
+                const filenameMatch = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
+                }
+            }
+            
+            a.download = filename;
             a.click();
             window.URL.revokeObjectURL(url);
         } else {
