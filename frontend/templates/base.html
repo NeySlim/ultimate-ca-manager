@@ -337,7 +337,29 @@
         // This happens when user navigates away while HTMX request is in flight
         console.warn('HTMX swap error (likely due to navigation):', evt.detail);
         evt.preventDefault(); // Prevent error from propagating
+        evt.stopPropagation();
     });
+    
+    // Prevent swap if target element doesn't exist (catches error before it happens)
+    document.body.addEventListener('htmx:beforeSwap', function(evt) {
+        // Check if target element exists
+        const target = evt.detail.target;
+        if (!target || !document.body.contains(target)) {
+            console.warn('HTMX swap target no longer exists, canceling swap');
+            evt.preventDefault(); // Cancel the swap
+            return false;
+        }
+    });
+    
+    // Catch any window-level errors from HTMX
+    window.addEventListener('error', function(evt) {
+        // Suppress HTMX querySelector errors (navigation-related)
+        if (evt.message && evt.message.includes('querySelector') && evt.filename && evt.filename.includes('htmx')) {
+            console.warn('HTMX DOM error suppressed (navigation-related)');
+            evt.preventDefault();
+            return true; // Prevent default error handling
+        }
+    }, true);
     
     // Listen for specific modal triggers from server
     document.body.addEventListener('openCreateCAModal', function() {
