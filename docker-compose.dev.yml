@@ -1,0 +1,106 @@
+# ============================================================================
+# UCM v1.8.0-beta - Docker Compose Development Configuration
+# ============================================================================
+# Development setup with hot-reload, debugging, and verbose logging
+# 
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ============================================================================
+
+version: '3.8'
+
+services:
+  ucm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development  # Use development stage if multi-stage
+    
+    # Mount source code for hot-reload
+    volumes:
+      - ./backend:/app/backend:rw
+      - ./frontend:/app/frontend:rw
+      - ucm-data:/app/backend/data
+      
+      # Don't mount these (keep container versions)
+      # - ./backend/__pycache__
+      # - ./backend/.pytest_cache
+    
+    # Development environment
+    environment:
+      # Debug mode
+      - UCM_DEBUG=true
+      - UCM_LOG_LEVEL=DEBUG
+      
+      # Flask development server
+      - FLASK_ENV=development
+      - FLASK_DEBUG=true
+      
+      # Disable caching for development
+      - UCM_CACHE_ENABLED=false
+      
+      # Disable backups for development
+      - UCM_BACKUP_ENABLED=false
+      
+      # Verbose SQL logging
+      - SQL_DEBUG=false  # Set true if needed (very verbose!)
+      
+      # Test SMTP (use Mailhog or similar)
+      - UCM_SMTP_ENABLED=false
+      - UCM_SMTP_SERVER=mailhog
+      - UCM_SMTP_PORT=1025
+      - UCM_SMTP_TLS=false
+    
+    # Override command to use Flask dev server with auto-reload
+    command: python3 -m flask run --host=0.0.0.0 --port=8443 --cert=data/https_cert.pem --key=data/https_key.pem --reload
+    
+    # Expose additional ports for debugging
+    ports:
+      - "${UCM_HTTPS_PORT:-8443}:8443"
+      - "${UCM_HTTP_PORT:-8080}:8080"
+      - "5678:5678"  # Python debugger (debugpy)
+    
+    # Relaxed resource limits for development
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    
+    # Development logging (more verbose)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    labels:
+      - "com.ultimate-ca-manager.environment=development"
+  
+  # Optional: Mailhog for testing email notifications
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: ucm-mailhog
+    restart: unless-stopped
+    
+    ports:
+      - "8025:8025"  # Web UI
+      - "1025:1025"  # SMTP
+    
+    networks:
+      - ucm-network
+    
+    labels:
+      - "com.ultimate-ca-manager.service=mailhog"
+  
+  # Optional: Redis for testing caching
+  # redis:
+  #   image: redis:alpine
+  #   container_name: ucm-redis
+  #   restart: unless-stopped
+  #   
+  #   ports:
+  #     - "6379:6379"
+  #   
+  #   networks:
+  #     - ucm-network
