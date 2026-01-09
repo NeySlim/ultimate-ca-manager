@@ -281,59 +281,59 @@ def dashboard_stats():
         
         return f"""
         <!-- CA Count -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-primary-100 dark:bg-primary-900 rounded-lg">
-                    <i class="fas fa-certificate text-primary-600 dark:text-primary-400 text-2xl"></i>
+        <div class="card" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: center;">
+                <div style="flex-shrink: 0; padding: 0.75rem; background: var(--primary-bg); border-radius: 8px;">
+                    <i class="fas fa-certificate" style="color: var(--primary-color); font-size: 1.5rem;"></i>
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Certificate Authorities</p>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white">{ca_count}</p>
+                <div style="margin-left: 1rem;">
+                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Certificate Authorities</p>
+                    <p style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">{ca_count}</p>
                 </div>
             </div>
         </div>
         
         <!-- Cert Count -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-                    <i class="fas fa-file-certificate text-green-600 dark:text-green-400 text-2xl"></i>
+        <div class="card" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: center;">
+                <div style="flex-shrink: 0; padding: 0.75rem; background: var(--success-bg); border-radius: 8px;">
+                    <i class="fas fa-file-certificate" style="color: var(--success-color); font-size: 1.5rem;"></i>
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Certificates</p>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white">{cert_count}</p>
+                <div style="margin-left: 1rem;">
+                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Certificates</p>
+                    <p style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">{cert_count}</p>
                 </div>
             </div>
         </div>
         
         <!-- SCEP Count -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-orange-100 dark:bg-orange-900 rounded-lg">
-                    <i class="fas fa-network-wired text-orange-600 dark:text-orange-400 text-2xl"></i>
+        <div class="card" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: center;">
+                <div style="flex-shrink: 0; padding: 0.75rem; background: var(--warning-bg); border-radius: 8px;">
+                    <i class="fas fa-network-wired" style="color: var(--warning-color); font-size: 1.5rem;"></i>
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">SCEP Requests</p>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white">{scep_count}</p>
+                <div style="margin-left: 1rem;">
+                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">SCEP Requests</p>
+                    <p style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">{scep_count}</p>
                 </div>
             </div>
         </div>
         
         <!-- Pending Count -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                    <i class="fas fa-clock text-yellow-600 dark:text-yellow-400 text-2xl"></i>
+        <div class="card" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: center;">
+                <div style="flex-shrink: 0; padding: 0.75rem; background: var(--warning-bg); border-radius: 8px;">
+                    <i class="fas fa-clock" style="color: var(--warning-color); font-size: 1.5rem;"></i>
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Approvals</p>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white">{pending_count}</p>
+                <div style="margin-left: 1rem;">
+                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Pending Approvals</p>
+                    <p style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">{pending_count}</p>
                 </div>
             </div>
         </div>
         """
     except Exception as e:
-        return f'<div class="text-red-600">Error loading stats: {str(e)}</div>'
+        return f'<div style="color: var(--danger-color);">Error loading stats: {str(e)}</div>'
 
 
 @ui_bp.route('/api/dashboard/recent-cas')
@@ -351,23 +351,23 @@ def dashboard_recent_cas():
         )
         
         if response.status_code != 200:
-            return '<p class="text-gray-500 dark:text-gray-400">No CAs found</p>'
+            return '<p style="color: var(--text-secondary);">No CAs found</p>'
         
         cas = response.json()[:5]  # Get latest 5
         
         if not cas:
-            return '<p class="text-gray-500 dark:text-gray-400">No CAs found. <a href="/ca/new" class="text-primary-600 hover:text-primary-700">Create one</a></p>'
+            return '<p style="color: var(--text-secondary);">No CAs found. <a href="/ca/new" style="color: var(--primary-color);">Create one</a></p>'
         
         html = '<div class="space-y-3">'
         for ca in cas:
             html += f'''
-            <a href="/ca/{ca['refid']}" class="block p-3 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors">
-                <div class="flex items-center justify-between">
+            <a href="/ca/{ca['refid']}" style="display: block; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; text-decoration: none; transition: background 0.2s;" onmouseover="this.style.background='var(--hover-bg)'" onmouseout="this.style.background='var(--bg-secondary)'">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div>
-                        <p class="font-medium text-gray-900 dark:text-white">{ca['descr']}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{ca.get('subject', 'N/A')}</p>
+                        <p style="font-weight: 500; color: var(--text-primary);">{ca['descr']}</p>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary);">{ca.get('subject', 'N/A')}</p>
                     </div>
-                    <i class="fas fa-chevron-right text-gray-400"></i>
+                    <i class="fas fa-chevron-right" style="color: var(--text-muted);"></i>
                 </div>
             </a>
             '''
@@ -375,7 +375,7 @@ def dashboard_recent_cas():
         
         return html
     except Exception as e:
-        return f'<p class="text-red-600">Error: {str(e)}</p>'
+        return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
 
 
 @ui_bp.route('/api/dashboard/scep-status')
@@ -393,7 +393,7 @@ def dashboard_scep_status():
         )
         
         if response.status_code != 200:
-            return '<p class="text-red-600">Failed to load SCEP status</p>'
+            return '<p style="color: var(--danger-color);">Failed to load SCEP status</p>'
         
         config = response.json()
         enabled = config.get('enabled', False)
@@ -401,50 +401,50 @@ def dashboard_scep_status():
         
         if not enabled:
             return f'''
-            <div class="flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                <div class="flex items-center">
-                    <i class="fas fa-circle text-red-500 mr-3"></i>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                <div style="display: flex; align-items: center;">
+                    <i class="fas fa-circle" style="color: var(--danger-color); margin-right: 0.75rem;"></i>
                     <div>
-                        <p class="font-medium text-gray-900 dark:text-white">SCEP Server: Disabled</p>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Configure SCEP to start accepting enrollment requests</p>
+                        <p style="font-weight: 500; color: var(--text-primary);">SCEP Server: Disabled</p>
+                        <p style="font-size: 0.875rem; color: var(--text-secondary);">Configure SCEP to start accepting enrollment requests</p>
                     </div>
                 </div>
-                <a href="/scep" class="btn btn-primary text-sm">
+                <a href="/scep" class="btn btn-primary" style="font-size: 0.875rem;">
                     Configure
                 </a>
             </div>
             '''
         
         return f'''
-        <div class="space-y-4">
-            <div class="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <div class="flex items-center">
-                    <i class="fas fa-circle text-green-500 mr-3 animate-pulse"></i>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: var(--success-bg); border-radius: 8px;">
+                <div style="display: flex; align-items: center;">
+                    <i class="fas fa-circle animate-pulse" style="color: var(--success-color); margin-right: 0.75rem;"></i>
                     <div>
-                        <p class="font-medium text-gray-900 dark:text-white">SCEP Server: Active</p>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Accepting enrollment requests</p>
+                        <p style="font-weight: 500; color: var(--text-primary);">SCEP Server: Active</p>
+                        <p style="font-size: 0.875rem; color: var(--text-secondary);">Accepting enrollment requests</p>
                     </div>
                 </div>
-                <a href="/scep" class="text-accent hover:text-accent-hover text-sm">
-                    Manage <i class="fas fa-chevron-right ml-1"></i>
+                <a href="/scep" style="color: var(--accent-color); font-size: 0.875rem; text-decoration: none;">
+                    Manage <i class="fas fa-chevron-right" style="margin-left: 0.25rem;"></i>
                 </a>
             </div>
-            <div class="grid grid-cols-2 gap-4 text-sm">
-                <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <p class="text-gray-500 dark:text-gray-400">Mode</p>
-                    <p class="font-medium text-gray-900 dark:text-white">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.875rem;">
+                <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px;">
+                    <p style="color: var(--text-secondary);">Mode</p>
+                    <p style="font-weight: 500; color: var(--text-primary);">
                         {'Auto-Approval' if auto_approve else 'Manual Approval'}
                     </p>
                 </div>
-                <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <p class="text-gray-500 dark:text-gray-400">Endpoint</p>
-                    <p class="font-medium text-gray-900 dark:text-white text-xs">/scep/pkiclient.exe</p>
+                <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px;">
+                    <p style="color: var(--text-secondary);">Endpoint</p>
+                    <p style="font-weight: 500; color: var(--text-primary); font-size: 0.75rem;">/scep/pkiclient.exe</p>
                 </div>
             </div>
         </div>
         '''
     except Exception as e:
-        return f'<p class="text-red-600">Error: {str(e)}</p>'
+        return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
 
 
 # Settings
@@ -487,7 +487,7 @@ def ca_list_content():
     try:
         token = session.get('access_token')
         if not token:
-            return '<div class="p-8 text-center text-red-600">Session expired. Please <a href="/logout" class="underline">logout</a> and login again.</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Session expired. Please <a href="/logout" style="text-decoration: underline;">logout</a> and login again.</div>'
         
         headers = {'Authorization': f'Bearer {token}'}
         
@@ -498,18 +498,18 @@ def ca_list_content():
         )
         
         if response.status_code == 401:
-            return '<div class="p-8 text-center text-red-600">Session expired. Please refresh the page or <a href="/logout" class="underline">logout</a> and login again.</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Session expired. Please refresh the page or <a href="/logout" style="text-decoration: underline;">logout</a> and login again.</div>'
         elif response.status_code != 200:
-            return f'<div class="p-8 text-center text-red-600">Failed to load CAs (Error {response.status_code})</div>'
+            return f'<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Failed to load CAs (Error {response.status_code})</div>'
         
         cas = response.json()
         
         if not cas:
             return '''
-            <div class="p-8 text-center text-gray-500 dark:text-gray-400">
-                <i class="fas fa-certificate text-4xl mb-4"></i>
-                <p class="text-lg font-medium mb-2">No Certificate Authorities</p>
-                <p class="text-sm">Create your first CA to get started</p>
+            <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                <i class="fas fa-certificate" style="font-size: 2.25rem; margin-bottom: 1rem;"></i>
+                <p style="font-size: 1.125rem; font-weight: 500; margin-bottom: 0.5rem;">No Certificate Authorities</p>
+                <p style="font-size: 0.875rem;">Create your first CA to get started</p>
             </div>
             '''
         
@@ -813,9 +813,9 @@ def ca_list_content():
                 <i class="fas fa-exclamation-triangle" style="color: var(--warning-color);"></i>
                 <span style="color: var(--warning-color); font-weight: 500;">CAs orphelines ({len(orphan_cas)}) - Parent non trouvé</span>
             </div>
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700">
-                    <tr>
+            <table id="ca-orphan-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
                         <th style="padding: 0.75rem; text-align: left;">Description</th>
                         <th style="padding: 0.75rem; text-align: left;">Émetteur (DN)</th>
                         <th style="padding: 0.75rem; text-align: left;">Nom</th>
@@ -825,7 +825,7 @@ def ca_list_content():
                         <th style="padding: 0.75rem; text-align: left;">Commandes</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody>
             '''
             
             for orphan_ca in orphan_cas:
@@ -996,7 +996,7 @@ def ca_list_content():
         
         return html
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/ca/create', methods=['POST'])
@@ -1135,7 +1135,7 @@ def cert_list_content():
     try:
         token = session.get('access_token')
         if not token:
-            return '<div class="p-8 text-center text-red-600">Session expired. Please <a href="/logout" class="underline">logout</a> and login again.</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Session expired. Please <a href="/logout" style="text-decoration: underline;">logout</a> and login again.</div>'
         
         headers = {'Authorization': f'Bearer {token}'}
         
@@ -1146,18 +1146,18 @@ def cert_list_content():
         )
         
         if response.status_code == 401:
-            return '<div class="p-8 text-center text-red-600">Session expired. Please refresh the page or <a href="/logout" class="underline">logout</a> and login again.</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Session expired. Please refresh the page or <a href="/logout" style="text-decoration: underline;">logout</a> and login again.</div>'
         elif response.status_code != 200:
-            return f'<div class="p-8 text-center text-red-600">Failed to load certificates (Error {response.status_code})</div>'
+            return f'<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Failed to load certificates (Error {response.status_code})</div>'
         
         certs = response.json()
         
         if not certs:
             return '''
-            <div class="p-8 text-center text-gray-500 dark:text-gray-400">
-                <i class="fas fa-file-certificate text-4xl mb-4"></i>
-                <p class="text-lg font-medium mb-2">No Certificates</p>
-                <p class="text-sm">Create your first certificate to get started</p>
+            <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                <i class="fas fa-file-certificate" style="font-size: 2.25rem; margin-bottom: 1rem;"></i>
+                <p style="font-size: 1.125rem; font-weight: 500; margin-bottom: 0.5rem;">No Certificates</p>
+                <p style="font-size: 0.875rem;">Create your first certificate to get started</p>
             </div>
             '''
         
@@ -1415,31 +1415,31 @@ def cert_list_content():
             
             if (isCSR) {
                 // CSR only has simple PEM export
-                menu.innerHTML = '<div class="py-1" role="menu">' +
-                    '<button data-action="export-cert-simple" data-id="' + id + '" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-file-certificate mr-2"></i>CSR (PEM)' +
+                menu.innerHTML = '<div style="padding: 0.25rem 0;" role="menu">' +
+                    '<button data-action="export-cert-simple" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i>CSR (PEM)' +
                     '</button>' +
                 '</div>';
             } else {
                 // Full certificate has all export options
-                menu.innerHTML = '<div class="py-1" role="menu">' +
-                    '<button data-action="export-cert-simple" data-id="' + id + '" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-file-certificate mr-2"></i>Certificate only (PEM)' +
+                menu.innerHTML = '<div style="padding: 0.25rem 0;" role="menu">' +
+                    '<button data-action="export-cert-simple" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i>Certificate only (PEM)' +
                     '</button>' +
-                    '<button data-action="export-cert-key" data-id="' + id + '" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-key mr-2"></i>Certificate + Key (PEM)' +
+                    '<button data-action="export-cert-key" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-key" style="margin-right: 0.5rem;"></i>Certificate + Key (PEM)' +
                     '</button>' +
-                    '<button data-action="export-cert-chain" data-id="' + id + '" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-link mr-2"></i>Certificate + CA Chain (PEM)' +
+                    '<button data-action="export-cert-chain" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-link" style="margin-right: 0.5rem;"></i>Certificate + CA Chain (PEM)' +
                     '</button>' +
-                    '<button data-action="export-cert-full" data-id="' + id + '" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-archive mr-2"></i>Full Chain + Key (PEM)' +
+                    '<button data-action="export-cert-full" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-archive" style="margin-right: 0.5rem;"></i>Full Chain + Key (PEM)' +
                     '</button>' +
-                    '<button data-action="export-cert-der" data-id="' + id + '" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-file-binary mr-2"></i>Certificate (DER)' +
+                    '<button data-action="export-cert-der" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-file-binary" style="margin-right: 0.5rem;"></i>Certificate (DER)' +
                     '</button>' +
-                    '<button data-action="show-pkcs12-modal" data-id="' + id + '" data-type="cert" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-lock mr-2"></i>PKCS#12 (.p12/.pfx)' +
+                    '<button data-action="show-pkcs12-modal" data-id="' + id + '" data-type="cert" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-lock" style="margin-right: 0.5rem;"></i>PKCS#12 (.p12/.pfx)' +
                     '</button>' +
                 '</div>';
             }
@@ -1534,7 +1534,7 @@ def cert_list_content():
         response.headers['Expires'] = '0'
         return response
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/cert/create', methods=['POST'])
@@ -1659,16 +1659,16 @@ def crl_list_data():
         )
         
         if response.status_code != 200:
-            return f'<div class="p-4 text-red-600">Failed to load CRLs: {response.text}</div>'
+            return f'<div style="padding: 1rem; color: var(--danger-color);">Failed to load CRLs: {response.text}</div>'
         
         crls = response.json()
         
         if not crls:
             return '''
-            <div class="p-8 text-center text-gray-500">
-                <i class="fas fa-file-contract text-6xl mb-4"></i>
-                <p class="text-lg">No CRLs generated yet</p>
-                <p class="text-sm mt-2">Enable CDP on a CA and generate a CRL to get started</p>
+            <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                <i class="fas fa-file-contract" style="font-size: 3.75rem; margin-bottom: 1rem;"></i>
+                <p style="font-size: 1.125rem;">No CRLs generated yet</p>
+                <p style="font-size: 0.875rem; margin-top: 0.5rem;">Enable CDP on a CA and generate a CRL to get started</p>
             </div>
             '''
         
@@ -1804,7 +1804,7 @@ def crl_list_data():
         return html
         
     except Exception as e:
-        return f'<div class="p-4 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 1rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/scep')
@@ -2065,7 +2065,7 @@ def scep_requests():
         
         return html
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 # Import Management
@@ -2107,29 +2107,29 @@ def import_config_form():
         html = f'''
         <form hx-post="/api/ui/import/save" hx-swap="none" 
               hx-on::after-request="if(event.detail.successful) window.showToast('Configuration saved successfully', 'success')">
-            <div class="space-y-4">
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">OPNsense URL</label>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">OPNsense URL</label>
                     <input type="url" name="base_url" value="{config.get('base_url', 'https://network')}" required
-                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                           class="form-control">
                 </div>
                 
                 <!-- API Key Authentication (only method) -->
                 <input type="hidden" name="auth_method" value="api">
                 
-                <div class="grid grid-cols-2 gap-4">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
+                        <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">API Key</label>
                         <input type="text" name="api_key" value="{config.get('api_key', '')}" required
-                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                               class="form-control">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Secret</label>
+                        <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">API Secret</label>
                         <input type="password" name="api_secret" required
-                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                               class="form-control">
                     </div>
                 </div>
-                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <p style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
                     <i class="fas fa-info-circle"></i> Create API key in OPNsense: System → Access → Users → Edit user → API keys
                 </p>
                 
@@ -2254,7 +2254,7 @@ def import_config_form():
         import sys
         sys.stderr.write(f"ERROR import_config_form: {str(e)}\n")
         sys.stderr.flush()
-        return f'<p class="text-red-600">Error: {str(e)}</p>'
+        return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
 
 
 @ui_bp.route('/api/ui/import/save', methods=['POST'])
@@ -2306,30 +2306,30 @@ def import_history():
         )
         
         if response.status_code != 200:
-            return '<div class="p-8 text-center text-gray-500">No history</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No history</div>'
         
         data = response.json()
         total = data['cas']['count'] + data['certs']['count']
         
         if total == 0:
-            return '<div class="p-8 text-center text-gray-500 dark:text-gray-400">No imported items</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No imported items</div>'
         
         return f'''
-        <div class="p-6">
-            <div class="grid grid-cols-2 gap-4">
-                <div class="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{data['cas']['count']}</p>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Imported CAs</p>
+        <div style="padding: 1.5rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div style="text-align: center; padding: 1rem; background: var(--primary-bg); border-radius: 8px;">
+                    <p style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">{data['cas']['count']}</p>
+                    <p style="font-size: 0.875rem; color: var(--text-secondary);">Imported CAs</p>
                 </div>
-                <div class="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">{data['certs']['count']}</p>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Imported Certificates</p>
+                <div style="text-align: center; padding: 1rem; background: var(--success-bg); border-radius: 8px;">
+                    <p style="font-size: 1.5rem; font-weight: 700; color: var(--success-color);">{data['certs']['count']}</p>
+                    <p style="font-size: 0.875rem; color: var(--text-secondary);">Imported Certificates</p>
                 </div>
             </div>
         </div>
         '''
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/certificates/import', methods=['POST'])
@@ -2590,7 +2590,7 @@ def config_https_cert():
         cert_path = str(Config.HTTPS_CERT_PATH)
         
         if not os.path.exists(cert_path):
-            return '<div class="text-yellow-600">No HTTPS certificate found</div>'
+            return '<div style="color: var(--warning-color);">No HTTPS certificate found</div>'
         
         with open(cert_path, 'rb') as f:
             cert_data = f.read()
@@ -2618,33 +2618,33 @@ def config_https_cert():
         <div style="margin-bottom: 1rem;">
             {source_badge}
         </div>
-        <dl class="grid grid-cols-1 gap-4">
+        <dl style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Subject</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{subject}</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Subject</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{subject}</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Issuer</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{issuer}</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Issuer</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{issuer}</dd>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Valid From</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{not_before}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Valid From</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{not_before}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Valid Until</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{not_after}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Valid Until</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{not_after}</dd>
                 </div>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Serial Number</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{serial}</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Serial Number</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{serial}</dd>
             </div>
         </dl>
         '''
     except Exception as e:
-        return f'<div class="text-red-600">Error: {str(e)}</div>'
+        return f'<div style="color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/config/regenerate-https', methods=['POST'])
@@ -2947,7 +2947,7 @@ def config_db_stats():
         )
         
         if response.status_code != 200:
-            return '<div class="text-red-600">Error loading stats</div>'
+            return '<div style="color: var(--danger-color);">Error loading stats</div>'
         
         stats = response.json()
         
@@ -2959,27 +2959,27 @@ def config_db_stats():
             db_size = os.path.getsize(db_path) / (1024 * 1024)  # MB
         
         return f'''
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.get('cas', 0)}</p>
-                <p class="text-sm text-gray-600 dark:text-gray-400">CAs</p>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+            <div style="background: var(--primary-bg); padding: 1rem; border-radius: 8px;">
+                <p style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">{stats.get('cas', 0)}</p>
+                <p style="font-size: 0.875rem; color: var(--text-secondary);">CAs</p>
             </div>
-            <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                <p class="text-2xl font-bold text-green-600 dark:text-green-400">{stats.get('certificates', 0)}</p>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Certificates</p>
+            <div style="background: var(--success-bg); padding: 1rem; border-radius: 8px;">
+                <p style="font-size: 1.5rem; font-weight: 700; color: var(--success-color);">{stats.get('certificates', 0)}</p>
+                <p style="font-size: 0.875rem; color: var(--text-secondary);">Certificates</p>
             </div>
-            <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.get('users', 0)}</p>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Users</p>
+            <div style="background: var(--info-bg); padding: 1rem; border-radius: 8px;">
+                <p style="font-size: 1.5rem; font-weight: 700; color: var(--info-color);">{stats.get('users', 0)}</p>
+                <p style="font-size: 0.875rem; color: var(--text-secondary);">Users</p>
             </div>
-            <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-                <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{db_size:.2f} MB</p>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Database Size</p>
+            <div style="background: var(--warning-bg); padding: 1rem; border-radius: 8px;">
+                <p style="font-size: 1.5rem; font-weight: 700; color: var(--warning-color);">{db_size:.2f} MB</p>
+                <p style="font-size: 0.875rem; color: var(--text-secondary);">Database Size</p>
             </div>
         </div>
         '''
     except Exception as e:
-        return f'<div class="text-red-600">Error: {str(e)}</div>'
+        return f'<div style="color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/config/backup-db', methods=['POST'])
@@ -3042,35 +3042,35 @@ def config_system_info():
         uptime_minutes = int((uptime_seconds % 3600) / 60)
         
         return f'''
-        <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <dl style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Version</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white">UCM 1.0.0</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Version</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">UCM 1.0.0</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Python Version</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white">{platform.python_version()}</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Python Version</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{platform.python_version()}</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Operating System</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white">{platform.system()} {platform.release()}</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Operating System</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{platform.system()} {platform.release()}</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Uptime</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white">{uptime_hours}h {uptime_minutes}m</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Uptime</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{uptime_hours}h {uptime_minutes}m</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Database Path</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">''' + str(Config.DATABASE_PATH) + '''</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Database Path</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">''' + str(Config.DATABASE_PATH) + '''</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Data Directory</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">''' + str(DATA_DIR) + '''/</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Data Directory</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">''' + str(DATA_DIR) + '''/</dd>
             </div>
         </dl>
         '''
     except Exception as e:
-        return f'<div class="text-red-600">Error: {str(e)}</div>'
+        return f'<div style="color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 # CA Detail Pages
@@ -3161,7 +3161,7 @@ def ca_certificates(ca_id):
         )
         
         if ca_response.status_code != 200:
-            return '<div class="p-8 text-center text-gray-500">CA not found</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">CA not found</div>'
         
         ca = ca_response.json()
         ca_refid = ca.get('refid')
@@ -3174,7 +3174,7 @@ def ca_certificates(ca_id):
         )
         
         if response.status_code != 200:
-            return '<div class="p-8 text-center text-gray-500">No certificates</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No certificates</div>'
         
         all_certs = response.json()
         # Filter by caref matching CA's refid
@@ -3242,7 +3242,7 @@ def ca_certificates(ca_id):
         
         return html
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/test-design')
@@ -3728,7 +3728,7 @@ def ocsp_status_list():
         
     except Exception as e:
         logger.error(f"Error getting OCSP status: {e}")
-        return f'<div class="text-red-600">Error loading OCSP status: {str(e)}</div>'
+        return f'<div style="color: var(--danger-color);">Error loading OCSP status: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/ocsp/stats')
@@ -3752,7 +3752,7 @@ def ocsp_stats_ui():
         
     except Exception as e:
         logger.error(f"Error getting OCSP stats: {e}")
-        return '<span class="text-red-600">Error</span>'
+        return '<span style="color: var(--danger-color);">Error</span>'
 
 
 # HTTPS Certificate Management UI Routes
