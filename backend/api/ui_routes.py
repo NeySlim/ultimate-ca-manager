@@ -656,9 +656,7 @@ def ca_list_content():
                 <tr class="{row_class}" 
                     data-action="navigate-ca" 
                     data-ca-id="{ca['id']}" 
-                    style="cursor: pointer;"
-                    onmouseenter="this.style.backgroundColor='var(--bg-secondary)'"
-                    onmouseleave="this.style.backgroundColor=''">
+                    style="cursor: pointer;">
                     <td style="padding: {row_padding_top} 0.75rem {row_padding_bottom} 0.75rem; {border_bottom} {vertical_align} {family_border_left}">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center;">
