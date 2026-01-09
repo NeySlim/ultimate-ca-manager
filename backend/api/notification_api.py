@@ -411,8 +411,15 @@ def update_user_notification_settings():
         
         data = request.get_json()
         
+        # Validate email if provided
         if 'email' in data:
-            user.email = data['email']
+            email = data['email']
+            if email:  # Only validate if not empty
+                import re
+                email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                if not re.match(email_pattern, email):
+                    return jsonify({'error': 'Invalid email format'}), 400
+            user.email = email
         
         if 'enabled' in data and hasattr(user, 'notifications_enabled'):
             user.notifications_enabled = data['enabled']

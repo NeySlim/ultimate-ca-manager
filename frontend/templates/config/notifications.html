@@ -505,12 +505,18 @@ async function loadNotificationHistory() {
                 return;
             }
             
-            tbody.innerHTML = data.logs.map(log => `
+            tbody.innerHTML = data.logs.map(log => {
+                // Escape user-controlled data to prevent XSS
+                const safeType = escapeHtml(log.type);
+                const safeRecipient = escapeHtml(log.recipient);
+                const safeSubject = escapeHtml(log.subject || 'N/A');
+                
+                return `
                 <tr>
                     <td>${new Date(log.sent_at).toLocaleString()}</td>
-                    <td><span class="badge-outline badge-info">${log.type}</span></td>
-                    <td>${log.recipient}</td>
-                    <td>${log.subject || 'N/A'}</td>
+                    <td><span class="badge-outline badge-info">${safeType}</span></td>
+                    <td>${safeRecipient}</td>
+                    <td>${safeSubject}</td>
                     <td>
                         ${log.status === 'sent' 
                             ? '<span class="badge-outline badge-success"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> Sent</span>'
@@ -518,7 +524,7 @@ async function loadNotificationHistory() {
                         }
                     </td>
                 </tr>
-            `).join('');
+            `}).join('');
         }
     } catch (error) {
         console.error('Error loading notification history:', error);
