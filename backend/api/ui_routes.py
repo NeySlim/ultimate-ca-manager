@@ -679,18 +679,31 @@ def ca_list_content():
         }
         
         function deleteCA(refid, name) {
-            if (confirm('Delete CA "' + name + '"? This cannot be undone!')) {
-                fetch('/api/v1/ca/' + refid + '', {
+            ucmConfirm(
+                'Delete CA "' + name + '"?\n\nThis cannot be undone! All certificates signed by this CA will be affected.',
+                'Delete CA',
+                { danger: true, confirmText: 'Delete', icon: 'trash' }
+            ).then(confirmed => {
+                if (!confirmed) return;
+                
+                fetch('/api/v1/ca/' + refid, {
                     method: 'DELETE',
                     headers: { 'Authorization': 'Bearer ' + ''' + f"'{token}'" + ''' }
                 })
-                .then(r => r.json())
-                .then(data => {
-                    alert('CA deleted successfully');
-                    htmx.trigger('body', 'refreshCAs');
+                .then(response => {
+                    if (response.ok) {
+                        showToast('CA deleted successfully', 'success');
+                        htmx.trigger('body', 'refreshCAs');
+                    } else {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Delete failed');
+                        });
+                    }
                 })
-                .catch(e => alert('Error deleting CA: ' + e));
-            }
+                .catch(e => {
+                    showToast('Error: ' + e.message, 'error');
+                });
+            });
         }
         
         function exportWithToken(url) {
@@ -1257,18 +1270,31 @@ def cert_list_content():
         }
         
         function deleteCert(refid, name) {
-            if (confirm('Delete certificate "' + name + '"?')) {
-                fetch('/api/v1/certificates/' + refid + '', {
+            ucmConfirm(
+                'Delete certificate "' + name + '"?\n\nThis action cannot be undone.',
+                'Delete Certificate',
+                { danger: true, confirmText: 'Delete', icon: 'trash' }
+            ).then(confirmed => {
+                if (!confirmed) return;
+                
+                fetch('/api/v1/certificates/by-refid/' + refid, {
                     method: 'DELETE',
                     headers: { 'Authorization': 'Bearer ' + ''' + f"'{token}'" + ''' }
                 })
-                .then(r => r.json())
-                .then(data => {
-                    alert('Certificate deleted successfully');
-                    htmx.trigger('body', 'refreshCerts');
+                .then(response => {
+                    if (response.ok) {
+                        showToast('Certificate deleted successfully', 'success');
+                        htmx.trigger('body', 'refreshCerts');
+                    } else {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Delete failed');
+                        });
+                    }
                 })
-                .catch(e => alert('Error: ' + e));
-            }
+                .catch(e => {
+                    showToast('Error: ' + e.message, 'error');
+                });
+            });
         }
         
         // Close menus when clicking outside
