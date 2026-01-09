@@ -181,15 +181,21 @@ jobs:
           docker run -d --name ucm-test -p 8443:8443 -e UCM_FQDN=test.local ucm:test
           sleep 10
           
-          # Check if container is running
-          docker ps | grep ucm-test
-          
-          # Check logs
+          # Show logs (whether container is running or not)
+          echo "=== Docker Container Logs ==="
           docker logs ucm-test
           
-          # Test health endpoint
-          curl -k https://localhost:8443/api/health || true
+          # Check if container is still running
+          if docker ps | grep ucm-test; then
+            echo "✅ Container is running"
+            # Test health endpoint
+            curl -k https://localhost:8443/api/health || true
+          else
+            echo "❌ Container exited"
+            docker ps -a | grep ucm-test
+            exit 1
+          fi
           
           # Cleanup
-          docker stop ucm-test
+          docker stop ucm-test || true
           docker rm ucm-test
