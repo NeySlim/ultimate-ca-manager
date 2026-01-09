@@ -3,7 +3,7 @@ name: Complete Release Pipeline
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
