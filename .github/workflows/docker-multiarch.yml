@@ -45,6 +45,7 @@ jobs:
         with:
           images: |
             ${{ env.REGISTRY_GHCR }}/${{ steps.image.outputs.name }}
+            ${{ env.REGISTRY_DOCKERHUB }}/neyslim/ultimate-ca-manager
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -58,14 +59,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      # Docker Hub disabled - uncomment and configure secrets to enable
-      # - name: Log in to Docker Hub
-      #   uses: docker/login-action@v3
-      #   with:
-      #     registry: ${{ env.REGISTRY_DOCKERHUB }}
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-      #   continue-on-error: true
+      - name: Log in to Docker Hub
+        if: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_DOCKERHUB }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
       
       - name: Build and push multi-arch
         uses: docker/build-push-action@v5
