@@ -682,7 +682,13 @@ def respond_to_challenge(challenge_id: str):
         if challenge.error:
             response_data["error"] = json.loads(challenge.error)
         
-        return acme_response(response_data)
+        response = acme_response(response_data)
+        
+        # Add Link header pointing to parent authorization (rel="up")
+        authz_url = f"{service.base_url}/acme/authz/{challenge.authorization.authorization_id}"
+        response.headers.add('Link', f'<{authz_url}>;rel="up"')
+        
+        return response
         
     except Exception as e:
         return acme_error('serverInternal', f'Internal error: {str(e)}', 500)
