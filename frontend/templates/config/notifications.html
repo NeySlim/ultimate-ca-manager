@@ -1,24 +1,26 @@
 {% extends "base.html" %}
 
-{% block title %}Email Notifications - UCM{% endblock %}
+{% block title %}Notifications - UCM{% endblock %}
 
 {% block content %}
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
-            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-envelope"/></svg> Email Notifications
+            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-bell"/></svg> Notifications
         </h1>
         <button onclick="testNotifications()" class="btn btn-outline-primary">
             <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-play"/></svg> Run Manual Check
         </button>
     </div>
 
-    <!-- SMTP Configuration -->
+    <!-- SMTP Configuration (Admin Only) -->
+    {% if session.get('role') == 'admin' %}
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
             <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                 <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-server"/></svg>
                 SMTP Server Configuration
+                <span class="badge-outline badge-warning" style="margin-left: 0.5rem; font-size: 0.75rem;">Admin Only</span>
             </h2>
             <span id="smtp-status-badge" class="badge-outline badge-secondary">
                 <svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg>
@@ -96,6 +98,7 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
     <!-- Notification Rules -->
     <div class="card">
