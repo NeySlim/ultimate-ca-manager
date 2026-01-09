@@ -249,8 +249,9 @@ def create_certificate():
                 username=username
             )
             
-            cert_pem = cert.crt_pem
-            key_pem = cert.prv_pem
+            # Decode certificate and key from base64
+            cert_pem = base64.b64decode(cert.crt)
+            key_pem = base64.b64decode(cert.prv) if cert.prv else None
             cert_name = f"Managed - {cn}"
         
         # Parse certificate to extract info
