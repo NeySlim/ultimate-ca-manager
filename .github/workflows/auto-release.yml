@@ -1,0 +1,120 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      version_override:
+        description: 'Version override (e.g., 1.9.0)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: read
+
+jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check if release needed
+        id: check
+        run: |
+          # Check if there are releasable commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous tag, first release"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            # Check for conventional commits
+            COMMITS=$(git log $LAST_TAG..HEAD --pretty=format:"%s")
+            
+            if echo "$COMMITS" | grep -qE "^(feat|fix|perf|refactor|docs):"; then
+              echo "Releasable commits found"
+              echo "should_release=true" >> $GITHUB_OUTPUT
+            else
+              echo "No releasable commits"
+              echo "should_release=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+      
+      - name: Calculate version
+        id: version
+        if: steps.check.outputs.should_release == 'true' || github.event.inputs.version_override != ''
+        run: |
+          if [ -n "${{ github.event.inputs.version_override }}" ]; then
+            VERSION="${{ github.event.inputs.version_override }}"
+            TAG="v$VERSION"
+          else
+            chmod +x .github/scripts/version-bump.sh
+            ./.github/scripts/version-bump.sh
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+  
+  create-release:
+    needs: check-release
+    if: needs.check-release.outputs.should_release == 'true' || github.event.inputs.version_override != ''
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Generate release notes
+        run: |
+          chmod +x .github/scripts/generate-release-notes.sh
+          ./.github/scripts/generate-release-notes.sh ${{ needs.check-release.outputs.version }}
+      
+      - name: Create Git tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a ${{ needs.check-release.outputs.tag }} -m "Release ${{ needs.check-release.outputs.version }}"
+          git push origin ${{ needs.check-release.outputs.tag }}
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.check-release.outputs.tag }}
+          name: Release ${{ needs.check-release.outputs.version }}
+          body_path: RELEASE_NOTES_v${{ needs.check-release.outputs.version }}.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
+  trigger-builds:
+    needs: [check-release, create-release]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Trigger Docker build
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          event-type: docker-build
+          client-payload: '{"version": "${{ needs.check-release.outputs.version }}", "tag": "${{ needs.check-release.outputs.tag }}"}'
+      
+      - name: Trigger package builds
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          event-type: package-build
+          client-payload: '{"version": "${{ needs.check-release.outputs.version }}", "tag": "${{ needs.check-release.outputs.tag }}"}'
