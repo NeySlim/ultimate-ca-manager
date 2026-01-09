@@ -403,11 +403,22 @@ def download_certificate(cert_id):
         # Create PEM file (cert_pem is already bytes from LargeBinary field)
         cert_data = auth_cert.cert_pem
         
+        # Extract CN from subject for filename
+        cn = "unknown"
+        if auth_cert.cert_subject:
+            # Parse subject DN (e.g., "CN=admin,O=MyOrg")
+            for part in auth_cert.cert_subject.split(','):
+                if part.strip().startswith('CN='):
+                    cn = part.split('=', 1)[1].strip()
+                    # Sanitize filename
+                    cn = cn.replace(' ', '_').replace('/', '_').replace('\\', '_')
+                    break
+        
         return send_file(
             io.BytesIO(cert_data),
             mimetype='application/x-pem-file',
             as_attachment=True,
-            download_name=f'client-cert-{auth_cert.cert_serial[:16]}.pem'
+            download_name=f'mtls-{cn}.pem'
         )
         
     except Exception as e:
