@@ -147,6 +147,11 @@
                        @click="open = false">
                         <svg class="ucm-icon" width="16" height="16"><use href="#icon-user"/></svg> My Account
                     </a>
+                    <a href="/my-account/mtls" class="dropdown-item"
+                       hx-get="/my-account/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+                       @click="open = false">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-key"/></svg> My Certificates
+                    </a>
                     
                     <div class="dropdown-divider"></div>
                     <div class="dropdown-header">Quick Access</div>
@@ -155,11 +160,6 @@
                        hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
                        @click="open = false">
                         <svg class="ucm-icon" width="16" height="16"><use href="#icon-bell"/></svg> Notifications
-                    </a>
-                    <a href="/config/mtls" class="dropdown-item"
-                       hx-get="/config/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
-                       @click="open = false">
-                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-shield-check"/></svg> mTLS Auth
                     </a>
                     <a href="/config/webauthn" class="dropdown-item"
                        hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
