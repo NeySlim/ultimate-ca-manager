@@ -612,7 +612,9 @@ function executePKIReset() {
 // ========================================
 function loadMTLSSettings() {
     // Load CA list
-    fetch('/api/v1/ca')
+    fetch('/api/v1/ca', {
+        credentials: 'same-origin'
+    })
         .then(response => response.json())
         .then(casData => {
             const select = document.getElementById('mtls_trusted_ca_id');
@@ -628,7 +630,9 @@ function loadMTLSSettings() {
         .catch(error => console.error('Error loading CAs:', error));
     
     // Load current mTLS settings
-    fetch('/api/v1/mtls/settings')
+    fetch('/api/v1/mtls/settings', {
+        credentials: 'same-origin'
+    })
         .then(response => response.json())
         .then(data => {
             const enabledCheckbox = document.getElementById('mtls_enabled');
@@ -683,6 +687,7 @@ document.getElementById('mtls-settings-form')?.addEventListener('submit', functi
     fetch('/api/v1/mtls/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify(data)
     })
     .then(response => response.json())
