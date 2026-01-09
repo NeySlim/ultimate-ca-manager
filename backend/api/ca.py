@@ -130,6 +130,22 @@ def delete_ca(ca_id):
         return jsonify({"error": f"Failed to delete CA: {str(e)}"}), 500
 
 
+@ca_bp.route('/<string:refid>', methods=['GET'])
+@jwt_required()
+def get_ca_by_refid(refid):
+    """
+    Get CA details by refid
+    ---
+    GET /api/v1/ca/<refid>
+    """
+    from models import CA
+    ca = CA.query.filter_by(refid=refid).first()
+    if not ca:
+        return jsonify({"error": "CA not found"}), 404
+    
+    return jsonify(ca.to_dict(include_private=False)), 200
+
+
 @ca_bp.route('/<string:refid>', methods=['DELETE'])
 @jwt_required()
 @operator_required

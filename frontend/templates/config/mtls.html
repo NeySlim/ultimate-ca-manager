@@ -422,7 +422,7 @@ async function loadMTLSSettings() {
     try {
         {% if session.get('role') == 'admin' %}
         // Load CA list
-        const casResponse = await fetch('/api/v1/cas', {
+        const casResponse = await fetch('/api/v1/ca', {
             headers: {'Authorization': `Bearer ${token}`}
         });
         
@@ -430,7 +430,7 @@ async function loadMTLSSettings() {
             const casData = await casResponse.json();
             const select = document.getElementById('mtls_trusted_ca_id');
             
-            casData.cas.forEach(ca => {
+            casData.forEach(ca => {
                 const option = document.createElement('option');
                 option.value = ca.refid;
                 option.textContent = `${ca.descr}`;
@@ -500,7 +500,7 @@ async function updateUserSection() {
         if (trustedCAId) {
             // Fetch CA details
             try {
-                const response = await fetch(`/api/v1/cas/${trustedCAId}`, {
+                const response = await fetch(`/api/v1/ca/${trustedCAId}`, {
                     headers: {'Authorization': `Bearer ${token}`}
                 });
                 if (response.ok) {
