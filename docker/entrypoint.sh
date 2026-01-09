@@ -105,6 +105,14 @@ validate_email() {
 : ${UCM_ACME_ENABLED:=true}
 : ${UCM_ACME_DIRECTORY_URL:="https://${UCM_FQDN}:${UCM_HTTPS_PORT}/acme/directory"}
 
+# Initial Admin User
+: ${UCM_INITIAL_ADMIN_USERNAME:="admin"}
+: ${UCM_INITIAL_ADMIN_EMAIL:="admin@${UCM_FQDN}"}
+: ${UCM_INITIAL_ADMIN_PASSWORD:="changeme123"}
+
+# Application
+: ${UCM_APP_VERSION:="1.8.0-beta"}
+
 # =============================================================================
 # VALIDATION
 # =============================================================================
@@ -218,6 +226,14 @@ DEFAULT_HASH_ALGO=${UCM_DEFAULT_HASH_ALGO}
 # ACME Settings
 ACME_ENABLED=${UCM_ACME_ENABLED}
 ACME_DIRECTORY_URL=${UCM_ACME_DIRECTORY_URL}
+
+# Initial Admin User (used on first run)
+INITIAL_ADMIN_USERNAME=${UCM_INITIAL_ADMIN_USERNAME}
+INITIAL_ADMIN_EMAIL=${UCM_INITIAL_ADMIN_EMAIL}
+INITIAL_ADMIN_PASSWORD=${UCM_INITIAL_ADMIN_PASSWORD}
+
+# Application Version
+APP_VERSION=${UCM_APP_VERSION}
 EOF
 
 chmod 600 /app/.env
