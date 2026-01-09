@@ -9,6 +9,7 @@ from flask import Flask, redirect, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
+from flask_caching import Cache
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -17,6 +18,9 @@ from config.settings import get_config, BASE_DIR
 from config.https_manager import HTTPSManager
 from models import db, User, SystemConfig
 from middleware.auth_middleware import init_auth_middleware
+
+# Initialize cache globally
+cache = Cache()
 
 
 def create_app(config_name=None):
@@ -45,6 +49,12 @@ def create_app(config_name=None):
     db.init_app(app)
     migrate = Migrate(app, db)
     jwt = JWTManager(app)
+    
+    # Initialize cache
+    cache.init_app(app, config={
+        'CACHE_TYPE': 'SimpleCache',  # In-memory cache
+        'CACHE_DEFAULT_TIMEOUT': 300   # 5 minutes default
+    })
     
     # CORS - only HTTPS origins
     CORS(app, resources={

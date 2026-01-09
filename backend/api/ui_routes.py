@@ -9,6 +9,7 @@ import requests
 import time
 from html import escape as html_escape
 from config.settings import Config, DATA_DIR
+from app import cache
 
 ui_bp = Blueprint('ui', __name__, template_folder='../../frontend/templates')
 
@@ -245,6 +246,7 @@ def dashboard():
 # Dashboard API endpoints (for HTMX)
 @ui_bp.route('/api/dashboard/stats')
 @login_required
+@cache.cached(timeout=300, key_prefix='dashboard_stats')  # Cache for 5 minutes
 def dashboard_stats():
     """Get dashboard statistics"""
     try:
@@ -338,6 +340,7 @@ def dashboard_stats():
 
 @ui_bp.route('/api/dashboard/recent-cas')
 @login_required
+@cache.cached(timeout=3600, key_prefix='dashboard_recent_cas')  # Cache for 1 hour
 def dashboard_recent_cas():
     """Get recent CAs"""
     try:
