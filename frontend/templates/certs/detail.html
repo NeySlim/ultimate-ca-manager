@@ -174,13 +174,15 @@
                 PKCS#12 format includes the certificate and private key in a password-protected file (.p12 or .pfx). 
                 This format is compatible with Windows, macOS, and most browsers.
             </p>
+            <form autocomplete="off">
             <div class="modal-form-group">
                 <label class="modal-form-label">
                     Password <span style="color: var(--danger-color);">*</span>
                 </label>
                 <input type="password" id="pkcs12-password" 
                     class="modal-form-input"
-                    placeholder="Enter password for PKCS#12 file" />
+                    placeholder="Enter password for PKCS#12 file"
+                    autocomplete="new-password" />
             </div>
             <div class="modal-form-group">
                 <label class="modal-form-label">
@@ -188,8 +190,10 @@
                 </label>
                 <input type="password" id="pkcs12-password-confirm" 
                     class="modal-form-input"
-                    placeholder="Confirm password" />
+                    placeholder="Confirm password"
+                    autocomplete="new-password" />
             </div>
+            </form>
             <div id="pkcs12-error" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background: var(--danger-bg-light); color: var(--status-danger); border-radius: 0.25rem; font-size: 0.875rem;"></div>
             <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
                 <button data-action="close-pkcs12-modal" class="btn-secondary">

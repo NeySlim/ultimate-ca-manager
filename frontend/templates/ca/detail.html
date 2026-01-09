@@ -376,13 +376,15 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                 PKCS#12 format includes the certificate and private key in a password-protected file (.p12 or .pfx). 
                 This format is compatible with Windows, macOS, and most browsers.
             </p>
+            <form autocomplete="off">
             <div style="margin-bottom: 1rem;">
                 <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">
                     Password <span style="color: var(--danger-color);">*</span>
                 </label>
                 <input type="password" id="pkcs12-password" 
                     style="display: block; width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--input-bg); color: var(--text-primary);"
-                    placeholder="Enter password for PKCS#12 file" />
+                    placeholder="Enter password for PKCS#12 file"
+                    autocomplete="new-password" />
             </div>
             <div style="margin-bottom: 1rem;">
                 <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">
@@ -390,8 +392,10 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                 </label>
                 <input type="password" id="pkcs12-password-confirm" 
                     style="display: block; width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--input-bg); color: var(--text-primary);"
-                    placeholder="Confirm password" />
+                    placeholder="Confirm password"
+                    autocomplete="new-password" />
             </div>
+            </form>
             <div id="pkcs12-error" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background: var(--danger-bg); color: var(--danger-color); border-radius: 0.25rem; font-size: 0.875rem;"></div>
             <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
                 <button data-action="close-pkcs12-modal" class="btn-secondary">

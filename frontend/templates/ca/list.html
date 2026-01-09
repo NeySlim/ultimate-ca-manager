@@ -268,12 +268,16 @@
             <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
                 Enter a password to protect the PKCS#12 file (minimum 4 characters):
             </p>
+            <form autocomplete="off">
             <input type="password" id="pkcs12Password" 
                    class="modal-form-input"
-                   placeholder="Enter password" minlength="4">
+                   placeholder="Enter password" minlength="4"
+                   autocomplete="new-password">
             <input type="password" id="pkcs12PasswordConfirm" 
                    style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); margin-top: 0.75rem;"
-                   placeholder="Confirm password" minlength="4">
+                   placeholder="Confirm password" minlength="4"
+                   autocomplete="new-password">
+            </form>
         </div>
         <div class="modal-form-footer">
             <button data-action="close-pkcs12-modal" 
