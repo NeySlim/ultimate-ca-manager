@@ -16,7 +16,7 @@ class IconSystem {
             // Try to load from localStorage cache first
             const cachedData = localStorage.getItem('ucm-icons-data');
             const cachedVersion = localStorage.getItem('ucm-icons-version');
-            const currentVersion = '2.9'; // Increment this when icons.json changes
+            const currentVersion = '3.0'; // Increment this when icons.json changes
             
             if (cachedData && cachedVersion === currentVersion) {
                 // Use cached data for instant load

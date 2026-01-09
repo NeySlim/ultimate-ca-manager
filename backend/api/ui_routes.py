@@ -894,7 +894,7 @@ def ca_list_content():
             
             // Previous button
             html += `<button class="pagination-btn" onclick="goToCAPage(${window.caCurrentPage - 1}, ${totalPages})" ${window.caCurrentPage === 1 ? 'disabled' : ''}>
-                <i class="fas fa-chevron-left"></i>
+                <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-left"/></svg>
             </button>`;
             
             // Page numbers (show first, last, and pages around current)
@@ -927,7 +927,7 @@ def ca_list_content():
             
             // Next button
             html += `<button class="pagination-btn" onclick="goToCAPage(${window.caCurrentPage + 1}, ${totalPages})" ${window.caCurrentPage === totalPages ? 'disabled' : ''}>
-                <i class="fas fa-chevron-right"></i>
+                <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-right"/></svg>
             </button>`;
             
             container.innerHTML = html;
@@ -1366,7 +1366,7 @@ def cert_list_content():
             
             // Previous button
             html += `<button class="pagination-btn" onclick="goToCertPage(${window.certCurrentPage - 1}, ${totalPages})" ${window.certCurrentPage === 1 ? 'disabled' : ''}>
-                <i class="fas fa-chevron-left"></i>
+                <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-left"/></svg>
             </button>`;
             
             // Page numbers
@@ -1399,7 +1399,8 @@ def cert_list_content():
             
             // Next button
             html += `<button class="pagination-btn" onclick="goToCertPage(${window.certCurrentPage + 1}, ${totalPages})" ${window.certCurrentPage === totalPages ? 'disabled' : ''}>
-                <i class="fas fa-chevron-right"></i>
+                <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-right"/></svg>
+            </button>`;
             </button>`;
             
             container.innerHTML = html;
