@@ -1,0 +1,240 @@
+#!/bin/bash
+# UCM Configuration Script
+# Interactive configuration tool for UCM
+
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Configuration file
+CONFIG_FILE="/etc/ucm/ucm.env"
+BACKUP_FILE="/etc/ucm/ucm.env.backup.$(date +%Y%m%d-%H%M%S)"
+
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${RED}Error: This script must be run as root${NC}"
+    echo "Usage: sudo ucm-configure"
+    exit 1
+fi
+
+# Banner
+echo -e "${CYAN}"
+cat << "EOF"
+╔════════════════════════════════════════╗
+║     UCM Configuration Tool             ║
+║     Version 1.8.0-beta                 ║
+╚════════════════════════════════════════╝
+EOF
+echo -e "${NC}"
+
+# Backup existing configuration
+if [ -f "$CONFIG_FILE" ]; then
+    echo -e "${YELLOW}Creating backup of current configuration...${NC}"
+    cp "$CONFIG_FILE" "$BACKUP_FILE"
+    echo -e "${GREEN}✓ Backup created: $BACKUP_FILE${NC}"
+    echo ""
+fi
+
+# Read current values
+if [ -f "$CONFIG_FILE" ]; then
+    source "$CONFIG_FILE"
+fi
+
+# Function to read input with default
+read_with_default() {
+    local prompt="$1"
+    local default="$2"
+    local var_name="$3"
+    local is_password="$4"
+    
+    if [ "$is_password" = "true" ]; then
+        read -sp "$prompt [$default]: " value
+        echo ""
+    else
+        read -p "$prompt [$default]: " value
+    fi
+    
+    if [ -z "$value" ]; then
+        eval "$var_name='$default'"
+    else
+        eval "$var_name='$value'"
+    fi
+}
+
+# Core Settings
+echo -e "${BLUE}=== Core Settings ===${NC}"
+read_with_default "FQDN" "${FQDN:-ucm.local}" NEW_FQDN
+read_with_default "HTTPS Port" "${HTTPS_PORT:-8443}" NEW_HTTPS_PORT
+read_with_default "Debug Mode (true/false)" "${DEBUG:-false}" NEW_DEBUG
+read_with_default "Log Level (DEBUG/INFO/WARNING/ERROR)" "${LOG_LEVEL:-INFO}" NEW_LOG_LEVEL
+echo ""
+
+# Security
+echo -e "${BLUE}=== Security Settings ===${NC}"
+echo -e "${YELLOW}Leave empty to keep current secrets${NC}"
+read_with_default "Secret Key" "(current)" NEW_SECRET_KEY true
+read_with_default "JWT Secret" "(current)" NEW_JWT_SECRET true
+
+# Generate new secrets if requested
+if [ "$NEW_SECRET_KEY" = "" ] || [ "$NEW_SECRET_KEY" = "(current)" ]; then
+    NEW_SECRET_KEY="$SECRET_KEY"
+fi
+
+if [ "$NEW_JWT_SECRET" = "" ] || [ "$NEW_JWT_SECRET" = "(current)" ]; then
+    NEW_JWT_SECRET="$JWT_SECRET_KEY"
+fi
+
+echo -e "${CYAN}Generate new secrets? (y/N):${NC} "
+read -r GEN_SECRETS
+if [[ "$GEN_SECRETS" =~ ^[Yy]$ ]]; then
+    NEW_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+    NEW_JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+    echo -e "${GREEN}✓ New secrets generated${NC}"
+fi
+echo ""
+
+# SMTP Configuration
+echo -e "${BLUE}=== Email Notifications ===${NC}"
+echo -e "${CYAN}Enable SMTP? (Y/n):${NC} "
+read -r ENABLE_SMTP
+
+if [[ ! "$ENABLE_SMTP" =~ ^[Nn]$ ]]; then
+    read_with_default "SMTP Server" "${SMTP_SERVER:-smtp.gmail.com}" NEW_SMTP_SERVER
+    read_with_default "SMTP Port" "${SMTP_PORT:-587}" NEW_SMTP_PORT
+    read_with_default "SMTP Username" "${SMTP_USERNAME:-}" NEW_SMTP_USERNAME
+    read_with_default "SMTP Password" "${SMTP_PASSWORD:-}" NEW_SMTP_PASSWORD true
+    read_with_default "From Address" "${SMTP_FROM:-noreply@$NEW_FQDN}" NEW_SMTP_FROM
+    NEW_SMTP_ENABLED="true"
+else
+    NEW_SMTP_ENABLED="false"
+fi
+echo ""
+
+# Caching
+echo -e "${BLUE}=== Performance Settings ===${NC}"
+echo -e "${CYAN}Enable caching? (Y/n):${NC} "
+read -r ENABLE_CACHE
+if [[ ! "$ENABLE_CACHE" =~ ^[Nn]$ ]]; then
+    NEW_CACHE_ENABLED="true"
+else
+    NEW_CACHE_ENABLED="false"
+fi
+echo ""
+
+# Generate new configuration file
+echo -e "${YELLOW}Generating new configuration...${NC}"
+
+cat > "$CONFIG_FILE" <<EOF
+# UCM Configuration
+# Last updated: $(date)
+# Configured with: ucm-configure
+
+# Core Settings
+FQDN=$NEW_FQDN
+HTTPS_PORT=$NEW_HTTPS_PORT
+HTTP_PORT=8080
+DEBUG=$NEW_DEBUG
+LOG_LEVEL=$NEW_LOG_LEVEL
+
+# Security
+SECRET_KEY=$NEW_SECRET_KEY
+JWT_SECRET_KEY=$NEW_JWT_SECRET
+SESSION_TIMEOUT=${SESSION_TIMEOUT:-3600}
+JWT_EXPIRATION=${JWT_EXPIRATION:-86400}
+
+# Database
+DATABASE_PATH=${DATABASE_PATH:-/var/lib/ucm/ucm.db}
+BACKUP_ENABLED=${BACKUP_ENABLED:-true}
+BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+
+# HTTPS Certificate
+HTTPS_CERT_PATH=${HTTPS_CERT_PATH:-/var/lib/ucm/https_cert.pem}
+HTTPS_KEY_PATH=${HTTPS_KEY_PATH:-/var/lib/ucm/https_key.pem}
+HTTPS_AUTO_GENERATE=true
+
+# SMTP Configuration
+SMTP_ENABLED=$NEW_SMTP_ENABLED
+EOF
+
+if [ "$NEW_SMTP_ENABLED" = "true" ]; then
+    cat >> "$CONFIG_FILE" <<EOF
+SMTP_SERVER=$NEW_SMTP_SERVER
+SMTP_PORT=$NEW_SMTP_PORT
+SMTP_USERNAME=$NEW_SMTP_USERNAME
+SMTP_PASSWORD=$NEW_SMTP_PASSWORD
+SMTP_FROM=$NEW_SMTP_FROM
+SMTP_TLS=true
+EOF
+fi
+
+cat >> "$CONFIG_FILE" <<EOF
+
+# Caching
+CACHE_ENABLED=$NEW_CACHE_ENABLED
+CACHE_TYPE=${CACHE_TYPE:-simple}
+CACHE_DEFAULT_TIMEOUT=${CACHE_DEFAULT_TIMEOUT:-300}
+
+# mTLS Authentication
+MTLS_ENABLED=${MTLS_ENABLED:-false}
+MTLS_CA_ID=${MTLS_CA_ID:-}
+MTLS_REQUIRE_CERT=${MTLS_REQUIRE_CERT:-false}
+
+# Certificate Defaults
+DEFAULT_VALIDITY_DAYS=${DEFAULT_VALIDITY_DAYS:-365}
+DEFAULT_KEY_SIZE=${DEFAULT_KEY_SIZE:-4096}
+DEFAULT_HASH_ALGO=${DEFAULT_HASH_ALGO:-SHA256}
+
+# Protocols
+ACME_ENABLED=${ACME_ENABLED:-true}
+SCEP_ENABLED=${SCEP_ENABLED:-true}
+
+# Logging
+LOG_FILE=/var/log/ucm/ucm.log
+AUDIT_LOG_FILE=/var/log/ucm/audit.log
+EOF
+
+# Secure configuration file
+chmod 600 "$CONFIG_FILE"
+chown ucm:ucm "$CONFIG_FILE"
+
+echo -e "${GREEN}✓ Configuration saved${NC}"
+echo ""
+
+# Restart service
+echo -e "${CYAN}Restart UCM service? (Y/n):${NC} "
+read -r RESTART_SERVICE
+
+if [[ ! "$RESTART_SERVICE" =~ ^[Nn]$ ]]; then
+    echo -e "${YELLOW}Restarting UCM service...${NC}"
+    systemctl restart ucm.service
+    
+    # Wait and check status
+    sleep 2
+    if systemctl is-active --quiet ucm.service; then
+        echo -e "${GREEN}✓ UCM service restarted successfully${NC}"
+    else
+        echo -e "${RED}✗ UCM service failed to start${NC}"
+        echo -e "${YELLOW}Check logs: journalctl -u ucm -n 50${NC}"
+        echo -e "${YELLOW}Restore backup: cp $BACKUP_FILE $CONFIG_FILE${NC}"
+    fi
+fi
+
+# Summary
+echo ""
+echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║   Configuration Complete! 🎉          ║${NC}"
+echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "${CYAN}Access: https://$NEW_FQDN:$NEW_HTTPS_PORT${NC}"
+echo ""
+echo "Configuration: $CONFIG_FILE"
+echo "Backup:        $BACKUP_FILE"
+echo "Service:       systemctl status ucm"
+echo "Logs:          journalctl -u ucm -f"
+echo ""
