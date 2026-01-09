@@ -316,6 +316,9 @@ RequestHeader set X-SSL-Client-S-DN "%{SSL_CLIENT_S_DN}s"</code></pre>
 </div>
 
 <script>
+// Get JWT token from session
+const token = '{{ session.get("access_token") }}';
+
 // Load data immediately when script runs (for HTMX navigation)
 (function() {
     loadHTTPSCertInfo();
@@ -613,7 +616,9 @@ function executePKIReset() {
 function loadMTLSSettings() {
     // Load CA list
     fetch('/api/v1/ca', {
-        credentials: 'same-origin'
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
     })
         .then(response => response.json())
         .then(casData => {
@@ -631,7 +636,9 @@ function loadMTLSSettings() {
     
     // Load current mTLS settings
     fetch('/api/v1/mtls/settings', {
-        credentials: 'same-origin'
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
     })
         .then(response => response.json())
         .then(data => {
@@ -686,8 +693,10 @@ document.getElementById('mtls-settings-form')?.addEventListener('submit', functi
     
     fetch('/api/v1/mtls/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(data)
     })
     .then(response => response.json())
