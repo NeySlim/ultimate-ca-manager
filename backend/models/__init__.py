@@ -343,6 +343,7 @@ class Certificate(db.Model):
             return []
     
     @property
+    @property
     def common_name(self) -> str:
         """Extract Common Name from subject"""
         if not self.subject:
