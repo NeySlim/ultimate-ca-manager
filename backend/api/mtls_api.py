@@ -12,6 +12,7 @@ from services.certificate_parser import CertificateParser
 from services.cert_service import CertificateService
 import logging
 import io
+import base64
 
 logger = logging.getLogger(__name__)
 
