@@ -752,6 +752,22 @@ def ca_list_content():
                 </tbody>
             </table>
         </div>
+        
+        <!-- Pagination for CA table -->
+        <div class="table-pagination">
+            <div class="pagination-info">
+                <span>Affichage <span id="ca-start">1</span>-<span id="ca-end">10</span> sur <span id="ca-total"></span> CAs</span>
+            </div>
+            <div class="pagination-controls">
+                <select class="pagination-select" id="ca-per-page" onchange="updateCAPagination()">
+                    <option value="10" selected>10 par page</option>
+                    <option value="25">25 par page</option>
+                    <option value="50">50 par page</option>
+                    <option value="100">100 par page</option>
+                </select>
+                <div class="pagination-buttons" id="ca-pagination-buttons"></div>
+            </div>
+        </div>
         '''
         
         # Add orphan CAs section if any exist
@@ -788,6 +804,143 @@ def ca_list_content():
         
         html += '''
         <script>
+        // CA Table Pagination
+        let caCurrentPage = 1;
+        let caPerPage = 10;
+        let caTotalRows = 0;
+        
+        function initCAPagination() {
+            const table = document.getElementById('ca-table');
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            const allRows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Count only ROOT CAs (families), not children
+            caTotalRows = allRows.filter(row => !row.classList.contains('ca-child-row')).length;
+            
+            document.getElementById('ca-total').textContent = caTotalRows;
+            updateCAPagination();
+        }
+        
+        function updateCAPagination() {
+            const perPageSelect = document.getElementById('ca-per-page');
+            caPerPage = parseInt(perPageSelect.value);
+            const totalPages = Math.ceil(caTotalRows / caPerPage);
+            
+            showCAPage(caCurrentPage, totalPages);
+            renderCAPaginationButtons(totalPages);
+        }
+        
+        function showCAPage(page, totalPages) {
+            const table = document.getElementById('ca-table');
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            const allRows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Separate ROOT CAs from children
+            const rootRows = allRows.filter(row => !row.classList.contains('ca-child-row'));
+            const childMap = new Map();
+            
+            // Build map of children for each parent
+            allRows.forEach((row, index) => {
+                if (row.classList.contains('ca-child-row')) {
+                    for (let i = index - 1; i >= 0; i--) {
+                        if (!allRows[i].classList.contains('ca-child-row')) {
+                            if (!childMap.has(allRows[i])) {
+                                childMap.set(allRows[i], []);
+                            }
+                            childMap.get(allRows[i]).push(row);
+                            break;
+                        }
+                    }
+                }
+            });
+            
+            const start = (page - 1) * caPerPage;
+            const end = start + caPerPage;
+            
+            // Hide all rows first
+            allRows.forEach(row => row.style.display = 'none');
+            
+            // Show only ROOT CAs in current page range + their children
+            rootRows.forEach((rootRow, index) => {
+                if (index >= start && index < end) {
+                    rootRow.style.display = '';
+                    // Show children
+                    if (childMap.has(rootRow)) {
+                        childMap.get(rootRow).forEach(childRow => {
+                            childRow.style.display = '';
+                        });
+                    }
+                }
+            });
+            
+            // Update info
+            const actualStart = Math.min(start + 1, caTotalRows);
+            const actualEnd = Math.min(end, caTotalRows);
+            document.getElementById('ca-start').textContent = actualStart;
+            document.getElementById('ca-end').textContent = actualEnd;
+        }
+        
+        function renderCAPaginationButtons(totalPages) {
+            const container = document.getElementById('ca-pagination-buttons');
+            if (!container) return;
+            
+            let html = '';
+            
+            // Previous button
+            html += `<button class="pagination-btn" onclick="goToCAPage(${caCurrentPage - 1}, ${totalPages})" ${caCurrentPage === 1 ? 'disabled' : ''}>
+                <i class="fas fa-chevron-left"></i>
+            </button>`;
+            
+            // Page numbers (show first, last, and pages around current)
+            const maxButtons = 7;
+            let startPage = Math.max(1, caCurrentPage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+            
+            if (endPage - startPage < maxButtons - 1) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+            
+            if (startPage > 1) {
+                html += `<button class="pagination-btn" onclick="goToCAPage(1, ${totalPages})">1</button>`;
+                if (startPage > 2) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="pagination-btn ${i === caCurrentPage ? 'active' : ''}" 
+                         onclick="goToCAPage(${i}, ${totalPages})">${i}</button>`;
+            }
+            
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+                html += `<button class="pagination-btn" onclick="goToCAPage(${totalPages}, ${totalPages})">${totalPages}</button>`;
+            }
+            
+            // Next button
+            html += `<button class="pagination-btn" onclick="goToCAPage(${caCurrentPage + 1}, ${totalPages})" ${caCurrentPage === totalPages ? 'disabled' : ''}>
+                <i class="fas fa-chevron-right"></i>
+            </button>`;
+            
+            container.innerHTML = html;
+        }
+        
+        function goToCAPage(page, totalPages) {
+            if (page < 1 || page > totalPages) return;
+            caCurrentPage = page;
+            showCAPage(page, totalPages);
+            renderCAPaginationButtons(totalPages);
+        }
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initCAPagination);
+        
         function filterTableCA() {
             const input = document.getElementById('searchCA');
             const filter = input.value.toLowerCase();
@@ -1137,6 +1290,126 @@ def cert_list_content():
                 </tbody>
             </table>
         </div>
+        
+        <!-- Pagination for Certificate table -->
+        <div class="table-pagination">
+            <div class="pagination-info">
+                <span>Affichage <span id="cert-start">1</span>-<span id="cert-end">10</span> sur <span id="cert-total"></span> certificats</span>
+            </div>
+            <div class="pagination-controls">
+                <select class="pagination-select" id="cert-per-page" onchange="updateCertPagination()">
+                    <option value="10" selected>10 par page</option>
+                    <option value="25">25 par page</option>
+                    <option value="50">50 par page</option>
+                    <option value="100">100 par page</option>
+                </select>
+                <div class="pagination-buttons" id="cert-pagination-buttons"></div>
+            </div>
+        </div>
+        
+        <script>
+        // Certificate Table Pagination
+        let certCurrentPage = 1;
+        let certPerPage = 10;
+        let certTotalRows = 0;
+        
+        function initCertPagination() {
+            const table = document.getElementById('cert-table');
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            certTotalRows = tbody.querySelectorAll('tr').length;
+            
+            document.getElementById('cert-total').textContent = certTotalRows;
+            updateCertPagination();
+        }
+        
+        function updateCertPagination() {
+            const perPageSelect = document.getElementById('cert-per-page');
+            certPerPage = parseInt(perPageSelect.value);
+            const totalPages = Math.ceil(certTotalRows / certPerPage);
+            
+            showCertPage(certCurrentPage, totalPages);
+            renderCertPaginationButtons(totalPages);
+        }
+        
+        function showCertPage(page, totalPages) {
+            const table = document.getElementById('cert-table');
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            const start = (page - 1) * certPerPage;
+            const end = start + certPerPage;
+            
+            rows.forEach((row, index) => {
+                row.style.display = (index >= start && index < end) ? '' : 'none';
+            });
+            
+            // Update info
+            const actualStart = Math.min(start + 1, certTotalRows);
+            const actualEnd = Math.min(end, certTotalRows);
+            document.getElementById('cert-start').textContent = actualStart;
+            document.getElementById('cert-end').textContent = actualEnd;
+        }
+        
+        function renderCertPaginationButtons(totalPages) {
+            const container = document.getElementById('cert-pagination-buttons');
+            if (!container) return;
+            
+            let html = '';
+            
+            // Previous button
+            html += `<button class="pagination-btn" onclick="goToCertPage(${certCurrentPage - 1}, ${totalPages})" ${certCurrentPage === 1 ? 'disabled' : ''}>
+                <i class="fas fa-chevron-left"></i>
+            </button>`;
+            
+            // Page numbers
+            const maxButtons = 7;
+            let startPage = Math.max(1, certCurrentPage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+            
+            if (endPage - startPage < maxButtons - 1) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+            
+            if (startPage > 1) {
+                html += `<button class="pagination-btn" onclick="goToCertPage(1, ${totalPages})">1</button>`;
+                if (startPage > 2) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="pagination-btn ${i === certCurrentPage ? 'active' : ''}" 
+                         onclick="goToCertPage(${i}, ${totalPages})">${i}</button>`;
+            }
+            
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+                html += `<button class="pagination-btn" onclick="goToCertPage(${totalPages}, ${totalPages})">${totalPages}</button>`;
+            }
+            
+            // Next button
+            html += `<button class="pagination-btn" onclick="goToCertPage(${certCurrentPage + 1}, ${totalPages})" ${certCurrentPage === totalPages ? 'disabled' : ''}>
+                <i class="fas fa-chevron-right"></i>
+            </button>`;
+            
+            container.innerHTML = html;
+        }
+        
+        function goToCertPage(page, totalPages) {
+            if (page < 1 || page > totalPages) return;
+            certCurrentPage = page;
+            showCertPage(page, totalPages);
+            renderCertPaginationButtons(totalPages);
+        }
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initCertPagination);
         
         <script>
         // Use window object to avoid var in HTMX-loaded content
