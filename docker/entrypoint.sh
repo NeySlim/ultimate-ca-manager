@@ -266,7 +266,11 @@ elif [ -f "$CERT_PATH" ] && [ -f "$KEY_PATH" ]; then
 else
     echo -e "${YELLOW}   Generating self-signed certificate...${NC}"
     
-    # Create OpenSSL config for SAN
+    # Get container's hostname and IP
+    CONTAINER_HOSTNAME=$(hostname)
+    CONTAINER_IP=$(hostname -i 2>/dev/null || echo "127.0.0.1")
+    
+    # Create OpenSSL config for SAN (Chrome/Edge compatibility)
     cat > /tmp/openssl.cnf <<EOF
 [req]
 distinguished_name = req_distinguished_name
@@ -282,14 +286,19 @@ OU = IT
 CN = ${UCM_FQDN}
 
 [v3_req]
-keyUsage = keyEncipherment, dataEncipherment
+keyUsage = critical, digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth
 subjectAltName = @alt_names
+basicConstraints = CA:FALSE
 
 [alt_names]
 DNS.1 = ${UCM_FQDN}
 DNS.2 = localhost
+DNS.3 = ${CONTAINER_HOSTNAME}
+DNS.4 = *.local
+DNS.5 = pve
 IP.1 = 127.0.0.1
+IP.2 = ${CONTAINER_IP}
 EOF
     
     # Generate certificate
