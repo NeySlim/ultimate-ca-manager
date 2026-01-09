@@ -15,7 +15,7 @@
 
 <!-- ACME Status Card -->
 <div class="card" style="margin-bottom: 20px;">
-    <div style="display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center;">
+    <div style="display: grid; grid-template-columns: auto 1fr 1fr; gap: 24px; align-items: start;">
         <!-- Status Badge -->
         <div>
             <span class="badge badge-success" id="acme-status-badge" style="font-size: 14px; padding: 6px 12px;">
@@ -25,12 +25,20 @@
         
         <!-- CA Info -->
         <div>
-            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">ACME Server</div>
-            <div style="font-weight: 600; color: var(--text-primary); margin-top: 4px;" id="acme-ca-display">Loading CA...</div>
+            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">ACME Server</div>
+            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;" id="acme-ca-display">Loading CA...</div>
+            
+            <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Supported Features</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                <span class="badge bg-secondary" style="font-size: 11px;" title="Account registration">new-account</span>
+                <span class="badge bg-secondary" style="font-size: 11px;" title="Order creation">new-order</span>
+                <span class="badge bg-secondary" style="font-size: 11px;" title="HTTP-01 validation">HTTP-01</span>
+                <span class="badge bg-secondary" style="font-size: 11px;" title="DNS-01 validation">DNS-01</span>
+            </div>
         </div>
         
         <!-- Directory URL -->
-        <div style="min-width: 400px;">
+        <div>
             <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">
                 Directory URL
             </label>
