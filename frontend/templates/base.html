@@ -304,12 +304,6 @@
                 <span>Email Notifications</span>
             </a>
             
-            <a href="/config/mtls" class="sidebar-link {% if request.path.startswith('/config/mtls') %}active{% endif %}"
-               hx-get="/config/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <svg class="ucm-icon" width="20" height="20"><use href="#icon-shield-check"/></svg>
-                <span>mTLS Authentication</span>
-            </a>
-            
             <a href="/config/webauthn" class="sidebar-link {% if request.path.startswith('/config/webauthn') %}active{% endif %}"
                hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-key"/></svg>
