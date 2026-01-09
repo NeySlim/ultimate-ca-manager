@@ -294,8 +294,7 @@ def create_certificate():
             'message': 'Certificate created successfully',
             'certificate': auth_cert.to_dict(),
             'cert_pem': cert_pem,  # Return PEM for user to download
-            'key_pem': key_pem
-            'private_key': key_pem  # Return private key for download
+            'key_pem': key_pem  # Return private key for download
         }), 200
         
     except Exception as e:
