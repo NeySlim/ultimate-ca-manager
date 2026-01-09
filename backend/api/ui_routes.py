@@ -1674,19 +1674,20 @@ def crl_list_data():
         
         # Build table HTML
         html = '''
-        <table class="w-full">
-            <thead class="bg-gray-50 border-b border-gray-200">
-                <tr>
-                    <th>CA</th>
-                    <th>CDP Status</th>
-                    <th>CRL Status</th>
-                    <th>Revoked Count</th>
-                    <th>Last Update</th>
-                    <th>Next Update</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+        <div style="overflow-x: auto;">
+            <table id="crl-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;">CA</th>
+                        <th style="padding: 0.75rem; text-align: left;">CDP Status</th>
+                        <th style="padding: 0.75rem; text-align: left;">CRL Status</th>
+                        <th style="padding: 0.75rem; text-align: left;">Revoked Count</th>
+                        <th style="padding: 0.75rem; text-align: left;">Last Update</th>
+                        <th style="padding: 0.75rem; text-align: left;">Next Update</th>
+                        <th style="padding: 0.75rem; text-align: left;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
         '''
         
         for crl_data in crls:
@@ -1698,13 +1699,13 @@ def crl_list_data():
             
             # CDP Status badge
             if cdp_enabled:
-                cdp_status = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Enabled</span>'
+                cdp_status = '<span class="badge-outline badge-success"><i class="fas fa-check" style="margin-right: 0.25rem;"></i>Enabled</span>'
             else:
-                cdp_status = '<span class="badge badge-secondary"><i class="fas fa-times mr-1"></i>Disabled</span>'
+                cdp_status = '<span class="badge-outline badge-secondary"><i class="fas fa-times" style="margin-right: 0.25rem;"></i>Disabled</span>'
             
             # CRL Status badge
             if not has_crl:
-                crl_status = '<span class="badge badge-warning">Never Generated</span>'
+                crl_status = '<span class="badge-outline badge-warning">Never Generated</span>'
                 revoked_count = '-'
                 last_update = '-'
                 next_update = '-'
@@ -1714,11 +1715,11 @@ def crl_list_data():
                 days_until_expiry = crl_data.get('days_until_expiry', 0)
                 
                 if is_stale:
-                    crl_status = '<span class="badge badge-danger"><i class="fas fa-exclamation-triangle mr-1"></i>Stale</span>'
+                    crl_status = '<span class="badge-outline badge-danger"><i class="fas fa-exclamation-triangle" style="margin-right: 0.25rem;"></i>Stale</span>'
                 elif days_until_expiry <= 1:
-                    crl_status = '<span class="badge badge-warning"><i class="fas fa-clock mr-1"></i>Expiring Soon</span>'
+                    crl_status = '<span class="badge-outline badge-warning"><i class="fas fa-clock" style="margin-right: 0.25rem;"></i>Expiring Soon</span>'
                 else:
-                    crl_status = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Up to Date</span>'
+                    crl_status = '<span class="badge-outline badge-success"><i class="fas fa-check" style="margin-right: 0.25rem;"></i>Up to Date</span>'
                 
                 revoked_count = crl_data.get('revoked_count', 0)
                 
@@ -1750,53 +1751,54 @@ def crl_list_data():
             
             # Actions buttons
             actions = f'''
-            <div class="flex justify-end space-x-2">
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
             '''
             
             if has_crl:
                 actions += f'''
                 <button data-action="download-crl" data-ca-id="{ca_id}" data-format="pem"
-                        class="btn-sm btn-secondary" title="Download PEM">
-                    <i class="fas fa-download"></i> PEM
+                        class="btn-icon btn-icon-secondary" title="Download PEM">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
                 </button>
                 <button data-action="download-crl" data-ca-id="{ca_id}" data-format="der"
-                        class="btn-sm btn-secondary" title="Download DER">
-                    <i class="fas fa-download"></i> DER
+                        class="btn-icon btn-icon-secondary" title="Download DER">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
                 </button>
                 <button data-action="view-crl-info" data-refid="{ca_refid}"
-                        class="btn-sm btn-secondary" title="View Info">
-                    <i class="fas fa-info-circle"></i>
+                        class="btn-icon btn-icon-secondary" title="View Info">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-info"/></svg>
                 </button>
                 '''
             
             if cdp_enabled:
                 actions += f'''
                 <button data-action="generate-crl" data-ca-id="{ca_id}" data-name="{html_escape(ca_name)}"
-                        class="btn-sm btn-primary" title="Force Generate">
-                    <i class="fas fa-refresh"></i>
+                        class="btn-icon btn-icon-primary" title="Force Generate">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-refresh"/></svg>
                 </button>
                 '''
             
             actions += '</div>'
             
             html += f'''
-            <tr class="hover:bg-gray-50">
-                <td>
-                    <div class="font-medium text-gray-900">{ca_name}</div>
-                    <div class="text-sm text-gray-500">{ca_refid}</div>
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;">
+                    <div style="font-weight: 500; color: var(--text-primary);">{ca_name}</div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary);">{ca_refid}</div>
                 </td>
-                <td>{cdp_status}</td>
-                <td>{crl_status}</td>
-                <td>{revoked_count}</td>
-                <td>{last_update}</td>
-                <td>{next_update} {days_until}</td>
-                <td>{actions}</td>
+                <td style="padding: 0.75rem;">{cdp_status}</td>
+                <td style="padding: 0.75rem;">{crl_status}</td>
+                <td style="padding: 0.75rem; color: var(--text-primary);">{revoked_count}</td>
+                <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{last_update}</td>
+                <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{next_update} {days_until}</td>
+                <td style="padding: 0.75rem;">{actions}</td>
             </tr>
             '''
         
         html += '''
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
         '''
         
         return html
