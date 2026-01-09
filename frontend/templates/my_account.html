@@ -468,6 +468,9 @@ document.querySelectorAll('.mtls-tab-button').forEach(btn => {
     btn.addEventListener('click', () => {
         const tabName = btn.dataset.tab;
         
+        // Mark that tab was manually set
+        window.mtlsTabManuallySet = true;
+        
         // Update buttons
         document.querySelectorAll('.mtls-tab-button').forEach(b => {
             b.classList.remove('active');
@@ -882,7 +885,25 @@ window.deleteCertificate = async function(certId) {
 };
 
 // Initialize mTLS section
-loadMTLSSettings();
+async function initMTLS() {
+    await loadMTLSSettings();
+    // Check if user has certificates to determine default tab
+    try {
+        const response = await fetch('/api/v1/mtls/certificates', {
+            headers: {'Authorization': `Bearer ${getToken()}`}
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.certificates.length > 0) {
+                // User has certificates, show manage tab by default
+                document.querySelector('.mtls-tab-button[data-tab="manage"]').click();
+            }
+        }
+    } catch (error) {
+        console.error('Error checking certificates:', error);
+    }
+}
+initMTLS();
 })();
 </script>
 {% endblock %}
