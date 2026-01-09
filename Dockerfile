@@ -48,6 +48,9 @@ COPY --from=builder /opt/venv /opt/venv
 # Set working directory
 WORKDIR /app
 
+# Ensure /app is owned by ucm user
+RUN chown ucm:ucm /app
+
 # Copy application files
 # Copy application files with proper ownership
 COPY --chown=ucm:ucm backend/ /app/backend/
