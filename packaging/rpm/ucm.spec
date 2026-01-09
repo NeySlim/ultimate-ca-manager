@@ -1,6 +1,6 @@
 Name:           ucm
-Version:        1.8.0
-Release:        1%{?dist}
+Version:        %{?_version}%{!?_version:1.8.0}
+Release:        %{?_release}%{!?_release:1}%{?dist}
 Summary:        Ultimate CA Manager - Complete PKI Management Platform
 
 License:        Proprietary
