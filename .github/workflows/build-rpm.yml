@@ -51,31 +51,11 @@ jobs:
           echo "RPM version: $RPM_VERSION"
           echo "RPM release: $RPM_RELEASE"
       
-      - name: Build RPM in container
-        run: |
-          docker run --rm -v $(pwd):/workspace rockylinux:9 bash -c "
-            dnf install -y rpm-build python3 python3-pip python3-devel gcc openssl-devel systemd-rpm-macros && \
-            cd /workspace && \
-            # Create RPM build structure
-            mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} && \
-            # Create tarball using base version
-            tar czf ~/rpmbuild/SOURCES/ucm-${{ steps.version.outputs.rpm_version }}.tar.gz \
-              --transform 's,^,ucm-${{ steps.version.outputs.rpm_version }}/,' \
-              --exclude='.git' \
-              --exclude='*.pyc' \
-              --exclude='__pycache__' \
-              . && \
-            # Build RPM with proper version and release
-            rpmbuild -ba packaging/rpm/ucm.spec \
-              --define '_version ${{ steps.version.outputs.rpm_version }}' \
-              --define '_release ${{ steps.version.outputs.rpm_release }}'
-          "
-      
-      - name: Copy RPM package
+      - name: Build and extract RPM package
         run: |
           docker run --rm -v $(pwd):/workspace -v /tmp:/output rockylinux:9 bash -c "
             dnf install -y rpm-build python3 systemd-rpm-macros && \
-            mkdir -p ~/rpmbuild && \
+            mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS} && \
             cd /workspace && \
             tar czf ~/rpmbuild/SOURCES/ucm-${{ steps.version.outputs.rpm_version }}.tar.gz \
               --transform 's,^,ucm-${{ steps.version.outputs.rpm_version }}/,' \
