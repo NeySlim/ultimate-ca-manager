@@ -270,11 +270,10 @@ def create_certificate():
         if isinstance(cert_pem, str):
             cert_pem_bytes = cert_pem.encode('utf-8')
         
-        # Create AuthCertificate record
+        # Create AuthCertificate record (metadata only, cert will be presented by client)
         auth_cert = AuthCertificate(
             user_id=user.id,
             name=cert_name,
-            cert_pem=cert_pem_bytes,  # Store as bytes
             cert_serial=cert_info['serial'],
             cert_fingerprint=cert_info['fingerprint_sha256'],
             cert_subject=cert_info['subject_dn'],
@@ -289,10 +288,13 @@ def create_certificate():
         
         log_audit('create_certificate', username, f"Created {'self-signed' if self_signed else 'managed'} certificate: {cn}")
         
+        # Return certificate and private key for download
         return jsonify({
             'success': True,
             'message': 'Certificate created successfully',
             'certificate': auth_cert.to_dict(),
+            'cert_pem': cert_pem,  # Return PEM for user to download
+            'key_pem': key_pem
             'private_key': key_pem  # Return private key for download
         }), 200
         
