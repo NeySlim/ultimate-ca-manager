@@ -386,7 +386,7 @@ touch /app/.docker-ready
 echo -e "${GREEN}🚀 Starting UCM v1.8.0-beta...${NC}"
 echo -e "${CYAN}   Access: https://${UCM_FQDN}:${UCM_HTTPS_PORT}${NC}"
 echo ""
-echo -e "${BLUE}📋 Executing command: $@${NC}"
+echo -e "${BLUE}📋 Executing command: $*${NC}"
 echo ""
 
 # Execute the main command
