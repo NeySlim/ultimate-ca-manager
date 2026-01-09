@@ -167,13 +167,14 @@ document.addEventListener('DOMContentLoaded', function() {
     loadAcmeCA();
     loadSettings();
     
-    // Handle form submission success - ONLY on form
+    // Handle form submission success - ONLY when form is submitted
     const form = document.getElementById('acme-settings-form');
     if (form) {
         form.addEventListener('htmx:afterRequest', function(event) {
-            if (event.detail.successful) {
+            // Check if this is a POST request (form submission)
+            if (event.detail.successful && event.detail.requestConfig.verb === 'post') {
                 showToast('ACME settings saved successfully', 'success');
-                loadAcmeCA();
+                setTimeout(() => loadAcmeCA(), 200);
             }
         });
     }
@@ -195,6 +196,7 @@ function loadStatistics() {
 
 function loadAcmeCA() {
     const badge = document.getElementById('acme-status-badge');
+    const caDisplay = document.getElementById('acme-ca-display');
     
     fetch('/api/ui/acme/settings/load')
         .then(response => response.json())
@@ -206,19 +208,24 @@ function loadAcmeCA() {
                 badge.style.padding = '6px 12px';
                 badge.innerHTML = '<i class="bi bi-check-circle-fill"></i> Active';
                 
-                // Get CA name from the select dropdown
+                // Get CA name from the select dropdown - wait for HTMX to load options
                 const caSelect = document.getElementById('acme-default-ca');
                 if (caSelect) {
-                    setTimeout(() => {
+                    // Try multiple times to find the option (HTMX might still be loading)
+                    let attempts = 0;
+                    const checkInterval = setInterval(() => {
                         const selectedOption = Array.from(caSelect.options).find(opt => opt.value === data.default_ca);
                         if (selectedOption) {
-                            document.getElementById('acme-ca-display').textContent = selectedOption.text;
-                        } else {
-                            document.getElementById('acme-ca-display').textContent = data.default_ca;
+                            caDisplay.textContent = selectedOption.text;
+                            clearInterval(checkInterval);
+                        } else if (++attempts > 10) {
+                            // After 10 attempts (1 second), just show the refid
+                            caDisplay.textContent = 'CA: ' + data.default_ca;
+                            clearInterval(checkInterval);
                         }
-                    }, 500);
+                    }, 100);
                 } else {
-                    document.getElementById('acme-ca-display').textContent = data.default_ca;
+                    caDisplay.textContent = 'CA: ' + data.default_ca;
                 }
             } else {
                 // No CA configured - show Not Configured (red)
@@ -226,7 +233,7 @@ function loadAcmeCA() {
                 badge.style.fontSize = '14px';
                 badge.style.padding = '6px 12px';
                 badge.innerHTML = '<i class="bi bi-x-circle-fill"></i> Not Configured';
-                document.getElementById('acme-ca-display').textContent = 'No CA configured';
+                caDisplay.textContent = 'No CA configured';
             }
         })
         .catch(error => {
@@ -235,7 +242,7 @@ function loadAcmeCA() {
             badge.style.fontSize = '14px';
             badge.style.padding = '6px 12px';
             badge.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> Error';
-            document.getElementById('acme-ca-display').textContent = 'Error loading CA';
+            caDisplay.textContent = 'Error loading CA';
             console.error('Error:', error);
         });
 }
