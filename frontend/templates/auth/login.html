@@ -783,6 +783,16 @@
             }
         }
         
+        // Handle login form submission to show loader
+        document.addEventListener('submit', function(e) {
+            if (e.target.action && e.target.action.includes('/login')) {
+                // Show global loader if it exists
+                if (typeof showGlobalLoader === 'function') {
+                    showGlobalLoader();
+                }
+            }
+        });
+        
         // Init
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('username').focus();

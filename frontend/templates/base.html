@@ -26,6 +26,14 @@
 </head>
 <body>
     
+    <!-- Global Loading Indicator -->
+    <div id="global-loader" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 9999; align-items: center; justify-content: center;">
+        <div style="background: var(--card-bg); border-radius: 12px; padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; min-width: 200px;">
+            <div class="spinner" style="margin: 0 auto 1rem auto; width: 48px; height: 48px; border-width: 4px;"></div>
+            <div style="color: var(--text-primary); font-weight: 500; font-size: 1rem;">Loading...</div>
+        </div>
+    </div>
+    
     {% if request.endpoint and request.endpoint != 'ui.login' %}
     
     <!-- Navbar -->
@@ -474,6 +482,59 @@
         
         return response;
     };
+    </script>
+    
+    
+    <!-- Global Loading Indicator Control -->
+    <script>
+    (function() {
+        const loader = document.getElementById('global-loader');
+        
+        // Show loader function
+        window.showGlobalLoader = function() {
+            if (loader) {
+                loader.style.display = 'flex';
+            }
+        };
+        
+        // Hide loader function
+        window.hideGlobalLoader = function() {
+            if (loader) {
+                loader.style.display = 'none';
+            }
+        };
+        
+        // Show loader on page navigation (HTMX requests)
+        document.body.addEventListener('htmx:beforeRequest', function(evt) {
+            // Only show for navigation requests (not for small HTMX updates)
+            const target = evt.detail.target;
+            if (target && target.id === 'main-content') {
+                showGlobalLoader();
+            }
+        });
+        
+        // Hide loader when navigation completes
+        document.body.addEventListener('htmx:afterSettle', function(evt) {
+            const target = evt.detail.target;
+            if (target && target.id === 'main-content') {
+                hideGlobalLoader();
+            }
+        });
+        
+        // Hide loader on errors
+        document.body.addEventListener('htmx:responseError', function(evt) {
+            hideGlobalLoader();
+        });
+        
+        document.body.addEventListener('htmx:sendError', function(evt) {
+            hideGlobalLoader();
+        });
+        
+        // Also hide loader when page is fully loaded
+        window.addEventListener('load', function() {
+            hideGlobalLoader();
+        });
+    })();
     </script>
     
     {% block extra_body %}{% endblock %}
