@@ -585,15 +585,6 @@ function updateMTLSBadge() {
     })
     .catch(error => console.error('Error loading mTLS status:', error));
 }
-        } else {
-            ucmAlert('✗ ' + (result.error || 'Failed to save settings'), 'Error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        ucmAlert('Failed to save mTLS settings', 'Error');
-    });
-});
 
 </script>
 {% endblock %}
