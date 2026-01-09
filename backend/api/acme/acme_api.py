@@ -581,7 +581,7 @@ def finalize_order(order_id: str):
 @acme_bp.route('/authz/<authorization_id>', methods=['POST'])
 def authorization_info(authorization_id: str):
     """Get authorization status (RFC 8555 Section 7.5)"""
-    from backend.models.acme_models import AcmeAuthorization
+    from models.acme_models import AcmeAuthorization
     
     service = get_acme_service()
     
