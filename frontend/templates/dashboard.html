@@ -110,43 +110,46 @@
         <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">Recent SCEP Requests</h2>
     </div>
     <div class="card-body" style="padding: 0;">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th style="width: 35%;">Device</th>
-                    <th style="width: 20%;">Status</th>
-                    <th style="width: 30%;">CA</th>
-                    <th style="width: 15%;">Date</th>
+        <div style="overflow-x: auto;">
+        <table id="dashboard-scep-table">
+            <thead style="background: var(--bg-secondary);">
+                <tr style="border-bottom: 2px solid var(--border-color);">
+                    <th style="padding: 0.75rem; text-align: left; width: 35%;">Device</th>
+                    <th style="padding: 0.75rem; text-align: left; width: 20%;">Status</th>
+                    <th style="padding: 0.75rem; text-align: left; width: 30%;">CA</th>
+                    <th style="padding: 0.75rem; text-align: left; width: 15%;">Date</th>
                 </tr>
             </thead>
             <tbody>
                 {% if scep_requests %}
                     {% for req in scep_requests[:5] %}
-                    <tr>
-                        <td><strong>{{ req.common_name }}</strong></td>
-                        <td>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 0.75rem; color: var(--text-primary); font-weight: 500;">{{ req.common_name }}</td>
+                        <td style="padding: 0.75rem;">
                             {% if req.status == 'approved' %}
-                                <span class="badge badge-success badge-xs">Approved</span>
+                                <span class="badge-outline badge-success"><i class="fas fa-check"></i> Approved</span>
                             {% elif req.status == 'pending' %}
-                                <span class="badge badge-warning badge-xs">Pending</span>
+                                <span class="badge-outline badge-warning"><i class="fas fa-clock"></i> Pending</span>
                             {% else %}
-                                <span class="badge badge-secondary badge-xs">{{ req.status }}</span>
+                                <span class="badge-outline badge-secondary">{{ req.status }}</span>
                             {% endif %}
                         </td>
-                        <td>{{ req.ca_name }}</td>
-                        <td style="font-size: 12px;">{{ req.created_at.strftime('%Y-%m-%d %H:%M') if req.created_at else 'N/A' }}</td>
+                        <td style="padding: 0.75rem; color: var(--text-secondary);">{{ req.ca_name }}</td>
+                        <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{{ req.created_at.strftime('%Y-%m-%d %H:%M') if req.created_at else 'N/A' }}</td>
                     </tr>
                     {% endfor %}
                 {% else %}
                 <tr>
-                    <td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 40px;">
-                        <i class="fas fa-network-wired" style="font-size: 48px; opacity: 0.2; margin-bottom: 12px; display: block;"></i>
-                        No SCEP requests
+                    <td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 2.5rem;">
+                        <i class="fas fa-network-wired" style="font-size: 3rem; opacity: 0.2; margin-bottom: 0.75rem; display: block;"></i>
+                        <div style="font-weight: 500; margin-bottom: 0.25rem;">No SCEP requests</div>
+                        <div style="font-size: 0.875rem;">Enrollment requests will appear here</div>
                     </td>
                 </tr>
                 {% endif %}
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 {% endblock %}

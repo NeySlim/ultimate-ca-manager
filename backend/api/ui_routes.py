@@ -4307,40 +4307,40 @@ def acme_accounts_list():
         
         if not accounts:
             return '''
-            <div class="text-center p-8">
-                <i class="bi bi-person-badge fs-1 text-muted"></i>
-                <p class="mt-3 text-muted">No ACME accounts yet</p>
-                <small>Accounts will appear here when ACME clients register</small>
+            <div style="text-align: center; padding: 2rem;">
+                <i class="fas fa-user-shield" style="font-size: 3rem; opacity: 0.2; margin-bottom: 0.75rem; display: block; color: var(--text-secondary);"></i>
+                <p style="margin-top: 1rem; color: var(--text-secondary); font-weight: 500;">No ACME accounts yet</p>
+                <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;">Accounts will appear here when ACME clients register</p>
             </div>
             '''
         
         html = '''
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Account ID</th>
-                        <th>Status</th>
-                        <th>Contacts</th>
-                        <th>JWK Thumbprint</th>
-                        <th>Created</th>
+        <div style="overflow-x: auto;">
+            <table id="acme-accounts-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;">Account ID</th>
+                        <th style="padding: 0.75rem; text-align: left;">Status</th>
+                        <th style="padding: 0.75rem; text-align: left;">Contacts</th>
+                        <th style="padding: 0.75rem; text-align: left;">JWK Thumbprint</th>
+                        <th style="padding: 0.75rem; text-align: left;">Created</th>
                     </tr>
                 </thead>
                 <tbody>
         '''
         
         for account in accounts:
-            status_badge = 'success' if account[2] == 'valid' else 'secondary'
+            status_badge_class = 'badge-success' if account[2] == 'valid' else 'badge-secondary'
             contacts = account[3] or '[]'
             created = datetime.fromisoformat(account[4]).strftime('%Y-%m-%d %H:%M')
             
             html += f'''
-                <tr>
-                    <td><code class="small">{account[1][:24]}...</code></td>
-                    <td><span class="badge bg-{status_badge}">{account[2]}</span></td>
-                    <td class="small">{contacts}</td>
-                    <td><code class="small">{account[5]}...</code></td>
-                    <td>{created}</td>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem;"><code style="font-size: 0.875rem; color: var(--text-primary);">{account[1][:24]}...</code></td>
+                    <td style="padding: 0.75rem;"><span class="badge-outline {status_badge_class}">{account[2]}</span></td>
+                    <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{contacts}</td>
+                    <td style="padding: 0.75rem;"><code style="font-size: 0.875rem; color: var(--text-secondary);">{account[5]}...</code></td>
+                    <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{created}</td>
                 </tr>
             '''
         
@@ -4376,23 +4376,23 @@ def acme_orders_list():
         
         if not orders:
             return '''
-            <div class="text-center p-8">
-                <i class="bi bi-file-earmark-text fs-1 text-muted"></i>
-                <p class="mt-3 text-muted">No ACME orders yet</p>
-                <small>Orders will appear here when certificates are requested</small>
+            <div style="text-align: center; padding: 2rem;">
+                <i class="fas fa-file-alt" style="font-size: 3rem; opacity: 0.2; margin-bottom: 0.75rem; display: block; color: var(--text-secondary);"></i>
+                <p style="margin-top: 1rem; color: var(--text-secondary); font-weight: 500;">No ACME orders yet</p>
+                <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;">Orders will appear here when certificates are requested</p>
             </div>
             '''
         
         html = '''
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Order ID</th>
-                        <th>Status</th>
-                        <th>Identifiers</th>
-                        <th>Account</th>
-                        <th>Created</th>
+        <div style="overflow-x: auto;">
+            <table id="acme-orders-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;">Order ID</th>
+                        <th style="padding: 0.75rem; text-align: left;">Status</th>
+                        <th style="padding: 0.75rem; text-align: left;">Identifiers</th>
+                        <th style="padding: 0.75rem; text-align: left;">Account</th>
+                        <th style="padding: 0.75rem; text-align: left;">Created</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -4400,22 +4400,22 @@ def acme_orders_list():
         
         for order in orders:
             status_colors = {
-                'pending': 'warning',
-                'ready': 'info',
-                'processing': 'primary',
-                'valid': 'success',
-                'invalid': 'danger'
+                'pending': 'badge-warning',
+                'ready': 'badge-info',
+                'processing': 'badge-primary',
+                'valid': 'badge-success',
+                'invalid': 'badge-danger'
             }
-            status_badge = status_colors.get(order[2], 'secondary')
+            status_badge_class = status_colors.get(order[2], 'badge-secondary')
             created = datetime.fromisoformat(order[4]).strftime('%Y-%m-%d %H:%M')
             
             html += f'''
-                <tr>
-                    <td><code class="small">{order[1][:24]}...</code></td>
-                    <td><span class="badge bg-{status_badge}">{order[2]}</span></td>
-                    <td class="small">{order[3]}</td>
-                    <td><code class="small">{order[5][:16] if order[5] else 'N/A'}...</code></td>
-                    <td>{created}</td>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem;"><code style="font-size: 0.875rem; color: var(--text-primary);">{order[1][:24]}...</code></td>
+                    <td style="padding: 0.75rem;"><span class="badge-outline {status_badge_class}">{order[2]}</span></td>
+                    <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{order[3]}</td>
+                    <td style="padding: 0.75rem;"><code style="font-size: 0.875rem; color: var(--text-secondary);">{order[5][:16] if order[5] else 'N/A'}...</code></td>
+                    <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{created}</td>
                 </tr>
             '''
         
