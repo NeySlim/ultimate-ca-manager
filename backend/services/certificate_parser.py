@@ -7,7 +7,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class CertificateParser:
@@ -107,12 +107,13 @@ class CertificateParser:
             'subject_dn': subject_dn,
             'issuer_dn': issuer_dn,
             'serial': serial,
-            'fingerprint': fingerprint,
+            'fingerprint_sha256': fingerprint,
+            'fingerprint': fingerprint,  # Backward compatibility
             'common_name': cn,
             'email': email,
             'valid_from': valid_from,
             'valid_until': valid_until,
-            'is_valid': datetime.utcnow() >= valid_from and datetime.utcnow() <= valid_until
+            'is_valid': datetime.now(timezone.utc) >= valid_from and datetime.now(timezone.utc) <= valid_until
         }
     
     @staticmethod
