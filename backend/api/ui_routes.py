@@ -6,7 +6,7 @@ from functools import wraps
 from datetime import datetime, timedelta
 import requests
 import time
-import html
+from html import escape as html_escape
 from config.settings import Config, DATA_DIR
 
 ui_bp = Blueprint('ui', __name__, template_folder='../../frontend/templates')
@@ -595,7 +595,7 @@ def ca_list_content():
                                 title="Export CA">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
                         </button>
-                        <button data-refid="{ca['refid']}" data-descr="{html.escape(ca['descr'])}"
+                        <button data-refid="{ca['refid']}" data-descr="{html_escape(ca['descr'])}"
                                 onclick="deleteCA(this.dataset.refid, this.dataset.descr)"
                                 class="btn-icon btn-icon-danger"
                                 title="Delete CA">
@@ -1050,7 +1050,7 @@ def cert_list_content():
                 
             if not is_revoked and not is_csr:
                 html += f'''
-                        <button data-refid="{cert['refid']}" data-descr="{html.escape(cert['descr'])}" 
+                        <button data-refid="{cert['refid']}" data-descr="{html_escape(cert['descr'])}" 
                                 onclick="revokeCert(this.dataset.refid, this.dataset.descr)"
                                 class="btn-icon btn-icon-danger"
                                 title="Revoke Certificate">
@@ -1059,7 +1059,7 @@ def cert_list_content():
                 '''
             
             html += f'''
-                        <button data-refid="{cert['refid']}" data-descr="{html.escape(cert['descr'])}"
+                        <button data-refid="{cert['refid']}" data-descr="{html_escape(cert['descr'])}"
                                 onclick="deleteCert(this.dataset.refid, this.dataset.descr)"
                                 class="btn-icon btn-icon-danger"
                                 title="Delete {'CSR' if is_csr else 'Certificate'}">
