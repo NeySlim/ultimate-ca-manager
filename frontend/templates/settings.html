@@ -130,11 +130,11 @@
             </div>
             
             <div style="display: flex; gap: 1rem; padding-top: 0.5rem;">
-                <button onclick="applyHTTPSCertificate()" class="btn btn-primary">
+                <button onclick="applyHTTPSCertificate()" class="btn-primary">
                     <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
                     Apply Certificate
                 </button>
-                <button onclick="regenerateSelfSigned()" class="btn btn-secondary">
+                <button onclick="regenerateSelfSigned()" class="btn-secondary">
                     <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-refresh"/></svg>
                     Regenerate Self-Signed
                 </button>
@@ -204,10 +204,62 @@
                 </div>
             </div>
             
-            <button onclick="confirmPKIReset()" class="btn btn-danger">
+            <button onclick="confirmPKIReset()" class="btn-danger">
                 <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-trash"/></svg>
                 Reset PKI Database
             </button>
+        </div>
+    </div>
+    
+    <!-- mTLS Authentication (Link to dedicated page) -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                    <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-shield-check"/></svg>
+                    mTLS Authentication
+                </h2>
+                <span id="mtls-status-badge" class="badge-outline badge-secondary">
+                    <svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Checking...
+                </span>
+            </div>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Configure mutual TLS (mTLS) authentication to allow users to authenticate using client certificates.
+            </p>
+            
+            <!-- Warning about reverse proxy requirement -->
+            <div style="background: var(--info-bg); border-left: 4px solid var(--primary-color); padding: 1rem; margin-bottom: 1.5rem; border-radius: 0.25rem;">
+                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                    <svg class="ucm-icon" width="18" height="18" style="color: var(--primary-color); flex-shrink: 0; margin-top: 2px;"><use href="#icon-info"/></svg>
+                    <div>
+                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.25rem;">Reverse Proxy Required for Browser Support</strong>
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.8125rem; line-height: 1.5;">
+                            mTLS requires a reverse proxy (Nginx/Apache) for browsers to prompt for client certificates.
+                            Without a proxy, certificates work for API authentication only.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Link to detailed configuration page -->
+            <a href="/config/mtls" class="btn-primary" style="display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+                <svg class="ucm-icon" width="16" height="16"><use href="#icon-settings"/></svg>
+                Configure mTLS Authentication
+                <svg class="ucm-icon" width="14" height="14" style="margin-left: auto;"><use href="#icon-arrow-right"/></svg>
+            </a>
+            
+            <p style="margin-top: 1rem; font-size: 0.8125rem; color: var(--text-secondary);">
+                The configuration page includes:
+            </p>
+            <ul style="margin: 0.5rem 0 0 1.25rem; font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.6;">
+                <li>Enable/disable mTLS authentication</li>
+                <li>Trusted CA configuration</li>
+                <li>Auto-generated Nginx/Apache configuration</li>
+                <li>CA certificate download</li>
+                <li>Complete setup instructions</li>
+            </ul>
         </div>
     </div>
     
@@ -215,12 +267,16 @@
 </div>
 
 <script>
+// Get JWT token from meta tag (defined in base.html)
+const getToken = () => document.querySelector('meta[name="access-token"]')?.content || '';
+
 // Load data immediately when script runs (for HTMX navigation)
 (function() {
     loadHTTPSCertInfo();
     loadPKIStats();
     loadCertificateCandidates();
     setupCertSelectorListener();
+    updateMTLSBadge();
 })();
 
 // Also load on DOMContentLoaded (for direct page access)
@@ -229,15 +285,21 @@ document.addEventListener('DOMContentLoaded', function() {
     loadPKIStats();
     loadCertificateCandidates();
     setupCertSelectorListener();
+    updateMTLSBadge();
 });
 
 function loadHTTPSCertInfo() {
     fetch('/api/ui/system/https-cert-info')
         .then(response => response.json())
         .then(data => {
-            if (data.subject) document.getElementById('cert-subject').textContent = data.subject;
-            if (data.expires) document.getElementById('cert-expiry').textContent = data.expires;
-            if (data.type) document.getElementById('cert-type').textContent = data.type;
+            // Check if elements exist before modifying
+            const certSubject = document.getElementById('cert-subject');
+            const certExpiry = document.getElementById('cert-expiry');
+            const certType = document.getElementById('cert-type');
+            
+            if (certSubject && data.subject) certSubject.textContent = data.subject;
+            if (certExpiry && data.expires) certExpiry.textContent = data.expires;
+            if (certType && data.type) certType.textContent = data.type;
             
             // Set radio button based on source
             if (data.source === 'managed' && data.cert_id) {
@@ -251,14 +313,21 @@ function loadHTTPSCertInfo() {
                 if (select) {
                     // Wait for certificates to load, then select
                     setTimeout(() => {
-                        select.value = String(data.cert_id);
-                        select.dispatchEvent(new Event('change'));
+                        // Double-check element still exists after timeout
+                        const selectCheck = document.getElementById('managed-cert-id');
+                        if (selectCheck) {
+                            selectCheck.value = String(data.cert_id);
+                            selectCheck.dispatchEvent(new Event('change'));
+                        }
                     }, 800);
                 }
                 toggleCertSelector();
             } else {
-                document.querySelector('input[name="cert-source"][value="auto"]').checked = true;
-                toggleCertSelector();
+                const autoRadio = document.querySelector('input[name="cert-source"][value="auto"]');
+                if (autoRadio) {
+                    autoRadio.checked = true;
+                    toggleCertSelector();
+                }
             }
         })
         .catch(error => console.error('Error loading HTTPS cert info:', error));
@@ -295,9 +364,12 @@ function loadCertificateCandidates() {
 }
 
 function toggleCertSelector() {
-    const source = document.querySelector('input[name="cert-source"]:checked').value;
+    const source = document.querySelector('input[name="cert-source"]:checked');
     const container = document.getElementById('cert-selector-container');
-    if (source === 'managed') {
+    
+    if (!source || !container) return; // Elements don't exist
+    
+    if (source.value === 'managed') {
         container.style.display = 'block';
     } else {
         container.style.display = 'none';
@@ -312,9 +384,15 @@ function setupCertSelectorListener() {
     select.dataset.listenerAdded = 'true';
     select.addEventListener('change', function() {
         const details = document.getElementById('cert-details');
+        const selectedCertSubject = document.getElementById('selected-cert-subject');
+        const selectedCertExpiry = document.getElementById('selected-cert-expiry');
+        
+        // Check all elements exist
+        if (!details || !selectedCertSubject || !selectedCertExpiry) return;
+        
         if (this.value && this.selectedOptions[0].dataset.subject) {
-            document.getElementById('selected-cert-subject').textContent = this.selectedOptions[0].dataset.subject;
-            document.getElementById('selected-cert-expiry').textContent = this.selectedOptions[0].dataset.expires;
+            selectedCertSubject.textContent = this.selectedOptions[0].dataset.subject;
+            selectedCertExpiry.textContent = this.selectedOptions[0].dataset.expires;
             details.style.display = 'block';
         } else {
             details.style.display = 'none';
@@ -335,12 +413,13 @@ function loadPKIStats() {
 }
 
 function applyHTTPSCertificate() {
-    const source = document.querySelector('input[name="cert-source"]:checked').value;
+    const source = document.querySelector('input[name="cert-source"]:checked');
+    if (!source) return;
     
     // Validate managed cert selection
-    if (source === 'managed') {
-        const certId = document.getElementById('managed-cert-id').value;
-        if (!certId) {
+    if (source.value === 'managed') {
+        const certIdSelect = document.getElementById('managed-cert-id');
+        if (!certIdSelect || !certIdSelect.value) {
             ucmAlert('Please select a certificate from the list', 'Error');
             return;
         }
@@ -435,10 +514,10 @@ function confirmPKIReset() {
                         <input type="text" id="pki-reset-confirmation" class="form-input" placeholder="RESET PKI DATA" style="width: 100%;">
                     </div>
                     <div class="ucm-modal-footer">
-                        <button class="btn btn-secondary" onclick="document.getElementById('ucm-modal-container').innerHTML = ''">
+                        <button class="btn-secondary" onclick="document.getElementById('ucm-modal-container').innerHTML = ''">
                             Cancel
                         </button>
-                        <button class="btn btn-danger" onclick="executePKIReset()">
+                        <button class="btn-danger" onclick="executePKIReset()">
                             Reset Database
                         </button>
                     </div>
@@ -481,5 +560,31 @@ function executePKIReset() {
         ucmAlert('Failed to reset PKI database', 'Error');
     });
 }
+
+// ========================================
+// mTLS Status Badge
+// ========================================
+function updateMTLSBadge() {
+    const token = getToken();
+    
+    fetch('/api/v1/mtls/settings', {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(response => response.json())
+    .then(data => {
+        const badge = document.getElementById('mtls-status-badge');
+        if (badge) {
+            if (data.enabled) {
+                badge.className = 'badge-outline badge-success';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Enabled';
+            } else {
+                badge.className = 'badge-outline badge-secondary';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Disabled';
+            }
+        }
+    })
+    .catch(error => console.error('Error loading mTLS status:', error));
+}
+
 </script>
 {% endblock %}

@@ -130,7 +130,7 @@ if [ "$MULTIARCH" = true ]; then
         --platform "$PLATFORMS" \
         --tag "$FULL_IMAGE_NAME:$IMAGE_TAG" \
         --tag "$FULL_IMAGE_NAME:$VERSION" \
-        $([ "$PUSH" = true ] && echo "--push" || echo "--load") \
+        "$([ "$PUSH" = true ] && echo "--push" || echo "--load")" \
         .
 else
     # Single architecture build

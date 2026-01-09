@@ -9,6 +9,7 @@ from flask import Flask, redirect, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
+from flask_caching import Cache
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -17,6 +18,9 @@ from config.settings import get_config, BASE_DIR
 from config.https_manager import HTTPSManager
 from models import db, User, SystemConfig
 from middleware.auth_middleware import init_auth_middleware
+
+# Initialize cache globally
+cache = Cache()
 
 
 def create_app(config_name=None):
@@ -45,6 +49,12 @@ def create_app(config_name=None):
     db.init_app(app)
     migrate = Migrate(app, db)
     jwt = JWTManager(app)
+    
+    # Initialize cache
+    cache.init_app(app, config={
+        'CACHE_TYPE': 'SimpleCache',  # In-memory cache
+        'CACHE_DEFAULT_TIMEOUT': 300   # 5 minutes default
+    })
     
     # CORS - only HTTPS origins
     CORS(app, resources={
@@ -109,35 +119,42 @@ def create_app(config_name=None):
 def init_database(app):
     """Initialize database with default data"""
     from datetime import datetime
+    from sqlalchemy.exc import IntegrityError
     
     # Create initial admin user if none exists
-    if User.query.count() == 0:
-        admin = User(
-            username=app.config["INITIAL_ADMIN_USERNAME"],
-            email=app.config["INITIAL_ADMIN_EMAIL"],
-            role="admin",
-            active=True
-        )
-        admin.set_password(app.config["INITIAL_ADMIN_PASSWORD"])
-        db.session.add(admin)
-        
-        # Add initial system config
-        configs = [
-            SystemConfig(key="app.initialized", value="true", 
-                        description="Application initialized"),
-            SystemConfig(key="app.version", value=app.config["APP_VERSION"],
-                        description="Application version"),
-            SystemConfig(key="https.enabled", value="true",
-                        description="HTTPS enforcement enabled"),
-        ]
-        
-        for config in configs:
-            db.session.add(config)
-        
-        db.session.commit()
-        print(f"\n[SETUP] Initial admin user created: {admin.username}")
-        print(f"[SETUP] Default password: {app.config['INITIAL_ADMIN_PASSWORD']}")
-        print(f"[SETUP] CHANGE THIS PASSWORD IMMEDIATELY!\n")
+    # Use try/except to handle race conditions with multiple workers
+    try:
+        if User.query.count() == 0:
+            admin = User(
+                username=app.config["INITIAL_ADMIN_USERNAME"],
+                email=app.config["INITIAL_ADMIN_EMAIL"],
+                role="admin",
+                active=True
+            )
+            admin.set_password(app.config["INITIAL_ADMIN_PASSWORD"])
+            db.session.add(admin)
+            
+            # Add initial system config
+            configs = [
+                SystemConfig(key="app.initialized", value="true", 
+                            description="Application initialized"),
+                SystemConfig(key="app.version", value=app.config["APP_VERSION"],
+                            description="Application version"),
+                SystemConfig(key="https.enabled", value="true",
+                            description="HTTPS enforcement enabled"),
+            ]
+            
+            for config in configs:
+                db.session.add(config)
+            
+            db.session.commit()
+            print(f"\n[SETUP] Initial admin user created: {admin.username}")
+            print(f"[SETUP] Default password: {app.config['INITIAL_ADMIN_PASSWORD']}")
+            print(f"[SETUP] CHANGE THIS PASSWORD IMMEDIATELY!\n")
+    except IntegrityError:
+        # Another worker already created the initial data
+        db.session.rollback()
+        pass
 
 
 def register_blueprints(app):
@@ -156,6 +173,7 @@ def register_blueprints(app):
     from api.mtls_api import mtls_bp
     from api.webauthn_api import webauthn_bp
     from api.ui_routes import ui_bp
+    from api.acme import acme_bp
     
     # Register UI routes (no prefix - serve from root)
     app.register_blueprint(ui_bp)
@@ -180,6 +198,7 @@ def register_blueprints(app):
     app.register_blueprint(scep_bp, url_prefix='/scep')  # SCEP protocol
     app.register_blueprint(cdp_bp, url_prefix='/cdp')     # CRL Distribution Points
     app.register_blueprint(ocsp_bp)                        # OCSP Responder (/ocsp)
+    app.register_blueprint(acme_bp)                        # ACME protocol (/acme)
 
 
 def main():
@@ -187,11 +206,65 @@ def main():
     config = get_config()
     app = create_app()
     
-    # Get SSL context
-    ssl_context = (
+    # Get SSL context with optional client certificate verification
+    import ssl
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ssl_context.load_cert_chain(
         str(config.HTTPS_CERT_PATH),
         str(config.HTTPS_KEY_PATH)
     )
+    
+    # Check if mTLS is enabled and configure client cert verification
+    from models import SystemConfig
+    import tempfile
+    import os
+    
+    ca_cert_path = None
+    with app.app_context():
+        mtls_enabled = SystemConfig.query.filter_by(key='mtls_enabled').first()
+        mtls_required = SystemConfig.query.filter_by(key='mtls_required').first()
+        mtls_ca_id = SystemConfig.query.filter_by(key='mtls_trusted_ca_id').first()
+        
+        if mtls_enabled and mtls_enabled.value == 'true' and mtls_ca_id:
+            # Load trusted CA for client certificate verification
+            from models import CA
+            ca = CA.query.filter_by(refid=mtls_ca_id.value).first()
+            if ca and ca.crt:
+                # CA certificate is base64 encoded in database - decode it
+                import base64
+                try:
+                    ca_pem = base64.b64decode(ca.crt).decode('utf-8')
+                except:
+                    # If decode fails, assume it's already in PEM format
+                    ca_pem = ca.crt
+                
+                # Create temp CA file (kept for app lifetime)
+                ca_file = tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False)
+                ca_file.write(ca_pem)
+                ca_file.flush()
+                ca_cert_path = ca_file.name
+                ca_file.close()
+                
+                # Verify file exists and is readable
+                if not os.path.exists(ca_cert_path):
+                    print(f"  ERROR: CA cert file not found at {ca_cert_path}")
+                    ca_cert_path = None
+                else:
+                    # Configure client cert verification
+                    if mtls_required and mtls_required.value == 'true':
+                        ssl_context.verify_mode = ssl.CERT_REQUIRED
+                        print(f"  mTLS: REQUIRED (client cert mandatory)")
+                    else:
+                        ssl_context.verify_mode = ssl.CERT_OPTIONAL
+                        print(f"  mTLS: OPTIONAL (client cert enhances security)")
+                    
+                    try:
+                        ssl_context.load_verify_locations(ca_cert_path)
+                        print(f"  mTLS CA: {ca.descr}")
+                        print(f"  mTLS CA file: {ca_cert_path}")
+                    except Exception as e:
+                        print(f"  ERROR loading mTLS CA: {e}")
+                        ca_cert_path = None
     
     print(f"\n{'='*60}")
     print(f"  {config.APP_NAME} v{config.APP_VERSION}")
@@ -207,13 +280,21 @@ def main():
         print(f"{'='*60}\n")
     
     # Run HTTPS server
-    app.run(
-        host=config.HOST,
-        port=config.HTTPS_PORT,
-        ssl_context=ssl_context,
-        debug=config.DEBUG,
-        threaded=True
-    )
+    try:
+        app.run(
+            host=config.HOST,
+            port=config.HTTPS_PORT,
+            ssl_context=ssl_context,
+            debug=config.DEBUG,
+            threaded=True
+        )
+    finally:
+        # Cleanup temp CA file
+        if ca_cert_path and os.path.exists(ca_cert_path):
+            try:
+                os.unlink(ca_cert_path)
+            except:
+                pass
 
 
 if __name__ == "__main__":

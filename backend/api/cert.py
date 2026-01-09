@@ -434,6 +434,11 @@ def export_certificate_advanced(cert_id):
     password = request.args.get('password')
     
     try:
+        # Get certificate for filename
+        cert = Certificate.query.get(cert_id)
+        if not cert:
+            return jsonify({"error": "Certificate not found"}), 404
+        
         cert_bytes = CertificateService.export_certificate_with_options(
             cert_id=cert_id,
             export_format=export_format,
@@ -453,11 +458,16 @@ def export_certificate_advanced(cert_id):
             mimetype = 'application/x-pem-file'
             extension = 'pem'
         
+        # Create human-readable filename from description
+        safe_descr = ''.join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in cert.descr)
+        safe_descr = safe_descr.replace(' ', '_')[:50]  # Limit length
+        filename = f'{safe_descr}.{extension}'
+        
         return send_file(
             BytesIO(cert_bytes),
             mimetype=mimetype,
             as_attachment=True,
-            download_name=f'certificate_{cert_id}.{extension}'
+            download_name=filename
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400

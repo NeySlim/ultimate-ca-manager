@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from io import BytesIO
 
-from models import db, CA, AuditLog
+from models import db, CA, AuditLog, User
 from services.ca_service import CAService
 from middleware.auth_middleware import operator_required, admin_required
 
@@ -128,6 +128,22 @@ def delete_ca(ca_id):
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": f"Failed to delete CA: {str(e)}"}), 500
+
+
+@ca_bp.route('/<string:refid>', methods=['GET'])
+@jwt_required()
+def get_ca_by_refid(refid):
+    """
+    Get CA details by refid
+    ---
+    GET /api/v1/ca/<refid>
+    """
+    from models import CA
+    ca = CA.query.filter_by(refid=refid).first()
+    if not ca:
+        return jsonify({"error": "CA not found"}), 404
+    
+    return jsonify(ca.to_dict(include_private=False)), 200
 
 
 @ca_bp.route('/<string:refid>', methods=['DELETE'])
@@ -281,6 +297,11 @@ def export_ca_advanced(ca_id):
     password = request.args.get('password')
     
     try:
+        # Get CA for filename
+        ca = CA.query.get(ca_id)
+        if not ca:
+            return jsonify({"error": "CA not found"}), 404
+        
         cert_bytes = CAService.export_ca_with_options(
             ca_id=ca_id,
             export_format=export_format,
@@ -300,11 +321,16 @@ def export_ca_advanced(ca_id):
             mimetype = 'application/x-pem-file'
             extension = 'pem'
         
+        # Create human-readable filename from description
+        safe_descr = ''.join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in ca.descr)
+        safe_descr = safe_descr.replace(' ', '_')[:50]  # Limit length
+        filename = f'{safe_descr}.{extension}'
+        
         return send_file(
             BytesIO(cert_bytes),
             mimetype=mimetype,
             as_attachment=True,
-            download_name=f'ca_{ca_id}.{extension}'
+            download_name=filename
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400

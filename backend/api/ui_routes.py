@@ -2,12 +2,14 @@
 UI Routes - Flask templates with HTMX
 """
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, make_response
+from flask_jwt_extended import create_access_token, set_access_cookies
 from functools import wraps
 from datetime import datetime, timedelta
 import requests
 import time
-import html
+from html import escape as html_escape
 from config.settings import Config, DATA_DIR
+from app import cache
 
 ui_bp = Blueprint('ui', __name__, template_folder='../../frontend/templates')
 
@@ -16,7 +18,9 @@ def escape_js(text):
     """Escape text for safe use in JavaScript strings"""
     if text is None:
         return ''
-    return html.escape(str(text)).replace("'", "&#39;").replace('"', '&quot;')
+    # Escape backslashes first, then quotes
+    text = str(text).replace('\\', '\\\\').replace("'", "\\'").replace('"', '\\"').replace('\n', '\\n').replace('\r', '\\r')
+    return text
 
 # Helper to check if user is logged in
 def login_required(f):
@@ -89,7 +93,16 @@ def login():
                 session['role'] = data.get('user', {}).get('role', 'viewer')
                 session['last_activity'] = time.time()  # Track session activity (timestamp)
                 flash('Login successful!', 'success')
-                return redirect(url_for('ui.dashboard'), code=303)  # 303 forces GET
+                
+                # Create response with JWT cookies using Flask-JWT-Extended
+                resp = make_response(redirect(url_for('ui.dashboard'), code=303))
+                
+                # Use Flask-JWT-Extended helper to set cookies properly
+                # We need to create a new access token because set_access_cookies expects the token
+                access_token = data.get('access_token')
+                set_access_cookies(resp, access_token)
+                
+                return resp
             else:
                 flash('Invalid username or password', 'error')
         except Exception as e:
@@ -183,6 +196,40 @@ def dashboard():
             # Sort by created_at and take top 5
             recent_list.sort(key=lambda x: x.get('created_at', ''), reverse=True)
             certificates = recent_list[:5]
+        
+        # Get SCEP requests
+        scep_response = requests.get(f"{request.url_root}scep/requests", headers=headers, verify=False)
+        if scep_response.status_code == 200:
+            scep_data = scep_response.json()
+            
+            # Get CA names for display
+            ca_names = {}
+            if ca_response.status_code == 200:
+                for ca in ca_response.json():
+                    ca_names[ca['refid']] = ca['descr']
+            
+            # Process SCEP requests
+            for req in scep_data:
+                # Extract common name from subject
+                subject = req.get('subject', '')
+                common_name = subject
+                if 'CN=' in subject:
+                    # Extract CN from subject string
+                    parts = subject.split(',')
+                    for part in parts:
+                        if part.strip().startswith('CN='):
+                            common_name = part.strip()[3:]
+                            break
+                
+                scep_requests.append({
+                    'common_name': common_name,
+                    'status': req.get('status', 'unknown'),
+                    'ca_name': 'SCEP',  # Could enhance this by linking to actual CA
+                    'created_at': datetime.fromisoformat(req['created_at'].replace('Z', '+00:00')) if req.get('created_at') else None
+                })
+            
+            # Sort by created_at (newest first) and limit to 5
+            scep_requests.sort(key=lambda x: x.get('created_at') or datetime.min, reverse=True)
             
     except Exception as e:
         print(f"⚠️  Dashboard error: {e}")
@@ -199,6 +246,7 @@ def dashboard():
 # Dashboard API endpoints (for HTMX)
 @ui_bp.route('/api/dashboard/stats')
 @login_required
+@cache.cached(timeout=300, key_prefix='dashboard_stats')  # Cache for 5 minutes
 def dashboard_stats():
     """Get dashboard statistics"""
     try:
@@ -235,63 +283,64 @@ def dashboard_stats():
         
         return f"""
         <!-- CA Count -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-primary-100 dark:bg-primary-900 rounded-lg">
-                    <i class="fas fa-certificate text-primary-600 dark:text-primary-400 text-2xl"></i>
+        <div class="card" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: center;">
+                <div style="flex-shrink: 0; padding: 0.75rem; background: var(--primary-bg); border-radius: 8px;">
+                    <i class="fas fa-certificate" style="color: var(--primary-color); font-size: 1.5rem;"></i>
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Certificate Authorities</p>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white">{ca_count}</p>
+                <div style="margin-left: 1rem;">
+                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Certificate Authorities</p>
+                    <p style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">{ca_count}</p>
                 </div>
             </div>
         </div>
         
         <!-- Cert Count -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-                    <i class="fas fa-file-certificate text-green-600 dark:text-green-400 text-2xl"></i>
+        <div class="card" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: center;">
+                <div style="flex-shrink: 0; padding: 0.75rem; background: var(--success-bg); border-radius: 8px;">
+                    <i class="fas fa-file-certificate" style="color: var(--success-color); font-size: 1.5rem;"></i>
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Certificates</p>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white">{cert_count}</p>
+                <div style="margin-left: 1rem;">
+                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Certificates</p>
+                    <p style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">{cert_count}</p>
                 </div>
             </div>
         </div>
         
         <!-- SCEP Count -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-orange-100 dark:bg-orange-900 rounded-lg">
-                    <i class="fas fa-network-wired text-orange-600 dark:text-orange-400 text-2xl"></i>
+        <div class="card" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: center;">
+                <div style="flex-shrink: 0; padding: 0.75rem; background: var(--warning-bg); border-radius: 8px;">
+                    <i class="fas fa-network-wired" style="color: var(--warning-color); font-size: 1.5rem;"></i>
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">SCEP Requests</p>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white">{scep_count}</p>
+                <div style="margin-left: 1rem;">
+                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">SCEP Requests</p>
+                    <p style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">{scep_count}</p>
                 </div>
             </div>
         </div>
         
         <!-- Pending Count -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 p-3 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
-                    <i class="fas fa-clock text-yellow-600 dark:text-yellow-400 text-2xl"></i>
+        <div class="card" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: center;">
+                <div style="flex-shrink: 0; padding: 0.75rem; background: var(--warning-bg); border-radius: 8px;">
+                    <i class="fas fa-clock" style="color: var(--warning-color); font-size: 1.5rem;"></i>
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Approvals</p>
-                    <p class="text-3xl font-bold text-gray-900 dark:text-white">{pending_count}</p>
+                <div style="margin-left: 1rem;">
+                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Pending Approvals</p>
+                    <p style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">{pending_count}</p>
                 </div>
             </div>
         </div>
         """
     except Exception as e:
-        return f'<div class="text-red-600">Error loading stats: {str(e)}</div>'
+        return f'<div style="color: var(--danger-color);">Error loading stats: {str(e)}</div>'
 
 
 @ui_bp.route('/api/dashboard/recent-cas')
 @login_required
+@cache.cached(timeout=3600, key_prefix='dashboard_recent_cas')  # Cache for 1 hour
 def dashboard_recent_cas():
     """Get recent CAs"""
     try:
@@ -305,23 +354,23 @@ def dashboard_recent_cas():
         )
         
         if response.status_code != 200:
-            return '<p class="text-gray-500 dark:text-gray-400">No CAs found</p>'
+            return '<p style="color: var(--text-secondary);">No CAs found</p>'
         
         cas = response.json()[:5]  # Get latest 5
         
         if not cas:
-            return '<p class="text-gray-500 dark:text-gray-400">No CAs found. <a href="/ca/new" class="text-primary-600 hover:text-primary-700">Create one</a></p>'
+            return '<p style="color: var(--text-secondary);">No CAs found. <a href="/ca/new" style="color: var(--primary-color);">Create one</a></p>'
         
         html = '<div class="space-y-3">'
         for ca in cas:
             html += f'''
-            <a href="/ca/{ca['refid']}" class="block p-3 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors">
-                <div class="flex items-center justify-between">
+            <a href="/ca/{ca['refid']}" style="display: block; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; text-decoration: none; transition: background 0.2s;" onmouseover="this.style.background='var(--hover-bg)'" onmouseout="this.style.background='var(--bg-secondary)'">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div>
-                        <p class="font-medium text-gray-900 dark:text-white">{ca['descr']}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">{ca.get('subject', 'N/A')}</p>
+                        <p style="font-weight: 500; color: var(--text-primary);">{ca['descr']}</p>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary);">{ca.get('subject', 'N/A')}</p>
                     </div>
-                    <i class="fas fa-chevron-right text-gray-400"></i>
+                    <i class="fas fa-chevron-right" style="color: var(--text-muted);"></i>
                 </div>
             </a>
             '''
@@ -329,7 +378,7 @@ def dashboard_recent_cas():
         
         return html
     except Exception as e:
-        return f'<p class="text-red-600">Error: {str(e)}</p>'
+        return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
 
 
 @ui_bp.route('/api/dashboard/scep-status')
@@ -347,7 +396,7 @@ def dashboard_scep_status():
         )
         
         if response.status_code != 200:
-            return '<p class="text-red-600">Failed to load SCEP status</p>'
+            return '<p style="color: var(--danger-color);">Failed to load SCEP status</p>'
         
         config = response.json()
         enabled = config.get('enabled', False)
@@ -355,50 +404,50 @@ def dashboard_scep_status():
         
         if not enabled:
             return f'''
-            <div class="flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                <div class="flex items-center">
-                    <i class="fas fa-circle text-red-500 mr-3"></i>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+                <div style="display: flex; align-items: center;">
+                    <i class="fas fa-circle" style="color: var(--danger-color); margin-right: 0.75rem;"></i>
                     <div>
-                        <p class="font-medium text-gray-900 dark:text-white">SCEP Server: Disabled</p>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Configure SCEP to start accepting enrollment requests</p>
+                        <p style="font-weight: 500; color: var(--text-primary);">SCEP Server: Disabled</p>
+                        <p style="font-size: 0.875rem; color: var(--text-secondary);">Configure SCEP to start accepting enrollment requests</p>
                     </div>
                 </div>
-                <a href="/scep" class="btn btn-primary text-sm">
+                <a href="/scep" class="btn btn-primary" style="font-size: 0.875rem;">
                     Configure
                 </a>
             </div>
             '''
         
         return f'''
-        <div class="space-y-4">
-            <div class="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <div class="flex items-center">
-                    <i class="fas fa-circle text-green-500 mr-3 animate-pulse"></i>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: var(--success-bg); border-radius: 8px;">
+                <div style="display: flex; align-items: center;">
+                    <i class="fas fa-circle animate-pulse" style="color: var(--success-color); margin-right: 0.75rem;"></i>
                     <div>
-                        <p class="font-medium text-gray-900 dark:text-white">SCEP Server: Active</p>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Accepting enrollment requests</p>
+                        <p style="font-weight: 500; color: var(--text-primary);">SCEP Server: Active</p>
+                        <p style="font-size: 0.875rem; color: var(--text-secondary);">Accepting enrollment requests</p>
                     </div>
                 </div>
-                <a href="/scep" class="text-accent hover:text-accent-hover text-sm">
-                    Manage <i class="fas fa-chevron-right ml-1"></i>
+                <a href="/scep" style="color: var(--accent-color); font-size: 0.875rem; text-decoration: none;">
+                    Manage <i class="fas fa-chevron-right" style="margin-left: 0.25rem;"></i>
                 </a>
             </div>
-            <div class="grid grid-cols-2 gap-4 text-sm">
-                <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <p class="text-gray-500 dark:text-gray-400">Mode</p>
-                    <p class="font-medium text-gray-900 dark:text-white">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.875rem;">
+                <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px;">
+                    <p style="color: var(--text-secondary);">Mode</p>
+                    <p style="font-weight: 500; color: var(--text-primary);">
                         {'Auto-Approval' if auto_approve else 'Manual Approval'}
                     </p>
                 </div>
-                <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <p class="text-gray-500 dark:text-gray-400">Endpoint</p>
-                    <p class="font-medium text-gray-900 dark:text-white text-xs">/scep/pkiclient.exe</p>
+                <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px;">
+                    <p style="color: var(--text-secondary);">Endpoint</p>
+                    <p style="font-weight: 500; color: var(--text-primary); font-size: 0.75rem;">/scep/pkiclient.exe</p>
                 </div>
             </div>
         </div>
         '''
     except Exception as e:
-        return f'<p class="text-red-600">Error: {str(e)}</p>'
+        return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
 
 
 # Settings
@@ -419,6 +468,13 @@ def my_account():
     return render_template('my_account.html')
 
 
+@ui_bp.route('/my-account/mtls')
+@login_required
+def my_account_mtls():
+    """User mTLS certificates management page"""
+    return render_template('my_account_mtls.html')
+
+
 @ui_bp.route('/users')
 @login_required
 def users():
@@ -437,11 +493,11 @@ def ca_list():
 @ui_bp.route('/api/ui/ca/list')
 @login_required
 def ca_list_content():
-    """Get CA list HTML as sortable table"""
+    """Get CA list HTML with hierarchical display"""
     try:
         token = session.get('access_token')
         if not token:
-            return '<div class="p-8 text-center text-red-600">Session expired. Please <a href="/logout" class="underline">logout</a> and login again.</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Session expired. Please <a href="/logout" style="text-decoration: underline;">logout</a> and login again.</div>'
         
         headers = {'Authorization': f'Bearer {token}'}
         
@@ -452,18 +508,18 @@ def ca_list_content():
         )
         
         if response.status_code == 401:
-            return '<div class="p-8 text-center text-red-600">Session expired. Please refresh the page or <a href="/logout" class="underline">logout</a> and login again.</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Session expired. Please refresh the page or <a href="/logout" style="text-decoration: underline;">logout</a> and login again.</div>'
         elif response.status_code != 200:
-            return f'<div class="p-8 text-center text-red-600">Failed to load CAs (Error {response.status_code})</div>'
+            return f'<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Failed to load CAs (Error {response.status_code})</div>'
         
         cas = response.json()
         
         if not cas:
             return '''
-            <div class="p-8 text-center text-gray-500 dark:text-gray-400">
-                <i class="fas fa-certificate text-4xl mb-4"></i>
-                <p class="text-lg font-medium mb-2">No Certificate Authorities</p>
-                <p class="text-sm">Create your first CA to get started</p>
+            <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                <i class="fas fa-certificate" style="font-size: 2.25rem; margin-bottom: 1rem;"></i>
+                <p style="font-size: 1.125rem; font-weight: 500; margin-bottom: 0.5rem;">No Certificate Authorities</p>
+                <p style="font-size: 0.875rem;">Create your first CA to get started</p>
             </div>
             '''
         
@@ -482,53 +538,73 @@ def ca_list_content():
                 if caref:
                     ca_usage[caref] = ca_usage.get(caref, 0) + 1
         
-        html = '''
-        <div style="overflow-x: auto; overflow-y: visible;">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" id="ca-table">
-                <thead class="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                        <th onclick="sortTable(0)" style="position: relative;">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span>Description <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i></span>
-                                <div style="position: relative; margin-left: 12px;">
-                                    <input type="text" id="searchCA" placeholder="Recherche..." 
-                                           class="form-control"
-                                           style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px;"
-                                           onkeyup="filterTableCA()"
-                                           onclick="event.stopPropagation()">
-                                    <i class="fas fa-search" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: 0.5; pointer-events: none;"></i>
-                                </div>
-                            </div>
-                        </th>
-                        <th onclick="sortTable(1)">
-                            Émetteur <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
-                        </th>
-                        <th onclick="sortTable(2)">
-                            Nom <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
-                        </th>
-                        <th onclick="sortTable(3)">
-                            Utilisations <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
-                        </th>
-                        <th onclick="sortTable(4)">
-                            Début validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
-                        </th>
-                        <th onclick="sortTable(5)">
-                            Fin validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
-                        </th>
-                        <th>
-                            Commandes
-                        </th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-        '''
+        # Organize CAs into hierarchy
+        root_cas = []
+        intermediate_cas = []
+        orphan_cas = []
+        ca_by_refid = {}
+        ca_by_subject_cn = {}
         
+        # First pass: categorize and build lookups
         for ca in cas:
-            is_root = not ca.get('caref')
+            ca_by_refid[ca['refid']] = ca
+            subject = ca.get('subject', '')
+            issuer = ca.get('issuer', '')
+            
+            # Extract CN from subject for lookup
+            if 'CN=' in subject:
+                for part in subject.split(','):
+                    if 'CN=' in part:
+                        cn = part.split('CN=')[1].strip()
+                        ca_by_subject_cn[cn] = ca
+                        break
+            
+            # Categorize
+            if subject == issuer:
+                root_cas.append(ca)
+            else:
+                intermediate_cas.append(ca)
+        
+        # Second pass: link intermediates to parents
+        ca_children = {ca['refid']: [] for ca in root_cas}
+        
+        for int_ca in intermediate_cas:
+            parent_caref = int_ca.get('caref')
+            parent_found = False
+            
+            if parent_caref and parent_caref in ca_by_refid:
+                # Direct link via caref
+                if parent_caref not in ca_children:
+                    ca_children[parent_caref] = []
+                ca_children[parent_caref].append(int_ca)
+                parent_found = True
+            else:
+                # Try to find parent by issuer CN
+                issuer = int_ca.get('issuer', '')
+                if 'CN=' in issuer:
+                    for part in issuer.split(','):
+                        if 'CN=' in part:
+                            issuer_cn = part.split('CN=')[1].strip()
+                            if issuer_cn in ca_by_subject_cn:
+                                parent_ca = ca_by_subject_cn[issuer_cn]
+                                parent_refid = parent_ca['refid']
+                                if parent_refid not in ca_children:
+                                    ca_children[parent_refid] = []
+                                ca_children[parent_refid].append(int_ca)
+                                parent_found = True
+                            break
+            
+            if not parent_found:
+                orphan_cas.append(int_ca)
+        
+        def render_ca_row(ca, indent_level=0, is_last_child=False, family_index=0):
+            """Render a single CA row with optional indentation and tree connector"""
+            subject = ca.get('subject', '')
+            issuer = ca.get('issuer', '')
+            is_root = (subject == issuer)
             usage_count = ca_usage.get(ca['refid'], 0)
             
             # Extract CN from subject
-            subject = ca.get('subject', '')
             cn = 'N/A'
             if 'CN=' in subject:
                 for part in subject.split(','):
@@ -536,31 +612,95 @@ def ca_list_content():
                         cn = part.split('CN=')[1].strip()
                         break
             
-            # Issuer info
-            issuer = ca.get('issuer', '')
-            issuer_cn = 'Self-signed' if is_root else 'N/A'
-            if 'CN=' in issuer and not is_root:
-                for part in issuer.split(','):
-                    if 'CN=' in part:
-                        issuer_cn = part.split('CN=')[1].strip()
-                        break
+            # Issuer display
+            if is_root:
+                issuer_display = 'Self-signed'
+            else:
+                parent_caref = ca.get('caref')
+                if parent_caref and parent_caref in ca_by_refid:
+                    issuer_display = ca_by_refid[parent_caref]['descr']
+                else:
+                    issuer_cn = 'Unknown'
+                    if 'CN=' in issuer:
+                        for part in issuer.split(','):
+                            if 'CN=' in part:
+                                issuer_cn = part.split('CN=')[1].strip()
+                                break
+                    if issuer_cn in ca_by_subject_cn:
+                        issuer_display = ca_by_subject_cn[issuer_cn]['descr']
+                    else:
+                        issuer_display = issuer_cn
             
             valid_from = ca.get('valid_from', '')[:10] if ca.get('valid_from') else 'N/A'
             valid_to = ca.get('valid_to', '')[:10] if ca.get('valid_to') else 'N/A'
             
-            # Check if CA has private key
             has_key = ca.get('has_private_key', False)
             key_badge = '<span class="badge-outline badge-success ml-2"><i class="fas fa-key"></i> Key</span>' if has_key else '<span class="badge-outline badge-secondary ml-2"><i class="fas fa-key-skeleton"></i> No Key</span>'
             
-            # Escape values for JavaScript
             safe_refid = escape_js(ca['refid'])
             safe_descr = escape_js(ca['descr'])
             
-            html += f'''
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onclick="window.location.href='/ca/{ca['id']}'">
-                    <td>
+            # Build tree connector visual
+            tree_connector = ''
+            if indent_level > 0:
+                # Create L-shaped connector using CSS class
+                tree_connector = '''
+                    <div style="display: flex; align-items: center; margin-right: 0.5rem;">
+                        <div class="ca-tree-connector"></div>
+                    </div>
+                '''
+            
+            # Alternating family background colors - disabled for now to avoid confusion
+            # Different color per family using modulo patterns
+            # family_colors = [
+            #     'var(--info-color)',      # Violet/Blue
+            #     'transparent',            # None
+            #     'var(--success-color)',   # Green
+            #     'transparent',            # None
+            # ]
+            # family_border_left = f'border-left: 4px solid {family_colors[family_index % 4]};'
+            family_border_left = ''  # No colored border to avoid confusion
+            
+            # Add class for styling
+            row_class = 'ca-parent-row' if indent_level == 0 and len(ca_children.get(ca['refid'], [])) > 0 else ''
+            row_class += ' ca-child-row' if indent_level > 0 else ''
+            row_class += ' ca-last-child' if is_last_child else ''
+            row_class += ' ca-standalone' if indent_level == 0 and len(ca_children.get(ca['refid'], [])) == 0 else ''
+            
+            # Vertical alignment and padding: parent with children aligns bottom, children are tight
+            if indent_level == 0 and len(ca_children.get(ca['refid'], [])) > 0:
+                # Parent with children: align text to bottom, reduced padding-bottom
+                vertical_align = 'vertical-align: bottom;'
+                row_padding_top = '0.75rem'
+                row_padding_bottom = '0.25rem'
+            elif indent_level > 0:
+                # Children: very tight padding, no top padding
+                vertical_align = 'vertical-align: middle;'
+                row_padding_top = '0.15rem'
+                row_padding_bottom = '0.15rem'
+            else:
+                # Standalone ROOT: normal padding
+                vertical_align = 'vertical-align: middle;'
+                row_padding_top = '0.75rem'
+                row_padding_bottom = '0.75rem'
+            
+            # Border for separators - inline override
+            border_bottom = ''
+            if 'ca-standalone' in row_class or 'ca-last-child' in row_class:
+                border_bottom = 'border-bottom: 1px solid var(--border-color) !important;'
+                row_padding_bottom = '0.5rem'  # Extra spacing
+            
+            return f'''
+                <tr class="{row_class}" 
+                    data-action="navigate-ca" 
+                    data-ca-id="{ca['id']}" 
+                    style="cursor: pointer;">
+                    <td style="padding: {row_padding_top} 0.75rem {row_padding_bottom} 0.75rem; {border_bottom} {vertical_align} {family_border_left}">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <span>{ca['descr']}</span>
+                            <div style="display: flex; align-items: center;">
+                                {tree_connector}
+                                <span style="color: var(--text-primary);">{ca['descr']}</span>
+                            </div>
                             <div style="display: flex; gap: 4px;">
                                 <span class="badge-outline badge-primary">
                                     <i class="{'fas fa-crown' if is_root else 'fas fa-link'}"></i>
@@ -570,30 +710,33 @@ def ca_list_content():
                             </div>
                         </div>
                     </td>
-                    <td>
-                        {issuer_cn}
+                    <td style="padding: {row_padding_top} 0.75rem {row_padding_bottom} 0.75rem; color: var(--text-primary); {border_bottom} {vertical_align}">
+                        {issuer_display}
                     </td>
-                    <td>
+                    <td style="padding: {row_padding_top} 0.75rem {row_padding_bottom} 0.75rem; color: var(--text-primary); {border_bottom} {vertical_align}">
                         {cn}
                     </td>
-                    <td>
+                    <td style="padding: {row_padding_top} 0.75rem {row_padding_bottom} 0.75rem; color: var(--text-primary); {border_bottom} {vertical_align}">
                         <span>
                             {usage_count}
                         </span>
                     </td>
-                    <td>
+                    <td style="padding: {row_padding_top} 0.75rem {row_padding_bottom} 0.75rem; color: var(--text-primary); {border_bottom} {vertical_align}">
                         {valid_from}
                     </td>
-                    <td>
+                    <td style="padding: {row_padding_top} 0.75rem {row_padding_bottom} 0.75rem; color: var(--text-primary); {border_bottom} {vertical_align}">
                         {valid_to}
                     </td>
-                    <td onclick="event.stopPropagation()">
-                        <button onclick="exportCA({ca['id']}, event)" 
+                    <td style="padding: {row_padding_top} 0.75rem {row_padding_bottom} 0.75rem; {border_bottom} {vertical_align}">
+                        <button data-action="export-ca"
+                                data-id="{ca['id']}"
                                 class="btn-icon btn-icon-primary"
                                 title="Export CA">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
                         </button>
-                        <button onclick="deleteCA('{safe_refid}', '{safe_descr}')" 
+                        <button data-action="delete-ca"
+                                data-refid="{ca['refid']}" 
+                                data-descr="{html_escape(ca['descr'])}"
                                 class="btn-icon btn-icon-danger"
                                 title="Delete CA">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
@@ -602,138 +745,268 @@ def ca_list_content():
                 </tr>
             '''
         
+        # Build HTML with hierarchy
+        html = '''
+        <div style="overflow-x: auto; overflow-y: visible;">
+            <table id="ca-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span>Description</span>
+                                <div style="position: relative; margin-left: 12px;">
+                                    <input type="text" id="searchCA" placeholder="Recherche..." 
+                                           style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);"
+                                           onkeyup="filterTableCA()"
+                                           onclick="event.stopPropagation()">
+                                    <i class="fas fa-search" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: 0.5; pointer-events: none;"></i>
+                                </div>
+                            </div>
+                        </th>
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="1">
+                            Émetteur <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        </th>
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="2">
+                            Nom <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        </th>
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="3">
+                            Utilisations <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        </th>
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="4">
+                            Début validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        </th>
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="5">
+                            Fin validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                        </th>
+                        <th style="padding: 0.75rem; text-align: left;">Commandes</th>
+                    </tr>
+                </thead>
+                <tbody>
+        '''
+        
+        # Render ROOT CAs with their children
+        for family_idx, root_ca in enumerate(root_cas):
+            html += render_ca_row(root_ca, indent_level=0, is_last_child=False, family_index=family_idx)
+            # Render children with indentation
+            children = ca_children.get(root_ca['refid'], [])
+            for idx, child_ca in enumerate(children):
+                is_last = (idx == len(children) - 1)
+                html += render_ca_row(child_ca, indent_level=1, is_last_child=is_last, family_index=family_idx)
+        
         html += '''
                 </tbody>
             </table>
         </div>
         
+        <!-- Pagination for CA table -->
+        <div class="table-pagination">
+            <div class="pagination-info">
+                <span>Affichage <span id="ca-start">1</span>-<span id="ca-end">10</span> sur <span id="ca-total"></span> CAs</span>
+            </div>
+            <div class="pagination-controls">
+                <select class="pagination-select" id="ca-per-page" onchange="updateCAPagination()">
+                    <option value="10" selected>10 par page</option>
+                    <option value="25">25 par page</option>
+                    <option value="50">50 par page</option>
+                    <option value="100">100 par page</option>
+                </select>
+                <div class="pagination-buttons" id="ca-pagination-buttons"></div>
+            </div>
+        </div>
+        '''
+        
+        # Add orphan CAs section if any exist
+        if orphan_cas:
+            html += f'''
+        <div style="margin-top: 2rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; padding: 0.75rem; background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 0.5rem;">
+                <i class="fas fa-exclamation-triangle" style="color: var(--warning-color);"></i>
+                <span style="color: var(--warning-color); font-weight: 500;">CAs orphelines ({len(orphan_cas)}) - Parent non trouvé</span>
+            </div>
+            <table id="ca-orphan-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;">Description</th>
+                        <th style="padding: 0.75rem; text-align: left;">Émetteur (DN)</th>
+                        <th style="padding: 0.75rem; text-align: left;">Nom</th>
+                        <th style="padding: 0.75rem; text-align: left;">Utilisations</th>
+                        <th style="padding: 0.75rem; text-align: left;">Début validité</th>
+                        <th style="padding: 0.75rem; text-align: left;">Fin validité</th>
+                        <th style="padding: 0.75rem; text-align: left;">Commandes</th>
+                    </tr>
+                </thead>
+                <tbody>
+            '''
+            
+            for orphan_ca in orphan_cas:
+                html += render_ca_row(orphan_ca, indent_level=0, is_last_child=False)
+            
+            html += '''
+                </tbody>
+            </table>
+        </div>
+            '''
+        
+        html += '''
         <script>
-        (function() {
-            // Isolated scope for CA list
-            var sortDirection = {};
+        // CA Table Pagination - Use window object to avoid redeclaration in HTMX
+        if (typeof window.window.caCurrentPage === 'undefined') {
+            window.window.caCurrentPage = 1;
+            window.window.caPerPage = 10;
+            window.window.caTotalRows = 0;
+        }
+        
+        function initCAPagination() {
+            const table = document.getElementById('ca-table');
+            if (!table) return;
             
-            window.sortTable = function(columnIndex) {
-                const table = document.getElementById('ca-table');
-                const tbody = table.querySelector('tbody');
-                const rows = Array.from(tbody.querySelectorAll('tr'));
-                
-                const currentDirection = sortDirection[columnIndex] || 'asc';
-                const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
-                sortDirection[columnIndex] = newDirection;
-                
-                rows.sort((a, b) => {
-                    let aValue = a.cells[columnIndex].textContent.trim();
-                    let bValue = b.cells[columnIndex].textContent.trim();
-                    
-                    // Handle numeric values for usage column
-                    if (columnIndex === 3) {
-                        aValue = parseInt(aValue) || 0;
-                        bValue = parseInt(bValue) || 0;
+            const tbody = table.querySelector('tbody');
+            const allRows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Count only ROOT CAs (families), not children
+            window.window.caTotalRows = allRows.filter(row => !row.classList.contains('ca-child-row')).length;
+            
+            document.getElementById('ca-total').textContent = window.window.caTotalRows;
+            updateCAPagination();
+        }
+        
+        function updateCAPagination() {
+            const perPageSelect = document.getElementById('ca-per-page');
+            window.caPerPage = parseInt(perPageSelect.value);
+            const totalPages = Math.ceil(window.caTotalRows / window.caPerPage);
+            
+            showCAPage(window.caCurrentPage, totalPages);
+            renderCAPaginationButtons(totalPages);
+        }
+        
+        function showCAPage(page, totalPages) {
+            const table = document.getElementById('ca-table');
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            const allRows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // Separate ROOT CAs from children
+            const rootRows = allRows.filter(row => !row.classList.contains('ca-child-row'));
+            const childMap = new Map();
+            
+            // Build map of children for each parent
+            allRows.forEach((row, index) => {
+                if (row.classList.contains('ca-child-row')) {
+                    for (let i = index - 1; i >= 0; i--) {
+                        if (!allRows[i].classList.contains('ca-child-row')) {
+                            if (!childMap.has(allRows[i])) {
+                                childMap.set(allRows[i], []);
+                            }
+                            childMap.get(allRows[i]).push(row);
+                            break;
+                        }
                     }
-                    
-                    if (aValue < bValue) return newDirection === 'asc' ? -1 : 1;
-                    if (aValue > bValue) return newDirection === 'asc' ? 1 : -1;
-                    return 0;
-                });
-                
-                rows.forEach(row => tbody.appendChild(row));
-            };
+                }
+            });
             
-            window.filterTableCA = function() {
-                const input = document.getElementById('searchCA');
-                const filter = input.value.toLowerCase();
-                const table = document.getElementById('ca-table');
-                const tbody = table.querySelector('tbody');
-                const rows = tbody.querySelectorAll('tr');
-                
+            const start = (page - 1) * window.caPerPage;
+            const end = start + window.caPerPage;
+            
+            // Hide all rows first
+            allRows.forEach(row => row.style.display = 'none');
+            
+            // Show only ROOT CAs in current page range + their children
+            rootRows.forEach((rootRow, index) => {
+                if (index >= start && index < end) {
+                    rootRow.style.display = '';
+                    // Show children
+                    if (childMap.has(rootRow)) {
+                        childMap.get(rootRow).forEach(childRow => {
+                            childRow.style.display = '';
+                        });
+                    }
+                }
+            });
+            
+            // Update info
+            const actualStart = Math.min(start + 1, window.caTotalRows);
+            const actualEnd = Math.min(end, window.caTotalRows);
+            document.getElementById('ca-start').textContent = actualStart;
+            document.getElementById('ca-end').textContent = actualEnd;
+        }
+        
+        function renderCAPaginationButtons(totalPages) {
+            const container = document.getElementById('ca-pagination-buttons');
+            if (!container) return;
+            
+            let html = '';
+            
+            // Previous button
+            html += `<button class="pagination-btn" onclick="goToCAPage(${window.caCurrentPage - 1}, ${totalPages})" ${window.caCurrentPage === 1 ? 'disabled' : ''}>
+                <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-left"/></svg>
+            </button>`;
+            
+            // Page numbers (show first, last, and pages around current)
+            const maxButtons = 7;
+            let startPage = Math.max(1, window.caCurrentPage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+            
+            if (endPage - startPage < maxButtons - 1) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+            
+            if (startPage > 1) {
+                html += `<button class="pagination-btn" onclick="goToCAPage(1, ${totalPages})">1</button>`;
+                if (startPage > 2) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="pagination-btn ${i === window.caCurrentPage ? 'active' : ''}" 
+                         onclick="goToCAPage(${i}, ${totalPages})">${i}</button>`;
+            }
+            
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<span class="pagination-ellipsis">...</span>`;
+                }
+                html += `<button class="pagination-btn" onclick="goToCAPage(${totalPages}, ${totalPages})">${totalPages}</button>`;
+            }
+            
+            // Next button
+            html += `<button class="pagination-btn" onclick="goToCAPage(${window.caCurrentPage + 1}, ${totalPages})" ${window.caCurrentPage === totalPages ? 'disabled' : ''}>
+                <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-right"/></svg>
+            </button>`;
+            
+            container.innerHTML = html;
+        }
+        
+        function goToCAPage(page, totalPages) {
+            if (page < 1 || page > totalPages) return;
+            window.caCurrentPage = page;
+            showCAPage(page, totalPages);
+            renderCAPaginationButtons(totalPages);
+        }
+        
+        // Initialize immediately (HTMX content already loaded)
+        setTimeout(initCAPagination, 100);
+        
+        function filterTableCA() {
+            const input = document.getElementById('searchCA');
+            const filter = input.value.toLowerCase();
+            const tables = document.querySelectorAll('#ca-table, table');
+            
+            tables.forEach(table => {
+                const rows = table.querySelectorAll('tbody tr');
                 rows.forEach(row => {
                     const text = row.textContent.toLowerCase();
                     row.style.display = text.includes(filter) ? '' : 'none';
                 });
-            };
-        })();
-        
-        function exportCASimple(id) {
-            exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem');
-            document.getElementById('export-menu-' + id).remove();
-        }
-        
-        function exportCAWithKey(id) {
-            exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&key=true');
-            document.getElementById('export-menu-' + id).remove();
-        }
-        
-        function exportCAWithChain(id) {
-            exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&chain=true');
-            document.getElementById('export-menu-' + id).remove();
-        }
-        
-        function exportCAFull(id) {
-            exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&key=true&chain=true');
-            document.getElementById('export-menu-' + id).remove();
-        }
-        
-        function exportCADER(id) {
-            exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=der');
-            document.getElementById('export-menu-' + id).remove();
-        }
-        
-        function deleteCA(refid, name) {
-            if (confirm('Delete CA "' + name + '"? This cannot be undone!')) {
-                fetch('/api/v1/ca/' + refid + '', {
-                    method: 'DELETE',
-                    headers: { 'Authorization': 'Bearer ' + ''' + f"'{token}'" + ''' }
-                })
-                .then(r => r.json())
-                .then(data => {
-                    alert('CA deleted successfully');
-                    htmx.trigger('body', 'refreshCAs');
-                })
-                .catch(e => alert('Error deleting CA: ' + e));
-            }
-        }
-        
-        function exportWithToken(url) {
-            const token = ''' + f"'{token}'" + ''';
-            fetch(url, {
-                headers: { 'Authorization': 'Bearer ' + token }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('Export failed');
-                return response.blob();
-            })
-            .then(blob => {
-                const downloadUrl = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                a.download = '';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(downloadUrl);
-            })
-            .catch(error => {
-                alert('Export failed: ' + error.message);
             });
         }
-        
-        // Close menus when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('button[onclick*="exportCA"]') && !e.target.closest('[id^="export-menu-"]')) {
-                document.querySelectorAll('[id^="export-menu-"]').forEach(m => m.remove());
-            }
-        });
         </script>
         '''
         
-        # Force no-cache to ensure fresh content
-        response = make_response(html)
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        return response
+        return html
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/ca/create', methods=['POST'])
@@ -872,7 +1145,7 @@ def cert_list_content():
     try:
         token = session.get('access_token')
         if not token:
-            return '<div class="p-8 text-center text-red-600">Session expired. Please <a href="/logout" class="underline">logout</a> and login again.</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Session expired. Please <a href="/logout" style="text-decoration: underline;">logout</a> and login again.</div>'
         
         headers = {'Authorization': f'Bearer {token}'}
         
@@ -883,18 +1156,18 @@ def cert_list_content():
         )
         
         if response.status_code == 401:
-            return '<div class="p-8 text-center text-red-600">Session expired. Please refresh the page or <a href="/logout" class="underline">logout</a> and login again.</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Session expired. Please refresh the page or <a href="/logout" style="text-decoration: underline;">logout</a> and login again.</div>'
         elif response.status_code != 200:
-            return f'<div class="p-8 text-center text-red-600">Failed to load certificates (Error {response.status_code})</div>'
+            return f'<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Failed to load certificates (Error {response.status_code})</div>'
         
         certs = response.json()
         
         if not certs:
             return '''
-            <div class="p-8 text-center text-gray-500 dark:text-gray-400">
-                <i class="fas fa-file-certificate text-4xl mb-4"></i>
-                <p class="text-lg font-medium mb-2">No Certificates</p>
-                <p class="text-sm">Create your first certificate to get started</p>
+            <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                <i class="fas fa-file-certificate" style="font-size: 2.25rem; margin-bottom: 1rem;"></i>
+                <p style="font-size: 1.125rem; font-weight: 500; margin-bottom: 0.5rem;">No Certificates</p>
+                <p style="font-size: 0.875rem;">Create your first certificate to get started</p>
             </div>
             '''
         
@@ -912,42 +1185,40 @@ def cert_list_content():
                 ca_names[ca['refid']] = ca['descr']
         
         html = '''
-        <!-- Cert list v2.0 with CRT/KEY badges -->
-        <div class="overflow-x-auto" style="overflow-y: visible;">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" id="cert-table">
-                <thead class="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                        <th onclick="sortTableCert(0)" style="position: relative;">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="overflow-x: auto; overflow-y: visible;">
+            <table id="cert-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;" data-action="sort-table-cert" data-column="0">
+                            <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
                                 <span>Description <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i></span>
                                 <div style="position: relative; margin-left: 12px;">
                                     <input type="text" id="searchCert" placeholder="Recherche..." 
-                                           class="form-control"
-                                           style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px;"
+                                           style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);"
                                            onkeyup="filterTableCert()"
                                            onclick="event.stopPropagation()">
                                     <i class="fas fa-search" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: 0.5; pointer-events: none;"></i>
                                 </div>
                             </div>
                         </th>
-                        <th onclick="sortTableCert(1)">
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="1">
                             Émetteur <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th onclick="sortTableCert(2)">
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="2">
                             Type <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th onclick="sortTableCert(3)">
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="3">
                             Début validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th onclick="sortTableCert(4)">
+                        <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="4">
                             Fin validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th>
+                        <th style="padding: 0.75rem; text-align: left;">
                             Commandes
                         </th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody>
         '''
         
         for cert in certs:
@@ -970,6 +1241,14 @@ def cert_list_content():
             
             crt_badge = '<span class="badge-outline badge-info"><i class="fas fa-certificate"></i> CRT</span>' if has_crt else ''
             key_badge = '<span class="badge-outline badge-success"><i class="fas fa-key"></i> KEY</span>' if has_key else ''
+            
+            # Check if ACME certificate
+            is_acme = cert.get('created_by') == 'acme'
+            acme_badge = '<span class="badge-outline badge-success"><i class="fas fa-robot"></i> ACME</span>' if is_acme else ''
+            
+            # Check if SCEP certificate
+            is_scep = cert.get('created_by') == 'scep'
+            scep_badge = '<span class="badge-outline badge-info"><i class="fas fa-network-wired"></i> SCEP</span>' if is_scep else ''
             
             # Get issuer name
             issuer_name = ca_names.get(cert.get('caref', ''), 'Unknown')
@@ -996,36 +1275,40 @@ def cert_list_content():
             safe_descr = escape_js(cert['descr'])
             
             html += f'''
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer" onclick="window.location.href='/certificates/{cert['id']}'">
-                    <td>
+                <tr data-action="navigate-cert" data-cert-id="{cert['id']}">
+                    <td style="padding: 0.75rem; color: var(--text-primary);">
                         <div style="display: flex; align-items: center; justify-content: space-between;">
                             <span>{cert['descr']}</span>
                             <div style="display: flex; gap: 4px;">
                                 {status_badge}
                                 {crt_badge}
                                 {key_badge}
+                                {acme_badge}
+                                {scep_badge}
                             </div>
                         </div>
                     </td>
-                    <td>
+                    <td style="padding: 0.75rem; color: var(--text-primary);">
                         {issuer_name}
                     </td>
-                    <td>
+                    <td style="padding: 0.75rem; color: var(--text-primary);">
                         {cert_type_display}
                     </td>
-                    <td>
+                    <td style="padding: 0.75rem; color: var(--text-primary);">
                         {valid_from}
                     </td>
-                    <td>
+                    <td style="padding: 0.75rem; color: var(--text-primary);">
                         {valid_to}
                     </td>
-                    <td onclick="event.stopPropagation()">
+                    <td style="padding: 0.75rem;">
             '''
             
             # Unified export button for both CSR and certificates
             button_class = "btn-icon btn-icon-primary"
             html += f'''
-                        <button onclick="exportCert({cert['id']}, event, {'true' if is_csr else 'false'})" 
+                        <button data-action="export-cert"
+                                data-id="{cert['id']}"
+                                data-is-csr="{'true' if is_csr else 'false'}"
                                 class="{button_class}"
                                 title="Export {'CSR' if is_csr else 'Certificate'}">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
@@ -1034,7 +1317,9 @@ def cert_list_content():
                 
             if not is_revoked and not is_csr:
                 html += f'''
-                        <button onclick="revokeCert('{safe_refid}', '{safe_descr}')" 
+                        <button data-action="revoke-cert"
+                                data-refid="{cert['refid']}" 
+                                data-descr="{html_escape(cert['descr'])}" 
                                 class="btn-icon btn-icon-danger"
                                 title="Revoke Certificate">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-ban"/></svg>
@@ -1042,7 +1327,9 @@ def cert_list_content():
                 '''
             
             html += f'''
-                        <button onclick="deleteCert('{safe_refid}', '{safe_descr}')" 
+                        <button data-action="delete-cert"
+                                data-refid="{cert['refid']}" 
+                                data-descr="{html_escape(cert['descr'])}"
                                 class="btn-icon btn-icon-danger"
                                 title="Delete {'CSR' if is_csr else 'Certificate'}">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
@@ -1056,9 +1343,31 @@ def cert_list_content():
             </table>
         </div>
         
+        <!-- Pagination for Certificate table -->
+        <div class="table-pagination">
+            <div class="pagination-info">
+                <span>Affichage <span id="cert-start">1</span>-<span id="cert-end">10</span> sur <span id="cert-total"></span> certificats</span>
+            </div>
+            <div class="pagination-controls">
+                <select class="pagination-select" id="cert-per-page" data-action="update-cert-pagination">
+                    <option value="10" selected>10 par page</option>
+                    <option value="25">25 par page</option>
+                    <option value="50">50 par page</option>
+                    <option value="100">100 par page</option>
+                </select>
+                <div class="pagination-buttons" id="cert-pagination-buttons"></div>
+            </div>
+        </div>
+        
         <script>
-        if (typeof sortDirectionCert === 'undefined') {
-            var sortDirectionCert = {};
+        // Initialize certificate pagination on HTMX load
+        setTimeout(initCertPagination, 100);
+        </script>
+        
+        <script>
+        // Use window object to avoid var in HTMX-loaded content
+        if (typeof window.sortDirectionCert === 'undefined') {
+            window.sortDirectionCert = {};
         }
         
         function sortTableCert(columnIndex) {
@@ -1066,9 +1375,9 @@ def cert_list_content():
             const tbody = table.querySelector('tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
             
-            const currentDirection = sortDirectionCert[columnIndex] || 'asc';
+            const currentDirection = window.sortDirectionCert[columnIndex] || 'asc';
             const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
-            sortDirectionCert[columnIndex] = newDirection;
+            window.sortDirectionCert[columnIndex] = newDirection;
             
             rows.sort((a, b) => {
                 let aValue = a.cells[columnIndex].textContent.trim();
@@ -1116,31 +1425,31 @@ def cert_list_content():
             
             if (isCSR) {
                 // CSR only has simple PEM export
-                menu.innerHTML = '<div class="py-1" role="menu">' +
-                    '<button onclick="exportCertSimple(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-file-certificate mr-2"></i>CSR (PEM)' +
+                menu.innerHTML = '<div style="padding: 0.25rem 0;" role="menu">' +
+                    '<button data-action="export-cert-simple" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i>CSR (PEM)' +
                     '</button>' +
                 '</div>';
             } else {
                 // Full certificate has all export options
-                menu.innerHTML = '<div class="py-1" role="menu">' +
-                    '<button onclick="exportCertSimple(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-file-certificate mr-2"></i>Certificate only (PEM)' +
+                menu.innerHTML = '<div style="padding: 0.25rem 0;" role="menu">' +
+                    '<button data-action="export-cert-simple" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i>Certificate only (PEM)' +
                     '</button>' +
-                    '<button onclick="exportCertWithKey(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-key mr-2"></i>Certificate + Key (PEM)' +
+                    '<button data-action="export-cert-key" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-key" style="margin-right: 0.5rem;"></i>Certificate + Key (PEM)' +
                     '</button>' +
-                    '<button onclick="exportCertWithChain(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-link mr-2"></i>Certificate + CA Chain (PEM)' +
+                    '<button data-action="export-cert-chain" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-link" style="margin-right: 0.5rem;"></i>Certificate + CA Chain (PEM)' +
                     '</button>' +
-                    '<button onclick="exportCertFull(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-archive mr-2"></i>Full Chain + Key (PEM)' +
+                    '<button data-action="export-cert-full" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-archive" style="margin-right: 0.5rem;"></i>Full Chain + Key (PEM)' +
                     '</button>' +
-                    '<button onclick="exportCertDER(' + id + ')" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-file-binary mr-2"></i>Certificate (DER)' +
+                    '<button data-action="export-cert-der" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-file-binary" style="margin-right: 0.5rem;"></i>Certificate (DER)' +
                     '</button>' +
-                    '<button onclick="showPKCS12ModalTable(' + id + ', &quot;cert&quot;)" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600">' +
-                        '<i class="fas fa-lock mr-2"></i>PKCS#12 (.p12/.pfx)' +
+                    '<button data-action="show-pkcs12-modal" data-id="' + id + '" data-type="cert" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: transparent; border: none; cursor: pointer;" onmouseover="this.style.background=\\'var(--hover-bg)\\'" onmouseout="this.style.background=\\'transparent\\'">' +
+                        '<i class="fas fa-lock" style="margin-right: 0.5rem;"></i>PKCS#12 (.p12/.pfx)' +
                     '</button>' +
                 '</div>';
             }
@@ -1211,65 +1520,13 @@ def cert_list_content():
                 window.URL.revokeObjectURL(downloadUrl);
             })
             .catch(error => {
-                alert('Export failed: ' + error.message);
+                showToast('Export failed: ' + error.message, 'error');
             });
         }
         
-        function downloadCSR(id) {
-            // Download via fetch with auth token
-            fetch('/api/v1/certificates/' + id + '/export?format=pem', {
-                headers: { 'Authorization': 'Bearer ' + ''' + f"'{token}'" + ''' }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('Download failed');
-                return response.blob();
-            })
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'csr_' + id + '.pem';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            })
-            .catch(e => alert('Error downloading CSR: ' + e));
-        }
         
-        function revokeCert(refid, name) {
-            if (confirm('Revoke certificate "' + name + '"? This cannot be undone!')) {
-                fetch('/api/v1/certificates/' + refid + '/revoke', {
-                    method: 'POST',
-                    headers: { 
-                        'Authorization': 'Bearer ' + ''' + f"'{token}'" + ''',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ reason: 'unspecified' })
-                })
-                .then(r => r.json())
-                .then(data => {
-                    alert('Certificate revoked successfully');
-                    htmx.trigger('body', 'refreshCerts');
-                })
-                .catch(e => alert('Error: ' + e));
-            }
-        }
-        
-        function deleteCert(refid, name) {
-            if (confirm('Delete certificate "' + name + '"?')) {
-                fetch('/api/v1/certificates/' + refid + '', {
-                    method: 'DELETE',
-                    headers: { 'Authorization': 'Bearer ' + ''' + f"'{token}'" + ''' }
-                })
-                .then(r => r.json())
-                .then(data => {
-                    alert('Certificate deleted successfully');
-                    htmx.trigger('body', 'refreshCerts');
-                })
-                .catch(e => alert('Error: ' + e));
-            }
-        }
+        // NOTE: downloadCSR, revokeCert, deleteCert, and export functions
+        // are now in ucm-global.js with JWT cookie authentication.
         
         // Close menus when clicking outside
         document.addEventListener('click', function(e) {
@@ -1287,7 +1544,7 @@ def cert_list_content():
         response.headers['Expires'] = '0'
         return response
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/cert/create', methods=['POST'])
@@ -1412,34 +1669,35 @@ def crl_list_data():
         )
         
         if response.status_code != 200:
-            return f'<div class="p-4 text-red-600">Failed to load CRLs: {response.text}</div>'
+            return f'<div style="padding: 1rem; color: var(--danger-color);">Failed to load CRLs: {response.text}</div>'
         
         crls = response.json()
         
         if not crls:
             return '''
-            <div class="p-8 text-center text-gray-500">
-                <i class="fas fa-file-contract text-6xl mb-4"></i>
-                <p class="text-lg">No CRLs generated yet</p>
-                <p class="text-sm mt-2">Enable CDP on a CA and generate a CRL to get started</p>
+            <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                <i class="fas fa-file-contract" style="font-size: 3.75rem; margin-bottom: 1rem;"></i>
+                <p style="font-size: 1.125rem;">No CRLs generated yet</p>
+                <p style="font-size: 0.875rem; margin-top: 0.5rem;">Enable CDP on a CA and generate a CRL to get started</p>
             </div>
             '''
         
         # Build table HTML
         html = '''
-        <table class="w-full">
-            <thead class="bg-gray-50 border-b border-gray-200">
-                <tr>
-                    <th>CA</th>
-                    <th>CDP Status</th>
-                    <th>CRL Status</th>
-                    <th>Revoked Count</th>
-                    <th>Last Update</th>
-                    <th>Next Update</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
+        <div style="overflow-x: auto;">
+            <table id="crl-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;">CA</th>
+                        <th style="padding: 0.75rem; text-align: left;">CDP Status</th>
+                        <th style="padding: 0.75rem; text-align: left;">CRL Status</th>
+                        <th style="padding: 0.75rem; text-align: left;">Revoked Count</th>
+                        <th style="padding: 0.75rem; text-align: left;">Last Update</th>
+                        <th style="padding: 0.75rem; text-align: left;">Next Update</th>
+                        <th style="padding: 0.75rem; text-align: left;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
         '''
         
         for crl_data in crls:
@@ -1451,13 +1709,13 @@ def crl_list_data():
             
             # CDP Status badge
             if cdp_enabled:
-                cdp_status = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Enabled</span>'
+                cdp_status = '<span class="badge-outline badge-success"><i class="fas fa-check" style="margin-right: 0.25rem;"></i>Enabled</span>'
             else:
-                cdp_status = '<span class="badge badge-secondary"><i class="fas fa-times mr-1"></i>Disabled</span>'
+                cdp_status = '<span class="badge-outline badge-secondary"><i class="fas fa-times" style="margin-right: 0.25rem;"></i>Disabled</span>'
             
             # CRL Status badge
             if not has_crl:
-                crl_status = '<span class="badge badge-warning">Never Generated</span>'
+                crl_status = '<span class="badge-outline badge-warning">Never Generated</span>'
                 revoked_count = '-'
                 last_update = '-'
                 next_update = '-'
@@ -1467,11 +1725,11 @@ def crl_list_data():
                 days_until_expiry = crl_data.get('days_until_expiry', 0)
                 
                 if is_stale:
-                    crl_status = '<span class="badge badge-danger"><i class="fas fa-exclamation-triangle mr-1"></i>Stale</span>'
+                    crl_status = '<span class="badge-outline badge-danger"><i class="fas fa-exclamation-triangle" style="margin-right: 0.25rem;"></i>Stale</span>'
                 elif days_until_expiry <= 1:
-                    crl_status = '<span class="badge badge-warning"><i class="fas fa-clock mr-1"></i>Expiring Soon</span>'
+                    crl_status = '<span class="badge-outline badge-warning"><i class="fas fa-clock" style="margin-right: 0.25rem;"></i>Expiring Soon</span>'
                 else:
-                    crl_status = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Up to Date</span>'
+                    crl_status = '<span class="badge-outline badge-success"><i class="fas fa-check" style="margin-right: 0.25rem;"></i>Up to Date</span>'
                 
                 revoked_count = crl_data.get('revoked_count', 0)
                 
@@ -1503,59 +1761,60 @@ def crl_list_data():
             
             # Actions buttons
             actions = f'''
-            <div class="flex justify-end space-x-2">
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
             '''
             
             if has_crl:
                 actions += f'''
-                <button onclick="downloadCRL({ca_id}, 'pem')" 
-                        class="btn-sm btn-secondary" title="Download PEM">
-                    <i class="fas fa-download"></i> PEM
+                <button data-action="download-crl" data-ca-id="{ca_id}" data-format="pem"
+                        class="btn-icon btn-icon-secondary" title="Download PEM">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
                 </button>
-                <button onclick="downloadCRL({ca_id}, 'der')" 
-                        class="btn-sm btn-secondary" title="Download DER">
-                    <i class="fas fa-download"></i> DER
+                <button data-action="download-crl" data-ca-id="{ca_id}" data-format="der"
+                        class="btn-icon btn-icon-secondary" title="Download DER">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
                 </button>
-                <button onclick="viewCRLInfo('{ca_refid}')" 
-                        class="btn-sm btn-secondary" title="View Info">
-                    <i class="fas fa-info-circle"></i>
+                <button data-action="view-crl-info" data-refid="{ca_refid}"
+                        class="btn-icon btn-icon-secondary" title="View Info">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-info"/></svg>
                 </button>
                 '''
             
             if cdp_enabled:
                 actions += f'''
-                <button onclick="generateCRL({ca_id}, '{ca_name}')" 
-                        class="btn-sm btn-primary" title="Force Generate">
-                    <i class="fas fa-refresh"></i>
+                <button data-action="generate-crl" data-ca-id="{ca_id}" data-name="{html_escape(ca_name)}"
+                        class="btn-icon btn-icon-primary" title="Force Generate">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-refresh"/></svg>
                 </button>
                 '''
             
             actions += '</div>'
             
             html += f'''
-            <tr class="hover:bg-gray-50">
-                <td>
-                    <div class="font-medium text-gray-900">{ca_name}</div>
-                    <div class="text-sm text-gray-500">{ca_refid}</div>
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;">
+                    <div style="font-weight: 500; color: var(--text-primary);">{ca_name}</div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary);">{ca_refid}</div>
                 </td>
-                <td>{cdp_status}</td>
-                <td>{crl_status}</td>
-                <td>{revoked_count}</td>
-                <td>{last_update}</td>
-                <td>{next_update} {days_until}</td>
-                <td>{actions}</td>
+                <td style="padding: 0.75rem;">{cdp_status}</td>
+                <td style="padding: 0.75rem;">{crl_status}</td>
+                <td style="padding: 0.75rem; color: var(--text-primary);">{revoked_count}</td>
+                <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{last_update}</td>
+                <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{next_update} {days_until}</td>
+                <td style="padding: 0.75rem;">{actions}</td>
             </tr>
             '''
         
         html += '''
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
         '''
         
         return html
         
     except Exception as e:
-        return f'<div class="p-4 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 1rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/scep')
@@ -1597,7 +1856,10 @@ def scep_config_form():
             ca_options += f'<option value="{ca["refid"]}" {selected}>{ca["descr"]}</option>'
         
         return f'''
-        <form hx-post="/api/ui/scep/save" hx-on::after-request="showToast('SCEP config saved', 'success')" style="display: flex; flex-direction: column; gap: 1.25rem;">
+        <form hx-post="/api/ui/scep/save" 
+              hx-swap="none"
+              hx-on::after-request="if(event.detail.successful) {{ showToast('SCEP configuration saved', 'success'); htmx.trigger('#scep-config-card', 'reload'); }}" 
+              style="display: flex; flex-direction: column; gap: 1.25rem;">
             <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
                 <input type="checkbox" name="enabled" {"checked" if enabled else ""} 
                        style="width: 1.125rem; height: 1.125rem; cursor: pointer;">
@@ -1677,68 +1939,143 @@ def scep_requests():
         )
         
         if response.status_code != 200:
-            return '<div class="p-8 text-center text-gray-500">No requests</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">Failed to load requests</div>'
         
         requests_list = response.json()
-        pending = [r for r in requests_list if r['status'] == 'pending']
         
-        if not pending:
-            return '<div class="p-8 text-center text-gray-500 dark:text-gray-400">No pending requests</div>'
-        
-        html = '<div class="divide-y divide-gray-200 dark:divide-gray-700">'
-        for req in pending:
-            safe_txid = escape_js(req['transaction_id'])
-            html += f'''
-            <div class="p-4">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="font-medium text-gray-900 dark:text-white">{req['subject']}</p>
-                        <p class="text-sm text-gray-500">From: {req['client_ip']}</p>
-                        <p class="text-xs text-gray-400">{req['created_at']}</p>
-                    </div>
-                    <div class="flex space-x-2">
-                        <button onclick="approveSCEP('{safe_txid}')"
-                                class="btn btn-success text-sm">
-                            Approve
-                        </button>
-                        <button onclick="rejectSCEP('{safe_txid}')"
-                                class="btn btn-danger text-sm">
-                            Reject
-                        </button>
-                    </div>
-                </div>
+        if not requests_list:
+            return '''
+            <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">
+                <i class="fas fa-inbox" style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                <p style="font-size: 1rem; font-weight: 500; margin-bottom: 0.5rem;">No SCEP Requests</p>
+                <p style="font-size: 0.875rem;">Enrollment requests will appear here</p>
             </div>
             '''
-        html += '</div>'
+        
+        # Separate by status
+        pending = [r for r in requests_list if r['status'] == 'pending']
+        approved = [r for r in requests_list if r['status'] == 'approved']
+        rejected = [r for r in requests_list if r['status'] == 'rejected']
+        
+        html = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse;">'
+        html += '''
+        <thead style="background: var(--bg-secondary);">
+            <tr style="border-bottom: 2px solid var(--border-color);">
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--text-primary);">Status</th>
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--text-primary);">Subject</th>
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--text-primary);">Client IP</th>
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--text-primary);">Date</th>
+                <th style="padding: 0.75rem; text-align: left; font-weight: 600; color: var(--text-primary);">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        '''
+        
+        # Show pending first
+        for req in pending:
+            safe_txid = escape_js(req['transaction_id'])
+            created_date = req['created_at'][:19] if req.get('created_at') else 'N/A'
+            html += f'''
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;">
+                    <span class="badge-outline badge-warning"><i class="fas fa-clock"></i> Pending</span>
+                </td>
+                <td style="padding: 0.75rem; color: var(--text-primary); font-weight: 500;">{req['subject']}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{req.get('client_ip', 'N/A')}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{created_date}</td>
+                <td style="padding: 0.75rem;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button data-action="approve-scep" data-txid="{safe_txid}"
+                                class="btn-primary" style="padding: 0.375rem 0.75rem; font-size: 0.875rem;">
+                            <i class="fas fa-check" style="margin-right: 0.25rem;"></i> Approve
+                        </button>
+                        <button data-action="reject-scep" data-txid="{safe_txid}"
+                                class="btn-secondary" style="padding: 0.375rem 0.75rem; font-size: 0.875rem; color: var(--danger-color);">
+                            <i class="fas fa-times" style="margin-right: 0.25rem;"></i> Reject
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            '''
+        
+        # Then approved
+        for req in approved:
+            created_date = req['created_at'][:19] if req.get('created_at') else 'N/A'
+            approved_date = req['approved_at'][:19] if req.get('approved_at') else 'N/A'
+            html += f'''
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;">
+                    <span class="badge-outline badge-success"><i class="fas fa-check"></i> Approved</span>
+                </td>
+                <td style="padding: 0.75rem; color: var(--text-primary);">{req['subject']}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{req.get('client_ip', 'N/A')}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{created_date}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">
+                    Approved: {approved_date}
+                </td>
+            </tr>
+            '''
+        
+        # Then rejected
+        for req in rejected:
+            created_date = req['created_at'][:19] if req.get('created_at') else 'N/A'
+            reason = req.get('rejection_reason', 'No reason provided')
+            html += f'''
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;">
+                    <span class="badge-outline badge-danger"><i class="fas fa-ban"></i> Rejected</span>
+                </td>
+                <td style="padding: 0.75rem; color: var(--text-primary);">{req['subject']}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{req.get('client_ip', 'N/A')}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">{created_date}</td>
+                <td style="padding: 0.75rem; color: var(--text-secondary); font-size: 0.875rem;">
+                    {reason}
+                </td>
+            </tr>
+            '''
+        
+        html += '</tbody></table></div>'
         
         html += f'''
         <script>
         function approveSCEP(txid) {{
+            if (!txid) return;
             fetch('/scep/requests/' + txid + '/approve', {{
                 method: 'POST',
                 headers: {{ 'Authorization': 'Bearer {token}', 'Content-Type': 'application/json' }}
             }})
             .then(r => r.json())
-            .then(() => {{ showToast('Request approved', 'success'); htmx.trigger('body', 'refreshSCEP'); }})
-            .catch(e => showToast('Error: ' + e, 'error'));
+            .then(() => {{ 
+                if (typeof showToast === 'function') showToast('Request approved', 'success'); 
+                htmx.trigger('body', 'refreshSCEP'); 
+            }})
+            .catch(e => {{ 
+                if (typeof showToast === 'function') showToast('Error: ' + e, 'error'); 
+            }});
         }}
         
         function rejectSCEP(txid) {{
+            if (!txid) return;
             fetch('/scep/requests/' + txid + '/reject', {{
                 method: 'POST',
                 headers: {{ 'Authorization': 'Bearer {token}', 'Content-Type': 'application/json' }},
                 body: JSON.stringify({{ reason: 'Rejected by administrator' }})
             }})
             .then(r => r.json())
-            .then(() => {{ showToast('Request rejected', 'success'); htmx.trigger('body', 'refreshSCEP'); }})
-            .catch(e => showToast('Error: ' + e, 'error'));
+            .then(() => {{ 
+                if (typeof showToast === 'function') showToast('Request rejected', 'success'); 
+                htmx.trigger('body', 'refreshSCEP'); 
+            }})
+            .catch(e => {{ 
+                if (typeof showToast === 'function') showToast('Error: ' + e, 'error'); 
+            }});
         }}
         </script>
         '''
         
         return html
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 # Import Management
@@ -1780,29 +2117,29 @@ def import_config_form():
         html = f'''
         <form hx-post="/api/ui/import/save" hx-swap="none" 
               hx-on::after-request="if(event.detail.successful) window.showToast('Configuration saved successfully', 'success')">
-            <div class="space-y-4">
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">OPNsense URL</label>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">OPNsense URL</label>
                     <input type="url" name="base_url" value="{config.get('base_url', 'https://network')}" required
-                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                           class="form-control">
                 </div>
                 
                 <!-- API Key Authentication (only method) -->
                 <input type="hidden" name="auth_method" value="api">
                 
-                <div class="grid grid-cols-2 gap-4">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key</label>
+                        <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">API Key</label>
                         <input type="text" name="api_key" value="{config.get('api_key', '')}" required
-                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                               class="form-control">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Secret</label>
+                        <label style="display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.5rem;">API Secret</label>
                         <input type="password" name="api_secret" required
-                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                               class="form-control">
                     </div>
                 </div>
-                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <p style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
                     <i class="fas fa-info-circle"></i> Create API key in OPNsense: System → Access → Users → Edit user → API keys
                 </p>
                 
@@ -1927,7 +2264,7 @@ def import_config_form():
         import sys
         sys.stderr.write(f"ERROR import_config_form: {str(e)}\n")
         sys.stderr.flush()
-        return f'<p class="text-red-600">Error: {str(e)}</p>'
+        return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
 
 
 @ui_bp.route('/api/ui/import/save', methods=['POST'])
@@ -1979,30 +2316,30 @@ def import_history():
         )
         
         if response.status_code != 200:
-            return '<div class="p-8 text-center text-gray-500">No history</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No history</div>'
         
         data = response.json()
         total = data['cas']['count'] + data['certs']['count']
         
         if total == 0:
-            return '<div class="p-8 text-center text-gray-500 dark:text-gray-400">No imported items</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No imported items</div>'
         
         return f'''
-        <div class="p-6">
-            <div class="grid grid-cols-2 gap-4">
-                <div class="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{data['cas']['count']}</p>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Imported CAs</p>
+        <div style="padding: 1.5rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div style="text-align: center; padding: 1rem; background: var(--primary-bg); border-radius: 8px;">
+                    <p style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">{data['cas']['count']}</p>
+                    <p style="font-size: 0.875rem; color: var(--text-secondary);">Imported CAs</p>
                 </div>
-                <div class="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">{data['certs']['count']}</p>
-                    <p class="text-sm text-gray-600 dark:text-gray-400">Imported Certificates</p>
+                <div style="text-align: center; padding: 1rem; background: var(--success-bg); border-radius: 8px;">
+                    <p style="font-size: 1.5rem; font-weight: 700; color: var(--success-color);">{data['certs']['count']}</p>
+                    <p style="font-size: 0.875rem; color: var(--text-secondary);">Imported Certificates</p>
                 </div>
             </div>
         </div>
         '''
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/certificates/import', methods=['POST'])
@@ -2263,7 +2600,7 @@ def config_https_cert():
         cert_path = str(Config.HTTPS_CERT_PATH)
         
         if not os.path.exists(cert_path):
-            return '<div class="text-yellow-600">No HTTPS certificate found</div>'
+            return '<div style="color: var(--warning-color);">No HTTPS certificate found</div>'
         
         with open(cert_path, 'rb') as f:
             cert_data = f.read()
@@ -2291,33 +2628,33 @@ def config_https_cert():
         <div style="margin-bottom: 1rem;">
             {source_badge}
         </div>
-        <dl class="grid grid-cols-1 gap-4">
+        <dl style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Subject</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{subject}</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Subject</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{subject}</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Issuer</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{issuer}</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Issuer</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{issuer}</dd>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Valid From</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{not_before}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Valid From</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{not_before}</dd>
                 </div>
                 <div>
-                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Valid Until</dt>
-                    <dd class="mt-1 text-sm text-gray-900 dark:text-white">{not_after}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Valid Until</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{not_after}</dd>
                 </div>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Serial Number</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">{serial}</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Serial Number</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{serial}</dd>
             </div>
         </dl>
         '''
     except Exception as e:
-        return f'<div class="text-red-600">Error: {str(e)}</div>'
+        return f'<div style="color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/config/regenerate-https', methods=['POST'])
@@ -2362,38 +2699,67 @@ def config_users():
         )
         
         if response.status_code != 200:
-            return '<div class="p-8 text-center text-gray-500">No users</div>'
+            return '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No users</div>'
         
         users = response.json()
         
         html = '''
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Actions</th>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Username</th>
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Email</th>
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Role</th>
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody>
         '''
         
         for user in users:
+            # Role badge
+            role_colors = {
+                'admin': 'var(--danger-color)',
+                'operator': 'var(--warning-color)',
+                'viewer': 'var(--info-color)'
+            }
+            role_color = role_colors.get(user['role'], 'var(--text-secondary)')
+            
+            # Role badge - clickable if not admin user
+            if user['username'] == 'admin':
+                role_badge = f'''
+                    <span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background: var(--bg-secondary); color: {role_color}; border: 1px solid var(--border-color);">
+                        <i class="fas fa-shield-alt" style="margin-right: 0.25rem;"></i> {user['role'].title()}
+                    </span>
+                '''
+            else:
+                role_badge = f'''
+                    <button data-action="change-role" data-user-id="{user['id']}" data-username="{user['username']}" data-current-role="{user['role']}"
+                            style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background: var(--bg-secondary); color: {role_color}; border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s;"
+                            onmouseover="this.style.borderColor='{role_color}'; this.style.background='var(--card-bg)';"
+                            onmouseout="this.style.borderColor='var(--border-color)'; this.style.background='var(--bg-secondary)';"
+                            title="Click to change role">
+                        <i class="fas fa-user-tag" style="margin-right: 0.25rem;"></i> {user['role'].title()}
+                    </button>
+                '''
+            
             html += f'''
-                    <tr>
-                        <td>{user['username']}</td>
-                        <td>{user['email']}</td>
-                        <td>
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
-                                {user['role']}
-                            </span>
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 0.75rem; color: var(--text-primary); font-weight: 500;">
+                            <i class="fas fa-user" style="margin-right: 0.5rem; color: var(--text-secondary);"></i>
+                            {user['username']}
                         </td>
-                        <td>
-                            <button onclick="$dispatch('open-modal', {{ modal: 'changePasswordModal', userId: {user['id']} }})"
-                                    class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3">
-                                Change Password
+                        <td style="padding: 0.75rem; color: var(--text-primary);">
+                            {user['email']}
+                        </td>
+                        <td style="padding: 0.75rem;">
+                            {role_badge}
+                        </td>
+                        <td style="padding: 0.75rem;">
+                            <button data-action="change-password" data-user-id="{user['id']}" data-username="{user['username']}"
+                                    style="color: var(--primary-color); background: none; border: none; cursor: pointer; text-decoration: none; font-size: 0.875rem; margin-right: 1rem;">
+                                <i class="fas fa-key" style="margin-right: 0.25rem;"></i> Change Password
                             </button>
             '''
             
@@ -2401,9 +2767,9 @@ def config_users():
                 html += f'''
                             <button hx-delete="/api/ui/config/user/{user['id']}"
                                     hx-confirm="Delete user {user['username']}?"
-                                    hx-swap="none"
-                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                                Delete
+                                    hx-on::after-request="if(event.detail.successful){{htmx.trigger('body','refreshUsers');if(typeof showToast==='function')showToast('User deleted','success');}}"
+                                    style="color: var(--danger-color); background: none; border: none; cursor: pointer; text-decoration: none; font-size: 0.875rem;">
+                                <i class="fas fa-trash" style="margin-right: 0.25rem;"></i> Delete
                             </button>
                 '''
             
@@ -2420,7 +2786,7 @@ def config_users():
         
         return html
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="text-align: center; padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/config/add-user', methods=['POST'])
@@ -2466,24 +2832,52 @@ def config_change_password():
         headers = {'Authorization': f'Bearer {token}'}
         
         user_id = request.form.get('user_id')
-        password = request.form.get('password')
+        new_password = request.form.get('new_password')
         
         response = requests.put(
             f"{request.url_root}api/v1/auth/users/{user_id}",
             headers=headers,
-            json={'password': password},
+            json={'password': new_password},
             verify=False
         )
         
         if response.status_code == 200:
-            flash('Password changed successfully', 'success')
-            return '<script>htmx.trigger("body", "refreshUsers")</script>', 200
+            return '', 200
         else:
             error_msg = response.json().get('error', 'Unknown error')
-            flash(f'Error changing password: {error_msg}', 'error')
-            return '', response.status_code
+            return error_msg, response.status_code
     except Exception as e:
-        flash(f'Error changing password: {str(e)}', 'error')
+        return str(e), 500
+
+
+@ui_bp.route('/api/ui/config/change-role', methods=['POST'])
+@login_required
+def config_change_role():
+    """Change user role"""
+    try:
+        token = session.get('access_token')
+        headers = {'Authorization': f'Bearer {token}'}
+        
+        user_id = request.form.get('user_id')
+        new_role = request.form.get('role')
+        
+        # Validate role
+        if new_role not in ['admin', 'operator', 'viewer']:
+            return 'Invalid role', 400
+        
+        response = requests.put(
+            f"{request.url_root}api/v1/auth/users/{user_id}",
+            headers=headers,
+            json={'role': new_role},
+            verify=False
+        )
+        
+        if response.status_code == 200:
+            return '', 200
+        else:
+            error_msg = response.json().get('error', 'Unknown error')
+            return error_msg, response.status_code
+    except Exception as e:
         return str(e), 500
 
 
@@ -2563,7 +2957,7 @@ def config_db_stats():
         )
         
         if response.status_code != 200:
-            return '<div class="text-red-600">Error loading stats</div>'
+            return '<div style="color: var(--danger-color);">Error loading stats</div>'
         
         stats = response.json()
         
@@ -2575,27 +2969,27 @@ def config_db_stats():
             db_size = os.path.getsize(db_path) / (1024 * 1024)  # MB
         
         return f'''
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.get('cas', 0)}</p>
-                <p class="text-sm text-gray-600 dark:text-gray-400">CAs</p>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+            <div style="background: var(--primary-bg); padding: 1rem; border-radius: 8px;">
+                <p style="font-size: 1.5rem; font-weight: 700; color: var(--primary-color);">{stats.get('cas', 0)}</p>
+                <p style="font-size: 0.875rem; color: var(--text-secondary);">CAs</p>
             </div>
-            <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                <p class="text-2xl font-bold text-green-600 dark:text-green-400">{stats.get('certificates', 0)}</p>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Certificates</p>
+            <div style="background: var(--success-bg); padding: 1rem; border-radius: 8px;">
+                <p style="font-size: 1.5rem; font-weight: 700; color: var(--success-color);">{stats.get('certificates', 0)}</p>
+                <p style="font-size: 0.875rem; color: var(--text-secondary);">Certificates</p>
             </div>
-            <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                <p class="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.get('users', 0)}</p>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Users</p>
+            <div style="background: var(--info-bg); padding: 1rem; border-radius: 8px;">
+                <p style="font-size: 1.5rem; font-weight: 700; color: var(--info-color);">{stats.get('users', 0)}</p>
+                <p style="font-size: 0.875rem; color: var(--text-secondary);">Users</p>
             </div>
-            <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-                <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{db_size:.2f} MB</p>
-                <p class="text-sm text-gray-600 dark:text-gray-400">Database Size</p>
+            <div style="background: var(--warning-bg); padding: 1rem; border-radius: 8px;">
+                <p style="font-size: 1.5rem; font-weight: 700; color: var(--warning-color);">{db_size:.2f} MB</p>
+                <p style="font-size: 0.875rem; color: var(--text-secondary);">Database Size</p>
             </div>
         </div>
         '''
     except Exception as e:
-        return f'<div class="text-red-600">Error: {str(e)}</div>'
+        return f'<div style="color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/config/backup-db', methods=['POST'])
@@ -2658,35 +3052,35 @@ def config_system_info():
         uptime_minutes = int((uptime_seconds % 3600) / 60)
         
         return f'''
-        <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <dl style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Version</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white">UCM 1.0.0</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Version</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">UCM 1.0.0</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Python Version</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white">{platform.python_version()}</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Python Version</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{platform.python_version()}</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Operating System</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white">{platform.system()} {platform.release()}</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Operating System</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{platform.system()} {platform.release()}</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Uptime</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white">{uptime_hours}h {uptime_minutes}m</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Uptime</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{uptime_hours}h {uptime_minutes}m</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Database Path</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">''' + str(Config.DATABASE_PATH) + '''</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Database Path</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">''' + str(Config.DATABASE_PATH) + '''</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Data Directory</dt>
-                <dd class="mt-1 text-sm text-gray-900 dark:text-white font-mono">''' + str(DATA_DIR) + '''/</dd>
+                <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Data Directory</dt>
+                <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">''' + str(DATA_DIR) + '''/</dd>
             </div>
         </dl>
         '''
     except Exception as e:
-        return f'<div class="text-red-600">Error: {str(e)}</div>'
+        return f'<div style="color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 # CA Detail Pages
@@ -2769,6 +3163,20 @@ def ca_certificates(ca_id):
         token = session.get('access_token')
         headers = {'Authorization': f'Bearer {token}'}
         
+        # Get CA to find its refid
+        ca_response = requests.get(
+            f"{request.url_root}api/v1/ca/{ca_id}",
+            headers=headers,
+            verify=False
+        )
+        
+        if ca_response.status_code != 200:
+            return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">CA not found</div>'
+        
+        ca = ca_response.json()
+        ca_refid = ca.get('refid')
+        
+        # Get all certificates
         response = requests.get(
             f"{request.url_root}api/v1/certificates/",
             headers=headers,
@@ -2776,56 +3184,61 @@ def ca_certificates(ca_id):
         )
         
         if response.status_code != 200:
-            return '<div class="p-8 text-center text-gray-500">No certificates</div>'
+            return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No certificates</div>'
         
         all_certs = response.json()
-        ca_certs = [c for c in all_certs if c.get('ca_id') == ca_id]
+        # Filter by caref matching CA's refid
+        ca_certs = [c for c in all_certs if c.get('caref') == ca_refid]
         
         if not ca_certs:
-            return '<div class="p-8 text-center text-gray-500 dark:text-gray-400">No certificates issued by this CA</div>'
+            return '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No certificates issued by this CA</div>'
         
         html = '''
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                        <th>Subject</th>
-                        <th>Type</th>
-                        <th>Status</th>
-                        <th>Valid Until</th>
-                        <th>Actions</th>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Subject</th>
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Type</th>
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Status</th>
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Valid Until</th>
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody>
         '''
         
         for cert in ca_certs:
-            # Badge for status instead of just icon
+            # Badge for status
             status_badge = {
-                'active': '<span class="badge-outline badge-success"><i class="fas fa-circle-check"></i> Active</span>',
-                'revoked': '<span class="badge-outline badge-danger"><i class="fas fa-ban"></i> Revoked</span>',
-                'pending': '<span class="badge-outline badge-warning"><i class="fas fa-clock"></i> Pending</span>'
-            }.get(cert.get('status', 'active'), '<span class="badge-outline badge-secondary"><i class="fas fa-circle"></i> Unknown</span>')
+                'active': '<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-border);"><i class="fas fa-circle-check" style="margin-right: 0.25rem;"></i> Active</span>',
+                'revoked': '<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-border);"><i class="fas fa-ban" style="margin-right: 0.25rem;"></i> Revoked</span>',
+                'pending': '<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background: var(--warning-bg); color: var(--warning-color); border: 1px solid var(--warning-border);"><i class="fas fa-clock" style="margin-right: 0.25rem;"></i> Pending</span>'
+            }.get(cert.get('status', 'active'), '<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-color);"><i class="fas fa-circle" style="margin-right: 0.25rem;"></i> Unknown</span>')
+            
+            # Check if ACME certificate
+            is_acme = cert.get('created_by') == 'acme'
+            acme_badge = '<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-border); margin-left: 0.5rem;"><i class="fas fa-robot" style="margin-right: 0.25rem;"></i> ACME</span>' if is_acme else ''
             
             html += f'''
-                <tr>
-                    <td>
-                        <a href="/certificates/{cert['id']}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
-                            {cert.get('common_name', cert.get('subject', 'N/A'))}
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem;">
+                        <a href="/certificates/{cert['id']}" style="color: var(--primary-color); font-weight: 500; text-decoration: none;">
+                            {cert.get('descr', cert.get('subject', 'N/A'))}
                         </a>
                     </td>
-                    <td>
-                        {cert.get('cert_type', 'server')}
+                    <td style="padding: 0.75rem; color: var(--text-primary);">
+                        {cert.get('cert_type', 'server_cert').replace('_', ' ').title()}{acme_badge}
                     </td>
-                    <td>
+                    <td style="padding: 0.75rem;">
                         {status_badge}
                     </td>
-                    <td>
-                        {cert.get('not_valid_after', 'N/A')[:10] if cert.get('not_valid_after') else 'N/A'}
+                    <td style="padding: 0.75rem; color: var(--text-primary); font-family: monospace; font-size: 0.875rem;">
+                        {cert.get('valid_to', 'N/A')[:10] if cert.get('valid_to') else 'N/A'}
                     </td>
-                    <td>
-                        <a href="/certificates/{cert['id']}" class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                            View
+                    <td style="padding: 0.75rem;">
+                        <a href="/certificates/{cert['id']}" style="color: var(--primary-color); text-decoration: none; font-size: 0.875rem;">
+                            <i class="fas fa-eye" style="margin-right: 0.25rem;"></i> View
                         </a>
                     </td>
                 </tr>
@@ -2839,7 +3252,7 @@ def ca_certificates(ca_id):
         
         return html
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/test-design')
@@ -2959,14 +3372,15 @@ def upload_https_cert():
         return str(e), 500
 
 
-@ui_bp.route('/api/ui/config/managed-certs-list')
+@ui_bp.route('/api/ui/config/managed-certs')
+@ui_bp.route('/api/ui/config/managed-certs-list')  # Backward compatibility
 @login_required
 def managed_certs_list():
-    """Get list of managed certificates suitable for HTTPS"""
+    """Get list of recent certificates for dashboard"""
     try:
         token = session.get('access_token')
         if not token:
-            return '<div class="p-8 text-center text-red-600">Session expired</div>'
+            return '<div style="text-align: center; padding: 2rem; color: var(--danger-color);">Session expired</div>'
         
         headers = {'Authorization': f'Bearer {token}'}
         
@@ -2978,124 +3392,132 @@ def managed_certs_list():
         )
         
         if response.status_code != 200:
-            return '<div class="p-8 text-center text-red-600">Failed to load certificates</div>'
+            return '<div style="text-align: center; padding: 2rem; color: var(--danger-color);">Failed to load certificates</div>'
         
         from datetime import datetime
-        now = datetime.utcnow()
         
-        # Filter valid certs (not CSRs, not revoked)
+        # Get all certificates (including CSRs, all types)
         all_certs = response.json()
-        # A certificate is valid if it has a serial number and valid dates (not a CSR)
-        certs = [c for c in all_certs 
-                if not c.get('revoked', False) 
-                and c.get('serial_number') 
-                and c.get('valid_from')
-                and c.get('has_private_key', False)]  # Need private key for HTTPS
         
-        # Sort by expiration
-        certs.sort(key=lambda x: x.get('valid_to', ''), reverse=True)
+        # Sort by creation date (most recent first)
+        certs = sorted(all_certs, key=lambda x: x.get('created_at', ''), reverse=True)[:10]  # Last 10
         
         if not certs:
             return '''
-            <div class="text-center py-8">
-                <i class="fas fa-certificate text-gray-400 text-4xl mb-3"></i>
-                <p class="text-gray-500 dark:text-gray-400">No valid certificates found</p>
-                <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">Create a certificate first, then select it here</p>
+            <div style="text-align: center; padding: 3rem;">
+                <i class="fas fa-certificate" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 1rem;"></i>
+                <p style="color: var(--text-secondary);">No certificates found</p>
+                <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.5rem;">Create your first certificate to get started</p>
             </div>
             '''
         
         html = '''
-        <div class="overflow-y-auto max-h-96">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                    <tr>
-                        <th>Subject</th>
-                        <th>Valid Until</th>
-                        <th>Type</th>
-                        <th>Action</th>
+        <div style="overflow-y: auto; max-height: 500px;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead style="position: sticky; top: 0; background: var(--bg-secondary); z-index: 10;">
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Certificate</th>
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Type</th>
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Status</th>
+                        <th style="padding: 0.75rem; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Expires</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody>
         '''
         
         for cert in certs:
-            # Parse subject for CN
-            subject = cert.get('subject', '')
-            cn = cert.get('descr', 'Unknown')
-            if 'CN=' in subject:
-                for part in subject.split(','):
-                    if 'CN=' in part:
-                        cn = part.split('CN=')[1].strip()
-                        break
+            # Get description
+            descr = cert.get('descr', 'Unknown Certificate')
+            cert_id = cert.get('id', '')
             
-            # Format date
+            # Get type
+            cert_type = cert.get('cert_type', 'unknown')
+            type_labels = {
+                'server_cert': 'Server',
+                'client_cert': 'Client', 
+                'combined_cert': 'Combined',
+                'ca_cert': 'CA'
+            }
+            type_label = type_labels.get(cert_type, cert_type.replace('_', ' ').title())
+            
+            # Type icon
+            type_icons = {
+                'server_cert': 'server',
+                'client_cert': 'user',
+                'combined_cert': 'exchange-alt',
+                'ca_cert': 'certificate'
+            }
+            type_icon = type_icons.get(cert_type, 'certificate')
+            
+            # Check if ACME certificate
+            is_acme = cert.get('created_by') == 'acme'
+            
+            # Status
+            is_csr = not cert.get('serial_number')
+            is_revoked = cert.get('revoked', False)
+            
+            if is_csr:
+                status_badge = '<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; background: var(--warning-bg); color: var(--warning-color); border: 1px solid var(--warning-border);"><i class="fas fa-file-signature" style="margin-right: 0.25rem;"></i> CSR</span>'
+            elif is_revoked:
+                status_badge = '<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; background: var(--danger-bg); color: var(--danger-color); border: 1px solid var(--danger-border);"><i class="fas fa-ban" style="margin-right: 0.25rem;"></i> Revoked</span>'
+            else:
+                status_badge = '<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-border);"><i class="fas fa-check-circle" style="margin-right: 0.25rem;"></i> Active</span>'
+            
+            # Expiration with color
             valid_to = cert.get('valid_to', '')[:10] if cert.get('valid_to') else 'N/A'
             
             # Calculate days left
+            days_color = 'var(--text-primary)'
+            days_text = ''
             try:
-                from datetime import datetime
-                if cert.get('valid_to'):
+                if cert.get('valid_to') and not is_csr:
                     exp_date = datetime.fromisoformat(cert['valid_to'].replace('Z', '+00:00'))
                     days_left = (exp_date - datetime.utcnow().replace(tzinfo=exp_date.tzinfo)).days
-                else:
-                    days_left = 0
+                    
+                    if days_left < 0:
+                        days_color = 'var(--danger-color)'
+                        days_text = f'Expired'
+                    elif days_left < 30:
+                        days_color = 'var(--danger-color)'
+                        days_text = f'{days_left}d left'
+                    elif days_left < 90:
+                        days_color = 'var(--warning-color)'
+                        days_text = f'{days_left}d left'
+                    else:
+                        days_color = 'var(--success-color)'
+                        days_text = f'{days_left}d left'
             except:
-                days_left = 0
-            
-            # Color based on days left
-            if days_left < 30:
-                date_class = 'text-red-600 dark:text-red-400'
-            elif days_left < 90:
-                date_class = 'text-yellow-600 dark:text-yellow-400'
-            else:
-                date_class = 'text-green-600 dark:text-green-400'
-            
-            cert_type = cert.get('cert_type', 'unknown')
-            
-            # Check if has private key (from API)
-            has_key = cert.get('has_private_key', False)
+                pass
             
             html += f'''
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td>
-                        <div class="flex items-center">
-                            <i class="fas fa-certificate text-blue-500 mr-2"></i>
-                            {cn}
+                <tr style="border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;"
+                    onmouseover="this.style.background='var(--bg-secondary)'"
+                    onmouseout="this.style.background='transparent'"
+                    onclick="window.location.href='/certificates/{cert_id}'">
+                    <td style="padding: 0.75rem;">
+                        <div style="display: flex; align-items: center;">
+                            <i class="fas fa-certificate" style="margin-right: 0.75rem; color: var(--primary-color);"></i>
+                            <div>
+                                <div style="font-weight: 500; color: var(--text-primary);">{descr}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.125rem;">ID: {cert_id}</div>
+                            </div>
                         </div>
-                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {'ID: ' + str(cert.get('id', 'N/A'))}
+                    </td>
+                    <td style="padding: 0.75rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div style="display: flex; align-items: center;">
+                                <i class="fas fa-{type_icon}" style="margin-right: 0.5rem; color: var(--text-secondary);"></i>
+                                <span style="color: var(--text-primary);">{type_label}</span>
+                            </div>
+                            {f'<span style="display: inline-flex; align-items: center; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; background: var(--success-bg); color: var(--success-color); border: 1px solid var(--success-border);"><i class="fas fa-robot" style="margin-right: 0.25rem;"></i> ACME</span>' if is_acme else ''}
                         </div>
                     </td>
-                    <td>
-                        {valid_to}
-                        <div class="text-xs text-gray-500 dark:text-gray-400">({days_left} days)</div>
+                    <td style="padding: 0.75rem;">
+                        {status_badge}
                     </td>
-                    <td>
-                        <span>
-                            {cert_type}
-                        </span>
-                    </td>
-                    <td>
-            '''
-            
-            if has_key:
-                html += f'''
-                        <button hx-post="/api/ui/config/use-managed-cert/{cert['id']}" 
-                                hx-confirm="Use this certificate for HTTPS? The server will restart."
-                                hx-swap="none"
-                                @htmx:after-request="if($event.detail.successful) {{ alert('Certificate applied successfully! Please restart the server.'); $dispatch('close-modal'); }}"
-                                class="btn btn-success text-xs">
-                            <i class="fas fa-check mr-1"></i>Use This
-                        </button>
-                '''
-            else:
-                html += '''
-                        <span class="" title="Private key not available">
-                            <i class="fas fa-key-skeleton mr-1"></i>No Key
-                        </span>
-                '''
-            
-            html += '''
+                    <td style="padding: 0.75rem;">
+                        <div style="color: var(--text-primary); font-family: monospace; font-size: 0.875rem;">{valid_to}</div>
+                        {f'<div style="font-size: 0.75rem; color: {days_color}; margin-top: 0.25rem;">{days_text}</div>' if days_text else ''}
                     </td>
                 </tr>
             '''
@@ -3108,7 +3530,7 @@ def managed_certs_list():
         
         return html
     except Exception as e:
-        return f'<div class="p-8 text-red-600">Error: {str(e)}</div>'
+        return f'<div style="text-align: center; padding: 2rem; color: var(--danger-color);">Error: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/config/use-managed-cert/<int:cert_id>', methods=['POST'])
@@ -3264,18 +3686,18 @@ def ocsp_status_list():
         cas = CA.query.all()
         
         html = '''
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th>CA Name</th>
-                        <th>OCSP Status</th>
-                        <th>OCSP URL</th>
-                        <th>Cached Responses</th>
-                        <th>Actions</th>
+        <div style="overflow-x: auto;">
+            <table id="ocsp-status-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;">CA Name</th>
+                        <th style="padding: 0.75rem; text-align: left;">OCSP Status</th>
+                        <th style="padding: 0.75rem; text-align: left;">OCSP URL</th>
+                        <th style="padding: 0.75rem; text-align: left;">Cached Responses</th>
+                        <th style="padding: 0.75rem; text-align: left;">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody>
         '''
         
         for ca in cas:
@@ -3283,24 +3705,24 @@ def ocsp_status_list():
             
             status_badge = ''
             if ca.ocsp_enabled:
-                status_badge = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Enabled</span>'
+                status_badge = '<span class="badge-outline badge-success"><i class="fas fa-check" style="margin-right: 0.25rem;"></i>Enabled</span>'
             else:
-                status_badge = '<span class="badge badge-secondary"><i class="fas fa-times mr-1"></i>Disabled</span>'
+                status_badge = '<span class="badge-outline badge-secondary"><i class="fas fa-times" style="margin-right: 0.25rem;"></i>Disabled</span>'
             
-            ocsp_url_display = ca.ocsp_url if ca.ocsp_url else '<span class="text-gray-400">Not configured</span>'
+            ocsp_url_display = ca.ocsp_url if ca.ocsp_url else '<span style="color: var(--text-muted);">Not configured</span>'
             
             html += f'''
-                <tr>
-                    <td>
-                        <div class="font-medium">{ca.descr}</div>
-                        <div class="text-xs text-gray-500">{ca.refid}</div>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem;">
+                        <div style="font-weight: 500; color: var(--text-primary);">{ca.descr}</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary);">{ca.refid}</div>
                     </td>
-                    <td>{status_badge}</td>
-                    <td><code class="text-xs">{ocsp_url_display}</code></td>
-                    <td class="text-center">{cached_count}</td>
-                    <td>
-                        <a href="/ca/{ca.id}" class="text-blue-600 hover:text-blue-800 text-sm">
-                            <i class="fas fa-cog mr-1"></i>Configure
+                    <td style="padding: 0.75rem;">{status_badge}</td>
+                    <td style="padding: 0.75rem;"><code style="font-size: 0.875rem; color: var(--text-secondary);">{ocsp_url_display}</code></td>
+                    <td style="padding: 0.75rem; text-align: center; color: var(--text-primary);">{cached_count}</td>
+                    <td style="padding: 0.75rem;">
+                        <a href="/ca/{ca.id}" class="btn-icon btn-icon-primary" title="Configure">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-settings"/></svg>
                         </a>
                     </td>
                 </tr>
@@ -3316,7 +3738,7 @@ def ocsp_status_list():
         
     except Exception as e:
         logger.error(f"Error getting OCSP status: {e}")
-        return f'<div class="text-red-600">Error loading OCSP status: {str(e)}</div>'
+        return f'<div style="color: var(--danger-color);">Error loading OCSP status: {str(e)}</div>'
 
 
 @ui_bp.route('/api/ui/ocsp/stats')
@@ -3340,7 +3762,7 @@ def ocsp_stats_ui():
         
     except Exception as e:
         logger.error(f"Error getting OCSP stats: {e}")
-        return '<span class="text-red-600">Error</span>'
+        return '<span style="color: var(--danger-color);">Error</span>'
 
 
 # HTTPS Certificate Management UI Routes
@@ -3828,3 +4250,255 @@ def system_info():
             'error': str(e),
             'success': False
         }), 500
+
+
+# ACME Management Routes
+@ui_bp.route('/config/acme')
+@login_required
+def config_acme_page():
+    """ACME configuration and management page"""
+    return render_template('config/acme.html')
+
+
+@ui_bp.route('/api/ui/acme/statistics')
+@login_required
+def acme_statistics():
+    """Get ACME statistics"""
+    try:
+        from models import db
+        from sqlalchemy import text
+        
+        # Query ACME database for statistics
+        total_accounts = db.session.execute(
+            text("SELECT COUNT(*) FROM acme_accounts")
+        ).scalar() or 0
+        
+        active_orders = db.session.execute(
+            text("SELECT COUNT(*) FROM acme_orders WHERE status IN ('pending', 'ready', 'processing')")
+        ).scalar() or 0
+        
+        completed_orders = db.session.execute(
+            text("SELECT COUNT(*) FROM acme_orders WHERE status = 'valid'")
+        ).scalar() or 0
+        
+        issued_certs = db.session.execute(
+            text("SELECT COUNT(*) FROM acme_orders WHERE status = 'valid' AND certificate_id IS NOT NULL")
+        ).scalar() or 0
+        
+        return jsonify({
+            'total_accounts': total_accounts,
+            'active_orders': active_orders,
+            'completed_orders': completed_orders,
+            'issued_certs': issued_certs
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'total_accounts': 0,
+            'active_orders': 0,
+            'completed_orders': 0,
+            'issued_certs': 0,
+            'error': str(e)
+        }), 200
+
+
+@ui_bp.route('/api/ui/acme/accounts')
+@login_required
+def acme_accounts_list():
+    """Get ACME accounts list"""
+    try:
+        from models import db
+        from datetime import datetime
+        from sqlalchemy import text
+        
+        accounts = db.session.execute(text("""
+            SELECT id, account_id, status, contact, created_at, 
+                   SUBSTR(jwk_thumbprint, 1, 16) as thumbprint_short
+            FROM acme_accounts 
+            ORDER BY created_at DESC
+        """)).fetchall()
+        
+        if not accounts:
+            return '''
+            <div style="text-align: center; padding: 2rem;">
+                <i class="fas fa-user-shield" style="font-size: 3rem; opacity: 0.2; margin-bottom: 0.75rem; display: block; color: var(--text-secondary);"></i>
+                <p style="margin-top: 1rem; color: var(--text-secondary); font-weight: 500;">No ACME accounts yet</p>
+                <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;">Accounts will appear here when ACME clients register</p>
+            </div>
+            '''
+        
+        html = '''
+        <div style="overflow-x: auto;">
+            <table id="acme-accounts-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;">Account ID</th>
+                        <th style="padding: 0.75rem; text-align: left;">Status</th>
+                        <th style="padding: 0.75rem; text-align: left;">Contacts</th>
+                        <th style="padding: 0.75rem; text-align: left;">JWK Thumbprint</th>
+                        <th style="padding: 0.75rem; text-align: left;">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+        '''
+        
+        for account in accounts:
+            status_badge_class = 'badge-success' if account[2] == 'valid' else 'badge-secondary'
+            contacts = account[3] or '[]'
+            created = datetime.fromisoformat(account[4]).strftime('%Y-%m-%d %H:%M')
+            
+            html += f'''
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem;"><code style="font-size: 0.875rem; color: var(--text-primary);">{account[1][:24]}...</code></td>
+                    <td style="padding: 0.75rem;"><span class="badge-outline {status_badge_class}">{account[2]}</span></td>
+                    <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{contacts}</td>
+                    <td style="padding: 0.75rem;"><code style="font-size: 0.875rem; color: var(--text-secondary);">{account[5]}...</code></td>
+                    <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{created}</td>
+                </tr>
+            '''
+        
+        html += '''
+                </tbody>
+            </table>
+        </div>
+        '''
+        
+        return html
+        
+    except Exception as e:
+        return f'<div class="alert alert-danger">Error: {str(e)}</div>'
+
+
+@ui_bp.route('/api/ui/acme/orders')
+@login_required
+def acme_orders_list():
+    """Get ACME orders list"""
+    try:
+        from models import db
+        from datetime import datetime
+        from sqlalchemy import text
+        
+        orders = db.session.execute(text("""
+            SELECT o.id, o.order_id, o.status, o.identifiers, o.created_at,
+                   a.account_id
+            FROM acme_orders o
+            LEFT JOIN acme_accounts a ON o.account_id = a.account_id
+            ORDER BY o.created_at DESC
+            LIMIT 50
+        """)).fetchall()
+        
+        if not orders:
+            return '''
+            <div style="text-align: center; padding: 2rem;">
+                <i class="fas fa-file-alt" style="font-size: 3rem; opacity: 0.2; margin-bottom: 0.75rem; display: block; color: var(--text-secondary);"></i>
+                <p style="margin-top: 1rem; color: var(--text-secondary); font-weight: 500;">No ACME orders yet</p>
+                <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem;">Orders will appear here when certificates are requested</p>
+            </div>
+            '''
+        
+        html = '''
+        <div style="overflow-x: auto;">
+            <table id="acme-orders-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;">Order ID</th>
+                        <th style="padding: 0.75rem; text-align: left;">Status</th>
+                        <th style="padding: 0.75rem; text-align: left;">Identifiers</th>
+                        <th style="padding: 0.75rem; text-align: left;">Account</th>
+                        <th style="padding: 0.75rem; text-align: left;">Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+        '''
+        
+        for order in orders:
+            status_colors = {
+                'pending': 'badge-warning',
+                'ready': 'badge-info',
+                'processing': 'badge-primary',
+                'valid': 'badge-success',
+                'invalid': 'badge-danger'
+            }
+            status_badge_class = status_colors.get(order[2], 'badge-secondary')
+            created = datetime.fromisoformat(order[4]).strftime('%Y-%m-%d %H:%M')
+            
+            html += f'''
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem;"><code style="font-size: 0.875rem; color: var(--text-primary);">{order[1][:24]}...</code></td>
+                    <td style="padding: 0.75rem;"><span class="badge-outline {status_badge_class}">{order[2]}</span></td>
+                    <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{order[3]}</td>
+                    <td style="padding: 0.75rem;"><code style="font-size: 0.875rem; color: var(--text-secondary);">{order[5][:16] if order[5] else 'N/A'}...</code></td>
+                    <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{created}</td>
+                </tr>
+            '''
+        
+        html += '''
+                </tbody>
+            </table>
+        </div>
+        '''
+        
+        return html
+        
+    except Exception as e:
+        return f'<div class="alert alert-danger">Error: {str(e)}</div>'
+
+
+@ui_bp.route('/api/ui/acme/settings', methods=['POST'])
+@login_required
+def acme_save_settings():
+    """Save ACME configuration settings"""
+    try:
+        from models import db, SystemConfig
+        
+        default_ca = request.form.get('default_ca')
+        cert_validity = request.form.get('cert_validity', '90')
+        
+        # Save default CA
+        if default_ca:
+            config = SystemConfig.query.filter_by(key='acme_default_ca').first()
+            if not config:
+                config = SystemConfig(key='acme_default_ca')
+            config.value = default_ca
+            config.description = 'Default CA for ACME certificate signing'
+            db.session.add(config)
+        
+        # Save certificate validity
+        config_validity = SystemConfig.query.filter_by(key='acme_cert_validity').first()
+        if not config_validity:
+            config_validity = SystemConfig(key='acme_cert_validity')
+        config_validity.value = cert_validity
+        config_validity.description = 'Default validity period for ACME certificates (days)'
+        db.session.add(config_validity)
+        
+        db.session.commit()
+        
+        flash('ACME settings saved successfully', 'success')
+        return '', 200
+        
+    except Exception as e:
+        flash(f'Error saving ACME settings: {str(e)}', 'error')
+        return str(e), 500
+
+
+@ui_bp.route('/api/ui/acme/settings/load')
+@login_required
+def acme_load_settings():
+    """Load current ACME configuration"""
+    try:
+        from models import SystemConfig
+        
+        default_ca = SystemConfig.query.filter_by(key='acme_default_ca').first()
+        cert_validity = SystemConfig.query.filter_by(key='acme_cert_validity').first()
+        
+        return jsonify({
+            'default_ca': default_ca.value if default_ca else None,
+            'cert_validity': cert_validity.value if cert_validity else '90'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'default_ca': None,
+            'cert_validity': '90',
+            'error': str(e)
+        }), 200

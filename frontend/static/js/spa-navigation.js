@@ -8,12 +8,18 @@ function updateActiveSidebarLink(url) {
     const path = new URL(url, window.location.origin).pathname;
     
     // Remove all active classes
-    document.querySelectorAll('.sidebar-link').forEach(link => {
-        link.classList.remove('active');
+    const sidebarLinks = document.querySelectorAll('.sidebar-link');
+    if (!sidebarLinks || sidebarLinks.length === 0) return; // No sidebar on this page
+    
+    sidebarLinks.forEach(link => {
+        if (link && link.classList) {
+            link.classList.remove('active');
+        }
     });
     
     // Add active class to matching link
-    document.querySelectorAll('.sidebar-link').forEach(link => {
+    sidebarLinks.forEach(link => {
+        if (!link || !link.classList) return;
         const href = link.getAttribute('href');
         if (href === path || (href !== '/' && path.startsWith(href))) {
             link.classList.add('active');

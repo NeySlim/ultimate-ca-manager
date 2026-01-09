@@ -58,7 +58,14 @@ class Config:
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(
         seconds=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES", "2592000"))
     )
-    JWT_TOKEN_LOCATION = ["headers"]
+    
+    # JWT Cookies - Enable cookie-based auth for UI
+    JWT_TOKEN_LOCATION = ["headers", "cookies"]  # Accept both headers and cookies
+    JWT_COOKIE_SECURE = True  # Require HTTPS
+    JWT_COOKIE_CSRF_PROTECT = False  # Disable CSRF for simplicity (we're using SameSite)
+    JWT_COOKIE_SAMESITE = "Lax"  # Protect against CSRF
+    JWT_ACCESS_COOKIE_NAME = "access_token_cookie"
+    JWT_REFRESH_COOKIE_NAME = "refresh_token_cookie"
     JWT_HEADER_NAME = "Authorization"
     JWT_HEADER_TYPE = "Bearer"
     

@@ -9,7 +9,7 @@
         <h1 style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">
             <i class="fas fa-file-contract" style="margin-right: 0.5rem;"></i> CRL Management
         </h1>
-        <button onclick="refreshCRLs()" class="btn btn-secondary">
+        <button onclick="refreshCRLs()" class="btn-secondary">
             <i class="fas fa-refresh" style="margin-right: 0.5rem;"></i> Refresh
         </button>
     </div>
@@ -68,7 +68,6 @@ function generateCRL(caId, caName) {
         fetch(`/api/v1/crl/${caId}/generate`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
                 'Content-Type': 'application/json'
             }
         })
@@ -89,7 +88,6 @@ function generateCRL(caId, caName) {
 }
 
 function downloadCRL(caId, format) {
-    const token = localStorage.getItem('jwt_token');
     window.open(`/api/v1/crl/${caId}/download?format=${format}&token=${token}`, '_blank');
 }
 
