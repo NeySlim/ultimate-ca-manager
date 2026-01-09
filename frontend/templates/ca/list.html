@@ -10,12 +10,12 @@
             <i class="fas fa-certificate" style="margin-right: 0.5rem;"></i> Certificate Authorities
         </h1>
         <div style="display: flex; gap: 0.5rem;">
-            <button onclick="openImportCAModal()" 
-                    class="btn btn-secondary">
+            <button data-action="open-import-ca-modal"
+                    class="btn-secondary">
                 <i class="fas fa-file-import" style="margin-right: 0.5rem; color: var(--success-color);"></i> Import CA
             </button>
-            <button onclick="openCreateCAModal()" 
-                    class="btn btn-primary">
+            <button data-action="open-create-ca-modal"
+                    class="btn-primary">
                 <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> Create CA
             </button>
         </div>
@@ -54,14 +54,14 @@
                 <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">
                     <i class="fas fa-plus-circle" style="margin-right: 0.5rem;"></i> Create Certificate Authority
                 </h2>
-                <button onclick="closeCreateCAModal()" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
+                <button data-action="close-create-ca-modal" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
                     <i class="fas fa-times" style="font-size: 1.25rem;"></i>
                 </button>
             </div>
         </div>
         
         <form hx-post="/api/ui/ca/create" 
-              hx-on::after-request="handleCACreateResponse(event)">
+              hx-on::after-request="if(event.detail.successful){closeCreateCAModal();htmx.trigger('body','refreshCAs');if(typeof showNotification==='function')showNotification('CA created successfully','success');}else{if(typeof showNotification==='function')showNotification('Error creating CA','error');}">
             <div style="padding: 1.5rem;">
                 
                 <!-- Basic Information -->
@@ -175,7 +175,7 @@
             </div>
             
             <div class="modal-form-footer">
-                <button type="button" onclick="closeCreateCAModal()" 
+                <button type="button" data-action="close-create-ca-modal" 
                         class="btn-secondary">
                     Cancel
                 </button>
@@ -198,14 +198,14 @@
                 <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">
                     <i class="fas fa-file-import" style="margin-right: 0.5rem;"></i> Import Certificate Authority
                 </h2>
-                <button onclick="closeImportCAModal()" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
+                <button data-action="close-import-ca-modal" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
                     <i class="fas fa-times" style="font-size: 1.25rem;"></i>
                 </button>
             </div>
         </div>
         
         <form hx-post="/api/ui/ca/import" 
-              hx-on::after-request="handleCAImportResponse(event)">
+              hx-on::after-request="if(event.detail.successful){closeImportCAModal();htmx.trigger('body','refreshCAs');if(typeof showNotification==='function')showNotification('CA imported successfully','success');}else{if(typeof showNotification==='function')showNotification('Error importing CA','error');}">
             <div style="padding: 1.5rem;">
                 
                 <div style="margin-bottom: 1rem;">
@@ -241,7 +241,7 @@
             </div>
             
             <div class="modal-form-footer">
-                <button type="button" onclick="closeImportCAModal()" 
+                <button type="button" data-action="close-import-ca-modal" 
                         class="btn-secondary">
                     Cancel
                 </button>
@@ -276,11 +276,11 @@
                    placeholder="Confirm password" minlength="4">
         </div>
         <div class="modal-form-footer">
-            <button onclick="closePKCS12Modal()" 
+            <button data-action="close-pkcs12-modal" 
                     class="btn-secondary">
                 Cancel
             </button>
-            <button onclick="downloadPKCS12WithPassword()" 
+            <button data-action="download-pkcs12-with-password" 
                     class="btn-primary">
                 Download
             </button>
@@ -367,22 +367,22 @@ function exportCA(id, event) {
     menu.style.border = '1px solid var(--border-color)';
     menu.style.zIndex = '50';
     menu.innerHTML = '<div style="padding: 0.25rem 0;">' +
-        '<button onclick="exportCASimple(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+        '<button data-action="export-ca-simple" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
             '<i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i>Certificate only (PEM)' +
         '</button>' +
-        '<button onclick="exportCAWithKey(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+        '<button data-action="export-ca-key" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
             '<i class="fas fa-key" style="margin-right: 0.5rem;"></i>Certificate + Key (PEM)' +
         '</button>' +
-        '<button onclick="exportCAWithChain(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+        '<button data-action="export-ca-chain" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
             '<i class="fas fa-link" style="margin-right: 0.5rem;"></i>Certificate + Chain (PEM)' +
         '</button>' +
-        '<button onclick="exportCAFull(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+        '<button data-action="export-ca-full" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
             '<i class="fas fa-archive" style="margin-right: 0.5rem;"></i>Full Chain + Key (PEM)' +
         '</button>' +
-        '<button onclick="exportCADER(' + id + ')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+        '<button data-action="export-ca-der" data-id="' + id + '" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
             '<i class="fas fa-file-binary" style="margin-right: 0.5rem;"></i>Certificate (DER)' +
         '</button>' +
-        '<button onclick="showPKCS12ModalTable(' + id + ', \'ca\')" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
+        '<button data-action="show-pkcs12-modal-table" data-id="' + id + '" data-type="ca" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'transparent\'">' +
             '<i class="fas fa-lock" style="margin-right: 0.5rem;"></i>PKCS#12 (.p12/.pfx)' +
         '</button>' +
     '</div>';
@@ -420,63 +420,8 @@ function exportCADER(id) {
     document.getElementById('export-menu-' + id)?.remove();
 }
 
-function deleteCA(refid, name) {
-    ucmConfirm(
-        'Delete CA "' + name + '"? This will also delete all certificates signed by this CA!',
-        'Delete CA',
-        { danger: true, confirmText: 'Delete', icon: 'trash' }
-    ).then(confirmed => {
-        if (!confirmed) return;
-        
-        fetch('/api/v1/ca/' + refid, {
-            method: 'DELETE',
-            headers: { 
-                'Authorization': 'Bearer ' + localStorage.getItem('access_token'),
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.error) {
-                ucmAlert('Error: ' + data.error, 'Error');
-            } else {
-                ucmAlert('CA deleted successfully', 'Success').then(() => {
-                    htmx.trigger('body', 'refreshCAs');
-                });
-            }
-        })
-        .catch(e => ucmAlert('Error deleting CA: ' + e, 'Error'));
-    });
-}
-
-function exportWithToken(url) {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-        ucmAlert('Not authenticated', 'Error');
-        return;
-    }
-    
-    fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + token }
-    })
-    .then(response => {
-        if (!response.ok) throw new Error('Export failed');
-        return response.blob();
-    })
-    .then(blob => {
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = '';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(downloadUrl);
-    })
-    .catch(error => {
-        ucmAlert('Export failed: ' + error.message, 'Error');
-    });
-}
+// Note: deleteCA() is now in ucm-global.js with event delegation
+// Note: exportWithToken() is now in ucm-global.js
 
 // Close menus when clicking outside
 document.addEventListener('click', function(e) {

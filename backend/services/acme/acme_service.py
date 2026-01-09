@@ -590,10 +590,43 @@ class AcmeService:
         if not ca.prv:
             return False, None, f"CA {ca.refid} has no private key"
         
+        # Extract CN from CSR for better description
+        descr = f"ACME Certificate - Order {order.order_id}"
+        try:
+            from cryptography.hazmat.backends import default_backend
+            from cryptography import x509
+            csr_bytes = csr_pem.encode() if isinstance(csr_pem, str) else csr_pem
+            csr = x509.load_pem_x509_csr(csr_bytes, default_backend())
+            
+            # Try to get CN from subject
+            cn = None
+            for attr in csr.subject:
+                if attr.oid == x509.oid.NameOID.COMMON_NAME:
+                    cn = attr.value
+                    break
+            
+            # If no CN, try first DNS name from SAN
+            if not cn:
+                try:
+                    san_ext = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+                    for name in san_ext.value:
+                        if isinstance(name, x509.DNSName):
+                            cn = name.value
+                            break
+                except:
+                    pass
+            
+            # Use CN as description if found
+            if cn:
+                descr = cn
+        except Exception as e:
+            # Keep default description if extraction fails
+            pass
+        
         # Create certificate record with CSR
         cert = Certificate(
             refid=secrets.token_urlsafe(16),
-            descr=f"ACME Certificate - Order {order.order_id}",
+            descr=descr,
             caref=ca.refid,
             csr=base64.b64encode(csr_pem.encode()).decode('utf-8'),
             cert_type='server_cert',

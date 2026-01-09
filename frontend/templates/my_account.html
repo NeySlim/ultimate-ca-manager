@@ -70,7 +70,7 @@
                     <input type="password" id="confirm-password" class="form-input" placeholder="Confirm new password" required>
                 </div>
                 <div style="padding-top: 0.5rem;">
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn-primary">
                         <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
                         Update Password
                     </button>
@@ -99,11 +99,11 @@
                         <span style="font-weight: 600; color: var(--text-primary);">Sentinel</span>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                        <button onclick="setTheme('sentinel-light')" class="btn btn-sm" style="justify-content: flex-start;">
+                        <button data-action="set-theme" data-theme="sentinel-light" class="btn-secondary" style="justify-content: flex-start;">
                             <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-sun"/></svg>
                             Light
                         </button>
-                        <button onclick="setTheme('sentinel-dark')" class="btn btn-sm" style="justify-content: flex-start;">
+                        <button data-action="set-theme" data-theme="sentinel-dark" class="btn-secondary" style="justify-content: flex-start;">
                             <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-moon"/></svg>
                             Dark
                         </button>
@@ -117,11 +117,11 @@
                         <span style="font-weight: 600; color: var(--text-primary);">Amber</span>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                        <button onclick="setTheme('amber-light')" class="btn btn-sm" style="justify-content: flex-start;">
+                        <button data-action="set-theme" data-theme="amber-light" class="btn-secondary" style="justify-content: flex-start;">
                             <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-sun"/></svg>
                             Light
                         </button>
-                        <button onclick="setTheme('amber-dark')" class="btn btn-sm" style="justify-content: flex-start;">
+                        <button data-action="set-theme" data-theme="amber-dark" class="btn-secondary" style="justify-content: flex-start;">
                             <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-moon"/></svg>
                             Dark
                         </button>
@@ -135,11 +135,11 @@
                         <span style="font-weight: 600; color: var(--text-primary);">Blossom</span>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                        <button onclick="setTheme('blossom-light')" class="btn btn-sm" style="justify-content: flex-start;">
+                        <button data-action="set-theme" data-theme="blossom-light" class="btn-secondary" style="justify-content: flex-start;">
                             <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-sun"/></svg>
                             Light
                         </button>
-                        <button onclick="setTheme('blossom-dark')" class="btn btn-sm" style="justify-content: flex-start;">
+                        <button data-action="set-theme" data-theme="blossom-dark" class="btn-secondary" style="justify-content: flex-start;">
                             <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-moon"/></svg>
                             Dark
                         </button>
@@ -153,11 +153,11 @@
                         <span style="font-weight: 600; color: var(--text-primary);">Nebula</span>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                        <button onclick="setTheme('nebula-light')" class="btn btn-sm" style="justify-content: flex-start;">
+                        <button data-action="set-theme" data-theme="nebula-light" class="btn-secondary" style="justify-content: flex-start;">
                             <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-sun"/></svg>
                             Light
                         </button>
-                        <button onclick="setTheme('nebula-dark')" class="btn btn-sm" style="justify-content: flex-start;">
+                        <button data-action="set-theme" data-theme="nebula-dark" class="btn-secondary" style="justify-content: flex-start;">
                             <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.5rem;"><use href="#icon-moon"/></svg>
                             Dark
                         </button>
@@ -189,7 +189,7 @@
                     <span style="font-weight: 600; color: var(--text-primary);">Password</span>
                 </div>
                 <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
-                    <a href="/logout" class="btn btn-danger">
+                    <a href="/logout" class="btn-danger">
                         <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-logout"/></svg>
                         Logout
                     </a>

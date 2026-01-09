@@ -11,7 +11,7 @@
         </h1>
         <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0 0;">Overview of your certificate infrastructure</p>
     </div>
-    <button class="btn btn-primary">
+    <button class="btn-primary">
         <i class="fas fa-sync"></i> Refresh
     </button>
 </div>
@@ -93,49 +93,14 @@
         <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">Recent Certificates</h2>
     </div>
     <div class="card-body" style="padding: 0;">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th style="width: 30%;">Common Name</th>
-                    <th style="width: 15%;">Type</th>
-                    <th style="width: 25%;">Issuer</th>
-                    <th style="width: 15%;">Status</th>
-                    <th style="width: 15%;">Expires</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if certificates %}
-                    {% for cert in certificates[:10] %}
-                    <tr>
-                        <td><strong>{{ cert.common_name }}</strong></td>
-                        <td><span class="badge badge-primary badge-xs">{{ cert.type or 'SERVER' }}</span></td>
-                        <td>{{ cert.issuer_cn }}</td>
-                        <td>
-                            {% if cert.is_valid %}
-                                <span class="badge badge-success badge-xs">Valid</span>
-                            {% else %}
-                                <span class="badge badge-secondary badge-xs">Expired</span>
-                            {% endif %}
-                        </td>
-                        <td style="font-size: 12px;">
-                            {% if cert.not_after %}
-                                {{ cert.not_after[:10] }}
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                <tr>
-                    <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 40px;">
-                        <i class="fas fa-certificate" style="font-size: 48px; opacity: 0.2; margin-bottom: 12px; display: block;"></i>
-                        No certificates found
-                    </td>
-                </tr>
-                {% endif %}
-            </tbody>
-        </table>
+        <div hx-get="/api/ui/config/managed-certs"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div style="text-align: center; padding: 3rem;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--text-secondary);"></i>
+                <p style="margin-top: 1rem; color: var(--text-secondary);">Loading certificates...</p>
+            </div>
+        </div>
     </div>
 </div>
 
