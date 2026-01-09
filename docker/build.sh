@@ -141,7 +141,7 @@ else
         .
 fi
 
-if [ $? -eq 0 ]; then
+if docker tag; then
     echo ""
     echo -e "${GREEN}✅ Build successful!${NC}"
     echo ""
