@@ -235,9 +235,14 @@ function loadHTTPSCertInfo() {
     fetch('/api/ui/system/https-cert-info')
         .then(response => response.json())
         .then(data => {
-            if (data.subject) document.getElementById('cert-subject').textContent = data.subject;
-            if (data.expires) document.getElementById('cert-expiry').textContent = data.expires;
-            if (data.type) document.getElementById('cert-type').textContent = data.type;
+            // Check if elements exist before modifying
+            const certSubject = document.getElementById('cert-subject');
+            const certExpiry = document.getElementById('cert-expiry');
+            const certType = document.getElementById('cert-type');
+            
+            if (certSubject && data.subject) certSubject.textContent = data.subject;
+            if (certExpiry && data.expires) certExpiry.textContent = data.expires;
+            if (certType && data.type) certType.textContent = data.type;
             
             // Set radio button based on source
             if (data.source === 'managed' && data.cert_id) {
@@ -251,14 +256,21 @@ function loadHTTPSCertInfo() {
                 if (select) {
                     // Wait for certificates to load, then select
                     setTimeout(() => {
-                        select.value = String(data.cert_id);
-                        select.dispatchEvent(new Event('change'));
+                        // Double-check element still exists after timeout
+                        const selectCheck = document.getElementById('managed-cert-id');
+                        if (selectCheck) {
+                            selectCheck.value = String(data.cert_id);
+                            selectCheck.dispatchEvent(new Event('change'));
+                        }
                     }, 800);
                 }
                 toggleCertSelector();
             } else {
-                document.querySelector('input[name="cert-source"][value="auto"]').checked = true;
-                toggleCertSelector();
+                const autoRadio = document.querySelector('input[name="cert-source"][value="auto"]');
+                if (autoRadio) {
+                    autoRadio.checked = true;
+                    toggleCertSelector();
+                }
             }
         })
         .catch(error => console.error('Error loading HTTPS cert info:', error));
@@ -295,9 +307,12 @@ function loadCertificateCandidates() {
 }
 
 function toggleCertSelector() {
-    const source = document.querySelector('input[name="cert-source"]:checked').value;
+    const source = document.querySelector('input[name="cert-source"]:checked');
     const container = document.getElementById('cert-selector-container');
-    if (source === 'managed') {
+    
+    if (!source || !container) return; // Elements don't exist
+    
+    if (source.value === 'managed') {
         container.style.display = 'block';
     } else {
         container.style.display = 'none';
@@ -312,9 +327,15 @@ function setupCertSelectorListener() {
     select.dataset.listenerAdded = 'true';
     select.addEventListener('change', function() {
         const details = document.getElementById('cert-details');
+        const selectedCertSubject = document.getElementById('selected-cert-subject');
+        const selectedCertExpiry = document.getElementById('selected-cert-expiry');
+        
+        // Check all elements exist
+        if (!details || !selectedCertSubject || !selectedCertExpiry) return;
+        
         if (this.value && this.selectedOptions[0].dataset.subject) {
-            document.getElementById('selected-cert-subject').textContent = this.selectedOptions[0].dataset.subject;
-            document.getElementById('selected-cert-expiry').textContent = this.selectedOptions[0].dataset.expires;
+            selectedCertSubject.textContent = this.selectedOptions[0].dataset.subject;
+            selectedCertExpiry.textContent = this.selectedOptions[0].dataset.expires;
             details.style.display = 'block';
         } else {
             details.style.display = 'none';
@@ -335,12 +356,13 @@ function loadPKIStats() {
 }
 
 function applyHTTPSCertificate() {
-    const source = document.querySelector('input[name="cert-source"]:checked').value;
+    const source = document.querySelector('input[name="cert-source"]:checked');
+    if (!source) return;
     
     // Validate managed cert selection
-    if (source === 'managed') {
-        const certId = document.getElementById('managed-cert-id').value;
-        if (!certId) {
+    if (source.value === 'managed') {
+        const certIdSelect = document.getElementById('managed-cert-id');
+        if (!certIdSelect || !certIdSelect.value) {
             ucmAlert('Please select a certificate from the list', 'Error');
             return;
         }
