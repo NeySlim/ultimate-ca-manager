@@ -9,6 +9,7 @@ from models import db, AuditLog
 from models.email_notification import SMTPConfig, NotificationConfig, NotificationLog
 from services.email_service import EmailService
 from services.notification_service import NotificationService
+from app import cache
 import json
 import logging
 
@@ -35,6 +36,7 @@ def log_audit(action, username, details=None):
 @notification_bp.route('/smtp/config', methods=['GET'])
 @jwt_required()
 @admin_required
+@cache.cached(timeout=3600, key_prefix='smtp_config')  # Cache for 1 hour
 def get_smtp_config():
     """
     Get SMTP configuration
@@ -113,6 +115,9 @@ def update_smtp_config():
         config.updated_by = username
         
         db.session.commit()
+        
+        # Invalidate cache
+        cache.delete('smtp_config')
         
         log_audit('update_smtp_config', username, f"Updated SMTP configuration")
         
