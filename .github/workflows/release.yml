@@ -1,0 +1,75 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          
+          # Get previous tag
+          PREV_TAG=$(git tag --sort=-v:refname | grep -A1 "^${VERSION}$" | tail -1)
+          
+          # Generate changelog
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" ${VERSION})
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" ${PREV_TAG}..${VERSION})
+          fi
+          
+          # Create release notes
+          cat > release_notes.md << EOF
+          ## What's New in ${VERSION}
+          
+          ${COMMITS}
+          
+          ## Installation
+          
+          ### Docker
+          \`\`\`bash
+          docker pull ghcr.io/neyslim/ultimate-ca-manager:${VERSION}
+          \`\`\`
+          
+          ### RPM (RHEL/Rocky/Alma/Fedora)
+          \`\`\`bash
+          sudo yum install ./ultimate-ca-manager-${VERSION#v}-1.el9.noarch.rpm
+          \`\`\`
+          
+          ### DEB (Debian/Ubuntu)
+          \`\`\`bash
+          sudo dpkg -i ultimate-ca-manager_${VERSION#v}_all.deb
+          sudo apt-get install -f
+          \`\`\`
+          
+          See [Documentation](https://github.com/NeySlim/ultimate-ca-manager/wiki) for more details.
+          EOF
+          
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: ${{ steps.notes.outputs.notes }}
+          draft: false
+          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') || contains(github.ref, 'rc') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
