@@ -92,10 +92,12 @@
     </div>
 
     <!-- CA OCSP Configuration -->
-    <div class="card">
-        <h2 style="font-size: 1.25rem; font-weight: 600; margin: 0 0 1rem 0; color: var(--text-primary);">
-            <i class="fas fa-cog" style="margin-right: 0.5rem;"></i>Certificate Authorities OCSP Configuration
-        </h2>
+    <div class="card" style="padding: 0;">
+        <div style="padding: 1.5rem 1.5rem 0.75rem 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin: 0; color: var(--text-primary);">
+                <i class="fas fa-cog" style="margin-right: 0.5rem;"></i>Certificate Authorities OCSP Configuration
+            </h2>
+        </div>
         <div hx-get="/api/ui/ocsp/status" 
              hx-trigger="load" 
              hx-target="#ocsp-status-list"

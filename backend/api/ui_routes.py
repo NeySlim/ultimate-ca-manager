@@ -3676,18 +3676,18 @@ def ocsp_status_list():
         cas = CA.query.all()
         
         html = '''
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th>CA Name</th>
-                        <th>OCSP Status</th>
-                        <th>OCSP URL</th>
-                        <th>Cached Responses</th>
-                        <th>Actions</th>
+        <div style="overflow-x: auto;">
+            <table id="ocsp-status-table">
+                <thead style="background: var(--bg-secondary);">
+                    <tr style="border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 0.75rem; text-align: left;">CA Name</th>
+                        <th style="padding: 0.75rem; text-align: left;">OCSP Status</th>
+                        <th style="padding: 0.75rem; text-align: left;">OCSP URL</th>
+                        <th style="padding: 0.75rem; text-align: left;">Cached Responses</th>
+                        <th style="padding: 0.75rem; text-align: left;">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
+                <tbody>
         '''
         
         for ca in cas:
@@ -3695,24 +3695,24 @@ def ocsp_status_list():
             
             status_badge = ''
             if ca.ocsp_enabled:
-                status_badge = '<span class="badge badge-success"><i class="fas fa-check mr-1"></i>Enabled</span>'
+                status_badge = '<span class="badge-outline badge-success"><i class="fas fa-check" style="margin-right: 0.25rem;"></i>Enabled</span>'
             else:
-                status_badge = '<span class="badge badge-secondary"><i class="fas fa-times mr-1"></i>Disabled</span>'
+                status_badge = '<span class="badge-outline badge-secondary"><i class="fas fa-times" style="margin-right: 0.25rem;"></i>Disabled</span>'
             
-            ocsp_url_display = ca.ocsp_url if ca.ocsp_url else '<span class="text-gray-400">Not configured</span>'
+            ocsp_url_display = ca.ocsp_url if ca.ocsp_url else '<span style="color: var(--text-muted);">Not configured</span>'
             
             html += f'''
-                <tr>
-                    <td>
-                        <div class="font-medium">{ca.descr}</div>
-                        <div class="text-xs text-gray-500">{ca.refid}</div>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                    <td style="padding: 0.75rem;">
+                        <div style="font-weight: 500; color: var(--text-primary);">{ca.descr}</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary);">{ca.refid}</div>
                     </td>
-                    <td>{status_badge}</td>
-                    <td><code class="text-xs">{ocsp_url_display}</code></td>
-                    <td class="text-center">{cached_count}</td>
-                    <td>
-                        <a href="/ca/{ca.id}" class="text-blue-600 hover:text-blue-800 text-sm">
-                            <i class="fas fa-cog mr-1"></i>Configure
+                    <td style="padding: 0.75rem;">{status_badge}</td>
+                    <td style="padding: 0.75rem;"><code style="font-size: 0.875rem; color: var(--text-secondary);">{ocsp_url_display}</code></td>
+                    <td style="padding: 0.75rem; text-align: center; color: var(--text-primary);">{cached_count}</td>
+                    <td style="padding: 0.75rem;">
+                        <a href="/ca/{ca.id}" class="btn-icon btn-icon-primary" title="Configure">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-settings"/></svg>
                         </a>
                     </td>
                 </tr>
