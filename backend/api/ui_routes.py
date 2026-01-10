@@ -756,7 +756,7 @@ def ca_list_content():
                             <div style="display: flex; align-items: center; justify-content: space-between;">
                                 <span>Description</span>
                                 <div style="position: relative; margin-left: 12px;">
-                                    <input type="text" id="searchCA" placeholder="Recherche..." 
+                                    <input type="text" id="searchCA" placeholder="Search..." 
                                            style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);"
                                            onkeyup="filterTableCA()"
                                            onclick="event.stopPropagation()">
@@ -1247,7 +1247,7 @@ def cert_list_content():
                             <div style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
                                 <span>Description <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i></span>
                                 <div style="position: relative; margin-left: 12px;">
-                                    <input type="text" id="searchCert" placeholder="Recherche..." 
+                                    <input type="text" id="searchCert" placeholder="Search..." 
                                            style="padding: 4px 8px 4px 24px; font-size: 12px; width: 160px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);"
                                            onkeyup="filterTableCert()"
                                            onclick="event.stopPropagation()">
