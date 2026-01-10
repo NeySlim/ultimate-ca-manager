@@ -242,6 +242,12 @@ class CA(db.Model):
             "is_root": self.is_root,
             "key_type": self.key_type,
             "hash_algorithm": self.hash_algorithm,
+            # CRL/CDP configuration
+            "cdp_enabled": self.cdp_enabled,
+            "cdp_url": self.cdp_url,
+            # OCSP configuration
+            "ocsp_enabled": self.ocsp_enabled,
+            "ocsp_url": self.ocsp_url,
         }
         if include_private:
             data["crt"] = self.crt

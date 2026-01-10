@@ -278,6 +278,11 @@ const getToken = () => document.querySelector('meta[name="access-token"]')?.cont
     loadCertificateCandidates();
     setupCertSelectorListener();
     updateMTLSBadge();
+    
+    // Refresh cert info every 10 seconds (without flicker)
+    setInterval(() => {
+        loadHTTPSCertInfo(true); // true = silent update
+    }, 10000);
 })();
 
 // Also load on DOMContentLoaded (for direct page access)
@@ -289,7 +294,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateMTLSBadge();
 });
 
-function loadHTTPSCertInfo() {
+function loadHTTPSCertInfo(silent = false) {
     fetch('/api/ui/system/https-cert-info')
         .then(response => response.json())
         .then(data => {
