@@ -59,6 +59,14 @@
 
 **Priority: Medium**
 
+#### SSO & Authentication
+- [ ] **Single Sign-On (SSO)** - Enterprise authentication (8-10h)
+  - SAML 2.0 support (Okta, Azure AD, Google Workspace)
+  - OAuth2/OIDC integration
+  - LDAP/Active Directory authentication
+  - Auto-provisioning from IdP
+  - Group/role mapping
+
 #### Certificate Templates
 - [ ] **Certificate Templates** - Pre-configured cert profiles
   - Web server template (serverAuth)
@@ -81,7 +89,7 @@
   - CRL download statistics
   - Top CAs by certificate count
 
-**Estimated Time:** 20-30 hours
+**Estimated Time:** 30-40 hours
 
 ---
 
@@ -144,7 +152,6 @@
 ## 💡 Feature Requests & Ideas
 
 ### Community Suggestions (vote on GitHub Discussions)
-- [ ] LDAP/Active Directory integration
 - [ ] S/MIME certificate generation
 - [ ] Smart card enrollment (PIV/CAC)
 - [ ] Certificate pinning management
@@ -152,6 +159,9 @@
 - [ ] Certificate transparency log submission
 - [ ] Cross-certification support
 - [ ] Multi-language support (French, German, Spanish)
+- [ ] Certificate auto-renewal for ACME clients
+- [ ] Certificate request approval workflow
+- [ ] External CA connector (DigiCert, Let's Encrypt Proxy)
 
 ---
 
