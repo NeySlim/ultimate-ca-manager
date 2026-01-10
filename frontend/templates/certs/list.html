@@ -365,7 +365,7 @@ if (typeof window.pkcs12ExportId === 'undefined') {
     window.pkcs12ExportType = null;
 }
 
-function showPKCS12ModalTable(id, type) {
+window.showPKCS12ModalTable = function(id, type) {
     const passwordField = document.getElementById('pkcs12-password');
     const confirmField = document.getElementById('pkcs12-password-confirm');
     
@@ -385,13 +385,13 @@ function showPKCS12ModalTable(id, type) {
     // Close any export menus
     document.querySelectorAll('[id^="export-menu-"]').forEach(m => m.remove());
     document.querySelectorAll('[id^="export-cert-menu-"]').forEach(m => m.remove());
-}
+};
 
-function closePKCS12Modal() {
+window.closePKCS12Modal = function() {
     closeModal('pkcs12-modal');
-}
+};
 
-function exportPKCS12() {
+window.exportPKCS12 = function() {
     const password = document.getElementById('pkcs12-password');
     const confirm = document.getElementById('pkcs12-password-confirm');
     const errorDiv = document.getElementById('pkcs12-error');
@@ -447,7 +447,7 @@ function exportPKCS12() {
         errorDiv.textContent = 'Export échoué: ' + error.message;
         errorDiv.classList.remove('hidden');
     });
-}
+};
 
 // Note: All export functions (exportCert, exportCertSimple, etc.) are now in ucm-global.js
 // and defined in ui_routes.py for HTMX content. No need to duplicate here.
