@@ -31,8 +31,7 @@ LimitNOFILE=65536
 LimitNPROC=512
 
 # Startup
-ExecStartPre=/usr/bin/python3 -m pip install --quiet --no-warn-script-location -r /usr/share/ucm/backend/requirements.txt
-ExecStart=/usr/bin/python3 -m gunicorn \
+ExecStart=/usr/share/ucm/venv/bin/gunicorn \
     --config /usr/share/ucm/gunicorn.conf.py \
     --bind 0.0.0.0:${HTTPS_PORT:-8443} \
     --certfile ${HTTPS_CERT_PATH:-/etc/ucm/https_cert.pem} \
