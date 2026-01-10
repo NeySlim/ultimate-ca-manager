@@ -104,3 +104,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const currentTheme = getCurrentTheme();
     updateActiveThemeIndicator(currentTheme);
 });
+
+// Also update indicator after HTMX navigation (SPA)
+document.body.addEventListener('htmx:afterSettle', function() {
+    const currentTheme = getCurrentTheme();
+    updateActiveThemeIndicator(currentTheme);
+});
