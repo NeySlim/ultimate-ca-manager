@@ -4094,11 +4094,19 @@ def https_cert_apply_ui():
             https_cert = Path(current_app.config['HTTPS_CERT_PATH'])
             https_key = Path(current_app.config['HTTPS_KEY_PATH'])
             
-            # Backup current cert
+            # Backup current cert to backups directory (not in /etc/ucm)
+            backup_dir = current_app.config['DATA_DIR'] / 'backups'
+            backup_dir.mkdir(exist_ok=True)
+            
             if https_cert.exists():
-                shutil.copy(https_cert, str(https_cert) + '.backup')
+                from datetime import datetime
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                backup_cert = backup_dir / f'https_cert_{timestamp}.pem.backup'
+                shutil.copy(https_cert, backup_cert)
             if https_key.exists():
-                shutil.copy(https_key, str(https_key) + '.backup')
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                backup_key = backup_dir / f'https_key_{timestamp}.pem.backup'
+                shutil.copy(https_key, backup_key)
             
             # Copy new cert
             shutil.copy(cert_file, https_cert)
