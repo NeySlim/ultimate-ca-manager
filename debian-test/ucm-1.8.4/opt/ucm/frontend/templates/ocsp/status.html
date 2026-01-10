@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}OCSP Status - UCM{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <div>
+        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary); margin: 0 0 0.5rem 0;">
+            <i class="fas fa-circle-check" style="margin-right: 0.5rem;"></i>OCSP Status
+        </h1>
+        <p style="font-size: 0.875rem; color: var(--text-secondary); margin: 0;">
+            Online Certificate Status Protocol - Real-time certificate validation
+        </p>
+    </div>
+
+    <!-- OCSP Overview -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+        <div class="card">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin: 0 0 0.5rem 0;">OCSP Enabled CAs</p>
+                    <p style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary); margin: 0;" 
+                       hx-get="/api/ui/ocsp/stats" 
+                       hx-trigger="load" 
+                       hx-swap="innerHTML"
+                       hx-select=".ocsp-enabled-count">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </p>
+                </div>
+                <div style="padding: 0.75rem; background: var(--primary-bg); border-radius: 50%;">
+                    <i class="fas fa-circle-check" style="color: var(--primary-color); font-size: 1.25rem;"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin: 0 0 0.5rem 0;">Cached Responses</p>
+                    <p style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary); margin: 0;"
+                       hx-get="/api/ui/ocsp/stats"
+                       hx-trigger="load"
+                       hx-swap="innerHTML"
+                       hx-select=".cached-responses-count">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </p>
+                </div>
+                <div style="padding: 0.75rem; background: var(--success-bg); border-radius: 50%;">
+                    <i class="fas fa-database" style="color: var(--success-color); font-size: 1.25rem;"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin: 0 0 0.5rem 0;">Responder Endpoint</p>
+                    <p style="font-size: 0.875rem; font-family: monospace; color: var(--text-primary); margin: 0;">/ocsp</p>
+                </div>
+                <div style="padding: 0.75rem; background: var(--primary-bg); border-radius: 50%;">
+                    <i class="fas fa-server" style="color: var(--primary-color); font-size: 1.25rem;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OCSP Information -->
+    <div class="card">
+        <h2 style="font-size: 1.25rem; font-weight: 600; margin: 0 0 1rem 0; color: var(--text-primary);">
+            <i class="fas fa-info-circle" style="margin-right: 0.5rem;"></i>What is OCSP?
+        </h2>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">
+            <p style="margin: 0;">
+                <strong>OCSP (Online Certificate Status Protocol)</strong> provides real-time certificate validation status. 
+                When a client connects to a server, it can query the OCSP responder to check if the certificate is valid, 
+                revoked, or unknown.
+            </p>
+            <div style="background: var(--info-bg); border: 1px solid var(--info-border); border-radius: 0.5rem; padding: 1rem;">
+                <p style="color: var(--text-primary); margin: 0;">
+                    <i class="fas fa-lightbulb" style="margin-right: 0.5rem;"></i>
+                    <strong>Advantages:</strong> Real-time status, lightweight responses, better performance than downloading full CRLs
+                </p>
+            </div>
+            <div style="background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 0.5rem; padding: 1rem;">
+                <p style="color: var(--text-primary); margin: 0;">
+                    <i class="fas fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
+                    <strong>Privacy Note:</strong> OCSP requests reveal which certificates are being validated to the responder. 
+                    Use CRL for better privacy or enable OCSP Stapling.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- CA OCSP Configuration -->
+    <div class="card" style="padding: 0;">
+        <div style="padding: 1.5rem 1.5rem 0.75rem 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin: 0; color: var(--text-primary);">
+                <i class="fas fa-cog" style="margin-right: 0.5rem;"></i>Certificate Authorities OCSP Configuration
+            </h2>
+        </div>
+        <div hx-get="/api/ui/ocsp/status" 
+             hx-trigger="load" 
+             hx-target="#ocsp-status-list"
+             hx-swap="innerHTML">
+            <div id="ocsp-status-list">
+                <div style="display: flex; justify-content: center; align-items: center; padding: 2rem;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--text-secondary);"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Testing Section -->
+    <div class="card">
+        <h2 style="font-size: 1.25rem; font-weight: 600; margin: 0 0 1rem 0; color: var(--text-primary);">
+            <i class="fas fa-flask" style="margin-right: 0.5rem;"></i>Testing OCSP Responder
+        </h2>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <div>
+                <p style="font-size: 0.875rem; font-weight: 500; margin: 0 0 0.5rem 0; color: var(--text-secondary);">Test with OpenSSL:</p>
+                <code style="display: block; background: #1e1e1e; color: #4ec9b0; padding: 1rem; border-radius: 0.5rem; font-size: 0.875rem; overflow-x: auto;">openssl ocsp -issuer ca.crt -cert certificate.crt \
+  -url https://your-domain:8443/ocsp \
+  -text</code>
+            </div>
+            <div>
+                <p style="font-size: 0.875rem; font-weight: 500; margin: 0 0 0.5rem 0; color: var(--text-secondary);">Expected Response:</p>
+                <code style="display: block; background: #1e1e1e; color: #4ec9b0; padding: 1rem; border-radius: 0.5rem; font-size: 0.875rem; overflow-x: auto;">Response verify OK
+certificate.crt: good
+    This Update: Jan  5 14:50:00 2026 GMT
+    Next Update: Jan  6 14:50:00 2026 GMT</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

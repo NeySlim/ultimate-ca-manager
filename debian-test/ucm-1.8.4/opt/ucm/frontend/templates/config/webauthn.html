@@ -1,0 +1,629 @@
+{% extends "base.html" %}
+
+{% block title %}WebAuthn/FIDO2 - UCM{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
+            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-key"/></svg> WebAuthn / FIDO2 Security Keys
+        </h1>
+        <button onclick="showRegistrationModal()" class="btn-primary">
+            <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Register New Key
+        </button>
+    </div>
+
+    <!-- Hostname Warning (shown only if hostname is not WebAuthn-compatible) -->
+    <div id="hostname-warning" style="display: none; background: var(--bg-warning); border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 0.25rem; margin-bottom: 1.5rem;">
+        <div style="display: flex; align-items: start; gap: 1rem;">
+            <svg class="ucm-icon" width="16" height="16" style="color: #f59e0b; flex-shrink: 0; margin-top: 0.25rem;"><use href="#icon-warning-triangle"/></svg>
+            <div style="flex: 1;">
+                <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">⚠️ Incompatible Hostname Detected</strong>
+                <p style="color: var(--text-secondary); margin: 0 0 0.75rem 0; font-size: 0.875rem;">
+                    WebAuthn requires a valid domain name or IP address. You are currently accessing UCM via "<span id="current-hostname" style="font-family: monospace; font-weight: 600;"></span>" which is not compatible.
+                </p>
+                <p style="color: var(--text-secondary); margin: 0 0 0.75rem 0; font-size: 0.875rem;">
+                    <strong>To use WebAuthn, please access UCM using one of these URLs:</strong>
+                </p>
+                <div id="valid-urls" style="font-size: 0.875rem; margin-left: 1rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Alert -->
+    <div style="background: var(--bg-info); border-left: 4px solid var(--primary-color); padding: 1rem; border-radius: 0.25rem;">
+        <strong style="color: var(--text-primary);">🔐 Passwordless Authentication</strong>
+        <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
+            Register your security keys (YubiKey, Nitrokey) or platform authenticators (TouchID, Windows Hello, Face ID) for passwordless login.
+            Your credentials are encrypted and stored securely, never leaving your device.
+        </p>
+    </div>
+
+    <!-- My Registered Keys -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
+                My Registered Keys
+            </h2>
+        </div>
+        <div id="credentials-list" style="padding: 1.5rem;">
+            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                <svg class="ucm-icon" width="32" height="32" style="  margin-bottom: 0.5rem;"><use href="#icon-spinner"/></svg>
+                <p>Loading credentials...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Card -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-chart-bar"/></svg>
+                Usage Statistics
+            </h2>
+        </div>
+        <div style="padding: 1.5rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: var(--primary-color);" id="total-credentials">-</div>
+                <div style="color: var(--text-secondary); font-size: 0.875rem;">Total Keys</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: var(--success-color);" id="active-credentials">-</div>
+                <div style="color: var(--text-secondary); font-size: 0.875rem;">Active Keys</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: var(--text-secondary);" id="last-used">-</div>
+                <div style="color: var(--text-secondary); font-size: 0.875rem;">Last Used</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Registration Modal -->
+<div id="registration-modal" style="display: none; position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0;">
+                Register Security Key
+            </h3>
+            <button onclick="hideRegistrationModal()" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.25rem;">
+                <svg class="ucm-icon" width="24" height="24" style=" "><use href="#icon-times"/></svg>
+            </button>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div id="registration-step-1">
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">
+                        Key Name <span style="color: var(--error-color);">*</span>
+                    </label>
+                    <input type="text" id="credential-name" placeholder="e.g., YubiKey 5C, TouchID Macbook" 
+                           style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.25rem; background: var(--input-bg); color: var(--text-primary);">
+                    <small style="color: var(--text-secondary); font-size: 0.875rem;">Give your security key a descriptive name</small>
+                </div>
+
+                <div style="background: var(--bg-warning); border-left: 4px solid #f59e0b; padding: 1rem; margin-bottom: 1.5rem; border-radius: 0.25rem;">
+                    <p style="color: var(--text-primary); margin: 0; font-size: 0.875rem;">
+                        <strong>📱 Before proceeding:</strong><br>
+                        • Have your security key ready<br>
+                        • Make sure it's plugged in (for USB keys)<br>
+                        • Your browser may prompt for biometric or PIN verification
+                    </p>
+                </div>
+
+                <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                    <button onclick="hideRegistrationModal()" class="btn-secondary">Cancel</button>
+                    <button onclick="startRegistration()" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-shield-check"/></svg> Start Registration
+                    </button>
+                </div>
+            </div>
+
+            <div id="registration-step-2" style="display: none; text-align: center;">
+                <div style="padding: 2rem;">
+                    <svg class="ucm-icon" width="48" height="48" style="  color: var(--primary-color); margin-bottom: 1rem;"><use href="#icon-spinner"/></svg>
+                    <h4 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+                        Touch Your Security Key
+                    </h4>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        Follow your browser's prompts to complete registration
+                    </p>
+                </div>
+                <button onclick="cancelRegistration()" class="btn-secondary">Cancel</button>
+            </div>
+
+            <div id="registration-step-3" style="display: none; text-align: center;">
+                <div style="padding: 2rem;">
+                    <div style="width: 4rem; height: 4rem; background: var(--success-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+                        <svg class="ucm-icon" width="32" height="32" style="  color: white;"><use href="#icon-check-circle"/></svg>
+                    </div>
+                    <h4 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+                        Registration Successful!
+                    </h4>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        Your security key has been registered and is ready to use
+                    </p>
+                </div>
+                <button onclick="hideRegistrationModal(); loadCredentials();" class="btn-primary">Done</button>
+            </div>
+
+            <div id="registration-step-error" style="display: none; text-align: center;">
+                <div style="padding: 2rem;">
+                    <div style="width: 4rem; height: 4rem; background: var(--error-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+                        <svg class="ucm-icon" width="32" height="32" style="  color: white;"><use href="#icon-times"/></svg>
+                    </div>
+                    <h4 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+                        Registration Failed
+                    </h4>
+                    <p id="registration-error-message" style="color: var(--text-secondary); font-size: 0.875rem;"></p>
+                </div>
+                <div style="display: flex; gap: 0.75rem; justify-content: center;">
+                    <button onclick="hideRegistrationModal()" class="btn-secondary">Close</button>
+                    <button onclick="resetRegistrationModal()" class="btn-primary">Try Again</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+const token = '{{ session.get("access_token") }}';
+
+// Toast helper
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 10000;
+        padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+        color: white; font-weight: 500; max-width: 400px;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+// Check if hostname is WebAuthn-compatible
+function isWebAuthnCompatibleHostname(hostname) {
+    // WebAuthn requires:
+    // 1. localhost or 127.0.0.1
+    // 2. A valid IP address (IPv4 or IPv6)
+    // 3. A domain with a TLD (e.g., .com, .local, .lan, .pet)
+    
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+        return true;
+    }
+    
+    // Check if it's an IP address
+    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (ipv4Regex.test(hostname)) {
+        return true;
+    }
+    
+    // Check if it has a TLD (contains at least one dot)
+    if (hostname.includes('.')) {
+        return true;
+    }
+    
+    return false;
+}
+
+// Get the proper FQDN for this server
+async function getServerFQDN() {
+    try {
+        // Try to get server info from API
+        const response = await fetch('/api/v1/system/info', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.fqdn) {
+                return data.fqdn;
+            }
+        }
+    } catch (e) {
+        // Fallback: construct from current hostname
+    }
+    
+    // Fallback: if hostname is just "netsuit", append common TLD
+    const hostname = window.location.hostname;
+    if (!hostname.includes('.')) {
+        // Common patterns: hostname.local or hostname.lan.domain
+        return `${hostname}.lan.pew.pet`;
+    }
+    
+    return hostname;
+}
+
+// Show hostname warning and suggest valid URLs or auto-redirect
+async function checkHostnameCompatibility() {
+    const hostname = window.location.hostname;
+    
+    if (!isWebAuthnCompatibleHostname(hostname)) {
+        const warning = document.getElementById('hostname-warning');
+        document.getElementById('current-hostname').textContent = hostname;
+        
+        // Get the proper FQDN
+        const fqdn = await getServerFQDN();
+        const port = window.location.port;
+        const protocol = window.location.protocol;
+        const currentPath = window.location.pathname;
+        
+        // Build the redirect URL
+        const redirectUrl = `${protocol}//${fqdn}:${port}${currentPath}`;
+        
+        // Build valid URL suggestions
+        const validUrls = document.getElementById('valid-urls');
+        validUrls.innerHTML = `
+            <div style="margin-bottom: 1rem;">
+                <strong style="color: var(--text-primary);">Recommended URL:</strong>
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <a href="${redirectUrl}" 
+                   style="color: var(--primary-color); text-decoration: none; font-weight: 600; font-size: 1rem;">
+                    ${protocol}//${fqdn}:${port}
+                </a>
+                <button onclick="window.location.href='${redirectUrl}'" 
+                        class="btn-primary" 
+                        style="margin-left: 1rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg> Switch to this URL
+                </button>
+            </div>
+            <div style="color: var(--text-secondary); margin-top: 0.75rem; font-size: 0.8125rem;">
+                <strong>Alternative options:</strong><br>
+                • Access via server IP address<br>
+                • Use localhost if on the server itself
+            </div>
+        `;
+        
+        warning.style.display = 'block';
+        
+        // Disable register button
+        const registerBtn = document.querySelector('button[onclick="showRegistrationModal()"]');
+        if (registerBtn) {
+            registerBtn.disabled = true;
+            registerBtn.title = 'WebAuthn not available with current hostname';
+            registerBtn.style.opacity = '0.5';
+            registerBtn.style.cursor = 'not-allowed';
+        }
+        
+        return false;
+    }
+    
+    return true;
+}
+
+// Convert base64url to ArrayBuffer
+function base64urlToBuffer(base64url) {
+    // Convert base64url to base64
+    let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    
+    // Add padding if needed
+    const padLength = (4 - (base64.length % 4)) % 4;
+    base64 += '='.repeat(padLength);
+    
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+// Convert ArrayBuffer to base64url
+function bufferToBase64url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// Load credentials list
+window.loadCredentials = async function() {
+    try {
+        const response = await fetch('/api/v1/webauthn/credentials', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        
+        if (response.ok && result.credentials) {
+            renderCredentials(result.credentials);
+            updateStats(result.credentials);
+        } else {
+            document.getElementById('credentials-list').innerHTML = `
+                <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                    <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
+                    <p>${result.error || 'Failed to load credentials'}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        document.getElementById('credentials-list').innerHTML = `
+            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
+                <p>Error: ${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+function renderCredentials(credentials) {
+    const container = document.getElementById('credentials-list');
+    
+    if (credentials.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem;"><use href="#icon-key"/></svg>
+                <p>No security keys registered yet</p>
+                <button onclick="showRegistrationModal()" class="btn-primary" style="margin-top: 1rem;">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Register Your First Key
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = credentials.map(cred => `
+        <div style="border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                        <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
+                        <h4 style="font-weight: 600; color: var(--text-primary); margin: 0;">${cred.name}</h4>
+                        ${cred.enabled ? 
+                            '<span class="badge-outline badge-success">Active</span>' : 
+                            '<span class="badge-outline badge-secondary">Disabled</span>'
+                        }
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.875rem; margin-left: 2rem;">
+                        <div><strong>Registered:</strong> ${new Date(cred.created_at).toLocaleString()}</div>
+                        ${cred.last_used_at ? 
+                            `<div><strong>Last used:</strong> ${new Date(cred.last_used_at).toLocaleString()}</div>` : 
+                            '<div><strong>Last used:</strong> Never</div>'
+                        }
+                        <div><strong>Sign count:</strong> ${cred.sign_count}</div>
+                        ${cred.backup_eligible ? '<div style="color: var(--success-color);">✓ Backup eligible</div>' : ''}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button onclick="toggleCredential('${cred.id}', ${!cred.enabled})"
+                            class="btn-secondary" style="padding: 0.5rem 0.75rem;">
+                        <svg class="ucm-icon" width="16" height="16">
+                            <use href="#icon-eye${cred.enabled ? '-slash' : ''}"/>
+                        </svg>
+                        ${cred.enabled ? 'Disable' : 'Enable'}
+                    </button>
+                    <button onclick="deleteCredential('${cred.id}')" 
+                            class="btn btn-sm btn-danger" title="Delete">
+                        <svg class="ucm-icon" width="16" height="16">
+                            <use href="#icon-trash"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateStats(credentials) {
+    document.getElementById('total-credentials').textContent = credentials.length;
+    document.getElementById('active-credentials').textContent = credentials.filter(c => c.enabled).length;
+    
+    const lastUsed = credentials
+        .filter(c => c.last_used_at)
+        .map(c => new Date(c.last_used_at))
+        .sort((a, b) => b - a)[0];
+    
+    if (lastUsed) {
+        const now = new Date();
+        const diff = now - lastUsed;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        
+        if (days > 0) {
+            document.getElementById('last-used').textContent = `${days}d ago`;
+        } else if (hours > 0) {
+            document.getElementById('last-used').textContent = `${hours}h ago`;
+        } else {
+            document.getElementById('last-used').textContent = 'Today';
+        }
+    } else {
+        document.getElementById('last-used').textContent = 'Never';
+    }
+}
+
+// Registration modal functions
+window.showRegistrationModal = function() {
+    document.getElementById('registration-modal').style.display = 'flex';
+    resetRegistrationModal();
+}
+
+window.hideRegistrationModal = function() {
+    document.getElementById('registration-modal').style.display = 'none';
+}
+
+window.resetRegistrationModal = function() {
+    document.getElementById('registration-step-1').style.display = 'block';
+    document.getElementById('registration-step-2').style.display = 'none';
+    document.getElementById('registration-step-3').style.display = 'none';
+    document.getElementById('registration-step-error').style.display = 'none';
+    document.getElementById('credential-name').value = '';
+}
+
+window.cancelRegistration = function() {
+    resetRegistrationModal();
+}
+
+// Start WebAuthn registration
+window.startRegistration = async function() {
+    const name = document.getElementById('credential-name').value.trim();
+    
+    if (!name) {
+        showToast('Please enter a name for your security key', 'error');
+        return;
+    }
+    
+    // Show loading state
+    document.getElementById('registration-step-1').style.display = 'none';
+    document.getElementById('registration-step-2').style.display = 'block';
+    
+    try {
+        // Step 1: Get registration options from server
+        const optionsResponse = await fetch('/api/v1/webauthn/register/options', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!optionsResponse.ok) {
+            const error = await optionsResponse.json();
+            throw new Error(error.error || 'Failed to get registration options');
+        }
+        
+        const options = await optionsResponse.json();
+        console.log('WebAuthn registration options received:', options);
+        console.log('Current window.location:', {
+            hostname: window.location.hostname,
+            host: window.location.host,
+            origin: window.location.origin
+        });
+        
+        // Convert base64url strings to ArrayBuffers
+        // Use server's RP ID (should match current hostname)
+        const publicKeyOptions = {
+            publicKey: {
+                ...options,
+                challenge: base64urlToBuffer(options.challenge),
+                user: {
+                    ...options.user,
+                    id: base64urlToBuffer(options.user.id)
+                },
+                excludeCredentials: options.excludeCredentials ? 
+                    options.excludeCredentials.map(cred => ({
+                        ...cred,
+                        id: base64urlToBuffer(cred.id)
+                    })) : []
+            }
+        };
+        console.log('Converted publicKeyOptions:', publicKeyOptions);
+        console.log('RP ID from server:', options.rp.id);
+        
+        // Step 2: Call WebAuthn API
+        const credential = await navigator.credentials.create(publicKeyOptions);
+        
+        if (!credential) {
+            throw new Error('Registration was cancelled');
+        }
+        
+        // Step 3: Send credential to server
+        const verifyResponse = await fetch('/api/v1/webauthn/register/verify', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: name,
+                credential: {
+                    id: credential.id,
+                    rawId: bufferToBase64url(credential.rawId),
+                    type: credential.type,
+                    response: {
+                        clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                        attestationObject: bufferToBase64url(credential.response.attestationObject)
+                    }
+                }
+            })
+        });
+        
+        if (!verifyResponse.ok) {
+            const error = await verifyResponse.json();
+            throw new Error(error.error || 'Failed to verify registration');
+        }
+        
+        // Success!
+        document.getElementById('registration-step-2').style.display = 'none';
+        document.getElementById('registration-step-3').style.display = 'block';
+        
+    } catch (error) {
+        console.error('Registration error:', error);
+        document.getElementById('registration-step-2').style.display = 'none';
+        document.getElementById('registration-step-error').style.display = 'block';
+        document.getElementById('registration-error-message').textContent = error.message;
+    }
+}
+
+// Toggle credential active state
+window.toggleCredential = async function(credentialId, newState) {
+    try {
+        const response = await fetch(`/api/v1/webauthn/credentials/${credentialId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ enabled: newState })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast(newState ? '✓ Key enabled' : '✓ Key disabled', 'success');
+            loadCredentials();
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to update'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+}
+
+// Delete credential
+window.deleteCredential = async function(credentialId) {
+    const confirmed = await ucmConfirm(
+        'Are you sure you want to delete this security key? This cannot be undone.',
+        'Delete Security Key',
+        { danger: true, confirmText: 'Delete', icon: 'trash' }
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+        const response = await fetch(`/api/v1/webauthn/credentials/${credentialId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Key deleted', 'success');
+            loadCredentials();
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to delete'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+}
+
+// Initialize - call immediately if DOM already loaded (HTMX swap), otherwise wait for DOMContentLoaded
+function init() {
+    checkHostnameCompatibility();
+    loadCredentials();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+})();
+</script>
+{% endblock %}

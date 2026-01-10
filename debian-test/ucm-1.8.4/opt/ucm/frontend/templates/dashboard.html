@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - UCM{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header" style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h1 style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0;">
+            <i class="fas fa-gauge-high" style="margin-right: 8px;"></i>Dashboard
+        </h1>
+        <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0 0;">Overview of your certificate infrastructure</p>
+    </div>
+    <button class="btn-primary">
+        <i class="fas fa-sync"></i> Refresh
+    </button>
+</div>
+
+<!-- Stats Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px;">
+    <!-- CA Count -->
+    <div class="card" style="box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+        <div class="card-body" style="display: flex; gap: 16px; align-items: center;">
+            <div style="width: 48px; height: 48px; border-radius: 6px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.15) 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">
+                <i class="fas fa-lock" style="background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 28px; font-weight: 600; color: var(--text-primary); line-height: 1;">
+                    {{ stats.total_cas or 0 }}
+                </div>
+                <div style="font-size: 14px; color: var(--text-secondary); font-weight: 500; margin-top: 4px;">
+                    Certificate Authorities
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Certificates Count -->
+    <div class="card" style="box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+        <div class="card-body" style="display: flex; gap: 16px; align-items: center;">
+            <div style="width: 48px; height: 48px; border-radius: 6px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.15) 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">
+                <i class="fas fa-certificate" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 28px; font-weight: 600; color: var(--text-primary); line-height: 1;">
+                    {{ stats.total_certificates or 0 }}
+                </div>
+                <div style="font-size: 14px; color: var(--text-secondary); font-weight: 500; margin-top: 4px;">
+                    Total Certificates
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Valid Certificates -->
+    <div class="card" style="box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+        <div class="card-body" style="display: flex; gap: 16px; align-items: center;">
+            <div style="width: 48px; height: 48px; border-radius: 6px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.15) 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">
+                <i class="fas fa-check" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 28px; font-weight: 600; color: var(--text-primary); line-height: 1;">
+                    {{ stats.valid_certificates or 0 }}
+                </div>
+                <div style="font-size: 14px; color: var(--text-secondary); font-weight: 500; margin-top: 4px;">
+                    Valid Certificates
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Expiring Soon -->
+    <div class="card" style="box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+        <div class="card-body" style="display: flex; gap: 16px; align-items: center;">
+            <div style="width: 48px; height: 48px; border-radius: 6px; background: linear-gradient(135deg, rgba(251, 188, 4, 0.1) 0%, rgba(251, 188, 4, 0.15) 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">
+                <i class="fas fa-exclamation-triangle" style="background: linear-gradient(135deg, #fbbf04 0%, #f59e0b 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;"></i>
+            </div>
+            <div style="flex: 1;">
+                <div style="font-size: 28px; font-weight: 600; color: var(--text-primary); line-height: 1;">
+                    {{ stats.expiring_soon or 0 }}
+                </div>
+                <div style="font-size: 14px; color: var(--text-secondary); font-weight: 500; margin-top: 4px;">
+                    Expiring Soon
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Certificates -->
+<div class="card">
+    <div class="card-header">
+        <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">Recent Certificates</h2>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <div hx-get="/api/ui/config/managed-certs"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div style="text-align: center; padding: 3rem;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--text-secondary);"></i>
+                <p style="margin-top: 1rem; color: var(--text-secondary);">Loading certificates...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SCEP Requests -->
+<div class="card">
+    <div class="card-header">
+        <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">Recent SCEP Requests</h2>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        <div style="overflow-x: auto;">
+        <table id="dashboard-scep-table">
+            <thead style="background: var(--bg-secondary);">
+                <tr style="border-bottom: 2px solid var(--border-color);">
+                    <th style="padding: 0.75rem; text-align: left; width: 35%;">Device</th>
+                    <th style="padding: 0.75rem; text-align: left; width: 20%;">Status</th>
+                    <th style="padding: 0.75rem; text-align: left; width: 30%;">CA</th>
+                    <th style="padding: 0.75rem; text-align: left; width: 15%;">Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if scep_requests %}
+                    {% for req in scep_requests[:5] %}
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 0.75rem; color: var(--text-primary); font-weight: 500;">{{ req.common_name }}</td>
+                        <td style="padding: 0.75rem;">
+                            {% if req.status == 'approved' %}
+                                <span class="badge-outline badge-success"><i class="fas fa-check"></i> Approved</span>
+                            {% elif req.status == 'pending' %}
+                                <span class="badge-outline badge-warning"><i class="fas fa-clock"></i> Pending</span>
+                            {% else %}
+                                <span class="badge-outline badge-secondary">{{ req.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 0.75rem; color: var(--text-secondary);">{{ req.ca_name }}</td>
+                        <td style="padding: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">{{ req.created_at.strftime('%Y-%m-%d %H:%M') if req.created_at else 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; color: var(--text-secondary); padding: 2.5rem;">
+                        <i class="fas fa-network-wired" style="font-size: 3rem; opacity: 0.2; margin-bottom: 0.75rem; display: block;"></i>
+                        <div style="font-weight: 500; margin-bottom: 0.25rem;">No SCEP requests</div>
+                        <div style="font-size: 0.875rem;">Enrollment requests will appear here</div>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+
+<!-- PKCS12 Password Modal -->
+<div id="pkcs12PasswordModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
+    <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h3 style="font-size: 1.25rem; font-weight: bold; color: var(--text-primary);">
+                <i class="fas fa-lock" style="margin-right: 0.5rem;"></i> PKCS#12 Password
+            </h3>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Enter a password to protect the PKCS#12 file (minimum 4 characters):
+            </p>
+            <form autocomplete="off">
+            <input type="password" id="pkcs12Password" 
+                   class="modal-form-input"
+                   placeholder="Enter password" minlength="4"
+                   autocomplete="new-password">
+            <input type="password" id="pkcs12PasswordConfirm" 
+                   style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); margin-top: 0.75rem;"
+                   placeholder="Confirm password" minlength="4"
+                   autocomplete="new-password">
+            </form>
+        </div>
+        <div class="modal-form-footer">
+            <button onclick="closePKCS12Modal()" 
+                    class="btn-secondary">
+                Cancel
+            </button>
+            <button onclick="downloadPKCS12WithPassword()" 
+                    class="btn-primary">
+                Download
+            </button>
+        </div>
+    </div>
+    </div>
+</div>
+
+<script>
+// Certificate and CA export functions with JWT authentication
+(function() {
+    var token = '{{ token }}';
+    
+    if (typeof window.exportWithToken === 'undefined') {
+        window.exportWithToken = function(url) {
+            showToast('Preparing download...', 'info');
+            
+            fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Export failed');
+                
+                var filename = '';
+                var disposition = response.headers.get('Content-Disposition');
+                if (disposition && disposition.includes('filename=')) {
+                    var matches = disposition.match(/filename[^;=\\n]*=(([\'"]).*?\\2|[^;\\n]*)/);
+                    if (matches && matches[1]) {
+                        filename = matches[1].replace(/[\'"]/g, '');
+                    }
+                }
+                
+                if (!filename) {
+                    var urlParts = url.split('/');
+                    filename = urlParts[urlParts.length - 1].split('?')[0] || 'download';
+                }
+                
+                return response.blob().then(blob => ({blob: blob, filename: filename}));
+            })
+            .then(function(result) {
+                var downloadUrl = window.URL.createObjectURL(result.blob);
+                var a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = result.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+                showToast('Download started: ' + result.filename, 'success');
+            })
+            .catch(error => {
+                showToast('Export failed: ' + error.message, 'error');
+            });
+        };
+    }
+    
+    // Certificate export functions
+    window.exportCertSimple = function(id) {
+        exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem');
+        var menu = document.getElementById('export-cert-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCertWithKey = function(id) {
+        exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem&key=true');
+        var menu = document.getElementById('export-cert-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCertWithChain = function(id) {
+        exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem&chain=true');
+        var menu = document.getElementById('export-cert-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCertFull = function(id) {
+        exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem&key=true&chain=true');
+        var menu = document.getElementById('export-cert-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCertDER = function(id) {
+        exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem&format=der');
+        var menu = document.getElementById('export-cert-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    // CA export functions
+    window.exportCASimple = function(id) {
+        exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem');
+        var menu = document.getElementById('export-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCAWithKey = function(id) {
+        exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&key=true');
+        var menu = document.getElementById('export-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCAWithChain = function(id) {
+        exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&chain=true');
+        var menu = document.getElementById('export-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCAFull = function(id) {
+        exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&key=true&chain=true');
+        var menu = document.getElementById('export-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCADER = function(id) {
+        exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=der');
+        var menu = document.getElementById('export-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    // PKCS12 export functions and modal management
+    window.pkcs12Params = {};
+    
+    window.closePKCS12Modal = function() {
+        var modal = document.getElementById('pkcs12PasswordModal');
+        if (modal) modal.classList.add('hidden');
+        window.pkcs12Params = {};
+    };
+    
+    window.downloadPKCS12WithPassword = function() {
+        var password = document.getElementById('pkcs12Password').value;
+        var confirm = document.getElementById('pkcs12PasswordConfirm').value;
+        
+        if (!password || password.length < 4) {
+            showToast('Password must be at least 4 characters', 'error');
+            return;
+        }
+        
+        if (password !== confirm) {
+            showToast('Passwords do not match', 'error');
+            return;
+        }
+        
+        var id = window.pkcs12Params.id;
+        var type = window.pkcs12Params.type;
+        
+        if (!id || !type) {
+            showToast('Export parameters missing', 'error');
+            return;
+        }
+        
+        var url = type === 'ca' 
+            ? '/api/v1/ca/' + id + '/export/advanced?format=pkcs12&password=' + encodeURIComponent(password)
+            : '/api/v1/certificates/' + id + '/export/advanced?format=pkcs12&password=' + encodeURIComponent(password);
+        
+        exportWithToken(url);
+        closePKCS12Modal();
+        
+        var menu = type === 'ca' 
+            ? document.getElementById('export-menu-' + id)
+            : document.getElementById('export-cert-menu-' + id);
+        if (menu) menu.remove();
+    };
+})();
+</script>
+{% endblock %}
