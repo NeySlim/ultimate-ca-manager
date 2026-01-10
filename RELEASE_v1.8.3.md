@@ -86,6 +86,7 @@ This is a **UI-only update** with no database or configuration changes.
 - Fixed theme indicator disappearing during HTMX navigation
 - Fixed btn-success using wrong CSS variable (gray instead of green)
 - Fixed missing btn-warning class
+- **Fixed missing gunicorn_config.py on native installations** (Issue #9)
 
 **Files Modified:**
 - `frontend/static/css/components.css` - Button classes and theme indicator
@@ -98,6 +99,7 @@ This is a **UI-only update** with no database or configuration changes.
 - `backend/api/ui_routes.py` - French→English translation, auto-restart on cert changes
 - `backend/app.py` - Restart signal logging
 - `backend/utils/service_manager.py` - Service management utilities
+- `backend/gunicorn_config.py` - **NEW** - Gunicorn configuration for native installations
 - `frontend/templates/config/system.html` - Restart confirmation messages
 
 **Commits:**
