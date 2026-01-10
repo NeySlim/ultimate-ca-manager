@@ -4095,7 +4095,8 @@ def https_cert_apply_ui():
             https_key = Path(current_app.config['HTTPS_KEY_PATH'])
             
             # Backup current cert to backups directory (not in /etc/ucm)
-            backup_dir = current_app.config['DATA_DIR'] / 'backups'
+            from config.settings import DATA_DIR
+            backup_dir = DATA_DIR / 'backups'
             backup_dir.mkdir(exist_ok=True)
             
             if https_cert.exists():
