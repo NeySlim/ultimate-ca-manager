@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+
+{% block title %}Certificates - UCM{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
+            <i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i> Certificates
+        </h1>
+        <div style="display: flex; gap: 0.5rem;">
+            <button data-action="open-create-cert-modal"
+                    class="btn-primary">
+                <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> Create Certificate
+            </button>
+            <button data-action="open-csr-modal"
+                    class="btn-secondary">
+                <i class="fas fa-file-signature" style="margin-right: 0.5rem; color: var(--success-color);"></i> Generate CSR
+            </button>
+        </div>
+    </div>
+    
+    <!-- Certificate List -->
+    <div class="card" style="padding: 0;">
+        <div id="cert-list" 
+             hx-get="/api/ui/cert/list" 
+             hx-trigger="load, refreshCerts from:body"
+             hx-swap="innerHTML">
+            <div style="padding: 2rem; text-align: center;">
+                <div style="animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="height: 1rem; background: var(--border-color); border-radius: 0.25rem;"></div>
+                    <div style="height: 1rem; background: var(--border-color); border-radius: 0.25rem;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Certificate Modal -->
+<div id="createCertModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
+    <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 1400px; width: 100%; max-height: calc(100vh - 80px); overflow-y: auto; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">
+                    <i class="fas fa-plus-circle" style="margin-right: 0.5rem;"></i> Create Certificate
+                </h2>
+                <button data-action="close-cert-modal" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
+                    <i class="fas fa-times" style="font-size: 1.25rem;"></i>
+                </button>
+            </div>
+        </div>
+        
+        <form hx-post="/api/ui/cert/create"
+              hx-trigger="submit"
+              hx-disabled-elt="find button[type='submit']"
+              hx-on::after-request="if(event.detail.successful){closeCertModal();htmx.trigger('body','refreshCerts');if(typeof showToast==='function')showToast('Certificate created','success');}">
+            <div style="padding: 1.5rem;">
+                
+                <!-- Basic Information -->
+                <div>
+                    <h3 class="modal-form-heading">Basic Information</h3>
+                    
+                    <!-- Description -->
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Description <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <input type="text" name="descr" required placeholder="My Server Certificate"
+                               class="modal-form-input">
+                    </div>
+                    
+                    <!-- Certificate Type -->
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Type <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <select name="cert_type" required onchange="updateCertTypeHints(this.value)"
+                                class="modal-form-input">
+                            <option value="server_cert">Server Certificate</option>
+                            <option value="client_cert">Client Certificate</option>
+                            <option value="combined_cert">Combined Client/Server Certificate</option>
+                            <option value="ca_cert">Certificate Authority (Intermediate)</option>
+                        </select>
+                        <p id="cert-type-hint" style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                            For web servers, VPNs, and other services
+                        </p>
+                    </div>
+                    
+                    <!-- Private Key Location -->
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Private Key Location <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <select name="private_key_location"
+                                class="modal-form-input">
+                            <option value="stored">Store private key in UCM</option>
+                            <option value="download_only">Download only (not stored)</option>
+                        </select>
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                            For higher security, download the private key and do not store it in UCM
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Key Configuration -->
+                <div>
+                    <h3 class="modal-form-heading">Key Configuration</h3>
+                    
+                    <div class="modal-form-grid-2">
+                        <div>
+                            <label class="modal-form-label">
+                                Key Type <span style="color: var(--danger-color);">*</span>
+                            </label>
+                            <select name="key_type" required
+                                    class="modal-form-input">
+                                <option value="2048">RSA 2048</option>
+                                <option value="4096">RSA 4096</option>
+                                <option value="prime256v1">EC P-256</option>
+                                <option value="secp384r1">EC P-384</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                Digest Algorithm <span style="color: var(--danger-color);">*</span>
+                            </label>
+                            <select name="digest_alg"
+                                    class="modal-form-input">
+                                <option value="sha256">SHA-256</option>
+                                <option value="sha384">SHA-384</option>
+                                <option value="sha512">SHA-512</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Issuer -->
+                <div>
+                    <h3 class="modal-form-heading">Issuer</h3>
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Certificate Authority <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <select name="caref" required id="ca-select"
+                                class="modal-form-input">
+                            <option>Loading CAs...</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Lifetime (days) <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <input type="number" name="lifetime" value="397" required min="1" max="36500"
+                               class="modal-form-input">
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                            Maximum 397 days for publicly-trusted certificates. 825 days for internal use.
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Distinguished Name -->
+                <div>
+                    <h3 class="modal-form-heading">Distinguished Name (DN)</h3>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="modal-form-label">
+                                Country Code
+                            </label>
+                            <input type="text" name="country" placeholder="FR" maxlength="2"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                State or Province
+                            </label>
+                            <input type="text" name="state" placeholder="Occitanie"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                City
+                            </label>
+                            <input type="text" name="city" placeholder="Montpellier"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                Organization
+                            </label>
+                            <input type="text" name="organization" placeholder="My Company"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                Organizational Unit
+                            </label>
+                            <input type="text" name="organizational_unit" placeholder="IT"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                Email Address
+                            </label>
+                            <input type="email" name="email" placeholder="admin@example.com"
+                                   class="modal-form-input">
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <label class="modal-form-label">
+                            Common Name (CN) <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <input type="text" name="common_name" required placeholder="server.example.com"
+                               class="modal-form-input">
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                            The primary identifier (FQDN for servers, name for users)
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Alternative Names -->
+                <div>
+                    <h3 class="modal-form-heading">Alternative Names (SAN)</h3>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            DNS Domain Names (one per line)
+                        </label>
+                        <textarea name="san_dns" rows="3" placeholder="www.example.com&#10;mail.example.com&#10;*.example.com"
+                                  class="form-input" style="width: 100%; font-family: monospace; font-size: 0.875rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--card-bg); color: var(--text-primary);"></textarea>
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                            Additional DNS names this certificate is valid for (wildcards supported)
+                        </p>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            IP Addresses (one per line)
+                        </label>
+                        <textarea name="san_ip" rows="2" placeholder="192.168.1.1&#10;10.0.0.1"
+                                  class="form-input" style="width: 100%; font-family: monospace; font-size: 0.875rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--card-bg); color: var(--text-primary);"></textarea>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Email Addresses (one per line)
+                        </label>
+                        <textarea name="san_email" rows="2" placeholder="user@example.com"
+                                  class="form-input" style="width: 100%; font-family: monospace; font-size: 0.875rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--card-bg); color: var(--text-primary);"></textarea>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            URIs (one per line)
+                        </label>
+                        <textarea name="san_uri" rows="2" placeholder="https://example.com/resource"
+                                  class="form-input" style="width: 100%; font-family: monospace; font-size: 0.875rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--card-bg); color: var(--text-primary);"></textarea>
+                    </div>
+                </div>
+                
+                <!-- OCSP -->
+                <div>
+                    <h3 class="modal-form-heading">OCSP (Optional)</h3>
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            OCSP URI
+                        </label>
+                        <input type="url" name="ocsp_uri" id="ocsp-uri-input" placeholder="http://ocsp.example.com"
+                               class="modal-form-input">
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                            URL where the OCSP responder can be reached for certificate status checking
+                        </p>
+                    </div>
+                </div>
+                
+            </div>
+            
+            <div class="modal-form-footer">
+                <button type="button" data-action="close-cert-modal"
+                        class="btn-secondary">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="btn-primary">
+                    <i class="fas fa-plus mr-2"></i> Create Certificate
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Generate CSR Modal -->
+<div id="csrModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
+    <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 1400px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <div class="flex justify-between items-center">
+                <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">
+                    <i class="fas fa-file-signature mr-2"></i> Generate CSR
+                </h2>
+                <button data-action="close-csr-modal" style="color: var(--text-secondary); cursor: pointer;">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+        
+        <form hx-post="/api/ui/cert/csr" 
+              hx-on::after-request="if(event.detail.successful){closeCSRModal();htmx.trigger('body','refreshCerts');if(typeof showToast==='function')showToast('CSR generated','success');}">
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="modal-form-label">
+                        Description <span style="color: var(--danger-color);">*</span>
+                    </label>
+                    <input type="text" name="descr" required
+                           class="modal-form-input">
+                </div>
+                
+                <div>
+                    <label class="modal-form-label">
+                        Common Name <span style="color: var(--danger-color);">*</span>
+                    </label>
+                    <input type="text" name="common_name" required
+                           class="modal-form-input">
+                </div>
+                
+                <div>
+                    <label class="modal-form-label">
+                        Key Type <span style="color: var(--danger-color);">*</span>
+                    </label>
+                    <select name="key_type" required
+                            class="modal-form-input">
+                        <option value="2048">RSA 2048</option>
+                        <option value="4096">RSA 4096</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="modal-form-footer">
+                <button type="button" data-action="close-csr-modal"
+                        class="btn-secondary">
+                    Cancel
+                </button>
+                <button type="submit"
+                        class="btn-primary">
+                    <i class="fas fa-file-signature" style="margin-right: 0.5rem;"></i> Generate CSR
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// NOTE: Global functions (openCreateCertModal, handleCertCreateResponse, etc.)
+// are now defined in /static/js/ucm-global.js and loaded globally.
+// Local overrides only if needed for page-specific behavior.
+// ============================================================================
+
+// Note: PKCS12 modal and functions are global (defined in ucm-global.js and base.html)
+
+</script>
+{% endblock %}

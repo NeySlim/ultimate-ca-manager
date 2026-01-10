@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}System Configuration - UCM{% endblock %}
+
+{% block content %}
+<div style="max-width: 80rem; margin: 0 auto;">
+    <div style="margin-bottom: 1.5rem;">
+        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
+            <i class="fas fa-gear" style="margin-right: 0.5rem;"></i>System Configuration
+        </h1>
+        <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Manage system settings, users, and certificates</p>
+    </div>
+
+    <!-- Tabs -->
+    <div style="border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;" x-data="{ activeTab: 'https' }">
+        <nav style="margin-bottom: -1px; display: flex; gap: 2rem;">
+            <button @click="activeTab = 'https'" :style="activeTab === 'https' ? 'border-bottom-color: var(--primary-color); color: var(--primary-color);' : 'border-bottom-color: transparent; color: var(--text-secondary);'" style="white-space: nowrap; padding: 1rem 0.25rem; border-bottom: 2px solid; font-weight: 500; font-size: 0.875rem; background: none; cursor: pointer;">
+                HTTPS Certificate
+            </button>
+            <button @click="activeTab = 'users'" :style="activeTab === 'users' ? 'border-bottom-color: var(--primary-color); color: var(--primary-color);' : 'border-bottom-color: transparent; color: var(--text-secondary);'" style="white-space: nowrap; padding: 1rem 0.25rem; border-bottom: 2px solid; font-weight: 500; font-size: 0.875rem; background: none; cursor: pointer;">
+                User Management
+            </button>
+            <button @click="activeTab = 'system'" :style="activeTab === 'system' ? 'border-bottom-color: var(--primary-color); color: var(--primary-color);' : 'border-bottom-color: transparent; color: var(--text-secondary);'" style="white-space: nowrap; padding: 1rem 0.25rem; border-bottom: 2px solid; font-weight: 500; font-size: 0.875rem; background: none; cursor: pointer;">
+                System Settings
+            </button>
+            <button @click="activeTab = 'database'" :style="activeTab === 'database' ? 'border-bottom-color: var(--primary-color); color: var(--primary-color);' : 'border-bottom-color: transparent; color: var(--text-secondary);'" style="white-space: nowrap; padding: 1rem 0.25rem; border-bottom: 2px solid; font-weight: 500; font-size: 0.875rem; background: none; cursor: pointer;">
+                Database
+            </button>
+            <button @click="activeTab = 'info'" :style="activeTab === 'info' ? 'border-bottom-color: var(--primary-color); color: var(--primary-color);' : 'border-bottom-color: transparent; color: var(--text-secondary);'" style="white-space: nowrap; padding: 1rem 0.25rem; border-bottom: 2px solid; font-weight: 500; font-size: 0.875rem; background: none; cursor: pointer;">
+                System Info
+            </button>
+        </nav>
+
+        <!-- HTTPS Certificate Tab -->
+        <div x-show="activeTab === 'https'" style="padding: 1.5rem 0;">
+            <div class="card">
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">HTTPS Certificate</h2>
+                
+                <!-- Current Certificate Info -->
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="font-size: 1.125rem; font-weight: 500; margin-bottom: 0.75rem; color: var(--text-primary);">Current Certificate</h3>
+                    <div hx-get="/api/ui/config/https-cert" hx-trigger="load, refreshHttps from:body" hx-target="#https-cert-info">
+                        <div id="https-cert-info">
+                            <div style="text-align: center; padding: 2rem 0;">
+                                <div class="spinner" style="margin: 0 auto;"></div>
+                                <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading certificate info...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                    <button @click="$dispatch('open-modal', 'uploadHttpsModal')" class="btn-primary">
+                        <i class="fas fa-upload" style="margin-right: 0.5rem;"></i>Import Certificate Chain
+                    </button>
+                    <button @click="$dispatch('open-modal', 'selectManagedCertModal')" class="btn-success">
+                        <i class="fas fa-certificate" style="margin-right: 0.5rem;"></i>Use Managed Certificate
+                    </button>
+                    <button hx-post="/api/ui/config/regenerate-https" hx-confirm="Are you sure you want to regenerate the HTTPS certificate? The service will restart automatically." class="btn-warning">
+                        <i class="fas fa-refresh" style="margin-right: 0.5rem;"></i>Regenerate Self-Signed
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Management Tab -->
+        <div x-show="activeTab === 'users'" style="padding: 1.5rem 0;">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">Users</h2>
+                    <button @click="$dispatch('open-modal', 'addUserModal')" class="btn-primary">
+                        Add User
+                    </button>
+                </div>
+                <div hx-get="/api/ui/config/users" hx-trigger="load, refreshUsers from:body" hx-target="#users-list">
+                    <div id="users-list">
+                        <div style="text-align: center; padding: 2rem 0;">
+                            <div class="spinner" style="margin: 0 auto;"></div>
+                            <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading users...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Settings Tab -->
+        <div x-show="activeTab === 'system'" style="padding: 1.5rem 0;">
+            <div class="card">
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">System Settings</h2>
+                <form hx-post="/api/ui/config/system-save" hx-swap="none" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label class="form-label">Default Certificate Validity (days)</label>
+                        <input type="number" name="default_cert_validity" value="365" min="1" max="7300" class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Session Timeout (minutes)</label>
+                        <input type="number" name="session_timeout" value="60" min="5" max="1440" class="form-input">
+                    </div>
+                    <div>
+                        <label style="display: flex; align-items: center;">
+                            <input type="checkbox" name="enable_audit_log" checked class="form-checkbox">
+                            <span style="margin-left: 0.5rem; font-size: 0.875rem; color: var(--text-primary);">Enable Audit Logging</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label style="display: flex; align-items: center;">
+                            <input type="checkbox" name="enable_rate_limit" checked class="form-checkbox">
+                            <span style="margin-left: 0.5rem; font-size: 0.875rem; color: var(--text-primary);">Enable Rate Limiting</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label class="form-label">Auto-approve SCEP Requests</label>
+                        <select name="scep_auto_approve" class="form-select">
+                            <option value="false">Manual Approval</option>
+                            <option value="true">Auto-approve</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary">
+                        Save Settings
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Database Tab -->
+        <div x-show="activeTab === 'database'" style="padding: 1.5rem 0;">
+            <div class="card">
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Database Management</h2>
+                
+                <!-- Database Statistics -->
+                <div style="margin-bottom: 1.5rem;">
+                    <h3 style="font-size: 1.125rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-primary);">Statistics</h3>
+                    <div hx-get="/api/ui/config/db-stats" hx-trigger="load, refreshDbStats from:body" hx-target="#db-stats">
+                        <div id="db-stats">
+                            <div style="text-align: center; padding: 2rem 0;">
+                                <div class="spinner" style="margin: 0 auto;"></div>
+                                <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading statistics...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Database Actions -->
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <h3 style="font-size: 1.125rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-primary);">Actions</h3>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button hx-post="/api/ui/config/backup-db" hx-swap="none" class="btn-primary">
+                                Create Backup
+                            </button>
+                            <button hx-post="/api/ui/config/vacuum-db" hx-confirm="Vacuum the database? This may take a moment." hx-swap="none" class="btn-success">
+                                Vacuum Database
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Info Tab -->
+        <div x-show="activeTab === 'info'" style="padding: 1.5rem 0;">
+            <div class="card">
+                <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">System Information</h2>
+                <div hx-get="/api/ui/config/system-info" hx-trigger="load, refreshSysInfo from:body" hx-target="#system-info">
+                    <div id="system-info">
+                        <div style="text-align: center; padding: 2rem 0;">
+                            <div class="spinner" style="margin: 0 auto;"></div>
+                            <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading system info...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload HTTPS Certificate Modal -->
+<div x-data="{ open: false }" 
+     @open-modal.window="open = ($event.detail === 'uploadHttpsModal')"
+     @close-modal.window="open = false"
+     x-show="open"
+     style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; z-index: 1000; overflow-y: auto; display: none;">
+    <div style="display: flex; align-items: center; justify-content: center; min-height: 100%; padding: 0 1rem;">
+        <div @click="open = false" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: rgba(107, 114, 128, 0.75); transition: opacity 0.3s;"></div>
+        <div style="position: relative; background: white; border-radius: 0.5rem; max-width: 1200px; width: 100%; padding: 1.5rem; z-index: 10; margin: 2rem 0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+            <h3 style="font-size: 1.125rem; font-weight: 500; color: var(--text-primary); margin-bottom: 1rem;">
+                <i class="fas fa-upload" style="margin-right: 0.5rem;"></i>Import HTTPS Certificate Chain
+            </h3>
+            <form hx-post="/api/ui/config/upload-https-cert" hx-swap="none" @htmx:after-request="if(event.detail.successful) open = false">
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label class="form-label" style="margin-bottom: 0.25rem;">
+                            Certificate (PEM format)
+                            <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <textarea name="certificate" required rows="8" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" 
+                                  class="form-textarea" style="font-family: monospace; font-size: 0.875rem;"></textarea>
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">Server certificate in PEM format</p>
+                    </div>
+                    <div>
+                        <label class="form-label" style="margin-bottom: 0.25rem;">
+                            Private Key (PEM format)
+                            <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <textarea name="private_key" required rows="8" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" 
+                                  class="form-textarea" style="font-family: monospace; font-size: 0.875rem;"></textarea>
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">Private key corresponding to the certificate</p>
+                    </div>
+                    <div>
+                        <label class="form-label" style="margin-bottom: 0.25rem;">
+                            CA Chain (PEM format, optional)
+                        </label>
+                        <textarea name="ca_chain" rows="6" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----&#10;-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" 
+                                  class="form-textarea" style="font-family: monospace; font-size: 0.875rem;"></textarea>
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">Optional: Intermediate and root CA certificates</p>
+                    </div>
+                    <div class="info-box">
+                        <div style="display: flex;">
+                            <i class="fas fa-info-circle" style="color: var(--info-color); margin-top: 0.125rem; margin-right: 0.5rem;"></i>
+                            <div style="font-size: 0.875rem; color: var(--info-color);">
+                                <p style="font-weight: 500; margin-bottom: 0.25rem;">Important:</p>
+                                <ul style="list-style-type: disc; list-style-position: inside; display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <li>Docker: manual container restart required after import</li>
+                                    <li>Private key must be unencrypted (no password)</li>
+                                    <li>Certificate and key must match</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                    <button type="button" @click="open = false" class="btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-upload" style="margin-right: 0.5rem;"></i>Import & Restart
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Select Managed Certificate Modal -->
+<div x-data="{ open: false }" 
+     @open-modal.window="open = ($event.detail === 'selectManagedCertModal')"
+     @close-modal.window="open = false"
+     x-show="open"
+     style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; z-index: 1000; overflow-y: auto; display: none;">
+    <div style="display: flex; align-items: center; justify-content: center; min-height: 100%; padding: 0 1rem;">
+        <div @click="open = false" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: rgba(107, 114, 128, 0.75); transition: opacity 0.3s;"></div>
+        <div style="position: relative; background: white; border-radius: 0.5rem; max-width: 1600px; width: 100%; padding: 1.5rem; z-index: 10; margin: 2rem 0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+            <h3 style="font-size: 1.125rem; font-weight: 500; color: var(--text-primary); margin-bottom: 1rem;">
+                <i class="fas fa-certificate" style="margin-right: 0.5rem;"></i>Select Managed Certificate
+            </h3>
+            <div hx-get="/api/ui/config/managed-certs-list" hx-trigger="load" hx-target="#managed-certs-list">
+                <div id="managed-certs-list">
+                    <div style="text-align: center; padding: 2rem 0;">
+                        <div class="spinner" style="margin: 0 auto;"></div>
+                        <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading certificates...</p>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end;">
+                <button type="button" @click="open = false" class="btn-secondary">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div x-data="{ open: false }" 
+     @open-modal.window="open = ($event.detail === 'addUserModal')"
+     @close-modal.window="open = false"
+     x-show="open"
+     style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; z-index: 1000; overflow-y: auto; display: none;">
+    <div style="display: flex; align-items: center; justify-content: center; min-height: 100%; padding: 0 1rem;">
+        <div @click="open = false" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: rgba(107, 114, 128, 0.75); transition: opacity 0.3s;"></div>
+        <div style="position: relative; background: white; border-radius: 0.5rem; max-width: 800px; width: 100%; padding: 1.5rem; z-index: 10; margin: 2rem 0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+            <h3 style="font-size: 1.125rem; font-weight: 500; color: var(--text-primary); margin-bottom: 1rem;">Add New User</h3>
+            <form hx-post="/api/ui/config/add-user" hx-swap="none" @htmx:after-request="if(event.detail.successful) open = false">
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label class="form-label">Username</label>
+                        <input type="text" name="username" required class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" required class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Password</label>
+                        <input type="password" name="password" required minlength="8" class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Role</label>
+                        <select name="role" required class="form-select">
+                            <option value="viewer">Viewer</option>
+                            <option value="operator">Operator</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                    <button type="button" @click="open = false" class="btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        Add User
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Change Password Modal -->
+<div x-data="{ open: false, userId: null }" 
+     @open-modal.window="if($event.detail.modal === 'changePasswordModal') { open = true; userId = $event.detail.userId; }"
+     @close-modal.window="open = false"
+     x-show="open"
+     style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; z-index: 1000; overflow-y: auto; display: none;">
+    <div style="display: flex; align-items: center; justify-content: center; min-height: 100%; padding: 0 1rem;">
+        <div @click="open = false" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: rgba(107, 114, 128, 0.75); transition: opacity 0.3s;"></div>
+        <div style="position: relative; background: white; border-radius: 0.5rem; max-width: 800px; width: 100%; padding: 1.5rem; z-index: 10; margin: 2rem 0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+            <h3 style="font-size: 1.125rem; font-weight: 500; color: var(--text-primary); margin-bottom: 1rem;">Change Password</h3>
+            <form hx-post="/api/ui/config/change-password" hx-swap="none" @htmx:after-request="if(event.detail.successful) open = false">
+                <input type="hidden" name="user_id" :value="userId">
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label class="form-label">New Password</label>
+                        <input type="password" name="password" required minlength="8" class="form-input">
+                    </div>
+                </div>
+                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                    <button type="button" @click="open = false" class="btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        Change Password
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

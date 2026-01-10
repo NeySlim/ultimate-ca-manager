@@ -8,157 +8,66 @@ on:
 
 permissions:
   contents: write
-  discussions: write
 
 jobs:
   build-deb:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
       
-      - name: Get version from tag
-        id: get_version
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          else
-            VERSION="1.6.0"
-          fi
-          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Building version: ${VERSION}"
-      
-      - name: Install build dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            debhelper \
-            dh-python \
-            python3-all \
-            python3-setuptools \
-            fakeroot \
-            lintian
-      
-      - name: Create package structure
-        run: |
-          VERSION="${{ steps.get_version.outputs.VERSION }}"
-          PKG_NAME="ucm-${VERSION}"
-          BUILD_DIR="debian/${PKG_NAME}"
-          
-          # Create debian directory structure
-          mkdir -p ${BUILD_DIR}/DEBIAN
-          mkdir -p ${BUILD_DIR}/opt/ucm
-          mkdir -p ${BUILD_DIR}/etc/systemd/system
-          mkdir -p ${BUILD_DIR}/usr/share/doc/ucm
-          mkdir -p ${BUILD_DIR}/var/lib/ucm
-          mkdir -p ${BUILD_DIR}/var/log/ucm
-          mkdir -p ${BUILD_DIR}/etc/ucm
-          
-          # Copy application files
-          cp -r backend frontend ${BUILD_DIR}/opt/ucm/
-          cp .env.example ${BUILD_DIR}/opt/ucm/
-          cp README.md CHANGELOG.md ${BUILD_DIR}/usr/share/doc/ucm/ 2>/dev/null || true
-          cp -r docs ${BUILD_DIR}/usr/share/doc/ucm/ 2>/dev/null || true
-          
-          # Use control file from packaging/debian/
-          # For binary package, remove source metadata and simplify dependencies
-          cat > ${BUILD_DIR}/DEBIAN/control << CTRLEOF
-Package: ucm
-Version: ${VERSION}
-Section: admin
-Priority: optional
-Architecture: all
-Depends: python3 (>= 3.10), python3-pip, python3-venv, systemd, openssl (>= 1.1.1), adduser
-Recommends: python3-flask-caching, python3-redis
-Suggests: nginx | apache2, certbot, python3-gunicorn
-Maintainer: UCM Team <support@ucm.local>
-Description: Ultimate CA Manager - Certificate Authority Management System
- UCM (Ultimate CA Manager) is a comprehensive web-based Certificate Authority
- management system designed for organizations that need to manage their own PKI
- infrastructure.
- .
- Features:
-  * Complete CA lifecycle management
-  * Certificate issuance and revocation
-  * CRL (Certificate Revocation List) generation
-  * ACME protocol support (RFC 8555) - Let's Encrypt compatible
-  * SCEP protocol support - Device enrollment
-  * mTLS authentication
-  * WebAuthn/FIDO2 passwordless login
-  * REST API with JWT authentication
-  * Email notifications
-  * 8 beautiful themes (light/dark variants)
-  * HTMX-powered dynamic interface
- .
- Deployment options:
-  * Standalone (built-in HTTPS server) - No reverse proxy needed
-  * Reverse proxy (nginx/apache recommended for production)
-  * Docker container (ghcr.io/neyslim/ultimate-ca-manager)
-CTRLEOF
-          
-          # Copy systemd service from packaging/
-          cp packaging/debian/ucm.service ${BUILD_DIR}/etc/systemd/system/ucm.service
-          
-          # Copy start wrapper script
-          cp packaging/debian/start-ucm.sh ${BUILD_DIR}/opt/ucm/start-ucm.sh
-          chmod +x ${BUILD_DIR}/opt/ucm/start-ucm.sh
-          
-          # Copy maintainer scripts from packaging/debian/
-          # Note: Using non-interactive postinst for GitHub Actions build
-          # For interactive debconf install, use: dpkg-buildpackage or build-deb.sh
-          cp packaging/debian/postinst-simple.sh ${BUILD_DIR}/DEBIAN/postinst
-          chmod 755 ${BUILD_DIR}/DEBIAN/postinst
-          
-          # Create prerm script
-          cat > ${BUILD_DIR}/DEBIAN/prerm << 'EOF'
-#!/bin/bash
-set -e
-
-# Stop service
-systemctl stop ucm.service || true
-systemctl disable ucm.service || true
-
-exit 0
-EOF
-          
-          chmod 755 ${BUILD_DIR}/DEBIAN/prerm
+          sudo apt-get install -y build-essential debhelper fakeroot
       
       - name: Build package
         run: |
-          VERSION="${{ steps.get_version.outputs.VERSION }}"
-          PKG_NAME="ucm-${VERSION}"
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          BUILD_DIR="debian/ucm-${VERSION}"
           
-          # Build deb package
-          dpkg-deb --build debian/${PKG_NAME}
-          mv debian/${PKG_NAME}.deb ucm_${VERSION}_all.deb
+          mkdir -p ${BUILD_DIR}/{DEBIAN,opt/ucm,etc/systemd/system}
           
-          # Create checksums
-          md5sum ucm_${VERSION}_all.deb > ucm_${VERSION}_all.deb.md5
-          sha256sum ucm_${VERSION}_all.deb > ucm_${VERSION}_all.deb.sha256
+          cp -r backend frontend ${BUILD_DIR}/opt/ucm/
+          cp .env.example ${BUILD_DIR}/opt/ucm/
+          
+          cat > ${BUILD_DIR}/DEBIAN/control << EOF
+Package: ucm
+Version: ${VERSION}
+Architecture: all
+Depends: python3 (>= 3.10), python3-pip, systemd, openssl
+Maintainer: UCM Team <support@ucm.local>
+Description: Certificate Authority Management System
+EOF
+          
+          cp packaging/debian/ucm.service ${BUILD_DIR}/etc/systemd/system/
+          cp packaging/debian/start-ucm.sh ${BUILD_DIR}/opt/ucm/
+          chmod +x ${BUILD_DIR}/opt/ucm/start-ucm.sh
+          
+          cp packaging/debian/postinst-simple.sh ${BUILD_DIR}/DEBIAN/postinst
+          chmod 755 ${BUILD_DIR}/DEBIAN/postinst
+          
+          cat > ${BUILD_DIR}/DEBIAN/prerm << 'EOF'
+#!/bin/bash
+systemctl stop ucm.service || true
+systemctl disable ucm.service || true
+EOF
+          chmod 755 ${BUILD_DIR}/DEBIAN/prerm
+          
+          dpkg-deb --build ${BUILD_DIR}
+          mv ${BUILD_DIR}.deb ucm_${VERSION}_all.deb
       
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: debian-package
-          path: |
-            ucm_*.deb
-            ucm_*.md5
-            ucm_*.sha256
+          path: ucm_*.deb
       
-      - name: Upload to release
+      - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            ucm_*.deb
-            ucm_*.md5
-            ucm_*.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: ucm_*.deb
