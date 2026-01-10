@@ -152,4 +152,54 @@
         </div>
     </div>
 </div>
+
+<script>
+// Certificate and CA export functions with JWT authentication
+(function() {
+    var token = '{{ token }}';
+    
+    if (typeof window.exportWithToken === 'undefined') {
+        window.exportWithToken = function(url) {
+            showToast('Preparing download...', 'info');
+            
+            fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Export failed');
+                
+                var filename = '';
+                var disposition = response.headers.get('Content-Disposition');
+                if (disposition && disposition.includes('filename=')) {
+                    var matches = disposition.match(/filename[^;=\\n]*=(([\'"]).*?\\2|[^;\\n]*)/);
+                    if (matches && matches[1]) {
+                        filename = matches[1].replace(/[\'"]/g, '');
+                    }
+                }
+                
+                if (!filename) {
+                    var urlParts = url.split('/');
+                    filename = urlParts[urlParts.length - 1].split('?')[0] || 'download';
+                }
+                
+                return response.blob().then(blob => ({blob: blob, filename: filename}));
+            })
+            .then(function(result) {
+                var downloadUrl = window.URL.createObjectURL(result.blob);
+                var a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = result.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+                showToast('Download started: ' + result.filename, 'success');
+            })
+            .catch(error => {
+                showToast('Export failed: ' + error.message, 'error');
+            });
+        };
+    }
+})();
+</script>
 {% endblock %}
