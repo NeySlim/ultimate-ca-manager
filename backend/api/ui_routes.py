@@ -239,7 +239,8 @@ def dashboard():
     return render_template('dashboard.html',
                          stats=stats,
                          certificates=certificates,
-                         scep_requests=scep_requests)
+                         scep_requests=scep_requests,
+                         token=token if 'token' in locals() else session.get('access_token', ''))
 
 
 
