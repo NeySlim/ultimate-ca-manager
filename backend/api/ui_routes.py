@@ -822,7 +822,7 @@ def ca_list_content():
         <div style="margin-top: 2rem;">
             <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; padding: 0.75rem; background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 0.5rem;">
                 <i class="fas fa-exclamation-triangle" style="color: var(--warning-color);"></i>
-                <span style="color: var(--warning-color); font-weight: 500;">CAs orphelines ({len(orphan_cas)}) - Parent non trouvé</span>
+                <span style="color: var(--warning-color); font-weight: 500;">Orphaned CAs ({len(orphan_cas)}) - Parent Not Found</span>
             </div>
             <table id="ca-orphan-table">
                 <thead style="background: var(--bg-secondary);">
