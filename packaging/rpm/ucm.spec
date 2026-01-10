@@ -160,6 +160,67 @@ chown -R %{name}:%{name} %{_sysconfdir}/%{name}
 chmod 700 %{_sharedstatedir}/%{name}/{cas,certs,backups}
 chmod 600 %{_sysconfdir}/%{name}/.env 2>/dev/null || true
 
+# Generate self-signed HTTPS certificate compatible with modern browsers
+CERT_PATH="%{_sysconfdir}/%{name}/https_cert.pem"
+KEY_PATH="%{_sysconfdir}/%{name}/https_key.pem"
+
+if [ ! -f "$CERT_PATH" ]; then
+    echo "Generating HTTPS certificate..."
+    FQDN=$(hostname -f 2>/dev/null || hostname)
+    IP=$(hostname -I | awk '{print $1}')
+    FQDN_BASE=$(echo $FQDN | cut -d. -f2-)
+    
+    cat > /tmp/ucm-ssl.cnf << SSLEOF
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+C = US
+ST = State
+L = City
+O = Ultimate CA Manager
+OU = IT
+CN = ${FQDN}
+
+[v3_req]
+# Key Usage - critical for modern browsers (macOS/Safari/Chrome)
+keyUsage = critical, digitalSignature, keyEncipherment, keyAgreement
+# Extended Key Usage - TLS Server Authentication
+extendedKeyUsage = serverAuth
+# Subject Alternative Name - required by modern browsers
+subjectAltName = @alt_names
+# Basic Constraints - not a CA
+basicConstraints = critical, CA:FALSE
+# Subject Key Identifier
+subjectKeyIdentifier = hash
+
+[alt_names]
+DNS.1 = ${FQDN}
+DNS.2 = localhost
+DNS.3 = *.${FQDN_BASE}
+IP.1 = ${IP}
+IP.2 = 127.0.0.1
+SSLEOF
+    
+    openssl req -x509 -newkey rsa:4096 -sha256 -nodes \
+        -keyout "$KEY_PATH" \
+        -out "$CERT_PATH" \
+        -days 365 \
+        -config /tmp/ucm-ssl.cnf \
+        -extensions v3_req \
+        2>/dev/null
+    
+    rm -f /tmp/ucm-ssl.cnf
+    chmod 600 "$KEY_PATH"
+    chmod 644 "$CERT_PATH"
+    chown %{name}:%{name} "$KEY_PATH"
+    chown %{name}:%{name} "$CERT_PATH"
+    
+    echo "✓ HTTPS certificate generated"
+fi
+
 # Install Python dependencies
 echo "Installing Python dependencies..."
 cd %{_datadir}/%{name}

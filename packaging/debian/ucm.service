@@ -4,20 +4,17 @@ Documentation=https://github.com/NeySlim/ultimate-ca-manager
 After=network.target
 
 [Service]
-Type=notify
+Type=simple
 User=ucm
 Group=ucm
 WorkingDirectory=/opt/ucm
-
-# Environment
-EnvironmentFile=/etc/ucm/ucm.env
 
 # Security settings
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/ucm /var/log/ucm
+ReadWritePaths=/opt/ucm/backend/data /var/lib/ucm /var/log/ucm
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
@@ -37,21 +34,8 @@ RestartSec=5s
 StartLimitInterval=60s
 StartLimitBurst=3
 
-# Execution
-ExecStartPre=/usr/bin/python3 -c "import sys; assert sys.version_info >= (3,10), 'Python 3.10+ required'"
-ExecStart=/usr/bin/python3 -m gunicorn \
-    --bind 0.0.0.0:${HTTPS_PORT} \
-    --workers 4 \
-    --worker-class sync \
-    --timeout 120 \
-    --access-logfile /var/log/ucm/access.log \
-    --error-logfile /var/log/ucm/error.log \
-    --log-level info \
-    --certfile /var/lib/ucm/https_cert.pem \
-    --keyfile /var/lib/ucm/https_key.pem \
-    --chdir /opt/ucm/backend \
-    "app:create_app()"
-
+# Execution - Uses wrapper script to load environment
+ExecStart=/opt/ucm/start-ucm.sh
 ExecReload=/bin/kill -HUP $MAINPID
 
 # Standard output
