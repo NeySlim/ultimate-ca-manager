@@ -140,7 +140,9 @@ class Config:
     # Application
     APP_NAME = os.getenv("APP_NAME", "Ultimate CA Manager")
     APP_VERSION = os.getenv("APP_VERSION", "1.8.3")
-    SECRET_KEY = os.getenv("SECRET_KEY", os.urandom(32).hex())
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    if not SECRET_KEY:
+        raise ValueError("SECRET_KEY must be set in environment. Check /etc/ucm/ucm.env")
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     
     # Server - HTTPS mandatory
@@ -159,7 +161,9 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # JWT Authentication
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", os.urandom(32).hex())
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+    if not JWT_SECRET_KEY:
+        raise ValueError("JWT_SECRET_KEY must be set in environment. Check /etc/ucm/ucm.env")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         seconds=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", "3600"))
     )

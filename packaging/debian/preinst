@@ -27,14 +27,26 @@ case "$1" in
             exit 1
         fi
         
-        # On upgrade, backup existing database
-        if [ "$1" = "upgrade" ] && [ -f "/var/lib/ucm/ucm.db" ]; then
-            echo "Creating backup of existing database..."
+        # On upgrade, backup existing database and config
+        if [ "$1" = "upgrade" ]; then
             BACKUP_DIR="/var/lib/ucm/backups"
             mkdir -p "$BACKUP_DIR"
-            BACKUP_FILE="$BACKUP_DIR/ucm-pre-upgrade-$(date +%Y%m%d-%H%M%S).db"
-            cp "/var/lib/ucm/ucm.db" "$BACKUP_FILE"
-            echo "✓ Backup created: $BACKUP_FILE"
+            
+            # Backup database
+            if [ -f "/var/lib/ucm/ucm.db" ]; then
+                echo "Creating backup of existing database..."
+                BACKUP_FILE="$BACKUP_DIR/ucm-pre-upgrade-$(date +%Y%m%d-%H%M%S).db"
+                cp "/var/lib/ucm/ucm.db" "$BACKUP_FILE"
+                echo "✓ Database backup: $BACKUP_FILE"
+            fi
+            
+            # Backup configuration
+            if [ -f "/etc/ucm/ucm.env" ]; then
+                echo "Creating backup of configuration..."
+                BACKUP_FILE="$BACKUP_DIR/ucm.env-pre-upgrade-$(date +%Y%m%d-%H%M%S)"
+                cp "/etc/ucm/ucm.env" "$BACKUP_FILE"
+                echo "✓ Config backup: $BACKUP_FILE"
+            fi
         fi
         
         ;;
