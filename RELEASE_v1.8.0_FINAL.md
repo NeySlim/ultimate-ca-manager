@@ -9,13 +9,69 @@
 
 ## 🎯 Release Highlights
 
-v1.8.0 delivers **complete export authentication**, **visual theme previews**, and **Docker/native compatibility** with extensive bug fixes for certificate management.
+Ultimate CA Manager v1.8.0 is a **production-ready Certificate Authority management platform** with modern protocols, enterprise features, and a beautiful web interface.
+
+This release delivers **complete export authentication**, **visual theme previews**, and **Docker/native compatibility** with extensive bug fixes.
 
 ---
 
-## ✨ Major Features
+## 🚀 Major Features
 
-### 1. Complete Export Authentication System
+### **1. ACME Protocol (RFC 8555) - Let's Encrypt Compatible** ⭐
+- **Local Certificate Authority** with full ACME v2 protocol support
+- Account management, order tracking, and automated issuance
+- **HTTP-01 and DNS-01** challenge validation
+- Works with certbot, acme.sh, and all standard ACME clients
+- **Run your own Let's Encrypt-style CA** for internal infrastructure
+
+### **2. WebAuthn/FIDO2 Authentication** 🔐
+- **Passwordless login** with security keys (YubiKey, Titan, SoloKey)
+- **Biometric support** (Touch ID, Windows Hello, fingerprint)
+- Credential management UI with usage statistics
+- Multi-device support with fallback to traditional auth
+
+### **3. SCEP Enrollment - Device Automation** 📱
+- **Simple Certificate Enrollment Protocol** for mobile devices
+- Auto-approval workflows for corporate device onboarding
+- PKCS#7 encryption/signing with DES-CBC support
+- Compatible with iOS, Android, Windows, and macOS MDM
+
+### **4. mTLS Hybrid Authentication** 🔒
+- **Mutual TLS** client certificate authentication
+- Works with both **native Gunicorn** and **reverse proxy** (Nginx/Apache)
+- Auto-detection of certificate source (peercert vs headers)
+- Zero configuration changes between deployment modes
+
+### **5. Certificate Revocation Lists (CRL)** ⛔
+- **RFC 5280 compliant** CRL generation and distribution
+- Public CDP (CRL Distribution Point) endpoints
+- Automatic CRL updates on certificate revocation
+- CRL metadata tracking and history
+
+### **6. Email Notifications** 📧
+- Automated alerts for certificate/CRL expiration
+- SMTP configuration with TLS support
+- Scheduled checks and manual triggers
+- Notification history and rule management
+
+### **7. Complete REST API** 🔌
+- Full RESTful API with **JWT authentication**
+- Certificate lifecycle management (create, renew, revoke, export)
+- CA operations, OCSP status, ACME/SCEP administration
+- OpenAPI/Swagger documentation (coming soon)
+
+### **8. Modern Web Interface** 🎨
+- **8 beautiful themes** with light/dark variants
+- **Visual theme preview cards** (new in v1.8.0!)
+- HTMX-powered dynamic updates (no page reloads)
+- Responsive dashboard with real-time statistics
+- Tab-based configuration pages with inline editing
+
+---
+
+## ✨ New in v1.8.0
+
+### 1. Complete Export Authentication System ✅
 **All export formats now properly authenticated with JWT:**
 - ✅ PEM (simple, with key, with chain, full)
 - ✅ DER format
@@ -292,21 +348,50 @@ This release represents extensive debugging and iterative improvement based on r
 
 ## 📦 Release Assets
 
-### GitHub
+### GitHub Release
 - **Tag:** [v1.8.0](https://github.com/NeySlim/ultimate-ca-manager/releases/tag/v1.8.0)
 - **Commit:** dc5a0d7
 - **Branch:** main
+- **Type:** Stable Release
 
-### Docker
+### Docker Images 🐳
 ```bash
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+# Stable v1.8.0
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.0
+docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
+
+# Multi-arch support (amd64 + arm64)
 ```
 
-### Source
+### Debian Package 📦
+```bash
+# Available after CI/CD build completes
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.0/ucm_1.8.0_all.deb
+sudo dpkg -i ucm_1.8.0_all.deb
+```
+
+### RPM Package 🚫
+**Note:** RPM packaging is currently disabled pending testing. Use Docker or Debian package instead.
+
+### Source Code 📥
 ```bash
 git clone https://github.com/NeySlim/ultimate-ca-manager.git
 git checkout v1.8.0
 ```
+
+---
+
+## 🌟 What Makes UCM Special?
+
+Unlike other CA solutions, UCM combines:
+- **Modern Protocols:** ACME, SCEP, OCSP, WebAuthn all in one platform
+- **Beautiful UI:** 8 themes, responsive design, no page reloads (HTMX)
+- **Enterprise Ready:** mTLS auth, CRL distribution, email alerts, REST API
+- **Easy Deployment:** Docker, native install, or Debian package
+- **Self-Hosted:** Your keys, your data, your infrastructure
+- **Open Source:** GPL-3.0 license, community-driven development
+
+**UCM is to certificate management what Webmin is to system administration - powerful yet accessible.**
 
 ---
 
@@ -318,7 +403,7 @@ git checkout v1.8.0
 
 ---
 
-**Previous Release:** [v1.7.0](../Release-Notes-v1.7.0)  
-**Next Release:** v1.8.0 (stable) - TBD
+**Previous Release:** [v1.7.5](https://github.com/NeySlim/ultimate-ca-manager/releases/tag/v1.7.5)  
+**Next Release:** v1.9.0 - TBD
 
-**Status:** ✅ RELEASED - All features tested and working
+**Status:** ✅ STABLE - Production ready and fully tested
