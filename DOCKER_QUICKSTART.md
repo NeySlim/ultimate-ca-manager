@@ -1,4 +1,4 @@
-# UCM v1.8.2-beta - Docker Quick Start Guide
+# UCM v1.8.3-beta - Docker Quick Start Guide
 
 ## 🚀 Quick Start (5 minutes)
 
@@ -348,5 +348,5 @@ http://localhost:8025
 
 ---
 
-**Version**: 1.8.2-beta  
+**Version**: 1.8.3-beta  
 **Last Updated**: 2026-01-09

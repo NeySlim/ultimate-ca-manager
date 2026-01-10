@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.3
     container_name: ucm
     restart: unless-stopped
     
@@ -140,7 +140,7 @@ services:
       - ucm-network
     
     labels:
-      - "com.ultimate-ca-manager.version=1.8.0-beta"
+      - "com.ultimate-ca-manager.version=1.8.3"
       - "com.ultimate-ca-manager.description=Certificate Authority Management"
       - "traefik.enable=false"  # Disable if using Traefik
 

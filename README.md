@@ -1,6 +1,6 @@
 # Ultimate CA Manager
 
-![Version](https://img.shields.io/badge/version-1.8.2-blue.svg)
+![Version](https://img.shields.io/badge/version-1.8.3-blue.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-success.svg)
@@ -60,7 +60,7 @@ docker run -d \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/app/backend/data \
-  ghcr.io/neyslim/ultimate-ca-manager:1.8.2
+  ghcr.io/neyslim/ultimate-ca-manager:1.8.3
 ```
 
 **Access:** https://localhost:8443  
@@ -72,7 +72,7 @@ docker run -d \
 version: '3.8'
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.2
+    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.3
     container_name: ucm
     ports:
       - "8443:8443"
@@ -89,10 +89,10 @@ services:
 
 ```bash
 # Download latest release
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.2/ucm_1.8.2_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.3/ucm_1.8.3_all.deb
 
 # Install (nginx optional!)
-sudo dpkg -i ucm_1.8.2_all.deb
+sudo dpkg -i ucm_1.8.3_all.deb
 sudo systemctl enable --now ucm
 ```
 
@@ -100,10 +100,10 @@ sudo systemctl enable --now ucm
 
 ```bash
 # Download latest release (⚠️ UNTESTED)
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.2/ucm-1.8.2-1.el9.noarch.rpm
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.3/ucm-1.8.3-1.el9.noarch.rpm
 
 # Install
-sudo dnf install ucm-1.8.2-1.el9.noarch.rpm
+sudo dnf install ucm-1.8.3-1.el9.noarch.rpm
 sudo systemctl enable --now ucm
 ```
 
@@ -243,7 +243,7 @@ Edit `/etc/ucm/config.json` or use the web interface at **Settings → System Co
 ### Docker
 
 ```bash
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.2
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.3
 docker stop ucm
 docker rm ucm
 # Recreate container with same volume
@@ -253,8 +253,8 @@ docker rm ucm
 
 ```bash
 # Download new package
-sudo dpkg -i ucm_1.8.2_all.deb  # Debian/Ubuntu
-sudo dnf upgrade ucm-1.8.2-1.el9.noarch.rpm  # RHEL/Rocky/Alma
+sudo dpkg -i ucm_1.8.3_all.deb  # Debian/Ubuntu
+sudo dnf upgrade ucm-1.8.3-1.el9.noarch.rpm  # RHEL/Rocky/Alma
 sudo systemctl restart ucm
 ```
 
