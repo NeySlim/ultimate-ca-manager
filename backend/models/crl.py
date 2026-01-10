@@ -53,9 +53,9 @@ class CRLMetadata(db.Model):
         delta = self.next_update - datetime.utcnow()
         return max(0, delta.days)
     
-    def to_dict(self):
+    def to_dict(self, include_crl_data=False):
         """Convert to dictionary for API responses"""
-        return {
+        data = {
             "id": self.id,
             "ca_id": self.ca_id,
             "crl_number": self.crl_number,
@@ -68,3 +68,7 @@ class CRLMetadata(db.Model):
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "generated_by": self.generated_by,
         }
+        if include_crl_data:
+            data["crl_pem"] = self.crl_pem
+            # crl_der is binary, don't include in JSON by default
+        return data
