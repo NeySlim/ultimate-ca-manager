@@ -229,6 +229,28 @@ SSLEOF
             fi
         fi
         
+        # Create Python virtual environment and install dependencies
+        if [ ! -d "$UCM_HOME/venv" ]; then
+            echo "Creating Python virtual environment..."
+            cd "$UCM_HOME"
+            sudo -u "$UCM_USER" python3 -m venv venv
+            sudo -u "$UCM_USER" "$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
+            sudo -u "$UCM_USER" "$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
+            echo "✓ Virtual environment created"
+        fi
+        
+        # Initialize database if it doesn't exist
+        if [ ! -f "$UCM_DATA/ucm.db" ]; then
+            echo "Initializing database..."
+            cd "$UCM_HOME"
+            # Load environment variables before running init_db
+            set -a
+            [ -f "$UCM_CONFIG/ucm.env" ] && . "$UCM_CONFIG/ucm.env"
+            set +a
+            sudo -u "$UCM_USER" -E "$UCM_HOME/venv/bin/python" "$UCM_HOME/backend/init_db.py"
+            echo "✓ Database initialized"
+        fi
+        
         # Reload systemd and force service file update
         # Always copy the new service file to ensure updates are applied
         if [ -f /opt/ucm/packaging/debian/ucm.service ]; then
