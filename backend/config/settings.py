@@ -34,36 +34,57 @@ def is_docker():
 
 def restart_ucm_service():
     """
-    Restart UCM service - handles Docker vs native installation
+    Restart UCM service - Multi-distro compatible without sudo
+    Uses process replacement (exec) for instant restart
     Returns: (success: bool, message: str)
     """
     if is_docker():
         # In Docker, don't restart - container manages lifecycle
-        # Certificate changes require container restart
         return True, "✅ Certificate updated successfully. ⚠️ You MUST restart the Docker container for changes to take effect: docker restart ucm"
     
-    # Native installation - try systemctl
+    # Native installation - multiple restart strategies
+    
+    # Strategy 1: Process replacement (instant, no permissions needed)
+    # Create restart signal file for app.py to detect and self-restart
     try:
-        subprocess.Popen(['systemctl', 'restart', 'ucm'], 
-                        stdout=subprocess.DEVNULL, 
-                        stderr=subprocess.DEVNULL)
-        return True, "Service restart initiated. Please wait 10 seconds and reload the page."
-    except FileNotFoundError:
-        # systemctl not available - could be SysV, OpenRC, etc.
-        # Try common init systems
-        for cmd in [
-            ['service', 'ucm', 'restart'],  # SysV
-            ['rc-service', 'ucm', 'restart'],  # OpenRC (Alpine, Gentoo)
-        ]:
-            try:
-                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                return True, "Service restart initiated"
-            except FileNotFoundError:
-                continue
+        restart_signal = DATA_DIR / '.restart_requested'
+        restart_signal.write_text('restart')
         
-        return False, "Could not restart service. Please restart manually."
+        # Give app time to detect the signal
+        import time
+        time.sleep(0.5)
+        
+        return True, "✅ Service restart initiated. Please wait 5 seconds and reload the page."
+        
     except Exception as e:
-        return False, f"Failed to restart service: {str(e)}"
+        # Strategy 2: Try systemctl (works if permissions allow)
+        try:
+            result = subprocess.run(
+                ['systemctl', 'restart', 'ucm'],
+                capture_output=True,
+                timeout=3,
+                check=False
+            )
+            if result.returncode == 0:
+                return True, "✅ Service restart initiated. Please wait 10 seconds and reload the page."
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        
+        # Strategy 3: Try service command (SysV)
+        try:
+            result = subprocess.run(
+                ['service', 'ucm', 'restart'],
+                capture_output=True,
+                timeout=3,
+                check=False
+            )
+            if result.returncode == 0:
+                return True, "✅ Service restart initiated. Please wait 10 seconds and reload the page."
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        
+        # If all automated methods fail, user must restart manually
+        return True, "✅ Certificate updated successfully. ⚠️ Please restart the service manually:\n\nsystemctl restart ucm\n\nor\n\nservice ucm restart"
 
 
 def get_system_fqdn():

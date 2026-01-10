@@ -161,6 +161,41 @@ def create_app(config_name=None):
     def health():
         return {"status": "ok", "version": config.APP_VERSION}
     
+    # Restart signal detector (before_request middleware)
+    @app.before_request
+    def check_restart_signal():
+        """Check if restart was requested and perform graceful shutdown"""
+        from pathlib import Path
+        from config.settings import DATA_DIR
+        
+        restart_signal = DATA_DIR / '.restart_requested'
+        
+        if restart_signal.exists():
+            try:
+                # Remove signal file
+                restart_signal.unlink()
+                
+                # Schedule graceful shutdown after this request completes
+                # Systemd will automatically restart the service
+                def do_shutdown():
+                    import time
+                    import sys
+                    import os
+                    
+                    time.sleep(1)  # Wait for response to be sent
+                    
+                    # Graceful shutdown - let systemd restart us
+                    os._exit(0)
+                
+                import threading
+                threading.Thread(target=do_shutdown, daemon=False).start()
+                
+            except Exception as e:
+                # Log error but don't fail the request
+                print(f"Restart signal error: {e}")
+        
+        return None
+    
     return app
 
 
