@@ -108,7 +108,7 @@ sudo systemctl stop ucm
 sudo cp /var/lib/ucm/backups/ucm-pre-upgrade-*.db /var/lib/ucm/ucm.db
 
 # Reinstall previous version
-sudo dpkg -i ucm_1.8.0_all.deb
+sudo dpkg -i ucm_1.8.2_all.deb
 
 sudo systemctl start ucm
 ```
@@ -186,7 +186,7 @@ sudo systemctl start ucm
 1. Standard upgrade procedure
 2. No configuration changes required
 
-### Upgrading to v1.8.0 from v1.7.x
+### Upgrading to v1.8.2 from v1.7.x
 
 **Important changes:**
 - New environment variables for Docker
@@ -337,9 +337,9 @@ systemctl is-active --quiet ucm || \
 
 ```bash
 # Specify exact version
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.0
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.2
 docker-compose down
-# Edit docker-compose.yml to use version 1.8.0
+# Edit docker-compose.yml to use version 1.8.2
 docker-compose up -d
 ```
 
@@ -347,10 +347,10 @@ docker-compose up -d
 
 ```bash
 # Download previous version
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.0/ucm_1.8.0_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.2/ucm_1.8.2_all.deb
 
 # Force install previous version
-sudo dpkg -i --force-downgrade ucm_1.8.0_all.deb
+sudo dpkg -i --force-downgrade ucm_1.8.2_all.deb
 ```
 
 **⚠️ Warning:** Downgrading may cause data loss if database schema changed. Always backup first!
@@ -367,4 +367,4 @@ sudo dpkg -i --force-downgrade ucm_1.8.0_all.deb
 ---
 
 **Last Updated:** 2026-01-09  
-**Applies to:** UCM v1.8.0 and later
+**Applies to:** UCM v1.8.2 and later
