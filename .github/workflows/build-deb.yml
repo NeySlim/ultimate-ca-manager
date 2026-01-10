@@ -70,17 +70,31 @@ jobs:
           Section: admin
           Priority: optional
           Architecture: all
-          Depends: python3 (>= 3.11), python3-pip, python3-venv, nginx, systemd
+          Depends: python3 (>= 3.11), python3-pip, python3-venv, systemd
+          Recommends: python3-flask-caching, python3-redis
+          Suggests: nginx | apache2, certbot, python3-gunicorn
           Maintainer: UCM Team <support@ucm.local>
-          Description: Ultimate CA Manager
-           A comprehensive Certificate Authority management system.
-           Features include:
-            - CA creation and management
+          Description: Ultimate CA Manager - Certificate Authority Management System
+           UCM is a comprehensive web-based Certificate Authority management system
+           designed for organizations that need to manage their own PKI infrastructure.
+           .
+           Features:
+            - Complete CA lifecycle management
             - Certificate issuance and revocation
-            - CRL distribution
-            - OCSP responder
-            - SCEP server
-            - Web-based management interface
+            - CRL (Certificate Revocation List) generation
+            - ACME protocol support (RFC 8555) - Let's Encrypt compatible
+            - SCEP protocol support - Device enrollment
+            - mTLS authentication
+            - WebAuthn/FIDO2 passwordless login
+            - REST API with JWT authentication
+            - Email notifications
+            - 8 beautiful themes (light/dark variants)
+            - HTMX-powered dynamic interface
+           .
+           Deployment options:
+            - Standalone (built-in HTTPS server) - No reverse proxy needed
+            - Reverse proxy (nginx/apache recommended for production)
+            - Docker container (ghcr.io/neyslim/ultimate-ca-manager)
           EOF
           
           # Create systemd service
