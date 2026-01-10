@@ -1,10 +1,9 @@
-name: Build RPM Package (DISABLED)
+name: Build RPM Package (⚠️ UNTESTED)
 
 on:
-  # DISABLED: RPM packaging not yet tested
-  # push:
-  #   tags:
-  #     - 'v*'
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
