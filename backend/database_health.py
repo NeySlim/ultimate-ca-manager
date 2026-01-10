@@ -46,7 +46,9 @@ def check_and_repair_database(app):
 
 
 def ensure_system_config_defaults(app):
-    """Ensure default system config entries exist"""
+    """Ensure default system config entries exist - handles race conditions"""
+    from sqlalchemy.exc import IntegrityError
+    
     defaults = [
         ('app.initialized', 'true', 'Application initialized'),
         ('app.version', app.config.get('APP_VERSION', '1.8.0'), 'Application version'),
@@ -54,45 +56,61 @@ def ensure_system_config_defaults(app):
     ]
     
     for key, value, description in defaults:
+        # Check if config already exists
         config = SystemConfig.query.filter_by(key=key).first()
-        if not config:
-            logger.info(f"Creating missing system config: {key}")
+        if config:
+            continue  # Already exists, skip
+            
+        # Try to create it
+        try:
             config = SystemConfig(key=key, value=value, description=description)
             db.session.add(config)
-    
-    try:
-        db.session.commit()
-    except Exception as e:
-        logger.error(f"Error creating system config defaults: {e}")
-        db.session.rollback()
+            db.session.commit()
+        except IntegrityError:
+            # Another worker created it first - rollback and continue
+            db.session.rollback()
+        except Exception as e:
+            logger.error(f"Error creating system config {key}: {e}")
+            db.session.rollback()
 
 
 def ensure_admin_user(app):
-    """Ensure admin user exists - handles race conditions with multiple workers"""
+    """Ensure admin user exists - prevents race conditions with atomic check"""
     from sqlalchemy.exc import IntegrityError
     
+    # Quick read-only check first (no lock needed)
+    admin_exists = User.query.filter_by(username=app.config.get("INITIAL_ADMIN_USERNAME", "admin")).first()
+    if admin_exists:
+        return  # Admin already exists, skip
+    
+    # Only one worker should reach here on first startup
+    # Use try/except to handle the case where another worker wins the race
     try:
-        # Check if admin already exists
-        admin_exists = User.query.filter_by(username=app.config.get("INITIAL_ADMIN_USERNAME", "admin")).first()
-        if admin_exists:
-            return  # Admin already exists, skip
+        # Double-check user count inside transaction
+        user_count = User.query.count()
+        if user_count > 0:
+            # Another worker already created a user
+            return
         
-        if User.query.count() == 0:
-            logger.info("No users found, creating admin user")
-            admin = User(
-                username=app.config.get("INITIAL_ADMIN_USERNAME", "admin"),
-                email=app.config.get("INITIAL_ADMIN_EMAIL", "admin@example.com"),
-                role="admin",
-                active=True
-            )
-            admin.set_password(app.config.get("INITIAL_ADMIN_PASSWORD", "changeme123"))
-            db.session.add(admin)
-            db.session.commit()
-            logger.info(f"Admin user created: {admin.username}")
+        # Create admin user
+        logger.info("No users found, creating admin user")
+        admin = User(
+            username=app.config.get("INITIAL_ADMIN_USERNAME", "admin"),
+            email=app.config.get("INITIAL_ADMIN_EMAIL", "admin@example.com"),
+            role="admin",
+            active=True
+        )
+        admin.set_password(app.config.get("INITIAL_ADMIN_PASSWORD", "changeme123"))
+        db.session.add(admin)
+        db.session.commit()
+        logger.info(f"✓ Admin user created: {admin.username}")
+        
     except IntegrityError:
-        # Another worker already created the admin user (race condition)
+        # Another worker won the race and created the admin user first
+        # This is normal with multiple Gunicorn workers starting simultaneously
         db.session.rollback()
-        logger.debug("Admin user already created by another worker")
+        # Silent - this is expected behavior, not an error
+        
     except Exception as e:
-        logger.error(f"Error ensuring admin user: {e}")
+        logger.error(f"Unexpected error ensuring admin user: {e}")
         db.session.rollback()
