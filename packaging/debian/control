@@ -27,10 +27,10 @@ Depends: ${misc:Depends},
          openssl (>= 1.1.1),
          adduser,
          systemd
-Recommends: nginx | apache2,
-            python3-flask-caching,
+Recommends: python3-flask-caching,
             python3-redis
-Suggests: certbot,
+Suggests: nginx | apache2,
+          certbot,
           python3-gunicorn
 Description: Ultimate CA Manager - Certificate Authority Management System
  UCM (Ultimate CA Manager) is a comprehensive web-based Certificate Authority
@@ -41,14 +41,19 @@ Description: Ultimate CA Manager - Certificate Authority Management System
   * Complete CA lifecycle management
   * Certificate issuance and revocation
   * CRL (Certificate Revocation List) generation
-  * ACME protocol support (RFC 8555)
-  * SCEP protocol support
+  * ACME protocol support (RFC 8555) - Let's Encrypt compatible
+  * SCEP protocol support - Device enrollment
   * mTLS authentication
-  * WebAuthn/FIDO2 support
-  * REST API
+  * WebAuthn/FIDO2 passwordless login
+  * REST API with JWT authentication
   * Email notifications
-  * Dark mode UI
-  * Multi-language support
+  * 8 beautiful themes (light/dark variants)
+  * HTMX-powered dynamic interface
+ .
+ Deployment options:
+  * Standalone (built-in HTTPS server) - No reverse proxy needed
+  * Reverse proxy (nginx/apache recommended for production)
+  * Docker container (ghcr.io/neyslim/ultimate-ca-manager)
  .
  This package includes:
   * Flask-based web application

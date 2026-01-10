@@ -21,14 +21,19 @@ Requires:       openssl >= 1.1.1
 Ultimate CA Manager (UCM) is a comprehensive Public Key Infrastructure (PKI)
 management platform providing:
 - Root and Intermediate Certificate Authorities
-- Certificate lifecycle management
+- Certificate lifecycle management (create, renew, revoke, export)
 - OCSP Responder
 - CRL Distribution Points
-- SCEP enrollment
+- SCEP enrollment (iOS, Android, Windows, macOS MDM)
 - ACME protocol support (Let's Encrypt compatible)
-- REST API
-- WebAuthn/FIDO2 authentication
-- mTLS client authentication
+- WebAuthn/FIDO2 passwordless authentication
+- mTLS client certificate authentication
+- REST API with JWT authentication
+- Email notifications for certificate expiration
+- 8 beautiful themes with light/dark variants
+
+Deployment: UCM includes a built-in HTTPS server and can run standalone
+or behind a reverse proxy (nginx/apache recommended for production).
 
 %prep
 %setup -q
