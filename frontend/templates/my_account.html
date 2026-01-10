@@ -91,7 +91,8 @@
             <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
                 Current theme: <span id="current-theme-name" style="font-weight: 600; color: var(--text-primary);"></span>
             </p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; max-width: 100%;">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; max-width: 100%;">
+                <!-- First row: Light themes -->
                 <!-- Sentinel Light -->
                 <button data-action="set-theme" data-theme="sentinel-light" style="all: unset; cursor: pointer; position: relative; border-radius: 0.5rem; overflow: hidden; border: 2px solid var(--border-color); transition: all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(59,130,246,0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
                     <div style="padding: 0.75rem; background: #f8fafc;">
