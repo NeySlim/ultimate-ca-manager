@@ -1054,7 +1054,6 @@ def ca_list_content():
                 });
             };
         }
-        window.exportWithToken(url);
         </script>
         '''
         
@@ -1529,84 +1528,82 @@ def cert_list_content():
             td.appendChild(menu);
         }
         
+        // Export function with JWT token for certificates
+        if (typeof window.exportWithTokenCert === 'undefined') {
+            window.exportWithTokenCert = function(url) {
+                var token = ''' + f"'{token}'" + ''';
+                
+                // Show loading toast
+                showToast('Preparing download...', 'info');
+                
+                fetch(url, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Export failed');
+                    
+                    // Extract filename from Content-Disposition header or URL
+                    var filename = '';
+                    var disposition = response.headers.get('Content-Disposition');
+                    if (disposition && disposition.includes('filename=')) {
+                        var matches = disposition.match(/filename[^;=\\n]*=(([\'"]).*?\\2|[^;\\n]*)/);
+                        if (matches && matches[1]) {
+                            filename = matches[1].replace(/[\'"]/g, '');
+                        }
+                    }
+                    
+                    // Fallback: extract from URL or use generic name
+                    if (!filename) {
+                        var urlParts = url.split('/');
+                        filename = urlParts[urlParts.length - 1].split('?')[0] || 'certificate.pem';
+                    }
+                    
+                    return response.blob().then(blob => ({blob: blob, filename: filename}));
+                })
+                .then(function(result) {
+                    // Small delay to show spinner
+                    setTimeout(function() {
+                        var downloadUrl = window.URL.createObjectURL(result.blob);
+                        var a = document.createElement('a');
+                        a.href = downloadUrl;
+                        a.download = result.filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(downloadUrl);
+                        showToast('Download started: ' + result.filename, 'success');
+                    }, 500);
+                })
+                .catch(error => {
+                    console.error('Export error:', error);
+                    showToast('Export failed: ' + error.message, 'error');
+                });
+            };
+        }
+        
         function exportCertSimple(id) {
-            exportWithTokenCert('/api/v1/certificates/' + id + '/export/advanced?format=pem');
+            window.exportWithTokenCert('/api/v1/certificates/' + id + '/export/advanced?format=pem');
             document.getElementById('export-cert-menu-' + id).remove();
         }
         
         function exportCertWithKey(id) {
-            exportWithTokenCert('/api/v1/certificates/' + id + '/export/advanced?format=pem&key=true');
+            window.exportWithTokenCert('/api/v1/certificates/' + id + '/export/advanced?format=pem&key=true');
             document.getElementById('export-cert-menu-' + id).remove();
         }
         
         function exportCertWithChain(id) {
-            exportWithTokenCert('/api/v1/certificates/' + id + '/export/advanced?format=pem&chain=true');
+            window.exportWithTokenCert('/api/v1/certificates/' + id + '/export/advanced?format=pem&chain=true');
             document.getElementById('export-cert-menu-' + id).remove();
         }
         
         function exportCertFull(id) {
-            exportWithTokenCert('/api/v1/certificates/' + id + '/export/advanced?format=pem&key=true&chain=true');
+            window.exportWithTokenCert('/api/v1/certificates/' + id + '/export/advanced?format=pem&key=true&chain=true');
             document.getElementById('export-cert-menu-' + id).remove();
         }
         
         function exportCertDER(id) {
-            exportWithTokenCert('/api/v1/certificates/' + id + '/export/advanced?format=der');
+            window.exportWithTokenCert('/api/v1/certificates/' + id + '/export/advanced?format=der');
             document.getElementById('export-cert-menu-' + id).remove();
-        }
-        
-        function exportWithTokenCert(url) {
-            if (typeof window.exportWithTokenCert === 'undefined') {
-                window.exportWithTokenCert = function(url) {
-                    var token = ''' + f"'{token}'" + ''';
-                    
-                    // Show loading toast
-                    showToast('Preparing download...', 'info');
-                    
-                    fetch(url, {
-                        headers: { 'Authorization': 'Bearer ' + token }
-                    })
-                    .then(response => {
-                        if (!response.ok) throw new Error('Export failed');
-                        
-                        // Extract filename from Content-Disposition header or URL
-                        var filename = '';
-                        var disposition = response.headers.get('Content-Disposition');
-                        if (disposition && disposition.includes('filename=')) {
-                            var matches = disposition.match(/filename[^;=\\n]*=(([\'"]).*?\\2|[^;\\n]*)/);
-                            if (matches && matches[1]) {
-                                filename = matches[1].replace(/[\'"]/g, '');
-                            }
-                        }
-                        
-                        // Fallback: extract from URL or use generic name
-                        if (!filename) {
-                            var urlParts = url.split('/');
-                            filename = urlParts[urlParts.length - 1].split('?')[0] || 'certificate.pem';
-                        }
-                        
-                        return response.blob().then(blob => ({blob: blob, filename: filename}));
-                    })
-                    .then(function(result) {
-                        // Small delay to show spinner
-                        setTimeout(function() {
-                            var downloadUrl = window.URL.createObjectURL(result.blob);
-                            var a = document.createElement('a');
-                            a.href = downloadUrl;
-                            a.download = result.filename;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            window.URL.revokeObjectURL(downloadUrl);
-                            showToast('Download started: ' + result.filename, 'success');
-                        }, 500);
-                    })
-                    .catch(error => {
-                        console.error('Export error:', error);
-                        showToast('Export failed: ' + error.message, 'error');
-                    });
-                };
-            }
-            window.exportWithTokenCert(url);
         }
         
         
