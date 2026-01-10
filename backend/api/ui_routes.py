@@ -4109,21 +4109,28 @@ def https_cert_apply_ui():
             os.chmod(https_cert, 0o644)
             
             # Save configuration
+            print(f"🔧 DEBUG: Saving certificate config - source=managed, cert_id={cert_id}")
             config = SystemConfig.query.filter_by(key='https_cert_source').first()
             if not config:
+                print(f"🔧 DEBUG: Creating new https_cert_source config")
                 config = SystemConfig(key='https_cert_source', value='managed')
                 db.session.add(config)
             else:
+                print(f"🔧 DEBUG: Updating existing https_cert_source config from {config.value} to managed")
                 config.value = 'managed'
             
             cert_id_config = SystemConfig.query.filter_by(key='https_cert_id').first()
             if not cert_id_config:
+                print(f"🔧 DEBUG: Creating new https_cert_id config with value {cert_id}")
                 cert_id_config = SystemConfig(key='https_cert_id', value=str(cert_id))
                 db.session.add(cert_id_config)
             else:
+                print(f"🔧 DEBUG: Updating existing https_cert_id config from {cert_id_config.value} to {cert_id}")
                 cert_id_config.value = str(cert_id)
             
+            print(f"🔧 DEBUG: Committing database changes...")
             db.session.commit()
+            print(f"🔧 DEBUG: Database commit successful!")
             
             logger.info(f"HTTPS certificate applied: {cert.common_name} (ID: {cert_id}) by {user.username}")
         
