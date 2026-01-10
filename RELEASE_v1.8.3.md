@@ -28,6 +28,14 @@
 - ✅ Removed outdated "manual restart required" messages for Docker users
 - ✅ Consistent messaging across Docker and native installations
 
+### Translation to English
+- ✅ Translated all French UI text to English
+- ✅ CA table headers (Émetteur→Issuer, Nom→Name, etc.)
+- ✅ Certificate table headers
+- ✅ Orphaned CAs section
+- ✅ Pagination controls (Affichage→Showing, par page→per page)
+- ✅ Search field placeholders (Recherche→Search)
+
 ## 📦 Installation
 
 ### Upgrade from v1.8.2
