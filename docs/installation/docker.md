@@ -20,8 +20,8 @@ Complete guide for installing Ultimate CA Manager using Docker.
 ### Pull and Run
 
 ```bash
-# Pull latest beta image
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+# Pull latest image
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.3
 
 # Run container
 docker run -d \
@@ -29,7 +29,7 @@ docker run -d \
   -p 8443:8443 \
   -v ucm-data:/app/backend/data \
   --restart unless-stopped \
-  ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+  ghcr.io/neyslim/ultimate-ca-manager:1.8.3
 ```
 
 **Access:** https://localhost:8443  
@@ -48,7 +48,7 @@ version: '3.8'
 
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.3
     container_name: ucm
     restart: unless-stopped
     ports:
@@ -75,7 +75,7 @@ version: '3.8'
 
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.3
     container_name: ucm
     restart: unless-stopped
     
@@ -110,13 +110,9 @@ services:
       - UCM_SMTP_USERNAME=your@email.com
       - UCM_SMTP_PASSWORD=yourpassword
       - UCM_SMTP_FROM=noreply@ucm.example.com
-      
-      # Database backup
-      - UCM_BACKUP_ENABLED=true
-      - UCM_BACKUP_RETENTION_DAYS=30
     
     healthcheck:
-      test: ["CMD", "curl", "-f", "-k", "https://localhost:8443/api/health"]
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:8443/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -159,8 +155,6 @@ volumes:
 | `UCM_JWT_EXPIRATION` | `86400` | JWT token expiration (seconds) |
 | `UCM_ACME_ENABLED` | `true` | Enable ACME protocol |
 | `UCM_CACHE_ENABLED` | `true` | Enable response caching |
-| `UCM_BACKUP_ENABLED` | `true` | Enable automatic backups |
-| `UCM_BACKUP_RETENTION_DAYS` | `30` | Backup retention period |
 | `UCM_SMTP_ENABLED` | `false` | Enable email notifications |
 
 See full list in [docker-compose.yml](../../docker-compose.yml)
@@ -225,7 +219,7 @@ docker run -v /path/to/cert.pem:/app/backend/data/https_cert.pem:ro \
 
 ```bash
 # Pull new image
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.3
 
 # Stop and remove old container
 docker stop ucm
@@ -237,7 +231,7 @@ docker run -d \
   -p 8443:8443 \
   -v ucm-data:/app/backend/data \
   --restart unless-stopped \
-  ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+  ghcr.io/neyslim/ultimate-ca-manager:1.8.3
 ```
 
 **With Docker Compose:**

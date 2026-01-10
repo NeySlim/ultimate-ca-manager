@@ -46,7 +46,7 @@
 ### ⚙️ Integration & Management
 - **OPNsense Import** - Direct import from OPNsense firewalls
 - **Email Notifications** - Certificate expiration alerts
-- **Backup/Restore** - Complete system backup functionality
+- **Database Backup** - Manual backup creation via UI
 - **REST API** - Full API for automation
 - **Web Configuration** - All settings via web UI
 
