@@ -54,6 +54,10 @@ install -d %{buildroot}%{_bindir}
 cp -r backend %{buildroot}%{_datadir}/%{name}/
 cp -r frontend %{buildroot}%{_datadir}/%{name}/
 cp -r scripts %{buildroot}%{_datadir}/%{name}/
+
+# Remove .env files (configuration is created by %post script)
+find %{buildroot}%{_datadir}/%{name} -name ".env*" -delete
+
 install -m 644 requirements.txt %{buildroot}%{_datadir}/%{name}/
 install -m 644 gunicorn.conf.py %{buildroot}%{_datadir}/%{name}/
 install -m 755 wsgi.py %{buildroot}%{_datadir}/%{name}/

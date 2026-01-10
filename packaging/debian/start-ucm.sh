@@ -27,4 +27,4 @@ exec /opt/ucm/venv/bin/gunicorn \
     --certfile "${HTTPS_CERT_PATH}" \
     --keyfile "${HTTPS_KEY_PATH}" \
     --chdir /opt/ucm/backend \
-    "app:create_app()"
+    wsgi:app
