@@ -426,8 +426,8 @@ function applyHTTPSCertificate() {
     ).then(confirmed => {
         if (!confirmed) return;
         
-        const requestBody = { source: source };
-        if (source === 'managed') {
+        const requestBody = { source: source.value };
+        if (source.value === 'managed') {
             requestBody.cert_id = parseInt(document.getElementById('managed-cert-id').value);
         }
         
