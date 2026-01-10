@@ -69,14 +69,36 @@ This is a **UI-only update** with no database or configuration changes.
 
 ## 📋 Changes from v1.8.2
 
+### 🎨 UI/UX Improvements
+- **Button Visibility**: Fixed btn-success and btn-warning buttons invisible on light themes
+- **Theme Indicator**: Added checkmark (✓) to show active theme in selector (persists on all pages)
+- **Translation**: Complete French→English translation (table headers, pagination, search fields)
+- **Settings Page**: Fixed certificate source radio button selection bug
+
+### 🔧 Technical Improvements  
+- **Auto-Restart**: HTTPS certificate changes now trigger automatic server restart
+- **Docker Messages**: Updated messages to reflect automatic restart mechanism
+- **Service Manager**: Added centralized service management utility module
+- **Logging**: Added restart signal debug logging for troubleshooting
+
+### 🐛 Bug Fixes
+- Fixed certificate source not saving to database (JavaScript DOM object vs value bug)
+- Fixed theme indicator disappearing during HTMX navigation
+- Fixed btn-success using wrong CSS variable (gray instead of green)
+- Fixed missing btn-warning class
+
 **Files Modified:**
-- `frontend/static/css/components.css` - Added btn-success, btn-warning, active-theme classes
-- `frontend/static/css/themes/sentinel-light.css` - Added status-* variables
-- `frontend/static/css/themes/amber-light.css` - Added status-* variables  
-- `frontend/static/js/theme-switcher.js` - Theme indicator logic
-- `frontend/templates/base.html` - Cache busting for JS
-- `backend/config/settings.py` - Updated Docker restart messages
-- `frontend/templates/config/system.html` - Updated restart confirmation messages
+- `frontend/static/css/components.css` - Button classes and theme indicator
+- `frontend/static/css/themes/sentinel-light.css` - Status color variables
+- `frontend/static/css/themes/amber-light.css` - Status color variables  
+- `frontend/static/js/theme-switcher.js` - Theme indicator with HTMX support
+- `frontend/templates/base.html` - Cache busting parameter
+- `frontend/templates/settings.html` - Certificate selection fix
+- `backend/config/settings.py` - Docker restart messages, version bump
+- `backend/api/ui_routes.py` - French→English translation, auto-restart on cert changes
+- `backend/app.py` - Restart signal logging
+- `backend/utils/service_manager.py` - Service management utilities
+- `frontend/templates/config/system.html` - Restart confirmation messages
 
 **Commits:**
 - d9476cb - Docker restart message updates
