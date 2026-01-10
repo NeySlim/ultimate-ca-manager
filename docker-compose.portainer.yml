@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.3
     container_name: ucm
     restart: unless-stopped
     ports:
