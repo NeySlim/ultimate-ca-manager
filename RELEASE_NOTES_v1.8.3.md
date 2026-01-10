@@ -1,7 +1,7 @@
 # Release Notes - UCM v1.8.3
 
 **Release Date:** 2026-01-10  
-**Build:** e188c22  
+**Build:** 283b480  
 **Type:** Maintenance Release
 
 ## 🎯 Overview
@@ -38,6 +38,7 @@ Version 1.8.3 focuses on workflow automation, UI consistency, and internationali
 - **Button visibility** - Improved btn-success and btn-warning classes
 - **Persistent theme indicator** - Shows active theme in navbar
 - **Docker restart messages** - Updated to reflect automatic restart mechanism
+- **mTLS settings navigation** - Fixed "My Certificates" link to use /my-account/mtls route
 
 ### Code Cleanup
 - **Removed backup files** - Cleaned up obsolete template backups
@@ -79,13 +80,14 @@ Service restart: **Automatic**
 
 ## 📊 Changes Summary
 
-**Commits since v1.8.2:** 19  
-**Files changed:** 25+  
+**Commits since v1.8.2:** 22  
+**Files changed:** 26+  
 **Primary focus:**
 - Workflow optimization
 - Packaging improvements  
 - Full English translation
 - UI consistency fixes
+- Navigation improvements
 
 ## 🔗 Links
 
