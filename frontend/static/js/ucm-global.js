@@ -362,6 +362,65 @@ function performCertRevoke(refid) {
 // ============================================================================
 // EXPORT FUNCTIONS
 // ============================================================================
+/**
+ * Global export function with JWT authentication
+ * Uses window.UCM_TOKEN which should be set by each page template
+ */
+if (typeof window.exportWithToken === 'undefined') {
+    window.exportWithToken = function(url) {
+        const token = window.UCM_TOKEN;
+        if (!token) {
+            console.error('UCM_TOKEN not set! Cannot authenticate export.');
+            showToast('Authentication error - please refresh the page', 'error');
+            return;
+        }
+        
+        showToast('Preparing download...', 'info');
+        
+        fetch(url, {
+            headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            // Extract filename from Content-Disposition header
+            let filename = '';
+            const disposition = response.headers.get('Content-Disposition');
+            if (disposition && disposition.includes('filename=')) {
+                const matches = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (matches && matches[1]) {
+                    filename = matches[1].replace(/['"]/g, '');
+                }
+            }
+            
+            // Fallback to URL-based filename
+            if (!filename) {
+                const urlParts = url.split('/');
+                filename = urlParts[urlParts.length - 1].split('?')[0] || 'download';
+            }
+            
+            return response.blob().then(blob => ({blob, filename}));
+        })
+        .then(({blob, filename}) => {
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(downloadUrl);
+            showToast('Download started: ' + filename, 'success');
+        })
+        .catch(error => {
+            console.error('Export failed:', error);
+            showToast('Export failed: ' + error.message, 'error');
+        });
+    };
+}
+
 // ============================================================================
 // EXPORT FUNCTIONS
 // ============================================================================
