@@ -143,6 +143,10 @@ class Config:
     # CORS
     CORS_ORIGINS = ["https://localhost:8443", "https://127.0.0.1:8443"]
     
+    # FQDN for redirect (from database or env)
+    FQDN = os.getenv("FQDN", None)  # Set via database settings or env var
+    HTTP_PORT = int(os.getenv("HTTP_PORT", "80"))  # For redirect URL construction
+    
     # File paths
     CA_DIR = DATA_DIR / "ca"
     CERT_DIR = DATA_DIR / "certs"
