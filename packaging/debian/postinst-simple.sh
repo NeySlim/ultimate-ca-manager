@@ -104,7 +104,7 @@ SESSION_TIMEOUT=3600
 JWT_EXPIRATION=86400
 
 # Database
-DATABASE_PATH=/opt/ucm/backend/data/ucm.db
+DATABASE_PATH=/var/lib/ucm/ucm.db
 
 # HTTPS Certificate
 HTTPS_CERT_PATH=/etc/ucm/https_cert.pem
