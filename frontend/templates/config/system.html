@@ -57,7 +57,7 @@
                     <button @click="$dispatch('open-modal', 'selectManagedCertModal')" class="btn-success">
                         <i class="fas fa-certificate" style="margin-right: 0.5rem;"></i>Use Managed Certificate
                     </button>
-                    <button hx-post="/api/ui/config/regenerate-https" hx-confirm="Are you sure you want to regenerate the HTTPS certificate? Docker users must manually restart the container." class="btn-warning">
+                    <button hx-post="/api/ui/config/regenerate-https" hx-confirm="Are you sure you want to regenerate the HTTPS certificate? The service will restart automatically." class="btn-warning">
                         <i class="fas fa-refresh" style="margin-right: 0.5rem;"></i>Regenerate Self-Signed
                     </button>
                 </div>

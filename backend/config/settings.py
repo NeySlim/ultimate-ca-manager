@@ -35,12 +35,23 @@ def is_docker():
 def restart_ucm_service():
     """
     Restart UCM service - Multi-distro compatible without sudo
-    Uses process replacement (exec) for instant restart
+    Uses signal file + graceful exit for automatic restart
     Returns: (success: bool, message: str)
     """
     if is_docker():
-        # In Docker, don't restart - container manages lifecycle
-        return True, "✅ Certificate updated successfully. ⚠️ You MUST restart the Docker container for changes to take effect: docker restart ucm"
+        # Docker: Use same signal file mechanism
+        # Container will auto-restart (restart: unless-stopped in docker-compose.yml)
+        try:
+            restart_signal = DATA_DIR / '.restart_requested'
+            restart_signal.write_text('restart')
+            
+            import time
+            time.sleep(0.5)
+            
+            return True, "✅ Certificate updated. Service will restart automatically in 3-5 seconds. Please reload the page."
+            
+        except Exception as e:
+            return False, f"❌ Failed to create restart signal: {str(e)}"
     
     # Native installation - multiple restart strategies
     
