@@ -36,9 +36,39 @@ function setTheme(themeName) {
     // Update icon in toggle button
     updateThemeIcon();
     
+    // Update active theme indicator in dropdown
+    updateActiveThemeIndicator(themeName);
+    
     // Notify icon system of theme change
     if (window.ucmIcons) {
         window.ucmIcons.updateTheme(themeName);
+    }
+}
+
+// Update active theme indicator in dropdown menu
+function updateActiveThemeIndicator(themeName) {
+    // Remove all active indicators
+    document.querySelectorAll('[data-action="set-theme"]').forEach(item => {
+        const icon = item.querySelector('.theme-active-icon');
+        if (icon) {
+            icon.remove();
+        }
+        item.style.fontWeight = '';
+        item.style.background = '';
+    });
+    
+    // Add indicator to current theme
+    const activeItem = document.querySelector(`[data-action="set-theme"][data-theme="${themeName}"]`);
+    if (activeItem) {
+        activeItem.style.fontWeight = '600';
+        activeItem.style.background = 'var(--bg-hover)';
+        
+        // Add checkmark icon
+        const checkIcon = document.createElement('i');
+        checkIcon.className = 'fas fa-check theme-active-icon';
+        checkIcon.style.marginLeft = 'auto';
+        checkIcon.style.color = 'var(--primary-color)';
+        activeItem.appendChild(checkIcon);
     }
 }
 
@@ -74,4 +104,7 @@ function updateThemeIcon() {
 // Initialize theme icon on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateThemeIcon();
+    // Initialize active theme indicator
+    const currentTheme = getCurrentTheme();
+    updateActiveThemeIndicator(currentTheme);
 });

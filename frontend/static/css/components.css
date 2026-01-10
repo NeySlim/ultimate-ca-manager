@@ -569,13 +569,13 @@ a.btn-primary .ucm-icon path {
     transition: all 0.2s ease !important;
     text-decoration: none !important;
     white-space: nowrap !important;
-    background: var(--bg-secondary) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border-color) !important;
+    background: var(--status-success, #10b981) !important;
+    color: #ffffff !important;
+    border: none !important;
 }
 
 .btn-success:hover:not(:disabled) {
-    background: var(--sidebar-hover) !important;
+    background: var(--success-hover, #059669) !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
@@ -592,7 +592,46 @@ a.btn-primary .ucm-icon path {
 .btn-success svg path,
 .btn-success .ucm-icon,
 .btn-success .ucm-icon path {
-    color: var(--status-success) !important;
+    color: #ffffff !important;
+    opacity: 1 !important;
+}
+
+.btn-warning {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
+    background: var(--status-warning, #f59e0b) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+.btn-warning:hover:not(:disabled) {
+    background: var(--warning-hover, #d97706) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.btn-warning:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
+.btn-warning i,
+.btn-warning i.fas,
+.btn-warning i.far,
+.btn-warning i.fab,
+.btn-warning svg,
+.btn-warning svg path,
+.btn-warning .ucm-icon,
+.btn-warning .ucm-icon path {
+    color: #ffffff !important;
     opacity: 1 !important;
 }
 
