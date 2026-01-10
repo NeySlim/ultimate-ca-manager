@@ -119,6 +119,7 @@ SECRET_KEY=${SECRET_KEY}
 JWT_SECRET_KEY=${JWT_SECRET}
 
 # Database
+DATABASE_PATH=%{_sharedstatedir}/%{name}/ucm.db
 SQLALCHEMY_DATABASE_URI=sqlite:///%{_sharedstatedir}/%{name}/ucm.db
 
 # Initial Admin (CHANGE PASSWORD IMMEDIATELY!)
