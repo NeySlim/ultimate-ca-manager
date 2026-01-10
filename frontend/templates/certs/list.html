@@ -421,13 +421,12 @@ function exportPKCS12() {
     }
     
     const url = window.pkcs12ExportType === 'ca' 
-        ? `/api/v1/ca/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`
-        : `/api/v1/certificates/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password)}`;
+        ? `/api/v1/ca/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password.value)}`
+        : `/api/v1/certificates/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password.value)}`;
     
     const token = '{{ session.get("access_token") }}';
     fetch(url, {
-        credentials: 'same-origin',
-        headers: { }
+        headers: { 'Authorization': 'Bearer ' + token }
     })
     .then(response => {
         if (!response.ok) throw new Error('Export failed');
