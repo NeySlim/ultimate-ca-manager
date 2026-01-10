@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.2] - 2026-01-10
+
+### 🐛 Critical Bug Fix - Nginx Dependency
+
+#### Fixed
+- **Nginx no longer required** - Package can now be installed without nginx (standalone mode)
+- GitHub Actions workflow was generating incorrect `control` file with nginx in `Depends:`
+- Updated workflow to match repository configuration:
+  - **Depends:** python3, pip, venv, systemd (essentials only)
+  - **Recommends:** flask-caching, redis (performance)
+  - **Suggests:** nginx, apache2, certbot, gunicorn (optional)
+
+#### Changed
+- Enhanced package descriptions with complete feature list (ACME, SCEP, WebAuthn, mTLS, CRL, Email, REST API, 8 themes)
+- Updated all documentation to v1.8.2 (README, UPGRADE, DOCKER_QUICKSTART)
+- Clarified deployment options (standalone, reverse proxy, Docker)
+
+---
+
+## [1.8.0-beta] - 2026-01-10
+
+### ✨ Major Features & Security Enhancements
+
+#### Added
+- **Complete export authentication** - All export formats (PEM, DER, PKCS#12) now authenticated with JWT
+- **Visual theme preview cards** - 2×4 grid layout with miniature UI previews replacing simple buttons
+- **Global PKCS#12 modal system** - Available across all pages including HTMX-loaded content
+- **Docker/native path compatibility** - Dynamic path resolution for both deployment modes
+
+#### Fixed
+- **Export system authentication** (10 commits):
+  - Missing Certificate import in backend/api/cert.py
+  - CA and certificate export 401 errors
+  - Dashboard missing JWT token
+  - PKCS#12 modal not found in HTMX content
+  - Broken global export functions (removed 114 lines)
+  - Added global `window.exportWithToken()` with JWT
+- **Hardcoded paths replaced** - `/opt/ucm` → `current_app.config[]` for Docker compatibility
+- **HTTPS certificate type detection** - Fixed subject/issuer comparison
+- **Certificate source synchronization** - Fixed race condition with Promises
+
+#### Changed
+- Moved PKCS#12 modal to base.html for global availability
+- Moved `window.UCM_TOKEN` definition to base.html
+- Enhanced theme selection with visual preview cards (8 themes in 2 rows of 4)
+- Improved sidebar naming ("Settings" → "System Settings")
+
+#### Statistics
+- **17 commits total** (15 bug fixes, 2 features)
+- **7 files modified** (3 backend, 4 frontend)
+- **+450 lines added, -300 removed** (net +150)
+- **8 tag iterations** during development
+
+---
+
 ## [1.6.0] - 2026-01-05
 
 ### 🎨 Complete UI Redesign & Tailwind Removal - Production Ready
