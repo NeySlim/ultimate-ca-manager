@@ -1,7 +1,7 @@
 """
 UI Routes - Flask templates with HTMX
 """
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, make_response
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, make_response, current_app
 from flask_jwt_extended import create_access_token, set_access_cookies
 from functools import wraps
 from datetime import datetime, timedelta
@@ -3861,7 +3861,7 @@ def https_cert_info_ui():
     
     logger = logging.getLogger(__name__)
     
-    cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
+    cert_path = Path(current_app.config['HTTPS_CERT_PATH'])
     
     try:
         with open(cert_path, 'rb') as f:
@@ -3966,10 +3966,10 @@ def https_cert_candidates_ui():
             continue
             
         # Check if private key exists
-        key_path = Path(f'/opt/ucm/backend/data/private/cert_{cert.refid}.key')
+        key_path = current_app.config['PRIVATE_DIR'] / f'cert_{cert.refid}.key'
         if not key_path.exists():
             # Try refid-based naming
-            key_path = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
+            key_path = current_app.config['PRIVATE_DIR'] / f'{cert.refid}.key'
             if not key_path.exists():
                 continue
         
@@ -4073,16 +4073,16 @@ def https_cert_apply_ui():
                 return jsonify({'success': False, 'error': 'Certificate not found'}), 404
             
             # Load certificate and key (use refid for file paths)
-            cert_file = Path(f'/opt/ucm/backend/data/certs/{cert.refid}.crt')
+            cert_file = current_app.config['CERT_DIR'] / f'{cert.refid}.crt'
             
-            key_file = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
+            key_file = current_app.config['PRIVATE_DIR'] / f'{cert.refid}.key'
             
             if not cert_file.exists() or not key_file.exists():
                 return jsonify({'success': False, 'error': 'Certificate or key file not found'}), 404
             
             # Copy to HTTPS location
-            https_cert = Path('/opt/ucm/backend/data/https_cert.pem')
-            https_key = Path('/opt/ucm/backend/data/https_key.pem')
+            https_cert = Path(current_app.config['HTTPS_CERT_PATH'])
+            https_key = Path(current_app.config['HTTPS_KEY_PATH'])
             
             # Backup current cert
             if https_cert.exists():
@@ -4158,8 +4158,8 @@ def https_cert_regenerate_ui():
         return jsonify({'success': False, 'error': 'Admin role required'}), 403
     
     try:
-        cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
-        key_path = Path('/opt/ucm/backend/data/https_key.pem')
+        cert_path = Path(current_app.config['HTTPS_CERT_PATH'])
+        key_path = Path(current_app.config['HTTPS_KEY_PATH'])
         
         # Backup current
         if cert_path.exists():
