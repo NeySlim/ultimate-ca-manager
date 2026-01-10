@@ -175,20 +175,27 @@ def create_app(config_name=None):
                 # Remove signal file
                 restart_signal.unlink()
                 
+                print(f"🔄 Restart signal detected! Initiating graceful shutdown...")
+                
                 # Schedule graceful shutdown after this request completes
-                # Systemd will automatically restart the service
+                # Docker/Systemd will automatically restart the service
                 def do_shutdown():
                     import time
                     import sys
                     import os
                     
+                    print(f"🔄 Shutdown thread started, waiting 1 second...")
                     time.sleep(1)  # Wait for response to be sent
                     
-                    # Graceful shutdown - let systemd restart us
+                    print(f"🔄 Executing os._exit(0) to trigger container restart...")
+                    sys.stdout.flush()  # Ensure logs are written
+                    
+                    # Graceful shutdown - let systemd/docker restart us
                     os._exit(0)
                 
                 import threading
                 threading.Thread(target=do_shutdown, daemon=False).start()
+                print(f"🔄 Shutdown thread launched")
                 
             except Exception as e:
                 # Log error but don't fail the request
