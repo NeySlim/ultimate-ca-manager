@@ -359,142 +359,43 @@
 // Local overrides only if needed for page-specific behavior.
 // ============================================================================
 
-// PKCS#12 Modal Functions (page-specific implementation)
-if (typeof window.pkcs12ExportId === 'undefined') {
-    window.pkcs12ExportId = null;
-    window.pkcs12ExportType = null;
-}
-
-window.showPKCS12ModalTable = function(id, type) {
-    const passwordField = document.getElementById('pkcs12-password');
-    const confirmField = document.getElementById('pkcs12-password-confirm');
-    
-    // Safety check
-    if (!passwordField || !confirmField) {
-        console.error('PKCS12 modal elements not found');
-        return;
-    }
-    
-    window.pkcs12ExportId = id;
-    window.pkcs12ExportType = type;
-    passwordField.value = '';
-    confirmField.value = '';
-    closeModal('pkcs12-error');
-    openModal('pkcs12-modal');
-    
-    // Close any export menus
-    document.querySelectorAll('[id^="export-menu-"]').forEach(m => m.remove());
-    document.querySelectorAll('[id^="export-cert-menu-"]').forEach(m => m.remove());
-};
-
-window.closePKCS12Modal = function() {
-    closeModal('pkcs12-modal');
-};
-
-window.exportPKCS12 = function() {
-    const password = document.getElementById('pkcs12-password');
-    const confirm = document.getElementById('pkcs12-password-confirm');
-    const errorDiv = document.getElementById('pkcs12-error');
-    
-    // Safety check - elements might not exist on all pages
-    if (!password || !confirm || !errorDiv) {
-        console.error('PKCS12 export elements not found');
-        return;
-    }
-    
-    if (!password.value) {
-        errorDiv.textContent = 'Le mot de passe est requis';
-        errorDiv.classList.remove('hidden');
-        return;
-    }
-    
-    if (password.value !== confirm.value) {
-        errorDiv.textContent = 'Les mots de passe ne correspondent pas';
-        errorDiv.classList.remove('hidden');
-        return;
-    }
-    
-    if (password.length < 4) {
-        errorDiv.textContent = 'Le mot de passe doit contenir au moins 4 caractères';
-        errorDiv.classList.remove('hidden');
-        return;
-    }
-    
-    const url = window.pkcs12ExportType === 'ca' 
-        ? `/api/v1/ca/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password.value)}`
-        : `/api/v1/certificates/${window.pkcs12ExportId}/export/advanced?format=pkcs12&password=${encodeURIComponent(password.value)}`;
-    
-    const token = '{{ session.get("access_token") }}';
-    fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + token }
-    })
-    .then(response => {
-        if (!response.ok) throw new Error('Export failed');
-        return response.blob();
-    })
-    .then(blob => {
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = '';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(downloadUrl);
-        closePKCS12Modal();
-    })
-    .catch(error => {
-        errorDiv.textContent = 'Export échoué: ' + error.message;
-        errorDiv.classList.remove('hidden');
-    });
-};
-
-// Note: All export functions (exportCert, exportCertSimple, etc.) are now in ucm-global.js
-// and defined in ui_routes.py for HTMX content. No need to duplicate here.
+// Note: PKCS12 modal and functions are global (defined in ucm-global.js)
 
 </script>
 
-<!-- PKCS#12 Export Modal -->
-<div id="pkcs12-modal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000;">
+<!-- PKCS#12 Password Modal -->
+<div id="pkcs12PasswordModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
-    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
-        <div style="padding: 1.5rem;">
-            <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">
-                <i class="fas fa-lock mr-2"></i>Export PKCS#12
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h3 style="font-size: 1.25rem; font-weight: bold; color: var(--text-primary);">
+                <i class="fas fa-lock" style="margin-right: 0.5rem;"></i> PKCS#12 Password
             </h3>
+        </div>
+        <div style="padding: 1.5rem;">
             <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
-                Le format PKCS#12 inclut le certificat et la clé privée dans un fichier protégé par mot de passe (.p12 ou .pfx). 
-                Ce format est compatible avec Windows, macOS et la plupart des navigateurs.
+                Enter a password to protect the PKCS#12 file (minimum 4 characters):
             </p>
             <form autocomplete="off">
-            <div style="margin-bottom: 1rem;">
-                <label class="modal-form-label">
-                    Mot de passe <span style="color: var(--danger-color);">*</span>
-                </label>
-                <input type="password" id="pkcs12-password" 
-                    class="form-input" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--card-bg); color: var(--text-primary);"
-                    placeholder="Entrez le mot de passe pour le fichier PKCS#12"
-                    autocomplete="new-password" />
-            </div>
-            <div style="margin-bottom: 1rem;">
-                <label class="modal-form-label">
-                    Confirmation <span style="color: var(--danger-color);">*</span>
-                </label>
-                <input type="password" id="pkcs12-password-confirm" 
-                    class="form-input" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.375rem; background: var(--card-bg); color: var(--text-primary);"
-                    placeholder="Confirmez le mot de passe"
-                    autocomplete="new-password" />
-            </div>
+            <input type="password" id="pkcs12Password" 
+                   class="modal-form-input"
+                   placeholder="Enter password" minlength="4"
+                   autocomplete="new-password">
+            <input type="password" id="pkcs12PasswordConfirm" 
+                   style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); margin-top: 0.75rem;"
+                   placeholder="Confirm password" minlength="4"
+                   autocomplete="new-password">
             </form>
-            <div id="pkcs12-error" style="display: none; margin-bottom: 1rem; padding: 0.75rem; background: rgba(239, 68, 68, 0.1); color: var(--status-danger); border-radius: 0.375rem; font-size: 0.875rem;"></div>
-            <div class="flex justify-end space-x-3">
-                <button data-action="close-pkcs12-modal" class="btn-secondary">
-                    Annuler
-                </button>
-                <button data-action="export-pkcs12" class="btn-primary">
-                    <i class="fas fa-download" style="margin-right: 0.5rem;"></i>Exporter
-                </button>
-            </div>
+        </div>
+        <div class="modal-form-footer">
+            <button data-action="close-pkcs12-modal" 
+                    class="btn-secondary">
+                Cancel
+            </button>
+            <button data-action="download-pkcs12-with-password" 
+                    class="btn-primary">
+                Download
+            </button>
         </div>
     </div>
     </div>
