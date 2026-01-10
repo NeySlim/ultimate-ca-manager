@@ -83,6 +83,23 @@ See all features in action: **[View Full Gallery](docs/SCREENSHOTS.md)**
 
 ## 🚀 Quick Start
 
+### Universal Installer (All Linux Distributions)
+
+**One-line install** - Auto-detects your OS and uses the best method:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/packaging/scripts/install-ucm.sh | sudo bash
+```
+
+Or with wget:
+```bash
+wget -qO- https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/packaging/scripts/install-ucm.sh | sudo bash
+```
+
+✅ **Supports:** Debian, Ubuntu, RHEL, Rocky, Alma, Fedora, openSUSE, Arch, Alpine  
+✅ **Smart:** Uses native packages (DEB/RPM) when available, otherwise installs from source  
+✅ **Zero dependencies:** Only requires bash
+
 ### Docker (Recommended)
 
 ```bash
