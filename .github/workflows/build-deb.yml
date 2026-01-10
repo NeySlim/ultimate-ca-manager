@@ -64,14 +64,41 @@ jobs:
           
           dpkg-deb --build ${BUILD_DIR}
           mv ${BUILD_DIR}.deb ucm_${VERSION}_all.deb
+          
+          # Create source tarball
+          tar czf ucm-${VERSION}.tar.gz \
+            --exclude='.git' \
+            --exclude='debian' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='backend/data/*.db' \
+            backend/ frontend/ packaging/ .env.example README.md CHANGELOG.md
+          
+          # Generate checksums
+          sha256sum ucm_${VERSION}_all.deb > ucm_${VERSION}_all.deb.sha256
+          md5sum ucm_${VERSION}_all.deb > ucm_${VERSION}_all.deb.md5
+          sha256sum ucm-${VERSION}.tar.gz > ucm-${VERSION}.tar.gz.sha256
+          md5sum ucm-${VERSION}.tar.gz > ucm-${VERSION}.tar.gz.md5
       
       - uses: actions/upload-artifact@v4
         with:
           name: debian-package
-          path: ucm_*.deb
+          path: |
+            ucm_*.deb
+            ucm_*.deb.sha256
+            ucm_*.deb.md5
+            ucm-*.tar.gz
+            ucm-*.tar.gz.sha256
+            ucm-*.tar.gz.md5
       
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: ucm_*.deb
+          files: |
+            ucm_*.deb
+            ucm_*.deb.sha256
+            ucm_*.deb.md5
+            ucm-*.tar.gz
+            ucm-*.tar.gz.sha256
+            ucm-*.tar.gz.md5
