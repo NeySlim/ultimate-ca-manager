@@ -666,7 +666,10 @@ class CertificateService:
             
             if include_key and certificate.prv:
                 key_pem = base64.b64decode(certificate.prv)
-                result += b'\n' + key_pem
+                # Ensure proper newline separation
+                if not result.endswith(b'\n'):
+                    result += b'\n'
+                result += key_pem
             
             if include_chain and certificate.caref:
                 # Get CA chain
@@ -675,7 +678,10 @@ class CertificateService:
                     from services.ca_service import CAService
                     chain = CAService.get_ca_chain(ca.id)
                     for chain_cert in chain:
-                        result += b'\n' + chain_cert
+                        # Ensure proper newline separation
+                        if not result.endswith(b'\n'):
+                            result += b'\n'
+                        result += chain_cert
             
             return result
         
