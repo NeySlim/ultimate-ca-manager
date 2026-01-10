@@ -475,32 +475,41 @@ def https_cert_candidates():
     if config:
         current_cert_id = int(config.value)
     
-    # Find suitable certificates
+    # Find suitable certificates (server type, not revoked, not expired)
+    now = datetime.now()
     certificates = Certificate.query.filter(
-        Certificate.status == 'valid',
-        Certificate.cert_type.in_(['server', 'cert'])
+        Certificate.cert_type.in_(['server_cert', 'combined_cert']),
+        Certificate.revoked == False,
+        Certificate.valid_to > now
     ).all()
     
     candidates = []
     for cert in certificates:
         # Check if private key exists
-        key_path = current_app.config['PRIVATE_DIR'] / f'cert_{cert.cert_id}.key'
+        key_path = current_app.config['PRIVATE_DIR'] / f'cert_{cert.refid}.key'
         if not key_path.exists():
-            # Try refid-based naming
+            # Try alternative naming
             key_path = current_app.config['PRIVATE_DIR'] / f'{cert.refid}.key'
             if not key_path.exists():
                 continue
         
         # Get CA name
-        ca = CA.query.get(cert.ca_id)
+        ca = CA.query.filter_by(refid=cert.caref).first()
+        
+        # Combine all SANs
+        san_list = []
+        if cert.san_dns_list:
+            san_list.extend(cert.san_dns_list)
+        if cert.san_ip_list:
+            san_list.extend(cert.san_ip_list)
+        san_str = ', '.join(san_list) if san_list else ''
         
         candidates.append({
             'id': cert.id,
-            'cert_id': cert.cert_id,
             'common_name': cert.common_name or 'N/A',
-            'san': cert.san or '',
-            'expires': cert.valid_until.strftime('%Y-%m-%d') if cert.valid_until else 'N/A',
-            'ca_name': ca.ca_name if ca else 'Unknown',
+            'san': san_str,
+            'expires': cert.valid_to.strftime('%Y-%m-%d') if cert.valid_to else 'N/A',
+            'ca_name': ca.descr if ca else 'Unknown',
             'is_current': cert.id == current_cert_id
         })
     
@@ -532,7 +541,6 @@ def apply_https_certificate():
                 return jsonify({'success': False, 'error': 'cert_id required for managed source'}), 400
             
             # Get certificate from database
-            from models import Certificate
             cert = Certificate.query.get(cert_id)
             if not cert:
                 return jsonify({'success': False, 'error': 'Certificate not found'}), 404
@@ -541,16 +549,17 @@ def apply_https_certificate():
             cert_dir = current_app.config['CERT_DIR']
             private_dir = current_app.config['PRIVATE_DIR']
             
-            cert_file = cert_dir / f'{cert.cert_id}.crt'
+            # Try different naming conventions
+            cert_file = cert_dir / f'{cert.refid}.crt'
             if not cert_file.exists():
-                cert_file = cert_dir / f'{cert.refid}.crt'
+                cert_file = cert_dir / f'{cert.id}.crt'
             
-            key_file = private_dir / f'cert_{cert.cert_id}.key'
+            key_file = private_dir / f'cert_{cert.refid}.key'
             if not key_file.exists():
                 key_file = private_dir / f'{cert.refid}.key'
             
             if not cert_file.exists() or not key_file.exists():
-                return jsonify({'success': False, 'error': 'Certificate or key file not found'}), 404
+                return jsonify({'success': False, 'error': f'Certificate or key file not found. Cert: {cert_file}, Key: {key_file}'}), 404
             
             # Copy to HTTPS location
             import shutil
@@ -597,10 +606,10 @@ def apply_https_certificate():
             pass
         
         # Restart UCM service
-        from config.settings import restart_ucm_service
-        success, message = restart_ucm_service()
+        from utils import restart_service
+        success, message = restart_service()
         
-        return jsonify({'success': True, 'message': message}), 200
+        return jsonify({'success': success, 'message': message}), 200
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -645,10 +654,10 @@ def regenerate_https_certificate():
                  details='Regenerated self-signed HTTPS certificate')
         
         # Restart UCM service
-        from config.settings import restart_ucm_service
-        success, message = restart_ucm_service()
+        from utils import restart_service
+        success, message = restart_service()
         
-        return jsonify({'success': True, 'message': message}), 200
+        return jsonify({'success': success, 'message': message}), 200
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
