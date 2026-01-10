@@ -68,7 +68,9 @@ def ensure_system_config_defaults(app):
 
 
 def ensure_admin_user(app):
-    """Ensure admin user exists"""
+    """Ensure admin user exists - handles race conditions with multiple workers"""
+    from sqlalchemy.exc import IntegrityError
+    
     try:
         # Check if admin already exists
         admin_exists = User.query.filter_by(username=app.config.get("INITIAL_ADMIN_USERNAME", "admin")).first()
@@ -87,6 +89,10 @@ def ensure_admin_user(app):
             db.session.add(admin)
             db.session.commit()
             logger.info(f"Admin user created: {admin.username}")
+    except IntegrityError:
+        # Another worker already created the admin user (race condition)
+        db.session.rollback()
+        logger.debug("Admin user already created by another worker")
     except Exception as e:
         logger.error(f"Error ensuring admin user: {e}")
         db.session.rollback()
