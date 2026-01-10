@@ -87,13 +87,12 @@ def create_app(config_name=None):
     with app.app_context():
         try:
             # Always run create_all to ensure all tables exist
-            # SQLAlchemy should skip existing tables with checkfirst=True
-            db.create_all(checkfirst=True)
+            # SQLAlchemy skips existing tables by default
+            db.create_all()
             app.logger.info("Database tables created/verified")
         except Exception as e:
             # Tables may already exist from another worker - not a real error
-            app.logger.debug(f"Database table creation (expected if tables exist): {e}")
-            # Don't raise - continue if tables already exist
+            app.logger.debug(f"Error creating tables (may already exist): {e}")
         
         # Run database health check and repair
         from database_health import check_and_repair_database
