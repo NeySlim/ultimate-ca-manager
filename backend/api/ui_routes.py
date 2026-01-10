@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import requests
 import time
 from html import escape as html_escape
-from config.settings import Config, DATA_DIR
+from config.settings import Config, DATA_DIR, restart_ucm_service
 from app import cache
 
 ui_bp = Blueprint('ui', __name__, template_folder='../../frontend/templates')
@@ -2760,7 +2760,10 @@ def config_regenerate_https():
         db.session.add(config)
         db.session.commit()
         
-        flash('HTTPS certificate regenerated. Please restart the server.', 'success')
+        # Trigger automatic restart
+        restart_ucm_service()
+        
+        flash('HTTPS certificate regenerated. Server will restart automatically.', 'success')
         return '', 200
     except Exception as e:
         flash(f'Error regenerating certificate: {str(e)}', 'error')
@@ -3440,7 +3443,10 @@ def upload_https_cert():
             db.session.add(config)
             db.session.commit()
             
-            flash('HTTPS certificate imported successfully. Please restart the server.', 'success')
+            # Trigger automatic restart
+            restart_ucm_service()
+            
+            flash('HTTPS certificate imported successfully. Server will restart automatically.', 'success')
             return '', 200
         except Exception as e:
             # Restore backups on error
@@ -3699,7 +3705,10 @@ def use_managed_cert(cert_id):
             
             db.session.commit()
             
-            flash('HTTPS certificate updated successfully. Please restart the server.', 'success')
+            # Trigger automatic restart
+            restart_ucm_service()
+            
+            flash('HTTPS certificate updated successfully. Server will restart automatically.', 'success')
             return '', 200
         except Exception as e:
             # Restore backups on error
