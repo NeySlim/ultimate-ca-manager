@@ -200,6 +200,68 @@
             });
         };
     }
+    
+    // Certificate export functions
+    window.exportCertSimple = function(id) {
+        exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem');
+        var menu = document.getElementById('export-cert-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCertWithKey = function(id) {
+        exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem&key=true');
+        var menu = document.getElementById('export-cert-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCertWithChain = function(id) {
+        exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem&chain=true');
+        var menu = document.getElementById('export-cert-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCertFull = function(id) {
+        exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem&key=true&chain=true');
+        var menu = document.getElementById('export-cert-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCertDER = function(id) {
+        exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem&format=der');
+        var menu = document.getElementById('export-cert-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    // CA export functions
+    window.exportCASimple = function(id) {
+        exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem');
+        var menu = document.getElementById('export-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCAWithKey = function(id) {
+        exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&key=true');
+        var menu = document.getElementById('export-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCAWithChain = function(id) {
+        exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&chain=true');
+        var menu = document.getElementById('export-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCAFull = function(id) {
+        exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&key=true&chain=true');
+        var menu = document.getElementById('export-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    window.exportCADER = function(id) {
+        exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=der');
+        var menu = document.getElementById('export-menu-' + id);
+        if (menu) menu.remove();
+    };
 })();
 </script>
 {% endblock %}

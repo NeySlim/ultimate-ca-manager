@@ -362,120 +362,14 @@ function performCertRevoke(refid) {
 // ============================================================================
 // EXPORT FUNCTIONS
 // ============================================================================
-
-/**
- * Generic export function using JWT cookies
- * Downloads a file from the given URL with authentication
- */
-function exportWithToken(url) {
-    fetch(url, {
-        credentials: 'same-origin',
-        headers: { }
-    })
-    .then(response => {
-        if (!response.ok) throw new Error('Export failed');
-        
-        // Extract filename from Content-Disposition header or URL
-        let filename = '';
-        const disposition = response.headers.get('Content-Disposition');
-        if (disposition && disposition.includes('filename=')) {
-            const matches = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-            if (matches && matches[1]) {
-                filename = matches[1].replace(/['"]/g, '');
-            }
-        }
-        
-        // Fallback: extract from URL or use generic name
-        if (!filename) {
-            const urlParts = url.split('/');
-            filename = urlParts[urlParts.length - 1] || 'download';
-            // If it's just a number, add extension based on URL
-            if (/^\d+$/.test(filename)) {
-                if (url.includes('export')) {
-                    filename = 'certificate_' + filename + '.pem';
-                } else {
-                    filename = 'download_' + filename;
-                }
-            }
-        }
-        
-        return response.blob().then(blob => ({ blob, filename }));
-    })
-    .then(({ blob, filename }) => {
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(downloadUrl);
-    })
-    .catch(error => {
-        if (typeof ucmAlert !== 'undefined') {
-            ucmAlert('Export failed: ' + error.message, 'Error');
-        } else {
-            showToast('Export failed: ' + error.message, 'error');
-        }
-    });
-}
-
-// Alias for certificate exports (some templates use this name)
-function exportWithTokenCert(url) {
-    exportWithToken(url);
-}
-
-// CA Export Functions
-function exportCASimple(id) {
-    exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem');
-    document.getElementById('export-menu-' + id)?.remove();
-}
-
-function exportCAWithKey(id) {
-    exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&key=true');
-    document.getElementById('export-menu-' + id)?.remove();
-}
-
-function exportCAWithChain(id) {
-    exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&chain=true');
-    document.getElementById('export-menu-' + id)?.remove();
-}
-
-function exportCAFull(id) {
-    exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=pem&key=true&chain=true');
-    document.getElementById('export-menu-' + id)?.remove();
-}
-
-function exportCADER(id) {
-    exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=der');
-    document.getElementById('export-menu-' + id)?.remove();
-}
-
-// Certificate Export Functions
-function exportCertSimple(id) {
-    exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem');
-    document.getElementById('export-cert-menu-' + id)?.remove();
-}
-
-function exportCertWithKey(id) {
-    exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem&key=true');
-    document.getElementById('export-cert-menu-' + id)?.remove();
-}
-
-function exportCertWithChain(id) {
-    exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem&chain=true');
-    document.getElementById('export-cert-menu-' + id)?.remove();
-}
-
-function exportCertFull(id) {
-    exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=pem&key=true&chain=true');
-    document.getElementById('export-cert-menu-' + id)?.remove();
-}
-
-function exportCertDER(id) {
-    exportWithToken('/api/v1/certificates/' + id + '/export/advanced?format=der');
-    document.getElementById('export-cert-menu-' + id)?.remove();
-}
+// ============================================================================
+// EXPORT FUNCTIONS
+// ============================================================================
+// NOTE: Export functions (exportCertSimple, exportCertWithChain, exportCASimple, etc.)
+// are defined in template inline scripts with proper JWT token injection.
+// DO NOT define them here as globals - they would override the authenticated versions.
+// Each page template (ca/list.html, certs/list.html, ca/detail.html, certs/detail.html, dashboard.html)
+// defines its own exportWithToken() function with the JWT token from the session.
 
 // ============================================================================
 // CRL FUNCTIONS
