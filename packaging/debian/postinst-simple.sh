@@ -103,6 +103,11 @@ JWT_SECRET_KEY=${JWT_SECRET}
 SESSION_TIMEOUT=3600
 JWT_EXPIRATION=86400
 
+# Initial Admin User
+INITIAL_ADMIN_USERNAME=admin
+INITIAL_ADMIN_PASSWORD=changeme123
+INITIAL_ADMIN_EMAIL=admin@ucm.local
+
 # Database
 DATABASE_PATH=/var/lib/ucm/ucm.db
 
@@ -120,9 +125,13 @@ ENVEOF
 fi
 
 # Initialize database if not exists
-if [ ! -f /opt/ucm/backend/data/ucm.db ]; then
+if [ ! -f /var/lib/ucm/ucm.db ]; then
     cd /opt/ucm
-    sudo -u ucm venv/bin/python backend/init_db.py
+    # Export required environment variables for init_db.py
+    export DATABASE_PATH=/var/lib/ucm/ucm.db
+    export SECRET_KEY="${SECRET_KEY}"
+    export JWT_SECRET_KEY="${JWT_SECRET}"
+    sudo -u ucm -E venv/bin/python backend/init_db.py
 fi
 
 # Enable and start service
