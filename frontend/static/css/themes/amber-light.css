@@ -25,6 +25,10 @@
     --accent-hover: #ff8555;
     --success-color: #10b981;
     --success-hover: #059669;
+    --status-success: #10b981;
+    --status-warning: #f59e0b;
+    --status-danger: #ef4444;
+    --status-info: #8b5cf6;
     --danger-color: #ef4444;
     --danger-hover: #dc2626;
     --warning-color: #ff9f43;

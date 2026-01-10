@@ -53,21 +53,17 @@ function updateActiveThemeIndicator(themeName) {
         if (icon) {
             icon.remove();
         }
-        item.style.fontWeight = '';
-        item.style.background = '';
+        item.classList.remove('active-theme');
     });
     
     // Add indicator to current theme
     const activeItem = document.querySelector(`[data-action="set-theme"][data-theme="${themeName}"]`);
     if (activeItem) {
-        activeItem.style.fontWeight = '600';
-        activeItem.style.background = 'var(--bg-hover)';
+        activeItem.classList.add('active-theme');
         
         // Add checkmark icon
         const checkIcon = document.createElement('i');
         checkIcon.className = 'fas fa-check theme-active-icon';
-        checkIcon.style.marginLeft = 'auto';
-        checkIcon.style.color = 'var(--primary-color)';
         activeItem.appendChild(checkIcon);
     }
 }
