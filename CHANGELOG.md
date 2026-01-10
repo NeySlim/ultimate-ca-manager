@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.3] - 2026-01-10
+
+### 🚀 Installation & CI/CD Improvements
+
+#### Added
+- **Universal installer script** - One-line install for all Linux distributions
+  - Auto-detects OS (Debian, Ubuntu, RHEL, Rocky, Alma, Fedora, openSUSE, Arch, Alpine)
+  - Offers native package (DEB/RPM) when available
+  - Falls back to source installation
+  - Zero dependencies required (only bash)
+- **Source tarballs in releases** - `ucm-{VERSION}.tar.gz` with full source code
+- **Checksum files** - SHA256 and MD5 for all release assets (DEB, RPM, source)
+- **Screenshots gallery** - 16 high-quality screenshots documenting all features
+  - Organized docs/SCREENSHOTS.md
+  - Preview table in README.md
+
+#### Fixed
+- **mTLS navigation** - "My Certificates" now uses `/my-account/mtls` route instead of anchor
+- **GitHub Actions workflows** - Simplified DEB workflow with echo-based file generation (no heredoc issues)
+- **Button visibility** - Improved btn-success and btn-warning classes across all themes
+- **Theme indicator** - Active theme now visible on all pages, not just dashboard
+
+#### Changed
+- **Full English translation** - All remaining French text translated
+  - Table search placeholders ("Rechercher..." → "Search...")
+  - Orphaned CAs backend messages
+  - Consistent language across entire interface
+- **Documentation accuracy** - Updated all docs to reflect v1.8.3 reality
+  - Removed mentions of non-implemented features (automated backups, restore UI)
+  - Fixed Docker environment variables (removed UCM_BACKUP_* vars)
+  - Updated version references from 1.8.0-beta to 1.8.3
+- **Service management** - Auto-restart after HTTPS certificate changes
+
+#### Documentation
+- **INSTALLATION.md** - Comprehensive installation guide
+- **ROADMAP.md** - Clear development plan through v2.0.0
+- **Wiki updates** - Backup-Restore page rewritten, homepage updated
+- All guides reflect accurate v1.8.3 feature set
+
+---
+
 ## [1.8.2] - 2026-01-10
 
 ### 🐛 Critical Bug Fix - Nginx Dependency
