@@ -35,14 +35,14 @@ jobs:
           cp -r backend frontend ${BUILD_DIR}/opt/ucm/
           cp .env.example ${BUILD_DIR}/opt/ucm/
           
-          cat > ${BUILD_DIR}/DEBIAN/control << EOF
+          cat > ${BUILD_DIR}/DEBIAN/control << 'CTRLEOF'
 Package: ucm
 Version: ${VERSION}
 Architecture: all
 Depends: python3 (>= 3.10), python3-pip, systemd, openssl
 Maintainer: UCM Team <support@ucm.local>
 Description: Certificate Authority Management System
-EOF
+CTRLEOF
           
           cp packaging/debian/ucm.service ${BUILD_DIR}/etc/systemd/system/
           cp packaging/debian/start-ucm.sh ${BUILD_DIR}/opt/ucm/
