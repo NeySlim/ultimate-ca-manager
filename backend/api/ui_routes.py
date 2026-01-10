@@ -1,16 +1,12 @@
 """
 UI Routes - Flask templates with HTMX
 """
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, make_response, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify, make_response
 from flask_jwt_extended import create_access_token, set_access_cookies
 from functools import wraps
 from datetime import datetime, timedelta
 import requests
 import time
-import os
-import sys
-import shutil
-import logging
 from html import escape as html_escape
 from config.settings import Config, DATA_DIR
 from app import cache
@@ -1007,47 +1003,58 @@ def ca_list_content():
         }
         
         // Export function with JWT token for CA exports
-        function exportWithToken(url) {
-            const token = ''' + f"'{token}'" + ''';
-            fetch(url, {
-                headers: { 'Authorization': 'Bearer ' + token }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('Export failed');
+        if (typeof window.exportWithToken === 'undefined') {
+            window.exportWithToken = function(url) {
+                var token = ''' + f"'{token}'" + ''';
                 
-                // Extract filename from Content-Disposition header or URL
-                let filename = '';
-                const disposition = response.headers.get('Content-Disposition');
-                if (disposition && disposition.includes('filename=')) {
-                    const matches = disposition.match(/filename[^;=\\n]*=(([\'"]).*?\\2|[^;\\n]*)/);
-                    if (matches && matches[1]) {
-                        filename = matches[1].replace(/[\'"]/g, '');
+                // Show loading toast
+                showToast('Preparing download...', 'info');
+                
+                fetch(url, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Export failed');
+                    
+                    // Extract filename from Content-Disposition header or URL
+                    var filename = '';
+                    var disposition = response.headers.get('Content-Disposition');
+                    if (disposition && disposition.includes('filename=')) {
+                        var matches = disposition.match(/filename[^;=\\n]*=(([\'"]).*?\\2|[^;\\n]*)/);
+                        if (matches && matches[1]) {
+                            filename = matches[1].replace(/[\'"]/g, '');
+                        }
                     }
-                }
-                
-                // Fallback: extract from URL or use generic name
-                if (!filename) {
-                    const urlParts = url.split('/');
-                    filename = urlParts[urlParts.length - 1].split('?')[0] || 'download';
-                }
-                
-                return response.blob().then(blob => ({blob, filename}));
-            })
-            .then(({blob, filename}) => {
-                const downloadUrl = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(downloadUrl);
-            })
-            .catch(error => {
-                console.error('Export error:', error);
-                showToast('Export failed: ' + error.message, 'error');
-            });
+                    
+                    // Fallback: extract from URL or use generic name
+                    if (!filename) {
+                        var urlParts = url.split('/');
+                        filename = urlParts[urlParts.length - 1].split('?')[0] || 'download';
+                    }
+                    
+                    return response.blob().then(blob => ({blob: blob, filename: filename}));
+                })
+                .then(function(result) {
+                    // Small delay to show spinner
+                    setTimeout(function() {
+                        var downloadUrl = window.URL.createObjectURL(result.blob);
+                        var a = document.createElement('a');
+                        a.href = downloadUrl;
+                        a.download = result.filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(downloadUrl);
+                        showToast('Download started: ' + result.filename, 'success');
+                    }, 500);
+                })
+                .catch(error => {
+                    console.error('Export error:', error);
+                    showToast('Export failed: ' + error.message, 'error');
+                });
+            };
         }
+        window.exportWithToken(url);
         </script>
         '''
         
@@ -1548,45 +1555,58 @@ def cert_list_content():
         }
         
         function exportWithTokenCert(url) {
-            const token = ''' + f"'{token}'" + ''';
-            fetch(url, {
-                headers: { 'Authorization': 'Bearer ' + token }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('Export failed');
-                
-                // Extract filename from Content-Disposition header or URL
-                let filename = '';
-                const disposition = response.headers.get('Content-Disposition');
-                if (disposition && disposition.includes('filename=')) {
-                    const matches = disposition.match(/filename[^;=\\n]*=(([\'"]).*?\\2|[^;\\n]*)/);
-                    if (matches && matches[1]) {
-                        filename = matches[1].replace(/[\'"]/g, '');
-                    }
-                }
-                
-                // Fallback: extract from URL or use generic name
-                if (!filename) {
-                    const urlParts = url.split('/');
-                    filename = urlParts[urlParts.length - 1].split('?')[0] || 'certificate.pem';
-                }
-                
-                return response.blob().then(blob => ({blob, filename}));
-            })
-            .then(({blob, filename}) => {
-                const downloadUrl = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(downloadUrl);
-            })
-            .catch(error => {
-                console.error('Export error:', error);
-                showToast('Export failed: ' + error.message, 'error');
-            });
+            if (typeof window.exportWithTokenCert === 'undefined') {
+                window.exportWithTokenCert = function(url) {
+                    var token = ''' + f"'{token}'" + ''';
+                    
+                    // Show loading toast
+                    showToast('Preparing download...', 'info');
+                    
+                    fetch(url, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Export failed');
+                        
+                        // Extract filename from Content-Disposition header or URL
+                        var filename = '';
+                        var disposition = response.headers.get('Content-Disposition');
+                        if (disposition && disposition.includes('filename=')) {
+                            var matches = disposition.match(/filename[^;=\\n]*=(([\'"]).*?\\2|[^;\\n]*)/);
+                            if (matches && matches[1]) {
+                                filename = matches[1].replace(/[\'"]/g, '');
+                            }
+                        }
+                        
+                        // Fallback: extract from URL or use generic name
+                        if (!filename) {
+                            var urlParts = url.split('/');
+                            filename = urlParts[urlParts.length - 1].split('?')[0] || 'certificate.pem';
+                        }
+                        
+                        return response.blob().then(blob => ({blob: blob, filename: filename}));
+                    })
+                    .then(function(result) {
+                        // Small delay to show spinner
+                        setTimeout(function() {
+                            var downloadUrl = window.URL.createObjectURL(result.blob);
+                            var a = document.createElement('a');
+                            a.href = downloadUrl;
+                            a.download = result.filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(downloadUrl);
+                            showToast('Download started: ' + result.filename, 'success');
+                        }, 500);
+                    })
+                    .catch(error => {
+                        console.error('Export error:', error);
+                        showToast('Export failed: ' + error.message, 'error');
+                    });
+                };
+            }
+            window.exportWithTokenCert(url);
         }
         
         
@@ -3844,7 +3864,7 @@ def https_cert_info_ui():
     
     logger = logging.getLogger(__name__)
     
-    cert_path = current_app.config['HTTPS_CERT_PATH']
+    cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
     
     try:
         with open(cert_path, 'rb') as f:
@@ -3854,32 +3874,6 @@ def https_cert_info_ui():
         # Determine certificate source
         source_config = SystemConfig.query.filter_by(key='https_cert_source').first()
         source = source_config.value if source_config else 'auto'
-        
-        # Check if running in Docker and cert needs restart
-        needs_restart = False
-        restart_warning = None
-        from config.settings import is_docker
-        if is_docker() and source == 'managed':
-            # In Docker, compare cert on disk vs what Gunicorn is serving
-            # If they differ, container needs restart
-            try:
-                import socket
-                import ssl
-                # Get currently served cert
-                context = ssl.create_default_context()
-                context.check_hostname = False
-                context.verify_mode = ssl.CERT_NONE
-                with socket.create_connection(('localhost', 8443), timeout=2) as sock:
-                    with context.wrap_socket(sock, server_hostname='localhost') as ssock:
-                        served_cert_der = ssock.getpeercert(binary_form=True)
-                        served_cert = x509.load_der_x509_certificate(served_cert_der, default_backend())
-                        
-                        # Compare with cert on disk
-                        if cert.serial_number != served_cert.serial_number:
-                            needs_restart = True
-                            restart_warning = "⚠️ Certificate has been changed. Please restart the Docker container for changes to take effect."
-            except:
-                pass  # Ignore errors, just won't show warning
         
         # Get cert ID if managed
         cert_id = None
@@ -3894,22 +3888,32 @@ def https_cert_info_ui():
             subject_parts.append(f"{attr.oid._name}={attr.value}")
         subject_str = ', '.join(subject_parts)
         
+        # Extract issuer
+        issuer_str = cert.issuer.rfc4514_string()
+        subject_rfc = cert.subject.rfc4514_string()
+        
+        # Determine if truly self-signed (subject == issuer)
+        is_self_signed = (subject_rfc == issuer_str)
+        
         # Format expiry date (compatible with all cryptography versions)
         expires = cert.not_valid_after.strftime('%Y-%m-%d %H:%M:%S UTC')
         
-        cert_type = 'Self-Signed' if source == 'auto' else 'UCM Managed'
+        # Determine display type based on source and whether truly self-signed
+        if source == 'managed':
+            cert_type = 'UCM Managed'
+        elif is_self_signed:
+            cert_type = 'Self-Signed'
+        else:
+            cert_type = 'CA-Signed (Auto-generated)'
         
         result = {
             'type': cert_type,
             'subject': subject_str,
             'expires': expires,
             'source': source,
-            'issuer': cert.issuer.rfc4514_string(),
-            'needs_restart': needs_restart
+            'issuer': issuer_str,
+            'is_self_signed': is_self_signed
         }
-        
-        if restart_warning:
-            result['restart_warning'] = restart_warning
         
         # Add cert_id if managed
         if source == 'managed' and cert_id:
@@ -3965,11 +3969,10 @@ def https_cert_candidates_ui():
             continue
             
         # Check if private key exists
-        private_dir = current_app.config['PRIVATE_DIR']
-        key_path = private_dir / f'cert_{cert.refid}.key'
+        key_path = Path(f'/opt/ucm/backend/data/private/cert_{cert.refid}.key')
         if not key_path.exists():
             # Try refid-based naming
-            key_path = private_dir / f'{cert.refid}.key'
+            key_path = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
             if not key_path.exists():
                 continue
         
@@ -4073,18 +4076,16 @@ def https_cert_apply_ui():
                 return jsonify({'success': False, 'error': 'Certificate not found'}), 404
             
             # Load certificate and key (use refid for file paths)
-            cert_dir = current_app.config['CERT_DIR']
-            private_dir = current_app.config['PRIVATE_DIR']
+            cert_file = Path(f'/opt/ucm/backend/data/certs/{cert.refid}.crt')
             
-            cert_file = cert_dir / f'{cert.refid}.crt'
-            key_file = private_dir / f'{cert.refid}.key'
+            key_file = Path(f'/opt/ucm/backend/data/private/{cert.refid}.key')
             
             if not cert_file.exists() or not key_file.exists():
                 return jsonify({'success': False, 'error': 'Certificate or key file not found'}), 404
             
             # Copy to HTTPS location
-            https_cert = current_app.config['HTTPS_CERT_PATH']
-            https_key = current_app.config['HTTPS_KEY_PATH']
+            https_cert = Path('/opt/ucm/backend/data/https_cert.pem')
+            https_key = Path('/opt/ucm/backend/data/https_key.pem')
             
             # Backup current cert
             if https_cert.exists():
@@ -4132,10 +4133,9 @@ def https_cert_apply_ui():
             logger.info(f"HTTPS certificate source set to auto (self-signed) by {user.username}")
         
         # Restart UCM service
-        from config.settings import restart_ucm_service
-        success, message = restart_ucm_service()
+        subprocess.Popen(['systemctl', 'restart', 'ucm'])
         
-        return jsonify({'success': True, 'message': message}), 200
+        return jsonify({'success': True}), 200
         
     except Exception as e:
         logger.error(f"Error applying HTTPS certificate: {e}")
@@ -4161,8 +4161,8 @@ def https_cert_regenerate_ui():
         return jsonify({'success': False, 'error': 'Admin role required'}), 403
     
     try:
-        cert_path = current_app.config['HTTPS_CERT_PATH']
-        key_path = current_app.config['HTTPS_KEY_PATH']
+        cert_path = Path('/opt/ucm/backend/data/https_cert.pem')
+        key_path = Path('/opt/ucm/backend/data/https_key.pem')
         
         # Backup current
         if cert_path.exists():
@@ -4186,10 +4186,9 @@ def https_cert_regenerate_ui():
         logger.info(f"HTTPS certificate regenerated by {user.username}")
         
         # Restart UCM service
-        from config.settings import restart_ucm_service
-        success, message = restart_ucm_service()
+        subprocess.Popen(['systemctl', 'restart', 'ucm'])
         
-        return jsonify({'success': True, 'message': message}), 200
+        return jsonify({'success': True}), 200
         
     except Exception as e:
         logger.error(f"Error regenerating HTTPS certificate: {e}")

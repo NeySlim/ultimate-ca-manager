@@ -143,9 +143,8 @@
             <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
                 <p style="margin-bottom: 0.25rem;"><strong>Important Notes:</strong></p>
                 <ul style="list-style: disc; margin-left: 1.25rem;">
-                    <li>Changing the certificate requires restarting UCM to take effect</li>
-                    <li>In Docker: you need to manually restart the container</li>
-                    <li>Native installation: service will restart automatically</li>
+                    <li>Changing the certificate will restart the UCM service</li>
+                    <li>You will be disconnected and need to reload the page</li>
                     <li>The certificate must be valid and match the server's hostname/IP</li>
                     <li>The private key must be available in UCM's keystore</li>
                 </ul>
@@ -275,90 +274,64 @@ const getToken = () => document.querySelector('meta[name="access-token"]')?.cont
 (function() {
     loadHTTPSCertInfo();
     loadPKIStats();
-    loadCertificateCandidates();
     setupCertSelectorListener();
     updateMTLSBadge();
-    
-    // Refresh cert info every 10 seconds (without flicker)
-    setInterval(() => {
-        loadHTTPSCertInfo(true); // true = silent update
-    }, 10000);
 })();
 
 // Also load on DOMContentLoaded (for direct page access)
 document.addEventListener('DOMContentLoaded', function() {
     loadHTTPSCertInfo();
     loadPKIStats();
-    loadCertificateCandidates();
     setupCertSelectorListener();
     updateMTLSBadge();
 });
 
-function loadHTTPSCertInfo(silent = false) {
-    fetch('/api/ui/system/https-cert-info')
-        .then(response => response.json())
-        .then(data => {
-            // Check if elements exist before modifying
-            const certSubject = document.getElementById('cert-subject');
-            const certExpiry = document.getElementById('cert-expiry');
-            const certType = document.getElementById('cert-type');
-            const certInfo = document.getElementById('https-cert-info');
-            
-            if (certSubject && data.subject) certSubject.textContent = data.subject;
-            if (certExpiry && data.expires) certExpiry.textContent = data.expires;
-            if (certType && data.type) certType.textContent = data.type;
-            
-            // Show restart warning if needed
-            if (certInfo && data.restart_warning) {
-                // Remove existing warning if any
-                const existingWarning = certInfo.querySelector('.restart-warning');
-                if (existingWarning) existingWarning.remove();
+function loadHTTPSCertInfo() {
+    // First load certificate candidates, then load current cert info
+    loadCertificateCandidates().then(() => {
+        fetch('/api/ui/system/https-cert-info')
+            .then(response => response.json())
+            .then(data => {
+                // Check if elements exist before modifying
+                const certSubject = document.getElementById('cert-subject');
+                const certExpiry = document.getElementById('cert-expiry');
+                const certType = document.getElementById('cert-type');
                 
-                // Add new warning
-                const warning = document.createElement('div');
-                warning.className = 'restart-warning';
-                warning.style.cssText = 'margin-top: 0.75rem; padding: 0.75rem; background: var(--warning-bg, #fff3cd); border: 1px solid var(--warning-border, #ffc107); border-radius: 0.375rem; color: var(--warning-text, #856404); font-size: 0.875rem;';
-                warning.innerHTML = `<strong>⚠️ Restart Required:</strong><br>${data.restart_warning}`;
-                certInfo.appendChild(warning);
-            }
-            
-            // Set radio button based on source
-            if (data.source === 'managed' && data.cert_id) {
-                const managedRadio = document.querySelector('input[name="cert-source"][value="managed"]');
-                if (managedRadio) {
-                    managedRadio.checked = true;
-                }
+                if (certSubject && data.subject) certSubject.textContent = data.subject;
+                if (certExpiry && data.expires) certExpiry.textContent = data.expires;
+                if (certType && data.type) certType.textContent = data.type;
                 
-                // Pre-select certificate in dropdown
-                const select = document.getElementById('managed-cert-id');
-                if (select) {
-                    // Wait for certificates to load, then select
-                    setTimeout(() => {
-                        // Double-check element still exists after timeout
-                        const selectCheck = document.getElementById('managed-cert-id');
-                        if (selectCheck) {
-                            selectCheck.value = String(data.cert_id);
-                            selectCheck.dispatchEvent(new Event('change'));
-                        }
-                    }, 800);
-                }
-                toggleCertSelector();
-            } else {
-                const autoRadio = document.querySelector('input[name="cert-source"][value="auto"]');
-                if (autoRadio) {
-                    autoRadio.checked = true;
+                // Set radio button based on source
+                if (data.source === 'managed' && data.cert_id) {
+                    const managedRadio = document.querySelector('input[name="cert-source"][value="managed"]');
+                    if (managedRadio) {
+                        managedRadio.checked = true;
+                    }
+                    
+                    // Pre-select certificate in dropdown (no timeout needed now)
+                    const select = document.getElementById('managed-cert-id');
+                    if (select) {
+                        select.value = String(data.cert_id);
+                        select.dispatchEvent(new Event('change'));
+                    }
                     toggleCertSelector();
+                } else {
+                    const autoRadio = document.querySelector('input[name="cert-source"][value="auto"]');
+                    if (autoRadio) {
+                        autoRadio.checked = true;
+                        toggleCertSelector();
+                    }
                 }
-            }
-        })
-        .catch(error => console.error('Error loading HTTPS cert info:', error));
+            })
+            .catch(error => console.error('Error loading HTTPS cert info:', error));
+    });
 }
 
 function loadCertificateCandidates() {
     const select = document.getElementById('managed-cert-id');
-    if (!select) return; // Element not found yet
+    if (!select) return Promise.resolve(); // Element not found yet
     
-    fetch('/api/ui/system/https-cert-candidates')
+    return fetch('/api/ui/system/https-cert-candidates')
         .then(response => response.json())
         .then(data => {
             select.innerHTML = '';
@@ -447,7 +420,7 @@ function applyHTTPSCertificate() {
     }
     
     ucmConfirm(
-        'Applying a new certificate will require restarting UCM. Continue?',
+        'Applying a new certificate will restart UCM and disconnect your session. Continue?',
         'Apply Certificate',
         { danger: true, confirmText: 'Apply', icon: 'warning-triangle' }
     ).then(confirmed => {
@@ -466,17 +439,8 @@ function applyHTTPSCertificate() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Show appropriate message based on restart message
-                const message = data.message || 'Certificate applied';
-                ucmAlert(message, 'Success');
-                
-                // If message indicates container restart needed, don't auto-reload
-                if (message.includes('Container restart') || message.includes('container restart')) {
-                    // Stay on page - user needs to manually restart container
-                } else {
-                    // Native installation - service will restart
-                    setTimeout(() => window.location.reload(), 3000);
-                }
+                ucmAlert('Certificate applied. UCM is restarting...', 'Success');
+                setTimeout(() => window.location.reload(), 3000);
             } else {
                 ucmAlert('Error: ' + (data.error || data.message || 'Unknown error'), 'Error');
             }
@@ -490,7 +454,7 @@ function applyHTTPSCertificate() {
 
 function regenerateSelfSigned() {
     ucmConfirm(
-        'This will generate a new self-signed certificate. Continue?',
+        'This will generate a new self-signed certificate and restart UCM. Continue?',
         'Regenerate Certificate',
         { danger: true, confirmText: 'Regenerate', icon: 'warning-triangle' }
     ).then(confirmed => {
@@ -502,15 +466,8 @@ function regenerateSelfSigned() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                const message = data.message || 'Certificate regenerated';
-                ucmAlert(message, 'Success');
-                
-                // If message indicates container restart needed, don't auto-reload
-                if (message.includes('Container restart') || message.includes('container restart')) {
-                    // Stay on page
-                } else {
-                    setTimeout(() => window.location.reload(), 3000);
-                }
+                ucmAlert('Certificate regenerated. UCM is restarting...', 'Success');
+                setTimeout(() => window.location.reload(), 3000);
             } else {
                 ucmAlert('Error: ' + data.message, 'Error');
             }
