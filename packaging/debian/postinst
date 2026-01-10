@@ -116,8 +116,8 @@ BACKUP_ENABLED=true
 BACKUP_RETENTION_DAYS=30
 
 # HTTPS Certificate
-HTTPS_CERT_PATH=$UCM_DATA/https_cert.pem
-HTTPS_KEY_PATH=$UCM_DATA/https_key.pem
+HTTPS_CERT_PATH=$UCM_CONFIG/https_cert.pem
+HTTPS_KEY_PATH=$UCM_CONFIG/https_key.pem
 HTTPS_AUTO_GENERATE=true
 
 # Initial Admin User
@@ -181,7 +181,7 @@ EOF
         # Generate HTTPS certificate if requested
         db_get ucm/generate_https_cert
         if [ "$RET" = "true" ]; then
-            if [ ! -f "$UCM_DATA/https_cert.pem" ]; then
+            if [ ! -f "$UCM_CONFIG/https_cert.pem" ]; then
                 echo "Generating self-signed HTTPS certificate..."
                 
                 # Create OpenSSL config with SAN
@@ -211,8 +211,8 @@ IP.1 = 127.0.0.1
 SSLEOF
                 
                 openssl req -x509 -newkey rsa:4096 -nodes \
-                    -keyout "$UCM_DATA/https_key.pem" \
-                    -out "$UCM_DATA/https_cert.pem" \
+                    -keyout "$UCM_CONFIG/https_key.pem" \
+                    -out "$UCM_CONFIG/https_cert.pem" \
                     -days 365 \
                     -config /tmp/ucm-ssl.cnf \
                     -extensions v3_req \
@@ -220,10 +220,10 @@ SSLEOF
                 
                 rm /tmp/ucm-ssl.cnf
                 
-                chmod 600 "$UCM_DATA/https_key.pem"
-                chmod 644 "$UCM_DATA/https_cert.pem"
-                chown "$UCM_USER":"$UCM_GROUP" "$UCM_DATA/https_key.pem"
-                chown "$UCM_USER":"$UCM_GROUP" "$UCM_DATA/https_cert.pem"
+                chmod 600 "$UCM_CONFIG/https_key.pem"
+                chmod 644 "$UCM_CONFIG/https_cert.pem"
+                chown "$UCM_USER":"$UCM_GROUP" "$UCM_CONFIG/https_key.pem"
+                chown "$UCM_USER":"$UCM_GROUP" "$UCM_CONFIG/https_cert.pem"
                 
                 echo "✓ HTTPS certificate generated"
             fi

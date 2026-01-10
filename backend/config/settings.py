@@ -154,13 +154,20 @@ class Config:
     HTTPS_PORT = int(os.getenv("HTTPS_PORT", "8443"))
     HTTP_REDIRECT = os.getenv("HTTP_REDIRECT", "true").lower() == "true"
     
-    # HTTPS Certificate (auto-generated if not exists)
-    HTTPS_CERT_PATH = DATA_DIR / "https_cert.pem"
-    HTTPS_KEY_PATH = DATA_DIR / "https_key.pem"
+    # HTTPS Certificate
+    # Respect package installation paths: /var/lib/ucm (Debian) or /etc/ucm (RPM)
+    # Fallback to DATA_DIR for Docker or manual installations
+    _https_cert_default = str(DATA_DIR / "https_cert.pem")
+    _https_key_default = str(DATA_DIR / "https_key.pem")
+    
+    HTTPS_CERT_PATH = Path(os.getenv("HTTPS_CERT_PATH", _https_cert_default))
+    HTTPS_KEY_PATH = Path(os.getenv("HTTPS_KEY_PATH", _https_key_default))
     HTTPS_AUTO_GENERATE = os.getenv("HTTPS_AUTO_GENERATE", "true").lower() == "true"
     
     # Database
-    DATABASE_PATH = DATA_DIR / "ucm.db"
+    # Respect package installation DATABASE_PATH or fallback to DATA_DIR
+    _db_default = str(DATA_DIR / "ucm.db")
+    DATABASE_PATH = Path(os.getenv("DATABASE_PATH", _db_default))
     SQLALCHEMY_DATABASE_URI = f"sqlite:///{DATABASE_PATH}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     

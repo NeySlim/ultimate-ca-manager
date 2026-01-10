@@ -28,7 +28,7 @@ chown -R ucm:ucm /var/log/ucm
 chmod 755 /var/log/ucm
 
 # Generate self-signed HTTPS certificate compatible with modern browsers
-if [ ! -f /var/lib/ucm/https_cert.pem ]; then
+if [ ! -f /etc/ucm/https_cert.pem ]; then
     FQDN=$(hostname -f 2>/dev/null || hostname)
     IP=$(hostname -I | awk '{print $1}')
     FQDN_BASE=$(echo $FQDN | cut -d. -f2-)
@@ -68,18 +68,18 @@ IP.2 = 127.0.0.1
 SSLEOF
     
     openssl req -x509 -newkey rsa:4096 -sha256 -nodes \
-        -keyout /var/lib/ucm/https_key.pem \
-        -out /var/lib/ucm/https_cert.pem \
+        -keyout /etc/ucm/https_key.pem \
+        -out /etc/ucm/https_cert.pem \
         -days 365 \
         -config /tmp/ucm-ssl.cnf \
         -extensions v3_req \
         2>/dev/null
     
     rm -f /tmp/ucm-ssl.cnf
-    chmod 600 /var/lib/ucm/https_key.pem
-    chmod 644 /var/lib/ucm/https_cert.pem
-    chown ucm:ucm /var/lib/ucm/https_key.pem
-    chown ucm:ucm /var/lib/ucm/https_cert.pem
+    chmod 600 /etc/ucm/https_key.pem
+    chmod 644 /etc/ucm/https_cert.pem
+    chown ucm:ucm /etc/ucm/https_key.pem
+    chown ucm:ucm /etc/ucm/https_cert.pem
 fi
 
 # Create environment file if not exists
@@ -107,8 +107,9 @@ JWT_EXPIRATION=86400
 DATABASE_PATH=/opt/ucm/backend/data/ucm.db
 
 # HTTPS Certificate
-HTTPS_CERT_PATH=/var/lib/ucm/https_cert.pem
-HTTPS_KEY_PATH=/var/lib/ucm/https_key.pem
+HTTPS_CERT_PATH=/etc/ucm/https_cert.pem
+HTTPS_KEY_PATH=/etc/ucm/https_key.pem
+HTTPS_AUTO_GENERATE=true
 
 # Logging
 LOG_FILE=/var/log/ucm/ucm.log
