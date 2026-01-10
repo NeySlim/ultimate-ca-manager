@@ -11,6 +11,9 @@ from pathlib import Path
 backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
 
+# Skip secret validation during package installation
+os.environ["UCM_SKIP_SECRET_VALIDATION"] = "1"
+
 from app import create_app
 from models import db, User
 import bcrypt

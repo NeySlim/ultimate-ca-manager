@@ -37,6 +37,16 @@ def create_app(config_name=None):
     config = get_config(config_name)
     app.config.from_object(config)
     
+    # Validate secrets at runtime (not during package installation)
+    try:
+        config.validate_secrets()
+    except ValueError as e:
+        app.logger.error(f"Configuration error: {e}")
+        # During install, this is OK - the service will fail to start until configured
+        # but the package installation should complete
+        if not os.getenv("UCM_SKIP_SECRET_VALIDATION"):
+            raise
+    
     # Ensure HTTPS certificate exists
     if config.HTTPS_AUTO_GENERATE:
         HTTPSManager.ensure_https_cert(

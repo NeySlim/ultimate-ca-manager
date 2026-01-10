@@ -140,9 +140,13 @@ class Config:
     # Application
     APP_NAME = os.getenv("APP_NAME", "Ultimate CA Manager")
     APP_VERSION = os.getenv("APP_VERSION", "1.8.3")
-    SECRET_KEY = os.getenv("SECRET_KEY")
-    if not SECRET_KEY:
-        raise ValueError("SECRET_KEY must be set in environment. Check /etc/ucm/ucm.env")
+    
+    # SECRET_KEY and JWT_SECRET_KEY validation - deferred to runtime
+    _secret_key = os.getenv("SECRET_KEY")
+    _jwt_secret = os.getenv("JWT_SECRET_KEY")
+    
+    # For packaging: allow missing secrets during install, but validate at runtime
+    SECRET_KEY = _secret_key if _secret_key else "INSTALL_TIME_PLACEHOLDER"
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     
     # Server - HTTPS mandatory
@@ -161,15 +165,27 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # JWT Authentication
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-    if not JWT_SECRET_KEY:
-        raise ValueError("JWT_SECRET_KEY must be set in environment. Check /etc/ucm/ucm.env")
+    JWT_SECRET_KEY = _jwt_secret if _jwt_secret else "INSTALL_TIME_PLACEHOLDER"
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         seconds=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", "3600"))
     )
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(
         seconds=int(os.getenv("JWT_REFRESH_TOKEN_EXPIRES", "2592000"))
     )
+    
+    @classmethod
+    def validate_secrets(cls):
+        """Validate that secrets are properly set - called at app startup"""
+        if cls.SECRET_KEY == "INSTALL_TIME_PLACEHOLDER" or not cls.SECRET_KEY:
+            raise ValueError(
+                "SECRET_KEY must be set in environment. "
+                "Check /etc/ucm/ucm.env or load environment variables."
+            )
+        if cls.JWT_SECRET_KEY == "INSTALL_TIME_PLACEHOLDER" or not cls.JWT_SECRET_KEY:
+            raise ValueError(
+                "JWT_SECRET_KEY must be set in environment. "
+                "Check /etc/ucm/ucm.env or load environment variables."
+            )
     
     # JWT Cookies - Enable cookie-based auth for UI
     JWT_TOKEN_LOCATION = ["headers", "cookies"]  # Accept both headers and cookies
