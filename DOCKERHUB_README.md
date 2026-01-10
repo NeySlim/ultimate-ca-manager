@@ -14,7 +14,7 @@ Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Cer
 
 ## 📸 Dashboard Preview
 
-![Dashboard](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/02-dashboard_amber-dark.png)
+![Dashboard](https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/dash.png)
 *Professional Dashboard - Amber Dark Theme*
 
 ---
@@ -25,7 +25,7 @@ Ultimate CA Manager (UCM) is a comprehensive web-based solution for managing Cer
 
 ```bash
 # Pull from GHCR (GitHub Container Registry)
-docker pull ghcr.io/ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.3
 
 # Run with SQLite
 docker run -d \
@@ -33,7 +33,7 @@ docker run -d \
   -p 8443:8443 \
   -v ucm-data:/app/backend/data \
   --restart unless-stopped \
-  ghcr.io/ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+  ghcr.io/neyslim/ultimate-ca-manager:1.8.3
 
 # Access: https://localhost:8443
 # Default login: admin / changeme123 ⚠️ CHANGE IMMEDIATELY!
@@ -134,7 +134,7 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/in
       <b>Blossom Light</b>
     </td>
     <td align="center">
-      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/02-dashboard_amber-dark.png" width="350"/><br/>
+      <img src="https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/docs/screenshots/dash.png" width="350"/><br/>
       <b>Amber Dark</b>
     </td>
   </tr>
@@ -148,7 +148,7 @@ curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/in
 
 ```bash
 # Latest stable
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.3
 
 # Specific version
 docker pull ghcr.io/neyslim/ultimate-ca-manager:1.0.1
@@ -157,7 +157,7 @@ docker pull ghcr.io/neyslim/ultimate-ca-manager:1.0.1
 docker pull ghcr.io/neyslim/ultimate-ca-manager:1
 
 # Architecture-specific
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta  # Multi-arch (amd64, arm64)
+docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.3  # Multi-arch (amd64, arm64)
 ```
 
 **Tags**:

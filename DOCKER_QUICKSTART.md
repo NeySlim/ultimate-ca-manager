@@ -1,4 +1,4 @@
-# UCM v1.8.3-beta - Docker Quick Start Guide
+# UCM v1.8.3 - Docker Quick Start Guide
 
 ## 🚀 Quick Start (5 minutes)
 
@@ -6,7 +6,7 @@
 
 ```bash
 # 1. Clone or download UCM
-git clone https://github.com/username/ucm.git
+git clone https://github.com/NeySlim/ultimate-ca-manager.git
 cd ucm
 
 # 2. Create environment file
@@ -337,16 +337,16 @@ http://localhost:8025
 - **Full Documentation**: `/docs` directory
 - **API Reference**: `https://your-domain:8443/api/docs`
 - **Environment Variables**: `.env.example`
-- **GitHub**: https://github.com/username/ucm
-- **Issues**: https://github.com/username/ucm/issues
+- **GitHub**: https://github.com/NeySlim/ultimate-ca-manager
+- **Issues**: https://github.com/NeySlim/ultimate-ca-manager/issues
 
 ## 🆘 Support
 
-- GitHub Issues: https://github.com/username/ucm/issues
+- GitHub Issues: https://github.com/NeySlim/ultimate-ca-manager/issues
 - Documentation: https://ucm.example.com/docs
 - Community Forum: https://community.ucm.example.com
 
 ---
 
-**Version**: 1.8.3-beta  
+**Version**: 1.8.3  
 **Last Updated**: 2026-01-09
