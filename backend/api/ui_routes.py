@@ -765,21 +765,21 @@ def ca_list_content():
                             </div>
                         </th>
                         <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="1">
-                            Émetteur <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                            Issuer <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
                         <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="2">
-                            Nom <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                            Name <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
                         <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="3">
-                            Utilisations <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                            Usage <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
                         <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="4">
-                            Début validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                            Valid From <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
                         <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-ca" data-column="5">
-                            Fin validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                            Valid Until <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
-                        <th style="padding: 0.75rem; text-align: left;">Commandes</th>
+                        <th style="padding: 0.75rem; text-align: left;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -802,14 +802,14 @@ def ca_list_content():
         <!-- Pagination for CA table -->
         <div class="table-pagination">
             <div class="pagination-info">
-                <span>Affichage <span id="ca-start">1</span>-<span id="ca-end">10</span> sur <span id="ca-total"></span> CAs</span>
+                <span>Showing <span id="ca-start">1</span>-<span id="ca-end">10</span> of <span id="ca-total"></span> CAs</span>
             </div>
             <div class="pagination-controls">
                 <select class="pagination-select" id="ca-per-page" onchange="updateCAPagination()">
-                    <option value="10" selected>10 par page</option>
-                    <option value="25">25 par page</option>
-                    <option value="50">50 par page</option>
-                    <option value="100">100 par page</option>
+                    <option value="10" selected>10 per page</option>
+                    <option value="25">25 per page</option>
+                    <option value="50">50 per page</option>
+                    <option value="100">100 per page</option>
                 </select>
                 <div class="pagination-buttons" id="ca-pagination-buttons"></div>
             </div>
@@ -828,12 +828,12 @@ def ca_list_content():
                 <thead style="background: var(--bg-secondary);">
                     <tr style="border-bottom: 2px solid var(--border-color);">
                         <th style="padding: 0.75rem; text-align: left;">Description</th>
-                        <th style="padding: 0.75rem; text-align: left;">Émetteur (DN)</th>
-                        <th style="padding: 0.75rem; text-align: left;">Nom</th>
-                        <th style="padding: 0.75rem; text-align: left;">Utilisations</th>
-                        <th style="padding: 0.75rem; text-align: left;">Début validité</th>
-                        <th style="padding: 0.75rem; text-align: left;">Fin validité</th>
-                        <th style="padding: 0.75rem; text-align: left;">Commandes</th>
+                        <th style="padding: 0.75rem; text-align: left;">Issuer (DN)</th>
+                        <th style="padding: 0.75rem; text-align: left;">Name</th>
+                        <th style="padding: 0.75rem; text-align: left;">Usage</th>
+                        <th style="padding: 0.75rem; text-align: left;">Valid From</th>
+                        <th style="padding: 0.75rem; text-align: left;">Valid Until</th>
+                        <th style="padding: 0.75rem; text-align: left;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1256,19 +1256,19 @@ def cert_list_content():
                             </div>
                         </th>
                         <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="1">
-                            Émetteur <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                            Issuer <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
                         <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="2">
                             Type <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
                         <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="3">
-                            Début validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                            Valid From <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
                         <th style="padding: 0.75rem; text-align: left; cursor: pointer;" data-action="sort-table-cert" data-column="4">
-                            Fin validité <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
+                            Valid Until <i class="fas fa-chevron-down" style="font-size: 10px; opacity: 0.5;"></i>
                         </th>
                         <th style="padding: 0.75rem; text-align: left;">
-                            Commandes
+                            Actions
                         </th>
                     </tr>
                 </thead>
@@ -1400,14 +1400,14 @@ def cert_list_content():
         <!-- Pagination for Certificate table -->
         <div class="table-pagination">
             <div class="pagination-info">
-                <span>Affichage <span id="cert-start">1</span>-<span id="cert-end">10</span> sur <span id="cert-total"></span> certificats</span>
+                <span>Showing <span id="cert-start">1</span>-<span id="cert-end">10</span> of <span id="cert-total"></span> certificates</span>
             </div>
             <div class="pagination-controls">
                 <select class="pagination-select" id="cert-per-page" data-action="update-cert-pagination">
-                    <option value="10" selected>10 par page</option>
-                    <option value="25">25 par page</option>
-                    <option value="50">50 par page</option>
-                    <option value="100">100 par page</option>
+                    <option value="10" selected>10 per page</option>
+                    <option value="25">25 per page</option>
+                    <option value="50">50 per page</option>
+                    <option value="100">100 per page</option>
                 </select>
                 <div class="pagination-buttons" id="cert-pagination-buttons"></div>
             </div>
