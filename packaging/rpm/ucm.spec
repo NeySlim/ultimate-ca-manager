@@ -177,6 +177,13 @@ app = create_app()
 print('Database initialized successfully!')
 " 2>&1 | grep -v "WARNING\|DEPRECAT"
 
+# Force update systemd service file
+if [ -f %{_datadir}/%{name}/packaging/rpm/ucm.service ]; then
+    cp -f %{_datadir}/%{name}/packaging/rpm/ucm.service %{_unitdir}/ucm.service
+    echo "✓ Updated systemd service file"
+fi
+systemctl daemon-reload >/dev/null 2>&1 || true
+
 # Enable and start service
 %systemd_post %{name}.service
 

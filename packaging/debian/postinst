@@ -201,7 +201,12 @@ SSLEOF
             fi
         fi
         
-        # Reload systemd
+        # Reload systemd and force service file update
+        # Always copy the new service file to ensure updates are applied
+        if [ -f /opt/ucm/packaging/debian/ucm.service ]; then
+            cp -f /opt/ucm/packaging/debian/ucm.service /etc/systemd/system/ucm.service
+            echo "✓ Updated systemd service file"
+        fi
         systemctl daemon-reload >/dev/null 2>&1 || true
         
         # Enable and start service if requested
