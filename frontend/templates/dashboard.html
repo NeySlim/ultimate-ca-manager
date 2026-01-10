@@ -153,6 +153,44 @@
     </div>
 </div>
 
+<!-- PKCS12 Password Modal -->
+<div id="pkcs12PasswordModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
+    <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h3 style="font-size: 1.25rem; font-weight: bold; color: var(--text-primary);">
+                <i class="fas fa-lock" style="margin-right: 0.5rem;"></i> PKCS#12 Password
+            </h3>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Enter a password to protect the PKCS#12 file (minimum 4 characters):
+            </p>
+            <form autocomplete="off">
+            <input type="password" id="pkcs12Password" 
+                   class="modal-form-input"
+                   placeholder="Enter password" minlength="4"
+                   autocomplete="new-password">
+            <input type="password" id="pkcs12PasswordConfirm" 
+                   style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); margin-top: 0.75rem;"
+                   placeholder="Confirm password" minlength="4"
+                   autocomplete="new-password">
+            </form>
+        </div>
+        <div class="modal-form-footer">
+            <button onclick="closePKCS12Modal()" 
+                    class="btn-secondary">
+                Cancel
+            </button>
+            <button onclick="downloadPKCS12WithPassword()" 
+                    class="btn-primary">
+                Download
+            </button>
+        </div>
+    </div>
+    </div>
+</div>
+
 <script>
 // Certificate and CA export functions with JWT authentication
 (function() {
@@ -260,6 +298,50 @@
     window.exportCADER = function(id) {
         exportWithToken('/api/v1/ca/' + id + '/export/advanced?format=der');
         var menu = document.getElementById('export-menu-' + id);
+        if (menu) menu.remove();
+    };
+    
+    // PKCS12 export functions and modal management
+    window.pkcs12Params = {};
+    
+    window.closePKCS12Modal = function() {
+        var modal = document.getElementById('pkcs12PasswordModal');
+        if (modal) modal.classList.add('hidden');
+        window.pkcs12Params = {};
+    };
+    
+    window.downloadPKCS12WithPassword = function() {
+        var password = document.getElementById('pkcs12Password').value;
+        var confirm = document.getElementById('pkcs12PasswordConfirm').value;
+        
+        if (!password || password.length < 4) {
+            showToast('Password must be at least 4 characters', 'error');
+            return;
+        }
+        
+        if (password !== confirm) {
+            showToast('Passwords do not match', 'error');
+            return;
+        }
+        
+        var id = window.pkcs12Params.id;
+        var type = window.pkcs12Params.type;
+        
+        if (!id || !type) {
+            showToast('Export parameters missing', 'error');
+            return;
+        }
+        
+        var url = type === 'ca' 
+            ? '/api/v1/ca/' + id + '/export/advanced?format=pkcs12&password=' + encodeURIComponent(password)
+            : '/api/v1/certificates/' + id + '/export/advanced?format=pkcs12&password=' + encodeURIComponent(password);
+        
+        exportWithToken(url);
+        closePKCS12Modal();
+        
+        var menu = type === 'ca' 
+            ? document.getElementById('export-menu-' + id)
+            : document.getElementById('export-cert-menu-' + id);
         if (menu) menu.remove();
     };
 })();
