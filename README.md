@@ -31,10 +31,11 @@
 - **HTTPS Only** - All traffic encrypted by default
 
 ### 🎨 Modern Interface
-- **4 Themes** - Default, Dark, Nebula, Polar Bear
+- **8 Beautiful Themes** - Sentinel, Amber, Nebula, Blossom (Light/Dark variants)
 - **Responsive Design** - Works on desktop, tablet, mobile
 - **Real-time Updates** - HTMX-powered dynamic interface
 - **Intuitive UI** - Clean, professional design
+- **[View Screenshots](docs/SCREENSHOTS.md)** - See all features in action
 
 ### 🚀 Deployment Options
 - **Docker** - Multi-arch images (amd64, arm64) via GHCR
@@ -48,6 +49,35 @@
 - **Backup/Restore** - Complete system backup functionality
 - **REST API** - Full API for automation
 - **Web Configuration** - All settings via web UI
+
+---
+
+## 📸 Screenshots
+
+See all features in action: **[View Full Gallery](docs/SCREENSHOTS.md)**
+
+<table>
+<tr>
+<td width="50%">
+<img src="docs/screenshots/dash.png" alt="Dashboard">
+<b>Dashboard</b> - Overview and statistics
+</td>
+<td width="50%">
+<img src="docs/screenshots/CAs.png" alt="Certificate Authorities">
+<b>CA Management</b> - Manage authorities
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="docs/screenshots/ACME.png" alt="ACME Server">
+<b>ACME Server</b> - Let's Encrypt compatible
+</td>
+<td width="50%">
+<img src="docs/screenshots/blossom-dark.png" alt="Themes">
+<b>Beautiful Themes</b> - 8 professional themes
+</td>
+</tr>
+</table>
 
 ---
 
