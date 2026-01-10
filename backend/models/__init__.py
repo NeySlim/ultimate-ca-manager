@@ -231,6 +231,7 @@ class CA(db.Model):
             "valid_to": self.valid_to.isoformat() if self.valid_to else None,
             "imported_from": self.imported_from,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_by": self.created_by,
             "has_private_key": self.has_private_key,
             # Computed properties for display
             "common_name": self.common_name,
@@ -414,7 +415,16 @@ class Certificate(db.Model):
             "revoke_reason": self.revoke_reason,
             "imported_from": self.imported_from,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_by": self.created_by,
             "has_private_key": self.has_private_key,
+            "private_key_location": self.private_key_location,
+            # Subject Alternative Names
+            "san_dns": self.san_dns,
+            "san_ip": self.san_ip,
+            "san_email": self.san_email,
+            "san_uri": self.san_uri,
+            # OCSP
+            "ocsp_uri": self.ocsp_uri,
             # Computed properties for display
             "common_name": self.common_name,
             "organization": self.organization,
@@ -443,9 +453,9 @@ class CRL(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    def to_dict(self):
+    def to_dict(self, include_crl=False):
         """Convert to dictionary"""
-        return {
+        data = {
             "id": self.id,
             "caref": self.caref,
             "descr": self.descr,
@@ -454,6 +464,9 @@ class CRL(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+        if include_crl:
+            data["text"] = self.text
+        return data
 
 
 class SCEPRequest(db.Model):
@@ -519,6 +532,7 @@ class AuditLog(db.Model):
             "resource_id": self.resource_id,
             "details": self.details,
             "ip_address": self.ip_address,
+            "user_agent": self.user_agent,
             "success": self.success,
         }
 
