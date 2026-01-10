@@ -56,19 +56,21 @@ def ensure_system_config_defaults(app):
     ]
     
     for key, value, description in defaults:
-        # Check if config already exists
+        # Check if config already exists (read-only check first)
         config = SystemConfig.query.filter_by(key=key).first()
         if config:
             continue  # Already exists, skip
             
-        # Try to create it
+        # Try to create it in isolated transaction
         try:
             config = SystemConfig(key=key, value=value, description=description)
             db.session.add(config)
+            db.session.flush()  # Force write immediately to catch IntegrityError before commit
             db.session.commit()
         except IntegrityError:
-            # Another worker created it first - rollback and continue
+            # Another worker won the race - expected with multiple workers
             db.session.rollback()
+            logger.debug(f"System config {key} already exists (created by another worker)")
         except Exception as e:
             logger.error(f"Error creating system config {key}: {e}")
             db.session.rollback()
