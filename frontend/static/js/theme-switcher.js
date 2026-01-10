@@ -61,9 +61,10 @@ function updateActiveThemeIndicator(themeName) {
     if (activeItem) {
         activeItem.classList.add('active-theme');
         
-        // Add checkmark icon
-        const checkIcon = document.createElement('i');
-        checkIcon.className = 'fas fa-check theme-active-icon';
+        // Add checkmark icon using simple text/emoji
+        const checkIcon = document.createElement('span');
+        checkIcon.className = 'theme-active-icon';
+        checkIcon.textContent = '✓'; // Simple checkmark character
         activeItem.appendChild(checkIcon);
     }
 }

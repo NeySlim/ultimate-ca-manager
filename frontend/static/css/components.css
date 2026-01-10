@@ -200,12 +200,17 @@ background: var(--bg-hover) !important;
 
 .dropdown-item .theme-active-icon {
     margin-left: auto !important;
+    flex-shrink: 0 !important;
     color: var(--primary-color, #3b82f6) !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+    font-weight: bold !important;
 }
 
 .dropdown-item i {
     width: 18px;
     text-align: center;
+    flex-shrink: 0;
 }
 
 .dropdown-divider {
