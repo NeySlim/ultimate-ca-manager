@@ -370,8 +370,14 @@ wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.0/ucm
 sudo dpkg -i ucm_1.8.0_all.deb
 ```
 
-### RPM Package 🚫
-**Note:** RPM packaging is currently disabled pending testing. Use Docker or Debian package instead.
+### RPM Package ⚠️
+**Note:** RPM packaging is **UNTESTED** - use at your own risk. Docker or Debian package recommended.
+
+```bash
+# Download RPM (untested)
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.0/ucm-1.8.0-1.el9.noarch.rpm
+sudo rpm -ivh ucm-1.8.0-1.el9.noarch.rpm
+```
 
 ### Source Code 📥
 ```bash
