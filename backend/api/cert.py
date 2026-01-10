@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from io import BytesIO
 
-from models import db, User
+from models import db, User, Certificate
 from services.cert_service import CertificateService
 from middleware.auth_middleware import operator_required
 

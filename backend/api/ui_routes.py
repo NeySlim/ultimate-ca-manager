@@ -1005,6 +1005,49 @@ def ca_list_content():
                 });
             });
         }
+        
+        // Export function with JWT token for CA exports
+        function exportWithToken(url) {
+            const token = ''' + f"'{token}'" + ''';
+            fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + token }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Export failed');
+                
+                // Extract filename from Content-Disposition header or URL
+                let filename = '';
+                const disposition = response.headers.get('Content-Disposition');
+                if (disposition && disposition.includes('filename=')) {
+                    const matches = disposition.match(/filename[^;=\\n]*=(([\'"]).*?\\2|[^;\\n]*)/);
+                    if (matches && matches[1]) {
+                        filename = matches[1].replace(/[\'"]/g, '');
+                    }
+                }
+                
+                // Fallback: extract from URL or use generic name
+                if (!filename) {
+                    const urlParts = url.split('/');
+                    filename = urlParts[urlParts.length - 1].split('?')[0] || 'download';
+                }
+                
+                return response.blob().then(blob => ({blob, filename}));
+            })
+            .then(({blob, filename}) => {
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+            })
+            .catch(error => {
+                console.error('Export error:', error);
+                showToast('Export failed: ' + error.message, 'error');
+            });
+        }
         </script>
         '''
         
@@ -1511,19 +1554,37 @@ def cert_list_content():
             })
             .then(response => {
                 if (!response.ok) throw new Error('Export failed');
-                return response.blob();
+                
+                // Extract filename from Content-Disposition header or URL
+                let filename = '';
+                const disposition = response.headers.get('Content-Disposition');
+                if (disposition && disposition.includes('filename=')) {
+                    const matches = disposition.match(/filename[^;=\\n]*=(([\'"]).*?\\2|[^;\\n]*)/);
+                    if (matches && matches[1]) {
+                        filename = matches[1].replace(/[\'"]/g, '');
+                    }
+                }
+                
+                // Fallback: extract from URL or use generic name
+                if (!filename) {
+                    const urlParts = url.split('/');
+                    filename = urlParts[urlParts.length - 1].split('?')[0] || 'certificate.pem';
+                }
+                
+                return response.blob().then(blob => ({blob, filename}));
             })
-            .then(blob => {
+            .then(({blob, filename}) => {
                 const downloadUrl = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = downloadUrl;
-                a.download = '';
+                a.download = filename;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 window.URL.revokeObjectURL(downloadUrl);
             })
             .catch(error => {
+                console.error('Export error:', error);
                 showToast('Export failed: ' + error.message, 'error');
             });
         }
