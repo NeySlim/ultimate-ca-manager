@@ -86,12 +86,22 @@ fi
 if [ ! -f /etc/ucm/ucm.env ]; then
     FQDN_VALUE=$(hostname -f 2>/dev/null || hostname)
     
+    # Generate security keys
+    SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+    JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+    
     cat > /etc/ucm/ucm.env << ENVEOF
 # UCM Configuration
 FQDN=${FQDN_VALUE}
 HTTPS_PORT=8443
 DEBUG=false
 LOG_LEVEL=INFO
+
+# Security
+SECRET_KEY=${SECRET_KEY}
+JWT_SECRET_KEY=${JWT_SECRET}
+SESSION_TIMEOUT=3600
+JWT_EXPIRATION=86400
 
 # Database
 DATABASE_PATH=/opt/ucm/backend/data/ucm.db

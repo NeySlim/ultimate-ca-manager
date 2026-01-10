@@ -32,6 +32,9 @@ override_dh_auto_install:
 	# Install start script
 	install -m 755 packaging/debian/start-ucm.sh debian/ucm/opt/ucm/start-ucm.sh
 	
+	# Install requirements.txt
+	install -m 644 requirements.txt debian/ucm/opt/ucm/requirements.txt
+	
 	# Copy documentation
 	cp README.md debian/ucm/usr/share/doc/ucm/
 	cp DOCKER_QUICKSTART.md debian/ucm/usr/share/doc/ucm/ || true
