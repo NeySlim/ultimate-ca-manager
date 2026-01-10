@@ -225,22 +225,28 @@ SSLEOF
     echo "✓ HTTPS certificate generated"
 fi
 
-# Install Python dependencies
-echo "Installing Python dependencies..."
-cd %{_datadir}/%{name}
-python3 -m pip install --quiet --no-warn-script-location -r requirements.txt
+# Create Python virtual environment
+VENV_DIR="%{_datadir}/%{name}/venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Creating Python virtual environment..."
+    cd %{_datadir}/%{name}
+    python3 -m venv venv
+    venv/bin/pip install --quiet --upgrade pip
+    venv/bin/pip install --quiet -r requirements.txt
+    echo "✓ Virtual environment created"
+fi
 
-# Initialize database
-echo "Initializing database..."
-cd %{_datadir}/%{name}
-export $(grep -v '^#' "$ENV_FILE" | xargs)
-python3 -c "
-import sys
-sys.path.insert(0, 'backend')
-from app import create_app
-app = create_app()
-print('Database initialized successfully!')
-" 2>&1 | grep -v "WARNING\|DEPRECAT"
+# Initialize database if it doesn't exist
+if [ ! -f "%{_sharedstatedir}/%{name}/ucm.db" ]; then
+    echo "Initializing database..."
+    cd %{_datadir}/%{name}
+    # Load environment variables
+    set -a
+    [ -f "$ENV_FILE" ] && . "$ENV_FILE"
+    set +a
+    venv/bin/python backend/init_db.py
+    echo "✓ Database initialized"
+fi
 
 # Force update systemd service file
 if [ -f %{_datadir}/%{name}/packaging/rpm/ucm.service ]; then
