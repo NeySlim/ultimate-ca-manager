@@ -66,6 +66,42 @@ def restart_ucm_service():
         return False, f"Failed to restart service: {str(e)}"
 
 
+def get_system_fqdn():
+    """
+    Get system FQDN based on environment:
+    - Docker: Use UCM_FQDN env var (MUST be set)
+    - Native: Use hostname -f command or FQDN env var
+    Returns None if not configured or on error
+    """
+    # Docker: MUST use environment variable
+    if is_docker():
+        return os.getenv('UCM_FQDN')
+    
+    # Native installation: Try hostname -f first
+    try:
+        result = subprocess.run(
+            ['hostname', '-f'],
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        if result.returncode == 0:
+            fqdn = result.stdout.strip()
+            # Validate it's not just a hostname (has a dot)
+            if fqdn and '.' in fqdn and fqdn not in ['localhost', 'localhost.localdomain']:
+                return fqdn
+    except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    
+    # Fallback: Check environment variable
+    env_fqdn = os.getenv('FQDN')
+    if env_fqdn and env_fqdn not in ['localhost', 'ucm.local', 'ucm.example.com']:
+        return env_fqdn
+    
+    # Last resort: Will be loaded from database later via Config.get_db_setting()
+    return None
+
+
 class Config:
     """Base configuration - values can be overridden by database settings"""
     
@@ -143,8 +179,10 @@ class Config:
     # CORS
     CORS_ORIGINS = ["https://localhost:8443", "https://127.0.0.1:8443"]
     
-    # FQDN for redirect (from database or env)
-    FQDN = os.getenv("FQDN", None)  # Set via database settings or env var
+    # FQDN for redirect - auto-detected based on environment
+    # Docker: Uses UCM_FQDN env var
+    # Native: Uses hostname -f or FQDN env var
+    FQDN = get_system_fqdn()
     HTTP_PORT = int(os.getenv("HTTP_PORT", "80"))  # For redirect URL construction
     
     # File paths
