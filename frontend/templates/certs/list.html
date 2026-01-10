@@ -353,55 +353,13 @@
 </div>
 
 <script>
-// Set JWT token for global export functions
-window.UCM_TOKEN = '{{ session.get("access_token") }}';
-
 // ============================================================================
 // NOTE: Global functions (openCreateCertModal, handleCertCreateResponse, etc.)
 // are now defined in /static/js/ucm-global.js and loaded globally.
 // Local overrides only if needed for page-specific behavior.
 // ============================================================================
 
-// Note: PKCS12 modal and functions are global (defined in ucm-global.js)
+// Note: PKCS12 modal and functions are global (defined in ucm-global.js and base.html)
 
 </script>
-
-<!-- PKCS#12 Password Modal -->
-<div id="pkcs12PasswordModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
-    <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
-    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
-        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <h3 style="font-size: 1.25rem; font-weight: bold; color: var(--text-primary);">
-                <i class="fas fa-lock" style="margin-right: 0.5rem;"></i> PKCS#12 Password
-            </h3>
-        </div>
-        <div style="padding: 1.5rem;">
-            <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
-                Enter a password to protect the PKCS#12 file (minimum 4 characters):
-            </p>
-            <form autocomplete="off">
-            <input type="password" id="pkcs12Password" 
-                   class="modal-form-input"
-                   placeholder="Enter password" minlength="4"
-                   autocomplete="new-password">
-            <input type="password" id="pkcs12PasswordConfirm" 
-                   style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); margin-top: 0.75rem;"
-                   placeholder="Confirm password" minlength="4"
-                   autocomplete="new-password">
-            </form>
-        </div>
-        <div class="modal-form-footer">
-            <button data-action="close-pkcs12-modal" 
-                    class="btn-secondary">
-                Cancel
-            </button>
-            <button data-action="download-pkcs12-with-password" 
-                    class="btn-primary">
-                Download
-            </button>
-        </div>
-    </div>
-    </div>
-</div>
-
 {% endblock %}
