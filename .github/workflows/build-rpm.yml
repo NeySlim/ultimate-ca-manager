@@ -74,19 +74,31 @@ jobs:
             rpmbuild -ba packaging/rpm/ucm.spec \
               --define '_version ${{ steps.version.outputs.rpm_version }}' \
               --define '_release ${{ steps.version.outputs.rpm_release }}' && \
-            find ~/rpmbuild/RPMS -name '*.rpm' -exec cp {} /output/ \;
+            find ~/rpmbuild/RPMS -name '*.rpm' -exec cp {} /output/ \; && \
+            find ~/rpmbuild/SRPMS -name '*.rpm' -exec cp {} /output/ \; && \
+            cd /output && \
+            for f in *.rpm; do \
+              sha256sum "$f" > "$f.sha256"; \
+              md5sum "$f" > "$f.md5"; \
+            done
           "
       
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
           name: rpm-package
-          path: /tmp/*.rpm
+          path: |
+            /tmp/*.rpm
+            /tmp/*.sha256
+            /tmp/*.md5
       
       - name: Upload to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: /tmp/*.rpm
+          files: |
+            /tmp/*.rpm
+            /tmp/*.sha256
+            /tmp/*.md5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
