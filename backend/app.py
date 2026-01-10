@@ -119,8 +119,8 @@ def create_app(config_name=None):
         if request.path in ['/api/health', '/health'] or request.path.startswith('/static/'):
             return None
         
-        # Get configured FQDN
-        fqdn = config.FQDN
+        # Get configured FQDN - check both UCM_FQDN (Docker) and FQDN env vars
+        fqdn = os.getenv('UCM_FQDN') or os.getenv('FQDN') or app.config.get('FQDN')
         if not fqdn or fqdn in ['localhost', '127.0.0.1', 'ucm.example.com', 'ucm.local', 'test.local']:
             return None  # Skip if FQDN is default/localhost
         
@@ -134,8 +134,15 @@ def create_app(config_name=None):
             if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', current_host):
                 # It's an IP, redirect to FQDN
                 scheme = 'https' if request.is_secure else 'http'
-                port = request.host.split(':')[1] if ':' in request.host else (config.HTTPS_PORT if request.is_secure else config.HTTP_PORT)
-                new_url = f"{scheme}://{fqdn}:{port}{request.full_path.rstrip('?')}"
+                port_str = request.host.split(':')[1] if ':' in request.host else None
+                if port_str:
+                    new_url = f"{scheme}://{fqdn}:{port_str}{request.full_path.rstrip('?')}"
+                else:
+                    # Use default ports
+                    https_port = os.getenv('UCM_HTTPS_PORT', app.config.get('HTTPS_PORT', 8443))
+                    http_port = os.getenv('UCM_HTTP_PORT', app.config.get('HTTP_PORT', 80))
+                    port = https_port if request.is_secure else http_port
+                    new_url = f"{scheme}://{fqdn}:{port}{request.full_path.rstrip('?')}"
                 return redirect(new_url, code=302)
         
         return None
