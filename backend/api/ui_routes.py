@@ -4626,3 +4626,58 @@ def acme_load_settings():
             'cert_validity': '90',
             'error': str(e)
         }), 200
+
+
+# Public stats endpoint for login page
+@ui_bp.route('/api/v1/stats/public')
+def public_stats():
+    """Public statistics for login page (no auth required)"""
+    try:
+        from models import CA, Certificate, User, SystemConfig
+        from datetime import datetime
+        import os
+        
+        # Get counts from database
+        ca_count = CA.query.count()
+        cert_count = Certificate.query.count()
+        user_count = User.query.count()
+        
+        # Get ACME account count if table exists
+        acme_count = 0
+        try:
+            from models import AcmeAccount
+            acme_count = AcmeAccount.query.count()
+        except:
+            acme_count = 0
+        
+        # Get last backup time
+        last_backup = None
+        backup_dir = os.path.join(DATA_DIR, 'backups')
+        if os.path.exists(backup_dir):
+            try:
+                backups = [f for f in os.listdir(backup_dir) if f.endswith('.tar.gz')]
+                if backups:
+                    latest = max(backups, key=lambda f: os.path.getmtime(os.path.join(backup_dir, f)))
+                    last_backup = datetime.fromtimestamp(
+                        os.path.getmtime(os.path.join(backup_dir, latest))
+                    ).isoformat()
+            except:
+                pass
+        
+        return jsonify({
+            'ca_count': ca_count,
+            'cert_count': cert_count,
+            'acme_count': acme_count,
+            'user_count': user_count,
+            'last_backup': last_backup
+        }), 200
+        
+    except Exception as e:
+        # Return placeholder data on error (login should still work)
+        return jsonify({
+            'ca_count': 0,
+            'cert_count': 0,
+            'acme_count': 0,
+            'user_count': 0,
+            'last_backup': None
+        }), 200
