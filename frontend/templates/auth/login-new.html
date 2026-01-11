@@ -181,6 +181,23 @@
             animation: pulse 2s ease-in-out infinite;
         }
         
+        /* Theme selector icon with gradient */
+        [href="#icon-palette"] {
+            background: linear-gradient(135deg, var(--primary-color), var(--success-color, #10b981));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .btn-secondary [href="#icon-palette"],
+        .theme-toggle [href="#icon-palette"] {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        /* Pulse animation for theme icon */
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.6; }
