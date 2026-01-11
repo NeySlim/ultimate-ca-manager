@@ -6,13 +6,14 @@
 <div class="container">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
         <div>
-            <h1 style="font-size: 28px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
-                <i class="fas fa-users" style="margin-right: 8px;"></i>Users
+            <h1 style="font-size: 1.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="24" height="24"><use href="#icon-users"/></svg>
+                <span>Users</span>
             </h1>
             <p style="color: var(--text-secondary); font-size: 14px;">Manage user accounts and permissions</p>
         </div>
         <button data-action="open-add-user-modal" class="btn-primary">
-            <i class="fas fa-plus"></i>
+            <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg>
             <span>Add User</span>
         </button>
     </div>
@@ -25,7 +26,7 @@
                  hx-trigger="load, refreshUsers from:body"
                  hx-swap="innerHTML">
                 <div style="padding: 60px; text-align: center;">
-                    <i class="fas fa-spinner fa-spin" style="font-size: 32px; color: var(--text-secondary);"></i>
+                    <svg class="icon spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
                     <p style="margin-top: 12px; color: var(--text-secondary);">Loading users...</p>
                 </div>
             </div>
@@ -39,11 +40,12 @@
         <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
             <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">
-                        <i class="fas fa-user-plus" style="margin-right: 0.5rem;"></i> Add User
+                    <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                        <svg class="ucm-icon" width="24" height="24"><use href="#icon-user-plus"/></svg>
+                        <span>Add User</span>
                     </h2>
                     <button data-action="close-add-user-modal" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
-                        <i class="fas fa-times" style="font-size: 1.25rem;"></i>
+                        <svg class="ucm-icon" width="20" height="20"><use href="#icon-x-circle"/></svg>
                     </button>
                 </div>
             </div>
@@ -102,7 +104,7 @@
                     </button>
                     <button type="submit"
                             class="btn-primary">
-                        <i class="fas fa-user-plus" style="margin-right: 0.5rem;"></i> Create User
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-user-plus"/></svg> Create User
                     </button>
                 </div>
             </form>
@@ -116,11 +118,12 @@
         <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 500px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
             <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">
-                        <i class="fas fa-key" style="margin-right: 0.5rem;"></i> Change Password
+                    <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                        <svg class="ucm-icon" width="24" height="24"><use href="#icon-key"/></svg>
+                        <span>Change Password</span>
                     </h2>
                     <button data-action="close-change-password-modal" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
-                        <i class="fas fa-times" style="font-size: 1.25rem;"></i>
+                        <svg class="ucm-icon" width="20" height="20"><use href="#icon-x-circle"/></svg>
                     </button>
                 </div>
                 <p id="change-password-username" style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;"></p>
@@ -161,7 +164,7 @@
                     </button>
                     <button type="submit"
                             class="btn-primary">
-                        <i class="fas fa-key" style="margin-right: 0.5rem;"></i> Change Password
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-key"/></svg> Change Password
                     </button>
                 </div>
             </form>
@@ -175,11 +178,12 @@
         <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 450px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
             <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">
-                        <i class="fas fa-user-tag" style="margin-right: 0.5rem;"></i> Change Role
+                    <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                        <svg class="ucm-icon" width="24" height="24"><use href="#icon-shield-check"/></svg>
+                        <span>Change Role</span>
                     </h2>
                     <button data-action="close-change-role-modal" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
-                        <i class="fas fa-times" style="font-size: 1.25rem;"></i>
+                        <svg class="ucm-icon" width="20" height="20"><use href="#icon-x-circle"/></svg>
                     </button>
                 </div>
                 <p id="change-role-username" style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;"></p>
@@ -208,7 +212,7 @@
                     </button>
                     <button type="submit"
                             class="btn-primary">
-                        <i class="fas fa-check" style="margin-right: 0.5rem;"></i> Change Role
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-check-circle"/></svg> Change Role
                     </button>
                 </div>
             </form>

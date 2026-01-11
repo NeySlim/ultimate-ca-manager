@@ -79,7 +79,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1><i class="fas fa-ban"></i> CRL Information</h1>
+            <h1 style="font-size: 1.875rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;"><svg class="ucm-icon" width="24" height="24"><use href="#icon-slash"/></svg> <span>CRL Information</span></h1>
             <p>{{ crl_info.ca_common_name }}</p>
         </div>
 
@@ -87,15 +87,15 @@
         <div class="card" style="margin-bottom: 1.5rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
                 <h2 class="section-title" style="margin: 0;">
-                    <i class="fas fa-info-circle"></i> CRL Status
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-info"/></svg> CRL Status
                 </h2>
                 {% if crl_info.is_stale %}
                 <span class="badge badge-danger">
-                    <i class="fas fa-exclamation-triangle"></i> Stale
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-alert-triangle"/></svg> Stale
                 </span>
                 {% else %}
                 <span class="badge badge-success">
-                    <i class="fas fa-check-circle"></i> Valid
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-check-circle"/></svg> Valid
                 </span>
                 {% endif %}
             </div>
@@ -151,24 +151,24 @@
 
         <div class="card">
             <h2 class="section-title">
-                <i class="fas fa-download"></i> Download CRL
+                <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg> Download CRL
             </h2>
             <div class="download-grid">
                 <a href="{{ crl_info.download_urls.pem }}" class="btn-secondary">
-                    <i class="fas fa-file-lines"></i> PEM Format
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-file-text"/></svg> PEM Format
                 </a>
                 <a href="{{ crl_info.download_urls.der }}" class="btn-secondary">
-                    <i class="fas fa-file-binary"></i> DER Format
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-file"/></svg> DER Format
                 </a>
                 <a href="{{ crl_info.download_urls.crl }}" class="btn-secondary">
-                    <i class="fas fa-file"></i> CRL Format
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-file"/></svg> CRL Format
                 </a>
             </div>
         </div>
         {% else %}
         <div class="card" style="background: var(--warning-bg); border: 1px solid var(--warning-border);">
             <div style="display: flex; gap: 1rem;">
-                <i class="fas fa-exclamation-triangle" style="color: var(--warning-color); font-size: 2rem; margin-top: 0.25rem;"></i>
+                <svg class="ucm-icon" width="48" height="48" style="color: var(--warning-color); margin-top: 0.25rem;"><use href="#icon-alert-triangle"/></svg>
                 <div>
                     <h3 style="font-size: 1.125rem; font-weight: 600; margin: 0 0 0.5rem 0;">No CRL Available</h3>
                     <p style="margin: 0 0 1rem 0;">{{ crl_info.message }}</p>

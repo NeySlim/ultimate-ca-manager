@@ -63,6 +63,12 @@
     --scrollbar-track: rgba(255, 255, 255, 0.05);
     --scrollbar-thumb: rgba(255, 255, 255, 0.2);
     --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
+    
+    /* Warning Alert Variables */
+    --warning-color: #f0c987;
+    --warning-hover: #edb865;
+    --warning-bg: rgba(240, 201, 135, 0.1);
+    --warning-text: #f0c987;
 }
 
 * {
@@ -956,3 +962,4 @@ table tbody tr:last-child td {
 .dark\:hover\:bg-gray-700:hover { background-color: var(--bg-hover); }
 .dark\:hover\:text-blue-300:hover { color: #93c5fd; }
 .dark\:hover\:text-orange-300:hover { color: #fdba74; }
+

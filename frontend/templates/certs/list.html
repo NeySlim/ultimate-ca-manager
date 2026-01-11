@@ -6,17 +6,20 @@
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
-            <i class="fas fa-file-certificate" style="margin-right: 0.5rem;"></i> Certificates
+        <h1 style="font-size: 1.875rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+            <svg class="ucm-icon" width="24" height="24"><use href="#icon-certificate"/></svg>
+            <span>Certificates</span>
         </h1>
         <div style="display: flex; gap: 0.5rem;">
             <button data-action="open-create-cert-modal"
                     class="btn-primary">
-                <i class="fas fa-plus" style="margin-right: 0.5rem;"></i> Create Certificate
+                <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg>
+                <span>Create Certificate</span>
             </button>
             <button data-action="open-csr-modal"
                     class="btn-secondary">
-                <i class="fas fa-file-signature" style="margin-right: 0.5rem; color: var(--success-color);"></i> Generate CSR
+                <svg class="ucm-icon" width="16" height="16"><use href="#icon-file-signature"/></svg>
+                <span>Generate CSR</span>
             </button>
         </div>
     </div>
@@ -40,14 +43,15 @@
 <!-- Create Certificate Modal -->
 <div id="createCertModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
-    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 1400px; width: 100%; max-height: calc(100vh - 80px); overflow-y: auto; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 750px; width: 100%; max-height: calc(100vh - 80px); overflow-y: auto; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary);">
-                    <i class="fas fa-plus-circle" style="margin-right: 0.5rem;"></i> Create Certificate
+                <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-plus"/></svg>
+                    <span>Create Certificate</span>
                 </h2>
                 <button data-action="close-cert-modal" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
-                    <i class="fas fa-times" style="font-size: 1.25rem;"></i>
+                    <svg class="ucm-icon" width="20" height="20"><use href="#icon-x-circle"/></svg>
                 </button>
             </div>
         </div>
@@ -285,7 +289,7 @@
                 </button>
                 <button type="submit"
                         class="btn-primary">
-                    <i class="fas fa-plus mr-2"></i> Create Certificate
+                    <svg class="icon mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Create Certificate
                 </button>
             </div>
         </form>
@@ -295,14 +299,15 @@
 <!-- Generate CSR Modal -->
 <div id="csrModal" class="hidden" style="position: fixed; top: 64px; right: 0; bottom: 0; left: 240px; background: var(--modal-backdrop, rgba(0,0,0,0.5)); z-index: 1000; padding: 1rem;">
     <div style="display: flex; align-items: center; justify-content: center; height: 100%;">
-    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 1400px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 700px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <div class="flex justify-between items-center">
-                <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">
-                    <i class="fas fa-file-signature mr-2"></i> Generate CSR
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-file-import"/></svg>
+                    <span>Generate CSR</span>
                 </h2>
-                <button data-action="close-csr-modal" style="color: var(--text-secondary); cursor: pointer;">
-                    <i class="fas fa-times text-xl"></i>
+                <button data-action="close-csr-modal" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
+                    <svg class="ucm-icon" width="20" height="20"><use href="#icon-x-circle"/></svg>
                 </button>
             </div>
         </div>
@@ -345,7 +350,7 @@
                 </button>
                 <button type="submit"
                         class="btn-primary">
-                    <i class="fas fa-file-signature" style="margin-right: 0.5rem;"></i> Generate CSR
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-file-signature"/></svg> Generate CSR
                 </button>
             </div>
         </form>

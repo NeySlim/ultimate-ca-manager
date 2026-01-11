@@ -64,6 +64,8 @@
     --danger-hover: #dc2626;
     --warning-color: #f59e0b;
     --warning-hover: #d97706;
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    --warning-text: #fbbf24;
     --info-color: #3b82f6;
     --info-hover: #2563eb;
     

@@ -6,8 +6,9 @@
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <!-- Page Header -->
     <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
-            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-shield-check"/></svg> mTLS Authentication
+        <h1 style="font-size: 1.875rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+            <svg class="ucm-icon" width="24" height="24"><use href="#icon-shield-check"/></svg>
+            <span>mTLS Authentication</span>
         </h1>
         <span id="mtls-status-badge" class="badge-outline badge-secondary">
             <svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg>
@@ -119,7 +120,7 @@
 
                     <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
                         <button type="submit" class="btn-primary">
-                            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-save"/></svg> 
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> 
                             Save Settings
                         </button>
                     </div>
@@ -223,17 +224,17 @@
             </div>
 
             <!-- Tabs -->
-            <div style="border-bottom: 1px solid var(--border-color); padding: 0 1.5rem; display: flex; gap: 0.5rem;">
-                <button class="tab-button active" data-tab="create" style="padding: 1rem 1.5rem; border: none; background: none; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500;">
-                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-plus"/></svg>
+            <div class="tabs-container" style="padding: 0 1.5rem;">
+                <button class="tab-button active" data-tab="create">
+                    <svg class="ucm-icon" width="20" height="20"><use href="#icon-plus"/></svg>
                     Create
                 </button>
-                <button class="tab-button" data-tab="import" style="padding: 1rem 1.5rem; border: none; background: none; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500;">
-                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-upload"/></svg>
+                <button class="tab-button" data-tab="import">
+                    <svg class="ucm-icon" width="20" height="20"><use href="#icon-upload"/></svg>
                     Import
                 </button>
-                <button class="tab-button" data-tab="manage" style="padding: 1rem 1.5rem; border: none; background: none; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500;">
-                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-list"/></svg>
+                <button class="tab-button" data-tab="manage">
+                    <svg class="ucm-icon" width="20" height="20"><use href="#icon-inbox"/></svg>
                     Manage
                 </button>
             </div>
@@ -270,7 +271,7 @@
 
                                 <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
                                     <button type="submit" class="btn-primary">
-                                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-key"/></svg>
+                                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-key"/></svg>
                                         Generate Certificate
                                     </button>
                                 </div>
@@ -315,7 +316,7 @@
 
                                 <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
                                     <button type="submit" class="btn-primary">
-                                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-key"/></svg>
+                                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-key"/></svg>
                                         Generate Self-Signed Certificate
                                     </button>
                                 </div>
@@ -358,11 +359,11 @@
 
                             <div style="display: flex; gap: 1rem;">
                                 <button type="button" onclick="validateImportedCert()" class="btn btn-outline-secondary">
-                                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check-circle"/></svg>
+                                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-check-circle"/></svg>
                                     Validate Certificate
                                 </button>
                                 <button type="submit" class="btn-primary">
-                                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-upload"/></svg>
+                                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-upload"/></svg>
                                     Import Certificate
                                 </button>
                             </div>
@@ -942,7 +943,7 @@ async function loadCertificates() {
                             <svg class="ucm-icon" width="32" height="32" style="opacity: 0.5;"><use href="#icon-key"/></svg>
                             <p style="margin-top: 0.5rem;">No certificates enrolled</p>
                             <button onclick="document.querySelector('.tab-button[data-tab=\\'create\\']').click()" class="btn btn-sm btn-primary" style="margin-top: 1rem;">
-                                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-plus"/></svg> Create Your First Certificate
+                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Create Your First Certificate
                             </button>
                         </td>
                     </tr>
