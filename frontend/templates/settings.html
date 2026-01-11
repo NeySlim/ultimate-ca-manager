@@ -5,8 +5,9 @@
 {% block content %}
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
-            <svg class="ucm-icon" width="24" height="24" style="margin-right: 0.5rem;"><use href="#icon-settings"/></svg> System Settings
+        <h1 style="font-size: 1.875rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+            <svg class="ucm-icon" width="24" height="24"><use href="#icon-settings"/></svg>
+            <span>System Settings</span>
         </h1>
     </div>
     
@@ -22,6 +23,29 @@
         </p>
     </div>
     {% else %}
+    
+    <!-- Settings Tabs -->
+    <div class="settings-tabs">
+        <button class="settings-tab active" onclick="switchSettingsTab('general')">
+            <svg class="ucm-icon" width="20" height="20"><use href="#icon-info-circle"/></svg>
+            <span>General</span>
+        </button>
+        <button class="settings-tab" onclick="switchSettingsTab('security')">
+            <svg class="ucm-icon" width="20" height="20"><use href="#icon-shield-check"/></svg>
+            <span>Security</span>
+        </button>
+        <button class="settings-tab" onclick="switchSettingsTab('database')">
+            <svg class="ucm-icon" width="20" height="20"><use href="#icon-database"/></svg>
+            <span>Database</span>
+        </button>
+        <button class="settings-tab" onclick="switchSettingsTab('advanced')">
+            <svg class="ucm-icon" width="20" height="20"><use href="#icon-settings"/></svg>
+            <span>Advanced</span>
+        </button>
+    </div>
+    
+    <!-- Tab: General -->
+    <div id="tab-general" class="tab-content active">
     
     <!-- System Information -->
     <div class="card">
@@ -65,6 +89,11 @@
             </div>
         </div>
     </div>
+    
+    </div><!-- End Tab: General -->
+    
+    <!-- Tab: Security -->
+    <div id="tab-security" class="tab-content">
     
     <!-- HTTPS Certificate -->
     <div class="card">
@@ -131,11 +160,11 @@
             
             <div style="display: flex; gap: 1rem; padding-top: 0.5rem;">
                 <button onclick="applyHTTPSCertificate()" class="btn-primary">
-                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-check"/></svg>
                     Apply Certificate
                 </button>
                 <button onclick="regenerateSelfSigned()" class="btn-secondary">
-                    <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-refresh"/></svg>
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-refresh"/></svg>
                     Regenerate Self-Signed
                 </button>
             </div>
@@ -152,71 +181,12 @@
         </div>
     </div>
     
-    <!-- PKI Database Management -->
-    <div class="card">
-        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-database"/></svg>
-                PKI Database Management
-            </h2>
-        </div>
-        <div style="padding: 1.5rem;">
-            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Reset the PKI database to start fresh. This will delete all CAs, certificates, CRLs, and OCSP records, but <strong>will preserve users and authentication settings</strong>.
-            </p>
-            
-            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;">
-                <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem;">Current PKI Data</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem;">
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">CAs</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-cas">0</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Certificates</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-certs">0</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">CRLs</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-crls">0</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">OCSP Records</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-ocsp">0</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1.5rem;">
-                <div style="display: flex; align-items: start; gap: 0.75rem;">
-                    <svg class="ucm-icon" width="20" height="20" style="color: #d97706; margin-top: 0.125rem;"><use href="#icon-warning-triangle"/></svg>
-                    <div style="font-size: 0.875rem; color: #92400e;">
-                        <p style="font-weight: 600; margin-bottom: 0.5rem;">⚠️ Danger Zone</p>
-                        <ul style="list-style: disc; margin-left: 1.25rem; display: flex; flex-direction: column; gap: 0.25rem;">
-                            <li>This action <strong>cannot be undone</strong></li>
-                            <li>All Certificate Authorities will be deleted</li>
-                            <li>All certificates will be deleted</li>
-                            <li>All CRLs and OCSP records will be deleted</li>
-                            <li>A backup will be created automatically</li>
-                            <li><strong>Users and sessions will NOT be affected</strong></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            
-            <button onclick="confirmPKIReset()" class="btn-danger">
-                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-trash"/></svg>
-                Reset PKI Database
-            </button>
-        </div>
-    </div>
-    
-    <!-- mTLS Authentication (Link to dedicated page) -->
+    <!-- mTLS Authentication -->
     <div class="card">
         <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                    <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-shield-check"/></svg>
+                    <i class="ucm-icon" data-ucm-icon="shield-check" style="font-size: 20px; color: var(--primary-color);"></i>
                     mTLS Authentication
                 </h2>
                 <span id="mtls-status-badge" class="badge-outline badge-secondary">
@@ -263,10 +233,310 @@
         </div>
     </div>
     
+    </div><!-- End Tab: Security -->
+    
+    <!-- Tab: Database -->
+    <div id="tab-database" class="tab-content">
+    
+    <!-- PKI Database Management -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                    <i class="ucm-icon" data-ucm-icon="database" style="font-size: 20px; color: var(--primary-color);"></i>
+                    Database Management
+                </h2>
+                <span id="db-health-badge" class="badge-outline badge-secondary">
+                    <svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Loading...
+                </span>
+            </div>
+        </div>
+        <div style="padding: 1.5rem;">
+            
+            <!-- Database Statistics -->
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1.25rem; margin-bottom: 1.5rem;">
+                <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-chart-bar"/></svg>
+                    Database Statistics
+                </h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem;">
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Database Size</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="db-stat-size">0 MB</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Fragmentation</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="db-stat-frag">0%</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">CAs</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-cas">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Certificates</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-certs">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">CRLs</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-crls">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">OCSP Records</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);" id="pki-stat-ocsp">0</div>
+                    </div>
+                </div>
+                
+                <!-- Last Maintenance Info -->
+                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); font-size: 0.75rem; color: var(--text-secondary); display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem;">
+                    <div>
+                        Last VACUUM: <span id="db-last-vacuum">Never</span>
+                    </div>
+                    <div>
+                        Last Integrity Check: <span id="db-last-check">Never</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Maintenance Actions -->
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1.25rem; margin-bottom: 1.5rem;">
+                <h3 style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <svg class="ucm-icon" width="16" height="16" style="color: var(--success-color);"><use href="#icon-settings"/></svg>
+                    Maintenance Operations
+                </h3>
+                
+                <div style="display: grid; gap: 1rem;">
+                    <!-- Optimize Database -->
+                    <div style="display: flex; align-items: start; gap: 1rem;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Optimize Database</div>
+                            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                                Run VACUUM and ANALYZE to reclaim space and improve performance
+                            </div>
+                        </div>
+                        <button onclick="optimizeDatabase()" class="btn-primary" style="white-space: nowrap;">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-refresh"/></svg>
+                            Optimize
+                        </button>
+                    </div>
+                    
+                    <!-- Integrity Check -->
+                    <div style="display: flex; align-items: start; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Integrity Check</div>
+                            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                                Verify database integrity and detect corruption
+                            </div>
+                        </div>
+                        <button onclick="checkIntegrity()" class="btn-secondary" style="white-space: nowrap;">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-check-circle"/></svg>
+                            Check
+                        </button>
+                    </div>
+                    
+                    <!-- Clean Expired Certs -->
+                    <div style="display: flex; align-items: start; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Clean Expired Certificates</div>
+                            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                                Delete certificates expired more than 30 days ago (revoked certs preserved)
+                            </div>
+                        </div>
+                        <button onclick="cleanExpiredCerts()" class="btn-secondary" style="white-space: nowrap;">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
+                            Clean
+                        </button>
+                    </div>
+                    
+                    <!-- Export SQL Dump -->
+                    <div style="display: flex; align-items: start; gap: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Export SQL Dump</div>
+                            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                                Download complete database as compressed SQL file
+                            </div>
+                        </div>
+                        <button onclick="exportDatabase()" class="btn-secondary" style="white-space: nowrap;">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
+                            Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- PKI Reset Danger Zone -->
+            <div class="alert-warning-border">
+                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                    <svg class="ucm-icon" width="20" height="20" style="color: var(--warning-color); margin-top: 0.125rem;"><use href="#icon-warning-triangle"/></svg>
+                    <div style="font-size: 0.875rem;">
+                        <p style="font-weight: 600; margin-bottom: 0.5rem;">⚠️ Danger Zone - Reset PKI Database</p>
+                        <ul style="list-style: disc; margin-left: 1.25rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                            <li>This action <strong>cannot be undone</strong></li>
+                            <li>All Certificate Authorities will be deleted</li>
+                            <li>All certificates will be deleted</li>
+                            <li>All CRLs and OCSP records will be deleted</li>
+                            <li>A backup will be created automatically</li>
+                            <li><strong>Users and sessions will NOT be affected</strong></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="confirmPKIReset()" class="btn-danger" style="margin-top: 1rem;">
+                <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
+                Reset PKI Database
+            </button>
+        </div>
+    </div>
+    
+    <!-- Backup & Restore -->
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-download"/></svg>
+                Backup & Restore
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Create encrypted backups of your entire PKI system or restore from a previous backup.
+            </p>
+            
+            <!-- Backup Section -->
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;">
+                <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <svg class="ucm-icon" width="18" height="18" style="color: var(--success-color);"><use href="#icon-save"/></svg>
+                    Create Backup
+                </h3>
+                <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                    Create an encrypted backup containing all CAs, certificates, users, and system configuration.
+                </p>
+                <div style="background: var(--info-bg); border-left: 4px solid var(--primary-color); padding: 0.75rem; margin-bottom: 1rem; border-radius: 0.25rem;">
+                    <div style="display: flex; align-items: start; gap: 0.5rem;">
+                        <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color); flex-shrink: 0; margin-top: 2px;"><use href="#icon-info"/></svg>
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.8125rem;">
+                            Backup is encrypted with AES-256-GCM. Keep your password safe - it's required for restore!
+                        </p>
+                    </div>
+                </div>
+                <button onclick="openBackupModal()" class="btn-primary">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
+                    Create Encrypted Backup
+                </button>
+            </div>
+            
+            <!-- Restore Section -->
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1.5rem;">
+                <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <svg class="ucm-icon" width="18" height="18" style="color: var(--warning-color);"><use href="#icon-upload"/></svg>
+                    Restore from Backup
+                </h3>
+                <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                    Restore your PKI system from a previously created backup file.
+                </p>
+                <div class="alert-warning-border">
+                    <div style="display: flex; align-items: start; gap: 0.5rem;">
+                        <svg class="ucm-icon" width="16" height="16" style="color: var(--warning-color); flex-shrink: 0; margin-top: 2px;"><use href="#icon-warning-triangle"/></svg>
+                        <p style="margin: 0; font-size: 0.8125rem;">
+                            <strong>Warning:</strong> Restoring will merge or replace existing data. Service will restart automatically.
+                        </p>
+                    </div>
+                </div>
+                <button onclick="openRestoreModal()" class="btn-secondary">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-upload"/></svg>
+                    Restore from Backup
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- OPNsense Import -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="18" height="18"><use href="#icon-database"/></svg>
+                <span>OPNsense Import</span>
+            </h2>
+        </div>
+        <div class="card-body"
+             hx-get="/api/ui/import/config-form"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div style="height: 10rem; background: var(--bg-secondary); border-radius: 0.375rem; animation: pulse 2s infinite;"></div>
+        </div>
+    </div>
+    
+    <!-- Last OPNsense Import History -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="18" height="18"><use href="#icon-clock"/></svg>
+                <span>Last OPNsense Import History</span>
+            </h2>
+        </div>
+        <div hx-get="/api/ui/import/history"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div style="padding: 2rem;"><div style="height: 5rem; background: var(--bg-secondary); border-radius: 0.375rem; animation: pulse 2s infinite;"></div></div>
+        </div>
+    </div>
+    
+    </div><!-- End Tab: Database -->
+    
+    <!-- Tab: Advanced -->
+    <div id="tab-advanced" class="tab-content">
+    
+    <div class="card">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-settings"/></svg>
+                Advanced Settings
+            </h2>
+        </div>
+        <div style="padding: 3rem; text-align: center;">
+            <svg class="ucm-icon" width="48" height="48" style="opacity: 0.3; margin: 0 auto 1rem auto;"><use href="#icon-info"/></svg>
+            <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                Advanced configuration options will be available in future updates.
+            </p>
+        </div>
+    </div>
+    
+    </div><!-- End Tab: Advanced -->
+    
     {% endif %}
 </div>
 
 <script>
+// Tab Switching
+function switchSettingsTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Remove active from all buttons
+    document.querySelectorAll('.settings-tab').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Show selected tab
+    document.getElementById('tab-' + tabName).classList.add('active');
+    
+    // Mark button as active
+    event.target.closest('.settings-tab').classList.add('active');
+    
+    // Save preference
+    localStorage.setItem('ucm-settings-tab', tabName);
+}
+
+// Restore last active tab on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const lastTab = localStorage.getItem('ucm-settings-tab');
+    if (lastTab && document.getElementById('tab-' + lastTab)) {
+        // Trigger click on saved tab
+        document.querySelector(`[onclick="switchSettingsTab('${lastTab}')"]`)?.click();
+    }
+});
+
 // Get JWT token from meta tag (defined in base.html)
 const getToken = () => document.querySelector('meta[name="access-token"]')?.content || '';
 
@@ -439,8 +709,7 @@ function applyHTTPSCertificate() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                ucmAlert('Certificate applied. UCM is restarting...', 'Success');
-                setTimeout(() => window.location.reload(), 3000);
+                showRestartCountdown(5, window.location.href);
             } else {
                 ucmAlert('Error: ' + (data.error || data.message || 'Unknown error'), 'Error');
             }
@@ -466,8 +735,7 @@ function regenerateSelfSigned() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                ucmAlert('Certificate regenerated. UCM is restarting...', 'Success');
-                setTimeout(() => window.location.reload(), 3000);
+                showRestartCountdown(5, window.location.href);
             } else {
                 ucmAlert('Error: ' + data.message, 'Error');
             }
@@ -579,6 +847,723 @@ function updateMTLSBadge() {
     })
     .catch(error => console.error('Error loading mTLS status:', error));
 }
+
+// ========================================
+// Backup & Restore Functions
+// ========================================
+
+function openBackupModal() {
+    const modalHTML = `
+        <div class="ucm-modal-overlay" onclick="closeBackupModal()">
+            <div class="ucm-modal" onclick="event.stopPropagation()" style="max-width: 600px;">
+                <div class="ucm-modal-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <svg class="ucm-icon" width="24" height="24" style="color: var(--primary-color);"><use href="#icon-download"/></svg>
+                        <h2 class="ucm-modal-title">Create Encrypted Backup</h2>
+                    </div>
+                    <button onclick="closeBackupModal()" class="ucm-modal-close">
+                        <svg class="ucm-icon" width="20" height="20"><use href="#icon-x"/></svg>
+                    </button>
+                </div>
+                <div class="ucm-modal-body">
+                    <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">
+                        Create a complete encrypted backup of your PKI system.
+                    </p>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label class="form-label">Backup Password</label>
+                        <input type="password" id="backup-password" class="form-input" 
+                               placeholder="Enter password (min 12 characters)" 
+                               minlength="12" required>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                            Required for restoring. Keep it safe!
+                        </p>
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label class="form-label">Confirm Password</label>
+                        <input type="password" id="backup-password-confirm" class="form-input" 
+                               placeholder="Confirm password" required>
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label class="form-label">Include in Backup</label>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="include-cas" checked>
+                                <span>Certificate Authorities</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="include-certs" checked>
+                                <span>Certificates</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="include-users" checked>
+                                <span>Users & Roles</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="include-config" checked>
+                                <span>System Configuration</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="include-acme" checked>
+                                <span>ACME Accounts</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="backup-progress" style="display: none; margin-bottom: 1rem;">
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill" style="width: 100%;"></div>
+                        </div>
+                        <p style="text-align: center; margin-top: 0.5rem; color: var(--text-secondary);">
+                            Creating backup...
+                        </p>
+                    </div>
+                </div>
+                <div class="ucm-modal-footer">
+                    <button class="btn-secondary" onclick="closeBackupModal()">Cancel</button>
+                    <button class="btn-primary" onclick="createBackup()">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
+                        Create Backup
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('ucm-modal-container').innerHTML = modalHTML;
+    document.getElementById('backup-password').focus();
+}
+
+function closeBackupModal() {
+    document.getElementById('ucm-modal-container').innerHTML = '';
+}
+
+async function createBackup() {
+    const password = document.getElementById('backup-password').value;
+    const passwordConfirm = document.getElementById('backup-password-confirm').value;
+    
+    // Validate
+    if (!password || password.length < 12) {
+        showToast('Password must be at least 12 characters long', 'warning');
+        return;
+    }
+    
+    if (password !== passwordConfirm) {
+        showToast('Passwords do not match', 'error');
+        return;
+    }
+    
+    const createBtn = document.querySelector('[onclick="createBackup()"]');
+    showButtonSpinner(createBtn, 'Creating...');
+    
+    // Show progress
+    document.getElementById('backup-progress').style.display = 'block';
+    
+    // Prepare backup request
+    const include = {
+        cas: document.getElementById('include-cas').checked,
+        certificates: document.getElementById('include-certs').checked,
+        users: document.getElementById('include-users').checked,
+        configuration: document.getElementById('include-config').checked,
+        acme_accounts: document.getElementById('include-acme').checked
+    };
+    
+    try {
+        const response = await fetch('/api/v1/backup/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + getToken()
+            },
+            body: JSON.stringify({
+                password: password,
+                type: 'full',
+                include: include
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Backup creation failed');
+        }
+        
+        // Download the file
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ucm-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.ucm-backup`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        closeBackupModal();
+        showToast('Backup created and downloaded successfully', 'success');
+        
+    } catch (error) {
+        console.error('Backup error:', error);
+        showToast('Backup creation failed: ' + error.message, 'error');
+    } finally {
+        hideButtonSpinner(createBtn);
+        document.getElementById('backup-progress').style.display = 'none';
+    }
+}
+
+function openRestoreModal() {
+    const modalHTML = `
+        <div class="ucm-modal-overlay" onclick="closeRestoreModal()">
+            <div class="ucm-modal" onclick="event.stopPropagation()" style="max-width: 600px;">
+                <div class="ucm-modal-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <svg class="ucm-icon" width="24" height="24" style="color: var(--warning-color);"><use href="#icon-upload"/></svg>
+                        <h2 class="ucm-modal-title">Restore from Backup</h2>
+                    </div>
+                    <button onclick="closeRestoreModal()" class="ucm-modal-close">
+                        <svg class="ucm-icon" width="20" height="20"><use href="#icon-x"/></svg>
+                    </button>
+                </div>
+                <div class="ucm-modal-body">
+                    <div class="alert-warning-border">
+                        <div style="display: flex; align-items: start; gap: 0.5rem;">
+                            <svg class="ucm-icon" width="16" height="16" style="color: var(--warning-color); flex-shrink: 0; margin-top: 2px;"><use href="#icon-warning-triangle"/></svg>
+                            <p style="margin: 0; font-size: 0.8125rem;">
+                                <strong>Warning:</strong> UCM will automatically restart after restore.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 0.75rem;">
+                        <label class="form-label">Backup File</label>
+                        <input type="file" id="restore-file" class="form-input" 
+                               accept=".ucm-backup" required>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                            Select a .ucm-backup file
+                        </p>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="form-label">Backup Password</label>
+                        <input type="password" id="restore-password" class="form-input" 
+                               placeholder="Enter backup password" required>
+                    </div>
+                    
+                    <!-- Validation Results (hidden initially, shown after validation) -->
+                    <div id="backup-info" style="display: none; opacity: 0; transition: opacity 0.3s ease, max-height 0.3s ease; max-height: 0; overflow: hidden; margin-bottom: 1rem;">
+                        <!-- Card wrapper around everything -->
+                        <div class="card" style="box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid var(--border-color);">
+                            <div class="card-body" style="padding: 0.5rem;">
+                                <!-- Title -->
+                                <div style="margin-bottom: 0.5rem; padding-bottom: 0.375rem; border-bottom: 1px solid var(--border-color);">
+                                    <h4 style="margin: 0; font-weight: 600; font-size: 0.875rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.375rem;">
+                                        <svg class="ucm-icon" width="14" height="14" style="color: var(--success-color);"><use href="#icon-check-circle"/></svg>
+                                        Backup Validated
+                                    </h4>
+                                </div>
+                                
+                                <!-- Stats Grid (dashboard style) -->
+                                <div id="backup-stats" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.375rem; margin-bottom: 0.5rem;"></div>
+                                
+                                <!-- Metadata Details -->
+                                <div style="background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.3rem; border: 1px solid var(--border-color);">
+                                    <div id="backup-metadata-details"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="form-label">Restore Options</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="restore-cas" checked>
+                                <span>Certificate Authorities</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="restore-certs" checked>
+                                <span>Certificates</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="restore-users">
+                                <span>Users (merge)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="restore-config">
+                                <span>System Configuration</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="restore-progress" style="display: none; margin-bottom: 1rem;">
+                        <div class="progress-bar">
+                            <div class="progress-bar-fill" style="width: 100%;"></div>
+                        </div>
+                        <p style="text-align: center; margin-top: 0.5rem; color: var(--text-secondary);">
+                            Restoring backup...
+                        </p>
+                    </div>
+                </div>
+                <div class="ucm-modal-footer">
+                    <button class="btn-secondary" onclick="closeRestoreModal()">Cancel</button>
+                    <button id="validate-btn" class="btn-secondary" onclick="validateBackup()">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-check"/></svg>
+                        Validate Backup
+                    </button>
+                    <button id="restore-btn" class="btn-danger" onclick="restoreBackup()" style="display: none;">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-upload"/></svg>
+                        Restore Backup
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('ucm-modal-container').innerHTML = modalHTML;
+}
+
+function closeRestoreModal() {
+    document.getElementById('ucm-modal-container').innerHTML = '';
+}
+
+async function validateBackup() {
+    const fileInput = document.getElementById('restore-file');
+    const password = document.getElementById('restore-password').value;
+    
+    if (!fileInput.files[0]) {
+        showToast('Please select a backup file', 'warning');
+        return;
+    }
+    
+    if (!password) {
+        showToast('Please enter the backup password', 'warning');
+        return;
+    }
+    
+    const validateBtn = document.getElementById('validate-btn');
+    showButtonSpinner(validateBtn, 'Validating...');
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('password', password);
+    
+    try {
+        const response = await fetch('/api/v1/backup/validate', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + getToken()
+            },
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (!data.valid) {
+            hideButtonSpinner(validateBtn);
+            showToast('Invalid backup: ' + (data.error || 'Unknown error'), 'error');
+            return;
+        }
+        
+        // Create dashboard-style stat widgets
+        const statsDiv = document.getElementById('backup-stats');
+        const stats = [
+            { 
+                icon: 'fa-lock', 
+                color: '#3b82f6', 
+                value: data.contents.cas, 
+                label: 'Certificate Authorities',
+                gradient: 'rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.15)'
+            },
+            { 
+                icon: 'fa-certificate', 
+                color: '#10b981', 
+                value: data.contents.certificates, 
+                label: 'Certificates',
+                gradient: 'rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.15)'
+            },
+            { 
+                icon: 'fa-users', 
+                color: '#8b5cf6', 
+                value: data.contents.users, 
+                label: 'Users',
+                gradient: 'rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.15)'
+            },
+            { 
+                icon: 'fa-key', 
+                color: '#f59e0b', 
+                value: data.contents.acme_accounts, 
+                label: 'ACME Accounts',
+                gradient: 'rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.15)'
+            }
+        ];
+        
+        statsDiv.innerHTML = stats.map(stat => `
+            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.375rem; padding: 0.5rem; display: flex; gap: 0.5rem; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <div style="width: 32px; height: 32px; border-radius: 5px; background: linear-gradient(135deg, ${stat.gradient}); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fas ${stat.icon}" style="background: linear-gradient(135deg, ${stat.color} 0%, ${stat.color} 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 16px;"></i>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 18px; font-weight: 600; color: var(--text-primary); line-height: 1;">
+                        ${stat.value}
+                    </div>
+                    <div style="font-size: 0.6875rem; color: var(--text-secondary); font-weight: 500; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${stat.label}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        // Metadata details
+        const metadataDetailsDiv = document.getElementById('backup-metadata-details');
+        metadataDetailsDiv.innerHTML = `
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.375rem 1rem; color: var(--text-secondary); font-size: 0.8125rem;">
+                <strong style="color: var(--text-primary);">Version:</strong>
+                <span>${data.metadata.ucm_version}</span>
+                
+                <strong style="color: var(--text-primary);">Created:</strong>
+                <span>${new Date(data.metadata.created_at).toLocaleString()}</span>
+                
+                <strong style="color: var(--text-primary);">Hostname:</strong>
+                <span>${data.metadata.hostname}</span>
+                
+                <strong style="color: var(--text-primary);">Type:</strong>
+                <span style="text-transform: capitalize;">${data.metadata.backup_type}</span>
+            </div>
+        `;
+        
+        // Smooth reveal animation
+        const infoDiv = document.getElementById('backup-info');
+        infoDiv.style.display = 'block';
+        infoDiv.style.maxHeight = '0';
+        infoDiv.style.opacity = '0';
+        
+        // Trigger animation on next frame
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                infoDiv.style.maxHeight = '600px';
+                infoDiv.style.opacity = '1';
+            });
+        });
+        
+        // Update validate button to green with checkmark (hide spinner first)
+        hideButtonSpinner(validateBtn);
+        validateBtn.className = 'btn-success';
+        validateBtn.style.background = 'var(--success-color)';
+        validateBtn.style.borderColor = 'var(--success-color)';
+        validateBtn.innerHTML = '<svg class="ucm-icon" width="16" height="16"><use href="#icon-check-circle"/></svg> Validated ✓';
+        validateBtn.disabled = true;
+        
+        // Show restore button
+        document.getElementById('restore-btn').style.display = 'inline-flex';
+        
+        // Show success toast (non-intrusive)
+        showToast('Backup validated successfully', 'success');
+        
+    } catch (error) {
+        console.error('Validation error:', error);
+        showToast('Validation failed: ' + error.message, 'error');
+        hideButtonSpinner(validateBtn);
+    }
+}
+
+async function restoreBackup() {
+    const fileInput = document.getElementById('restore-file');
+    const password = document.getElementById('restore-password').value;
+    
+    if (!fileInput.files[0] || !password) {
+        showToast('Please select a file and enter password', 'warning');
+        return;
+    }
+    
+    // Confirm
+    const confirmed = await ucmConfirm(
+        'This will restore data from the backup file.\n\n' +
+        '⚠️ UCM will restart automatically after restore.\n' +
+        'You will need to log in again.\n\n' +
+        'Continue?',
+        'Confirm Restore',
+        { danger: true, confirmText: 'Restore Now', icon: 'warning-triangle' }
+    );
+    
+    if (!confirmed) return;
+    
+    const restoreBtn = document.getElementById('restore-btn');
+    showButtonSpinner(restoreBtn, 'Restoring...');
+    
+    // Show progress
+    document.getElementById('restore-progress').style.display = 'block';
+    
+    const options = {
+        restore_cas: document.getElementById('restore-cas').checked,
+        restore_certificates: document.getElementById('restore-certs').checked,
+        restore_users: document.getElementById('restore-users').checked,
+        merge_users: document.getElementById('restore-users').checked,
+        restore_configuration: document.getElementById('restore-config').checked
+    };
+    
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('password', password);
+    formData.append('options', JSON.stringify(options));
+    
+    try {
+        const response = await fetch('/api/v1/backup/restore', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + getToken()
+            },
+            body: formData
+        });
+        
+        console.log('Restore response status:', response.status);
+        const data = await response.json();
+        console.log('Restore response data:', data);
+        
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Restore failed');
+        }
+        
+        console.log('Closing modal and showing countdown...');
+        closeRestoreModal();
+        
+        // Show restart countdown with spinner
+        showRestartCountdown(5, '/login');
+        
+    } catch (error) {
+        console.error('Restore error:', error);
+        showToast('Restore failed: ' + error.message, 'error');
+        hideButtonSpinner(restoreBtn);
+        document.getElementById('restore-progress').style.display = 'none';
+    }
+}
+
+// ============================================================================
+// Database Management Functions
+// ============================================================================
+
+// Load database stats on page load
+async function loadDatabaseStats() {
+    try {
+        const response = await fetch('/api/v1/system/database/stats', {
+            headers: { 'Authorization': 'Bearer ' + getToken() }
+        });
+        const data = await response.json();
+        
+        if (data.success && data.stats) {
+            const stats = data.stats;
+            
+            // Update stats
+            document.getElementById('db-stat-size').textContent = stats.size_formatted || '0 MB';
+            document.getElementById('db-stat-frag').textContent = stats.fragmentation_pct + '%';
+            
+            // Update last maintenance
+            if (stats.last_vacuum) {
+                const vacuumDate = new Date(stats.last_vacuum);
+                document.getElementById('db-last-vacuum').textContent = vacuumDate.toLocaleDateString();
+            }
+            if (stats.last_integrity_check) {
+                const checkDate = new Date(stats.last_integrity_check);
+                document.getElementById('db-last-check').textContent = checkDate.toLocaleDateString();
+            }
+            
+            // Update table counts
+            if (stats.tables) {
+                if (stats.tables.certificate_authority !== undefined) 
+                    document.getElementById('pki-stat-cas').textContent = stats.tables.certificate_authority || 0;
+                if (stats.tables.certificate !== undefined) 
+                    document.getElementById('pki-stat-certs').textContent = stats.tables.certificate || 0;
+                if (stats.tables.crl !== undefined) 
+                    document.getElementById('pki-stat-crls').textContent = stats.tables.crl || 0;
+                if (stats.tables.ocsp_response !== undefined) 
+                    document.getElementById('pki-stat-ocsp').textContent = stats.tables.ocsp_response || 0;
+            }
+        }
+        
+        // Load health status
+        loadDatabaseHealth();
+        
+    } catch (error) {
+        console.error('Error loading database stats:', error);
+    }
+}
+
+async function loadDatabaseHealth() {
+    try {
+        const response = await fetch('/api/v1/system/database/health', {
+            headers: { 'Authorization': 'Bearer ' + getToken() }
+        });
+        const data = await response.json();
+        
+        if (data.success && data.health) {
+            const health = data.health;
+            const badge = document.getElementById('db-health-badge');
+            
+            // Update health badge
+            if (health.status === 'healthy') {
+                badge.className = 'badge-outline badge-success';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Healthy';
+            } else if (health.status === 'warning') {
+                badge.className = 'badge-outline badge-warning';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-warning-triangle"/></svg> Warnings';
+            } else {
+                badge.className = 'badge-outline badge-danger';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-exclamation-circle"/></svg> Issues';
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error loading database health:', error);
+    }
+}
+
+async function optimizeDatabase() {
+    const confirmed = confirm('Optimize database?\n\nThis will run VACUUM and ANALYZE to:\n• Reclaim unused disk space\n• Defragment the database\n• Update query statistics\n\nThis may take a few moments.');
+    
+    if (!confirmed) return;
+    
+    showToast('Optimizing database...', 'info');
+    
+    try {
+        const response = await fetch('/api/v1/system/database/optimize', {
+            method: 'POST',
+            headers: { 
+                'Authorization': 'Bearer ' + getToken(),
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const saved = data.vacuum.space_saved_formatted || '0 B';
+            showToast(`Database optimized successfully! Space saved: ${saved}`, 'success');
+            loadDatabaseStats(); // Refresh stats
+        } else {
+            throw new Error(data.error || 'Optimization failed');
+        }
+        
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+async function checkIntegrity() {
+    showToast('Running integrity check...', 'info');
+    
+    try {
+        const response = await fetch('/api/v1/system/database/integrity-check', {
+            method: 'POST',
+            headers: { 
+                'Authorization': 'Bearer ' + getToken(),
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.healthy) {
+            showToast('Database integrity check passed - no errors found', 'success');
+        } else if (data.errors && data.errors.length > 0) {
+            showToast('Database integrity issues found: ' + data.errors.join(', '), 'error');
+        } else {
+            showToast('Integrity check completed', 'success');
+        }
+        
+        loadDatabaseStats(); // Refresh last check date
+        
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+async function cleanExpiredCerts() {
+    const confirmed = confirm('Clean expired certificates?\n\nThis will permanently delete certificates that expired more than 30 days ago.\n\nRevoked certificates will be preserved for CRL generation.');
+    
+    if (!confirmed) return;
+    
+    showToast('Cleaning expired certificates...', 'info');
+    
+    try {
+        const response = await fetch('/api/v1/system/database/clean-expired', {
+            method: 'POST',
+            headers: { 
+                'Authorization': 'Bearer ' + getToken(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ days_after_expiry: 30 })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast(`Deleted ${data.deleted_count} expired certificates`, 'success');
+            loadDatabaseStats(); // Refresh stats
+        } else {
+            throw new Error(data.error || 'Cleanup failed');
+        }
+        
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+async function exportDatabase() {
+    const confirmed = confirm('Export database?\n\nThis will download a compressed SQL dump of the entire database.');
+    
+    if (!confirmed) return;
+    
+    showToast('Exporting database...', 'info');
+    
+    try {
+        const response = await fetch('/api/v1/system/database/export', {
+            method: 'POST',
+            headers: { 
+                'Authorization': 'Bearer ' + getToken(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ compress: true })
+        });
+        
+        if (response.ok) {
+            // Download file
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ucm-database-dump.sql.gz';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            showToast('Database exported successfully', 'success');
+        } else {
+            const data = await response.json();
+            throw new Error(data.error || 'Export failed');
+        }
+        
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+// Load database stats on Database tab activation
+document.addEventListener('DOMContentLoaded', () => {
+    // Load stats when Database tab is clicked
+    const dbTab = document.querySelector('.settings-tab[onclick*="database"]');
+    if (dbTab) {
+        dbTab.addEventListener('click', () => {
+            setTimeout(loadDatabaseStats, 100);
+        });
+    }
+    
+    // Load stats if Database tab is active on page load
+    const activeTab = localStorage.getItem('ucm-settings-tab');
+    if (activeTab === 'database') {
+        setTimeout(loadDatabaseStats, 500);
+    }
+});
 
 </script>
 {% endblock %}

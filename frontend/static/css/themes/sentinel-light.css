@@ -43,6 +43,8 @@
     --bg-success-light: #d1fae5;
     --bg-danger-light: #fee2e2;
     --bg-warning-light: #fef3c7;
+    --warning-bg: #fef3c7;
+    --warning-text: #92400e;
     --bg-info-light: #f3e8ff;
     
     --border-color: #e5e7eb;

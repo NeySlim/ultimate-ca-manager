@@ -36,11 +36,45 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
+            overflow-x: hidden;
         }
         
         .login-container {
-            max-width: 420px;
+            max-width: 450px;
             width: 100%;
+            animation: fadeInUp 0.6s ease-out;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
         
         .login-header {
@@ -50,10 +84,11 @@
         
         .login-logo {
             margin: 0 auto 20px;
+            animation: pulse 2s ease-in-out infinite;
         }
         
         .login-title {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 8px;
@@ -77,6 +112,35 @@
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
         
+        /* Step Indicator */
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .step-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--border);
+            transition: all 0.3s ease;
+        }
+        
+        .step-dot.active {
+            background: var(--primary-color);
+            transform: scale(1.3);
+        }
+        
+        .step-dot.completed {
+            background: var(--primary-color);
+        }
+        
+        /* Form Groups */
         .form-group {
             margin-bottom: 20px;
         }
@@ -84,14 +148,14 @@
         .form-label {
             display: block;
             font-size: 13px;
-            font-weight: 500;
+            font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
         
         .form-input {
             width: 100%;
-            padding: 11px 14px;
+            padding: 12px 14px;
             font-size: 15px;
             border: 1.5px solid var(--border);
             border-radius: 6px;
@@ -114,58 +178,266 @@
         
         .form-checkbox input {
             margin-right: 8px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
         }
         
         .form-checkbox label {
             font-size: 13px;
             color: var(--text-secondary);
+            cursor: pointer;
         }
         
-        .btn-login {
+        /* Buttons */
+        .btn {
             width: 100%;
-            padding: 11px 16px;
+            padding: 12px 16px;
             font-size: 15px;
             font-weight: 600;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            background: var(--btn-secondary-bg, var(--bg-secondary)) !important;
-            color: var(--text-primary) !important;
-            border: 1px solid var(--border-color) !important;
+            gap: 10px;
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s ease;
+            border: none;
         }
         
-        .btn-login:hover:not(:disabled) {
-            background: var(--btn-secondary-hover, var(--sidebar-hover)) !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-hover);
             transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
         
-        .btn-login:active:not(:disabled) {
-            transform: translateY(0);
+        .btn-secondary {
+            background: var(--btn-secondary-bg, var(--bg-secondary));
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
         }
         
-        .btn-login:disabled {
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--btn-secondary-hover, var(--sidebar-hover));
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
         }
         
-        .btn-login i {
-            color: var(--primary-color) !important;
-            opacity: 1 !important;
+        /* Auth Method Cards */
+        .auth-methods-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
         }
         
-        /* Ensure login button icons are always visible */
-        .btn-login i.fas,
-        .btn-login svg,
-        .btn-login .ucm-icon {
-            opacity: 1 !important;
-            color: var(--primary-color) !important;
+        .auth-method-card {
+            padding: 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            gap: 14px;
         }
         
+        .auth-method-card:hover {
+            border-color: var(--primary-color);
+            background: var(--card-bg);
+            transform: translateX(4px);
+            box-shadow: -4px 0 0 0 var(--primary-color), 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        
+        .auth-method-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        
+        .auth-method-icon.webauthn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .auth-method-icon.mtls {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .auth-method-icon.password {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        
+        .auth-method-content {
+            flex: 1;
+        }
+        
+        .auth-method-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+        
+        .auth-method-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .auth-method-arrow {
+            color: var(--text-secondary);
+            font-size: 18px;
+            opacity: 0;
+            transform: translateX(-10px);
+            transition: all 0.25s ease;
+        }
+        
+        .auth-method-card:hover .auth-method-arrow {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        
+        /* User Display */
+        .user-display {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .user-info {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 15px;
+        }
+        
+        .change-account {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            font-size: 13px;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+        
+        .change-account:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+        
+        /* Status Messages */
+        .status-message {
+            text-align: center;
+            padding: 14px;
+            border-radius: 6px;
+            margin-top: 16px;
+            font-size: 14px;
+            animation: slideInRight 0.3s ease;
+        }
+        
+        .status-info {
+            background: rgba(var(--primary-color-rgb, 66, 153, 225), 0.1);
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+        }
+        
+        .status-error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+            border: 1px solid #dc2626;
+        }
+        
+        .status-success {
+            background: rgba(34, 197, 94, 0.1);
+            color: #16a34a;
+            border: 1px solid #16a34a;
+        }
+        
+        /* Loading State */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeIn 0.2s ease;
+        }
+        
+        .loading-content {
+            background: var(--card-bg);
+            padding: 32px 40px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+        
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 15px;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        /* Footer */
         .login-footer {
             margin-top: 28px;
             text-align: center;
@@ -204,10 +476,7 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
         
-        .github-badge i {
-            font-size: 14px;
-        }
-        
+        /* Theme Selector */
         .theme-selector {
             position: absolute;
             top: 20px;
@@ -231,7 +500,6 @@
             background: var(--bg-secondary);
             border-color: var(--primary-color);
             transform: translateY(-2px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         
         .theme-dropdown {
@@ -245,7 +513,7 @@
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 8px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
             min-width: 200px;
             z-index: 1000;
             display: none;
@@ -292,7 +560,68 @@
         .theme-dropdown-divider {
             height: 1px;
             background: var(--border);
-            margin: 4px 0;
+            margin: 6px 0;
+        }
+        
+        /* Session Expired Alert */
+        .alert-warning {
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-color, #fbbf24);
+            border-left: 4px solid var(--warning-color, #fbbf24);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: start;
+            gap: 12px;
+            animation: slideInRight 0.4s ease;
+        }
+        
+        .alert-icon {
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        
+        .alert-content {
+            flex: 1;
+        }
+        
+        .alert-title {
+            font-weight: 600;
+            color: var(--warning-text);
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        
+        .alert-message {
+            font-size: 13px;
+            color: var(--warning-text);
+        }
+        
+        /* Hide/Show Steps */
+        .step-content {
+            display: none;
+        }
+        
+        .step-content.active {
+            display: block;
+            animation: slideInRight 0.4s ease;
+        }
+        
+        /* Responsive */
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 24px;
+            }
+            
+            .login-title {
+                font-size: 22px;
+            }
+            
+            .theme-selector {
+                top: 12px;
+                right: 12px;
+            }
         }
     </style>
 </head>
@@ -301,52 +630,52 @@
     <div class="theme-selector">
         <div class="theme-dropdown">
             <button class="theme-btn" data-action="toggle-dropdown">
-                <svg class="ucm-icon" width="20" height="20"><use href="#icon-palette"/></svg>
+                <i class="fas fa-palette"></i>
             </button>
             
             <div id="themeDropdown" class="theme-dropdown-menu">
                 <div class="theme-dropdown-header">Sentinel</div>
                 <a href="#" data-action="set-theme" data-theme="sentinel-light" class="theme-dropdown-item">
-                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
+                    <i class="fas fa-sun"></i> Light
                 </a>
                 <a href="#" data-action="set-theme" data-theme="sentinel-dark" class="theme-dropdown-item">
-                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
+                    <i class="fas fa-moon"></i> Dark
                 </a>
                 
                 <div class="theme-dropdown-divider"></div>
                 
                 <div class="theme-dropdown-header">Amber</div>
                 <a href="#" data-action="set-theme" data-theme="amber-light" class="theme-dropdown-item">
-                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
+                    <i class="fas fa-sun"></i> Light
                 </a>
                 <a href="#" data-action="set-theme" data-theme="amber-dark" class="theme-dropdown-item">
-                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
+                    <i class="fas fa-moon"></i> Dark
                 </a>
                 
                 <div class="theme-dropdown-divider"></div>
                 
                 <div class="theme-dropdown-header">Blossom</div>
                 <a href="#" data-action="set-theme" data-theme="blossom-light" class="theme-dropdown-item">
-                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
+                    <i class="fas fa-sun"></i> Light
                 </a>
                 <a href="#" data-action="set-theme" data-theme="blossom-dark" class="theme-dropdown-item">
-                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
+                    <i class="fas fa-moon"></i> Dark
                 </a>
                 
                 <div class="theme-dropdown-divider"></div>
                 
                 <div class="theme-dropdown-header">Nebula</div>
                 <a href="#" data-action="set-theme" data-theme="nebula-light" class="theme-dropdown-item">
-                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
+                    <i class="fas fa-sun"></i> Light
                 </a>
                 <a href="#" data-action="set-theme" data-theme="nebula-dark" class="theme-dropdown-item">
-                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
+                    <i class="fas fa-moon"></i> Dark
                 </a>
             </div>
         </div>
         
         <button class="theme-btn" data-action="toggle-theme-variant" title="Toggle Dark/Light">
-            <svg class="ucm-icon" id="theme-toggle-icon" width="20" height="20"><use href="#icon-moon"/></svg>
+            <i id="theme-toggle-icon" class="fas fa-moon"></i>
         </button>
     </div>
 
@@ -380,63 +709,71 @@
         
         <!-- Session Expired Alert -->
         {% if request.args.get('expired') == '1' %}
-        <div style="background: var(--warning-bg); border: 1px solid var(--warning-color, #fbbf24); border-left: 4px solid var(--warning-color, #fbbf24); border-radius: 6px; padding: 14px 16px; margin-bottom: 24px; display: flex; align-items: start; gap: 12px; animation: slideInRight 0.4s ease;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px; color: var(--warning-text, #92400e);">
+        <div class="alert-warning">
+            <svg class="alert-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <div style="flex: 1;">
-                <div style="font-weight: 600; color: var(--warning-text, #92400e); margin-bottom: 4px; font-size: 14px;">Session Expired</div>
-                <div style="font-size: 13px; color: var(--warning-text, #92400e);">Your session has expired due to inactivity. Please log in again.</div>
+            <div class="alert-content">
+                <div class="alert-title">Session Expired</div>
+                <div class="alert-message">Your session has expired due to inactivity. Please log in again.</div>
             </div>
         </div>
         {% endif %}
         
         <!-- Login Card -->
         <div class="login-card">
+            <!-- Step Indicator -->
+            <div class="step-indicator">
+                <div class="step-dot active" id="step-dot-1"></div>
+                <div class="step-dot" id="step-dot-2"></div>
+            </div>
+            
             <!-- Step 1: Username Entry -->
-            <div id="step-username">
+            <div id="step-username" class="step-content active">
                 <div class="form-group">
-                    <label class="form-label" for="username">Username</label>
+                    <label class="form-label" for="username">
+                        <i class="fas fa-user" style="margin-right: 6px; color: var(--primary-color);"></i>
+                        Username
+                    </label>
                     <input class="form-input" id="username" type="text" required placeholder="Enter your username" autofocus>
                 </div>
                 
-                <button type="button" data-action="check-auth-methods" class="btn-login">
-                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg>
+                <button type="button" data-action="check-auth-methods" class="btn btn-primary">
                     <span>Continue</span>
+                    <i class="fas fa-arrow-right"></i>
                 </button>
             </div>
             
-            <!-- Step 2: Authentication Methods (hidden initially) -->
-            <div id="step-auth-methods" style="display: none;">
-                <div style="margin-bottom: 1.5rem; padding: 14px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;">
-                    <div style="display: flex; align-items: center; gap: 0.75rem;">
-                        <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--primary-color), var(--primary-hover)); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px;">
-                            <span id="user-avatar-initial"></span>
-                        </div>
-                        <div style="flex: 1;">
-                            <span id="display-username" style="font-weight: 600; color: var(--text-primary); font-size: 15px; display: block;"></span>
-                            <button data-action="reset-login" style="background: none; border: none; color: var(--primary-color); font-size: 13px; cursor: pointer; padding: 0; margin-top: 2px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
-                                <svg class="ucm-icon" width="12" height="12"><use href="#icon-refresh-cw"/></svg>
-                                Change account
-                            </button>
-                        </div>
+            <!-- Step 2: Authentication Methods -->
+            <div id="step-auth-methods" class="step-content">
+                <!-- User Display -->
+                <div class="user-display">
+                    <div class="user-avatar" id="user-avatar">U</div>
+                    <div class="user-info">
+                        <div class="user-name" id="display-username"></div>
+                        <button data-action="reset-login" class="change-account">
+                            <i class="fas fa-rotate-left" style="font-size: 11px; margin-right: 4px;"></i>
+                            Change account
+                        </button>
                     </div>
                 </div>
                 
+                <!-- Auth Methods Container -->
                 <div id="auth-methods-container"></div>
                 
-                <div id="auth-status" style="margin-top: 12px; text-align: center; font-size: 13px; display: none;"></div>
+                <!-- Status Messages -->
+                <div id="auth-status" style="display: none;"></div>
             </div>
         </div>
         
         <!-- Footer -->
         <div class="login-footer">
             <p class="login-info">
-                <svg class="ucm-icon" width="12" height="12"><use href="#icon-lock"/></svg>
+                <i class="fas fa-lock" style="font-size: 11px;"></i>
                 <span>HTTPS-only secure connection</span>
             </p>
             <a href="https://github.com/NeySlim/ultimate-ca-manager" target="_blank" class="github-badge">
-                <svg class="ucm-icon" width="16" height="16"><use href="#icon-github"/></svg>
+                <i class="fab fa-github"></i>
                 <span>View on GitHub</span>
             </a>
         </div>
@@ -450,8 +787,13 @@
     
     <!-- Theme Switcher -->
     <script src="{{ url_for('static', filename='js/theme-switcher.js') }}"></script>
+    
     <script>
-        // Event delegation for theme controls and auth actions
+        // Global state
+        let currentUsername = null;
+        let availableMethods = [];
+        
+        // Event delegation
         document.addEventListener('click', function(event) {
             const target = event.target.closest('[data-action]');
             
@@ -467,7 +809,6 @@
             
             const action = target.dataset.action;
             
-            // Handle toggle dropdown
             if (action === 'toggle-dropdown') {
                 event.preventDefault();
                 const dropdown = document.getElementById('themeDropdown');
@@ -477,24 +818,18 @@
                 return;
             }
             
-            // Handle set theme
             if (action === 'set-theme') {
                 event.preventDefault();
                 const themeName = target.dataset.theme;
                 if (themeName) {
                     setTheme(themeName);
-                    // Close dropdown
                     const dropdown = document.getElementById('themeDropdown');
-                    if (dropdown) {
-                        dropdown.classList.remove('active');
-                    }
-                    // Update toggle icon
+                    if (dropdown) dropdown.classList.remove('active');
                     updateToggleIcon();
                 }
                 return;
             }
             
-            // Handle toggle theme variant
             if (action === 'toggle-theme-variant') {
                 event.preventDefault();
                 toggleThemeVariant();
@@ -502,20 +837,18 @@
                 return;
             }
             
-            // Handle check auth methods
             if (action === 'check-auth-methods') {
                 event.preventDefault();
                 checkAuthMethods();
                 return;
             }
             
-            // Handle reset login
             if (action === 'reset-login') {
                 event.preventDefault();
                 resetLogin();
                 return;
             }
-        }, true); // Use capture phase
+        }, true);
         
         // Handle Enter key on username field
         document.addEventListener('keypress', function(event) {
@@ -536,13 +869,29 @@
         // Set correct icon on load
         document.addEventListener('DOMContentLoaded', () => {
             updateToggleIcon();
+            document.getElementById('username').focus();
         });
-    </script>
-    
-    <!-- Smart Authentication System -->
-    <script>
-        let currentUsername = null;
-        let availableMethods = [];
+        
+        // Switch between steps
+        function switchToStep(stepNumber) {
+            // Update step indicator
+            document.querySelectorAll('.step-dot').forEach((dot, index) => {
+                dot.classList.remove('active', 'completed');
+                if (index + 1 < stepNumber) {
+                    dot.classList.add('completed');
+                } else if (index + 1 === stepNumber) {
+                    dot.classList.add('active');
+                }
+            });
+            
+            // Switch step content
+            document.querySelectorAll('.step-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            const targetStep = stepNumber === 1 ? 'step-username' : 'step-auth-methods';
+            document.getElementById(targetStep).classList.add('active');
+        }
         
         // Check available authentication methods
         async function checkAuthMethods() {
@@ -553,9 +902,14 @@
                 return;
             }
             
+            // Show loading overlay
+            showLoadingOverlay('Checking authentication methods...');
+            
             try {
                 const response = await fetch(`/api/v1/auth/methods?username=${encodeURIComponent(username)}`);
                 const data = await response.json();
+                
+                hideLoadingOverlay();
                 
                 if (!response.ok) {
                     showAuthStatus(data.error || 'Failed to check authentication methods', 'error');
@@ -565,19 +919,19 @@
                 currentUsername = username;
                 availableMethods = data.methods;
                 
-                // Show username and avatar
+                // Update user display
                 document.getElementById('display-username').textContent = username;
-                const avatarInitial = document.getElementById('user-avatar-initial');
-                if (avatarInitial) {
-                    avatarInitial.textContent = username.charAt(0).toUpperCase();
-                }
-                document.getElementById('step-username').style.display = 'none';
-                document.getElementById('step-auth-methods').style.display = 'block';
+                const avatar = document.getElementById('user-avatar');
+                avatar.textContent = username.charAt(0).toUpperCase();
                 
-                // Auto-try secure methods in priority order
+                // Switch to step 2
+                switchToStep(2);
+                
+                // Try secure methods automatically
                 await autoAuthenticateSecure(data);
                 
             } catch (error) {
+                hideLoadingOverlay();
                 showAuthStatus('Error: ' + error.message, 'error');
             }
         }
@@ -588,11 +942,8 @@
             
             // Priority 1: Try mTLS (if available)
             if (methods.includes('mtls') && data.counts.mtls > 0) {
-                container.innerHTML = '<div style="text-align: center; padding: 2rem;"><svg class="icon spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg><p style="margin-top: 1rem; color: var(--text-secondary);">Checking for client certificate...</p></div>';
-                
-                // mTLS is handled by reverse proxy - if user has cert, they'd already be logged in
-                // Wait a moment to simulate check
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                container.innerHTML = '<div style="text-align: center; padding: 2rem;"><div class="spinner"></div><p style="margin-top: 1rem; color: var(--text-secondary); font-size: 14px;">Checking for client certificate...</p></div>';
+                await new Promise(resolve => setTimeout(resolve, 800));
             }
             
             // Priority 2: Try WebAuthn (if available and compatible)
@@ -600,46 +951,82 @@
                 const isCompatible = checkWebAuthnCompatibility();
                 
                 if (isCompatible) {
-                    container.innerHTML = '<div style="text-align: center; padding: 2rem;"><svg class="ucm-icon" width="48" height="48"><use href="#icon-key"/></svg><p style="margin-top: 1rem; color: var(--text-primary); font-weight: 600;">Touch your security key</p><p style="color: var(--text-secondary); font-size: 0.875rem;">Follow your browser prompts to sign in</p></div>';
-                    
-                    try {
-                        await startWebAuthnLogin();
-                        return; // Success - will redirect
-                    } catch (error) {
-                        console.log('WebAuthn failed, falling back to password:', error);
-                        showAuthStatus('Security key authentication failed', 'error');
-                    }
+                    // Show all available methods first
+                    renderAuthMethods(methods);
+                    return;
                 }
             }
             
-            // Fallback: Show password form
-            showPasswordFallback();
+            // Fallback: Show all available methods
+            renderAuthMethods(methods);
         }
         
-        function showPasswordFallback() {
+        function renderAuthMethods(methods) {
+            const container = document.getElementById('auth-methods-container');
+            let html = '<div class="auth-methods-grid">';
+            
+            // WebAuthn
+            if (methods.includes('webauthn')) {
+                html += `
+                    <div class="auth-method-card" onclick="startWebAuthnLogin()">
+                        <div class="auth-method-icon webauthn">
+                            <i class="fas fa-key"></i>
+                        </div>
+                        <div class="auth-method-content">
+                            <div class="auth-method-title">Security Key / Passkey</div>
+                            <div class="auth-method-desc">Touch your security key or use biometrics</div>
+                        </div>
+                        <i class="fas fa-arrow-right auth-method-arrow"></i>
+                    </div>
+                `;
+            }
+            
+            // Password (always available)
+            html += `
+                <div class="auth-method-card" onclick="showPasswordForm()">
+                    <div class="auth-method-icon password">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <div class="auth-method-content">
+                        <div class="auth-method-title">Password</div>
+                        <div class="auth-method-desc">Sign in with your password</div>
+                    </div>
+                    <i class="fas fa-arrow-right auth-method-arrow"></i>
+                </div>
+            `;
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function showPasswordForm() {
             const container = document.getElementById('auth-methods-container');
             
             container.innerHTML = `
-                <div style="animation: fadeIn 0.3s;">
-                    <form action="/login" method="POST">
-                        <input type="hidden" name="username" value="${currentUsername}">
-                        <div class="form-group">
-                            <label class="form-label" for="password">
-                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-lock"/></svg>
-                                Password
-                            </label>
-                            <input class="form-input" id="password" name="password" type="password" required placeholder="Enter your password" autofocus>
-                        </div>
-                        <div class="form-checkbox">
-                            <input id="remember" name="remember" type="checkbox">
-                            <label for="remember">Remember me for 30 days</label>
-                        </div>
-                        <button type="submit" class="btn-login" style="width: 100%;">
-                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-log-in"/></svg>
+                <form action="/login" method="POST" onsubmit="handlePasswordSubmit(event)">
+                    <input type="hidden" name="username" value="${escapeHtml(currentUsername)}">
+                    <div class="form-group">
+                        <label class="form-label" for="password">
+                            <i class="fas fa-lock" style="margin-right: 6px; color: var(--primary-color);"></i>
+                            Password
+                        </label>
+                        <input class="form-input" id="password" name="password" type="password" required placeholder="Enter your password" autofocus>
+                    </div>
+                    <div class="form-checkbox">
+                        <input id="remember" name="remember" type="checkbox">
+                        <label for="remember">Remember me for 30 days</label>
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <button type="button" onclick="renderAuthMethods(availableMethods)" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i>
+                            <span>Back</span>
+                        </button>
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">
+                            <i class="fas fa-right-to-bracket"></i>
                             <span>Sign In</span>
                         </button>
-                    </form>
-                </div>
+                    </div>
+                </form>
             `;
             
             // Focus password field
@@ -647,6 +1034,12 @@
                 const pwdField = document.getElementById('password');
                 if (pwdField) pwdField.focus();
             }, 100);
+        }
+        
+        function handlePasswordSubmit(event) {
+            event.preventDefault();
+            showLoadingOverlay('Signing in...');
+            event.target.submit();
         }
         
         function checkWebAuthnCompatibility() {
@@ -659,8 +1052,7 @@
         }
         
         function resetLogin() {
-            document.getElementById('step-auth-methods').style.display = 'none';
-            document.getElementById('step-username').style.display = 'block';
+            switchToStep(1);
             document.getElementById('username').value = '';
             document.getElementById('username').focus();
             hideAuthStatus();
@@ -669,9 +1061,9 @@
         function showAuthStatus(message, type = 'info') {
             const status = document.getElementById('auth-status');
             if (status) {
-                status.textContent = message;
+                status.className = `status-message status-${type}`;
+                status.innerHTML = `<i class="fas fa-${type === 'error' ? 'exclamation-circle' : type === 'success' ? 'check-circle' : 'info-circle'}" style="margin-right: 8px;"></i>${escapeHtml(message)}`;
                 status.style.display = 'block';
-                status.style.color = type === 'error' ? 'var(--error-color)' : type === 'success' ? 'var(--success-color)' : 'var(--primary-color)';
             }
         }
         
@@ -681,60 +1073,43 @@
                 status.style.display = 'none';
             }
         }
-    </script>
-    
-    <style>
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
-    
-    <!-- WebAuthn Login -->
-    <script>
-        // Convert base64url to ArrayBuffer
-        function base64urlToBuffer(base64url) {
-            // Convert base64url to base64
-            let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-            
-            // Add padding if needed
-            const padLength = (4 - (base64.length % 4)) % 4;
-            base64 += '='.repeat(padLength);
-            
-            const binary = atob(base64);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {
-                bytes[i] = binary.charCodeAt(i);
-            }
-            return bytes.buffer;
+        
+        function showLoadingOverlay(message) {
+            const overlay = document.createElement('div');
+            overlay.id = 'loading-overlay';
+            overlay.className = 'loading-overlay';
+            overlay.innerHTML = `
+                <div class="loading-content">
+                    <div class="spinner"></div>
+                    <div class="loading-text">${escapeHtml(message)}</div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
         }
         
-        // Convert ArrayBuffer to base64url
-        function bufferToBase64url(buffer) {
-            const bytes = new Uint8Array(buffer);
-            let binary = '';
-            for (let i = 0; i < bytes.length; i++) {
-                binary += String.fromCharCode(bytes[i]);
+        function hideLoadingOverlay() {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.remove();
             }
-            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
         }
         
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // WebAuthn Login
         async function startWebAuthnLogin() {
-            showAuthStatus('🔑 Touch your security key...', 'info');
+            showLoadingOverlay('Touch your security key...');
             
             try {
-                // Use the stored username from step 1
-                const username = currentUsername || document.getElementById('username').value.trim();
-                if (!username) {
-                    showAuthStatus('✗ Username required', 'error');
-                    return;
-                }
-                
-                // Step 1: Get authentication options from server
+                // Get authentication options
                 const optionsResponse = await fetch('/api/v1/webauthn/authenticate/options', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: username })
+                    body: JSON.stringify({ username: currentUsername })
                 });
                 
                 if (!optionsResponse.ok) {
@@ -744,8 +1119,7 @@
                 
                 const options = await optionsResponse.json();
                 
-                // Convert base64url strings to ArrayBuffers
-                // Note: API returns the options object directly, not wrapped in {publicKey: ...}
+                // Convert base64url to ArrayBuffers
                 const publicKeyOptions = {
                     publicKey: {
                         ...options,
@@ -758,19 +1132,14 @@
                     }
                 };
                 
-                // Step 2: Show "Touch your key" message
-                showAuthStatus('🔑 Touch your security key now...', 'info');
-                
-                // Step 3: Call WebAuthn API
+                // Call WebAuthn API
                 const credential = await navigator.credentials.get(publicKeyOptions);
                 
                 if (!credential) {
                     throw new Error('Authentication was cancelled');
                 }
                 
-                // Step 4: Send credential to server
-                showAuthStatus('✓ Verifying credential...', 'success');
-                
+                // Verify credential
                 const verifyResponse = await fetch('/api/v1/webauthn/authenticate/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -795,46 +1164,52 @@
                     throw new Error(error.error || 'Authentication failed');
                 }
                 
-                // Success! Redirect to dashboard
-                showAuthStatus('✓ Authentication successful! Redirecting...');
+                // Success! Redirect
+                hideLoadingOverlay();
+                showAuthStatus('Authentication successful! Redirecting...', 'success');
                 setTimeout(() => {
                     window.location.href = '/';
                 }, 500);
                 
             } catch (error) {
                 console.error('WebAuthn login error:', error);
-                btn.disabled = false;
-                btn.innerHTML = originalHTML;
+                hideLoadingOverlay();
                 
                 let errorMessage = error.message;
                 
-                // Provide helpful error messages
                 if (error.name === 'NotAllowedError') {
                     errorMessage = 'Authentication was cancelled or timed out';
                 } else if (error.name === 'InvalidStateError') {
-                    errorMessage = 'Security key not recognized. Please register it first.';
+                    errorMessage = 'Security key not recognized';
                 } else if (error.name === 'NotSupportedError') {
                     errorMessage = 'WebAuthn not supported in this browser';
                 }
                 
-                showAuthStatus('✗ ' + errorMessage, true);
+                showAuthStatus(errorMessage, 'error');
             }
         }
         
-        // Handle login form submission to show loader
-        document.addEventListener('submit', function(e) {
-            if (e.target.action && e.target.action.includes('/login')) {
-                // Show global loader if it exists
-                if (typeof showGlobalLoader === 'function') {
-                    showGlobalLoader();
-                }
+        // Base64url conversion helpers
+        function base64urlToBuffer(base64url) {
+            let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+            const padLength = (4 - (base64.length % 4)) % 4;
+            base64 += '='.repeat(padLength);
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
             }
-        });
+            return bytes.buffer;
+        }
         
-        // Init
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('username').focus();
-        });
+        function bufferToBase64url(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
     </script>
 </body>
 </html>

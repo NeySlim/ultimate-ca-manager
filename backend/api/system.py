@@ -2,12 +2,13 @@
 System Configuration API
 Web-based configuration for HTTPS, SCEP, and all system settings
 """
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, User, SystemConfig, AuditLog
 from middleware.auth_middleware import admin_required
 from config.https_manager import HTTPSManager
 from services.pki_reset_service import PKIResetService
+from services.db_management_service import DatabaseManagementService
 from pathlib import Path
 import json
 import os
@@ -723,6 +724,192 @@ def reset_pki():
             'message': 'PKI data reset successfully',
             'stats': stats
         }), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================================
+# Database Management Endpoints
+# ============================================================================
+
+@system_bp.route('/database/stats', methods=['GET'])
+@jwt_required()
+@admin_required
+def get_database_stats():
+    """
+    Get comprehensive database statistics
+    ---
+    GET /api/v1/system/database/stats
+    
+    Returns:
+    - Database size, page count, fragmentation
+    - Table statistics
+    - Last maintenance timestamps
+    - Health metrics
+    """
+    try:
+        db_service = DatabaseManagementService()
+        stats = db_service.get_database_stats()
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@system_bp.route('/database/health', methods=['GET'])
+@jwt_required()
+@admin_required
+def get_database_health():
+    """
+    Get database health status with recommendations
+    ---
+    GET /api/v1/system/database/health
+    """
+    try:
+        db_service = DatabaseManagementService()
+        health = db_service.get_health_status()
+        
+        return jsonify({
+            'success': True,
+            'health': health
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@system_bp.route('/database/optimize', methods=['POST'])
+@jwt_required()
+@admin_required
+def optimize_database():
+    """
+    Run database optimization (VACUUM + ANALYZE)
+    ---
+    POST /api/v1/system/database/optimize
+    
+    This will:
+    - VACUUM: Reclaim unused space and defragment
+    - ANALYZE: Update query planner statistics
+    """
+    try:
+        admin = User.query.filter_by(username=get_jwt_identity()).first()
+        
+        db_service = DatabaseManagementService()
+        result = db_service.optimize_database()
+        
+        if result['success']:
+            # Log audit
+            log_audit('database_optimize', admin.username,
+                     details=f"Space saved: {result['vacuum'].get('space_saved_formatted', 'N/A')}")
+        
+        return jsonify(result), 200 if result['success'] else 500
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@system_bp.route('/database/integrity-check', methods=['POST'])
+@jwt_required()
+@admin_required
+def check_database_integrity():
+    """
+    Run database integrity check
+    ---
+    POST /api/v1/system/database/integrity-check
+    """
+    try:
+        admin = User.query.filter_by(username=get_jwt_identity()).first()
+        
+        db_service = DatabaseManagementService()
+        result = db_service.check_integrity()
+        
+        # Log audit
+        log_audit('database_integrity_check', admin.username,
+                 details=f"Status: {result.get('status', 'unknown')}")
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@system_bp.route('/database/clean-expired', methods=['POST'])
+@jwt_required()
+@admin_required
+def clean_expired_certificates():
+    """
+    Clean expired certificates
+    ---
+    POST /api/v1/system/database/clean-expired
+    
+    Body (optional):
+    {
+        "days_after_expiry": 30
+    }
+    """
+    try:
+        admin = User.query.filter_by(username=get_jwt_identity()).first()
+        
+        data = request.get_json() or {}
+        days = data.get('days_after_expiry', 30)
+        
+        db_service = DatabaseManagementService()
+        result = db_service.clean_expired_certificates(days_after_expiry=days)
+        
+        if result['success']:
+            # Log audit
+            log_audit('database_clean_expired', admin.username,
+                     details=f"Deleted {result['deleted_count']} expired certificates")
+        
+        return jsonify(result), 200 if result['success'] else 500
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@system_bp.route('/database/export', methods=['POST'])
+@jwt_required()
+@admin_required
+def export_database():
+    """
+    Export database as SQL dump
+    ---
+    POST /api/v1/system/database/export
+    
+    Body (optional):
+    {
+        "compress": true
+    }
+    
+    Returns download link
+    """
+    try:
+        admin = User.query.filter_by(username=get_jwt_identity()).first()
+        
+        data = request.get_json() or {}
+        compress = data.get('compress', True)
+        
+        db_service = DatabaseManagementService()
+        result = db_service.export_sql_dump(compress=compress)
+        
+        if result['success']:
+            # Log audit
+            log_audit('database_export', admin.username,
+                     details=f"Exported to {result['file_path']}")
+            
+            # Return file for download
+            return send_file(
+                result['file_path'],
+                as_attachment=True,
+                download_name=os.path.basename(result['file_path'])
+            )
+        else:
+            return jsonify(result), 500
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

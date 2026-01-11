@@ -279,6 +279,69 @@
         }
       ]
     },
+    "info": {
+      "viewBox": "0 0 24 24",
+      "stroke": true,
+      "paths": [
+        {
+          "d": "M12 2a10 10 0 100 20 10 10 0 000-20z",
+          "gradient": "info",
+          "fill": "none",
+          "stroke-width": "1.5"
+        },
+        {
+          "d": "M12 16v-4m0-4h.01",
+          "gradient": "info",
+          "fill": "none",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      ]
+    },
+    "database": {
+      "viewBox": "0 0 24 24",
+      "stroke": true,
+      "paths": [
+        {
+          "d": "M12 2C6.5 2 2 3.79 2 6v12c0 2.21 4.5 4 10 4s10-1.79 10-4V6c0-2.21-4.5-4-10-4z",
+          "gradient": "primary",
+          "fill": "none",
+          "stroke-width": "1.5"
+        },
+        {
+          "d": "M2 12c0 2.21 4.5 4 10 4s10-1.79 10-4",
+          "gradient": "accent",
+          "fill": "none",
+          "stroke-width": "1.5"
+        },
+        {
+          "d": "M2 6c0 2.21 4.5 4 10 4s10-1.79 10-4",
+          "gradient": "accent",
+          "fill": "none",
+          "stroke-width": "1.5"
+        }
+      ]
+    },
+    "shield": {
+      "viewBox": "0 0 24 24",
+      "stroke": true,
+      "paths": [
+        {
+          "d": "M12 2.5L3.5 6v5.5c0 5.25 3.63 10.16 8.5 11.35 4.87-1.19 8.5-6.1 8.5-11.35V6l-8.5-3.5z",
+          "gradient": "primary",
+          "fill": "none",
+          "stroke-width": "1.5"
+        },
+        {
+          "d": "M9 12l2 2 4-4",
+          "gradient": "accent",
+          "fill": "none",
+          "stroke-width": "1.5",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      ]
+    },
     "chevron-down": {
       "viewBox": "0 0 24 24",
       "stroke": true,

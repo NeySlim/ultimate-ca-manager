@@ -79,48 +79,48 @@
             <!-- Theme Selector Dropdown -->
             <div class="dropdown" x-data="{ open: false }">
                 <button @click="open = !open" class="btn-secondary">
-                    <i class="fas fa-palette"></i>
+                    <svg class="ucm-icon" width="18" height="18"><use href="#icon-palette"/></svg>
                     <span>Theme</span>
-                    <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+                    <svg class="ucm-icon" width="12" height="12"><use href="#icon-chevron-down"/></svg>
                 </button>
                 
                 <div x-show="open" @click.away="open = false" x-cloak class="dropdown-menu">
                     <div class="dropdown-header">Sentinel</div>
                     <a href="#" data-action="set-theme" data-theme="sentinel-light" class="dropdown-item" style="display: flex; align-items: center;">
-                        <i class="fas fa-sun"></i> Light
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
                     </a>
                     <a href="#" data-action="set-theme" data-theme="sentinel-dark" class="dropdown-item" style="display: flex; align-items: center;">
-                        <i class="fas fa-moon"></i> Dark
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
                     </a>
                     
                     <div class="dropdown-divider"></div>
                     
                     <div class="dropdown-header">Amber</div>
                     <a href="#" data-action="set-theme" data-theme="amber-light" class="dropdown-item" style="display: flex; align-items: center;">
-                        <i class="fas fa-sun"></i> Light
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
                     </a>
                     <a href="#" data-action="set-theme" data-theme="amber-dark" class="dropdown-item" style="display: flex; align-items: center;">
-                        <i class="fas fa-moon"></i> Dark
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
                     </a>
                     
                     <div class="dropdown-divider"></div>
                     
                     <div class="dropdown-header">Blossom</div>
                     <a href="#" data-action="set-theme" data-theme="blossom-light" class="dropdown-item" style="display: flex; align-items: center;">
-                        <i class="fas fa-sun"></i> Light
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
                     </a>
                     <a href="#" data-action="set-theme" data-theme="blossom-dark" class="dropdown-item" style="display: flex; align-items: center;">
-                        <i class="fas fa-moon"></i> Dark
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
                     </a>
                     
                     <div class="dropdown-divider"></div>
                     
                     <div class="dropdown-header">Nebula</div>
                     <a href="#" data-action="set-theme" data-theme="nebula-light" class="dropdown-item" style="display: flex; align-items: center;">
-                        <i class="fas fa-sun"></i> Light
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-sun"/></svg> Light
                     </a>
                     <a href="#" data-action="set-theme" data-theme="nebula-dark" class="dropdown-item" style="display: flex; align-items: center;">
-                        <i class="fas fa-moon"></i> Dark
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-moon"/></svg> Dark
                     </a>
                 </div>
             </div>
@@ -135,9 +135,9 @@
             <!-- User Menu with Dropdown -->
             <div class="dropdown" x-data="{ open: false }">
                 <button @click="open = !open" class="btn-secondary">
-                    <i class="fas fa-user"></i>
+                    <svg class="ucm-icon" width="18" height="18"><use href="#icon-user"/></svg>
                     <span>{{ session.get('username', 'User') }}</span>
-                    <i class="fas fa-chevron-down" style="font-size: 10px;"></i>
+                    <svg class="ucm-icon" width="12" height="12"><use href="#icon-chevron-down"/></svg>
                 </button>
                 
                 <div x-show="open" @click.away="open = false" x-cloak class="dropdown-menu" style="right: 0; left: auto;">
@@ -180,11 +180,6 @@
                     </a>
                 </div>
             </div>
-            
-            <!-- Logout -->
-            <a href="/logout" class="btn-secondary" title="Logout">
-                <i class="fas fa-right-from-bracket"></i>
-            </a>
         </div>
     </nav>
     
@@ -193,13 +188,13 @@
         <div class="sidebar-nav">
             <a href="/dashboard" class="sidebar-link {% if request.path == '/dashboard' or request.path == '/sentinel-demo' %}active{% endif %}"
                hx-get="/dashboard" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <i class="fas fa-gauge-high"></i>
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-dashboard"/></svg>
                 <span>Dashboard</span>
             </a>
             
             <a href="/ca" class="sidebar-link {% if request.path.startswith('/ca') or request.path.startswith('/import-ca') %}active{% endif %}"
                hx-get="/ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <i class="fas fa-lock"></i>
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-certificate-authority"/></svg>
                 <span>Certificate Authorities</span>
             </a>
             <div class="sidebar-submenu">
@@ -219,7 +214,7 @@
             
             <a href="/certificates" class="sidebar-link {% if request.path.startswith('/certificates') or request.path.startswith('/import') %}active{% endif %}"
                hx-get="/certificates" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <i class="fas fa-certificate"></i>
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-certificate"/></svg>
                 <span>Certificates</span>
             </a>
             <div class="sidebar-submenu">
@@ -239,7 +234,7 @@
             
             <a href="/scep" class="sidebar-link {% if request.path.startswith('/scep') %}active{% endif %}"
                hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <i class="fas fa-server"></i>
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-scep"/></svg>
                 <span>SCEP</span>
             </a>
             <div class="sidebar-submenu">
@@ -257,19 +252,19 @@
             
             <a href="/crl" class="sidebar-link {% if request.path.startswith('/crl') %}active{% endif %}"
                hx-get="/crl" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <i class="fas fa-file-contract"></i>
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-crl"/></svg>
                 <span>CRL Management</span>
             </a>
             
             <a href="/ocsp" class="sidebar-link {% if request.path.startswith('/ocsp') %}active{% endif %}"
                hx-get="/ocsp" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <i class="fas fa-circle-check"></i>
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-ocsp"/></svg>
                 <span>OCSP Status</span>
             </a>
             
             <a href="/users" class="sidebar-link {% if request.path.startswith('/users') %}active{% endif %}"
                hx-get="/users" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <i class="fas fa-user-group"></i>
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-users"/></svg>
                 <span>Users</span>
             </a>
             
@@ -415,10 +410,10 @@
         
         // Set color based on type
         const colors = {
-            'success': 'background: #10b981; color: white;',
-            'error': 'background: #ef4444; color: white;',
-            'warning': 'background: #f59e0b; color: white;',
-            'info': 'background: #3b82f6; color: white;'
+            'success': 'background: var(--success-color); color: white;',
+            'error': 'background: var(--danger-color); color: white;',
+            'warning': 'background: var(--warning-color); color: white;',
+            'info': 'background: var(--info-color); color: white;'
         };
         toast.style.cssText += colors[type] || colors['info'];
         
@@ -442,13 +437,13 @@
         toast.appendChild(messageEl);
         toastContainer.appendChild(toast);
         
-        // Auto remove after 4 seconds
+        // Auto remove after 6 seconds
         setTimeout(() => {
             toast.style.animation = 'slideOut 0.3s ease';
             setTimeout(() => {
                 toast.remove();
             }, 300);
-        }, 4000);
+        }, 6000);
     }
     
     // Add CSS animation
@@ -551,7 +546,7 @@
         <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
             <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
                 <h3 style="font-size: 1.25rem; font-weight: bold; color: var(--text-primary);">
-                    <i class="fas fa-lock" style="margin-right: 0.5rem;"></i> PKCS#12 Password
+                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-lock"/></svg> PKCS#12 Password
                 </h3>
             </div>
             <div style="padding: 1.5rem;">
@@ -582,6 +577,9 @@
         </div>
         </div>
     </div>
+    
+    <!-- UCM Loading Manager -->
+    <script src="{{ url_for('static', filename='js/loading-manager.js') }}"></script>
     
     {% block extra_body %}{% endblock %}
 </body>
