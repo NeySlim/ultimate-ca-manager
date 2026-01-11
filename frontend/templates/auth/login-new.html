@@ -650,40 +650,7 @@
                             <span id="current-theme-name">Sentinel Dark</span>
                             <svg class="ucm-icon" width="12" height="12"><use href="#icon-chevron-down"/></svg>
                         </button>
-                        <div id="theme-dropdown" class="theme-dropdown-menu" style="display: none;">
-                            <button type="button" data-theme="sentinel-light">
-                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);"></span>
-                                Sentinel Light
-                            </button>
-                            <button type="button" data-theme="sentinel-dark">
-                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #1e40af, #1e3a8a);"></span>
-                                Sentinel Dark
-                            </button>
-                            <button type="button" data-theme="amber-light">
-                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #fb923c, #f97316);"></span>
-                                Amber Light
-                            </button>
-                            <button type="button" data-theme="amber-dark">
-                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #c2410c, #9a3412);"></span>
-                                Amber Dark
-                            </button>
-                            <button type="button" data-theme="blossom-light">
-                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #f472b6, #ec4899);"></span>
-                                Blossom Light
-                            </button>
-                            <button type="button" data-theme="blossom-dark">
-                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #be185d, #9f1239);"></span>
-                                Blossom Dark
-                            </button>
-                            <button type="button" data-theme="nebula-light">
-                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #a78bfa, #8b5cf6);"></span>
-                                Nebula Light
-                            </button>
-                            <button type="button" data-theme="nebula-dark">
-                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #6d28d9, #5b21b6);"></span>
-                                Nebula Dark
-                            </button>
-                        </div>
+                        <div id="theme-dropdown" class="theme-dropdown-menu" style="display: none;"></div>
                     </div>
                 </div>
             </div>
@@ -718,29 +685,46 @@
                 document.getElementById('stat-users').textContent = '—';
             });
         
-        // Theme labels
-        const themeLabels = {
-            'sentinel-light': 'Sentinel Light',
-            'sentinel-dark': 'Sentinel Dark',
-            'amber-light': 'Amber Light',
-            'amber-dark': 'Amber Dark',
-            'blossom-light': 'Blossom Light',
-            'blossom-dark': 'Blossom Dark',
-            'nebula-light': 'Nebula Light',
-            'nebula-dark': 'Nebula Dark'
+        // Theme colors and labels
+        const themeConfig = {
+            'sentinel-light': { label: 'Sentinel Light', colors: ['#60a5fa', '#3b82f6'] },
+            'sentinel-dark': { label: 'Sentinel Dark', colors: ['#3b82f6', '#1e40af'] },
+            'amber-light': { label: 'Amber Light', colors: ['#fbbf24', '#f59e0b'] },
+            'amber-dark': { label: 'Amber Dark', colors: ['#ff9f43', '#ea580c'] },
+            'blossom-light': { label: 'Blossom Light', colors: ['#f9a8d4', '#d88c92'] },
+            'blossom-dark': { label: 'Blossom Dark', colors: ['#d88c92', '#be185d'] },
+            'nebula-light': { label: 'Nebula Light', colors: ['#a78bfa', '#8b5cf6'] },
+            'nebula-dark': { label: 'Nebula Dark', colors: ['#a78bfa', '#6d28d9'] }
         };
         
         // Update dropdown label
         function updateThemeLabel() {
             const currentTheme = localStorage.getItem('ucm-theme') || 'sentinel-dark';
             const labelElement = document.getElementById('current-theme-name');
-            if (labelElement) {
-                labelElement.textContent = themeLabels[currentTheme];
+            if (labelElement && themeConfig[currentTheme]) {
+                labelElement.textContent = themeConfig[currentTheme].label;
             }
         }
         
         // Init label on load
         updateThemeLabel();
+        
+        // Generate theme dropdown dynamically
+        const dropdown = document.getElementById('theme-dropdown');
+        Object.keys(themeConfig).forEach(themeName => {
+            const config = themeConfig[themeName];
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('data-theme', themeName);
+            
+            const preview = document.createElement('span');
+            preview.className = 'theme-color-preview';
+            preview.style.background = `linear-gradient(135deg, ${config.colors[0]}, ${config.colors[1]})`;
+            
+            btn.appendChild(preview);
+            btn.appendChild(document.createTextNode(config.label));
+            dropdown.appendChild(btn);
+        });
         
         // Toggle dropdown
         document.addEventListener('click', (e) => {
