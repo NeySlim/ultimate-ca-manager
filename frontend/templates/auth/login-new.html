@@ -440,6 +440,49 @@
             border-color: var(--primary-color);
         }
         
+        .theme-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 0.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            padding: 0.5rem;
+            z-index: 1000;
+            min-width: max-content;
+        }
+        
+        .theme-dropdown-menu button {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            text-align: left;
+            background: none;
+            border: none;
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            white-space: nowrap;
+        }
+        
+        .theme-dropdown-menu button:hover {
+            background: var(--bg-hover);
+        }
+        
+        .theme-color-preview {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            border: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        
         /* Responsive */
         @media (max-width: 1024px) {
             .login-sidebar {
@@ -601,11 +644,47 @@
             <div class="login-footer">
                 <div class="theme-selector">
                     <span>Theme:</span>
-                    <button type="button" class="theme-toggle" onclick="toggleThemeDropdown()">
-                        <svg class="ucm-icon" width="14" height="14"><use href="#icon-palette"/></svg>
-                        <span id="current-theme-name">Sentinel Dark</span>
-                        <svg class="ucm-icon" width="12" height="12"><use href="#icon-chevron-down"/></svg>
-                    </button>
+                    <div style="position: relative;">
+                        <button type="button" class="theme-toggle" id="theme-dropdown-toggle">
+                            <svg class="ucm-icon" width="14" height="14"><use href="#icon-palette"/></svg>
+                            <span id="current-theme-name">Sentinel Dark</span>
+                            <svg class="ucm-icon" width="12" height="12"><use href="#icon-chevron-down"/></svg>
+                        </button>
+                        <div id="theme-dropdown" class="theme-dropdown-menu" style="display: none;">
+                            <button type="button" data-theme="sentinel-light">
+                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #3b82f6, #2563eb);"></span>
+                                Sentinel Light
+                            </button>
+                            <button type="button" data-theme="sentinel-dark">
+                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #3b82f6, #2563eb);"></span>
+                                Sentinel Dark
+                            </button>
+                            <button type="button" data-theme="amber-light">
+                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #f97316, #ea580c);"></span>
+                                Amber Light
+                            </button>
+                            <button type="button" data-theme="amber-dark">
+                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #f97316, #ea580c);"></span>
+                                Amber Dark
+                            </button>
+                            <button type="button" data-theme="blossom-light">
+                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #ec4899, #db2777);"></span>
+                                Blossom Light
+                            </button>
+                            <button type="button" data-theme="blossom-dark">
+                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #ec4899, #db2777);"></span>
+                                Blossom Dark
+                            </button>
+                            <button type="button" data-theme="nebula-light">
+                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></span>
+                                Nebula Light
+                            </button>
+                            <button type="button" data-theme="nebula-dark">
+                                <span class="theme-color-preview" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></span>
+                                Nebula Dark
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -639,30 +718,50 @@
                 document.getElementById('stat-users').textContent = '—';
             });
         
-        // Theme selector - simple inline implementation
-        function toggleThemeDropdown() {
-            const themes = [
-                {name: 'sentinel-light', label: 'Sentinel Light'},
-                {name: 'sentinel-dark', label: 'Sentinel Dark'},
-                {name: 'amber-light', label: 'Amber Light'},
-                {name: 'amber-dark', label: 'Amber Dark'},
-                {name: 'blossom-light', label: 'Blossom Light'},
-                {name: 'blossom-dark', label: 'Blossom Dark'},
-                {name: 'nebula-light', label: 'Nebula Light'},
-                {name: 'nebula-dark', label: 'Nebula Dark'}
-            ];
-            
-            const current = localStorage.getItem('ucm-theme') || 'sentinel-dark';
-            const currentIndex = themes.findIndex(t => t.name === current);
-            const nextIndex = (currentIndex + 1) % themes.length;
-            const nextTheme = themes[nextIndex];
-            
-            // Set theme
-            localStorage.setItem('ucm-theme', nextTheme.name);
-            document.documentElement.setAttribute('data-theme', nextTheme.name);
-            document.getElementById('theme-css').href = '/static/css/themes/' + nextTheme.name + '.css';
-            document.getElementById('current-theme-name').textContent = nextTheme.label;
+        // Theme dropdown
+        const themeLabels = {
+            'sentinel-light': 'Sentinel Light',
+            'sentinel-dark': 'Sentinel Dark',
+            'amber-light': 'Amber Light',
+            'amber-dark': 'Amber Dark',
+            'blossom-light': 'Blossom Light',
+            'blossom-dark': 'Blossom Dark',
+            'nebula-light': 'Nebula Light',
+            'nebula-dark': 'Nebula Dark'
+        };
+        
+        function setTheme(themeName) {
+            localStorage.setItem('ucm-theme', themeName);
+            document.documentElement.setAttribute('data-theme', themeName);
+            document.getElementById('theme-css').href = '/static/css/themes/' + themeName + '.css';
+            document.getElementById('current-theme-name').textContent = themeLabels[themeName];
         }
+        
+        // Toggle dropdown
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('theme-dropdown');
+            
+            if (e.target.closest('#theme-dropdown-toggle')) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+                return;
+            }
+            
+            const themeBtn = e.target.closest('[data-theme]');
+            if (themeBtn && dropdown.contains(themeBtn)) {
+                e.preventDefault();
+                e.stopPropagation();
+                const themeName = themeBtn.getAttribute('data-theme');
+                if (themeName) {
+                    setTheme(themeName);
+                    dropdown.style.display = 'none';
+                }
+                return;
+            }
+            
+            dropdown.style.display = 'none';
+        });
     </script>
     
     <!-- Theme Switcher -->
@@ -964,27 +1063,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('username').focus();
             
-            // Update theme name display
+            // Update theme name display on load
             const currentTheme = localStorage.getItem('ucm-theme') || 'sentinel-dark';
-            const themeLabels = {
-                'sentinel-light': 'Sentinel Light',
-                'sentinel-dark': 'Sentinel Dark',
-                'amber-light': 'Amber Light',
-                'amber-dark': 'Amber Dark',
-                'blossom-light': 'Blossom Light',
-                'blossom-dark': 'Blossom Dark',
-                'nebula-light': 'Nebula Light',
-                'nebula-dark': 'Nebula Dark'
-            };
-            document.getElementById('current-theme-name').textContent = themeLabels[currentTheme] || 'Sentinel Dark';
-        });
-    </script>
-    
-    <style>
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
 </body>
 </html>
