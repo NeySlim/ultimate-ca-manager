@@ -440,49 +440,6 @@
             border-color: var(--primary-color);
         }
         
-        .theme-dropdown-menu {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            margin-top: 0.5rem;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-            padding: 0.5rem;
-            z-index: 1000;
-            min-width: max-content;
-        }
-        
-        .theme-dropdown-menu button {
-            width: 100%;
-            padding: 0.625rem 0.875rem;
-            text-align: left;
-            background: none;
-            border: none;
-            border-radius: 6px;
-            color: var(--text-primary);
-            font-size: 0.875rem;
-            cursor: pointer;
-            transition: background 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 0.625rem;
-            white-space: nowrap;
-        }
-        
-        .theme-dropdown-menu button:hover {
-            background: var(--bg-hover);
-        }
-        
-        .theme-color-preview {
-            width: 16px;
-            height: 16px;
-            border-radius: 3px;
-            border: 1px solid var(--border-color);
-            flex-shrink: 0;
-        }
-        
         /* Responsive */
         @media (max-width: 1024px) {
             .login-sidebar {
@@ -1053,7 +1010,27 @@
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('username').focus();
             
-            // Update theme name display on load
+            // Update theme name display
             const currentTheme = localStorage.getItem('ucm-theme') || 'sentinel-dark';
+            const themeLabels = {
+                'sentinel-light': 'Sentinel Light',
+                'sentinel-dark': 'Sentinel Dark',
+                'amber-light': 'Amber Light',
+                'amber-dark': 'Amber Dark',
+                'blossom-light': 'Blossom Light',
+                'blossom-dark': 'Blossom Dark',
+                'nebula-light': 'Nebula Light',
+                'nebula-dark': 'Nebula Dark'
+            };
+            document.getElementById('current-theme-name').textContent = themeLabels[currentTheme] || 'Sentinel Dark';
+        });
+    </script>
+    
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </body>
 </html>
