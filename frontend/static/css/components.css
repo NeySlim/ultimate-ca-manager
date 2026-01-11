@@ -56,6 +56,12 @@ button, a, input, select, textarea, .card, .modal {
     -webkit-text-fill-color: transparent;
 }
 
+/* Thinner strokes for palette icon */
+svg.ucm-icon use[href="#icon-palette"] ~ path,
+svg.ucm-icon:has(use[href="#icon-palette"]) path {
+    stroke-width: 1;
+}
+
 /* ===========================
    NAVBAR
    =========================== */
