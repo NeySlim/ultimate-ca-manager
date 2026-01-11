@@ -48,6 +48,14 @@ button, a, input, select, textarea, .card, .modal {
     }
 }
 
+/* Theme palette icon with gradient */
+[href="#icon-palette"] {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
 /* ===========================
    NAVBAR
    =========================== */
