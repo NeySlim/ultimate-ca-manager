@@ -23,6 +23,32 @@ background: var(--bg-hover) !important;
  */
 
 /* ===========================
+   GLOBAL SMOOTH ANIMATIONS
+   =========================== */
+
+* {
+    transition: background-color 0.2s ease, 
+                border-color 0.2s ease, 
+                color 0.2s ease,
+                opacity 0.2s ease,
+                transform 0.2s ease;
+}
+
+/* Smoother transitions for interactive elements */
+button, a, input, select, textarea, .card, .modal {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ===========================
    NAVBAR
    =========================== */
 
