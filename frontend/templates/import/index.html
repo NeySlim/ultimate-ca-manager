@@ -5,38 +5,43 @@
 {% block content %}
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <!-- Page Header -->
-    <div class="page-header" style="margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
-            <h1 style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin: 0;">
-                <i class="fas fa-file-import" style="margin-right: 8px;"></i>Import Certificates
+            <h1 style="font-size: 1.875rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="24" height="24"><use href="#icon-file-import"/></svg>
+                <span>Import Certificates</span>
             </h1>
-            <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0 0;">Import certificates from various sources</p>
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin: 4px 0 0 0;">Import certificates from various sources</p>
         </div>
     </div>
     
     <!-- Manual Import Section -->
     <div class="card">
         <div class="card-header">
-            <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">
-                <i class="fas fa-upload" style="margin-right: 8px;"></i>Manual Certificate Import
+            <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="18" height="18"><use href="#icon-upload"/></svg>
+                <span>Manual Certificate Import</span>
             </h2>
         </div>
         <div class="card-body">
-            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
                 Import a certificate and its private key by uploading files or pasting PEM content.
             </p>
             
             <form id="manual-import-form" style="display: grid; gap: 20px;">
                 <!-- Import Method Tabs -->
-                <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--border-color);">
-                    <button type="button" class="tab-button active" onclick="switchImportMethod('paste')" style="padding: 8px 16px; border: none; background: none; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;">
-                        <i class="fas fa-paste"></i> Paste Content
+                <div class="tabs-container">
+                    <button type="button" class="tab-button active" onclick="switchImportMethod('paste')">
+                        <svg class="ucm-icon" width="20" height="20"><use href="#icon-file-import"/></svg>
+                        <span>Paste Content</span>
                     </button>
-                    <button type="button" class="tab-button" onclick="switchImportMethod('upload')" style="padding: 8px 16px; border: none; background: none; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;">
-                        <i class="fas fa-upload"></i> Upload Files
+                    <button type="button" class="tab-button" onclick="switchImportMethod('upload')">
+                        <svg class="ucm-icon" width="20" height="20"><use href="#icon-upload"/></svg>
+                        <span>Upload Files</span>
                     </button>
-                    <button type="button" class="tab-button" onclick="switchImportMethod('container')" style="padding: 8px 16px; border: none; background: none; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;">
-                        <i class="fas fa-box"></i> Container File
+                    <button type="button" class="tab-button" onclick="switchImportMethod('container')">
+                        <svg class="ucm-icon" width="20" height="20"><use href="#icon-archive"/></svg>
+                        <span>Container File</span>
                     </button>
                 </div>
                 
@@ -117,10 +122,10 @@
                 
                 <div style="display: flex; gap: 12px;">
                     <button type="button" onclick="importManualCertificate()" class="btn-primary">
-                        <i class="fas fa-check"></i> Import Certificate
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-check-circle"/></svg> Import Certificate
                     </button>
                     <button type="button" onclick="clearManualForm()" class="btn-secondary">
-                        <i class="fas fa-times"></i> Clear
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-x-circle"/></svg> Clear
                     </button>
                 </div>
                 
@@ -132,8 +137,9 @@
     <!-- OPNsense Import Section -->
     <div class="card">
         <div class="card-header">
-            <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">
-                <i class="fas fa-server" style="margin-right: 8px;"></i>OPNsense Import
+            <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="18" height="18"><use href="#icon-database"/></svg>
+                <span>OPNsense Import</span>
             </h2>
         </div>
         <div class="card-body"
@@ -147,8 +153,9 @@
     <!-- Last OPNsense Import History -->
     <div class="card">
         <div class="card-header">
-            <h2 style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0;">
-                <i class="fas fa-history" style="margin-right: 8px;"></i>Last OPNsense Import History
+            <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="18" height="18"><use href="#icon-clock"/></svg>
+                <span>Last OPNsense Import History</span>
             </h2>
         </div>
         <div hx-get="/api/ui/import/history"

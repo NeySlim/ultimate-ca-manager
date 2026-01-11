@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Ultimate CA Manager</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    
+    <!-- CRITICAL: Set theme attribute IMMEDIATELY before any CSS loads -->
+    <script>
+        (function() {
+            var theme = localStorage.getItem('ucm-theme') || 'sentinel-dark';
+            document.documentElement.setAttribute('data-theme', theme);
+            document.write('<link id="theme-css" rel="stylesheet" href="/static/css/themes/' + theme + '.css">');
+        })();
+    </script>
+    
+    <!-- Components CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Subtle grid background - classy, not "hacker" */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(var(--border-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
+            background-size: 50px 50px;
+            opacity: 0.15;
+            pointer-events: none;
+        }
+        
+        /* Gradient overlay - subtle, elegant */
+        body::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at top right, var(--primary-color)15, transparent 50%),
+                        radial-gradient(circle at bottom left, var(--primary-color)10, transparent 50%);
+            pointer-events: none;
+        }
+        
+        /* Left sidebar - stats & info */
+        .login-sidebar {
+            flex: 0 0 380px;
+            padding: 3rem 2.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2.5rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .sidebar-logo {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px var(--primary-color)30;
+        }
+        
+        .sidebar-title {
+            flex: 1;
+        }
+        
+        .sidebar-title h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+        
+        .sidebar-title p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        /* Stats grid - professional & informative */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+        
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.25rem;
+            transition: all 0.2s ease;
+        }
+        
+        .stat-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 4px 12px var(--primary-color)10;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .stat-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--primary-color);
+        }
+        
+        /* System status - subtle, professional */
+        .system-status {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+        
+        .status-header {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success-color);
+            box-shadow: 0 0 8px var(--success-color);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .status-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8125rem;
+        }
+        
+        .status-item-label {
+            color: var(--text-secondary);
+        }
+        
+        .status-item-value {
+            color: var(--text-primary);
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+        }
+        
+        /* Main content - centered login form */
+        .login-main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+        }
+        
+        .login-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2.5rem;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .login-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .login-header p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        /* Session expired alert */
+        .alert-warning {
+            background: var(--bg-warning, #fef3c7);
+            border: 1px solid var(--warning-color, #f59e0b);
+            border-left: 4px solid var(--warning-color, #f59e0b);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: start;
+            gap: 0.75rem;
+        }
+        
+        .alert-icon {
+            width: 20px;
+            height: 20px;
+            color: var(--warning-color, #f59e0b);
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        
+        .alert-content {
+            flex: 1;
+        }
+        
+        .alert-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .alert-message {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+        
+        /* Form styles */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-size: 0.9375rem;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px var(--primary-color)15;
+        }
+        
+        .form-input::placeholder {
+            color: var(--text-tertiary);
+        }
+        
+        .btn-login {
+            width: 100%;
+            padding: 0.875rem 1.5rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            color: white;
+            background: var(--primary-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-login:hover:not(:disabled) {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px var(--primary-color)40;
+        }
+        
+        .btn-login:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        
+        .btn-login:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        /* User badge after username entry */
+        .user-badge {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        
+        .user-info {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9375rem;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        
+        .btn-change {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            font-size: 0.8125rem;
+            cursor: pointer;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            transition: opacity 0.2s;
+        }
+        
+        .btn-change:hover {
+            opacity: 0.8;
+        }
+        
+        /* Footer */
+        .login-footer {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+        }
+        
+        .theme-selector {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+        
+        .theme-toggle {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .theme-toggle:hover {
+            border-color: var(--primary-color);
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .login-sidebar {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 640px) {
+            .login-main {
+                padding: 1rem;
+            }
+            
+            .login-card {
+                padding: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Left Sidebar - Stats & Info -->
+    <div class="login-sidebar">
+        <!-- Header -->
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <svg class="ucm-icon" width="28" height="28" style="color: white;"><use href="#icon-shield-check"/></svg>
+            </div>
+            <div class="sidebar-title">
+                <h1>Ultimate CA Manager</h1>
+                <p>Certificate Authority Platform</p>
+            </div>
+        </div>
+        
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Certificate Authorities</div>
+                <div class="stat-value">
+                    <svg class="ucm-icon stat-icon" width="24" height="24"><use href="#icon-certificate-authority"/></svg>
+                    <span id="stat-ca">—</span>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Certificates</div>
+                <div class="stat-value">
+                    <svg class="ucm-icon stat-icon" width="24" height="24"><use href="#icon-certificate"/></svg>
+                    <span id="stat-certs">—</span>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">ACME Accounts</div>
+                <div class="stat-value">
+                    <svg class="ucm-icon stat-icon" width="24" height="24"><use href="#icon-acme"/></svg>
+                    <span id="stat-acme">—</span>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-label">Active Users</div>
+                <div class="stat-value">
+                    <svg class="ucm-icon stat-icon" width="24" height="24"><use href="#icon-users"/></svg>
+                    <span id="stat-users">—</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Status -->
+        <div class="system-status">
+            <div class="status-header">
+                <span class="status-indicator"></span>
+                System Status
+            </div>
+            <div class="status-list">
+                <div class="status-item">
+                    <span class="status-item-label">Platform</span>
+                    <span class="status-item-value">Operational</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-item-label">Database</span>
+                    <span class="status-item-value">Healthy</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-item-label">ACME Service</span>
+                    <span class="status-item-value">Active</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-item-label">Last Backup</span>
+                    <span class="status-item-value" id="last-backup">—</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Security Info -->
+        <div style="margin-top: auto; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--text-tertiary);">
+                <svg class="ucm-icon" width="14" height="14"><use href="#icon-shield-check"/></svg>
+                <span>Encrypted HTTPS connection</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content - Login Form -->
+    <div class="login-main">
+        <div class="login-container">
+            <div class="login-card">
+                <!-- Header -->
+                <div class="login-header">
+                    <h2>Sign In</h2>
+                    <p>Access your certificate authority dashboard</p>
+                </div>
+                
+                <!-- Session Expired Alert -->
+                {% if request.args.get('expired') == '1' %}
+                <div class="alert-warning">
+                    <svg class="ucm-icon alert-icon" width="20" height="20"><use href="#icon-warning-triangle"/></svg>
+                    <div class="alert-content">
+                        <div class="alert-title">Session Expired</div>
+                        <div class="alert-message">Your session has expired. Please sign in again.</div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Step 1: Username Entry -->
+                <div id="step-username">
+                    <div class="form-group">
+                        <label class="form-label" for="username">Username</label>
+                        <input class="form-input" id="username" type="text" required placeholder="Enter your username" autofocus autocomplete="username">
+                    </div>
+                    
+                    <button type="button" data-action="check-auth-methods" class="btn-login">
+                        <span>Continue</span>
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg>
+                    </button>
+                </div>
+                
+                <!-- Step 2: Authentication Methods -->
+                <div id="step-auth-methods" style="display: none;">
+                    <div class="user-badge">
+                        <div class="user-avatar">
+                            <span id="user-avatar-initial"></span>
+                        </div>
+                        <div class="user-info">
+                            <span class="user-name" id="display-username"></span>
+                            <button type="button" data-action="reset-login" class="btn-change">
+                                <svg class="ucm-icon" width="12" height="12"><use href="#icon-refresh-cw"/></svg>
+                                Change account
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="auth-methods-container"></div>
+                    
+                    <div id="auth-status" style="margin-top: 1rem; text-align: center; font-size: 0.8125rem; display: none;"></div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="login-footer">
+                <div class="theme-selector">
+                    <span>Theme:</span>
+                    <button type="button" class="theme-toggle" onclick="toggleThemeDropdown()">
+                        <svg class="ucm-icon" width="14" height="14"><use href="#icon-palette"/></svg>
+                        <span id="current-theme-name">Sentinel Dark</span>
+                        <svg class="ucm-icon" width="12" height="12"><use href="#icon-chevron-down"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Icon System -->
+    <script src="{{ url_for('static', filename='js/icon-system.js') }}"></script>
+    
+    <!-- Load Stats -->
+    <script>
+        // Load stats from API (non-blocking)
+        fetch('/api/v1/stats/public')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('stat-ca').textContent = data.ca_count || 0;
+                document.getElementById('stat-certs').textContent = data.cert_count || 0;
+                document.getElementById('stat-acme').textContent = data.acme_count || 0;
+                document.getElementById('stat-users').textContent = data.user_count || 0;
+                
+                if (data.last_backup) {
+                    const date = new Date(data.last_backup);
+                    const hours = Math.floor((Date.now() - date.getTime()) / 3600000);
+                    document.getElementById('last-backup').textContent = hours < 24 ? hours + 'h ago' : date.toLocaleDateString();
+                }
+            })
+            .catch(() => {
+                // Silent fail - show placeholder
+                document.getElementById('stat-ca').textContent = '—';
+                document.getElementById('stat-certs').textContent = '—';
+                document.getElementById('stat-acme').textContent = '—';
+                document.getElementById('stat-users').textContent = '—';
+            });
+        
+        // Theme selector placeholder
+        function toggleThemeDropdown() {
+            alert('Theme selector - implement dropdown with 8 themes');
+        }
+    </script>
+    
+    <!-- Authentication Logic (keep existing from login.html) -->
+    <script>
+        // TODO: Copy authentication logic from existing login.html
+        // Lines ~450-840 with checkAuthMethods(), handlePasswordAuth(), etc.
+    </script>
+</body>
+</html>

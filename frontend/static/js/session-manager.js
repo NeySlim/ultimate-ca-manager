@@ -336,10 +336,8 @@ class SessionManager {
                 <div style="background: var(--card-bg); border-radius: 12px; padding: 32px; max-width: 500px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
                     <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
                         <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); display: flex; align-items: center; justify-content: center;">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--status-danger)" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <polyline points="12 6 12 12"/>
-                                <line x1="12" y1="16" x2="12.01" y2="16"/>
+                            <svg class="ucm-icon" width="24" height="24" style="color: var(--status-danger);">
+                                <use href="#icon-warning-triangle"/>
                             </svg>
                         </div>
                         <div>

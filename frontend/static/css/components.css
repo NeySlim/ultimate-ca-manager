@@ -524,10 +524,7 @@ a.btn-primary .ucm-icon path {
 .btn-secondary i.fas,
 .btn-secondary i.far,
 .btn-secondary i.fab,
-.btn-secondary svg,
-.btn-secondary svg path,
-.btn-secondary .ucm-icon,
-.btn-secondary .ucm-icon path {
+.btn-secondary svg {
     color: var(--text-primary) !important;
     opacity: 1 !important;
 }
@@ -766,9 +763,21 @@ textarea.form-control {
 }
 
 .alert-warning {
-    background: rgba(245, 158, 11, 0.1);
-    border-color: var(--status-warning);
-    color: var(--status-warning);
+    background: var(--warning-bg);
+    border-color: var(--warning-color);
+    color: var(--warning-text);
+}
+
+.alert-warning-border {
+    background: var(--warning-bg);
+    border-left: 4px solid var(--warning-color);
+    border-top: 1px solid var(--warning-color);
+    border-right: 1px solid var(--warning-color);
+    border-bottom: 1px solid var(--warning-color);
+    color: var(--warning-text);
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin-bottom: 12px;
 }
 
 .alert-danger {
@@ -1281,10 +1290,6 @@ i.fas.text-yellow-600,
     color: var(--warning-color) !important;
 }
 
-    color: var(--text-secondary);
-    border-color: var(--border-color);
-}
-
 /* ===== ACTION BUTTONS (icon only) ===== */
 /* Clean icon buttons for table actions */
 
@@ -1362,8 +1367,6 @@ i.fas.text-yellow-600,
 .badge-secondary {
     color: var(--text-secondary);
     border-color: var(--border-color);
-}
-
 }
 
 table td:last-child .btn-icon {
@@ -2218,4 +2221,156 @@ body.modal-open {
 
 #cert-table thead tr {
     border-bottom: 2px solid var(--border-color);
+}
+
+/* ===========================
+   TABS
+   =========================== */
+
+/* ============================================
+   TABS SYSTEM - Universal Design for All Tabs
+   ============================================ */
+
+/* Tab Container with Bottom Border */
+.settings-tabs,
+.tabs-container {
+    display: flex;
+    gap: 0;
+    margin-bottom: 2rem;
+    border-bottom: 3px solid var(--border-color);
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+/* Tab Buttons - Base Style */
+.settings-tab,
+.tab-button,
+.mtls-tab-button {
+    padding: 1.125rem 1.75rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.625rem;
+    position: relative;
+    user-select: none;
+    margin-bottom: -3px;
+}
+
+/* Hover State */
+.settings-tab:hover:not(.active),
+.tab-button:hover:not(.active),
+.mtls-tab-button:hover:not(.active) {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+    background: var(--bg-hover);
+}
+
+
+
+/* Active State */
+.settings-tab.active,
+.tab-button.active,
+.mtls-tab-button.active {
+    color: var(--primary-color);
+    font-weight: 600;
+    border-bottom-color: var(--primary-color);
+    background: transparent;
+}
+
+
+
+/* UCM Icons in tabs - let them manage their own gradients, only set size */
+.settings-tab svg.ucm-icon,
+.tab-button svg.ucm-icon,
+.mtls-tab-button svg.ucm-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    transition: all 0.25s ease;
+}
+
+/* Tab Content Panels */
+.tab-content,
+.mtls-tab-content {
+    display: none;
+}
+
+.tab-content.active,
+.mtls-tab-content.active {
+    display: block;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Mobile Responsive Tabs */
+@media (max-width: 768px) {
+    .settings-tabs,
+    .tabs-container {
+        gap: 0;
+    }
+    
+    .settings-tab,
+    .tab-button,
+    .mtls-tab-button {
+        padding: 0.75rem 1rem;
+        font-size: 0.75rem;
+    }
+    
+    .settings-tab svg,
+    .tab-button svg,
+    .mtls-tab-button svg {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .settings-tab span {
+        font-size: 0.75rem;
+    }
+}
+
+/* ===========================
+   SVG ICONS
+   =========================== */
+
+/* UCM Icon System - gradient icons use <svg class="ucm-icon"><use href="#icon-name"/> */
+/* Size is set inline or by parent containers */
+
+/* Spinner animation for loading icons */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+/* UCM icon size utilities (prefer inline width/height) */
+svg.icon-sm {
+    width: 14px;
+    height: 14px;
+}
+
+svg.icon-lg {
+    width: 24px;
+    height: 24px;
+}
+
+svg.icon-xl {
+    width: 32px;
+    height: 32px;
 }

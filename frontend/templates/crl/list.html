@@ -6,18 +6,19 @@
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1 style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary);">
-            <i class="fas fa-file-contract" style="margin-right: 0.5rem;"></i> CRL Management
+        <h1 style="font-size: 1.875rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+            <svg class="ucm-icon" width="24" height="24"><use href="#icon-crl"/></svg>
+            <span>CRL Management</span>
         </h1>
         <button onclick="refreshCRLs()" class="btn-secondary">
-            <i class="fas fa-refresh" style="margin-right: 0.5rem;"></i> Refresh
+            <svg class="ucm-icon" width="16" height="16"><use href="#icon-refresh-cw"/></svg> Refresh
         </button>
     </div>
     
     <!-- Info Banner -->
     <div style="background: var(--info-bg); border: 1px solid var(--info-border, var(--border-color)); border-radius: 0.5rem; padding: 1rem;">
         <div style="display: flex; align-items: flex-start;">
-            <i class="fas fa-info-circle" style="color: var(--info-color); margin-top: 0.25rem; margin-right: 0.75rem;"></i>
+            <svg class="ucm-icon" width="20" height="20" style="color: var(--info-color); margin-top: 0.25rem; margin-right: 0.75rem;"><use href="#icon-info"/></svg>
             <div>
                 <h3 style="font-weight: 600; color: var(--text-primary);">Certificate Revocation Lists (CRL)</h3>
                 <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">

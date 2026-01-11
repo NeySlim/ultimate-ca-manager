@@ -5,11 +5,12 @@
 {% block content %}
 <div style="display: flex; flex-direction: column; gap: 1.5rem;">
     <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1 style="font-size: 1.875rem; font-weight: bold; color: var(--text-primary);">
-            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-bell"/></svg> Notifications
+        <h1 style="font-size: 1.875rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+            <svg class="ucm-icon" width="24" height="24"><use href="#icon-bell"/></svg>
+            <span>Notifications</span>
         </h1>
         <button onclick="testNotifications()" class="btn btn-outline-primary">
-            <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-play"/></svg> Run Manual Check
+            <svg class="ucm-icon" width="16" height="16"><use href="#icon-play"/></svg> Run Manual Check
         </button>
     </div>
 
@@ -89,10 +90,10 @@
                 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
                     <button type="submit" class="btn-primary">
-                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-save"/></svg> Save SMTP Configuration
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save SMTP Configuration
                     </button>
                     <button type="button" onclick="testSMTP()" class="btn btn-outline-success">
-                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-envelope"/></svg> Send Test Email
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-envelope"/></svg> Send Test Email
                     </button>
                 </div>
             </form>
@@ -134,7 +135,7 @@
                 
                 <div style="display: flex; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
                     <button type="submit" class="btn-primary">
-                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-save"/></svg> Save My Settings
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save My Settings
                     </button>
                 </div>
             </form>
@@ -435,7 +436,7 @@ async function loadNotificationRules() {
                         
                         <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
                             <button onclick="updateRule('${config.type}')" class="btn btn-sm btn-primary">
-                                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-save"/></svg> Save Rule
+                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save Rule
                             </button>
                         </div>
                     </div>
