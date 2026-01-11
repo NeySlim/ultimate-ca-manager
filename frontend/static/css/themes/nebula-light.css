@@ -1,10 +1,10 @@
 /* Nebula Light Theme - Proxmox-inspired datacenter aesthetic */
 
 :root {
-    /* Primary Colors - Professional blue */
-    --primary-color: #2563eb;
-    --primary-hover: #1d4ed8;
-    --primary-light: rgba(37, 99, 235, 0.1);
+    /* Primary Colors - Purple/violet for cosmic nebula */
+    --primary-color: #8b5cf6;
+    --primary-hover: #7c3aed;
+    --primary-light: rgba(139, 92, 246, 0.1);
     
     /* Backgrounds - Light and clean */
     --body-bg: #f5f7fa;
@@ -30,8 +30,8 @@
     
     /* Sidebar */
     --sidebar-link-hover-bg: #f1f5f9;
-    --sidebar-link-active-bg: rgba(37, 99, 235, 0.1);
-    --sidebar-link-active-text: #2563eb;
+    --sidebar-link-active-bg: rgba(139, 92, 246, 0.1);
+    --sidebar-link-active-text: #8b5cf6;
     
     /* Buttons */
     --btn-secondary-bg: #f1f5f9;
