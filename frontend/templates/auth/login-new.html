@@ -718,7 +718,7 @@
                 document.getElementById('stat-users').textContent = '—';
             });
         
-        // Theme dropdown
+        // Theme labels
         const themeLabels = {
             'sentinel-light': 'Sentinel Light',
             'sentinel-dark': 'Sentinel Dark',
@@ -730,12 +730,17 @@
             'nebula-dark': 'Nebula Dark'
         };
         
-        function setTheme(themeName) {
-            localStorage.setItem('ucm-theme', themeName);
-            document.documentElement.setAttribute('data-theme', themeName);
-            document.getElementById('theme-css').href = '/static/css/themes/' + themeName + '.css';
-            document.getElementById('current-theme-name').textContent = themeLabels[themeName];
+        // Update dropdown label
+        function updateThemeLabel() {
+            const currentTheme = localStorage.getItem('ucm-theme') || 'sentinel-dark';
+            const labelElement = document.getElementById('current-theme-name');
+            if (labelElement) {
+                labelElement.textContent = themeLabels[currentTheme];
+            }
         }
+        
+        // Init label on load
+        updateThemeLabel();
         
         // Toggle dropdown
         document.addEventListener('click', (e) => {
@@ -754,7 +759,8 @@
                 e.stopPropagation();
                 const themeName = themeBtn.getAttribute('data-theme');
                 if (themeName) {
-                    setTheme(themeName);
+                    setTheme(themeName); // Uses theme-switcher.js function
+                    updateThemeLabel();
                     dropdown.style.display = 'none';
                 }
                 return;
