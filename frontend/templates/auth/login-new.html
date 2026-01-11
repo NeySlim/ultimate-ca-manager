@@ -1028,8 +1028,71 @@
     
     <style>
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { 
+                opacity: 0; 
+                transform: translateY(-10px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+        
+        /* Smooth page load animation */
+        .login-main {
+            animation: fadeInUp 0.5s ease-out;
+        }
+        
+        .login-sidebar {
+            animation: fadeInLeft 0.5s ease-out;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        /* Smooth step transitions */
+        #step-username, #step-auth-methods {
+            animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* Smooth dropdown */
+        .theme-dropdown-menu {
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            transform-origin: bottom;
+        }
+        
+        .theme-dropdown-menu[style*="display: block"] {
+            animation: dropdownSlide 0.2s ease-out;
+        }
+        
+        @keyframes dropdownSlide {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 </body>
