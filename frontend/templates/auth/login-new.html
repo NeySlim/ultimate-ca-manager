@@ -639,16 +639,352 @@
                 document.getElementById('stat-users').textContent = '—';
             });
         
-        // Theme selector placeholder
+        // Theme selector - simple inline implementation
         function toggleThemeDropdown() {
-            alert('Theme selector - implement dropdown with 8 themes');
+            const themes = [
+                {name: 'sentinel-light', label: 'Sentinel Light'},
+                {name: 'sentinel-dark', label: 'Sentinel Dark'},
+                {name: 'amber-light', label: 'Amber Light'},
+                {name: 'amber-dark', label: 'Amber Dark'},
+                {name: 'blossom-light', label: 'Blossom Light'},
+                {name: 'blossom-dark', label: 'Blossom Dark'},
+                {name: 'nebula-light', label: 'Nebula Light'},
+                {name: 'nebula-dark', label: 'Nebula Dark'}
+            ];
+            
+            const current = localStorage.getItem('ucm-theme') || 'sentinel-dark';
+            const currentIndex = themes.findIndex(t => t.name === current);
+            const nextIndex = (currentIndex + 1) % themes.length;
+            const nextTheme = themes[nextIndex];
+            
+            // Set theme
+            localStorage.setItem('ucm-theme', nextTheme.name);
+            document.documentElement.setAttribute('data-theme', nextTheme.name);
+            document.getElementById('theme-css').href = '/static/css/themes/' + nextTheme.name + '.css';
+            document.getElementById('current-theme-name').textContent = nextTheme.label;
         }
     </script>
     
-    <!-- Authentication Logic (keep existing from login.html) -->
+    <!-- Theme Switcher -->
+    <script src="{{ url_for('static', filename='js/theme-switcher.js') }}"></script>
+    
+    <!-- Authentication Logic -->
     <script>
-        // TODO: Copy authentication logic from existing login.html
-        // Lines ~450-840 with checkAuthMethods(), handlePasswordAuth(), etc.
+        let currentUsername = null;
+        let availableMethods = [];
+        
+        // Event delegation for auth actions
+        document.addEventListener('click', function(event) {
+            const target = event.target.closest('[data-action]');
+            if (!target) return;
+            
+            const action = target.dataset.action;
+            
+            if (action === 'check-auth-methods') {
+                event.preventDefault();
+                checkAuthMethods();
+                return;
+            }
+            
+            if (action === 'reset-login') {
+                event.preventDefault();
+                resetLogin();
+                return;
+            }
+        }, true);
+        
+        // Handle Enter key on username field
+        document.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter' && event.target.id === 'username') {
+                event.preventDefault();
+                checkAuthMethods();
+            }
+        });
+        
+        // Check available authentication methods
+        async function checkAuthMethods() {
+            const username = document.getElementById('username').value.trim();
+            
+            if (!username) {
+                showAuthStatus('Please enter your username', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/auth/methods?username=${encodeURIComponent(username)}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showAuthStatus(data.error || 'Failed to check authentication methods', 'error');
+                    return;
+                }
+                
+                currentUsername = username;
+                availableMethods = data.methods;
+                
+                // Show username and avatar
+                document.getElementById('display-username').textContent = username;
+                const avatarInitial = document.getElementById('user-avatar-initial');
+                if (avatarInitial) {
+                    avatarInitial.textContent = username.charAt(0).toUpperCase();
+                }
+                document.getElementById('step-username').style.display = 'none';
+                document.getElementById('step-auth-methods').style.display = 'block';
+                
+                // Auto-try secure methods in priority order
+                await autoAuthenticateSecure(data);
+                
+            } catch (error) {
+                showAuthStatus('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function autoAuthenticateSecure(data) {
+            const methods = data.methods;
+            const container = document.getElementById('auth-methods-container');
+            
+            // Priority 1: Try mTLS (if available)
+            if (methods.includes('mtls') && data.counts.mtls > 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 2rem;"><div class="spinner-border" role="status"></div><p style="margin-top: 1rem; color: var(--text-secondary);">Checking for client certificate...</p></div>';
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            // Priority 2: Try WebAuthn (if available and compatible)
+            if (methods.includes('webauthn') && data.counts.webauthn > 0) {
+                const isCompatible = checkWebAuthnCompatibility();
+                
+                if (isCompatible) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem;"><svg class="ucm-icon" width="48" height="48" style="color: var(--primary-color);"><use href="#icon-key"/></svg><p style="margin-top: 1rem; color: var(--text-primary); font-weight: 600;">Touch your security key</p><p style="color: var(--text-secondary); font-size: 0.875rem;">Follow your browser prompts to sign in</p></div>';
+                    
+                    try {
+                        await startWebAuthnLogin();
+                        return;
+                    } catch (error) {
+                        console.log('WebAuthn failed, falling back to password:', error);
+                        showAuthStatus('Security key authentication failed', 'error');
+                    }
+                }
+            }
+            
+            // Fallback: Show password form
+            showPasswordFallback();
+        }
+        
+        function showPasswordFallback() {
+            const container = document.getElementById('auth-methods-container');
+            
+            container.innerHTML = `
+                <div style="animation: fadeIn 0.3s;">
+                    <form action="/login" method="POST">
+                        <input type="hidden" name="username" value="${currentUsername}">
+                        <div class="form-group">
+                            <label class="form-label" for="password">Password</label>
+                            <input class="form-input" id="password" name="password" type="password" required placeholder="Enter your password" autofocus autocomplete="current-password">
+                        </div>
+                        <button type="submit" class="btn-login">
+                            <span>Sign In</span>
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg>
+                        </button>
+                    </form>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                const pwdField = document.getElementById('password');
+                if (pwdField) pwdField.focus();
+            }, 100);
+        }
+        
+        function checkWebAuthnCompatibility() {
+            const hostname = window.location.hostname;
+            return hostname === 'localhost' || 
+                   hostname === '127.0.0.1' || 
+                   hostname === '::1' ||
+                   /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
+                   hostname.includes('.');
+        }
+        
+        function resetLogin() {
+            document.getElementById('step-auth-methods').style.display = 'none';
+            document.getElementById('step-username').style.display = 'block';
+            document.getElementById('username').value = '';
+            document.getElementById('username').focus();
+            hideAuthStatus();
+        }
+        
+        function showAuthStatus(message, type = 'info') {
+            const status = document.getElementById('auth-status');
+            if (status) {
+                status.textContent = message;
+                status.style.display = 'block';
+                status.style.color = type === 'error' ? 'var(--danger-color)' : 
+                                      type === 'success' ? 'var(--success-color)' : 
+                                      'var(--primary-color)';
+            }
+        }
+        
+        function hideAuthStatus() {
+            const status = document.getElementById('auth-status');
+            if (status) {
+                status.style.display = 'none';
+            }
+        }
+        
+        // WebAuthn functions
+        function base64urlToBuffer(base64url) {
+            let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+            const padLength = (4 - (base64.length % 4)) % 4;
+            base64 += '='.repeat(padLength);
+            
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+        
+        function bufferToBase64url(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+        
+        async function startWebAuthnLogin() {
+            showAuthStatus('Touch your security key...', 'info');
+            
+            try {
+                const username = currentUsername || document.getElementById('username').value.trim();
+                if (!username) {
+                    showAuthStatus('Username required', 'error');
+                    return;
+                }
+                
+                // Get authentication options from server
+                const optionsResponse = await fetch('/api/v1/webauthn/authenticate/options', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username })
+                });
+                
+                if (!optionsResponse.ok) {
+                    const error = await optionsResponse.json();
+                    throw new Error(error.error || 'Failed to get authentication options');
+                }
+                
+                const options = await optionsResponse.json();
+                
+                // Convert base64url strings to ArrayBuffers
+                const publicKeyOptions = {
+                    publicKey: {
+                        ...options,
+                        challenge: base64urlToBuffer(options.challenge),
+                        allowCredentials: options.allowCredentials ?
+                            options.allowCredentials.map(cred => ({
+                                ...cred,
+                                id: base64urlToBuffer(cred.id)
+                            })) : []
+                    }
+                };
+                
+                showAuthStatus('Touch your security key now...', 'info');
+                
+                // Call WebAuthn API
+                const credential = await navigator.credentials.get(publicKeyOptions);
+                
+                if (!credential) {
+                    throw new Error('Authentication was cancelled');
+                }
+                
+                showAuthStatus('Verifying credential...', 'success');
+                
+                // Send credential to server
+                const verifyResponse = await fetch('/api/v1/webauthn/authenticate/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        credential: {
+                            id: credential.id,
+                            rawId: bufferToBase64url(credential.rawId),
+                            type: credential.type,
+                            response: {
+                                clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                                authenticatorData: bufferToBase64url(credential.response.authenticatorData),
+                                signature: bufferToBase64url(credential.response.signature),
+                                userHandle: credential.response.userHandle ? 
+                                    bufferToBase64url(credential.response.userHandle) : null
+                            }
+                        }
+                    })
+                });
+                
+                if (!verifyResponse.ok) {
+                    const error = await verifyResponse.json();
+                    throw new Error(error.error || 'Authentication failed');
+                }
+                
+                // Success! Redirect to dashboard
+                showAuthStatus('Authentication successful! Redirecting...', 'success');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 500);
+                
+            } catch (error) {
+                console.error('WebAuthn login error:', error);
+                
+                let errorMessage = error.message;
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = 'Authentication was cancelled or timed out';
+                } else if (error.name === 'InvalidStateError') {
+                    errorMessage = 'Security key not recognized. Please register it first.';
+                } else if (error.name === 'NotSupportedError') {
+                    errorMessage = 'WebAuthn not supported in this browser';
+                }
+                
+                showAuthStatus(errorMessage, 'error');
+                throw error; // Re-throw to trigger fallback
+            }
+        }
+        
+        // Handle form submission loading
+        document.addEventListener('submit', function(e) {
+            if (e.target.action && e.target.action.includes('/login')) {
+                const btn = e.target.querySelector('button[type="submit"]');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span>Signing in...</span>';
+                }
+            }
+        });
+        
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('username').focus();
+            
+            // Update theme name display
+            const currentTheme = localStorage.getItem('ucm-theme') || 'sentinel-dark';
+            const themeLabels = {
+                'sentinel-light': 'Sentinel Light',
+                'sentinel-dark': 'Sentinel Dark',
+                'amber-light': 'Amber Light',
+                'amber-dark': 'Amber Dark',
+                'blossom-light': 'Blossom Light',
+                'blossom-dark': 'Blossom Dark',
+                'nebula-light': 'Nebula Light',
+                'nebula-dark': 'Nebula Dark'
+            };
+            document.getElementById('current-theme-name').textContent = themeLabels[currentTheme] || 'Sentinel Dark';
+        });
     </script>
+    
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </body>
 </html>
