@@ -1,6 +1,6 @@
 # 🗺️ UCM Roadmap
 
-**Current Version:** v1.8.3 (2026-01-10)  
+**Current Version:** v1.9.0 (2026-01-11)  
 **Status:** Production Ready
 
 ---
@@ -14,12 +14,16 @@
 - ✅ **CRL Enhancements** - Auto-generation, improved UI
 - ✅ **SCEP Improvements** - Better device enrollment
 
-### v1.8.0-beta - mTLS & API Enhancements
+### v1.8.0-v1.9.0 - UI & System Enhancements
 - ✅ **mTLS Authentication** - Client certificate browser auth
 - ✅ **REST API Completion** - Full JWT API coverage
 - ✅ **OPNsense Import** - Direct CA/cert import from firewalls
 - ✅ **Docker Multi-arch** - amd64/arm64 support
 - ✅ **Theme System** - 8 beautiful themes (4 colors × light/dark)
+- ✅ **Icon System Migration** - 220+ inline SVG → UCM icons
+- ✅ **Login Page Redesign** - Modern UI with stats sidebar
+- ✅ **Backup/Restore UI** - Complete web interface for backups
+- ✅ **Smooth Animations** - Global transitions and polish
 
 ### v1.8.1 - v1.8.3 - Refinements
 - ✅ **UI Consistency** - Unified button styles, theme indicators
@@ -33,29 +37,40 @@
 
 ## 🚧 In Progress
 
-### v1.8.4 - Backup/Restore & Database Enhancements (ETA: 1-2 days)
+### v1.9.0 - UI Modernization & System Enhancements (ETA: Complete)
 
 **Priority: High**
 
-#### Database Management
-- [ ] **Restore UI** - Web interface to restore backups
+#### UI/UX Improvements ✅
+- ✅ **Icon System Migration** - 220+ inline SVG → UCM icons (100% coverage)
+- ✅ **Login Page Redesign** - Modern design with stats sidebar, theme dropdown
+- ✅ **Theme System Enhancement** - Nebula purple variant, gradient palette icon
+- ✅ **Smooth Animations** - Global transitions and page animations
+- ✅ **Modal Optimization** - Reduced modal sizes (1400px → 650-750px)
+
+#### Database Management ✅
+- ✅ **Backup UI** - Web interface to create encrypted backups
+  - Password-protected AES-256-GCM encryption
+  - Selective backup options
+  - Download .ucm-backup file
+- ✅ **Restore UI** - Web interface to restore backups
   - Upload backup file
-  - List available backups with metadata
-  - One-click restore with confirmation
+  - Password decryption
+  - Selective restore options
   - Automatic service restart after restore
 
-#### System Improvements  
+#### System Improvements (Remaining)
 - [ ] **Health Check API** - `/api/health` endpoint for monitoring
 - [ ] **Database optimization** - Automatic VACUUM on schedule
 - [ ] **Log rotation** - Systemd journal integration
 
-**Estimated Time:** 4-6 hours
+**Estimated Time Remaining:** 2-3 hours
 
 ---
 
 ## 📅 Planned Features
 
-### v1.9.0 - Advanced Certificate Management (ETA: 1-2 weeks)
+### v1.10.0 - Advanced Certificate Management (ETA: 1-2 weeks)
 
 **Priority: Medium**
 
@@ -191,6 +206,7 @@
 
 | Version | Release Date | Highlights |
 |---------|-------------|------------|
+| v1.9.0  | 2026-01-11  | Icon migration, login redesign, backup/restore UI, smooth animations |
 | v1.8.3  | 2026-01-10  | Universal installer, UI fixes, screenshots |
 | v1.8.2  | 2026-01-10  | Service management utilities, HTTPS auto-restart |
 | v1.8.0  | 2026-01-09  | mTLS auth, full REST API, OPNsense import |
@@ -222,5 +238,5 @@ Want to help with the roadmap?
 
 ---
 
-**Last Updated:** 2026-01-10  
+**Last Updated:** 2026-01-11  
 **Next Review:** 2026-02-01
