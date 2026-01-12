@@ -35,9 +35,9 @@
 
 ---
 
-## 🚧 In Progress
+## ✅ Completed
 
-### v1.9.0 - UI Modernization & System Enhancements (ETA: Complete)
+### v1.9.0 - UI Modernization & System Enhancements (Released: 2026-01-12)
 
 **Priority: High**
 
@@ -59,12 +59,24 @@
   - Selective restore options
   - Automatic service restart after restore
 
-#### System Improvements (Remaining)
-- [ ] **Health Check API** - `/api/health` endpoint for monitoring
-- [ ] **Database optimization** - Automatic VACUUM on schedule
-- [ ] **Log rotation** - Systemd journal integration
+#### System Improvements ✅
+- ✅ **Health Check API** - `/api/health` endpoint for monitoring
+  - `/api/health` - Basic health status
+  - `/api/health/detailed` - Full metrics (DB, CPU, memory, disk)
+  - `/api/health/readiness` - Kubernetes readiness probe
+  - `/api/health/liveness` - Kubernetes liveness probe
+- ✅ **Database Optimization** - Automatic VACUUM scheduling
+  - Weekly auto-VACUUM (Sundays 3 AM)
+  - Manual optimization button in Settings
+  - Smart skipping (DB < 10MB or fragmentation < 5%)
+- ✅ **Log Rotation** - Automated log management
+  - Daily rotation for application logs (14 days retention)
+  - Automatic compression (gzip, ~80% space savings)
+  - Systemd journal integration
 
-**Estimated Time Remaining:** 2-3 hours
+**Status:** Complete and deployed  
+**Total Development Time:** ~8 hours  
+**Commits:** 15+
 
 ---
 
