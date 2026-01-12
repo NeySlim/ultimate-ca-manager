@@ -1,0 +1,18 @@
+[Unit]
+Description=UCM Database Optimizer
+Documentation=https://github.com/NeySlim/ultimate-ca-manager
+After=ucm.service
+Requires=ucm.service
+
+[Service]
+Type=oneshot
+User=ucm
+Group=ucm
+WorkingDirectory=/opt/ucm
+ExecStart=/opt/ucm/scripts/db-optimizer.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ucm-db-optimizer
+
+[Install]
+WantedBy=multi-user.target
