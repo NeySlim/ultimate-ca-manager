@@ -817,9 +817,30 @@
             const methods = data.methods;
             const container = document.getElementById('auth-methods-container');
             
+            // Show single "Sign In" button
+            container.innerHTML = `
+                <div style="animation: fadeIn 0.3s;">
+                    <button type="button" class="btn-login" onclick="handleSignIn()">
+                        <span>Sign In</span>
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg>
+                    </button>
+                </div>
+            `;
+            
+            // Store auth methods for later use
+            window.authData = data;
+        }
+        
+        async function handleSignIn() {
+            const data = window.authData;
+            if (!data) return;
+            
+            const methods = data.methods;
+            const container = document.getElementById('auth-methods-container');
+            
             // Priority 1: Try mTLS (if available)
             if (methods.includes('mtls') && data.counts.mtls > 0) {
-                container.innerHTML = '<div style="text-align: center; padding: 2rem;"><div class="spinner-border" role="status"></div><p style="margin-top: 1rem; color: var(--text-secondary);">Checking for client certificate...</p></div>';
+                container.innerHTML = '<div style="text-align: center; padding: 2rem; animation: fadeIn 0.3s;"><div class="spinner-border" role="status"></div><p style="margin-top: 1rem; color: var(--text-secondary);">Checking for client certificate...</p></div>';
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
             
@@ -828,7 +849,7 @@
                 const isCompatible = checkWebAuthnCompatibility();
                 
                 if (isCompatible) {
-                    container.innerHTML = '<div style="text-align: center; padding: 2rem;"><svg class="ucm-icon" width="48" height="48" style="color: var(--primary-color);"><use href="#icon-key"/></svg><p style="margin-top: 1rem; color: var(--text-primary); font-weight: 600;">Touch your security key</p><p style="color: var(--text-secondary); font-size: 0.875rem;">Follow your browser prompts to sign in</p></div>';
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem; animation: fadeIn 0.3s;"><svg class="ucm-icon" width="48" height="48" style="color: var(--primary-color);"><use href="#icon-key"/></svg><p style="margin-top: 1rem; color: var(--text-primary); font-weight: 600;">Touch your security key</p><p style="color: var(--text-secondary); font-size: 0.875rem;">Follow your browser prompts to sign in</p></div>';
                     
                     try {
                         await startWebAuthnLogin();
@@ -836,15 +857,16 @@
                     } catch (error) {
                         console.log('WebAuthn failed, falling back to password:', error);
                         showAuthStatus('Security key authentication failed', 'error');
+                        await new Promise(resolve => setTimeout(resolve, 1500));
                     }
                 }
             }
             
             // Fallback: Show password form
-            showPasswordFallback();
+            showPasswordForm();
         }
         
-        function showPasswordFallback() {
+        function showPasswordForm() {
             const container = document.getElementById('auth-methods-container');
             
             container.innerHTML = `
@@ -1043,10 +1065,8 @@
             
             if (lastUsername) {
                 usernameInput.value = lastUsername;
-                // Show "Not you?" hint
-                changeUserHint.style.display = 'block';
-                // Auto-focus and select for easy override
-                usernameInput.select();
+                // Auto-advance to step 2 with saved username
+                checkAuthMethods();
             } else {
                 usernameInput.focus();
             }
@@ -1117,8 +1137,48 @@
         
         /* Smooth dropdown */
         .theme-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 0.5rem;
+            background: var(--surface-elevated);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
             transition: opacity 0.2s ease, transform 0.2s ease;
-            transform-origin: bottom;
+            transform-origin: top;
+            z-index: 1000;
+            padding: 0.5rem 0;
+            min-width: 180px;
+            white-space: nowrap;
+        }
+        
+        .theme-dropdown-menu button {
+            width: 100%;
+            padding: 0.625rem 1rem 0.625rem 1rem;
+            background: var(--surface-elevated);
+            border: none;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.15s ease;
+        }
+        
+        .theme-dropdown-menu button:hover {
+            background: var(--surface-hover);
+        }
+        
+        .theme-color-preview {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
         }
         
         .theme-dropdown-menu[style*="display: block"] {
@@ -1128,7 +1188,7 @@
         @keyframes dropdownSlide {
             from {
                 opacity: 0;
-                transform: translateY(8px);
+                transform: translateY(-8px);
             }
             to {
                 opacity: 1;
