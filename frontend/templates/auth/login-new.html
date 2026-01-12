@@ -591,6 +591,14 @@
                         <span>Continue</span>
                         <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg>
                     </button>
+                    
+                    <!-- Show "Not you?" link if username is pre-filled -->
+                    <div id="change-user-hint" style="display: none; text-align: center; margin-top: 1rem;">
+                        <button type="button" onclick="document.getElementById('username').value = ''; document.getElementById('username').focus(); this.parentElement.style.display = 'none';" 
+                                style="background: none; border: none; color: var(--text-secondary); font-size: 0.875rem; cursor: pointer; text-decoration: underline;">
+                            Not you? Sign in as different user
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- Step 2: Authentication Methods -->
@@ -783,6 +791,9 @@
                 }
                 
                 currentUsername = username;
+                
+                // Save username to localStorage for next login
+                localStorage.setItem('ucm-last-username', username);
                 availableMethods = data.methods;
                 
                 // Show username and avatar
@@ -1025,7 +1036,20 @@
         
         // Init
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('username').focus();
+            // Restore last username if available
+            const lastUsername = localStorage.getItem('ucm-last-username');
+            const usernameInput = document.getElementById('username');
+            const changeUserHint = document.getElementById('change-user-hint');
+            
+            if (lastUsername) {
+                usernameInput.value = lastUsername;
+                // Show "Not you?" hint
+                changeUserHint.style.display = 'block';
+                // Auto-focus and select for easy override
+                usernameInput.select();
+            } else {
+                usernameInput.focus();
+            }
             
             // Update theme name display
             const currentTheme = localStorage.getItem('ucm-theme') || 'sentinel-dark';
