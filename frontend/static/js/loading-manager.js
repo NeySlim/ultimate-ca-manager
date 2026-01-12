@@ -122,13 +122,31 @@
     /**
      * Show global full-screen loading overlay
      * @param {string} message - Optional loading message
+     * @param {number} delay - Optional delay in ms before showing (default: 250ms)
      */
-    window.showGlobalLoader = function(message = 'Loading...') {
+    let globalLoaderTimeout = null;
+
+    window.showGlobalLoader = function(message = 'Loading...', delay = 250) {
         const loader = document.getElementById('global-loader');
         if (loader) {
             const messageEl = loader.querySelector('div > div:last-child');
             if (messageEl) messageEl.textContent = message;
-            loader.style.display = 'flex';
+            
+            // Clear any existing timeout
+            if (globalLoaderTimeout) {
+                clearTimeout(globalLoaderTimeout);
+            }
+            
+            // Set new timeout to show loader
+            globalLoaderTimeout = setTimeout(() => {
+                loader.style.display = 'flex';
+                // Add a small fade-in animation
+                loader.style.opacity = '0';
+                loader.style.transition = 'opacity 0.2s ease';
+                requestAnimationFrame(() => {
+                    loader.style.opacity = '1';
+                });
+            }, delay);
         }
     };
 
@@ -136,9 +154,16 @@
      * Hide global loading overlay
      */
     window.hideGlobalLoader = function() {
+        // Clear any pending timeout (so it doesn't show up if task finished quickly)
+        if (globalLoaderTimeout) {
+            clearTimeout(globalLoaderTimeout);
+            globalLoaderTimeout = null;
+        }
+
         const loader = document.getElementById('global-loader');
         if (loader) {
             loader.style.display = 'none';
+            loader.style.opacity = '0'; // Reset opacity for next time
         }
     };
 
