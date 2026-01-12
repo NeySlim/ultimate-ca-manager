@@ -1,0 +1,51 @@
+# UCM Log Rotation Configuration
+# Rotates UCM application logs to prevent disk space issues
+
+# Main application logs (access, error)
+/var/log/ucm/access.log /var/log/ucm/error.log {
+    # Rotate daily
+    daily
+    
+    # Keep 14 days of logs
+    rotate 14
+    
+    # Compress old logs (saves ~80% disk space)
+    compress
+    
+    # Delay compression for most recent rotation
+    # (allows viewing yesterday's logs uncompressed)
+    delaycompress
+    
+    # Don't rotate if log is empty
+    notifempty
+    
+    # Don't fail if log file is missing
+    missingok
+    
+    # Create new log file after rotation
+    create 0640 ucm ucm
+    
+    # Use date extension (access.log-20260112)
+    dateext
+    dateformat -%Y%m%d
+    
+    # Shared scripts for all logs
+    sharedscripts
+    
+    # Send HUP signal to Gunicorn to reopen log files
+    postrotate
+        # Restart UCM service to reopen logs (safer than HUP)
+        systemctl reload ucm.service 2>/dev/null || true
+    endscript
+}
+
+# DB Optimizer log (less frequent rotation)
+/var/log/ucm/db-optimizer.log {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    notifempty
+    missingok
+    create 0640 ucm ucm
+}
