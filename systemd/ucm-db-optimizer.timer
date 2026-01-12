@@ -1,0 +1,15 @@
+[Unit]
+Description=UCM Database Optimizer Timer
+Documentation=https://github.com/NeySlim/ultimate-ca-manager
+Requires=ucm-db-optimizer.service
+
+[Timer]
+# Run every Sunday at 3:00 AM
+OnCalendar=Sun *-*-* 03:00:00
+# Run 10 minutes after boot if missed
+Persistent=true
+# Random delay up to 30 minutes to avoid load spikes
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target
