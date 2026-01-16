@@ -353,8 +353,18 @@ function loadProxyStatus() {
     fetch('/api/ui/acme/proxy/status')
         .then(response => response.json())
         .then(data => {
-            document.getElementById('proxy-upstream-display').textContent = data.upstream_url;
-            document.getElementById('proxy-directory-url').value = data.directory_url;
+            // Check if elements exist (user might not be on proxy tab)
+            const upstreamDisplay = document.getElementById('proxy-upstream-display');
+            const directoryUrl = document.getElementById('proxy-directory-url');
+            const container = document.getElementById('proxy-account-container');
+            
+            if (!upstreamDisplay || !directoryUrl || !container) {
+                // Elements not in DOM, silently return
+                return;
+            }
+            
+            upstreamDisplay.textContent = data.upstream_url;
+            directoryUrl.value = data.directory_url;
             
             const container = document.getElementById('proxy-account-container');
             
