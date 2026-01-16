@@ -199,7 +199,7 @@
     <aside id="sidebar">
         <!-- Toggle button -->
         <button id="sidebar-toggle" class="sidebar-toggle-btn" title="Toggle sidebar">
-            <svg class="ucm-icon" width="20" height="20"><use href="#icon-menu"/></svg>
+            <svg class="ucm-icon" width="20" height="20"><use href="#icon-chevron-left"/></svg>
         </button>
         
         <div class="sidebar-nav">
@@ -626,11 +626,26 @@
             const toggleBtn = document.getElementById('sidebar-toggle');
             if (!toggleBtn) return;
             
+            const toggleIcon = toggleBtn.querySelector('use');
+            
+            // Update icon based on initial state
+            function updateIcon(collapsed) {
+                if (collapsed) {
+                    toggleIcon.setAttribute('href', '#icon-chevron-right');
+                } else {
+                    toggleIcon.setAttribute('href', '#icon-chevron-left');
+                }
+            }
+            
+            // Set initial icon
+            updateIcon(sidebarCollapsed);
+            
             // Toggle sidebar on button click
             toggleBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
                 localStorage.setItem('ucm-sidebar-collapsed', isCollapsed);
+                updateIcon(isCollapsed);
             });
         });
     })();
