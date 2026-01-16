@@ -4881,7 +4881,7 @@ def ui_templates_list():
             <div style="border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem; background: var(--bg-secondary); transition: all 0.2s;"
                  onmouseover="this.style.borderColor='var(--primary-color)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';" 
                  onmouseout="this.style.borderColor='var(--border-color)'; this.style.boxShadow='none';">
-                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: start; gap: 1rem;">
                     <div style="flex: 1;">
                         <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem;">
                             <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin: 0;">
@@ -4891,31 +4891,31 @@ def ui_templates_list():
                                 {badge_text}
                             </span>
                         </div>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">
+                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0 0 0.75rem 0;">
                             {html_escape(template.description or '')}
                         </p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; font-size: 0.875rem;">
+                            <div>
+                                <strong style="color: var(--text-secondary);">Type:</strong>
+                                <span style="color: var(--text-primary);"> {html_escape(template.template_type)}</span>
+                            </div>
+                            <div>
+                                <strong style="color: var(--text-secondary);">Key:</strong>
+                                <span style="color: var(--text-primary);"> {html_escape(template.key_type)}</span>
+                            </div>
+                            <div>
+                                <strong style="color: var(--text-secondary);">Validity:</strong>
+                                <span style="color: var(--text-primary);"> {template.validity_days} days</span>
+                            </div>
+                            <div>
+                                <strong style="color: var(--text-secondary);">EKU:</strong>
+                                <span style="color: var(--text-primary);"> {html_escape(eku)}</span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem; font-size: 0.875rem;">
-                    <div>
-                        <strong style="color: var(--text-secondary);">Type:</strong>
-                        <span style="color: var(--text-primary);"> {html_escape(template.template_type)}</span>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 80px;">
+                        {actions}
                     </div>
-                    <div>
-                        <strong style="color: var(--text-secondary);">Key:</strong>
-                        <span style="color: var(--text-primary);"> {html_escape(template.key_type)}</span>
-                    </div>
-                    <div>
-                        <strong style="color: var(--text-secondary);">Validity:</strong>
-                        <span style="color: var(--text-primary);"> {template.validity_days} days</span>
-                    </div>
-                    <div>
-                        <strong style="color: var(--text-secondary);">EKU:</strong>
-                        <span style="color: var(--text-primary);"> {html_escape(eku)}</span>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    {actions}
                 </div>
             </div>
             '''
