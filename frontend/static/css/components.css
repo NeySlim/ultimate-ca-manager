@@ -2414,3 +2414,25 @@ svg.icon-xl {
     width: 32px;
     height: 32px;
 }
+
+/* Windows 11 Style Centric Spinner */
+@keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes spin-fast {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.ucm-icon use[href="#icon-refresh"] {
+    transform-origin: center;
+    animation: spin-slow 3s linear infinite; /* Slow centric rotation */
+}
+
+/* Acceleration on active state or when refreshing */
+.btn-secondary:active .ucm-icon use[href="#icon-refresh"],
+.btn-secondary.refreshing .ucm-icon use[href="#icon-refresh"] {
+    animation: spin-fast 0.6s linear infinite; /* Fast rotation */
+}
