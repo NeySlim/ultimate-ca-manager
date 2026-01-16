@@ -265,30 +265,6 @@
         </div>
     </div>
     
-    <!-- mTLS Certificates -->
-    <div id="mtls-section" class="card" style="display: none;">
-        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
-                mTLS Client Certificates
-            </h2>
-        </div>
-
-        <!-- Tabs -->
-        <div class="tabs-container" style="display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 2px solid var(--border-color);">
-            <button class="tab-button active" onclick="ucm_switchTab('create')" id="btn-tab-create" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 600; color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-plus"/></svg>
-                Create
-            </button>
-            <button class="tab-button" onclick="ucm_switchTab('import')" id="btn-tab-import" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-upload"/></svg>
-                Import
-            </button>
-            <button class="tab-button" onclick="ucm_switchTab('manage'); loadCertificates()" id="btn-tab-manage" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-inbox"/></svg>
-                Manage
-            </button>
-        </div>
 
         <!-- Tab Content -->
         <div style="padding: 1.5rem;">

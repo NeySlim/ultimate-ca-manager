@@ -469,6 +469,13 @@ def my_account():
     return render_template('my_account.html')
 
 
+@ui_bp.route('/my-account/mtls')
+@login_required
+def my_account_mtls():
+    """User mTLS certificates management page"""
+    return render_template('my_account_mtls.html')
+
+
 
 
 @ui_bp.route('/users')

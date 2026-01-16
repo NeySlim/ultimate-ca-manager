@@ -157,7 +157,12 @@
                     <a href="/my-account" class="dropdown-item"
                        hx-get="/my-account" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
                        @click="open = false">
-                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-user"/></svg> My Account ( & Certificates)
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-user"/></svg> My Account
+                    </a>
+                    <a href="/my-account/mtls" class="dropdown-item"
+                       hx-get="/my-account/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+                       @click="open = false">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-certificate"/></svg> My Certificates
                     </a>
                     
                     <div class="dropdown-divider"></div>
@@ -288,10 +293,16 @@
                 My Account
             </div>
             
-            <a href="/my-account" class="sidebar-link {% if request.path.startswith('/my-account') %}active{% endif %}"
+            <a href="/my-account" class="sidebar-link {% if request.path.startswith('/my-account') %}{% if request.path == '/my-account/mtls' %}{% else %}active{% endif %}{% endif %}"
                hx-get="/my-account" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-user"/></svg>
                 <span>Profile & Settings</span>
+            </a>
+            
+            <a href="/my-account/mtls" class="sidebar-link {% if request.path == '/my-account/mtls' %}active{% endif %}"
+               hx-get="/my-account/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-certificate"/></svg>
+                <span>My Certificates</span>
             </a>
             
 
