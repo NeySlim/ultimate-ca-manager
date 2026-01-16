@@ -83,6 +83,29 @@ def create_app(config_name=None):
     from middleware.mtls_middleware import init_mtls_middleware
     init_mtls_middleware(app)
     
+    # Initialize general task scheduler (CRL auto-regen, etc)
+    try:
+        from services.scheduler_service import SchedulerService
+        from services.crl_scheduler_task import CRLSchedulerTask
+        
+        # Initialize and start scheduler
+        scheduler = SchedulerService()
+        scheduler.start(app=app)
+        
+        # Register CRL auto-regeneration task (runs every hour)
+        scheduler.register_task(
+            name="crl_auto_regen",
+            func=CRLSchedulerTask.execute,
+            interval=3600,  # "interval" parameter, not "interval_seconds"
+            description="Auto-regenerate expiring CRLs"
+        )
+        app.logger.info("Scheduler service started with CRL auto-regeneration task")
+        
+        # Register scheduler in app context for graceful shutdown
+        app.scheduler = scheduler
+    except Exception as e:
+        app.logger.error(f"Failed to start scheduler service: {e}")
+    
     # Create database tables and auto-migrate
     with app.app_context():
         try:
