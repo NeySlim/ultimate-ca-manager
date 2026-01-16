@@ -1765,22 +1765,63 @@ def crl_list_data():
             </div>
             '''
         
-        # Build table HTML
-        html = '''
-        <div style="overflow-x: auto;">
-            <table id="crl-table">
-                <thead style="background: var(--bg-secondary);">
-                    <tr style="border-bottom: 2px solid var(--border-color);">
-                        <th style="padding: 0.75rem; text-align: left;">CA</th>
-                        <th style="padding: 0.75rem; text-align: left;">CDP Status</th>
-                        <th style="padding: 0.75rem; text-align: left;">CRL Status</th>
-                        <th style="padding: 0.75rem; text-align: left;">Revoked Count</th>
-                        <th style="padding: 0.75rem; text-align: left;">Last Update</th>
-                        <th style="padding: 0.75rem; text-align: left;">Next Update</th>
-                        <th style="padding: 0.75rem; text-align: left;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
+        # Calculate Stats
+        total_cas = len(crls)
+        active_crls = sum(1 for c in crls if c.get('has_crl'))
+        total_revoked = sum(c.get('revoked_count', 0) for c in crls if c.get('has_crl'))
+
+        # Build HTML
+        html = f'''
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <!-- Active CRLs -->
+            <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+                <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(var(--primary-rgb), 0.1); display: flex; align-items: center; justify-content: center; color: var(--primary-color);">
+                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-activity"/></svg>
+                </div>
+                <div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Active CRLs</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">{active_crls} <span style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 400;">/ {total_cas} CAs</span></div>
+                </div>
+            </div>
+            
+            <!-- Total Revoked -->
+            <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+                <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(var(--danger-rgb), 0.1); display: flex; align-items: center; justify-content: center; color: var(--danger-color);">
+                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-slash"/></svg>
+                </div>
+                <div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Revoked Certs</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">{total_revoked}</div>
+                </div>
+            </div>
+            
+            <!-- Scheduler Status -->
+            <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+                <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(var(--success-rgb), 0.1); display: flex; align-items: center; justify-content: center; color: var(--success-color);">
+                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-clock"/></svg>
+                </div>
+                <div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Auto-Regeneration</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">Active</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card" style="padding: 0;">
+            <div style="overflow-x: auto;">
+                <table id="crl-table">
+                    <thead style="background: var(--bg-secondary);">
+                        <tr style="border-bottom: 2px solid var(--border-color);">
+                            <th style="padding: 0.75rem; text-align: left;">CA</th>
+                            <th style="padding: 0.75rem; text-align: left;">CDP Status</th>
+                            <th style="padding: 0.75rem; text-align: left;">CRL Status</th>
+                            <th style="padding: 0.75rem; text-align: left;">Revoked Count</th>
+                            <th style="padding: 0.75rem; text-align: left;">Last Update</th>
+                            <th style="padding: 0.75rem; text-align: left;">Next Update</th>
+                            <th style="padding: 0.75rem; text-align: left;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         '''
         
         for crl_data in crls:
@@ -1891,6 +1932,7 @@ def crl_list_data():
         html += '''
                 </tbody>
             </table>
+        </div>
         </div>
         '''
         
