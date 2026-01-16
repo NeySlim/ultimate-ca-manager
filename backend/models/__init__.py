@@ -8,6 +8,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
+# Import sub-models
+from models.certificate_template import CertificateTemplate
+
 
 class User(db.Model):
     """User model for authentication"""
@@ -298,8 +301,12 @@ class Certificate(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(80))
     
+    # Template reference (optional - null if created without template)
+    template_id = db.Column(db.Integer, db.ForeignKey("certificate_templates.id"), nullable=True)
+    
     # Relationships
     ca = db.relationship("CA", back_populates="certificates")
+    template = db.relationship("CertificateTemplate", foreign_keys=[template_id])
     
     @property
     def has_private_key(self) -> bool:
@@ -546,6 +553,6 @@ from .acme_models import AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChalleng
 
 __all__ = [
     "db", "User", "SystemConfig", "CA", "Certificate", "CRL", "SCEPRequest", 
-    "AuditLog", "CRLMetadata", "OCSPResponse",
+    "AuditLog", "CRLMetadata", "OCSPResponse", "CertificateTemplate",
     "AcmeAccount", "AcmeOrder", "AcmeAuthorization", "AcmeChallenge", "AcmeNonce"
 ]

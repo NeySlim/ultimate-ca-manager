@@ -325,6 +325,7 @@ def register_blueprints(app):
     from api.acme.acme_proxy_api import acme_proxy_bp
     from api.backup_routes import backup_bp
     from api.health_routes import health_bp
+    from api.template_api import bp as template_bp  # NEW: Certificate Templates
     
     # Register UI routes (no prefix - serve from root)
     app.register_blueprint(ui_bp)
@@ -345,6 +346,7 @@ def register_blueprints(app):
     app.register_blueprint(mtls_bp, url_prefix='/api/v1/mtls')
     app.register_blueprint(webauthn_bp, url_prefix='/api/v1/webauthn')
     app.register_blueprint(backup_bp)  # Already has /api/v1/backup prefix
+    app.register_blueprint(template_bp)  # Certificate Templates API
     app.register_blueprint(health_bp)  # Health check endpoints (no auth)
     
     # Public endpoints (no auth, no /api prefix - standard paths)
