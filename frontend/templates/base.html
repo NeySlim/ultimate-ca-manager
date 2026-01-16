@@ -196,16 +196,23 @@
     </nav>
     
     <!-- Sidebar -->
-    <aside>
+    <aside id="sidebar">
+        <!-- Toggle button -->
+        <button id="sidebar-toggle" class="sidebar-toggle-btn" title="Toggle sidebar">
+            <svg class="ucm-icon" width="20" height="20"><use href="#icon-menu"/></svg>
+        </button>
+        
         <div class="sidebar-nav">
             <a href="/dashboard" class="sidebar-link {% if request.path == '/dashboard' or request.path == '/sentinel-demo' %}active{% endif %}"
-               hx-get="/dashboard" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/dashboard" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="Dashboard">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-dashboard"/></svg>
                 <span>Dashboard</span>
             </a>
             
             <a href="/ca" class="sidebar-link {% if request.path.startswith('/ca') or request.path.startswith('/import-ca') %}active{% endif %}"
-               hx-get="/ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="Certificate Authorities">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-certificate-authority"/></svg>
                 <span>Certificate Authorities</span>
             </a>
@@ -225,7 +232,8 @@
             </div>
             
             <a href="/certificates" class="sidebar-link {% if request.path.startswith('/certificates') or request.path.startswith('/import') %}active{% endif %}"
-               hx-get="/certificates" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/certificates" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="Certificates">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-certificate"/></svg>
                 <span>Certificates</span>
             </a>
@@ -245,7 +253,8 @@
             </div>
             
             <a href="/scep" class="sidebar-link {% if request.path.startswith('/scep') %}active{% endif %}"
-               hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="SCEP">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-scep"/></svg>
                 <span>SCEP</span>
             </a>
@@ -257,32 +266,37 @@
             </div>
             
             <a href="/config/acme" class="sidebar-link {% if request.path.startswith('/config/acme') %}active{% endif %}"
-               hx-get="/config/acme" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/config/acme" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="ACME">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-acme"/></svg>
                 <span>ACME</span>
             </a>
             
             <a href="/crl" class="sidebar-link {% if request.path.startswith('/crl') %}active{% endif %}"
-               hx-get="/crl" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/crl" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="CRL Management">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-crl"/></svg>
                 <span>CRL Management</span>
             </a>
             
             <a href="/ocsp" class="sidebar-link {% if request.path.startswith('/ocsp') %}active{% endif %}"
-               hx-get="/ocsp" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/ocsp" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="OCSP Status">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-ocsp"/></svg>
                 <span>OCSP Status</span>
             </a>
             
             <a href="/users" class="sidebar-link {% if request.path.startswith('/users') %}active{% endif %}"
-               hx-get="/users" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/users" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="Users">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-users"/></svg>
                 <span>Users</span>
             </a>
             
             {% if session.get('role') == 'admin' %}
             <a href="/settings" class="sidebar-link {% if request.path.startswith('/settings') %}active{% endif %}"
-               hx-get="/settings" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/settings" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="System Settings">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-settings"/></svg>
                 <span>System Settings</span>
             </a>
@@ -294,13 +308,15 @@
             </div>
             
             <a href="/my-account" class="sidebar-link {% if request.path.startswith('/my-account') %}{% if request.path == '/my-account/mtls' %}{% else %}active{% endif %}{% endif %}"
-               hx-get="/my-account" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/my-account" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="Profile & Settings">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-user"/></svg>
                 <span>Profile & Settings</span>
             </a>
             
             <a href="/my-account/mtls" class="sidebar-link {% if request.path == '/my-account/mtls' %}active{% endif %}"
-               hx-get="/my-account/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/my-account/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="My Certificates">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-certificate"/></svg>
                 <span>My Certificates</span>
             </a>
@@ -308,13 +324,15 @@
 
             
             <a href="/config/notifications" class="sidebar-link {% if request.path.startswith('/config/notifications') %}active{% endif %}"
-               hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="Notifications">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-bell"/></svg>
                 <span>Notifications</span>
             </a>
             
             <a href="/config/webauthn" class="sidebar-link {% if request.path.startswith('/config/webauthn') %}active{% endif %}"
-               hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
+               hx-get="/config/webauthn" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="Security Keys">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-key"/></svg>
                 <span>Security Keys</span>
             </a>
@@ -591,6 +609,32 @@
         </div>
         </div>
     </div>
+    
+    <!-- Sidebar Toggle Script -->
+    <script>
+    (function() {
+        'use strict';
+        
+        // Check saved sidebar state and apply immediately
+        const sidebarCollapsed = localStorage.getItem('ucm-sidebar-collapsed') === 'true';
+        if (sidebarCollapsed) {
+            document.body.classList.add('sidebar-collapsed');
+        }
+        
+        // Wait for DOM ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('sidebar-toggle');
+            if (!toggleBtn) return;
+            
+            // Toggle sidebar on button click
+            toggleBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const isCollapsed = document.body.classList.toggle('sidebar-collapsed');
+                localStorage.setItem('ucm-sidebar-collapsed', isCollapsed);
+            });
+        });
+    })();
+    </script>
     
     <!-- UCM Loading Manager -->
     <script src="{{ url_for('static', filename='js/loading-manager.js') }}"></script>
