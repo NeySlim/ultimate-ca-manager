@@ -1772,7 +1772,8 @@ def crl_list_data():
         
         # Get scheduler status
         scheduler_status = "Active"
-        last_run_str = ""
+        last_run_str = '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Initializing...</div>'
+        
         try:
             from services.scheduler_service import get_scheduler
             scheduler = get_scheduler()
@@ -1780,18 +1781,23 @@ def crl_list_data():
             if task_status:
                 if not task_status.get('enabled'):
                     scheduler_status = "Disabled"
-                
-                last_run = task_status.get('last_run')
-                if last_run:
-                    from datetime import datetime
-                    try:
-                        dt = datetime.fromisoformat(last_run.replace('Z', '+00:00'))
-                        last_run_time = dt.strftime('%H:%M')
-                        last_run_str = f'<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Last check: {last_run_time}</div>'
-                    except:
-                        pass
+                    last_run_str = '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Scheduler disabled</div>'
+                else:
+                    last_run = task_status.get('last_run')
+                    if last_run:
+                        from datetime import datetime
+                        try:
+                            dt = datetime.fromisoformat(last_run.replace('Z', '+00:00'))
+                            # Convert to local time approximation (assuming server is UTC, browser will see server time)
+                            last_run_time = dt.strftime('%H:%M:%S UTC')
+                            last_run_str = f'<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Last check: {last_run_time}</div>'
+                        except:
+                            pass
+                    else:
+                         last_run_str = '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Pending first run...</div>'
         except Exception as e:
             scheduler_status = "Unknown"
+            last_run_str = f'<div style="font-size: 0.75rem; color: var(--danger-color); margin-top: 0.25rem;">Error: {str(e)}</div>'
 
         # Build HTML
         html = f'''
