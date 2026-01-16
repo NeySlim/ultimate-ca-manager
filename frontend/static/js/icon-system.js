@@ -16,7 +16,7 @@ class IconSystem {
             // Try to load from localStorage cache first
             const cachedData = localStorage.getItem('ucm-icons-data');
             const cachedVersion = localStorage.getItem('ucm-icons-version');
-            const currentVersion = '3.1'; // Increment this when icons.json changes
+            const currentVersion = '3.5'; // Increment this when icons.json changes
             
             if (cachedData && cachedVersion === currentVersion) {
                 // Use cached data for instant load
@@ -25,7 +25,7 @@ class IconSystem {
                 this.gradients = data.gradients;
             } else {
                 // Fetch and cache
-                const response = await fetch('/static/data/icons.json');
+                const response = await fetch(`/static/data/icons.json?v=${currentVersion}`);
                 const data = await response.json();
                 this.icons = data.icons;
                 this.gradients = data.gradients;
@@ -174,8 +174,12 @@ class IconSystem {
         }).join('');
 
         const animateClass = iconData.animate?.rotate ? ' ucm-icon-rotate' : '';
+        const refreshClass = iconName === 'refresh' ? ' ucm-icon-refresh' : '';
         
-        const svg = `<svg class="ucm-icon ${className}${animateClass}" width="${size}" height="${size}" viewBox="${iconData.viewBox}" xmlns="http://www.w3.org/2000/svg">${paths}</svg>`;
+        // Ensure refresh icon NEVER gets the generic rotate class
+        const finalAnimateClass = (iconName === 'refresh') ? '' : animateClass;
+        
+        const svg = `<svg class="ucm-icon ${className}${finalAnimateClass}${refreshClass}" width="${size}" height="${size}" viewBox="${iconData.viewBox}" xmlns="http://www.w3.org/2000/svg">${paths}</svg>`;
         
         // Cache the result
         this.svgCache.set(cacheKey, svg);
@@ -377,6 +381,27 @@ body.icons-loaded i.fab {
     to {
         transform: rotate(360deg);
     }
+}
+
+/* Rotate icon when button is in HTMX request state */
+.htmx-request .ucm-icon,
+.htmx-request.ucm-icon {
+    animation: ucm-rotate 1s linear infinite;
+    transform-origin: center;
+}
+
+/* Specific handling for refresh icon to prevent unwanted rotation */
+.ucm-icon-refresh,
+.ucm-icon:has(use[href="#icon-refresh"]) {
+    animation: none !important;
+    transform: none !important;
+}
+
+.htmx-request .ucm-icon-refresh,
+.htmx-request.ucm-icon-refresh,
+.htmx-request .ucm-icon:has(use[href="#icon-refresh"]),
+.htmx-request.ucm-icon:has(use[href="#icon-refresh"]) {
+    animation: ucm-rotate 1s linear infinite !important;
 }
 
 /* Ensure icons align properly */
