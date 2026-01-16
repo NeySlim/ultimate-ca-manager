@@ -207,12 +207,32 @@
 
 <script>
 // Load templates on page load
+// Get JWT token from cookie
+function getJWTToken() {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'jwt_token') {
+            return value;
+        }
+    }
+    return null;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     loadTemplates();
 });
 
 function loadTemplates() {
-    fetch('/api/v1/templates')
+    const token = getJWTToken();
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
+    fetch('/api/v1/templates', {
+        headers: {'Authorization': `Bearer ${token}`}
+    })
         .then(response => response.json())
         .then(data => {
             displayTemplates(data.templates);
@@ -323,7 +343,10 @@ function closeTemplateModal() {
 }
 
 function viewTemplate(id) {
-    fetch(`/api/v1/templates/${id}`)
+    const token = getJWTToken();
+    fetch(`/api/v1/templates/${id}`, {
+        headers: {'Authorization': `Bearer ${token}`}
+    })
         .then(response => response.json())
         .then(template => {
             alert(`Template: ${template.name}\n\nType: ${template.template_type}\nKey: ${template.key_type}\nValidity: ${template.validity_days} days\nDigest: ${template.digest}\n\nDN Template:\n${JSON.stringify(template.dn_template, null, 2)}\n\nExtensions:\n${JSON.stringify(template.extensions_template, null, 2)}`);
@@ -335,7 +358,10 @@ function viewTemplate(id) {
 }
 
 function editTemplate(id) {
-    fetch(`/api/v1/templates/${id}`)
+    const token = getJWTToken();
+    fetch(`/api/v1/templates/${id}`, {
+        headers: {'Authorization': `Bearer ${token}`}
+    })
         .then(response => response.json())
         .then(template => {
             document.getElementById('modal-title').textContent = 'Edit Template';
@@ -390,8 +416,10 @@ function deleteTemplate(id, name) {
         return;
     }
     
+    const token = getJWTToken();
     fetch(`/api/v1/templates/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {'Authorization': `Bearer ${token}`}
     })
     .then(response => response.json())
     .then(data => {
@@ -462,10 +490,12 @@ document.getElementById('templateForm').addEventListener('submit', function(e) {
     const url = isEdit ? `/api/v1/templates/${templateId}` : '/api/v1/templates';
     const method = isEdit ? 'PUT' : 'POST';
     
+    const token = getJWTToken();
     fetch(url, {
         method: method,
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(data)
     })
