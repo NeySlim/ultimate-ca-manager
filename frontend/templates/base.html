@@ -271,6 +271,13 @@
                 <span>ACME</span>
             </a>
             
+            <a href="/config/templates" class="sidebar-link {% if request.path.startswith('/config/templates') %}active{% endif %}"
+               hx-get="/config/templates" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
+               data-tooltip="Certificate Templates">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-file"/></svg>
+                <span>Templates</span>
+            </a>
+            
             <a href="/crl" class="sidebar-link {% if request.path.startswith('/crl') %}active{% endif %}"
                hx-get="/crl" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
                data-tooltip="CRL Management">
