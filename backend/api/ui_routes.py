@@ -4814,3 +4814,178 @@ def public_stats():
 def config_templates_page():
     """Certificate Templates configuration page"""
     return render_template('config/templates.html')
+
+
+# ========================================
+# TEMPLATES UI ROUTES (HTMX)
+# ========================================
+
+@ui_bp.route('/api/ui/templates/list', methods=['GET'])
+@login_required
+def ui_templates_list():
+    """Get templates list HTML fragment for HTMX"""
+    try:
+        import json
+        from services.template_service import TemplateService
+        templates = TemplateService.get_all_templates()
+        
+        if not templates:
+            return '''
+            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                <svg class="ucm-icon" width="48" height="48" style="opacity: 0.3; margin-bottom: 1rem;"><use href="#icon-file"/></svg>
+                <p>No templates found</p>
+                <p style="font-size: 0.875rem; margin-top: 0.5rem;">Create a custom template to get started</p>
+            </div>
+            '''
+        
+        # Sort: system first, then by name
+        templates.sort(key=lambda t: (not t.is_system, t.name))
+        
+        html = '<div style="display: grid; gap: 1rem;">'
+        
+        for template in templates:
+            badge_color = 'var(--info-color)' if template.is_system else 'var(--success-color)'
+            badge_text = 'System' if template.is_system else 'Custom'
+            
+            # Parse JSON extensions
+            extensions = json.loads(template.extensions_template) if isinstance(template.extensions_template, str) else template.extensions_template
+            eku = ', '.join(extensions.get('extended_key_usage', [])) or 'None'
+            
+            # Build action buttons
+            actions = f'''
+            <button onclick="viewTemplateDetail({template.id})" 
+                    style="padding: 0.375rem 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 0.375rem;">
+                <svg class="ucm-icon" width="14" height="14"><use href="#icon-eye"/></svg>
+                View
+            </button>
+            '''
+            
+            if not template.is_system:
+                actions += f'''
+                <button onclick="openEditModal({template.id})"
+                        style="padding: 0.375rem 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 0.375rem;">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-edit"/></svg>
+                    Edit
+                </button>
+                <button hx-delete="/api/ui/templates/delete/{template.id}"
+                        hx-confirm="Delete template '{html_escape(template.name)}'? This cannot be undone."
+                        hx-target="#templates-list"
+                        hx-swap="innerHTML"
+                        style="padding: 0.375rem 0.75rem; background: var(--danger-bg); border: 1px solid var(--danger-color); border-radius: 4px; color: var(--danger-color); cursor: pointer; font-size: 0.875rem; display: flex; align-items: center; gap: 0.375rem;">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-trash"/></svg>
+                    Delete
+                </button>
+                '''
+            
+            html += f'''
+            <div style="border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem; background: var(--bg-secondary); transition: all 0.2s;"
+                 onmouseover="this.style.borderColor='var(--primary-color)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)';" 
+                 onmouseout="this.style.borderColor='var(--border-color)'; this.style.boxShadow='none';">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem;">
+                            <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin: 0;">
+                                {html_escape(template.name)}
+                            </h3>
+                            <span style="padding: 0.125rem 0.5rem; background: {badge_color}20; color: {badge_color}; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">
+                                {badge_text}
+                            </span>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">
+                            {html_escape(template.description or '')}
+                        </p>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem; font-size: 0.875rem;">
+                    <div>
+                        <strong style="color: var(--text-secondary);">Type:</strong>
+                        <span style="color: var(--text-primary);"> {html_escape(template.template_type)}</span>
+                    </div>
+                    <div>
+                        <strong style="color: var(--text-secondary);">Key:</strong>
+                        <span style="color: var(--text-primary);"> {html_escape(template.key_type)}</span>
+                    </div>
+                    <div>
+                        <strong style="color: var(--text-secondary);">Validity:</strong>
+                        <span style="color: var(--text-primary);"> {template.validity_days} days</span>
+                    </div>
+                    <div>
+                        <strong style="color: var(--text-secondary);">EKU:</strong>
+                        <span style="color: var(--text-primary);"> {html_escape(eku)}</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    {actions}
+                </div>
+            </div>
+            '''
+        
+        html += '</div>'
+        return html
+        
+    except Exception as e:
+        return f'''
+        <div style="text-align: center; padding: 2rem; color: var(--danger-color);">
+            <p>Error loading templates: {html_escape(str(e))}</p>
+        </div>
+        '''
+
+
+@ui_bp.route('/api/ui/templates/stats', methods=['GET'])
+@login_required
+def ui_templates_stats():
+    """Get templates stats HTML fragment for HTMX"""
+    try:
+        from services.template_service import TemplateService
+        templates = TemplateService.get_all_templates()
+        
+        total = len(templates)
+        system = sum(1 for t in templates if t.is_system)
+        custom = total - system
+        active = sum(1 for t in templates if t.is_active)
+        
+        return f'''
+        <div class="stats-card">
+            <div style="color: var(--text-secondary); font-size: 0.875rem;">Total Templates</div>
+            <div style="font-size: 2rem; font-weight: 700; color: var(--primary-color);">{total}</div>
+        </div>
+        <div class="stats-card">
+            <div style="color: var(--text-secondary); font-size: 0.875rem;">System</div>
+            <div style="font-size: 2rem; font-weight: 700; color: var(--info-color);">{system}</div>
+        </div>
+        <div class="stats-card">
+            <div style="color: var(--text-secondary); font-size: 0.875rem;">Custom</div>
+            <div style="font-size: 2rem; font-weight: 700; color: var(--success-color);">{custom}</div>
+        </div>
+        <div class="stats-card">
+            <div style="color: var(--text-secondary); font-size: 0.875rem;">Active</div>
+            <div style="font-size: 2rem; font-weight: 700; color: var(--accent-color);">{active}</div>
+        </div>
+        '''
+    except Exception as e:
+        return f'<div style="color: var(--danger-color);">Error: {html_escape(str(e))}</div>'
+
+
+@ui_bp.route('/api/ui/templates/delete/<int:template_id>', methods=['DELETE'])
+@login_required
+def ui_templates_delete(template_id):
+    """Delete a template and return refreshed list"""
+    try:
+        from services.template_service import TemplateService
+        from models import User
+        
+        # Check admin role
+        user = User.query.get(session['user_id'])
+        if user.role != 'admin':
+            return '<div style="color: var(--danger-color); padding: 1rem;">Admin role required</div>', 403
+        
+        success, message = TemplateService.delete_template(template_id, session['username'])
+        
+        if success:
+            # Return refreshed list
+            return ui_templates_list()
+        else:
+            return f'<div style="color: var(--danger-color); padding: 1rem;">{html_escape(message)}</div>', 400
+            
+    except Exception as e:
+        return f'<div style="color: var(--danger-color); padding: 1rem;">Error: {html_escape(str(e))}</div>', 500
