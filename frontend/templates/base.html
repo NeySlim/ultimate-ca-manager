@@ -26,6 +26,18 @@
 </head>
 <body>
     
+    <!-- Global Alerts -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer" style="z-index: 1060;"></div>
+
+    {% if is_self_signed %}
+    <div class="alert alert-warning alert-dismissible fade show rounded-0 mb-0 text-center" role="alert" style="position: fixed; top: 0; left: 0; right: 0; z-index: 1050; font-size: 0.9rem; padding: 0.5rem; background-color: #fff3cd; color: #664d03; border-bottom: 1px solid #ffecb5;">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+        <strong>Warning:</strong> You are using a self-signed certificate. ACME clients (like Certbot) will fail unless you trust the CA or disable verification.
+        <button type="button" class="btn-close p-2" data-bs-dismiss="alert" aria-label="Close" style="top: 0.2rem;"></button>
+    </div>
+    <div style="height: 40px;"></div> <!-- Spacer -->
+    {% endif %}
+    
     <!-- Global Loading Indicator -->
     <div id="global-loader" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: transparent; z-index: 9999; align-items: center; justify-content: center; pointer-events: none;">
         <div style="background: var(--card-bg); border-radius: 12px; padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; min-width: 200px;">
@@ -145,12 +157,7 @@
                     <a href="/my-account" class="dropdown-item"
                        hx-get="/my-account" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
                        @click="open = false">
-                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-user"/></svg> My Account
-                    </a>
-                    <a href="/my-account/mtls" class="dropdown-item"
-                       hx-get="/my-account/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
-                       @click="open = false">
-                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-certificate"/></svg> My Certificates
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-user"/></svg> My Account ( & Certificates)
                     </a>
                     
                     <div class="dropdown-divider"></div>
@@ -287,11 +294,7 @@
                 <span>Profile & Settings</span>
             </a>
             
-            <a href="/my-account/mtls" class="sidebar-link {% if request.path == '/my-account/mtls' %}active{% endif %}"
-               hx-get="/my-account/mtls" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
-                <svg class="ucm-icon" width="20" height="20"><use href="#icon-certificate"/></svg>
-                <span>My Certificates</span>
-            </a>
+
             
             <a href="/config/notifications" class="sidebar-link {% if request.path.startswith('/config/notifications') %}active{% endif %}"
                hx-get="/config/notifications" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">

@@ -235,6 +235,13 @@ class SchedulerService:
                     ]
                 
                 # Execute tasks outside of lock
+                with self.tasks_lock:
+                    tasks_to_run = [
+                        task for task in self.tasks.values()
+                        if task.should_run()
+                    ]
+                
+                # Execute tasks outside of lock
                 for task in tasks_to_run:
                     try:
                         self._run_task(task)
@@ -308,13 +315,14 @@ def get_scheduler() -> SchedulerService:
     return _scheduler
 
 
-def init_scheduler(app=None, wake_interval: int = 60) -> SchedulerService:
+def init_scheduler(app=None, wake_interval: int = 60, autostart: bool = True) -> SchedulerService:
     """
     Initialize and start the scheduler
     
     Args:
         app: Flask app instance
         wake_interval: Wake interval in seconds (default 60s, must be > 0)
+        autostart: Whether to start the scheduler immediately (default True)
         
     Returns:
         SchedulerService instance
@@ -325,6 +333,11 @@ def init_scheduler(app=None, wake_interval: int = 60) -> SchedulerService:
         raise ValueError("wake_interval must be > 0")
     
     _scheduler = SchedulerService(wake_interval=wake_interval)
-    _scheduler.start(app=app)
+    
+    if autostart:
+        _scheduler.start(app=app)
+    elif app:
+        # If not autostarting but app provided, store it for later start()
+        _scheduler._app = app
     
     return _scheduler

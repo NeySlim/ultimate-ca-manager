@@ -169,6 +169,26 @@ class HTTPSManager:
             return False
     
     @staticmethod
+    def is_self_signed(cert_path: Path) -> bool:
+        """
+        Check if a certificate is self-signed
+        
+        Args:
+            cert_path: Path to certificate
+            
+        Returns:
+            True if self-signed, False otherwise
+        """
+        try:
+            with open(cert_path, "rb") as f:
+                cert = x509.load_pem_x509_certificate(f.read(), default_backend())
+            
+            # Simple check: Issuer == Subject
+            return cert.issuer == cert.subject
+        except Exception:
+            return False
+
+    @staticmethod
     def get_cert_info(cert_path: Path) -> Optional[dict]:
         """
         Get information about a certificate

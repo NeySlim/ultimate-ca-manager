@@ -29,24 +29,24 @@
             </p>
             
             <form id="manual-import-form" style="display: grid; gap: 20px;">
-                <!-- Import Method Tabs -->
-                <div class="tabs-container">
-                    <button type="button" class="tab-button active" onclick="switchImportMethod('paste')">
-                        <svg class="ucm-icon" width="20" height="20"><use href="#icon-file-import"/></svg>
+                <!-- Import Method Tabs (Global Inline Design) -->
+                <div class="tabs-container" style="display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 2px solid var(--border-color);">
+                    <button type="button" class="tab-button active" onclick="ucm_switchTab('paste'); switchImportMethod('paste')" id="btn-tab-paste" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 600; color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+                        <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-file-import"/></svg>
                         <span>Paste Content</span>
                     </button>
-                    <button type="button" class="tab-button" onclick="switchImportMethod('upload')">
-                        <svg class="ucm-icon" width="20" height="20"><use href="#icon-upload"/></svg>
+                    <button type="button" class="tab-button" onclick="ucm_switchTab('upload'); switchImportMethod('upload')" id="btn-tab-upload" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+                        <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-upload"/></svg>
                         <span>Upload Files</span>
                     </button>
-                    <button type="button" class="tab-button" onclick="switchImportMethod('container')">
-                        <svg class="ucm-icon" width="20" height="20"><use href="#icon-archive"/></svg>
+                    <button type="button" class="tab-button" onclick="ucm_switchTab('container'); switchImportMethod('container')" id="btn-tab-container" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+                        <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-archive"/></svg>
                         <span>Container File</span>
                     </button>
                 </div>
                 
                 <!-- Paste Method -->
-                <div id="paste-method" style="display: grid; gap: 16px;">
+                <div id="tab-paste" class="tab-content active" style="display: grid; gap: 16px;">
                     <div>
                         <label class="modal-form-label">Certificate (PEM format) <span style="color: var(--status-danger);">*</span></label>
                         <textarea id="cert-paste" rows="8" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" 
@@ -66,7 +66,7 @@
                 </div>
                 
                 <!-- Upload Method -->
-                <div id="upload-method" style="display: none; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div id="tab-upload" class="tab-content" style="display: none; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div>
                         <label class="modal-form-label">Certificate File (.crt, .pem, .cer) <span style="color: var(--status-danger);">*</span></label>
                         <input type="file" id="cert-file" accept=".crt,.pem,.cer,.der" class="modal-form-input" style="padding: 8px;">
@@ -83,7 +83,7 @@
                 </div>
                 
                 <!-- Container Method -->
-                <div id="container-method" style="display: none; gap: 16px;">
+                <div id="tab-container" class="tab-content" style="display: none; gap: 16px;">
                     <div>
                         <label class="modal-form-label">Container Format</label>
                         <select id="container-format" class="modal-form-input">
@@ -168,38 +168,18 @@
 
 <script>
 function switchImportMethod(method) {
-    // Update tabs
-    document.querySelectorAll('.tab-button').forEach(btn => {
-        btn.classList.remove('active');
-        btn.style.borderBottomColor = 'transparent';
-        btn.style.color = 'var(--text-secondary)';
-    });
-    event.target.closest('.tab-button').classList.add('active');
-    event.target.closest('.tab-button').style.borderBottomColor = 'var(--primary-color)';
-    event.target.closest('.tab-button').style.color = 'var(--primary-color)';
-    
-    // Hide all methods
-    document.getElementById('paste-method').style.display = 'none';
-    document.getElementById('upload-method').style.display = 'none';
-    document.getElementById('container-method').style.display = 'none';
-    
-    // Show selected method
-    if (method === 'paste') {
-        document.getElementById('paste-method').style.display = 'grid';
-    } else if (method === 'upload') {
-        document.getElementById('upload-method').style.display = 'grid';
-    } else if (method === 'container') {
-        document.getElementById('container-method').style.display = 'grid';
-    }
+    // Legacy logic preserved if needed, but UI is handled by ucm_switchTab
+    // This function now only handles specific logic if any (none for now)
 }
 
 async function importManualCertificate() {
     const statusDiv = document.getElementById('manual-import-status');
     let method = 'paste';
     
-    if (document.getElementById('upload-method').style.display !== 'none') {
+    // Check visibility using the new IDs
+    if (document.getElementById('tab-upload').style.display !== 'none') {
         method = 'upload';
-    } else if (document.getElementById('container-method').style.display !== 'none') {
+    } else if (document.getElementById('tab-container').style.display !== 'none') {
         method = 'container';
     }
     
@@ -317,11 +297,8 @@ function showStatus(element, message, type) {
 
 // Initialize first tab
 document.addEventListener('DOMContentLoaded', function() {
-    const firstTab = document.querySelector('.tab-button.active');
-    if (firstTab) {
-        firstTab.style.borderBottomColor = 'var(--primary-color)';
-        firstTab.style.color = 'var(--primary-color)';
-    }
+    // Default to paste tab
+    ucm_switchTab('paste');
 });
 </script>
 

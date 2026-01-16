@@ -469,11 +469,6 @@ def my_account():
     return render_template('my_account.html')
 
 
-@ui_bp.route('/my-account/mtls')
-@login_required
-def my_account_mtls():
-    """User mTLS certificates management page"""
-    return render_template('my_account_mtls.html')
 
 
 @ui_bp.route('/users')
@@ -1771,8 +1766,8 @@ def crl_list_data():
         total_revoked = sum(c.get('revoked_count', 0) for c in crls if c.get('has_crl'))
         
         # Get scheduler status
-        scheduler_status = "Active"
-        last_run_str = '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Initializing...</div>'
+        scheduler_status = "Unknown"
+        last_run_str = '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Last check: Initializing...</div>'
         
         try:
             from services.scheduler_service import get_scheduler
@@ -1781,8 +1776,9 @@ def crl_list_data():
             if task_status:
                 if not task_status.get('enabled'):
                     scheduler_status = "Disabled"
-                    last_run_str = '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Scheduler disabled</div>'
+                    last_run_str = '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Last check: Disabled</div>'
                 else:
+                    scheduler_status = "Active"
                     last_run = task_status.get('last_run')
                     if last_run:
                         from datetime import datetime
@@ -1794,9 +1790,9 @@ def crl_list_data():
                         except:
                             pass
                     else:
-                         last_run_str = '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Pending first run...</div>'
+                         last_run_str = '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Last check: Pending...</div>'
         except Exception as e:
-            scheduler_status = "Unknown"
+            scheduler_status = "Error"
             last_run_str = f'<div style="font-size: 0.75rem; color: var(--danger-color); margin-top: 0.25rem;">Error: {str(e)}</div>'
 
         # Build HTML
@@ -4496,6 +4492,58 @@ def acme_statistics():
             'issued_certs': 0,
             'error': str(e)
         }), 200
+
+@ui_bp.route('/api/ui/acme/proxy/status')
+@login_required
+def acme_proxy_status():
+    """Get ACME Proxy status"""
+    try:
+        from services.acme.acme_proxy_service import AcmeProxyService
+        from models import SystemConfig
+        
+        # Get base URL
+        base_url = f"{request.scheme}://{request.host}"
+        svc = AcmeProxyService(base_url)
+        
+        # Get config
+        upstream_url_conf = SystemConfig.query.filter_by(key='acme.proxy.upstream_url').first()
+        upstream_url = upstream_url_conf.value if upstream_url_conf else svc.DEFAULT_UPSTREAM
+        
+        account_url_conf = SystemConfig.query.filter_by(key='acme.proxy.account_url').first()
+        account_url = account_url_conf.value if account_url_conf else None
+        
+        # Check connectivity (lightweight check)
+        is_registered = account_url is not None
+        
+        return jsonify({
+            'enabled': True,
+            'upstream_url': upstream_url,
+            'account_url': account_url or "Not Registered",
+            'is_registered': is_registered,
+            'directory_url': f"{base_url}/acme/proxy/directory"
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@ui_bp.route('/api/ui/acme/proxy/register', methods=['POST'])
+@login_required
+def acme_proxy_register():
+    """Register ACME Proxy upstream account"""
+    try:
+        from services.acme.acme_proxy_service import AcmeProxyService
+        
+        base_url = f"{request.scheme}://{request.host}"
+        svc = AcmeProxyService(base_url)
+        
+        # Force register
+        svc._register_upstream_account()
+        
+        return jsonify({'status': 'success', 'message': 'Upstream account registered'})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 
 @ui_bp.route('/api/ui/acme/accounts')

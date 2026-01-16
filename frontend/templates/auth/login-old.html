@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Ultimate CA Manager</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    
+    <!-- CRITICAL: Set theme attribute IMMEDIATELY before any CSS loads -->
+    <script>
+        (function() {
+            var theme = localStorage.getItem('ucm-theme') || 'sentinel-light';
+            document.documentElement.setAttribute('data-theme', theme);
+            document.write('<link id="theme-css" rel="stylesheet" href="/static/css/themes/' + theme + '.css">');
+        })();
+    </script>
+    
+    <!-- Components CSS for dropdown styling -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            max-width: 420px;
+            width: 100%;
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        
+        .login-logo {
+            margin: 0 auto 20px;
+        }
+        
+        .login-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        
+        .login-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .login-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 32px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 14px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: border-color 0.2s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        
+        .form-checkbox {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .form-checkbox input {
+            margin-right: 8px;
+        }
+        
+        .form-checkbox label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        .btn-login {
+            width: 100%;
+            padding: 9px 12px;
+            font-size: 15px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: var(--btn-secondary-bg, var(--bg-secondary)) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-login:hover {
+            background: var(--btn-secondary-hover, var(--sidebar-hover)) !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+        }
+        
+        .btn-login i {
+            color: var(--primary-color) !important;
+            opacity: 1 !important;
+        }
+        
+        /* Ensure login button icons are always visible */
+        .btn-login i.fas,
+        .btn-login svg,
+        .btn-login .ucm-icon {
+            opacity: 1 !important;
+            color: var(--primary-color) !important;
+        }
+        
+        .login-footer {
+            margin-top: 24px;
+            text-align: center;
+        }
+        
+        .login-info {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .github-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            margin-top: 8px;
+        }
+        
+        .github-badge:hover {
+            color: var(--text-primary);
+            background: var(--sidebar-hover);
+            border-color: var(--primary-color);
+            transform: translateY(-1px);
+        }
+        
+        .github-badge i {
+            font-size: 12px;
+        }
+        
+        .theme-selector {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .theme-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+        
+        .theme-btn:hover {
+            background: var(--bg-hover);
+        }
+        
+        .theme-dropdown {
+            position: relative;
+        }
+        
+        .theme-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            min-width: 180px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .theme-dropdown-menu.active {
+            display: block;
+        }
+        
+        .theme-dropdown-header {
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .theme-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 13px;
+            transition: background-color 0.15s;
+        }
+        
+        .theme-dropdown-item:hover {
+            background: var(--bg-hover);
+        }
+        
+        .theme-dropdown-item i {
+            width: 16px;
+            text-align: center;
+            font-size: 12px;
+        }
+        
+        .theme-dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Theme Selector -->
+    <div class="theme-selector">
+        <div class="theme-dropdown">
+            <button class="theme-btn" data-action="toggle-dropdown">
+                <i class="fas fa-palette"></i>
+            </button>
+            
+            <div id="themeDropdown" class="theme-dropdown-menu">
+                <div class="theme-dropdown-header">Sentinel</div>
+                <a href="#" data-action="set-theme" data-theme="sentinel-light" class="theme-dropdown-item">
+                    <i class="fas fa-sun"></i> Light
+                </a>
+                <a href="#" data-action="set-theme" data-theme="sentinel-dark" class="theme-dropdown-item">
+                    <i class="fas fa-moon"></i> Dark
+                </a>
+                
+                <div class="theme-dropdown-divider"></div>
+                
+                <div class="theme-dropdown-header">Amber</div>
+                <a href="#" data-action="set-theme" data-theme="amber-light" class="theme-dropdown-item">
+                    <i class="fas fa-sun"></i> Light
+                </a>
+                <a href="#" data-action="set-theme" data-theme="amber-dark" class="theme-dropdown-item">
+                    <i class="fas fa-moon"></i> Dark
+                </a>
+                
+                <div class="theme-dropdown-divider"></div>
+                
+                <div class="theme-dropdown-header">Blossom</div>
+                <a href="#" data-action="set-theme" data-theme="blossom-light" class="theme-dropdown-item">
+                    <i class="fas fa-sun"></i> Light
+                </a>
+                <a href="#" data-action="set-theme" data-theme="blossom-dark" class="theme-dropdown-item">
+                    <i class="fas fa-moon"></i> Dark
+                </a>
+                
+                <div class="theme-dropdown-divider"></div>
+                
+                <div class="theme-dropdown-header">Nebula</div>
+                <a href="#" data-action="set-theme" data-theme="nebula-light" class="theme-dropdown-item">
+                    <i class="fas fa-sun"></i> Light
+                </a>
+                <a href="#" data-action="set-theme" data-theme="nebula-dark" class="theme-dropdown-item">
+                    <i class="fas fa-moon"></i> Dark
+                </a>
+            </div>
+        </div>
+        
+        <button class="theme-btn" data-action="toggle-theme-variant" title="Toggle Dark/Light">
+            <i id="theme-toggle-icon" class="fas fa-moon"></i>
+        </button>
+    </div>
+
+    <div class="login-container">
+        <!-- Header -->
+        <div class="login-header">
+            <svg class="login-logo" width="64" height="64" viewBox="0 0 192 150" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="ucm-logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:var(--primary-color);stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:var(--primary-hover);stop-opacity:1" />
+                </linearGradient>
+              </defs>
+              <rect class="logo-border" x="8" y="0" width="176" height="116" rx="4" fill="url(#ucm-logo-gradient)"/>
+              <rect class="logo-bg" x="12" y="4" width="168" height="108" rx="3" fill="transparent"/>
+              <line class="logo-line" x1="42" y1="22" x2="150" y2="22" stroke="url(#ucm-logo-gradient)" stroke-width="4" opacity="0.3"/>
+              <line class="logo-line" x1="42" y1="34" x2="138" y2="34" stroke="url(#ucm-logo-gradient)" stroke-width="4" opacity="0.3"/>
+              <line class="logo-line" x1="42" y1="46" x2="126" y2="46" stroke="url(#ucm-logo-gradient)" stroke-width="4" opacity="0.3"/>
+              <circle class="logo-badge" cx="96" cy="70" r="24" fill="url(#ucm-logo-gradient)"/>
+              <circle class="logo-badge-ring" cx="96" cy="70" r="20" fill="none" stroke="#fff" stroke-width="3"/>
+              <circle class="logo-badge-ring" cx="96" cy="70" r="16" fill="none" stroke="#fff" stroke-width="2" opacity="0.5"/>
+              <path class="logo-check" d="M88 70l5 5 11-11" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path class="logo-ribbon" d="M70 116 L70 142 L80 133 L80 116 Z" fill="url(#ucm-logo-gradient)"/>
+              <path class="logo-ribbon-outline" d="M70 116 L70 142 L80 133 L80 116" fill="none" stroke="#fff" stroke-width="2" opacity="0.6"/>
+              <path class="logo-ribbon" d="M112 116 L112 142 L102 133 L102 116 Z" fill="url(#ucm-logo-gradient)"/>
+              <path class="logo-ribbon-outline" d="M112 116 L112 142 L102 133 L102 116" fill="none" stroke="#fff" stroke-width="2" opacity="0.6"/>
+            </svg>
+            <h1 class="login-title">Ultimate CA Manager</h1>
+            <p class="login-subtitle">Secure Certificate Authority Management</p>
+        </div>
+        
+        <!-- Session Expired Alert -->
+        {% if request.args.get('expired') == '1' %}
+        <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: start; gap: 12px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink: 0; margin-top: 2px;">
+                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div style="flex: 1;">
+                <div style="font-weight: 600; color: #92400e; margin-bottom: 4px;">Session Expired</div>
+                <div style="font-size: 14px; color: #92400e;">Your session has expired due to inactivity. Please log in again.</div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Login Card -->
+        <div class="login-card">
+            <!-- Step 1: Username Entry -->
+            <div id="step-username">
+                <div class="form-group">
+                    <label class="form-label" for="username">Username</label>
+                    <input class="form-input" id="username" type="text" required placeholder="Enter your username" autofocus>
+                </div>
+                
+                <button type="button" data-action="check-auth-methods" class="btn-login">
+                    <i class="fas fa-arrow-right"></i>
+                    <span>Continue</span>
+                </button>
+            </div>
+            
+            <!-- Step 2: Authentication Methods (hidden initially) -->
+            <div id="step-auth-methods" style="display: none;">
+                <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-user-circle" style="color: var(--primary-color);"></i>
+                        <span id="display-username" style="font-weight: 600; color: var(--text-primary);"></span>
+                    </div>
+                    <button data-action="reset-login" style="background: none; border: none; color: var(--primary-color); font-size: 0.875rem; cursor: pointer; padding: 0; margin-top: 0.25rem;">
+                        Not you? Change account
+                    </button>
+                </div>
+                
+                <div id="auth-methods-container"></div>
+                
+                <div id="auth-status" style="margin-top: 12px; text-align: center; font-size: 13px; display: none;"></div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="login-footer">
+            <p class="login-info" style="font-size: 12px; opacity: 0.7;">HTTPS-only secure connection</p>
+            <a href="https://github.com/NeySlim/ultimate-ca-manager" target="_blank" class="github-badge">
+                <i class="fab fa-github"></i>
+                <span>View on GitHub</span>
+            </a>
+        </div>
+    </div>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/fontawesome.css') }}">
+    
+    <!-- Icon System -->
+    <script src="{{ url_for('static', filename='js/icon-system.js') }}"></script>
+    
+    <!-- Theme Switcher -->
+    <script src="{{ url_for('static', filename='js/theme-switcher.js') }}"></script>
+    <script>
+        // Event delegation for theme controls and auth actions
+        document.addEventListener('click', function(event) {
+            const target = event.target.closest('[data-action]');
+            
+            if (!target) {
+                // Close dropdown when clicking outside
+                const dropdown = document.querySelector('.theme-dropdown');
+                const dropdownMenu = document.getElementById('themeDropdown');
+                if (dropdown && !dropdown.contains(event.target) && dropdownMenu) {
+                    dropdownMenu.classList.remove('active');
+                }
+                return;
+            }
+            
+            const action = target.dataset.action;
+            
+            // Handle toggle dropdown
+            if (action === 'toggle-dropdown') {
+                event.preventDefault();
+                const dropdown = document.getElementById('themeDropdown');
+                if (dropdown) {
+                    dropdown.classList.toggle('active');
+                }
+                return;
+            }
+            
+            // Handle set theme
+            if (action === 'set-theme') {
+                event.preventDefault();
+                const themeName = target.dataset.theme;
+                if (themeName) {
+                    setTheme(themeName);
+                    // Close dropdown
+                    const dropdown = document.getElementById('themeDropdown');
+                    if (dropdown) {
+                        dropdown.classList.remove('active');
+                    }
+                    // Update toggle icon
+                    updateToggleIcon();
+                }
+                return;
+            }
+            
+            // Handle toggle theme variant
+            if (action === 'toggle-theme-variant') {
+                event.preventDefault();
+                toggleThemeVariant();
+                updateToggleIcon();
+                return;
+            }
+            
+            // Handle check auth methods
+            if (action === 'check-auth-methods') {
+                event.preventDefault();
+                checkAuthMethods();
+                return;
+            }
+            
+            // Handle reset login
+            if (action === 'reset-login') {
+                event.preventDefault();
+                resetLogin();
+                return;
+            }
+        }, true); // Use capture phase
+        
+        // Handle Enter key on username field
+        document.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter' && event.target.id === 'username') {
+                event.preventDefault();
+                checkAuthMethods();
+            }
+        });
+        
+        function updateToggleIcon() {
+            const variant = getThemeVariant();
+            const icon = document.getElementById('theme-toggle-icon');
+            if (icon) {
+                icon.className = variant === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+            }
+        }
+        
+        // Set correct icon on load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateToggleIcon();
+        });
+    </script>
+    
+    <!-- Smart Authentication System -->
+    <script>
+        let currentUsername = null;
+        let availableMethods = [];
+        
+        // Check available authentication methods
+        async function checkAuthMethods() {
+            const username = document.getElementById('username').value.trim();
+            
+            if (!username) {
+                showAuthStatus('Please enter your username', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/auth/methods?username=${encodeURIComponent(username)}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    showAuthStatus(data.error || 'Failed to check authentication methods', 'error');
+                    return;
+                }
+                
+                currentUsername = username;
+                availableMethods = data.methods;
+                
+                // Show username
+                document.getElementById('display-username').textContent = username;
+                document.getElementById('step-username').style.display = 'none';
+                document.getElementById('step-auth-methods').style.display = 'block';
+                
+                // Auto-try secure methods in priority order
+                await autoAuthenticateSecure(data);
+                
+            } catch (error) {
+                showAuthStatus('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function autoAuthenticateSecure(data) {
+            const methods = data.methods;
+            const container = document.getElementById('auth-methods-container');
+            
+            // Priority 1: Try mTLS (if available)
+            if (methods.includes('mtls') && data.counts.mtls > 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 2rem;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary-color);"></i><p style="margin-top: 1rem; color: var(--text-secondary);">Checking for client certificate...</p></div>';
+                
+                // mTLS is handled by reverse proxy - if user has cert, they'd already be logged in
+                // Wait a moment to simulate check
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            // Priority 2: Try WebAuthn (if available and compatible)
+            if (methods.includes('webauthn') && data.counts.webauthn > 0) {
+                const isCompatible = checkWebAuthnCompatibility();
+                
+                if (isCompatible) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem;"><i class="fas fa-key" style="font-size: 2rem; color: var(--primary-color);"></i><p style="margin-top: 1rem; color: var(--text-primary); font-weight: 600;">Touch your security key</p><p style="color: var(--text-secondary); font-size: 0.875rem;">Follow your browser prompts to sign in</p></div>';
+                    
+                    try {
+                        await startWebAuthnLogin();
+                        return; // Success - will redirect
+                    } catch (error) {
+                        console.log('WebAuthn failed, falling back to password:', error);
+                        showAuthStatus('Security key authentication failed', 'error');
+                    }
+                }
+            }
+            
+            // Fallback: Show password form
+            showPasswordFallback();
+        }
+        
+        function showPasswordFallback() {
+            const container = document.getElementById('auth-methods-container');
+            
+            container.innerHTML = `
+                <div style="animation: fadeIn 0.3s;">
+                    <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 0.25rem; margin-bottom: 1rem; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-lock" style="color: var(--text-secondary);"></i>
+                        <span style="color: var(--text-secondary);">Please enter your password</span>
+                    </div>
+                    <form action="/login" method="POST">
+                        <input type="hidden" name="username" value="${currentUsername}">
+                        <div class="form-group">
+                            <label class="form-label" for="password">Password</label>
+                            <input class="form-input" id="password" name="password" type="password" required placeholder="Enter your password" autofocus>
+                        </div>
+                        <div class="form-checkbox">
+                            <input id="remember" name="remember" type="checkbox">
+                            <label for="remember">Remember me</label>
+                        </div>
+                        <button type="submit" class="btn-login" style="width: 100%;">
+                            <i class="fas fa-right-from-bracket"></i>
+                            <span>Sign In</span>
+                        </button>
+                    </form>
+                </div>
+            `;
+            
+            // Focus password field
+            setTimeout(() => {
+                const pwdField = document.getElementById('password');
+                if (pwdField) pwdField.focus();
+            }, 100);
+        }
+        
+        function checkWebAuthnCompatibility() {
+            const hostname = window.location.hostname;
+            return hostname === 'localhost' || 
+                   hostname === '127.0.0.1' || 
+                   hostname === '::1' ||
+                   /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
+                   hostname.includes('.');
+        }
+        
+        function resetLogin() {
+            document.getElementById('step-auth-methods').style.display = 'none';
+            document.getElementById('step-username').style.display = 'block';
+            document.getElementById('username').value = '';
+            document.getElementById('username').focus();
+            hideAuthStatus();
+        }
+        
+        function showAuthStatus(message, type = 'info') {
+            const status = document.getElementById('auth-status');
+            if (status) {
+                status.textContent = message;
+                status.style.display = 'block';
+                status.style.color = type === 'error' ? 'var(--error-color)' : type === 'success' ? 'var(--success-color)' : 'var(--primary-color)';
+            }
+        }
+        
+        function hideAuthStatus() {
+            const status = document.getElementById('auth-status');
+            if (status) {
+                status.style.display = 'none';
+            }
+        }
+    </script>
+    
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    
+    <!-- WebAuthn Login -->
+    <script>
+        // Convert base64url to ArrayBuffer
+        function base64urlToBuffer(base64url) {
+            // Convert base64url to base64
+            let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+            
+            // Add padding if needed
+            const padLength = (4 - (base64.length % 4)) % 4;
+            base64 += '='.repeat(padLength);
+            
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+        
+        // Convert ArrayBuffer to base64url
+        function bufferToBase64url(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+        
+        async function startWebAuthnLogin() {
+            showAuthStatus('🔑 Touch your security key...', 'info');
+            
+            try {
+                // Use the stored username from step 1
+                const username = currentUsername || document.getElementById('username').value.trim();
+                if (!username) {
+                    showAuthStatus('✗ Username required', 'error');
+                    return;
+                }
+                
+                // Step 1: Get authentication options from server
+                const optionsResponse = await fetch('/api/v1/webauthn/authenticate/options', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username })
+                });
+                
+                if (!optionsResponse.ok) {
+                    const error = await optionsResponse.json();
+                    throw new Error(error.error || 'Failed to get authentication options');
+                }
+                
+                const options = await optionsResponse.json();
+                
+                // Convert base64url strings to ArrayBuffers
+                // Note: API returns the options object directly, not wrapped in {publicKey: ...}
+                const publicKeyOptions = {
+                    publicKey: {
+                        ...options,
+                        challenge: base64urlToBuffer(options.challenge),
+                        allowCredentials: options.allowCredentials ?
+                            options.allowCredentials.map(cred => ({
+                                ...cred,
+                                id: base64urlToBuffer(cred.id)
+                            })) : []
+                    }
+                };
+                
+                // Step 2: Show "Touch your key" message
+                showAuthStatus('🔑 Touch your security key now...', 'info');
+                
+                // Step 3: Call WebAuthn API
+                const credential = await navigator.credentials.get(publicKeyOptions);
+                
+                if (!credential) {
+                    throw new Error('Authentication was cancelled');
+                }
+                
+                // Step 4: Send credential to server
+                showAuthStatus('✓ Verifying credential...', 'success');
+                
+                const verifyResponse = await fetch('/api/v1/webauthn/authenticate/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        credential: {
+                            id: credential.id,
+                            rawId: bufferToBase64url(credential.rawId),
+                            type: credential.type,
+                            response: {
+                                clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                                authenticatorData: bufferToBase64url(credential.response.authenticatorData),
+                                signature: bufferToBase64url(credential.response.signature),
+                                userHandle: credential.response.userHandle ? 
+                                    bufferToBase64url(credential.response.userHandle) : null
+                            }
+                        }
+                    })
+                });
+                
+                if (!verifyResponse.ok) {
+                    const error = await verifyResponse.json();
+                    throw new Error(error.error || 'Authentication failed');
+                }
+                
+                // Success! Redirect to dashboard
+                showAuthStatus('✓ Authentication successful! Redirecting...');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 500);
+                
+            } catch (error) {
+                console.error('WebAuthn login error:', error);
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+                
+                let errorMessage = error.message;
+                
+                // Provide helpful error messages
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = 'Authentication was cancelled or timed out';
+                } else if (error.name === 'InvalidStateError') {
+                    errorMessage = 'Security key not recognized. Please register it first.';
+                } else if (error.name === 'NotSupportedError') {
+                    errorMessage = 'WebAuthn not supported in this browser';
+                }
+                
+                showAuthStatus('✗ ' + errorMessage, true);
+            }
+        }
+        
+        // Handle login form submission to show loader
+        document.addEventListener('submit', function(e) {
+            if (e.target.action && e.target.action.includes('/login')) {
+                // Show global loader if it exists
+                if (typeof showGlobalLoader === 'function') {
+                    showGlobalLoader();
+                }
+            }
+        });
+        
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('username').focus();
+        });
+    </script>
+</body>
+</html>

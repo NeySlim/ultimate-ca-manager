@@ -2274,20 +2274,24 @@ body.modal-open {
 /* Tab Container with Bottom Border */
 .settings-tabs,
 .tabs-container {
-    display: flex;
-    gap: 0;
-    margin-bottom: 2rem;
-    border-bottom: 3px solid var(--border-color);
+    display: flex; /* MATCH ACME INLINE */
+    gap: 0; /* MATCH ACME INLINE */
+    margin-bottom: 2rem; /* MATCH ACME INLINE */
+    border-bottom: 2px solid var(--border-color); /* MATCH ACME INLINE */
     overflow-x: auto;
     scrollbar-width: thin;
 }
 
-/* Tab Buttons - Base Style */
+/* Tab Buttons - Base Style (SPACIOUS MODEL) */
 .settings-tab,
 .tab-button,
 .mtls-tab-button {
-    padding: 1.125rem 1.75rem;
-    font-size: 0.9375rem;
+    /* Use !important to ensure global CSS supports the layout if inline styles are missing */
+    padding: 1rem 2rem !important; 
+    font-size: 0.95rem !important;
+    min-height: 3.5rem !important;
+    
+    /* Base styles */
     font-weight: 500;
     color: var(--text-secondary);
     background: transparent;
@@ -2299,10 +2303,11 @@ body.modal-open {
     display: inline-flex;
     flex-direction: row;
     align-items: center;
-    gap: 0.625rem;
+    /* gap: 0.5rem; - Removed to match ACME inline model which uses margin on icon */
     position: relative;
     user-select: none;
-    margin-bottom: -3px;
+    font-family: inherit;
+    box-sizing: border-box;
 }
 
 /* Hover State */
@@ -2312,42 +2317,38 @@ body.modal-open {
     color: var(--text-primary);
     background: var(--bg-hover);
 }
-    background: var(--bg-hover);
-}
-
-
 
 /* Active State */
 .settings-tab.active,
 .tab-button.active,
 .mtls-tab-button.active {
     color: var(--primary-color);
-    font-weight: 600;
-    border-bottom-color: var(--primary-color);
+    font-weight: 600; /* MATCH ACME INLINE: font-weight: 600 */
+    border-bottom: 3px solid var(--primary-color); /* MATCH ACME INLINE: 3px solid color */
     background: transparent;
+    /* margin-bottom and z-index removed as they are not in ACME inline */
 }
-
-
 
 /* UCM Icons in tabs - let them manage their own gradients, only set size */
 .settings-tab svg.ucm-icon,
 .tab-button svg.ucm-icon,
 .mtls-tab-button svg.ucm-icon {
     flex-shrink: 0;
-    width: 20px;
-    height: 20px;
+    width: 18px; /* MATCH ACME INLINE: width="18" */
+    height: 18px; /* MATCH ACME INLINE: height="18" */
+    margin-right: 8px; /* MATCH ACME INLINE: style="margin-right: 8px;" */
     transition: all 0.25s ease;
 }
 
 /* Tab Content Panels */
 .tab-content,
 .mtls-tab-content {
-    display: none;
+    /* display: none; - Handled by inline styles now to prevent conflict */
 }
 
 .tab-content.active,
 .mtls-tab-content.active {
-    display: block;
+    /* display: block; - Handled by inline styles now */
     animation: fadeIn 0.2s ease;
 }
 
