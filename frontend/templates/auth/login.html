@@ -418,6 +418,41 @@
             text-align: center;
         }
         
+        /* Compact user badge for auth step - stays visible */
+        .user-badge-compact {
+            background: var(--bg-secondary);
+            border: 1.5px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            animation: slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .user-avatar-compact {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1.125rem;
+            flex-shrink: 0;
+            box-shadow: 0 2px 8px var(--primary-color)25;
+        }
+        
+        .user-name-compact {
+            flex: 1;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+        
         /* Text link button - subtle, modern */
         .btn-text-link {
             background: none;
@@ -432,6 +467,18 @@
         .btn-text-link:hover {
             color: var(--primary-color);
             text-decoration: underline;
+        }
+        
+        /* Slide down animation for compact badge */
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         /* Footer */
@@ -608,9 +655,9 @@
                     <!-- Clean user badge - just avatar and name, clickable -->
                     <button type="button" data-action="start-auth" class="user-select-btn">
                         <div class="user-avatar">
-                            <span id="user-avatar-initial"></span>
+                            <span id="user-avatar-initial-select"></span>
                         </div>
-                        <div class="user-name" id="display-username"></div>
+                        <div class="user-name" id="display-username-select"></div>
                     </button>
                     
                     <!-- "Not you?" link below -->
@@ -621,10 +668,26 @@
                     </div>
                 </div>
                 
-                <!-- Step 3: Authentication in progress / Password -->
-                <div id="step-auth-methods" style="display: none;">
+                <!-- Step 3: Authentication (user badge stays visible) -->
+                <div id="step-auth" style="display: none;">
+                    <!-- User badge - persistent, compact version -->
+                    <div class="user-badge-compact">
+                        <div class="user-avatar-compact">
+                            <span id="user-avatar-initial"></span>
+                        </div>
+                        <span class="user-name-compact" id="display-username"></span>
+                    </div>
+                    
+                    <!-- Dynamic auth container below -->
                     <div id="auth-methods-container"></div>
                     <div id="auth-status" style="margin-top: 1rem; text-align: center; font-size: 0.8125rem; display: none;"></div>
+                    
+                    <!-- "Not you?" link at bottom -->
+                    <div style="text-align: center; margin-top: 1.5rem;">
+                        <button type="button" data-action="reset-login" class="btn-text-link">
+                            Not you? Change account
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -803,10 +866,14 @@
                 // Save username to localStorage
                 localStorage.setItem('ucm-last-username', username);
                 
-                // Hide username entry, show auth in progress
+                // Populate user badge in auth step
+                document.getElementById('user-avatar-initial').textContent = username.charAt(0).toUpperCase();
+                document.getElementById('display-username').textContent = username;
+                
+                // Hide username/selection steps, show auth step with user badge
                 document.getElementById('step-username').style.display = 'none';
                 document.getElementById('step-user-select').style.display = 'none';
-                document.getElementById('step-auth-methods').style.display = 'block';
+                document.getElementById('step-auth').style.display = 'block';
                 
                 // Auto-try secure methods immediately
                 await trySecureAuthentication(data);
@@ -832,7 +899,7 @@
                 const isCompatible = checkWebAuthnCompatibility();
                 
                 if (isCompatible) {
-                    container.innerHTML = '<div style="text-align: center; padding: 2rem; animation: fadeIn 0.3s;"><svg class="ucm-icon" width="48" height="48" style="color: var(--primary-color);"><use href="#icon-key"/></svg><p style="margin-top: 1rem; color: var(--text-primary); font-weight: 600;">Touch your security key</p><p style="color: var(--text-secondary); font-size: 0.875rem;">Follow your browser prompts to sign in</p></div>';
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem; animation: fadeIn 0.3s;"><svg class="ucm-icon" width="64" height="64" style="color: var(--primary-color);"><use href="#icon-key"/></svg><p style="margin-top: 1.25rem; color: var(--text-primary); font-weight: 600; font-size: 1rem;">Touch your security key</p><p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">Follow your browser prompts to sign in</p></div>';
                     
                     try {
                         // Add 10 second timeout for WebAuthn
@@ -890,11 +957,12 @@
         }
         
         function resetLogin() {
-            document.getElementById('step-auth-methods').style.display = 'none';
+            document.getElementById('step-auth').style.display = 'none';
             document.getElementById('step-user-select').style.display = 'none';
             document.getElementById('step-username').style.display = 'block';
             document.getElementById('username').value = '';
             document.getElementById('username').focus();
+            document.getElementById('auth-methods-container').innerHTML = '';
             hideAuthStatus();
         }
         
@@ -1059,10 +1127,10 @@
                 usernameInput.value = lastUsername;
                 
                 // Set up user selection UI
-                const avatarInitial = document.getElementById('user-avatar-initial');
-                const displayUsername = document.getElementById('display-username');
-                if (avatarInitial) avatarInitial.textContent = lastUsername.charAt(0).toUpperCase();
-                if (displayUsername) displayUsername.textContent = lastUsername;
+                const avatarInitialSelect = document.getElementById('user-avatar-initial-select');
+                const displayUsernameSelect = document.getElementById('display-username-select');
+                if (avatarInitialSelect) avatarInitialSelect.textContent = lastUsername.charAt(0).toUpperCase();
+                if (displayUsernameSelect) displayUsernameSelect.textContent = lastUsername;
                 
                 // Show user selection step instead of username entry
                 stepUsername.style.display = 'none';
@@ -1134,7 +1202,7 @@
         }
         
         /* Smooth step transitions */
-        #step-username, #step-user-select, #step-auth-methods {
+        #step-username, #step-user-select, #step-auth {
             animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
