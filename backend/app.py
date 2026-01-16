@@ -85,12 +85,11 @@ def create_app(config_name=None):
     
     # Initialize general task scheduler (CRL auto-regen, etc)
     try:
-        from services.scheduler_service import SchedulerService
+        from services.scheduler_service import init_scheduler
         from services.crl_scheduler_task import CRLSchedulerTask
         
-        # Initialize and start scheduler
-        scheduler = SchedulerService()
-        scheduler.start(app=app)
+        # Initialize and start scheduler (using global instance)
+        scheduler = init_scheduler(app=app)
         
         # Register CRL auto-regeneration task (runs every hour)
         scheduler.register_task(
