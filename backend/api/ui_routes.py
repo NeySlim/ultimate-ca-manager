@@ -4808,3 +4808,9 @@ def public_stats():
             'user_count': 0,
             'last_backup': None
         }), 200
+
+@ui_bp.route('/config/templates')
+@login_required
+def config_templates_page():
+    """Certificate Templates configuration page"""
+    return render_template('config/templates.html')
