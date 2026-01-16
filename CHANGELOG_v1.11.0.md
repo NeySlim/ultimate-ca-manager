@@ -8,6 +8,30 @@
 
 ## 🎉 Major Features
 
+### Backup & Restore System (NEW)
+- **Full system backup with encryption**
+  - AES-256-GCM encryption for all sensitive data
+  - PBKDF2 key derivation (100,000 iterations)
+  - Individual private key encryption
+  - SHA256 checksum verification
+  - Exports all models: CAs, certificates, users, config, ACME accounts
+  
+- **Restore with validation**
+  - Version compatibility checks
+  - Checksum verification before restore
+  - Database transaction rollback on failure
+  - Validation endpoint for pre-restore checks
+  
+- **API Endpoints**
+  - `POST /api/v1/backup/create` - Create encrypted backup
+  - `POST /api/v1/backup/restore` - Restore from backup
+  - `POST /api/v1/backup/validate` - Validate backup file
+  
+- **Testing**
+  - 22 unit tests passing (12 backup + 10 restore)
+  - Full workflow integration tests passing
+  - Typical backup size: ~219KB
+
 ### Sidebar Collapsible (NEW)
 - **Collapsible navigation sidebar** with icon-only mode
   - Normal mode: 240px width with full text labels
@@ -95,9 +119,19 @@
   - Prevents disk space issues
   - Configurable retention policies
 
+- **Backup directory management**
+  - Moved HTTPS cert backups to data directory
+  - Uses DATA_DIR constant for consistency
+  - Fixed /etc/ucm write access permissions
+
 ---
 
 ## 🐛 Bug Fixes
+
+### Backup System
+- Fixed backup directory path using DATA_DIR constant
+- Fixed /etc/ucm write permissions for cert backups
+- Improved backup file organization
 
 ### Login Flow
 - Fixed manual "Sign In" button not working
@@ -124,15 +158,16 @@
 
 ### Code Changes
 - **Commits:** 40+ commits since v1.8.3
-- **Files Modified:** 25+ files across frontend and backend
-- **Lines Added:** ~2,000+ lines
-- **Lines Removed:** ~500+ lines
+- **Files Modified:** 30+ files across frontend and backend
+- **Lines Added:** ~3,500+ lines
+- **Lines Removed:** ~800+ lines
 
 ### Features Breakdown
-- **New Features:** 5 major features
+- **New Features:** 6 major features (Backup, Restore, Sidebar, Login UX, CRL Auto-regen, Health)
 - **UI Improvements:** 12+ enhancements
-- **Bug Fixes:** 8+ critical fixes
+- **Bug Fixes:** 10+ critical fixes
 - **Performance:** 3 optimizations
+- **Security:** AES-256-GCM encryption for backups
 
 ---
 
