@@ -935,32 +935,31 @@
             const container = document.getElementById('auth-methods-container');
             
             // Priority 1: Try mTLS (if available)
-            if (methods.includes('mtls') && data.counts.mtls > 0) {
+            if (methods.includes('mtls') && data.counts && data.counts.mtls > 0) {
                 container.innerHTML = '<div style="text-align: center; padding: 2rem; animation: fadeIn 0.3s;"><p style="color: var(--text-secondary); font-size: 0.9375rem;">Checking for client certificate...</p></div>';
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 500));
                 // Note: mTLS is handled server-side via TLS handshake
             }
             
             // Priority 2: Try WebAuthn (if available and compatible)
-            if (methods.includes('webauthn') && data.counts.webauthn > 0) {
+            if (methods.includes('webauthn') && data.counts && data.counts.webauthn > 0) {
                 const isCompatible = checkWebAuthnCompatibility();
                 
                 if (isCompatible) {
                     container.innerHTML = '<div style="text-align: center; padding: 2rem; animation: fadeIn 0.3s;"><svg class="ucm-icon" width="64" height="64" style="color: var(--primary-color);"><use href="#icon-key"/></svg><p style="margin-top: 1.25rem; color: var(--text-primary); font-weight: 600; font-size: 1rem;">Touch your security key</p><p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">Follow your browser prompts to sign in</p></div>';
                     
                     try {
-                        // Add 10 second timeout for WebAuthn
+                        // Short 3 second timeout for WebAuthn to avoid blocking user
                         await Promise.race([
                             startWebAuthnLogin(),
                             new Promise((_, reject) => 
-                                setTimeout(() => reject(new Error('WebAuthn timeout')), 10000)
+                                setTimeout(() => reject(new Error('WebAuthn timeout')), 3000)
                             )
                         ]);
                         return; // Success - WebAuthn will redirect
                     } catch (error) {
-                        console.log('WebAuthn failed, falling back to password:', error);
-                        showAuthStatus('Security key authentication failed', 'error');
-                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        console.log('WebAuthn not available, falling back to password:', error);
+                        // Silent fallback - no error message shown to user
                     }
                 }
             }
