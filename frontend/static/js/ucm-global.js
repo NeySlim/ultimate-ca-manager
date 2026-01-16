@@ -5,6 +5,60 @@
  */
 
 // ============================================================================
+// UI UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Universal Tab Switching with Inline Styles (The "Spacious" Design)
+ * Handles tab switching by manipulating inline styles directly to guarantee
+ * identical appearance across all pages regardless of CSS quirks.
+ * 
+ * @param {string} tabName - The ID suffix of the tab to show
+ * @param {string} containerSelector - Selector for the tab buttons container (optional)
+ */
+window.ucm_switchTab = function(tabName, containerSelector = '.tabs-container') {
+    // 1. Hide all tab content panels
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.style.display = 'none';
+        tab.classList.remove('active');
+    });
+
+    // 2. Reset all buttons in the container to "Inactive" state (inline styles)
+    const container = document.querySelector(containerSelector);
+    if (container) {
+        container.querySelectorAll('.tab-button').forEach(btn => {
+            btn.classList.remove('active');
+            btn.style.color = 'var(--text-secondary)';
+            btn.style.borderBottomColor = 'transparent';
+            btn.style.fontWeight = '500';
+        });
+    }
+
+    // 3. Show selected content
+    const selectedTab = document.getElementById('tab-' + tabName);
+    if (selectedTab) {
+        selectedTab.style.display = 'block';
+        selectedTab.classList.add('active');
+    }
+
+    // 4. Set active button state (inline styles)
+    const activeBtn = document.getElementById('btn-tab-' + tabName);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.style.color = 'var(--primary-color)';
+        activeBtn.style.borderBottomColor = 'var(--primary-color)';
+        activeBtn.style.fontWeight = '600';
+    }
+
+    // 5. Save preference if valid
+    if (tabName) {
+        // Try to guess context from URL or fallback to generic
+        const context = window.location.pathname.split('/')[1] || 'general';
+        localStorage.setItem(`ucm-tab-${context}`, tabName);
+    }
+};
+
+// ============================================================================
 // SECURITY UTILITY FUNCTIONS
 // ============================================================================
 

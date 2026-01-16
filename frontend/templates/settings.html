@@ -24,23 +24,19 @@
     </div>
     {% else %}
     
-    <!-- Settings Tabs -->
-    <div class="settings-tabs">
-        <button class="settings-tab active" onclick="switchSettingsTab('general')">
-            <svg class="ucm-icon" width="20" height="20"><use href="#icon-info-circle"/></svg>
-            <span>General</span>
+    <!-- Settings Tabs (ACME-Style Inline) -->
+    <div class="tabs-container" style="display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 2px solid var(--border-color);">
+        <button class="tab-button active" onclick="ucm_switchTab('general')" id="btn-tab-general" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 600; color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+            <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-info-circle"/></svg> General
         </button>
-        <button class="settings-tab" onclick="switchSettingsTab('security')">
-            <svg class="ucm-icon" width="20" height="20"><use href="#icon-shield-check"/></svg>
-            <span>Security</span>
+        <button class="tab-button" onclick="ucm_switchTab('security')" id="btn-tab-security" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+            <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-shield-check"/></svg> Security
         </button>
-        <button class="settings-tab" onclick="switchSettingsTab('database')">
-            <svg class="ucm-icon" width="20" height="20"><use href="#icon-database"/></svg>
-            <span>Database</span>
+        <button class="tab-button" onclick="ucm_switchTab('database')" id="btn-tab-database" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+            <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-database"/></svg> Database
         </button>
-        <button class="settings-tab" onclick="switchSettingsTab('advanced')">
-            <svg class="ucm-icon" width="20" height="20"><use href="#icon-settings"/></svg>
-            <span>Advanced</span>
+        <button class="tab-button" onclick="ucm_switchTab('advanced')" id="btn-tab-advanced" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+            <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-settings"/></svg> Advanced
         </button>
     </div>
     
@@ -506,34 +502,11 @@
 </div>
 
 <script>
-// Tab Switching
-function switchSettingsTab(tabName) {
-    // Hide all tabs
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    
-    // Remove active from all buttons
-    document.querySelectorAll('.settings-tab').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    
-    // Show selected tab
-    document.getElementById('tab-' + tabName).classList.add('active');
-    
-    // Mark button as active
-    event.target.closest('.settings-tab').classList.add('active');
-    
-    // Save preference
-    localStorage.setItem('ucm-settings-tab', tabName);
-}
-
 // Restore last active tab on page load
 document.addEventListener('DOMContentLoaded', function() {
-    const lastTab = localStorage.getItem('ucm-settings-tab');
+    const lastTab = localStorage.getItem('ucm-tab-settings');
     if (lastTab && document.getElementById('tab-' + lastTab)) {
-        // Trigger click on saved tab
-        document.querySelector(`[onclick="switchSettingsTab('${lastTab}')"]`)?.click();
+        ucm_switchTab(lastTab);
     }
 });
 
@@ -1551,7 +1524,7 @@ async function exportDatabase() {
 // Load database stats on Database tab activation
 document.addEventListener('DOMContentLoaded', () => {
     // Load stats when Database tab is clicked
-    const dbTab = document.querySelector('.settings-tab[onclick*="database"]');
+    const dbTab = document.querySelector('.tab-button[onclick*="database"]');
     if (dbTab) {
         dbTab.addEventListener('click', () => {
             setTimeout(loadDatabaseStats, 100);

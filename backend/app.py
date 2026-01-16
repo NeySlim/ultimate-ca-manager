@@ -89,7 +89,8 @@ def create_app(config_name=None):
         from services.crl_scheduler_task import CRLSchedulerTask
         
         # Initialize and start scheduler (using global instance)
-        scheduler = init_scheduler(app=app)
+        # using autostart=False to ensure tasks are registered before first run
+        scheduler = init_scheduler(app=app, autostart=False)
         
         # Register CRL auto-regeneration task (runs every hour)
         scheduler.register_task(
@@ -98,6 +99,9 @@ def create_app(config_name=None):
             interval=3600,  # "interval" parameter, not "interval_seconds"
             description="Auto-regenerate expiring CRLs"
         )
+        
+        # Start scheduler now that tasks are registered
+        scheduler.start(app=app)
         app.logger.info("Scheduler service started with CRL auto-regeneration task")
         
         # Register scheduler in app context for graceful shutdown
@@ -179,6 +183,13 @@ def create_app(config_name=None):
         
         return None
     
+    # Context processor to inject variables into all templates
+    @app.context_processor
+    def inject_global_vars():
+        return {
+            'is_self_signed': HTTPSManager.is_self_signed(config.HTTPS_CERT_PATH)
+        }
+
     # HTTPS redirect middleware (if enabled)
     if config.HTTP_REDIRECT:
         @app.before_request
@@ -311,6 +322,7 @@ def register_blueprints(app):
     from api.webauthn_api import webauthn_bp
     from api.ui_routes import ui_bp
     from api.acme import acme_bp
+    from api.acme.acme_proxy_api import acme_proxy_bp
     from api.backup_routes import backup_bp
     from api.health_routes import health_bp
     
@@ -340,6 +352,7 @@ def register_blueprints(app):
     app.register_blueprint(cdp_bp, url_prefix='/cdp')     # CRL Distribution Points
     app.register_blueprint(ocsp_bp)                        # OCSP Responder (/ocsp)
     app.register_blueprint(acme_bp)                        # ACME protocol (/acme)
+    app.register_blueprint(acme_proxy_bp)                  # ACME Proxy (/acme/proxy)
 
 
 def main():

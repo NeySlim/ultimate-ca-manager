@@ -163,10 +163,8 @@
           "stroke": "currentColor",
           "strokeLinecap": "round"
         }
-      ]
-    },
-        "rotate": true
-      }
+      ],
+      "rotate": true
     },
     "theme-palette": {
       "viewBox": "0 0 24 24",
@@ -1138,6 +1136,24 @@
           "d": "M6.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm3-3.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm5 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm3 3.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z",
           "gradient": "accent",
           "fill": "currentColor"
+        }
+      ]
+    },
+    "clipboard": {
+      "viewBox": "0 0 24 24",
+      "stroke": true,
+      "paths": [
+        {
+          "d": "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2",
+          "gradient": "primary",
+          "fill": "none",
+          "stroke-width": "1.5"
+        },
+        {
+          "d": "M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z",
+          "gradient": "accent",
+          "fill": "none",
+          "stroke-width": "1.5"
         }
       ]
     }

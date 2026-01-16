@@ -224,17 +224,17 @@
             </div>
 
             <!-- Tabs -->
-            <div class="tabs-container" style="padding: 0 1.5rem;">
-                <button class="tab-button active" data-tab="create">
-                    <svg class="ucm-icon" width="20" height="20"><use href="#icon-plus"/></svg>
+            <div class="tabs-container" style="display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 2px solid var(--border-color);">
+                <button class="tab-button active" onclick="ucm_switchTab('create')" id="btn-tab-create" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 600; color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+                    <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-plus"/></svg>
                     Create
                 </button>
-                <button class="tab-button" data-tab="import">
-                    <svg class="ucm-icon" width="20" height="20"><use href="#icon-upload"/></svg>
+                <button class="tab-button" onclick="ucm_switchTab('import')" id="btn-tab-import" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+                    <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-upload"/></svg>
                     Import
                 </button>
-                <button class="tab-button" data-tab="manage">
-                    <svg class="ucm-icon" width="20" height="20"><use href="#icon-inbox"/></svg>
+                <button class="tab-button" onclick="ucm_switchTab('manage'); loadCertificates()" id="btn-tab-manage" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+                    <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-inbox"/></svg>
                     Manage
                 </button>
             </div>
@@ -451,33 +451,8 @@ function copyToClipboard(elementId, name) {
     });
 }
 
-// Tab switching
-document.querySelectorAll('.tab-button').forEach(btn => {
-    btn.addEventListener('click', () => {
-        const tabName = btn.dataset.tab;
-        
-        // Update buttons
-        document.querySelectorAll('.tab-button').forEach(b => {
-            b.classList.remove('active');
-            b.style.color = 'var(--text-secondary)';
-            b.style.borderBottomColor = 'transparent';
-        });
-        btn.classList.add('active');
-        btn.style.color = 'var(--text-primary)';
-        btn.style.borderBottomColor = 'var(--primary-color)';
-        
-        // Update content
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.style.display = 'none';
-        });
-        document.getElementById(`tab-${tabName}`).style.display = 'block';
-        
-        // Load certificates when switching to manage tab
-        if (tabName === 'manage') {
-            loadCertificates();
-        }
-    });
-});
+// Tab switching - Handled by ucm_switchTab global function
+// document.querySelectorAll('.tab-button').forEach(btn => ... removed ...);
 
 // Load mTLS settings
 async function loadMTLSSettings() {
@@ -795,7 +770,8 @@ document.getElementById('create-managed-cert-form')?.addEventListener('submit', 
         if (response.ok) {
             showToast('✓ Certificate created successfully', 'success');
             // Switch to manage tab
-            document.querySelector('.tab-button[data-tab="manage"]').click();
+            ucm_switchTab('manage');
+            loadCertificates();
         } else {
             showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
         }
@@ -830,7 +806,8 @@ document.getElementById('create-selfsigned-cert-form')?.addEventListener('submit
         
         if (response.ok) {
             showToast('✓ Self-signed certificate created', 'success');
-            document.querySelector('.tab-button[data-tab="manage"]').click();
+            ucm_switchTab('manage');
+            loadCertificates();
         } else {
             showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
         }
@@ -916,7 +893,8 @@ document.getElementById('import-cert-form')?.addEventListener('submit', async (e
             showToast('✓ Certificate imported successfully', 'success');
             document.getElementById('import-cert-form').reset();
             document.getElementById('import-validation-result').style.display = 'none';
-            document.querySelector('.tab-button[data-tab="manage"]').click();
+            ucm_switchTab('manage');
+            loadCertificates();
         } else {
             showToast('✗ ' + (result.error || 'Failed to import certificate'), 'error');
         }
@@ -942,7 +920,7 @@ async function loadCertificates() {
                         <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
                             <svg class="ucm-icon" width="32" height="32" style="opacity: 0.5;"><use href="#icon-key"/></svg>
                             <p style="margin-top: 0.5rem;">No certificates enrolled</p>
-                            <button onclick="document.querySelector('.tab-button[data-tab=\\'create\\']').click()" class="btn btn-sm btn-primary" style="margin-top: 1rem;">
+                            <button onclick="ucm_switchTab('create')" class="btn btn-sm btn-primary" style="margin-top: 1rem;">
                                 <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Create Your First Certificate
                             </button>
                         </td>

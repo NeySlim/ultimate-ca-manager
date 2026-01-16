@@ -9,6 +9,7 @@
 
 ### v1.7.0 - ACME Protocol & Email Notifications
 - ✅ **ACME Server** - RFC 8555 compliant (Let's Encrypt compatible)
+- ✅ **ACME Auto-Renewal** - Supports standard client renewal flows
 - ✅ **Email Notifications** - Certificate expiration alerts
 - ✅ **WebAuthn/FIDO2** - Hardware key passwordless authentication
 - ✅ **CRL Enhancements** - Auto-generation, improved UI
@@ -190,7 +191,6 @@
 - [ ] Certificate transparency log submission
 - [ ] Cross-certification support
 - [ ] Multi-language support (French, German, Spanish)
-- [ ] Certificate auto-renewal for ACME clients
 - [ ] Certificate request approval workflow
 - [ ] External CA connector (DigiCert, Let's Encrypt Proxy)
 

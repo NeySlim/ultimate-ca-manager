@@ -224,7 +224,8 @@ class AcmeService:
         for identifier in identifiers:
             auth = self._create_authorization(
                 order_id=order.order_id,
-                identifier=identifier
+                identifier=identifier,
+                account_id=account_id
             )
             order.authorizations.append(auth)
         
@@ -235,17 +236,55 @@ class AcmeService:
     def _create_authorization(
         self,
         order_id: str,
-        identifier: Dict[str, str]
+        identifier: Dict[str, str],
+        account_id: str = None
     ) -> AcmeAuthorization:
-        """Create authorization with challenges
+        """Create authorization with challenges (checking for reuse)
         
         Args:
             order_id: Parent order ID
             identifier: Identifier dict {"type": "dns", "value": "example.com"}
+            account_id: Account ID for authorization reuse lookup
             
         Returns:
             AcmeAuthorization object
         """
+        # Check for existing valid authorization for this account/identifier (Authorization Reuse)
+        if account_id:
+            try:
+                # Find valid authorization for same account and identifier
+                # We reuse the logic by creating a new valid authorization
+                # to avoid schema changes (many-to-many complexity)
+                identifier_json = json.dumps(identifier)
+                
+                valid_auth = AcmeAuthorization.query.join(AcmeOrder).filter(
+                    AcmeOrder.account_id == account_id,
+                    AcmeAuthorization.identifier == identifier_json,
+                    AcmeAuthorization.status == 'valid',
+                    AcmeAuthorization.expires > datetime.utcnow()
+                ).order_by(AcmeAuthorization.expires.desc()).first()
+                
+                if valid_auth:
+                    # Reuse found! Create a new pre-validated authorization
+                    auth = AcmeAuthorization(
+                        order_id=order_id,
+                        status="valid",
+                        identifier=identifier_json,
+                        expires=valid_auth.expires  # Carry over expiration or extend? Let's carry over for safety
+                    )
+                    
+                    db.session.add(auth)
+                    db.session.flush()
+                    
+                    # Create pre-validated challenges (clients may check them)
+                    self._create_challenges(auth, status="valid", validated=datetime.utcnow())
+                    
+                    return auth
+            except Exception as e:
+                # Log but continue with new auth
+                print(f"Error checking auth reuse: {e}")
+
+        # No reuse - create new pending authorization
         auth = AcmeAuthorization(
             order_id=order_id,
             status="pending",
@@ -256,17 +295,24 @@ class AcmeService:
         db.session.add(auth)
         db.session.flush()  # Get auth.authorization_id
         
-        # Create challenges
-        identifier_value = identifier.get("value", "")
+        # Create pending challenges
+        self._create_challenges(auth, status="pending")
         
+        db.session.commit()
+        
+        return auth
+
+    def _create_challenges(self, auth: AcmeAuthorization, status: str, validated: datetime = None):
+        """Helper to create standard challenges for an authorization"""
         # HTTP-01 Challenge
         http_token = secrets.token_urlsafe(32)
         http_challenge = AcmeChallenge(
             authorization_id=auth.authorization_id,
             type="http-01",
-            status="pending",
+            status=status,
             token=http_token,
-            url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}"
+            url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
+            validated=validated
         )
         auth.challenges.append(http_challenge)
         
@@ -275,15 +321,12 @@ class AcmeService:
         dns_challenge = AcmeChallenge(
             authorization_id=auth.authorization_id,
             type="dns-01",
-            status="pending",
+            status=status,
             token=dns_token,
-            url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}"
+            url=f"{self.base_url}/acme/challenge/{secrets.token_urlsafe(16)}",
+            validated=validated
         )
         auth.challenges.append(dns_challenge)
-        
-        db.session.commit()
-        
-        return auth
     
     def get_order(self, order_id: str) -> Optional[AcmeOrder]:
         """Get order by ID
