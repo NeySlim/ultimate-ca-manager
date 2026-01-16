@@ -366,8 +366,6 @@ function loadProxyStatus() {
             upstreamDisplay.textContent = data.upstream_url;
             directoryUrl.value = data.directory_url;
             
-            const container = document.getElementById('proxy-account-container');
-            
             if (data.is_registered) {
                 container.innerHTML = `
                     <div style="color: var(--success-color); font-weight: 500; font-size: 14px;">
