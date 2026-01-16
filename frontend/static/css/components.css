@@ -2435,3 +2435,101 @@ svg.icon-xl {
 button.htmx-request .ucm-icon use[href="#icon-refresh"] {
     animation: spin-fast 0.6s linear infinite;
 }
+
+/* ===========================
+   SIDEBAR COLLAPSE
+   =========================== */
+
+/* Toggle button */
+.sidebar-toggle-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.sidebar-toggle-btn:hover {
+    background: var(--surface-hover);
+    border-color: var(--primary-color);
+}
+
+/* Collapsed state - applied to body for global changes */
+body.sidebar-collapsed aside {
+    width: 70px !important;
+}
+
+body.sidebar-collapsed main {
+    margin-left: 70px !important;
+}
+
+/* Hide text in collapsed state */
+body.sidebar-collapsed .sidebar-link span,
+body.sidebar-collapsed .sidebar-submenu,
+body.sidebar-collapsed .sidebar-section-title {
+    display: none;
+}
+
+/* Center icons when collapsed */
+body.sidebar-collapsed .sidebar-link {
+    justify-content: center;
+    padding: 11px 0;
+}
+
+/* Rotate toggle icon when collapsed */
+body.sidebar-collapsed .sidebar-toggle-btn {
+    transform: rotate(180deg);
+}
+
+/* Hide logo text when collapsed */
+body.sidebar-collapsed nav .navbar-brand-text {
+    display: none;
+}
+
+/* Tooltip for collapsed sidebar links */
+body.sidebar-collapsed .sidebar-link {
+    position: relative;
+}
+
+body.sidebar-collapsed .sidebar-link::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--surface-elevated);
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    margin-left: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-color);
+    transition: opacity 0.2s ease;
+    z-index: 1000;
+}
+
+body.sidebar-collapsed .sidebar-link:hover::after {
+    opacity: 1;
+}
+
+/* Smooth transition for sidebar width */
+aside {
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+main {
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
