@@ -370,21 +370,36 @@
             cursor: not-allowed;
         }
         
-        /* User badge after username entry */
-        .user-badge {
+        /* User selection button - clean, modern design inspired by Google/Microsoft */
+        .user-select-btn {
+            width: 100%;
             background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 0.5rem;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 0.75rem;
+            gap: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .user-select-btn:hover {
+            border-color: var(--primary-color);
+            background: var(--surface-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .user-select-btn:active {
+            transform: translateY(0);
         }
         
         .user-avatar {
-            width: 40px;
-            height: 40px;
+            width: 64px;
+            height: 64px;
             border-radius: 50%;
             background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
             color: white;
@@ -392,36 +407,31 @@
             align-items: center;
             justify-content: center;
             font-weight: 600;
-            font-size: 1rem;
-        }
-        
-        .user-info {
-            flex: 1;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 12px var(--primary-color)30;
         }
         
         .user-name {
             font-weight: 600;
             color: var(--text-primary);
-            font-size: 0.9375rem;
-            display: block;
-            margin-bottom: 0.25rem;
+            font-size: 1.125rem;
+            text-align: center;
         }
         
-        .btn-change {
+        /* Text link button - subtle, modern */
+        .btn-text-link {
             background: none;
             border: none;
-            color: var(--primary-color);
-            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
             cursor: pointer;
-            padding: 0;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-            transition: opacity 0.2s;
+            padding: 0.5rem;
+            transition: color 0.2s ease;
         }
         
-        .btn-change:hover {
-            opacity: 0.8;
+        .btn-text-link:hover {
+            color: var(--primary-color);
+            text-decoration: underline;
         }
         
         /* Footer */
@@ -587,37 +597,33 @@
                         <input class="form-input" id="username" type="text" required placeholder="Enter your username" autofocus autocomplete="username">
                     </div>
                     
-                    <button type="button" data-action="check-auth-methods" class="btn-login">
+                    <button type="button" data-action="start-auth" class="btn-login">
                         <span>Continue</span>
                         <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg>
                     </button>
+                </div>
+                
+                <!-- Step 2: User Selection (with saved username) -->
+                <div id="step-user-select" style="display: none;">
+                    <!-- Clean user badge - just avatar and name, clickable -->
+                    <button type="button" data-action="start-auth" class="user-select-btn">
+                        <div class="user-avatar">
+                            <span id="user-avatar-initial"></span>
+                        </div>
+                        <div class="user-name" id="display-username"></div>
+                    </button>
                     
-                    <!-- Show "Not you?" link if username is pre-filled -->
-                    <div id="change-user-hint" style="display: none; text-align: center; margin-top: 1rem;">
-                        <button type="button" onclick="document.getElementById('username').value = ''; document.getElementById('username').focus(); this.parentElement.style.display = 'none';" 
-                                style="background: none; border: none; color: var(--text-secondary); font-size: 0.875rem; cursor: pointer; text-decoration: underline;">
-                            Not you? Sign in as different user
+                    <!-- "Not you?" link below -->
+                    <div style="text-align: center; margin-top: 1rem;">
+                        <button type="button" data-action="reset-login" class="btn-text-link">
+                            Not you? Change account
                         </button>
                     </div>
                 </div>
                 
-                <!-- Step 2: Authentication Methods -->
+                <!-- Step 3: Authentication in progress / Password -->
                 <div id="step-auth-methods" style="display: none;">
-                    <div class="user-badge">
-                        <div class="user-avatar">
-                            <span id="user-avatar-initial"></span>
-                        </div>
-                        <div class="user-info">
-                            <span class="user-name" id="display-username"></span>
-                            <button type="button" data-action="reset-login" class="btn-change">
-                                <svg class="ucm-icon ucm-icon-refresh" width="12" height="12"><use href="#icon-refresh"/></svg>
-                                Change account
-                            </button>
-                        </div>
-                    </div>
-                    
                     <div id="auth-methods-container"></div>
-                    
                     <div id="auth-status" style="margin-top: 1rem; text-align: center; font-size: 0.8125rem; display: none;"></div>
                 </div>
             </div>
@@ -751,9 +757,9 @@
             
             const action = target.dataset.action;
             
-            if (action === 'check-auth-methods') {
+            if (action === 'start-auth') {
                 event.preventDefault();
-                checkAuthMethods();
+                startAuthentication();
                 return;
             }
             
@@ -768,12 +774,12 @@
         document.addEventListener('keypress', function(event) {
             if (event.key === 'Enter' && event.target.id === 'username') {
                 event.preventDefault();
-                checkAuthMethods();
+                startAuthentication();
             }
         });
         
-        // Check available authentication methods
-        async function checkAuthMethods() {
+        // Main authentication flow
+        async function startAuthentication() {
             const username = document.getElementById('username').value.trim();
             
             if (!username) {
@@ -782,6 +788,7 @@
             }
             
             try {
+                // Fetch available auth methods
                 const response = await fetch(`/api/v1/auth/methods?username=${encodeURIComponent(username)}`);
                 const data = await response.json();
                 
@@ -791,50 +798,25 @@
                 }
                 
                 currentUsername = username;
-                
-                // Save username to localStorage for next login
-                localStorage.setItem('ucm-last-username', username);
                 availableMethods = data.methods;
                 
-                // Show username and avatar
-                document.getElementById('display-username').textContent = username;
-                const avatarInitial = document.getElementById('user-avatar-initial');
-                if (avatarInitial) {
-                    avatarInitial.textContent = username.charAt(0).toUpperCase();
-                }
+                // Save username to localStorage
+                localStorage.setItem('ucm-last-username', username);
+                
+                // Hide username entry, show auth in progress
                 document.getElementById('step-username').style.display = 'none';
+                document.getElementById('step-user-select').style.display = 'none';
                 document.getElementById('step-auth-methods').style.display = 'block';
                 
-                // Auto-try secure methods in priority order
-                await autoAuthenticateSecure(data);
+                // Auto-try secure methods immediately
+                await trySecureAuthentication(data);
                 
             } catch (error) {
                 showAuthStatus('Error: ' + error.message, 'error');
             }
         }
         
-        async function autoAuthenticateSecure(data) {
-            const methods = data.methods;
-            const container = document.getElementById('auth-methods-container');
-            
-            // Show single "Sign In" button
-            container.innerHTML = `
-                <div style="animation: fadeIn 0.3s;">
-                    <button type="button" class="btn-login" onclick="handleSignIn()">
-                        <span>Sign In</span>
-                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg>
-                    </button>
-                </div>
-            `;
-            
-            // Store auth methods for later use
-            window.authData = data;
-        }
-        
-        async function handleSignIn() {
-            const data = window.authData;
-            if (!data) return;
-            
+        async function trySecureAuthentication(data) {
             const methods = data.methods;
             const container = document.getElementById('auth-methods-container');
             
@@ -842,6 +824,7 @@
             if (methods.includes('mtls') && data.counts.mtls > 0) {
                 container.innerHTML = '<div style="text-align: center; padding: 2rem; animation: fadeIn 0.3s;"><div class="spinner-border" role="status"></div><p style="margin-top: 1rem; color: var(--text-secondary);">Checking for client certificate...</p></div>';
                 await new Promise(resolve => setTimeout(resolve, 1000));
+                // Note: mTLS is handled server-side via TLS handshake
             }
             
             // Priority 2: Try WebAuthn (if available and compatible)
@@ -852,8 +835,14 @@
                     container.innerHTML = '<div style="text-align: center; padding: 2rem; animation: fadeIn 0.3s;"><svg class="ucm-icon" width="48" height="48" style="color: var(--primary-color);"><use href="#icon-key"/></svg><p style="margin-top: 1rem; color: var(--text-primary); font-weight: 600;">Touch your security key</p><p style="color: var(--text-secondary); font-size: 0.875rem;">Follow your browser prompts to sign in</p></div>';
                     
                     try {
-                        await startWebAuthnLogin();
-                        return;
+                        // Add 10 second timeout for WebAuthn
+                        await Promise.race([
+                            startWebAuthnLogin(),
+                            new Promise((_, reject) => 
+                                setTimeout(() => reject(new Error('WebAuthn timeout')), 10000)
+                            )
+                        ]);
+                        return; // Success - WebAuthn will redirect
                     } catch (error) {
                         console.log('WebAuthn failed, falling back to password:', error);
                         showAuthStatus('Security key authentication failed', 'error');
@@ -902,6 +891,7 @@
         
         function resetLogin() {
             document.getElementById('step-auth-methods').style.display = 'none';
+            document.getElementById('step-user-select').style.display = 'none';
             document.getElementById('step-username').style.display = 'block';
             document.getElementById('username').value = '';
             document.getElementById('username').focus();
@@ -1061,13 +1051,26 @@
             // Restore last username if available
             const lastUsername = localStorage.getItem('ucm-last-username');
             const usernameInput = document.getElementById('username');
-            const changeUserHint = document.getElementById('change-user-hint');
+            const stepUsername = document.getElementById('step-username');
+            const stepUserSelect = document.getElementById('step-user-select');
             
             if (lastUsername) {
+                // Pre-fill username but show user selection instead
                 usernameInput.value = lastUsername;
-                // Auto-advance to step 2 with saved username
-                checkAuthMethods();
+                
+                // Set up user selection UI
+                const avatarInitial = document.getElementById('user-avatar-initial');
+                const displayUsername = document.getElementById('display-username');
+                if (avatarInitial) avatarInitial.textContent = lastUsername.charAt(0).toUpperCase();
+                if (displayUsername) displayUsername.textContent = lastUsername;
+                
+                // Show user selection step instead of username entry
+                stepUsername.style.display = 'none';
+                stepUserSelect.style.display = 'block';
             } else {
+                // No saved username - show username entry
+                stepUsername.style.display = 'block';
+                stepUserSelect.style.display = 'none';
                 usernameInput.focus();
             }
             
@@ -1131,7 +1134,7 @@
         }
         
         /* Smooth step transitions */
-        #step-username, #step-auth-methods {
+        #step-username, #step-user-select, #step-auth-methods {
             animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
