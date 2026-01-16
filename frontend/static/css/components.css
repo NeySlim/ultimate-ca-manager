@@ -2441,9 +2441,16 @@ button.htmx-request .ucm-icon use[href="#icon-refresh"] {
    =========================== */
 
 /* Toggle button */
+/* Ensure dashboard link (first link) is positioned relative for toggle */
+.sidebar-nav > .sidebar-link:first-child {
+    position: relative;
+}
+
 .sidebar-toggle-btn {
-    margin-left: auto;
-    margin-right: -12px;
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
     width: 20px;
     height: 20px;
     border-radius: 4px;
