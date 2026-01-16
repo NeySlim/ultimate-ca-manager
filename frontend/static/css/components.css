@@ -2443,7 +2443,7 @@ button.htmx-request .ucm-icon use[href="#icon-refresh"] {
 /* Toggle button */
 .sidebar-toggle-btn {
     margin-left: auto;
-    margin-right: -8px;
+    margin-right: -12px;
     width: 20px;
     height: 20px;
     border-radius: 4px;
