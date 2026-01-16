@@ -2463,6 +2463,11 @@ button.htmx-request .ucm-icon use[href="#icon-refresh"] {
     border-color: var(--primary-color);
 }
 
+/* Add space for toggle button */
+aside .sidebar-nav {
+    padding-top: 56px;
+}
+
 /* Collapsed state - applied to body for global changes */
 body.sidebar-collapsed aside {
     width: 70px !important;
