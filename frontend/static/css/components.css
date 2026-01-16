@@ -2443,29 +2443,30 @@ button.htmx-request .ucm-icon use[href="#icon-refresh"] {
 /* Toggle button */
 .sidebar-toggle-btn {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    opacity: 0.4;
     transition: all 0.2s ease;
     z-index: 10;
 }
 
 .sidebar-toggle-btn:hover {
+    opacity: 0.8;
     background: var(--surface-hover);
-    border-color: var(--primary-color);
 }
 
-/* Add space for toggle button */
-aside .sidebar-nav {
-    padding-top: 56px;
+.sidebar-toggle-btn .ucm-icon {
+    width: 16px;
+    height: 16px;
 }
 
 /* Collapsed state - applied to body for global changes */
