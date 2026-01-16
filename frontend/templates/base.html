@@ -197,17 +197,16 @@
     
     <!-- Sidebar -->
     <aside id="sidebar">
-        <!-- Toggle button -->
-        <button id="sidebar-toggle" class="sidebar-toggle-btn" title="Toggle sidebar">
-            <svg class="ucm-icon" width="20" height="20"><use href="#icon-chevron-left"/></svg>
-        </button>
-        
         <div class="sidebar-nav">
             <a href="/dashboard" class="sidebar-link {% if request.path == '/dashboard' or request.path == '/sentinel-demo' %}active{% endif %}"
                hx-get="/dashboard" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
                data-tooltip="Dashboard">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-dashboard"/></svg>
                 <span>Dashboard</span>
+                <!-- Toggle button inside dashboard link -->
+                <button id="sidebar-toggle" class="sidebar-toggle-btn" title="Toggle sidebar" onclick="event.preventDefault(); event.stopPropagation();">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-chevron-left"/></svg>
+                </button>
             </a>
             
             <a href="/ca" class="sidebar-link {% if request.path.startswith('/ca') or request.path.startswith('/import-ca') %}active{% endif %}"

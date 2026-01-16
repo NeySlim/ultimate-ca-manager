@@ -2442,11 +2442,9 @@ button.htmx-request .ucm-icon use[href="#icon-refresh"] {
 
 /* Toggle button */
 .sidebar-toggle-btn {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    width: 24px;
-    height: 24px;
+    margin-left: auto;
+    width: 20px;
+    height: 20px;
     border-radius: 4px;
     background: transparent;
     border: none;
@@ -2456,7 +2454,7 @@ button.htmx-request .ucm-icon use[href="#icon-refresh"] {
     cursor: pointer;
     opacity: 0.4;
     transition: all 0.2s ease;
-    z-index: 10;
+    flex-shrink: 0;
 }
 
 .sidebar-toggle-btn:hover {
@@ -2465,8 +2463,8 @@ button.htmx-request .ucm-icon use[href="#icon-refresh"] {
 }
 
 .sidebar-toggle-btn .ucm-icon {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
 }
 
 /* Collapsed state - applied to body for global changes */
@@ -2481,7 +2479,8 @@ body.sidebar-collapsed main {
 /* Hide text in collapsed state */
 body.sidebar-collapsed .sidebar-link span,
 body.sidebar-collapsed .sidebar-submenu,
-body.sidebar-collapsed .sidebar-section-title {
+body.sidebar-collapsed .sidebar-section-title,
+body.sidebar-collapsed .sidebar-toggle-btn {
     display: none;
 }
 
@@ -2491,7 +2490,26 @@ body.sidebar-collapsed .sidebar-link {
     padding: 11px 0;
 }
 
-/* Rotate toggle icon when collapsed */
+/* Show toggle button on first collapsed icon */
+body.sidebar-collapsed .sidebar-link:first-child {
+    position: relative;
+}
+
+body.sidebar-collapsed .sidebar-link:first-child .sidebar-toggle-btn {
+    display: flex;
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+}
+
+body.sidebar-collapsed .sidebar-link:first-child .sidebar-toggle-btn .ucm-icon {
+    width: 12px;
+    height: 12px;
+}
+
 /* Hide logo text when collapsed */
 body.sidebar-collapsed nav .navbar-brand-text {
     display: none;
