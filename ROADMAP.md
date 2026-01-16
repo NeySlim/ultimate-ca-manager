@@ -37,7 +37,7 @@
 
 ## ✅ Completed
 
-### v1.9.0 - UI Modernization & System Enhancements (Released: 2026-01-12)
+### v1.9.0 - UI Modernization & System Enhancements (Beta: 2026-01-16)
 
 **Priority: High**
 
@@ -73,10 +73,14 @@
   - Daily rotation for application logs (14 days retention)
   - Automatic compression (gzip, ~80% space savings)
   - Systemd journal integration
+- ✅ **CRL Auto-Regeneration** - Automated CRL maintenance
+  - Background scheduler checks CRL expiration hourly
+  - Automatically regenerates CRLs 24h before expiration
+  - Dashboard stats for CRL health
 
-**Status:** Complete and deployed  
-**Total Development Time:** ~8 hours  
-**Commits:** 15+
+**Status:** Beta (v1.9.0-beta1) deployed to dev  
+**Total Development Time:** ~10 hours  
+**Commits:** 20+
 
 ---
 
@@ -218,7 +222,7 @@
 
 | Version | Release Date | Highlights |
 |---------|-------------|------------|
-| v1.9.0  | 2026-01-11  | Icon migration, login redesign, backup/restore UI, smooth animations |
+| v1.9.0-b1| 2026-01-16 | UI Modernization, Scheduler, CRL Auto-regen (Beta) |
 | v1.8.3  | 2026-01-10  | Universal installer, UI fixes, screenshots |
 | v1.8.2  | 2026-01-10  | Service management utilities, HTTPS auto-restart |
 | v1.8.0  | 2026-01-09  | mTLS auth, full REST API, OPNsense import |
