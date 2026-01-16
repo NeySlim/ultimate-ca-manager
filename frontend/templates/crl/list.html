@@ -11,7 +11,8 @@
             <span>CRL Management</span>
         </h1>
         <button onclick="refreshCRLs()" class="btn-secondary">
-            <svg class="ucm-icon" width="16" height="16"><use href="#icon-refresh-cw"/></svg> Refresh
+            <svg class="ucm-icon" width="16" height="16"><use href="#icon-refresh"/></svg>
+            <span>Refresh</span>
         </button>
     </div>
     
@@ -25,6 +26,10 @@
                     CRLs contain lists of revoked certificates. They are automatically generated when certificates are revoked
                     and can be distributed via public CDP endpoints for certificate validation.
                 </p>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.875rem;">
+                    <svg class="ucm-icon" width="16" height="16" style="color: var(--success-color);"><use href="#icon-check-circle"/></svg>
+                    <span><strong>Auto-Regeneration Active:</strong> Checked hourly. Regenerates automatically 24h before expiration.</span>
+                </div>
             </div>
         </div>
     </div>
@@ -55,7 +60,15 @@
 
 <script>
 function refreshCRLs() {
+    const btn = document.querySelector('button[onclick="refreshCRLs()"]');
+    if(btn) btn.classList.add('refreshing');
+    
     htmx.trigger('#crl-list', 'refreshCRLs');
+    
+    // Remove class after delay (simulating load) or when HTMX settles
+    setTimeout(() => {
+        if(btn) btn.classList.remove('refreshing');
+    }, 1000);
 }
 
 function generateCRL(caId, caName) {
