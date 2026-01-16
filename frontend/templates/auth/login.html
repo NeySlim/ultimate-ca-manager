@@ -453,6 +453,32 @@
             font-size: 1rem;
         }
         
+        /* Windows 11 spinner - positioned to the right of username */
+        .win11-spinner {
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
+        }
+        
+        .win11-spinner-svg {
+            width: 100%;
+            height: 100%;
+            animation: win11-rotate 1s linear infinite;
+        }
+        
+        .win11-spinner-circle {
+            fill: none;
+            stroke: var(--primary-color);
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-dasharray: 75 25;
+        }
+        
+        @keyframes win11-rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
         /* Text link button - subtle, modern */
         .btn-text-link {
             background: none;
@@ -676,6 +702,12 @@
                             <span id="user-avatar-initial"></span>
                         </div>
                         <span class="user-name-compact" id="display-username"></span>
+                        <!-- Windows 11 spinner to the right of username -->
+                        <div class="win11-spinner" id="auth-spinner" style="display: none;">
+                            <svg viewBox="0 0 36 36" class="win11-spinner-svg">
+                                <circle cx="18" cy="18" r="16" class="win11-spinner-circle"></circle>
+                            </svg>
+                        </div>
                     </div>
                     
                     <!-- Dynamic auth container below -->
@@ -841,6 +873,17 @@
             }
         });
         
+        // Spinner control helpers
+        function showSpinner() {
+            const spinner = document.getElementById('auth-spinner');
+            if (spinner) spinner.style.display = 'block';
+        }
+        
+        function hideSpinner() {
+            const spinner = document.getElementById('auth-spinner');
+            if (spinner) spinner.style.display = 'none';
+        }
+        
         // Main authentication flow
         async function startAuthentication() {
             const username = document.getElementById('username').value.trim();
@@ -875,10 +918,14 @@
                 document.getElementById('step-user-select').style.display = 'none';
                 document.getElementById('step-auth').style.display = 'block';
                 
+                // Show spinner for auth attempt
+                showSpinner();
+                
                 // Auto-try secure methods immediately
                 await trySecureAuthentication(data);
                 
             } catch (error) {
+                hideSpinner();
                 showAuthStatus('Error: ' + error.message, 'error');
             }
         }
@@ -889,7 +936,7 @@
             
             // Priority 1: Try mTLS (if available)
             if (methods.includes('mtls') && data.counts.mtls > 0) {
-                container.innerHTML = '<div style="text-align: center; padding: 2rem; animation: fadeIn 0.3s;"><div class="spinner-border" role="status"></div><p style="margin-top: 1rem; color: var(--text-secondary);">Checking for client certificate...</p></div>';
+                container.innerHTML = '<div style="text-align: center; padding: 2rem; animation: fadeIn 0.3s;"><p style="color: var(--text-secondary); font-size: 0.9375rem;">Checking for client certificate...</p></div>';
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 // Note: mTLS is handled server-side via TLS handshake
             }
@@ -918,7 +965,8 @@
                 }
             }
             
-            // Fallback: Show password form
+            // Fallback: Show password form (hide spinner)
+            hideSpinner();
             showPasswordForm();
         }
         
@@ -957,6 +1005,7 @@
         }
         
         function resetLogin() {
+            hideSpinner();
             document.getElementById('step-auth').style.display = 'none';
             document.getElementById('step-user-select').style.display = 'none';
             document.getElementById('step-username').style.display = 'block';
@@ -1106,6 +1155,9 @@
         // Handle form submission loading
         document.addEventListener('submit', function(e) {
             if (e.target.action && e.target.action.includes('/login')) {
+                // Show spinner during password authentication
+                showSpinner();
+                
                 const btn = e.target.querySelector('button[type="submit"]');
                 if (btn) {
                     btn.disabled = true;
