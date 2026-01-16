@@ -34,18 +34,16 @@
         </div>
     </div>
     
-    <!-- CRL List -->
-    <div class="card" style="padding: 0;">
-        <div id="crl-list" 
-             hx-get="/api/ui/crl/list" 
-             hx-trigger="load, refreshCRLs from:body"
-             hx-swap="innerHTML">
-            <div style="padding: 2rem; text-align: center;">
-                <div style="display: flex; flex-direction: column; gap: 1rem; animation: pulse 2s infinite;">
-                    <div style="height: 1rem; background: var(--bg-secondary); border-radius: 0.25rem;"></div>
-                    <div style="height: 1rem; background: var(--bg-secondary); border-radius: 0.25rem;"></div>
-                    <div style="height: 1rem; background: var(--bg-secondary); border-radius: 0.25rem;"></div>
-                </div>
+    <!-- CRL Content (Stats + List) -->
+    <div id="crl-content" 
+         hx-get="/api/ui/crl/list" 
+         hx-trigger="load, refreshCRLs from:body"
+         hx-swap="innerHTML">
+        <div class="card" style="padding: 2rem; text-align: center;">
+            <div style="display: flex; flex-direction: column; gap: 1rem; animation: pulse 2s infinite;">
+                <div style="height: 1rem; background: var(--bg-secondary); border-radius: 0.25rem;"></div>
+                <div style="height: 1rem; background: var(--bg-secondary); border-radius: 0.25rem;"></div>
+                <div style="height: 1rem; background: var(--bg-secondary); border-radius: 0.25rem;"></div>
             </div>
         </div>
     </div>
@@ -63,7 +61,7 @@ function refreshCRLs() {
     const btn = document.querySelector('button[onclick="refreshCRLs()"]');
     if(btn) btn.classList.add('refreshing');
     
-    htmx.trigger('#crl-list', 'refreshCRLs');
+    htmx.trigger('#crl-content', 'refreshCRLs');
     
     // Remove class after delay (simulating load) or when HTMX settles
     setTimeout(() => {
