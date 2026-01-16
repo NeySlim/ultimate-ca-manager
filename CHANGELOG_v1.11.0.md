@@ -4,6 +4,8 @@
 **Previous Version:** 1.8.3  
 **Breaking Changes:** None
 
+**Summary:** This release introduces 7 major features including ACME proxy to Let's Encrypt, complete backup/restore system, collapsible sidebar, and comprehensive login UX refactor.
+
 ---
 
 ## 🎉 Major Features
@@ -74,6 +76,24 @@
     - Revoked certificates count
     - Scheduler status (enabled/disabled)
     - Last check timestamp
+
+### ACME Proxy to Let's Encrypt (NEW)
+- **Proxy client mode** for Let's Encrypt integration
+  - Gateway between internal ACME clients and Let's Encrypt
+  - Shared upstream account for centralized management
+  - Support for both staging and production environments
+  - Rate limiting and policy enforcement at proxy level
+  
+- **Features**:
+  - `/acme/proxy/directory` - Proxy endpoint for ACME clients
+  - Automatic upstream account registration
+  - Compatible with Certbot, Traefik, and other ACME clients
+  - Self-signed certificate detection with setup instructions
+  
+- **Tab-based UI** in ACME configuration page
+  - "Local Server" tab - UCM's own ACME server
+  - "Proxy Client" tab - Let's Encrypt proxy configuration
+  - Status monitoring and account management
 
 ### Health & Monitoring
 - **Health check API endpoints**
