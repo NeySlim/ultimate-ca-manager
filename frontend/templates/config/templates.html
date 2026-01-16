@@ -45,6 +45,21 @@ function openCreateModal() {
     alert('Create modal - Work in progress');
 }
 
+function viewTemplateDetail(id) {
+    // Simple alert for now - could be enhanced with a modal
+    fetch('/api/v1/templates/' + id)
+        .then(r => r.json())
+        .then(t => {
+            const details = `Template: ${t.name}\n\nType: ${t.template_type}\nKey: ${t.key_type}\nValidity: ${t.validity_days} days\nDigest: ${t.digest}\n\nDN Template:\n${JSON.stringify(t.dn_template, null, 2)}\n\nExtensions:\n${JSON.stringify(t.extensions_template, null, 2)}`;
+            alert(details);
+        })
+        .catch(e => alert('Error: ' + e.message));
+}
+
+function openEditModal(id) {
+    alert('Edit modal - Work in progress (template ID: ' + id + ')');
+}
+
 window.showToast = window.showToast || function(msg, type) { alert(msg); };
 </script>
 
