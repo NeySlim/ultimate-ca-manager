@@ -1769,6 +1769,29 @@ def crl_list_data():
         total_cas = len(crls)
         active_crls = sum(1 for c in crls if c.get('has_crl'))
         total_revoked = sum(c.get('revoked_count', 0) for c in crls if c.get('has_crl'))
+        
+        # Get scheduler status
+        scheduler_status = "Active"
+        last_run_str = ""
+        try:
+            from services.scheduler_service import get_scheduler
+            scheduler = get_scheduler()
+            task_status = scheduler.get_task_status("crl_auto_regen")
+            if task_status:
+                if not task_status.get('enabled'):
+                    scheduler_status = "Disabled"
+                
+                last_run = task_status.get('last_run')
+                if last_run:
+                    from datetime import datetime
+                    try:
+                        dt = datetime.fromisoformat(last_run.replace('Z', '+00:00'))
+                        last_run_time = dt.strftime('%H:%M')
+                        last_run_str = f'<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Last check: {last_run_time}</div>'
+                    except:
+                        pass
+        except Exception as e:
+            scheduler_status = "Unknown"
 
         # Build HTML
         html = f'''
@@ -1802,7 +1825,8 @@ def crl_list_data():
                 </div>
                 <div>
                     <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Auto-Regeneration</div>
-                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">Active</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">{scheduler_status}</div>
+                    {last_run_str}
                 </div>
             </div>
         </div>
