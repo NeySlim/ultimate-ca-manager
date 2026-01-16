@@ -2486,10 +2486,6 @@ body.sidebar-collapsed .sidebar-link {
 }
 
 /* Rotate toggle icon when collapsed */
-body.sidebar-collapsed .sidebar-toggle-btn {
-    transform: rotate(180deg);
-}
-
 /* Hide logo text when collapsed */
 body.sidebar-collapsed nav .navbar-brand-text {
     display: none;
