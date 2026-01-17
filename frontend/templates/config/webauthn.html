@@ -15,15 +15,15 @@
     </div>
 
     <!-- Hostname Warning (shown only if hostname is not WebAuthn-compatible) -->
-    <div id="hostname-warning" style="display: none; background: var(--bg-warning); border-left: 4px solid var(--warning-color); padding: 1rem; border-radius: 0.25rem; margin-bottom: 1.5rem;">
+    <div id="hostname-warning" style="display: none; background: var(--warning-bg); border-left: 4px solid var(--warning-color); padding: 1rem; border-radius: 0.25rem; margin-bottom: 1.5rem;">
         <div style="display: flex; align-items: start; gap: 1rem;">
             <svg class="ucm-icon" width="16" height="16" style="color: var(--warning-color); flex-shrink: 0; margin-top: 0.25rem;"><use href="#icon-warning-triangle"/></svg>
             <div style="flex: 1;">
-                <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">⚠️ Incompatible Hostname Detected</strong>
-                <p style="color: var(--text-secondary); margin: 0 0 0.75rem 0; font-size: 0.875rem;">
+                <strong style="color: var(--warning-text); display: block; margin-bottom: 0.5rem;">⚠️ Incompatible Hostname Detected</strong>
+                <p style="color: var(--warning-text); opacity: 0.9; margin: 0 0 0.75rem 0; font-size: 0.875rem;">
                     WebAuthn requires a valid domain name or IP address. You are currently accessing UCM via "<span id="current-hostname" style="font-family: monospace; font-weight: 600;"></span>" which is not compatible.
                 </p>
-                <p style="color: var(--text-secondary); margin: 0 0 0.75rem 0; font-size: 0.875rem;">
+                <p style="color: var(--warning-text); opacity: 0.9; margin: 0 0 0.75rem 0; font-size: 0.875rem;">
                     <strong>To use WebAuthn, please access UCM using one of these URLs:</strong>
                 </p>
                 <div id="valid-urls" style="font-size: 0.875rem; margin-left: 1rem;"></div>
@@ -32,8 +32,8 @@
     </div>
 
     <!-- Info Alert -->
-    <div style="background: var(--bg-info); border-left: 4px solid var(--primary-color); padding: 1rem; border-radius: 0.25rem;">
-        <strong style="color: var(--text-primary);">🔐 Passwordless Authentication</strong>
+    <div style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--info-color); padding: 1rem; border-radius: 0.25rem;">
+        <strong style="color: var(--info-color);">🔐 Passwordless Authentication</strong>
         <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
             Register your security keys (YubiKey, Nitrokey) or platform authenticators (TouchID, Windows Hello, Face ID) for passwordless login.
             Your credentials are encrypted and stored securely, never leaving your device.
@@ -103,8 +103,8 @@
                     <small style="color: var(--text-secondary); font-size: 0.875rem;">Give your security key a descriptive name</small>
                 </div>
 
-                <div style="background: var(--bg-warning); border-left: 4px solid var(--warning-color); padding: 1rem; margin-bottom: 1.5rem; border-radius: 0.25rem;">
-                    <p style="color: var(--text-primary); margin: 0; font-size: 0.875rem;">
+                <div style="background: var(--warning-bg); border-left: 4px solid var(--warning-color); padding: 1rem; margin-bottom: 1.5rem; border-radius: 0.25rem;">
+                    <p style="color: var(--warning-text); margin: 0; font-size: 0.875rem;">
                         <strong>📱 Before proceeding:</strong><br>
                         • Have your security key ready<br>
                         • Make sure it's plugged in (for USB keys)<br>
