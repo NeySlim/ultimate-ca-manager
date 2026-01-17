@@ -324,10 +324,7 @@
                         <div style="flex: 1;">
                             <h3 style="font-weight: 600; color: var(--text-primary); margin: 0 0 0.5rem 0; font-size: 0.875rem;">Use a Template (Optional)</h3>
                             <select id="csr-template-select" onchange="applyCSRTemplate(this.value)"
-                                    class="modal-form-input" style="margin-bottom: 0.5rem;"
-                                    hx-get="/api/ui/templates/options"
-                                    hx-trigger="load"
-                                    hx-swap="innerHTML">
+                                    class="modal-form-input" style="margin-bottom: 0.5rem;">
                                 <option value="">-- Loading templates... --</option>
                             </select>
                             <p style="margin: 0; font-size: 0.75rem; color: var(--text-muted);">
@@ -471,6 +468,32 @@
 </div>
 
 <script>
+// Load templates when CSR modal opens
+document.addEventListener('DOMContentLoaded', function() {
+    // Hook into openCSRModal to load templates
+    const originalOpenCSRModal = window.openCSRModal;
+    window.openCSRModal = function() {
+        if (originalOpenCSRModal) originalOpenCSRModal();
+        loadCSRTemplates();
+    };
+});
+
+// Load templates for CSR dropdown (uses fetch-wrapper for JWT auth)
+function loadCSRTemplates() {
+    const select = document.getElementById('csr-template-select');
+    if (!select) return;
+    
+    fetch('/api/ui/templates/options')
+        .then(r => r.text())
+        .then(html => {
+            select.innerHTML = html;
+        })
+        .catch(err => {
+            console.error('Failed to load templates:', err);
+            select.innerHTML = '<option value="">-- Error loading templates --</option>';
+        });
+}
+
 // Apply template to CSR form
 // Note: fetch() is OK here because fetch-wrapper.js auto-injects JWT token
 function applyCSRTemplate(templateId) {
