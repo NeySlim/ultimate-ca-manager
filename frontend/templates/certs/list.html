@@ -298,11 +298,11 @@
 
 <!-- Generate CSR Modal -->
 <div id="csrModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
-    <div onclick="event.stopPropagation()" style="background: var(--card-bg); border-radius: 0.5rem; max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+    <div onclick="event.stopPropagation()" style="background: var(--card-bg); border-radius: 0.5rem; max-width: 750px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
         <div class="card-header">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h2 style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
-                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-file-import"/></svg>
+                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-file-signature"/></svg>
                     <span>Generate CSR</span>
                 </h2>
                 <button data-action="close-csr-modal" style="color: var(--text-secondary); cursor: pointer; background: none; border: none;">
@@ -312,34 +312,128 @@
         </div>
         
         <form hx-post="/api/ui/cert/csr" 
-              hx-on::after-request="if(event.detail.successful){closeCSRModal();htmx.trigger('body','refreshCerts');if(typeof showToast==='function')showToast('CSR generated','success');}">
-            <div class="p-6 space-y-4">
+              hx-trigger="submit"
+              hx-disabled-elt="find button[type='submit']"
+              hx-on::after-request="if(event.detail.successful){closeCSRModal();htmx.trigger('body','refreshCerts');if(typeof showToast==='function')showToast('CSR generated successfully','success');}">
+            <div style="padding: 1.5rem;">
+                
+                <!-- Basic Information -->
                 <div>
-                    <label class="modal-form-label">
-                        Description <span style="color: var(--danger-color);">*</span>
-                    </label>
-                    <input type="text" name="descr" required
-                           class="modal-form-input">
+                    <h3 class="modal-form-heading">Basic Information</h3>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Description <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <input type="text" name="descr" required placeholder="My CSR for external CA"
+                               class="modal-form-input">
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                            Internal identifier for this CSR
+                        </p>
+                    </div>
                 </div>
                 
+                <!-- Key Configuration -->
                 <div>
-                    <label class="modal-form-label">
-                        Common Name <span style="color: var(--danger-color);">*</span>
-                    </label>
-                    <input type="text" name="common_name" required
-                           class="modal-form-input">
+                    <h3 class="modal-form-heading">Key Configuration</h3>
+                    
+                    <div class="modal-form-grid-2">
+                        <div>
+                            <label class="modal-form-label">
+                                Key Type <span style="color: var(--danger-color);">*</span>
+                            </label>
+                            <select name="key_type" required
+                                    class="modal-form-input">
+                                <option value="2048">RSA 2048</option>
+                                <option value="4096" selected>RSA 4096</option>
+                                <option value="prime256v1">EC P-256</option>
+                                <option value="secp384r1">EC P-384</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                Digest Algorithm <span style="color: var(--danger-color);">*</span>
+                            </label>
+                            <select name="digest"
+                                    class="modal-form-input">
+                                <option value="sha256" selected>SHA-256</option>
+                                <option value="sha384">SHA-384</option>
+                                <option value="sha512">SHA-512</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 
+                <!-- Distinguished Name -->
                 <div>
-                    <label class="modal-form-label">
-                        Key Type <span style="color: var(--danger-color);">*</span>
-                    </label>
-                    <select name="key_type" required
-                            class="modal-form-input">
-                        <option value="2048">RSA 2048</option>
-                        <option value="4096">RSA 4096</option>
-                    </select>
+                    <h3 class="modal-form-heading">Distinguished Name (DN)</h3>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Common Name (CN) <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <input type="text" name="common_name" required placeholder="example.com"
+                               class="modal-form-input">
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                            Fully Qualified Domain Name (FQDN) or email address
+                        </p>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="modal-form-label">
+                                Organization (O)
+                            </label>
+                            <input type="text" name="organization" placeholder="My Company"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                Organizational Unit (OU)
+                            </label>
+                            <input type="text" name="organizational_unit" placeholder="IT Department"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                Country Code (C)
+                            </label>
+                            <input type="text" name="country" placeholder="FR" maxlength="2"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                State or Province (ST)
+                            </label>
+                            <input type="text" name="state" placeholder="Occitanie"
+                                   class="modal-form-input">
+                        </div>
+                        <div>
+                            <label class="modal-form-label">
+                                Locality / City (L)
+                            </label>
+                            <input type="text" name="locality" placeholder="Montpellier"
+                                   class="modal-form-input">
+                        </div>
+                    </div>
                 </div>
+                
+                <!-- Subject Alternative Names -->
+                <div>
+                    <h3 class="modal-form-heading">Subject Alternative Names (SAN)</h3>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Alternative Names
+                        </label>
+                        <textarea name="altnames" rows="3" placeholder="DNS:www.example.com&#10;DNS:*.example.com&#10;IP:192.168.1.1&#10;EMAIL:admin@example.com"
+                                  class="modal-form-input" style="resize: vertical;"></textarea>
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                            One per line. Format: DNS:name, IP:address, EMAIL:address
+                        </p>
+                    </div>
+                </div>
+                
             </div>
             
             <div class="modal-form-footer">
