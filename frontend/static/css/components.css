@@ -845,7 +845,7 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
     gap: 1rem;
     padding: 1.25rem;
     min-height: 88px;
-    height: 100%;
+    flex: 1; /* Fill parent card */
 }
 
 .stat-card-icon {
@@ -915,7 +915,8 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
 .card:has(.card-header),
 .card:has(.stat-card) {
     padding: 0;
-    height: 100%; /* For grid alignment */
+    display: flex;
+    flex-direction: column;
 }
 
 /* ===========================
