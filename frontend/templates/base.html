@@ -30,8 +30,8 @@
     <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer" style="z-index: 1060;"></div>
 
     {% if is_self_signed %}
-    <div class="alert alert-warning alert-dismissible fade show rounded-0 mb-0 text-center" role="alert" style="position: fixed; top: 0; left: 0; right: 0; z-index: 1050; font-size: 0.9rem; padding: 0.5rem; background-color: #fff3cd; color: #664d03; border-bottom: 1px solid #ffecb5;">
-        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+    <div class="alert alert-warning alert-dismissible fade show rounded-0 mb-0 text-center" role="alert" style="position: fixed; top: 0; left: 0; right: 0; z-index: 1050; font-size: 0.9rem; padding: 0.5rem; background-color: var(--warning-bg); color: var(--warning-text); border-bottom: 1px solid var(--warning-color);">
+        <svg class="ucm-icon" width="16" height="16" style="display: inline; vertical-align: text-bottom; margin-right: 0.5rem;"><use href="#icon-warning-triangle"/></svg>
         <strong>Warning:</strong> You are using a self-signed certificate. ACME clients (like Certbot) will fail unless you trust the CA or disable verification.
         <button type="button" class="btn-close p-2" data-bs-dismiss="alert" aria-label="Close" style="top: 0.2rem;"></button>
     </div>
