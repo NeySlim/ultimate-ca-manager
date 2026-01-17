@@ -5079,3 +5079,242 @@ def ca_x509_details(ca_id):
         return extensions_html
     except Exception as e:
         return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
+
+
+# Certificate Detail - Fingerprints
+@ui_bp.route('/api/ui/certificates/<cert_id>/fingerprints')
+@login_required
+def cert_fingerprints(cert_id):
+    """Get certificate fingerprints (for HTMX)"""
+    try:
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/certificates/{cert_id}/fingerprints")
+        
+        if not response or response.status_code != 200:
+            return '<p style="color: var(--danger-color);">Failed to load fingerprints</p>'
+        
+        data = response.json()
+        html = f'''
+            <dl class="space-y-3">
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">SHA-256</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-primary); font-family: monospace; word-break: break-all; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.375rem;">{data.get('sha256', 'N/A')}</dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">SHA-1</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-primary); font-family: monospace; word-break: break-all; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.375rem;">{data.get('sha1', 'N/A')}</dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">MD5</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-primary); font-family: monospace; word-break: break-all; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.375rem;">{data.get('md5', 'N/A')}</dd>
+                </div>
+            </dl>
+        '''
+        return html
+    except Exception as e:
+        return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
+
+
+# Certificate Detail - X509 Details  
+@ui_bp.route('/api/ui/certificates/<cert_id>/x509details')
+@login_required
+def cert_x509_details(cert_id):
+    """Get certificate X.509 details (for HTMX)"""
+    try:
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/certificates/{cert_id}/details")
+        
+        if not response or response.status_code != 200:
+            return '<p style="color: var(--danger-color);">Failed to load certificate details</p>'
+        
+        data = response.json()
+        
+        html = '<div class="space-y-4">'
+        
+        # Public Key Info
+        if data.get('public_key'):
+            pk = data['public_key']
+            html += f'''
+                <div>
+                    <h3 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Public Key</h3>
+                    <dl class="ml-4 space-y-1">
+                        <div class="flex">
+                            <dt style="width: 150px; font-size: 0.875rem; color: var(--text-secondary);">Algorithm:</dt>
+                            <dd style="font-size: 0.875rem; color: var(--text-primary);">{pk.get('algorithm', 'N/A')}</dd>
+                        </div>
+                        <div class="flex">
+                            <dt style="width: 150px; font-size: 0.875rem; color: var(--text-secondary);">Size:</dt>
+                            <dd style="font-size: 0.875rem; color: var(--text-primary);">{pk.get('size', 'N/A')} bits</dd>
+                        </div>
+            '''
+            if pk.get('curve'):
+                html += f'''
+                        <div class="flex">
+                            <dt style="width: 150px; font-size: 0.875rem; color: var(--text-secondary);">Curve:</dt>
+                            <dd style="font-size: 0.875rem; color: var(--text-primary);">{pk.get('curve')}</dd>
+                        </div>
+                '''
+            html += '''
+                    </dl>
+                </div>
+            '''
+        
+        # Signature
+        if data.get('signature'):
+            sig = data['signature']
+            html += f'''
+                <div>
+                    <h3 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Signature</h3>
+                    <dl class="ml-4 space-y-1">
+                        <div class="flex">
+                            <dt style="width: 150px; font-size: 0.875rem; color: var(--text-secondary);">Algorithm:</dt>
+                            <dd style="font-size: 0.875rem; color: var(--text-primary);">{sig.get('algorithm', 'N/A')}</dd>
+                        </div>
+                    </dl>
+                </div>
+            '''
+        
+        # Extensions
+        if data.get('extensions'):
+            html += '<div><h3 style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Extensions</h3><dl class="ml-4 space-y-2">'
+            for ext_name, ext_value in data['extensions'].items():
+                if isinstance(ext_value, dict):
+                    value_str = '<br>'.join([f"&nbsp;&nbsp;{k}: {v}" for k, v in ext_value.items()])
+                elif isinstance(ext_value, list):
+                    value_str = '<br>'.join([f"&nbsp;&nbsp;- {v}" for v in ext_value])
+                else:
+                    value_str = str(ext_value)
+                    
+                html += f'''
+                    <div>
+                        <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 0.25rem;">{ext_name}</dt>
+                        <dd style="font-size: 0.875rem; color: var(--text-primary); background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem; font-family: monospace; white-space: pre-wrap;">{value_str}</dd>
+                    </div>
+                '''
+            html += '</dl></div>'
+        
+        html += '</div>'
+        return html
+    except Exception as e:
+        return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
+
+
+# Template Detail (for modal)
+@ui_bp.route('/api/ui/templates/<int:template_id>/detail')
+@login_required
+def ui_template_detail(template_id):
+    """Get template details for modal (HTMX)"""
+    try:
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/templates/{template_id}")
+        
+        if not response or response.status_code != 200:
+            return '<div style="color: var(--danger-color); padding: 2rem; text-align: center;">Template not found</div>'
+        
+        t = response.json()
+        
+        # Format DN template
+        dn_entries = ''
+        if t.get('dn_template'):
+            for k, v in t['dn_template'].items():
+                if v and str(v).strip():
+                    dn_entries += f'<div><strong>{html_escape(k)}:</strong> {html_escape(v)}</div>'
+        
+        # Format extensions
+        ku = t.get('extensions_template', {}).get('key_usage', [])
+        eku = t.get('extensions_template', {}).get('extended_key_usage', [])
+        san = t.get('extensions_template', {}).get('san_types', [])
+        
+        html = f'''
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Header -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0;">{html_escape(t.get('name', ''))}</h3>
+                        <span style="padding: 0.125rem 0.5rem; background: {'var(--info-color)' if t.get('is_system') else 'var(--success-color)'}20; color: {'var(--info-color)' if t.get('is_system') else 'var(--success-color)'}; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">
+                            {'System' if t.get('is_system') else 'Custom'}
+                        </span>
+                    </div>
+                    {f'<p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">{html_escape(t.get("description", ""))}</p>' if t.get('description') else ''}
+                </div>
+
+                <!-- Configuration -->
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 6px;">
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Type</div>
+                        <div style="font-weight: 500; color: var(--text-primary);">{html_escape(t.get('template_type', ''))}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Key Type</div>
+                        <div style="font-weight: 500; color: var(--text-primary);">{html_escape(t.get('key_type', ''))}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Validity</div>
+                        <div style="font-weight: 500; color: var(--text-primary);">{t.get('validity_days', 0)} days</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Digest Algorithm</div>
+                        <div style="font-weight: 500; color: var(--text-primary);">{html_escape(t.get('digest', ''))}</div>
+                    </div>
+                </div>
+
+                <!-- DN Template -->
+                <div>
+                    <h4 style="font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">
+                        <svg class="ucm-icon" width="16" height="16" style="vertical-align: middle; margin-right: 0.375rem;"><use href="#icon-file-text"/></svg>
+                        Distinguished Name Template
+                    </h4>
+                    <div style="padding: 1rem; background: var(--bg-primary); border-radius: 4px; font-family: monospace; font-size: 0.875rem;">
+                        {dn_entries if dn_entries else '<div style="color: var(--text-secondary);">No DN template</div>'}
+                    </div>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                        Variables: {{hostname}}, {{email}}, {{username}}
+                    </p>
+                </div>
+
+                <!-- Extensions -->
+                <div>
+                    <h4 style="font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">
+                        <svg class="ucm-icon" width="16" height="16" style="vertical-align: middle; margin-right: 0.375rem;"><use href="#icon-shield"/></svg>
+                        Certificate Extensions
+                    </h4>
+                    
+                    <div style="display: grid; gap: 1rem;">
+        '''
+        
+        if ku:
+            html += f'''
+                        <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Key Usage</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                                {' '.join([f'<span style="padding: 0.25rem 0.5rem; background: var(--primary-color)20; color: var(--primary-color); border-radius: 4px; font-size: 0.75rem;">{html_escape(k)}</span>' for k in ku])}
+                            </div>
+                        </div>
+            '''
+        
+        if eku:
+            html += f'''
+                        <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Extended Key Usage</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                                {' '.join([f'<span style="padding: 0.25rem 0.5rem; background: var(--success-color)20; color: var(--success-color); border-radius: 4px; font-size: 0.75rem;">{html_escape(k)}</span>' for k in eku])}
+                            </div>
+                        </div>
+            '''
+        
+        if san:
+            html += f'''
+                        <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">SAN Types Supported</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                                {' '.join([f'<span style="padding: 0.25rem 0.5rem; background: var(--info-color)20; color: var(--info-color); border-radius: 4px; font-size: 0.75rem;">{html_escape(k)}</span>' for k in san])}
+                            </div>
+                        </div>
+            '''
+        
+        html += '''
+                    </div>
+                </div>
+            </div>
+        '''
+        
+        return html
+    except Exception as e:
+        return f'<div style="color: var(--danger-color); padding: 2rem; text-align: center;">Error: {html_escape(str(e))}</div>'
