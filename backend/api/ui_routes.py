@@ -5346,3 +5346,51 @@ def ui_template_detail(template_id):
         return html
     except Exception as e:
         return f'<div style="color: var(--danger-color); padding: 2rem; text-align: center;">Error: {html_escape(str(e))}</div>'
+
+
+@ui_bp.route('/api/ui/templates/options')
+@login_required
+def templates_options():
+    """Get templates as HTML options for select dropdown"""
+    try:
+        token = session.get('access_token')
+        headers = {'Authorization': f'Bearer {token}'}
+        
+        response = requests.get(
+            f"{request.url_root}api/v1/templates",
+            headers=headers,
+            verify=False
+        )
+        
+        if response.status_code == 200:
+            templates = response.json()
+            html = '<option value="">-- No Template (Manual) --</option>'
+            for t in templates:
+                html += f'<option value="{t["id"]}">{t["name"]} ({t["type"]})</option>'
+            return html, 200
+        else:
+            return '<option value="">-- No Template (Manual) --</option>', 200
+    except Exception as e:
+        return f'<option value="">Error loading templates</option>', 500
+
+
+@ui_bp.route('/api/ui/templates/<int:template_id>/json')
+@login_required
+def template_json(template_id):
+    """Get single template as JSON (for CSR auto-fill)"""
+    try:
+        token = session.get('access_token')
+        headers = {'Authorization': f'Bearer {token}'}
+        
+        response = requests.get(
+            f"{request.url_root}api/v1/templates/{template_id}",
+            headers=headers,
+            verify=False
+        )
+        
+        if response.status_code == 200:
+            return response.json(), 200
+        else:
+            return {'error': 'Template not found'}, response.status_code
+    except Exception as e:
+        return {'error': str(e)}, 500
