@@ -2026,8 +2026,8 @@ async function loadMTLSSettings() {
     try {
         {% if session.get('role') == 'admin' %}
         // Load CA list
-        const casResponse = await fetch('/api/ui/ca/list', {
-            `}
+        const casResponse = await fetch('/api/v1/ca', {
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (casResponse.ok) {
@@ -2044,8 +2044,8 @@ async function loadMTLSSettings() {
         {% endif %}
         
         // Load current settings
-        const response = await fetch('/api/ui/mtls/settings', {
-            `}
+        const response = await fetch('/api/v1/mtls/settings', {
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -2211,8 +2211,8 @@ document.getElementById('download-ca-btn')?.addEventListener('click', async () =
     }
     
     try {
-        const response = await fetch(`/api/ui/ca/${caId}/export?format=pem`, {
-            `}
+        const response = await fetch(`/api/v1/ca/${caId}/export?format=pem`, {
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -2251,8 +2251,8 @@ async function updateUserSection() {
         if (trustedCAId) {
             // Fetch CA details
             try {
-                const response = await fetch(`/api/ui/ca/${trustedCAId}`, {
-                    `}
+                const response = await fetch(`/api/v1/ca/${trustedCAId}`, {
+                    headers: {'Authorization': `Bearer ${token}`}
                 });
                 if (response.ok) {
                     const ca = await response.json();
@@ -2289,7 +2289,7 @@ document.getElementById('mtls-settings-form')?.addEventListener('submit', async 
     };
     
     try {
-        const response = await fetch('/api/ui/mtls/settings', {
+        const response = await fetch('/api/v1/mtls/settings', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2323,7 +2323,7 @@ document.getElementById('create-managed-cert-form')?.addEventListener('submit', 
     };
     
     try {
-        const response = await fetch('/api/ui/mtls/certificates/create', {
+        const response = await fetch('/api/v1/mtls/certificates/create', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2360,7 +2360,7 @@ document.getElementById('create-selfsigned-cert-form')?.addEventListener('submit
     };
     
     try {
-        const response = await fetch('/api/ui/mtls/certificates/create', {
+        const response = await fetch('/api/v1/mtls/certificates/create', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2393,7 +2393,7 @@ async function validateImportedCert() {
     }
     
     try {
-        const response = await fetch('/api/ui/mtls/validate-certificate', {
+        const response = await fetch('/api/v1/mtls/validate-certificate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2445,7 +2445,7 @@ document.getElementById('import-cert-form')?.addEventListener('submit', async (e
     };
     
     try {
-        const response = await fetch('/api/ui/mtls/certificates/enroll', {
+        const response = await fetch('/api/v1/mtls/certificates/enroll', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2473,8 +2473,8 @@ document.getElementById('import-cert-form')?.addEventListener('submit', async (e
 // Load certificates
 async function loadCertificates() {
     try {
-        const response = await fetch('/api/ui/mtls/certificates', {
-            `}
+        const response = await fetch('/api/v1/mtls/certificates', {
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -2553,8 +2553,8 @@ async function loadCertificates() {
 // Certificate actions
 async function downloadCertificate(certId) {
     try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}/download`, {
-            `}
+        const response = await fetch(`/api/v1/mtls/certificates/${certId}/download`, {
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -2584,8 +2584,9 @@ async function revokeCertificate(certId) {
     if (!confirmed) return;
     
     try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}/revoke`, {
-            method: 'POST'`}
+        const response = await fetch(`/api/v1/mtls/certificates/${certId}/revoke`, {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -2602,8 +2603,9 @@ window.revokeCertificate = revokeCertificate;
 
 async function enableCertificate(certId) {
     try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}/enable`, {
-            method: 'POST'`}
+        const response = await fetch(`/api/v1/mtls/certificates/${certId}/enable`, {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -2628,8 +2630,9 @@ async function deleteCertificate(certId) {
     if (!confirmed) return;
     
     try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}`, {
-            method: 'DELETE'`}
+        const response = await fetch(`/api/v1/mtls/certificates/${certId}`, {
+            method: 'DELETE',
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -2699,8 +2702,8 @@ function isWebAuthnCompatibleHostname(hostname) {
 async function getServerFQDN() {
     try {
         // Try to get server info from API
-        const response = await fetch('/api/ui/system/info', {
-            ` }
+        const response = await fetch('/api/v1/system/info', {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (response.ok) {
@@ -2811,8 +2814,8 @@ function bufferToBase64url(buffer) {
 // Load credentials list
 window.loadCredentials = async function() {
     try {
-        const response = await fetch('/api/ui/webauthn/credentials', {
-            ` }
+        const response = await fetch('/api/v1/webauthn/credentials', {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
         const result = await response.json();
         
@@ -2959,8 +2962,10 @@ window.startRegistration = async function() {
     
     try {
         // Step 1: Get registration options from server
-        const optionsResponse = await fetch('/api/ui/webauthn/register/options', {
-            method: 'POST'`,
+        const optionsResponse = await fetch('/api/v1/webauthn/register/options', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             }
         });
@@ -3006,8 +3011,10 @@ window.startRegistration = async function() {
         }
         
         // Step 3: Send credential to server
-        const verifyResponse = await fetch('/api/ui/webauthn/register/verify', {
-            method: 'POST'`,
+        const verifyResponse = await fetch('/api/v1/webauthn/register/verify', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -3044,8 +3051,10 @@ window.startRegistration = async function() {
 // Toggle credential active state
 window.toggleCredential = async function(credentialId, newState) {
     try {
-        const response = await fetch(`/api/ui/webauthn/credentials/${credentialId}/toggle`, {
-            method: 'POST'`,
+        const response = await fetch(`/api/v1/webauthn/credentials/${credentialId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ enabled: newState })
@@ -3075,8 +3084,9 @@ window.deleteCredential = async function(credentialId) {
     if (!confirmed) return;
     
     try {
-        const response = await fetch(`/api/ui/webauthn/credentials/${credentialId}`, {
-            method: 'DELETE'` }
+        const response = await fetch(`/api/v1/webauthn/credentials/${credentialId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
         });
         
         const result = await response.json();
@@ -3129,8 +3139,8 @@ function showToast(message, type = 'info') {
 // Load SMTP configuration
 async function loadSMTPConfig() {
     try {
-        const response = await fetch('/api/ui/notifications/smtp/config', {
-            `}
+        const response = await fetch('/api/v1/notifications/smtp/config', {
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -3181,7 +3191,7 @@ document.getElementById('smtp-form').addEventListener('submit', async (e) => {
     }
     
     try {
-        const response = await fetch('/api/ui/notifications/smtp/config', {
+        const response = await fetch('/api/v1/notifications/smtp/config', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3214,7 +3224,7 @@ document.getElementById('user-notification-form')?.addEventListener('submit', as
     };
     
     try {
-        const response = await fetch('/api/ui/notifications/user/settings', {
+        const response = await fetch('/api/v1/notifications/user/settings', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3238,8 +3248,8 @@ document.getElementById('user-notification-form')?.addEventListener('submit', as
 // Load user notification settings
 async function loadUserNotificationSettings() {
     try {
-        const response = await fetch('/api/ui/notifications/user/settings', {
-            `}
+        const response = await fetch('/api/v1/notifications/user/settings', {
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -3282,7 +3292,7 @@ window.testSMTP = async function() {
     showToast('Sending test email...', 'info');
     
     try {
-        const response = await fetch('/api/ui/notifications/smtp/test', {
+        const response = await fetch('/api/v1/notifications/smtp/test', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3306,8 +3316,8 @@ window.testSMTP = async function() {
 // Load notification rules
 async function loadNotificationRules() {
     try {
-        const response = await fetch('/api/ui/notifications/config', {
-            `}
+        const response = await fetch('/api/v1/notifications/config', {
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -3375,7 +3385,7 @@ async function updateRule(type) {
     const recipients = recipientsStr.split(',').map(e => e.trim()).filter(e => e);
     
     try {
-        const response = await fetch(`/api/ui/notifications/config/${type}`, {
+        const response = await fetch(`/api/v1/notifications/config/${type}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3399,8 +3409,8 @@ async function updateRule(type) {
 // Load notification history
 async function loadNotificationHistory() {
     try {
-        const response = await fetch('/api/ui/notifications/history?limit=20', {
-            `}
+        const response = await fetch('/api/v1/notifications/history?limit=20', {
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -3448,8 +3458,8 @@ async function loadNotificationHistory() {
 // Load notification stats
 async function loadNotificationStats() {
     try {
-        const response = await fetch('/api/ui/notifications/stats', {
-            `}
+        const response = await fetch('/api/v1/notifications/stats', {
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         if (response.ok) {
@@ -3483,8 +3493,9 @@ async function testNotifications() {
     if (!confirmed) return;
     
     try {
-        const response = await fetch('/api/ui/notifications/check', {
-            method: 'POST'`}
+        const response = await fetch('/api/v1/notifications/check', {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${token}`}
         });
         
         const result = await response.json();
@@ -3690,7 +3701,7 @@ function viewTemplateDetail(id) {
     openModal('viewTemplateModal'); // View-only, overlay closes automatically
     document.getElementById('viewTemplateContent').innerHTML = '<svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>';
     
-    fetch('/api/ui/templates/' + id)
+    fetch('/api/v1/templates/' + id)
         .then(r => r.json())
         .then(t => {
             // Format DN template nicely
@@ -4105,8 +4116,10 @@ function executePKIReset() {
 // mTLS Status Badge
 // ========================================
 function updateMTLSBadge() {
-    fetch('/api/ui/mtls/settings', {
-        ` }
+    const token = getToken();
+    
+    fetch('/api/v1/mtls/settings', {
+        headers: { 'Authorization': `Bearer ${token}` }
     })
     .then(response => response.json())
     .then(data => {
@@ -4247,7 +4260,7 @@ async function createBackup() {
     };
     
     try {
-        const response = await fetch('/api/ui/backup/create', {
+        const response = await fetch('/api/v1/backup/create', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -4425,8 +4438,11 @@ async function validateBackup() {
     formData.append('password', password);
     
     try {
-        const response = await fetch('/api/ui/backup/validate', {
+        const response = await fetch('/api/v1/backup/validate', {
             method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + getToken()
+            },
             body: formData
         });
         
@@ -4578,8 +4594,11 @@ async function restoreBackup() {
     formData.append('options', JSON.stringify(options));
     
     try {
-        const response = await fetch('/api/ui/backup/restore', {
+        const response = await fetch('/api/v1/backup/restore', {
             method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + getToken()
+            },
             body: formData
         });
         
@@ -4612,8 +4631,8 @@ async function restoreBackup() {
 // Load database stats on page load
 async function loadDatabaseStats() {
     try {
-        const response = await fetch('/api/ui/system/database/stats', {
-            
+        const response = await fetch('/api/v1/system/database/stats', {
+            headers: { 'Authorization': 'Bearer ' + getToken() }
         });
         const data = await response.json();
         
@@ -4657,8 +4676,8 @@ async function loadDatabaseStats() {
 
 async function loadDatabaseHealth() {
     try {
-        const response = await fetch('/api/ui/system/database/health', {
-            
+        const response = await fetch('/api/v1/system/database/health', {
+            headers: { 'Authorization': 'Bearer ' + getToken() }
         });
         const data = await response.json();
         
@@ -4692,8 +4711,12 @@ async function optimizeDatabase() {
     showToast('Optimizing database...', 'info');
     
     try {
-        const response = await fetch('/api/ui/system/database/optimize', {
-            method: 'POST'
+        const response = await fetch('/api/v1/system/database/optimize', {
+            method: 'POST',
+            headers: { 
+                'Authorization': 'Bearer ' + getToken(),
+                'Content-Type': 'application/json'
+            }
         });
         
         const data = await response.json();
@@ -4715,8 +4738,12 @@ async function checkIntegrity() {
     showToast('Running integrity check...', 'info');
     
     try {
-        const response = await fetch('/api/ui/system/database/integrity-check', {
-            method: 'POST'
+        const response = await fetch('/api/v1/system/database/integrity-check', {
+            method: 'POST',
+            headers: { 
+                'Authorization': 'Bearer ' + getToken(),
+                'Content-Type': 'application/json'
+            }
         });
         
         const data = await response.json();
@@ -4744,8 +4771,12 @@ async function cleanExpiredCerts() {
     showToast('Cleaning expired certificates...', 'info');
     
     try {
-        const response = await fetch('/api/ui/system/database/clean-expired', {
+        const response = await fetch('/api/v1/system/database/clean-expired', {
             method: 'POST',
+            headers: { 
+                'Authorization': 'Bearer ' + getToken(),
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({ days_after_expiry: 30 })
         });
         
@@ -4771,8 +4802,12 @@ async function exportDatabase() {
     showToast('Exporting database...', 'info');
     
     try {
-        const response = await fetch('/api/ui/system/database/export', {
+        const response = await fetch('/api/v1/system/database/export', {
             method: 'POST',
+            headers: { 
+                'Authorization': 'Bearer ' + getToken(),
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({ compress: true })
         });
         
