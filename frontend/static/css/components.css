@@ -1787,7 +1787,7 @@ table td:last-child .btn-icon {
 /* Display */
 .block { display: block; }
 .inline-block { display: inline-block; }
-.hidden { display: none; }
+.hidden { display: none !important; }  /* !important to override inline styles */
 
 /* Width */
 .w-full { width: 100%; }
