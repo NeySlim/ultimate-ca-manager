@@ -324,8 +324,11 @@
                         <div style="flex: 1;">
                             <h3 style="font-weight: 600; color: var(--text-primary); margin: 0 0 0.5rem 0; font-size: 0.875rem;">Use a Template (Optional)</h3>
                             <select id="csr-template-select" onchange="applyCSRTemplate(this.value)"
-                                    class="modal-form-input" style="margin-bottom: 0.5rem;">
-                                <option value="">-- No Template (Manual) --</option>
+                                    class="modal-form-input" style="margin-bottom: 0.5rem;"
+                                    hx-get="/api/ui/templates/options"
+                                    hx-trigger="load"
+                                    hx-swap="innerHTML">
+                                <option value="">-- Loading templates... --</option>
                             </select>
                             <p style="margin: 0; font-size: 0.75rem; color: var(--text-muted);">
                                 Select a template to auto-fill fields, or leave empty for manual configuration
@@ -468,30 +471,7 @@
 </div>
 
 <script>
-// Load templates for CSR modal
-function loadCSRTemplates() {
-    fetch('/api/v1/templates')
-        .then(r => r.json())
-        .then(templates => {
-            const select = document.getElementById('csr-template-select');
-            if (!select) return;
-            
-            // Keep the "No Template" option
-            select.innerHTML = '<option value="">-- No Template (Manual) --</option>';
-            
-            if (templates && templates.length > 0) {
-                templates.forEach(t => {
-                    const option = document.createElement('option');
-                    option.value = t.id;
-                    option.textContent = `${t.name} (${t.type})`;
-                    select.appendChild(option);
-                });
-            }
-        })
-        .catch(err => console.error('Failed to load templates:', err));
-}
-
-// Apply template to CSR form
+// Apply template to CSR form using HTMX (NO fetch()!)
 function applyCSRTemplate(templateId) {
     if (!templateId) {
         // Reset form when "No Template" selected
@@ -500,55 +480,48 @@ function applyCSRTemplate(templateId) {
         return;
     }
     
-    fetch('/api/v1/templates/' + templateId)
-        .then(r => r.json())
-        .then(template => {
-            // Apply key configuration
-            const keyType = template.key_type || '4096';
-            document.getElementById('csr-key-type').value = keyType;
-            
-            const digest = template.digest || 'sha256';
-            document.getElementById('csr-digest').value = digest;
-            
-            // Apply DN defaults (but don't overwrite if user already entered something)
-            const dn = template.dn_template || {};
-            if (dn.O && !document.getElementById('csr-org').value) {
-                document.getElementById('csr-org').value = dn.O.replace('{username}', '').replace('{email}', '').trim();
-            }
-            if (dn.OU && !document.getElementById('csr-ou').value) {
-                document.getElementById('csr-ou').value = dn.OU.replace('{username}', '').replace('{email}', '').trim();
-            }
-            if (dn.C && !document.getElementById('csr-country').value) {
-                document.getElementById('csr-country').value = dn.C;
-            }
-            if (dn.ST && !document.getElementById('csr-state').value) {
-                document.getElementById('csr-state').value = dn.ST;
-            }
-            if (dn.L && !document.getElementById('csr-locality').value) {
-                document.getElementById('csr-locality').value = dn.L;
-            }
-            
-            // Show toast
-            if (typeof showToast === 'function') {
-                showToast(`Template "${template.name}" applied`, 'success');
-            }
-        })
-        .catch(err => {
-            console.error('Failed to load template:', err);
-            if (typeof showToast === 'function') {
-                showToast('Failed to load template', 'error');
-            }
-        });
+    // Use htmx.ajax instead of fetch()
+    htmx.ajax('GET', '/api/ui/templates/' + templateId + '/json', {
+        swap: 'none'
+    }).then(response => {
+        return response.json();
+    }).then(template => {
+        // Apply key configuration
+        const keyType = template.key_type || '4096';
+        document.getElementById('csr-key-type').value = keyType;
+        
+        const digest = template.digest || 'sha256';
+        document.getElementById('csr-digest').value = digest;
+        
+        // Apply DN defaults (but don't overwrite if user already entered something)
+        const dn = template.dn_template || {};
+        if (dn.O && !document.getElementById('csr-org').value) {
+            document.getElementById('csr-org').value = dn.O.replace('{username}', '').replace('{email}', '').trim();
+        }
+        if (dn.OU && !document.getElementById('csr-ou').value) {
+            document.getElementById('csr-ou').value = dn.OU.replace('{username}', '').replace('{email}', '').trim();
+        }
+        if (dn.C && !document.getElementById('csr-country').value) {
+            document.getElementById('csr-country').value = dn.C;
+        }
+        if (dn.ST && !document.getElementById('csr-state').value) {
+            document.getElementById('csr-state').value = dn.ST;
+        }
+        if (dn.L && !document.getElementById('csr-locality').value) {
+            document.getElementById('csr-locality').value = dn.L;
+        }
+        
+        // Show toast
+        if (typeof showToast === 'function') {
+            showToast(`Template "${template.name}" applied`, 'success');
+        }
+    }).catch(err => {
+        console.error('Failed to load template:', err);
+        if (typeof showToast === 'function') {
+            showToast('Failed to load template', 'error');
+        }
+    });
 }
-
-// Load templates when CSR modal opens
-document.addEventListener('DOMContentLoaded', function() {
-    const origOpenCSRModal = window.openCSRModal;
-    window.openCSRModal = function() {
-        if (origOpenCSRModal) origOpenCSRModal();
-        loadCSRTemplates();
-    };
-});
 </script>
 
 <script>
