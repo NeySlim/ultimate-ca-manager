@@ -1745,14 +1745,29 @@ def cert_csr():
         token = session.get('access_token')
         headers = {'Authorization': f'Bearer {token}'}
         
+        # Build DN from form data
+        dn = {
+            'CN': request.form.get('common_name'),
+            'O': request.form.get('organization', ''),
+            'OU': request.form.get('organizational_unit', ''),
+            'C': request.form.get('country', ''),
+            'ST': request.form.get('state', ''),
+            'L': request.form.get('locality', '')
+        }
+        
+        # Filter out empty values
+        dn = {k: v for k, v in dn.items() if v}
+        
         data = {
+            'action': 'csr',  # CRITICAL: use action=csr
             'descr': request.form.get('descr'),
-            'common_name': request.form.get('common_name'),
+            'dn': dn,
             'key_type': request.form.get('key_type'),
+            'digest': 'sha256'
         }
         
         response = requests.post(
-            f"{request.url_root}api/v1/certificates/csr",
+            f"{request.url_root}api/v1/certificates",  # FIXED: correct endpoint
             headers=headers,
             json=data,
             verify=False
