@@ -841,10 +841,10 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
 
 .stat-card {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 1rem;
     padding: 1.25rem;
-    min-height: 88px; /* 56px icon + 2*16px padding */
+    min-height: 88px;
     height: 100%;
 }
 
