@@ -34,7 +34,7 @@
 
         <!-- HTTPS Certificate Tab -->
         <div x-show="activeTab === 'https'" style="padding: 1.5rem 0;">
-            <div class="card">
+            <div class="card" style="padding: 0;">
                 <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">HTTPS Certificate</h2>
                 
                 <!-- Current Certificate Info -->
@@ -67,7 +67,7 @@
 
         <!-- User Management Tab -->
         <div x-show="activeTab === 'users'" style="padding: 1.5rem 0;">
-            <div class="card">
+            <div class="card" style="padding: 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary);">Users</h2>
                     <button @click="$dispatch('open-modal', 'addUserModal')" class="btn-primary">
@@ -87,7 +87,7 @@
 
         <!-- System Settings Tab -->
         <div x-show="activeTab === 'system'" style="padding: 1.5rem 0;">
-            <div class="card">
+            <div class="card" style="padding: 0;">
                 <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">System Settings</h2>
                 <form hx-post="/api/ui/config/system-save" hx-swap="none" style="display: flex; flex-direction: column; gap: 1rem;">
                     <div>
@@ -126,7 +126,7 @@
 
         <!-- Database Tab -->
         <div x-show="activeTab === 'database'" style="padding: 1.5rem 0;">
-            <div class="card">
+            <div class="card" style="padding: 0;">
                 <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Database Management</h2>
                 
                 <!-- Database Statistics -->
@@ -161,7 +161,7 @@
 
         <!-- System Info Tab -->
         <div x-show="activeTab === 'info'" style="padding: 1.5rem 0;">
-            <div class="card">
+            <div class="card" style="padding: 0;">
                 <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">System Information</h2>
                 <div hx-get="/api/ui/config/system-info" hx-trigger="load, refreshSysInfo from:body" hx-target="#system-info">
                     <div id="system-info">
