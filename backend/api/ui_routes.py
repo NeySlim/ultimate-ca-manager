@@ -5370,7 +5370,7 @@ def templates_options():
         else:
             return '<option value="">-- No templates found --</option>', 200
     except Exception as e:
-        app.logger.error(f"Error loading templates: {str(e)}")
+        current_app.logger.error(f"Error loading templates: {str(e)}")
         return f'<option value="">-- Error: {str(e)[:30]} --</option>', 200
 
 
@@ -5392,5 +5392,5 @@ def template_json(template_id):
         else:
             return {'error': 'Template not found'}, 404
     except Exception as e:
-        app.logger.error(f"Error loading template {template_id}: {str(e)}")
+        current_app.logger.error(f"Error loading template {template_id}: {str(e)}")
         return {'error': str(e)}, 500
