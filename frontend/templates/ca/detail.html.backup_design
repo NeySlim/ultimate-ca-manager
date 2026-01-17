@@ -57,45 +57,45 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
     </div>
 
     <!-- CA Information -->
-    <div class="detail-grid">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 1.5rem;">
         <!-- Basic Information -->
         <div class="card">
-            <h2 class="card-title">Basic Information</h2>
-            <dl class="detail-list">
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Basic Information</h2>
+            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
                 <div>
-                    <dt class="detail-dt">Common Name</dt>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Common Name</dt>
                     <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{{ ca.common_name }}</dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">Organization</dt>
-                    <dd class="detail-dd">{{ ca.organization or 'N/A' }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Organization</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.organization or 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">Organizational Unit</dt>
-                    <dd class="detail-dd">{{ ca.organizational_unit or 'N/A' }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Organizational Unit</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.organizational_unit or 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">Country</dt>
-                    <dd class="detail-dd">{{ ca.country or 'N/A' }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Country</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.country or 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">State/Province</dt>
-                    <dd class="detail-dd">{{ ca.state or 'N/A' }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">State/Province</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.state or 'N/A' }}</dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">Locality</dt>
-                    <dd class="detail-dd">{{ ca.locality or 'N/A' }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Locality</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.locality or 'N/A' }}</dd>
                 </div>
             </dl>
         </div>
 
         <!-- Technical Details -->
         <div class="card">
-            <h2 class="card-title">Technical Details</h2>
-            <dl class="detail-list">
+            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Technical Details</h2>
+            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
                 <div>
-                    <dt class="detail-dt">Type</dt>
-                    <dd class="detail-dd">
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Type</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">
                         {% if ca.is_root %}
                         <span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--info-color);">Root CA</span>
                         {% else %}
@@ -104,24 +104,24 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                     </dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">Key Type</dt>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Key Type</dt>
                     <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{{ ca.key_type }}</dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">Hash Algorithm</dt>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Hash Algorithm</dt>
                     <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace;">{{ ca.hash_algorithm }}</dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">Serial Number</dt>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Serial Number</dt>
                     <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace; word-break: break-all;">{{ ca.serial_number }}</dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">Valid From</dt>
-                    <dd class="detail-dd">{{ ca.not_valid_before }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Valid From</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.not_valid_before }}</dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">Valid Until</dt>
-                    <dd class="detail-dd">{{ ca.not_valid_after }}</dd>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Valid Until</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ ca.not_valid_after }}</dd>
                 </div>
             </dl>
         </div>
@@ -129,7 +129,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
 
     <!-- Fingerprints -->
     <div class="card" style="margin-top: 1.5rem;">
-        <h2 class="card-title-sm">
+        <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
             <svg class="ucm-icon" width="18" height="18"><use href="#icon-fingerprint"/></svg>
             <span>Certificate Fingerprints</span>
         </h2>
@@ -143,7 +143,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
 
     <!-- X.509 Extensions and Details -->
     <div class="card" style="margin-top: 1.5rem;">
-        <h2 class="card-title-sm">
+        <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
             <svg class="ucm-icon" width="18" height="18"><use href="#icon-award"/></svg>
             <span>X.509 Certificate Details</span>
         </h2>
@@ -158,7 +158,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
     <!-- CRL Distribution Points Configuration -->
     <div class="card" style="margin-top: 1.5rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h2 class="card-title-sm">
+            <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
                 <svg class="ucm-icon" width="18" height="18"><use href="#icon-file-text"/></svg>
                 <span>CRL Distribution Points (CDP)</span>
             </h2>
@@ -168,9 +168,9 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
         </div>
         
         <div id="cdp-view-mode">
-            <dl class="detail-list">
+            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
                 <div>
-                    <dt class="detail-dt">CDP Status</dt>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">CDP Status</dt>
                     <dd style="margin-top: 0.25rem;">
                         {% if ca.cdp_enabled %}
                             <span class="badge badge-success">
@@ -185,13 +185,13 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                 </div>
                 {% if ca.cdp_enabled and ca.cdp_url %}
                 <div>
-                    <dt class="detail-dt">CDP URL</dt>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">CDP URL</dt>
                     <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--primary-color); font-family: monospace; background: rgba(59, 130, 246, 0.1); padding: 0.5rem; border-radius: 0.25rem;">
                         {{ ca.cdp_url.replace('{ca_refid}', ca.refid) }}
                     </dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">Public Access</dt>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Public Access</dt>
                     <dd style="margin-top: 0.25rem;">
                         <a href="/crl/info/{{ ca.refid }}" style="color: var(--primary-color); font-size: 0.875rem;">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-info"/></svg> View CRL Info
@@ -259,7 +259,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
     <!-- OCSP Configuration -->
     <div class="card" style="margin-top: 1.5rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h2 class="card-title-sm">
+            <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
                 <svg class="ucm-icon" width="18" height="18"><use href="#icon-check-circle"/></svg>
                 <span>OCSP (Online Certificate Status Protocol)</span>
             </h2>
@@ -269,9 +269,9 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
         </div>
         
         <div id="ocsp-view-mode">
-            <dl class="detail-list">
+            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
                 <div>
-                    <dt class="detail-dt">OCSP Status</dt>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">OCSP Status</dt>
                     <dd style="margin-top: 0.25rem;">
                         {% if ca.ocsp_enabled %}
                             <span class="badge badge-success">
@@ -286,13 +286,13 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                 </div>
                 {% if ca.ocsp_enabled and ca.ocsp_url %}
                 <div>
-                    <dt class="detail-dt">OCSP Responder URL</dt>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">OCSP Responder URL</dt>
                     <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem;">
                         {{ ca.ocsp_url }}
                     </dd>
                 </div>
                 <div>
-                    <dt class="detail-dt">Test OCSP</dt>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Test OCSP</dt>
                     <dd style="margin-top: 0.25rem;">
                         <code style="font-size: 0.75rem; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem; display: block; overflow-x: auto;">
                             openssl ocsp -issuer ca.crt -cert cert.crt -url {{ ca.ocsp_url }} -text
@@ -357,7 +357,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
 
     <!-- Certificates issued by this CA -->
     <div class="card" style="margin-top: 1.5rem;">
-        <h2 class="card-title">Issued Certificates</h2>
+        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Issued Certificates</h2>
         <div hx-get="/api/ui/ca/{{ ca.id }}/certificates" hx-trigger="load" hx-target="#cert-list">
             <div id="cert-list">
                 <div style="text-align: center; padding: 2rem 0;">

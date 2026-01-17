@@ -57,8 +57,8 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;">
         <!-- Basic Information -->
         <div class="card" style="padding: 0;">
-            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Basic Information</h2>
-            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <h2 class="card-title">Basic Information</h2>
+            <dl class="detail-list">
                 <div>
                     <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Description</dt>
                     <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">{{ cert.descr }}</dd>
@@ -100,8 +100,8 @@
 
         <!-- Technical Details -->
         <div class="card" style="padding: 0;">
-            <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Technical Details</h2>
-            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <h2 class="card-title">Technical Details</h2>
+            <dl class="detail-list">
                 <div>
                     <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Serial Number</dt>
                     <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary); font-family: monospace; word-break: break-all;">{{ cert.serial_number }}</dd>
@@ -138,7 +138,7 @@
 
     <!-- Fingerprints -->
     <div class="card" style="margin-top: 1.5rem;">
-        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">
+        <h2 class="card-title">
             <svg class="ucm-icon" width="18" height="18"><use href="#icon-fingerprint"/></svg> Certificate Fingerprints
         </h2>
         <div id="fingerprints-section">
@@ -151,7 +151,7 @@
 
     <!-- X.509 Extensions and Details -->
     <div class="card" style="margin-top: 1.5rem;">
-        <h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">
+        <h2 class="card-title">
             <svg class="ucm-icon" width="18" height="18"><use href="#icon-award"/></svg> X.509 Certificate Details
         </h2>
         <div id="x509-details">
