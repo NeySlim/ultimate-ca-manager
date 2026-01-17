@@ -99,7 +99,7 @@ function addCloseButtonToModal(modal) {
         closeModal(modalId, hasFormInputs(modal));
     };
     closeBtn.style.cssText = 'background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.25rem; margin-left: auto;';
-    closeBtn.innerHTML = '<svg class="ucm-icon" width="20" height="20"><use href="#icon-x-circle"/></svg>';
+    closeBtn.innerHTML = '<svg class="ucm-icon" width="20" height="20"><use href="#icon-times"/></svg>';
     
     // Insert as last child of header
     header.appendChild(closeBtn);
