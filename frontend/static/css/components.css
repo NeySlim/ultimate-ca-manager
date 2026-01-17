@@ -2785,3 +2785,59 @@ aside {
 main {
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* ===========================
+   DETAIL PAGES - Spacing
+   =========================== */
+
+/* Add spacing between cards on detail pages */
+.card + .card {
+    margin-top: 1.5rem;
+}
+
+/* Detail page grid layout */
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 1.5rem;
+}
+
+/* Card title styling for detail pages */
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-title-sm {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Definition list styling for detail pages */
+.detail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.detail-list dt {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.detail-list dd {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
