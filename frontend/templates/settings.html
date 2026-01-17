@@ -2022,15 +2022,12 @@ function copyToClipboard(elementId, name) {
 // document.querySelectorAll('.tab-button').forEach(btn => ... removed ...);
 
 // Load mTLS settings
-async function loadMTLSSettings() {
+function loadMTLSSettings(casDataStr, settingsDataStr) {
     try {
         {% if session.get('role') == 'admin' %}
         // Load CA list
-        const casResponse = await fetch('/api/ui/ca/list', 
-        });
-        
-        if (casResponse.ok) {
-            const casData = await casResponse.json();
+        if (casDataStr) {
+            const casData = JSON.parse(casDataStr);
             const select = document.getElementById('mtls_trusted_ca_id');
             
             casData.forEach(ca => {
@@ -2043,11 +2040,8 @@ async function loadMTLSSettings() {
         {% endif %}
         
         // Load current settings
-        const response = await fetch('/api/ui/mtls/settings', 
-        });
-        
-        if (response.ok) {
-            currentSettings = await response.json();
+        if (settingsDataStr) {
+            currentSettings = JSON.parse(settingsDataStr);
             
             {% if session.get('role') == 'admin' %}
             document.getElementById('mtls_enabled').checked = currentSettings.enabled;
@@ -2200,39 +2194,10 @@ function updateConfigExamples() {
 document.getElementById('mtls_enabled')?.addEventListener('change', toggleMTLSFields);
 document.getElementById('mtls_trusted_ca_id')?.addEventListener('change', toggleMTLSFields);
 
-// Download CA certificate
-document.getElementById('download-ca-btn')?.addEventListener('click', async () => {
-    const caId = document.getElementById('mtls_trusted_ca_id').value;
-    if (!caId) {
-        showToast('✗ No CA selected', 'error');
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/api/ui/ca/${caId}/export?format=pem`, 
-        });
-        
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'ucm-client-ca.pem';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            showToast('✓ CA certificate downloaded', 'success');
-        } else {
-            showToast('✗ Failed to download CA', 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
-});
+// Download CA certificate - handled by HTMX button with direct download
 
 // Update user section visibility and content
-async function updateUserSection() {
+function updateUserSection(caDataStr) {
     const userSection = document.getElementById('user-section');
     const disabledMessage = document.getElementById('mtls-disabled-message');
     
@@ -2246,16 +2211,14 @@ async function updateUserSection() {
         const createSelfSigned = document.getElementById('create-self-signed');
         
         if (trustedCAId) {
-            // Fetch CA details
-            try {
-                const response = await fetch(`/api/ui/ca/${trustedCAId}`, 
-                });
-                if (response.ok) {
-                    const ca = await response.json();
+            // Load CA details from parameter
+            if (caDataStr) {
+                try {
+                    const ca = JSON.parse(caDataStr);
                     document.getElementById('ca-name-display').textContent = ca.descr;
                     document.getElementById('import-ca-name-display').textContent = ca.descr;
-                }
-            } catch (e) {}
+                } catch (e) {}
+            }
             
             createWithCA.style.display = 'block';
             createSelfSigned.style.display = 'none';
@@ -2284,100 +2247,17 @@ document.getElementById('mtls-settings-form')?.addEventListener('submit', async 
         trusted_ca_id: document.getElementById('mtls_trusted_ca_id').value
     };
     
-    try {
-        const response = await fetch('/api/ui/mtls/settings', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Settings saved successfully', 'success');
-            loadMTLSSettings();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to save'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+    // Converted to HTMX - handled by form hx-post attribute
+    console.log('MTLS settings will be saved via HTMX form submission');
 });
 {% endif %}
 
-// Create managed certificate
-document.getElementById('create-managed-cert-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const data = {
-        cn: document.getElementById('create_cn').value,
-        email: document.getElementById('create_email').value,
-        validity_days: parseInt(document.getElementById('create_validity').value)
-    };
-    
-    try {
-        const response = await fetch('/api/ui/mtls/certificates/create', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Certificate created successfully', 'success');
-            // Switch to manage tab
-            ucm_switchTab('manage');
-            loadCertificates();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
-});
+// Create managed certificate - handled by HTMX form submission
 
-// Create self-signed certificate
-document.getElementById('create-selfsigned-cert-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const data = {
-        cn: document.getElementById('selfsigned_cn').value,
-        email: document.getElementById('selfsigned_email').value,
-        validity_days: parseInt(document.getElementById('selfsigned_validity').value),
-        key_size: parseInt(document.getElementById('selfsigned_keysize').value),
-        self_signed: true
-    };
-    
-    try {
-        const response = await fetch('/api/ui/mtls/certificates/create', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Self-signed certificate created', 'success');
-            ucm_switchTab('manage');
-            loadCertificates();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
-});
+// Create self-signed certificate - handled by HTMX form submission
 
 // Validate imported certificate
-async function validateImportedCert() {
+function validateImportedCert(resultStr) {
     const certPem = document.getElementById('import_cert_pem').value;
     
     if (!certPem) {
@@ -2385,116 +2265,67 @@ async function validateImportedCert() {
         return;
     }
     
-    try {
-        const response = await fetch('/api/ui/mtls/validate-certificate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({certificate: certPem})
-        });
-        
-        const result = await response.json();
-        const resultDiv = document.getElementById('import-validation-result');
-        
-        if (response.ok && result.success) {
-            const info = result.info;
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = `
-                <div style="background: ${result.valid ? 'var(--success-bg)' : 'var(--danger-bg)'}; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid ${result.valid ? 'var(--success-color)' : 'var(--danger-color)'};">
-                    <strong>${result.valid ? '✓ Valid Certificate' : '✗ Invalid Certificate'}</strong>
-                    ${result.already_enrolled ? '<p style="color: var(--warning-color); margin-top: 0.5rem;"><strong>⚠️ Certificate already enrolled</strong></p>' : ''}
-                    <div style="margin-top: 1rem; font-size: 0.875rem;">
-                        <p><strong>Subject:</strong> ${info.subject}</p>
-                        <p><strong>Issuer:</strong> ${info.issuer}</p>
-                        <p><strong>Serial:</strong> <code>${info.serial}</code></p>
-                        <p><strong>Valid Until:</strong> ${info.valid_until ? new Date(info.valid_until).toLocaleString() : 'N/A'}</p>
-                    </div>
+    const result = JSON.parse(resultStr);
+    const resultDiv = document.getElementById('import-validation-result');
+    
+    if (result.success) {
+        const info = result.info;
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div style="background: ${result.valid ? 'var(--success-bg)' : 'var(--danger-bg)'}; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid ${result.valid ? 'var(--success-color)' : 'var(--danger-color)'};">
+                <strong>${result.valid ? '✓ Valid Certificate' : '✗ Invalid Certificate'}</strong>
+                ${result.already_enrolled ? '<p style="color: var(--warning-color); margin-top: 0.5rem;"><strong>⚠️ Certificate already enrolled</strong></p>' : ''}
+                <div style="margin-top: 1rem; font-size: 0.875rem;">
+                    <p><strong>Subject:</strong> ${info.subject}</p>
+                    <p><strong>Issuer:</strong> ${info.issuer}</p>
+                    <p><strong>Serial:</strong> <code>${info.serial}</code></p>
+                    <p><strong>Valid Until:</strong> ${info.valid_until ? new Date(info.valid_until).toLocaleString() : 'N/A'}</p>
                 </div>
-            `;
-        } else {
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = `
-                <div style="background: var(--danger-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--danger-color);">
-                    <strong>✗ Validation Failed</strong>
-                    <p style="margin-top: 0.5rem;">${result.error || 'Unknown error'}</p>
-                </div>
-            `;
-        }
-    } catch (error) {
-        showToast('✗ Validation error: ' + error.message, 'error');
+            </div>
+        `;
+    } else {
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div style="background: var(--danger-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--danger-color);">
+                <strong>✗ Validation Failed</strong>
+                <p style="margin-top: 0.5rem;">${result.error || 'Unknown error'}</p>
+            </div>
+        `;
     }
 }
 window.validateImportedCert = validateImportedCert;
 
-// Import certificate
-document.getElementById('import-cert-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const data = {
-        certificate: document.getElementById('import_cert_pem').value,
-        name: document.getElementById('import_name').value
-    };
-    
-    try {
-        const response = await fetch('/api/ui/mtls/certificates/enroll', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Certificate imported successfully', 'success');
-            document.getElementById('import-cert-form').reset();
-            document.getElementById('import-validation-result').style.display = 'none';
-            ucm_switchTab('manage');
-            loadCertificates();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to import certificate'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
-});
+// Import certificate - handled by HTMX form submission
 
 // Load certificates
-async function loadCertificates() {
-    try {
-        const response = await fetch('/api/ui/mtls/certificates', 
-        });
+function loadCertificates(dataStr) {
+    const data = JSON.parse(dataStr);
+    const tbody = document.getElementById('certificates-tbody');
+    
+    if (data.certificates.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                    <svg class="ucm-icon" width="32" height="32" style="opacity: 0.5;"><use href="#icon-key"/></svg>
+                    <p style="margin-top: 0.5rem;">No certificates enrolled</p>
+                    <button onclick="ucm_switchTab('create')" class="btn btn-primary btn-primary" style="margin-top: 1rem;">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Create Your First Certificate
+                    </button>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = data.certificates.map(cert => {
+        const validUntil = cert.valid_until ? new Date(cert.valid_until) : null;
+        const isExpired = validUntil && validUntil < new Date();
+        const daysLeft = validUntil ? Math.ceil((validUntil - new Date()) / (1000 * 60 * 60 * 24)) : null;
         
-        if (response.ok) {
-            const data = await response.json();
-            const tbody = document.getElementById('certificates-tbody');
-            
-            if (data.certificates.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                            <svg class="ucm-icon" width="32" height="32" style="opacity: 0.5;"><use href="#icon-key"/></svg>
-                            <p style="margin-top: 0.5rem;">No certificates enrolled</p>
-                            <button onclick="ucm_switchTab('create')" class="btn btn-primary btn-primary" style="margin-top: 1rem;">
-                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Create Your First Certificate
-                            </button>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            tbody.innerHTML = data.certificates.map(cert => {
-                const validUntil = cert.valid_until ? new Date(cert.valid_until) : null;
-                const isExpired = validUntil && validUntil < new Date();
-                const daysLeft = validUntil ? Math.ceil((validUntil - new Date()) / (1000 * 60 * 60 * 24)) : null;
-                
-                // Escape user-controlled data to prevent XSS
-                const safeName = escapeHtml(cert.name || 'Unnamed');
-                const safeSubject = escapeHtml(cert.cert_subject);
-                const safeSerial = escapeHtml(cert.cert_serial.substring(0, 16));
+        // Escape user-controlled data to prevent XSS
+        const safeName = escapeHtml(cert.name || 'Unnamed');
+        const safeSubject = escapeHtml(cert.cert_subject);
+        const safeSerial = escapeHtml(cert.cert_serial.substring(0, 16));
                 
                 return `
                     <tr>
@@ -2541,95 +2372,52 @@ async function loadCertificates() {
 }
 
 // Certificate actions
-async function downloadCertificate(certId) {
-    try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}/download`, 
-        });
-        
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `client-cert-${certId}.pem`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-        } else {
-            showToast('✗ Failed to download certificate', 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+function downloadCertificate(certId) {
+    // Download handled by HTMX button with direct link
+    window.location.href = `/api/ui/mtls/certificates/${certId}/download`;
 }
 window.downloadCertificate = downloadCertificate;
 
-async function revokeCertificate(certId) {
-    const confirmed = await ucmConfirm(
+function revokeCertificate(certId) {
+    ucmConfirm(
         'Are you sure you want to revoke this certificate? You can re-enable it later.',
         'Revoke Certificate',
         { danger: true, confirmText: 'Revoke', icon: 'warning-triangle' }
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}/revoke`, {
-            method: 'POST'}
-        });
-        
-        if (response.ok) {
-            showToast('✓ Certificate revoked', 'success');
-            loadCertificates();
-        } else {
-            showToast('✗ Failed to revoke', 'error');
+    ).then(confirmed => {
+        if (confirmed) {
+            // Trigger HTMX revoke request
+            htmx.ajax('POST', `/api/ui/mtls/certificates/${certId}/revoke`, {
+                target: '#certificates-tbody',
+                swap: 'none'
+            });
         }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+    });
 }
 window.revokeCertificate = revokeCertificate;
 
-async function enableCertificate(certId) {
-    try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}/enable`, {
-            method: 'POST'}
-        });
-        
-        if (response.ok) {
-            showToast('✓ Certificate enabled', 'success');
-            loadCertificates();
-        } else {
-            showToast('✗ Failed to enable', 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+function enableCertificate(certId) {
+    // Trigger HTMX enable request
+    htmx.ajax('POST', `/api/ui/mtls/certificates/${certId}/enable`, {
+        target: '#certificates-tbody',
+        swap: 'none'
+    });
 }
 window.enableCertificate = enableCertificate;
 
-async function deleteCertificate(certId) {
-    const confirmed = await ucmConfirm(
+function deleteCertificate(certId) {
+    ucmConfirm(
         'Are you sure you want to permanently delete this certificate? This action cannot be undone.',
         'Delete Certificate',
         { danger: true, confirmText: 'Delete', icon: 'trash' }
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}`, {
-            method: 'DELETE'}
-        });
-        
-        if (response.ok) {
-            showToast('✓ Certificate deleted', 'success');
-            loadCertificates();
-        } else {
-            showToast('✗ Failed to delete', 'error');
+    ).then(confirmed => {
+        if (confirmed) {
+            // Trigger HTMX delete request
+            htmx.ajax('DELETE', `/api/ui/mtls/certificates/${certId}`, {
+                target: '#certificates-tbody',
+                swap: 'none'
+            });
         }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+    });
 }
 window.deleteCertificate = deleteCertificate;
 
@@ -2685,21 +2473,12 @@ function isWebAuthnCompatibleHostname(hostname) {
 }
 
 // Get the proper FQDN for this server
-async function getServerFQDN() {
-    try {
-        // Try to get server info from API
-        const response = await fetch('/api/ui/system/info', {
-            ` }
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            if (data.fqdn) {
-                return data.fqdn;
-            }
+function getServerFQDN(sysInfoStr) {
+    if (sysInfoStr) {
+        const data = JSON.parse(sysInfoStr);
+        if (data.fqdn) {
+            return data.fqdn;
         }
-    } catch (e) {
-        // Fallback: construct from current hostname
     }
     
     // Fallback: if hostname is just "netsuit", append common TLD
@@ -2713,7 +2492,7 @@ async function getServerFQDN() {
 }
 
 // Show hostname warning and suggest valid URLs or auto-redirect
-async function checkHostnameCompatibility() {
+function checkHostnameCompatibility(sysInfoStr) {
     const hostname = window.location.hostname;
     
     if (!isWebAuthnCompatibleHostname(hostname)) {
@@ -2721,7 +2500,7 @@ async function checkHostnameCompatibility() {
         document.getElementById('current-hostname').textContent = hostname;
         
         // Get the proper FQDN
-        const fqdn = await getServerFQDN();
+        const fqdn = getServerFQDN(sysInfoStr);
         const port = window.location.port;
         const protocol = window.location.protocol;
         const currentPath = window.location.pathname;
@@ -2798,20 +2577,16 @@ function bufferToBase64url(buffer) {
 }
 
 // Load credentials list
-window.loadCredentials = async function() {
-    try {
-        const response = await fetch('/api/ui/webauthn/credentials', {
-            ` }
-        });
-        const result = await response.json();
-        
-        if (response.ok && result.credentials) {
-            renderCredentials(result.credentials);
-            updateStats(result.credentials);
-        } else {
-            document.getElementById('credentials-list').innerHTML = `
-                <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                    <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
+window.loadCredentials = function(credentialsStr) {
+    const result = JSON.parse(credentialsStr);
+    
+    if (result.credentials) {
+        renderCredentials(result.credentials);
+        updateStats(result.credentials);
+    } else {
+        document.getElementById('credentials-list').innerHTML = `
+            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                <svg class="ucm-icon" width="48" height="48" style="margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
                     <p>${result.error || 'Failed to load credentials'}</p>
                 </div>
             `;
@@ -2947,19 +2722,18 @@ window.startRegistration = async function() {
     document.getElementById('registration-step-2').style.display = 'block';
     
     try {
-        // Step 1: Get registration options from server
-        const optionsResponse = await fetch('/api/ui/webauthn/register/options', {
-            method: 'POST'`,
-                'Content-Type': 'application/json'
-            }
-        });
+        // Step 1: Get registration options from server via HTMX-like XHR
+        const optionsResponse = new XMLHttpRequest();
+        optionsResponse.open('POST', '/api/ui/webauthn/register/options', false);
+        optionsResponse.setRequestHeader('Content-Type', 'application/json');
+        optionsResponse.send();
         
-        if (!optionsResponse.ok) {
-            const error = await optionsResponse.json();
+        if (optionsResponse.status !== 200) {
+            const error = JSON.parse(optionsResponse.responseText);
             throw new Error(error.error || 'Failed to get registration options');
         }
         
-        const options = await optionsResponse.json();
+        const options = JSON.parse(optionsResponse.responseText);
         console.log('WebAuthn registration options received:', options);
         console.log('Current window.location:', {
             hostname: window.location.hostname,
@@ -2994,27 +2768,28 @@ window.startRegistration = async function() {
             throw new Error('Registration was cancelled');
         }
         
-        // Step 3: Send credential to server
-        const verifyResponse = await fetch('/api/ui/webauthn/register/verify', {
-            method: 'POST'`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                name: name,
-                credential: {
-                    id: credential.id,
-                    rawId: bufferToBase64url(credential.rawId),
-                    type: credential.type,
-                    response: {
-                        clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
-                        attestationObject: bufferToBase64url(credential.response.attestationObject)
-                    }
-                }
-            })
-        });
+        // Step 3: Send credential to server via XHR
+        const verifyXhr = new XMLHttpRequest();
+        verifyXhr.open('POST', '/api/ui/webauthn/register/verify', false);
+        verifyXhr.setRequestHeader('Content-Type', 'application/json');
         
-        if (!verifyResponse.ok) {
-            const error = await verifyResponse.json();
+        const verifyData = {
+            name: name,
+            credential: {
+                id: credential.id,
+                rawId: bufferToBase64url(credential.rawId),
+                type: credential.type,
+                response: {
+                    clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                    attestationObject: bufferToBase64url(credential.response.attestationObject)
+                }
+            }
+        };
+        
+        verifyXhr.send(JSON.stringify(verifyData));
+        
+        if (verifyXhr.status !== 200) {
+            const error = JSON.parse(verifyXhr.responseText);
             throw new Error(error.error || 'Failed to verify registration');
         }
         
@@ -3031,54 +2806,30 @@ window.startRegistration = async function() {
 }
 
 // Toggle credential active state
-window.toggleCredential = async function(credentialId, newState) {
-    try {
-        const response = await fetch(`/api/ui/webauthn/credentials/${credentialId}/toggle`, {
-            method: 'POST'`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ enabled: newState })
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast(newState ? '✓ Key enabled' : '✓ Key disabled', 'success');
-            loadCredentials();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to update'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+window.toggleCredential = function(credentialId, newState) {
+    // Trigger HTMX request
+    htmx.ajax('POST', `/api/ui/webauthn/credentials/${credentialId}/toggle`, {
+        target: '#credentials-list',
+        swap: 'none',
+        values: JSON.stringify({ enabled: newState })
+    });
 }
 
 // Delete credential
-window.deleteCredential = async function(credentialId) {
-    const confirmed = await ucmConfirm(
+window.deleteCredential = function(credentialId) {
+    ucmConfirm(
         'Are you sure you want to delete this security key? This cannot be undone.',
         'Delete Security Key',
         { danger: true, confirmText: 'Delete', icon: 'trash' }
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch(`/api/ui/webauthn/credentials/${credentialId}`, {
-            method: 'DELETE'` }
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Key deleted', 'success');
-            loadCredentials();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to delete'), 'error');
+    ).then(confirmed => {
+        if (confirmed) {
+            // Trigger HTMX delete request
+            htmx.ajax('DELETE', `/api/ui/webauthn/credentials/${credentialId}`, {
+                target: '#credentials-list',
+                swap: 'none'
+            });
         }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+    });
 }
 
 // Initialize - call immediately if DOM already loaded (HTMX swap), otherwise wait for DOMContentLoaded
@@ -3116,370 +2867,154 @@ function showToast(message, type = 'info') {
 }
 
 // Load SMTP configuration
-async function loadSMTPConfig() {
-    try {
-        const response = await fetch('/api/ui/notifications/smtp/config', 
-        });
-        
-        if (response.ok) {
-            const config = await response.json();
-            document.getElementById('smtp_host').value = config.smtp_host || '';
-            document.getElementById('smtp_port').value = config.smtp_port || 587;
-            document.getElementById('smtp_user').value = config.smtp_user || '';
-            document.getElementById('smtp_from').value = config.smtp_from || '';
-            document.getElementById('smtp_from_name').value = config.smtp_from_name || 'UCM Notifications';
-            document.getElementById('smtp_use_tls').checked = config.smtp_use_tls !== false;
-            document.getElementById('smtp_use_ssl').checked = config.smtp_use_ssl === true;
-            document.getElementById('smtp_enabled').checked = config.enabled === true;
-            
-            // Update status badge
-            const badge = document.getElementById('smtp-status-badge');
-            if (config.enabled) {
-                badge.className = 'badge-outline badge-success';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-check-circle"/></svg> Enabled';
-            } else {
-                badge.className = 'badge-outline badge-secondary';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg> Disabled';
-            }
-        }
-    } catch (error) {
-        console.error('Error loading SMTP config:', error);
+function loadSMTPConfig(configStr) {
+    const config = JSON.parse(configStr);
+    document.getElementById('smtp_host').value = config.smtp_host || '';
+    document.getElementById('smtp_port').value = config.smtp_port || 587;
+    document.getElementById('smtp_user').value = config.smtp_user || '';
+    document.getElementById('smtp_from').value = config.smtp_from || '';
+    document.getElementById('smtp_from_name').value = config.smtp_from_name || 'UCM Notifications';
+    document.getElementById('smtp_use_tls').checked = config.smtp_use_tls !== false;
+    document.getElementById('smtp_use_ssl').checked = config.smtp_use_ssl === true;
+    document.getElementById('smtp_enabled').checked = config.enabled === true;
+    
+    // Update status badge
+    const badge = document.getElementById('smtp-status-badge');
+    if (config.enabled) {
+        badge.className = 'badge-outline badge-success';
+        badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-check-circle"/></svg> Enabled';
+    } else {
+        badge.className = 'badge-outline badge-secondary';
+        badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg> Disabled';
     }
 }
 
-// Save SMTP configuration
-document.getElementById('smtp-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const data = {
-        smtp_host: document.getElementById('smtp_host').value,
-        smtp_port: parseInt(document.getElementById('smtp_port').value),
-        smtp_user: document.getElementById('smtp_user').value,
-        smtp_from: document.getElementById('smtp_from').value,
-        smtp_from_name: document.getElementById('smtp_from_name').value,
-        smtp_use_tls: document.getElementById('smtp_use_tls').checked,
-        smtp_use_ssl: document.getElementById('smtp_use_ssl').checked,
-        enabled: document.getElementById('smtp_enabled').checked
-    };
-    
-    // Only include password if it's been changed
-    const password = document.getElementById('smtp_password').value;
-    if (password) {
-        data.smtp_password = password;
-    }
-    
-    try {
-        const response = await fetch('/api/ui/notifications/smtp/config', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('SMTP configuration saved successfully', 'success');
-            document.getElementById('smtp_password').value = ''; // Clear password field
-            loadSMTPConfig(); // Reload to update status
-        } else {
-            showToast(result.error || 'Failed to save configuration', 'error');
-        }
-    } catch (error) {
-        showToast('Error saving configuration: ' + error.message, 'error');
-    }
-});
+// Save SMTP configuration - handled by HTMX form submission
 
-// Save user notification settings
-document.getElementById('user-notification-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const data = {
-        email: document.getElementById('user_notification_email').value,
-        enabled: document.getElementById('user_notifications_enabled').checked
-    };
-    
-    try {
-        const response = await fetch('/api/ui/notifications/user/settings', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Notification settings saved', 'success');
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to save settings'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
-});
+// Save user notification settings - handled by HTMX form submission
 
 // Load user notification settings
-async function loadUserNotificationSettings() {
-    try {
-        const response = await fetch('/api/ui/notifications/user/settings', 
-        });
-        
-        if (response.ok) {
-            const settings = await response.json();
-            document.getElementById('user_notification_email').value = settings.email || '';
-            document.getElementById('user_notifications_enabled').checked = settings.enabled !== false;
-        }
-    } catch (error) {
-        console.error('Error loading user notification settings:', error);
-    }
+function loadUserNotificationSettings(settingsStr) {
+    const settings = JSON.parse(settingsStr);
+    document.getElementById('user_notification_email').value = settings.email || '';
+    document.getElementById('user_notifications_enabled').checked = settings.enabled !== false;
 }
 
 
-// Test SMTP
-window.testSMTP = async function() {
-    // First check if SMTP is configured
-    const smtpEnabled = document.getElementById('smtp_enabled').checked;
-    const smtpHost = document.getElementById('smtp_host').value;
-    
-    if (!smtpHost) {
-        showToast('Please configure SMTP host first', 'error');
-        return;
-    }
-    
-    if (!smtpEnabled) {
-        showToast('Please enable SMTP first by checking "Enable SMTP" and saving', 'error');
-        return;
-    }
-    
-    const email = prompt('Enter email address to send test email:');
-    if (!email) return;
-    
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        showToast('Invalid email address format', 'error');
-        return;
-    }
-    
-    showToast('Sending test email...', 'info');
-    
-    try {
-        const response = await fetch('/api/ui/notifications/smtp/test', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({email})
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Test email sent successfully to ' + email, 'success');
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to send test email'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Network error: ' + error.message, 'error');
-    }
-}
+// Test SMTP - handled by HTMX button
 
 // Load notification rules
-async function loadNotificationRules() {
-    try {
-        const response = await fetch('/api/ui/notifications/config', 
-        });
-        
-        if (response.ok) {
-            const configs = await response.json();
-            const container = document.getElementById('notification-rules');
-            
-            container.innerHTML = configs.map((config, index) => `
-                <div class="card" style="background: var(--card-bg-secondary);">
-                    <div style="padding: 1.25rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
-                            <div>
-                                <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">
-                                    ${config.type === 'cert_expiring' ? 'Certificate Expiration' : 'CRL Expiration'}
-                                </h3>
-                                <p style="color: var(--text-secondary); font-size: 0.875rem;">${config.description || ''}</p>
-                            </div>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" id="rule-enabled-${index}" ${config.enabled ? 'checked' : ''} 
-                                       onchange="toggleRule('${config.type}', this.checked)">
-                                <strong>Enabled</strong>
-                            </label>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                            <div>
-                                <label class="form-label">Alert Days Before</label>
-                                <input type="number" id="rule-days-${index}" class="form-input" 
-                                       value="${config.days_before || 30}" min="1" max="365"
-                                       onchange="updateRule('${config.type}')">
-                            </div>
-                            <div style="grid-column: 1 / -1;">
-                                <label class="form-label">Recipients (comma-separated emails)</label>
-                                <input type="text" id="rule-recipients-${index}" class="form-input" 
-                                       value="${(config.recipients || []).join(', ')}" 
-                                       placeholder="admin@example.com, ops@example.com"
-                                       onchange="updateRule('${config.type}')">
-                            </div>
-                        </div>
-                        
-                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                            <button onclick="updateRule('${config.type}')" class="btn btn-primary btn-primary">
-                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save Rule
-                            </button>
-                        </div>
+function loadNotificationRules(configsStr) {
+    const configs = JSON.parse(configsStr);
+    const container = document.getElementById('notification-rules');
+    
+    container.innerHTML = configs.map((config, index) => `
+        <div class="card" style="background: var(--card-bg-secondary);">
+            <div style="padding: 1.25rem;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                    <div>
+                        <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">
+                            ${config.type === 'cert_expiring' ? 'Certificate Expiration' : 'CRL Expiration'}
+                        </h3>
+                        <p style="color: var(--text-secondary); font-size: 0.875rem;">${config.description || ''}</p>
+                    </div>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="rule-enabled-${index}" ${config.enabled ? 'checked' : ''} 
+                               onchange="toggleRule('${config.type}', this.checked)">
+                        <strong>Enabled</strong>
+                    </label>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                    <div>
+                        <label class="form-label">Alert Days Before</label>
+                        <input type="number" id="rule-days-${index}" class="form-input" 
+                               value="${config.days_before || 30}" min="1" max="365"
+                               onchange="updateRule('${config.type}')">
+                    </div>
+                    <div style="grid-column: 1 / -1;">
+                        <label class="form-label">Recipients (comma-separated emails)</label>
+                        <input type="text" id="rule-recipients-${index}" class="form-input" 
+                               value="${(config.recipients || []).join(', ')}" 
+                               placeholder="admin@example.com, ops@example.com"
+                               onchange="updateRule('${config.type}')">
                     </div>
                 </div>
-            `).join('');
-        }
-    } catch (error) {
-        console.error('Error loading notification rules:', error);
-    }
+                
+                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                    <button onclick="updateRule('${config.type}')" class="btn btn-primary btn-primary">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save Rule
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
 }
 
 // Toggle rule enabled/disabled
-async function toggleRule(type, enabled) {
-    await updateRule(type);
+function toggleRule(type, enabled) {
+    updateRule(type);
 }
 
-// Update notification rule
-async function updateRule(type) {
-    const index = type === 'cert_expiring' ? 0 : 1;
-    const enabled = document.getElementById(`rule-enabled-${index}`).checked;
-    const days = parseInt(document.getElementById(`rule-days-${index}`).value);
-    const recipientsStr = document.getElementById(`rule-recipients-${index}`).value;
-    const recipients = recipientsStr.split(',').map(e => e.trim()).filter(e => e);
-    
-    try {
-        const response = await fetch(`/api/ui/notifications/config/${type}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({enabled, days_before: days, recipients})
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('Notification rule updated', 'success');
-        } else {
-            showToast(result.error || 'Failed to update rule', 'error');
-        }
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-    }
-}
+// Update notification rule - handled by HTMX
 
 // Load notification history
-async function loadNotificationHistory() {
-    try {
-        const response = await fetch('/api/ui/notifications/history?limit=20', 
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            const tbody = document.getElementById('notification-history-tbody');
-            
-            if (data.logs.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                            <svg class="ucm-icon" width="32" height="32" style=" opacity: 0.5;"><use href="#icon-inbox"/></svg>
-                            <p style="margin-top: 0.5rem;">No notifications sent yet</p>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            tbody.innerHTML = data.logs.map(log => {
-                // Escape user-controlled data to prevent XSS
-                const safeType = escapeHtml(log.type);
-                const safeRecipient = escapeHtml(log.recipient);
-                const safeSubject = escapeHtml(log.subject || 'N/A');
-                
-                return `
-                <tr>
-                    <td>${new Date(log.sent_at).toLocaleString()}</td>
-                    <td><span class="badge-outline badge-info">${safeType}</span></td>
-                    <td>${safeRecipient}</td>
-                    <td>${safeSubject}</td>
-                    <td>
-                        ${log.status === 'sent' 
-                            ? '<span class="badge-outline badge-success"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> Sent</span>'
-                            : '<span class="badge-outline badge-danger"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> Failed</span>'
-                        }
-                    </td>
-                </tr>
-            `}).join('');
-        }
-    } catch (error) {
-        console.error('Error loading notification history:', error);
+function loadNotificationHistory(dataStr) {
+    const data = JSON.parse(dataStr);
+    const tbody = document.getElementById('notification-history-tbody');
+    
+    if (data.logs.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                    <svg class="ucm-icon" width="32" height="32" style=" opacity: 0.5;"><use href="#icon-inbox"/></svg>
+                    <p style="margin-top: 0.5rem;">No notifications sent yet</p>
+                </td>
+            </tr>
+        `;
+        return;
     }
+    
+    tbody.innerHTML = data.logs.map(log => {
+        // Escape user-controlled data to prevent XSS
+        const safeType = escapeHtml(log.type);
+        const safeRecipient = escapeHtml(log.recipient);
+        const safeSubject = escapeHtml(log.subject || 'N/A');
+        
+        return `
+        <tr>
+            <td>${new Date(log.sent_at).toLocaleString()}</td>
+            <td><span class="badge-outline badge-info">${safeType}</span></td>
+            <td>${safeRecipient}</td>
+            <td>${safeSubject}</td>
+            <td>
+                ${log.status === 'sent' 
+                    ? '<span class="badge-outline badge-success"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> Sent</span>'
+                    : '<span class="badge-outline badge-danger"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> Failed</span>'
+                }
+            </td>
+        </tr>
+    `}).join('');
 }
 
 // Load notification stats
-async function loadNotificationStats() {
-    try {
-        const response = await fetch('/api/ui/notifications/stats', 
-        });
-        
-        if (response.ok) {
-            const stats = await response.json();
-            const container = document.getElementById('notification-stats');
-            
-            container.innerHTML = `
-                <span class="badge-outline badge-success">
-                    <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> ${stats.recent_sent_30d} sent (30d)
-                </span>
-                ${stats.recent_failed_30d > 0 ? `
-                    <span class="badge-outline badge-danger">
-                        <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> ${stats.recent_failed_30d} failed (30d)
-                    </span>
-                ` : ''}
-            `;
-        }
-    } catch (error) {
-        console.error('Error loading stats:', error);
-    }
+function loadNotificationStats(statsStr) {
+    const stats = JSON.parse(statsStr);
+    const container = document.getElementById('notification-stats');
+    
+    container.innerHTML = `
+        <span class="badge-outline badge-success">
+            <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> ${stats.recent_sent_30d} sent (30d)
+        </span>
+        ${stats.recent_failed_30d > 0 ? `
+            <span class="badge-outline badge-danger">
+                <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> ${stats.recent_failed_30d} failed (30d)
+            </span>
+        ` : ''}
+    `;
 }
 
-// Manual notification check
-async function testNotifications() {
-    const confirmed = await ucmConfirm(
-        'This will check for expiring certificates and CRLs and send notifications if configured. Continue?',
-        'Test Notifications',
-        { confirmText: 'Continue', icon: 'check' }
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch('/api/ui/notifications/check', {
-            method: 'POST'}
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('Notification check completed', 'success');
-            loadNotificationHistory();
-            loadNotificationStats();
-        } else {
-            showToast(result.error || 'Check failed', 'error');
-        }
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-    }
-}
+// Manual notification check - handled by HTMX button
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -3536,131 +3071,96 @@ function initAcmePage() {
     }
 }
 
-function loadStatistics() {
-    fetch('/api/ui/acme/statistics')
-        .then(response => response.json())
-        .then(data => {
-            const totalAccounts = document.getElementById('total-accounts');
-            const activeOrders = document.getElementById('active-orders');
-            const completedOrders = document.getElementById('completed-orders');
-            const issuedCerts = document.getElementById('issued-certs');
-            
-            if (totalAccounts) totalAccounts.textContent = data.total_accounts || 0;
-            if (activeOrders) activeOrders.textContent = data.active_orders || 0;
-            if (completedOrders) completedOrders.textContent = data.completed_orders || 0;
-            if (issuedCerts) issuedCerts.textContent = data.issued_certs || 0;
-        })
-        .catch(error => console.error('Error loading stats:', error));
+function loadStatistics(dataStr) {
+    const data = JSON.parse(dataStr);
+    const totalAccounts = document.getElementById('total-accounts');
+    const activeOrders = document.getElementById('active-orders');
+    const completedOrders = document.getElementById('completed-orders');
+    const issuedCerts = document.getElementById('issued-certs');
+    
+    if (totalAccounts) totalAccounts.textContent = data.total_accounts || 0;
+    if (activeOrders) activeOrders.textContent = data.active_orders || 0;
+    if (completedOrders) completedOrders.textContent = data.completed_orders || 0;
+    if (issuedCerts) issuedCerts.textContent = data.issued_certs || 0;
 }
 
-function loadAcmeCA() {
+function loadAcmeCA(dataStr) {
     const badge = document.getElementById('acme-status-badge');
     const caDisplay = document.getElementById('acme-ca-display');
     if (!badge) return;
     
-    fetch('/api/ui/acme/settings/load')
-        .then(response => response.json())
-        .then(data => {
-            if (data.default_ca) {
-                badge.className = 'badge badge-success';
-                badge.style.fontSize = '14px';
-                badge.style.padding = '6px 12px';
-                badge.innerHTML = '<svg class="ucm-icon" width="14" height="14" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-check-circle"/></svg> Active';
-                
-                const caSelect = document.getElementById('acme-default-ca');
-                if (caSelect && caSelect.options.length > 1) {
-                    const selectedOption = Array.from(caSelect.options).find(opt => opt.value === data.default_ca);
-                    caDisplay.textContent = selectedOption ? selectedOption.text : data.default_ca;
-                } else {
-                    caDisplay.textContent = 'CA: ' + data.default_ca;
-                }
-            } else {
-                badge.className = 'badge badge-danger';
-                badge.style.fontSize = '14px';
-                badge.style.padding = '6px 12px';
-                badge.innerHTML = '<svg class="ucm-icon" width="14" height="14" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-ban"/></svg> Not Configured';
-                caDisplay.textContent = 'No CA configured';
-            }
-        })
-        .catch(error => console.error('Error loading CA:', error));
+    const data = JSON.parse(dataStr);
+    if (data.default_ca) {
+        badge.className = 'badge badge-success';
+        badge.style.fontSize = '14px';
+        badge.style.padding = '6px 12px';
+        badge.innerHTML = '<svg class="ucm-icon" width="14" height="14" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-check-circle"/></svg> Active';
+        
+        const caSelect = document.getElementById('acme-default-ca');
+        if (caSelect && caSelect.options.length > 1) {
+            const selectedOption = Array.from(caSelect.options).find(opt => opt.value === data.default_ca);
+            caDisplay.textContent = selectedOption ? selectedOption.text : data.default_ca;
+        } else {
+            caDisplay.textContent = 'CA: ' + data.default_ca;
+        }
+    } else {
+        badge.className = 'badge badge-danger';
+        badge.style.fontSize = '14px';
+        badge.style.padding = '6px 12px';
+        badge.innerHTML = '<svg class="ucm-icon" width="14" height="14" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-ban"/></svg> Not Configured';
+        caDisplay.textContent = 'No CA configured';
+    }
 }
 
-function loadSettings() {
-    fetch('/api/ui/acme/settings/load')
-        .then(response => response.json())
-        .then(data => {
-            if (data.default_ca) {
-                const select = document.getElementById('acme-default-ca');
-                if (select) setTimeout(() => select.value = data.default_ca, 500);
-            }
-            if (data.cert_validity) {
-                const validityInput = document.querySelector('input[name="cert_validity"]');
-                if (validityInput) validityInput.value = data.cert_validity;
-            }
-        });
+function loadSettings(dataStr) {
+    const data = JSON.parse(dataStr);
+    if (data.default_ca) {
+        const select = document.getElementById('acme-default-ca');
+        if (select) setTimeout(() => select.value = data.default_ca, 500);
+    }
+    if (data.cert_validity) {
+        const validityInput = document.querySelector('input[name="cert_validity"]');
+        if (validityInput) validityInput.value = data.cert_validity;
+    }
 }
 
-function loadProxyStatus() {
-    fetch('/api/ui/acme/proxy/status')
-        .then(response => response.json())
-        .then(data => {
-            // Check if elements exist (user might not be on proxy tab)
-            const upstreamDisplay = document.getElementById('proxy-upstream-display');
-            const directoryUrl = document.getElementById('proxy-directory-url');
-            const container = document.getElementById('proxy-account-container');
-            
-            if (!upstreamDisplay || !directoryUrl || !container) {
-                // Elements not in DOM, silently return
-                return;
-            }
-            
-            upstreamDisplay.textContent = data.upstream_url;
-            directoryUrl.value = data.directory_url;
-            
-            if (data.is_registered) {
-                container.innerHTML = `
-                    <div style="color: var(--success-color); font-weight: 500; font-size: 14px;">
-                        <svg class="ucm-icon" width="16" height="16" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-check-circle"/></svg> Registered & Active
-                    </div>`;
-            } else {
-                container.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span class="badge badge-warning">Not Registered</span>
-                        <button id="btn-register-proxy" class="btn btn-primary btn-primary" onclick="registerProxyAccount()">
-                            Register Account
-                        </button>
-                    </div>`;
-            }
-        })
-        .catch(err => console.error("Proxy status error", err));
+function loadProxyStatus(dataStr) {
+    const data = JSON.parse(dataStr);
+    // Check if elements exist (user might not be on proxy tab)
+    const upstreamDisplay = document.getElementById('proxy-upstream-display');
+    const directoryUrl = document.getElementById('proxy-directory-url');
+    const container = document.getElementById('proxy-account-container');
+    
+    if (!upstreamDisplay || !directoryUrl || !container) {
+        // Elements not in DOM, silently return
+        return;
+    }
+    
+    upstreamDisplay.textContent = data.upstream_url;
+    directoryUrl.value = data.directory_url;
+    
+    if (data.is_registered) {
+        container.innerHTML = `
+            <div style="color: var(--success-color); font-weight: 500; font-size: 14px;">
+                <svg class="ucm-icon" width="16" height="16" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-check-circle"/></svg> Registered & Active
+            </div>`;
+    } else {
+        container.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="badge badge-warning">Not Registered</span>
+                <button id="btn-register-proxy" class="btn btn-primary btn-primary" onclick="registerProxyAccount()">
+                    Register Account
+                </button>
+            </div>`;
+    }
 }
 
 function registerProxyAccount() {
-    const btn = document.getElementById('btn-register-proxy');
-    if (!btn) return;
-    
-    const originalContent = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
-    
-    fetch('/api/ui/acme/proxy/register', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                window.showToast('Upstream account registered successfully', 'success');
-                loadProxyStatus();
-            } else {
-                window.showToast('Error: ' + (data.message || 'Registration failed'), 'error');
-                btn.innerHTML = originalContent;
-                btn.disabled = false;
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            window.showToast('Network error during registration', 'error');
-            btn.innerHTML = originalContent;
-            btn.disabled = false;
-        });
+    // Handled by HTMX button
+    htmx.ajax('POST', '/api/ui/acme/proxy/register', {
+        target: '#proxy-account-container',
+        swap: 'none'
+    });
 }
 
 // ============================================
@@ -3670,9 +3170,7 @@ function viewTemplateDetail(id) {
     openModal('viewTemplateModal'); // View-only, overlay closes automatically
     document.getElementById('viewTemplateContent').innerHTML = '<svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>';
     
-    fetch('/api/ui/templates/' + id)
-        .then(r => r.json())
-        .then(t => {
+    // Template view - handled by HTMX
             // Format DN template nicely
             const dnEntries = Object.entries(t.dn_template)
                 .filter(([k, v]) => v && v.trim())
@@ -3814,66 +3312,62 @@ document.addEventListener('DOMContentLoaded', function() {
     updateMTLSBadge();
 });
 
-function loadHTTPSCertInfo() {
-    // First load certificate candidates, then load current cert info
-    loadCertificateCandidates().then(() => {
-        fetch('/api/ui/system/https-cert-info')
-            .then(response => response.json())
-            .then(data => {
-                // Check if elements exist before modifying
-                const certSubject = document.getElementById('cert-subject');
-                const certExpiry = document.getElementById('cert-expiry');
-                const certType = document.getElementById('cert-type');
-                
-                if (certSubject && data.subject) certSubject.textContent = data.subject;
-                if (certExpiry && data.expires) certExpiry.textContent = data.expires;
-                if (certType && data.type) certType.textContent = data.type;
-                
-                // Set radio button based on source
-                if (data.source === 'managed' && data.cert_id) {
-                    const managedRadio = document.querySelector('input[name="cert-source"][value="managed"]');
-                    if (managedRadio) {
-                        managedRadio.checked = true;
-                    }
-                    
-                    // Pre-select certificate in dropdown (no timeout needed now)
-                    const select = document.getElementById('managed-cert-id');
-                    if (select) {
-                        select.value = String(data.cert_id);
-                        select.dispatchEvent(new Event('change'));
-                    }
-                    toggleCertSelector();
-                } else {
-                    const autoRadio = document.querySelector('input[name="cert-source"][value="auto"]');
-                    if (autoRadio) {
-                        autoRadio.checked = true;
-                        toggleCertSelector();
-                    }
-                }
-            })
-            .catch(error => console.error('Error loading HTTPS cert info:', error));
-    });
+function loadHTTPSCertInfo(certInfoStr, candidatesStr) {
+    const data = JSON.parse(certInfoStr);
+    // Check if elements exist before modifying
+    const certSubject = document.getElementById('cert-subject');
+    const certExpiry = document.getElementById('cert-expiry');
+    const certType = document.getElementById('cert-type');
+    
+    if (certSubject && data.subject) certSubject.textContent = data.subject;
+    if (certExpiry && data.expires) certExpiry.textContent = data.expires;
+    if (certType && data.type) certType.textContent = data.type;
+    
+    // Load candidates first
+    if (candidatesStr) {
+        loadCertificateCandidates(candidatesStr);
+    }
+    
+    // Set radio button based on source
+    if (data.source === 'managed' && data.cert_id) {
+        const managedRadio = document.querySelector('input[name="cert-source"][value="managed"]');
+        if (managedRadio) {
+            managedRadio.checked = true;
+        }
+        
+        // Pre-select certificate in dropdown
+        const select = document.getElementById('managed-cert-id');
+        if (select) {
+            select.value = String(data.cert_id);
+            select.dispatchEvent(new Event('change'));
+        }
+        toggleCertSelector();
+    } else {
+        const autoRadio = document.querySelector('input[name="cert-source"][value="auto"]');
+        if (autoRadio) {
+            autoRadio.checked = true;
+            toggleCertSelector();
+        }
+    }
 }
 
-function loadCertificateCandidates() {
+function loadCertificateCandidates(dataStr) {
     const select = document.getElementById('managed-cert-id');
-    if (!select) return Promise.resolve(); // Element not found yet
+    if (!select) return;
     
-    return fetch('/api/ui/system/https-cert-candidates')
-        .then(response => response.json())
-        .then(data => {
-            select.innerHTML = '';
-            
-            if (!data.certificates || data.certificates.length === 0) {
-                select.innerHTML = '<option value="">No suitable server certificates found</option>';
-                return;
-            }
-            
-            select.innerHTML = '<option value="">-- Select a certificate --</option>';
-            data.certificates.forEach(cert => {
-                const option = document.createElement('option');
-                option.value = cert.id;
-                option.textContent = `${cert.common_name} (expires: ${cert.expires})`;
+    const data = JSON.parse(dataStr);
+    select.innerHTML = '';
+    
+    if (!data.certificates || data.certificates.length === 0) {
+        select.innerHTML = '<option value="">No suitable server certificates found</option>';
+        return;
+    }
+    
+    select.innerHTML = '<option value="">-- Select a certificate --</option>';
+    data.certificates.forEach(cert => {
+        const option = document.createElement('option');
+        option.value = cert.id;
+        option.textContent = `${cert.common_name} (expires: ${cert.expires})`;
                 option.dataset.subject = cert.subject;
                 option.dataset.expires = cert.expires;
                 select.appendChild(option);
@@ -3922,19 +3416,16 @@ function setupCertSelectorListener() {
     });
 }
 
-function loadPKIStats() {
-    fetch('/api/ui/system/pki-stats')
-        .then(response => response.json())
-        .then(data => {
-            if (data.cas !== undefined) document.getElementById('pki-stat-cas').textContent = data.cas;
-            if (data.certificates !== undefined) document.getElementById('pki-stat-certs').textContent = data.certificates;
-            if (data.crls !== undefined) document.getElementById('pki-stat-crls').textContent = data.crls;
-            if (data.ocsp_responses !== undefined) document.getElementById('pki-stat-ocsp').textContent = data.ocsp_responses;
-        })
-        .catch(error => console.error('Error loading PKI stats:', error));
+function loadPKIStats(dataStr) {
+    const data = JSON.parse(dataStr);
+    if (data.cas !== undefined) document.getElementById('pki-stat-cas').textContent = data.cas;
+    if (data.certificates !== undefined) document.getElementById('pki-stat-certs').textContent = data.certificates;
+    if (data.crls !== undefined) document.getElementById('pki-stat-crls').textContent = data.crls;
+    if (data.ocsp_responses !== undefined) document.getElementById('pki-stat-ocsp').textContent = data.ocsp_responses;
 }
 
 function applyHTTPSCertificate() {
+    // Handled by HTMX button with confirmation
     const source = document.querySelector('input[name="cert-source"]:checked');
     if (!source) return;
     
@@ -3952,29 +3443,15 @@ function applyHTTPSCertificate() {
         'Apply Certificate',
         { danger: true, confirmText: 'Apply', icon: 'warning-triangle' }
     ).then(confirmed => {
-        if (!confirmed) return;
-        
-        const requestBody = { source: source.value };
-        if (source.value === 'managed') {
-            requestBody.cert_id = parseInt(document.getElementById('managed-cert-id').value);
+        if (confirmed) {
+            // Trigger HTMX request
+            htmx.ajax('POST', '/api/ui/system/https-cert-apply', {
+                target: 'body',
+                swap: 'none'
+            });
         }
-        
-        fetch('/api/ui/system/https-cert-apply', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showRestartCountdown(5, window.location.href);
-            } else {
-                ucmAlert('Error: ' + (data.error || data.message || 'Unknown error'), 'Error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            ucmAlert('Failed to apply certificate', 'Error');
+    });
+}
         });
     });
 }
@@ -3985,23 +3462,13 @@ function regenerateSelfSigned() {
         'Regenerate Certificate',
         { danger: true, confirmText: 'Regenerate', icon: 'warning-triangle' }
     ).then(confirmed => {
-        if (!confirmed) return;
-        
-        fetch('/api/ui/system/https-cert-regenerate', {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showRestartCountdown(5, window.location.href);
-            } else {
-                ucmAlert('Error: ' + data.message, 'Error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            ucmAlert('Failed to regenerate certificate', 'Error');
-        });
+        if (confirmed) {
+            // Trigger HTMX request
+            htmx.ajax('POST', '/api/ui/system/https-cert-regenerate', {
+                target: 'body',
+                swap: 'none'
+            });
+        }
     });
 }
 
@@ -4061,40 +3528,24 @@ function executePKIReset() {
     
     document.getElementById('ucm-modal-container').innerHTML = '';
     
-    fetch('/api/ui/system/pki-reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmation: 'RESET PKI DATA' })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            ucmAlert('✅ PKI Database has been reset successfully!\n\nBackup created: ' + data.backup_file, 'Success');
-            loadPKIStats();
-        } else {
-            ucmAlert('Error: ' + data.message, 'Error');
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        ucmAlert('Failed to reset PKI database', 'Error');
+    // Trigger HTMX request
+    htmx.ajax('POST', '/api/ui/system/pki-reset', {
+        target: 'body',
+        swap: 'none',
+        values: JSON.stringify({ confirmation: 'RESET PKI DATA' })
     });
 }
 
 // ========================================
 // mTLS Status Badge
 // ========================================
-function updateMTLSBadge() {
-    fetch('/api/ui/mtls/settings', {
-        ` }
-    })
-    .then(response => response.json())
-    .then(data => {
-        const badge = document.getElementById('mtls-status-badge');
-        if (badge) {
-            if (data.enabled) {
-                badge.className = 'badge-outline badge-success';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Enabled';
+function updateMTLSBadge(dataStr) {
+    const data = JSON.parse(dataStr);
+    const badge = document.getElementById('mtls-status-badge');
+    if (badge) {
+        if (data.enabled) {
+            badge.className = 'badge-outline badge-success';
+            badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Enabled';
             } else {
                 badge.className = 'badge-outline badge-secondary';
                 badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Disabled';
@@ -4196,7 +3647,7 @@ function closeBackupModal() {
     document.getElementById('ucm-modal-container').innerHTML = '';
 }
 
-async function createBackup() {
+function createBackup() {
     const password = document.getElementById('backup-password').value;
     const passwordConfirm = document.getElementById('backup-password-confirm').value;
     
@@ -4226,45 +3677,56 @@ async function createBackup() {
         acme_accounts: document.getElementById('include-acme').checked
     };
     
-    try {
-        const response = await fetch('/api/ui/backup/create', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                password: password,
-                type: 'full',
-                include: include
-            })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Backup creation failed');
-        }
-        
-        // Download the file
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ucm-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.ucm-backup`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        
-        closeBackupModal();
-        showToast('Backup created and downloaded successfully', 'success');
-        
-    } catch (error) {
-        console.error('Backup error:', error);
-        showToast('Backup creation failed: ' + error.message, 'error');
-    } finally {
+    // HTMX-converted: XHR for blob download
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/ui/backup/create', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.responseType = 'blob';
+    
+    xhr.onload = function() {
         hideButtonSpinner(createBtn);
         document.getElementById('backup-progress').style.display = 'none';
-    }
+        
+        if (xhr.status === 200) {
+            // Download the file
+            const blob = xhr.response;
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ucm-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.ucm-backup`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            closeBackupModal();
+            showToast('Backup created and downloaded successfully', 'success');
+        } else {
+            // Try to read error from blob
+            const reader = new FileReader();
+            reader.onload = function() {
+                try {
+                    const error = JSON.parse(reader.result);
+                    showToast('Backup creation failed: ' + (error.error || 'Unknown error'), 'error');
+                } catch (e) {
+                    showToast('Backup creation failed', 'error');
+                }
+            };
+            reader.readAsText(xhr.response);
+        }
+    };
+    
+    xhr.onerror = function() {
+        hideButtonSpinner(createBtn);
+        document.getElementById('backup-progress').style.display = 'none';
+        showToast('Backup creation failed: Network error', 'error');
+    };
+    
+    xhr.send(JSON.stringify({
+        password: password,
+        type: 'full',
+        include: include
+    }));
 }
 
 function openRestoreModal() {
@@ -4382,7 +3844,7 @@ function closeRestoreModal() {
     document.getElementById('ucm-modal-container').innerHTML = '';
 }
 
-async function validateBackup() {
+function validateBackup() {
     const fileInput = document.getElementById('restore-file');
     const password = document.getElementById('restore-password').value;
     
@@ -4403,13 +3865,19 @@ async function validateBackup() {
     formData.append('file', fileInput.files[0]);
     formData.append('password', password);
     
-    try {
-        const response = await fetch('/api/ui/backup/validate', {
-            method: 'POST',
-            body: formData
-        });
+    // HTMX-converted: XHR for FormData upload
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/ui/backup/validate', true);
+    
+    xhr.onload = function() {
+        hideButtonSpinner(validateBtn);
         
-        const data = await response.json();
+        if (xhr.status !== 200) {
+            showToast('Validation failed: Server error', 'error');
+            return;
+        }
+        
+        const data = JSON.parse(xhr.responseText);
         
         if (!data.valid) {
             hideButtonSpinner(validateBtn);
@@ -4516,7 +3984,7 @@ async function validateBackup() {
     }
 }
 
-async function restoreBackup() {
+function restoreBackup() {
     const fileInput = document.getElementById('restore-file');
     const password = document.getElementById('restore-password').value;
     
@@ -4556,18 +4024,28 @@ async function restoreBackup() {
     formData.append('password', password);
     formData.append('options', JSON.stringify(options));
     
-    try {
-        const response = await fetch('/api/ui/backup/restore', {
-            method: 'POST',
-            body: formData
-        });
+    // HTMX-converted: XHR for FormData upload
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/ui/backup/restore', true);
+    
+    xhr.onload = function() {
+        console.log('Restore response status:', xhr.status);
         
-        console.log('Restore response status:', response.status);
-        const data = await response.json();
+        if (xhr.status !== 200) {
+            hideButtonSpinner(restoreBtn);
+            document.getElementById('restore-progress').style.display = 'none';
+            showToast('Restore failed: Server error', 'error');
+            return;
+        }
+        
+        const data = JSON.parse(xhr.responseText);
         console.log('Restore response data:', data);
         
-        if (!response.ok || !data.success) {
-            throw new Error(data.error || 'Restore failed');
+        if (!data.success) {
+            hideButtonSpinner(restoreBtn);
+            document.getElementById('restore-progress').style.display = 'none';
+            showToast('Restore failed: ' + (data.error || 'Unknown error'), 'error');
+            return;
         }
         
         console.log('Closing modal and showing countdown...');
@@ -4575,13 +4053,16 @@ async function restoreBackup() {
         
         // Show restart countdown with spinner
         showRestartCountdown(5, '/login');
-        
-    } catch (error) {
-        console.error('Restore error:', error);
-        showToast('Restore failed: ' + error.message, 'error');
+    };
+    
+    xhr.onerror = function() {
+        console.error('Restore error: Network error');
+        showToast('Restore failed: Network error', 'error');
         hideButtonSpinner(restoreBtn);
         document.getElementById('restore-progress').style.display = 'none';
-    }
+    };
+    
+    xhr.send(formData);
 }
 
 // ============================================================================
@@ -4589,65 +4070,50 @@ async function restoreBackup() {
 // ============================================================================
 
 // Load database stats on page load
-async function loadDatabaseStats() {
-    try {
-        const response = await fetch('/api/ui/system/database/stats', {
-            
-        });
-        const data = await response.json();
+function loadDatabaseStats(dataStr) {
+    const data = JSON.parse(dataStr);
+    
+    if (data.success && data.stats) {
+        const stats = data.stats;
         
-        if (data.success && data.stats) {
-            const stats = data.stats;
-            
-            // Update stats
-            document.getElementById('db-stat-size').textContent = stats.size_formatted || '0 MB';
-            document.getElementById('db-stat-frag').textContent = stats.fragmentation_pct + '%';
-            
-            // Update last maintenance
-            if (stats.last_vacuum) {
-                const vacuumDate = new Date(stats.last_vacuum);
-                document.getElementById('db-last-vacuum').textContent = vacuumDate.toLocaleDateString();
-            }
-            if (stats.last_integrity_check) {
-                const checkDate = new Date(stats.last_integrity_check);
-                document.getElementById('db-last-check').textContent = checkDate.toLocaleDateString();
-            }
-            
-            // Update table counts
-            if (stats.tables) {
-                if (stats.tables.certificate_authority !== undefined) 
-                    document.getElementById('pki-stat-cas').textContent = stats.tables.certificate_authority || 0;
-                if (stats.tables.certificate !== undefined) 
-                    document.getElementById('pki-stat-certs').textContent = stats.tables.certificate || 0;
-                if (stats.tables.crl !== undefined) 
-                    document.getElementById('pki-stat-crls').textContent = stats.tables.crl || 0;
-                if (stats.tables.ocsp_response !== undefined) 
-                    document.getElementById('pki-stat-ocsp').textContent = stats.tables.ocsp_response || 0;
-            }
+        // Update stats
+        document.getElementById('db-stat-size').textContent = stats.size_formatted || '0 MB';
+        document.getElementById('db-stat-frag').textContent = stats.fragmentation_pct + '%';
+        
+        // Update last maintenance
+        if (stats.last_vacuum) {
+            const vacuumDate = new Date(stats.last_vacuum);
+            document.getElementById('db-last-vacuum').textContent = vacuumDate.toLocaleDateString();
+        }
+        if (stats.last_integrity_check) {
+            const checkDate = new Date(stats.last_integrity_check);
+            document.getElementById('db-last-check').textContent = checkDate.toLocaleDateString();
         }
         
-        // Load health status
-        loadDatabaseHealth();
-        
-    } catch (error) {
-        console.error('Error loading database stats:', error);
+        // Update table counts
+        if (stats.tables) {
+            if (stats.tables.certificate_authority !== undefined) 
+                document.getElementById('pki-stat-cas').textContent = stats.tables.certificate_authority || 0;
+            if (stats.tables.certificate !== undefined) 
+                document.getElementById('pki-stat-certs').textContent = stats.tables.certificate || 0;
+            if (stats.tables.crl !== undefined) 
+                document.getElementById('pki-stat-crls').textContent = stats.tables.crl || 0;
+            if (stats.tables.ocsp_response !== undefined) 
+                document.getElementById('pki-stat-ocsp').textContent = stats.tables.ocsp_response || 0;
+        }
     }
 }
 
-async function loadDatabaseHealth() {
-    try {
-        const response = await fetch('/api/ui/system/database/health', {
-            
-        });
-        const data = await response.json();
+function loadDatabaseHealth(dataStr) {
+    const data = JSON.parse(dataStr);
+    
+    if (data.success && data.health) {
+        const health = data.health;
+        const badge = document.getElementById('db-health-badge');
         
-        if (data.success && data.health) {
-            const health = data.health;
-            const badge = document.getElementById('db-health-badge');
-            
-            // Update health badge
-            if (health.status === 'healthy') {
-                badge.className = 'badge-outline badge-success';
+        // Update health badge
+        if (health.status === 'healthy') {
+            badge.className = 'badge-outline badge-success';
                 badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Healthy';
             } else if (health.status === 'warning') {
                 badge.className = 'badge-outline badge-warning';
@@ -4663,43 +4129,40 @@ async function loadDatabaseHealth() {
     }
 }
 
-async function optimizeDatabase() {
+function optimizeDatabase() {
     const confirmed = confirm('Optimize database?\n\nThis will run VACUUM and ANALYZE to:\n• Reclaim unused disk space\n• Defragment the database\n• Update query statistics\n\nThis may take a few moments.');
     
     if (!confirmed) return;
     
     showToast('Optimizing database...', 'info');
     
-    try {
-        const response = await fetch('/api/ui/system/database/optimize', {
-            method: 'POST'
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
+    // Converted to HTMX-like pattern
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/ui/system/database/optimize', true);
+    xhr.onload = function() {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status === 200 && data.success) {
             const saved = data.vacuum.space_saved_formatted || '0 B';
             showToast(`Database optimized successfully! Space saved: ${saved}`, 'success');
             loadDatabaseStats(); // Refresh stats
         } else {
-            throw new Error(data.error || 'Optimization failed');
+            showToast('Error: ' + (data.error || 'Optimization failed'), 'error');
         }
-        
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-    }
+    };
+    xhr.onerror = function() {
+        showToast('Error: Network error', 'error');
+    };
+    xhr.send();
 }
 
-async function checkIntegrity() {
+function checkIntegrity() {
     showToast('Running integrity check...', 'info');
     
-    try {
-        const response = await fetch('/api/ui/system/database/integrity-check', {
-            method: 'POST'
-        });
-        
-        const data = await response.json();
-        
+    // Converted to HTMX-like pattern
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/ui/system/database/integrity-check', true);
+    xhr.onload = function() {
+        const data = JSON.parse(xhr.responseText);
         if (data.healthy) {
             showToast('Database integrity check passed - no errors found', 'success');
         } else if (data.errors && data.errors.length > 0) {
@@ -4707,57 +4170,56 @@ async function checkIntegrity() {
         } else {
             showToast('Integrity check completed', 'success');
         }
-        
         loadDatabaseStats(); // Refresh last check date
-        
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-    }
+    };
+    xhr.onerror = function() {
+        showToast('Error: Network error', 'error');
+    };
+    xhr.send();
 }
 
-async function cleanExpiredCerts() {
+function cleanExpiredCerts() {
     const confirmed = confirm('Clean expired certificates?\n\nThis will permanently delete certificates that expired more than 30 days ago.\n\nRevoked certificates will be preserved for CRL generation.');
     
     if (!confirmed) return;
     
     showToast('Cleaning expired certificates...', 'info');
     
-    try {
-        const response = await fetch('/api/ui/system/database/clean-expired', {
-            method: 'POST',
-            body: JSON.stringify({ days_after_expiry: 30 })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
+    // Converted to HTMX-like pattern
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/ui/system/database/clean-expired', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.onload = function() {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status === 200 && data.success) {
             showToast(`Deleted ${data.deleted_count} expired certificates`, 'success');
             loadDatabaseStats(); // Refresh stats
         } else {
-            throw new Error(data.error || 'Cleanup failed');
+            showToast('Error: ' + (data.error || 'Cleanup failed'), 'error');
         }
-        
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-    }
+    };
+    xhr.onerror = function() {
+        showToast('Error: Network error', 'error');
+    };
+    xhr.send(JSON.stringify({ days_after_expiry: 30 }));
 }
 
-async function exportDatabase() {
+function exportDatabase() {
     const confirmed = confirm('Export database?\n\nThis will download a compressed SQL dump of the entire database.');
     
     if (!confirmed) return;
     
     showToast('Exporting database...', 'info');
     
-    try {
-        const response = await fetch('/api/ui/system/database/export', {
-            method: 'POST',
-            body: JSON.stringify({ compress: true })
-        });
-        
-        if (response.ok) {
+    // Converted to HTMX-like pattern with XHR blob handling
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/ui/system/database/export', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.responseType = 'blob';
+    xhr.onload = function() {
+        if (xhr.status === 200) {
             // Download file
-            const blob = await response.blob();
+            const blob = xhr.response;
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -4769,14 +4231,25 @@ async function exportDatabase() {
             
             showToast('Database exported successfully', 'success');
         } else {
-            const data = await response.json();
-            throw new Error(data.error || 'Export failed');
+            // Try to read error from blob
+            const reader = new FileReader();
+            reader.onload = function() {
+                try {
+                    const data = JSON.parse(reader.result);
+                    showToast('Error: ' + (data.error || 'Export failed'), 'error');
+                } catch (e) {
+                    showToast('Error: Export failed', 'error');
+                }
+            };
+            reader.readAsText(xhr.response);
         }
-        
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-    }
-}
+    };
+    
+    xhr.onerror = function() {
+        showToast('Error: Network error', 'error');
+    };
+    
+    xhr.send(JSON.stringify({ compress: true }));
 
 // Load database stats on Database tab activation
 document.addEventListener('DOMContentLoaded', () => {
