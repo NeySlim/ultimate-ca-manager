@@ -14,7 +14,7 @@
 
     <!-- Tabs -->
     <div class="tabs-container" style="border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem;">
-        <nav style="margin-bottom: -1px; display: flex; gap: 2rem;">
+        <div style="margin-bottom: -1px; display: flex; gap: 2rem;">
             <button class="tab-button active" onclick="ucm_switchTab('https')" id="btn-tab-https" style="white-space: nowrap; padding: 1rem 0.25rem; border-bottom: 2px solid var(--primary-color); font-weight: 600; font-size: 0.875rem; background: none; cursor: pointer; color: var(--primary-color); border-top: none; border-left: none; border-right: none;">
                 HTTPS Certificate
             </button>
@@ -30,7 +30,7 @@
             <button class="tab-button" onclick="ucm_switchTab('info')" id="btn-tab-info" style="white-space: nowrap; padding: 1rem 0.25rem; border-bottom: 2px solid transparent; font-weight: 500; font-size: 0.875rem; background: none; cursor: pointer; color: var(--text-secondary); border-top: none; border-left: none; border-right: none;">
                 System Info
             </button>
-        </nav>
+        </div>
 
         <!-- HTTPS Certificate Tab -->
         <div id="tab-https" class="tab-content active" style="padding: 1.5rem 0;">
