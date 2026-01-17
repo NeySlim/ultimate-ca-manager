@@ -24,13 +24,19 @@
     </div>
     {% else %}
     
-    <!-- Settings Tabs (ACME-Style Inline) -->
+    <!-- Settings Tabs (6 tabs) -->
     <div class="tabs-container" style="display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 2px solid var(--border-color);">
         <button class="tab-button active" onclick="ucm_switchTab('general')" id="btn-tab-general" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 600; color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
             <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-info-circle"/></svg> General
         </button>
         <button class="tab-button" onclick="ucm_switchTab('security')" id="btn-tab-security" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
             <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-shield-check"/></svg> Security
+        </button>
+        <button class="tab-button" onclick="ucm_switchTab('authentication')" id="btn-tab-authentication" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+            <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-key"/></svg> Authentication
+        </button>
+        <button class="tab-button" onclick="ucm_switchTab('email')" id="btn-tab-email" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+            <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-mail"/></svg> Email
         </button>
         <button class="tab-button" onclick="ucm_switchTab('database')" id="btn-tab-database" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
             <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-database"/></svg> Database
@@ -230,6 +236,107 @@
     </div>
     
     </div><!-- End Tab: Security -->
+    
+    <!-- Tab: Authentication -->
+    <div id="tab-authentication" class="tab-content">
+    
+    <!-- mTLS Authentication -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-shield-check"/></svg>
+                mTLS Authentication
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Configure mutual TLS (mTLS) authentication for secure client certificate-based access.
+            </p>
+            <div style="background: var(--info-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--info-color); margin-bottom: 1.5rem;">
+                <p style="font-size: 0.875rem; color: var(--text-primary); margin: 0;">
+                    <strong>ℹ️ Note:</strong> Full mTLS configuration is available in the <a href="/config/mtls" style="color: var(--primary-color); text-decoration: underline;">mTLS Configuration</a> page.
+                </p>
+            </div>
+            <a href="/config/mtls" class="btn-primary">
+                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-settings"/></svg>
+                Configure mTLS
+            </a>
+        </div>
+    </div>
+    
+    <!-- WebAuthn / FIDO2 -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
+                WebAuthn / FIDO2
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Passwordless authentication using hardware security keys (YubiKey, etc.).
+            </p>
+            <div style="background: var(--info-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--info-color); margin-bottom: 1.5rem;">
+                <p style="font-size: 0.875rem; color: var(--text-primary); margin: 0;">
+                    <strong>ℹ️ Note:</strong> Users can manage their security keys in <a href="/config/webauthn" style="color: var(--primary-color); text-decoration: underline;">WebAuthn Settings</a>.
+                </p>
+            </div>
+            <a href="/config/webauthn" class="btn-primary">
+                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-settings"/></svg>
+                Configure WebAuthn
+            </a>
+        </div>
+    </div>
+    
+    <!-- User Management -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-users"/></svg>
+                Local Users
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Manage local user accounts and permissions.
+            </p>
+            <a href="/config" class="btn-primary">
+                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-users"/></svg>
+                Manage Users
+            </a>
+        </div>
+    </div>
+    
+    </div><!-- End Tab: Authentication -->
+    
+    <!-- Tab: Email & Notifications -->
+    <div id="tab-email" class="tab-content">
+    
+    <!-- SMTP Server -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-mail"/></svg>
+                SMTP Server Configuration
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Configure outbound email settings for notifications and alerts.
+            </p>
+            <div style="background: var(--info-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--info-color); margin-bottom: 1.5rem;">
+                <p style="font-size: 0.875rem; color: var(--text-primary); margin: 0;">
+                    <strong>ℹ️ Note:</strong> Full email configuration is available in the <a href="/config/notifications" style="color: var(--primary-color); text-decoration: underline;">Notifications</a> page.
+                </p>
+            </div>
+            <a href="/config/notifications" class="btn-primary">
+                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-settings"/></svg>
+                Configure Email
+            </a>
+        </div>
+    </div>
+    
+    </div><!-- End Tab: Email -->
     
     <!-- Tab: Database -->
     <div id="tab-database" class="tab-content">
