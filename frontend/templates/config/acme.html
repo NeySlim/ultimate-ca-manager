@@ -135,7 +135,10 @@
     <!-- ACME Configuration -->
     <div class="card" style="padding: 0;">
         <div style="padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 16px;">
-            <h2 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0;">ACME Configuration</h2>
+            <h2 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="18" height="18"><use href="#icon-settings"/></svg>
+                ACME Configuration
+            </h2>
         </div>
         <form id="acme-settings-form" 
               hx-post="/api/ui/acme/settings" 
