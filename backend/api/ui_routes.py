@@ -5362,15 +5362,31 @@ def templates_options():
         response = api_call_with_retry('GET', f"{request.url_root}api/v1/templates")
         
         if response and response.status_code == 200:
-            templates = response.json()
+            data = response.json()
+            
+            # Debug: check type
+            current_app.logger.info(f"Templates response type: {type(data)}, content: {str(data)[:200]}")
+            
+            # Handle if data is a dict with 'templates' key or direct list
+            if isinstance(data, dict):
+                templates = data.get('templates', data.get('data', []))
+            elif isinstance(data, list):
+                templates = data
+            else:
+                current_app.logger.error(f"Unexpected templates data type: {type(data)}")
+                return '<option value="">-- Unexpected response format --</option>', 200
+            
             html = '<option value="">-- No Template (Manual) --</option>'
             for t in templates:
-                html += f'<option value="{t["id"]}">{t["name"]} ({t["type"]})</option>'
+                if isinstance(t, dict):  # Safety check
+                    html += f'<option value="{t.get("id", "")}">{t.get("name", "Unknown")} ({t.get("type", "")})</option>'
             return html, 200
         else:
             return '<option value="">-- No templates found --</option>', 200
     except Exception as e:
         current_app.logger.error(f"Error loading templates: {str(e)}")
+        import traceback
+        current_app.logger.error(traceback.format_exc())
         return f'<option value="">-- Error: {str(e)[:30]} --</option>', 200
 
 
