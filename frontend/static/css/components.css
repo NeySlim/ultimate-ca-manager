@@ -958,6 +958,33 @@ textarea.form-control {
 }
 
 /* ===========================
+   CARD COMPONENTS - Headers and Content
+   =========================== */
+
+.card-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.card-header h2,
+.card-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.card-content {
+    padding: 1.5rem;
+}
+
+/* Remove default card padding when using card-header or stat-card */
+.card:has(.card-header),
+.card:has(.stat-card) {
+    padding: 0;
+}
+
+/* ===========================
    UTILITIES
    =========================== */
 
