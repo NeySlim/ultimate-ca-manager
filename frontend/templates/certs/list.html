@@ -471,7 +471,8 @@
 </div>
 
 <script>
-// Apply template to CSR form using HTMX (NO fetch()!)
+// Apply template to CSR form
+// Note: fetch() is OK here because fetch-wrapper.js auto-injects JWT token
 function applyCSRTemplate(templateId) {
     if (!templateId) {
         // Reset form when "No Template" selected
@@ -480,47 +481,46 @@ function applyCSRTemplate(templateId) {
         return;
     }
     
-    // Use htmx.ajax instead of fetch()
-    htmx.ajax('GET', '/api/ui/templates/' + templateId + '/json', {
-        swap: 'none'
-    }).then(response => {
-        return response.json();
-    }).then(template => {
-        // Apply key configuration
-        const keyType = template.key_type || '4096';
-        document.getElementById('csr-key-type').value = keyType;
-        
-        const digest = template.digest || 'sha256';
-        document.getElementById('csr-digest').value = digest;
-        
-        // Apply DN defaults (but don't overwrite if user already entered something)
-        const dn = template.dn_template || {};
-        if (dn.O && !document.getElementById('csr-org').value) {
-            document.getElementById('csr-org').value = dn.O.replace('{username}', '').replace('{email}', '').trim();
-        }
-        if (dn.OU && !document.getElementById('csr-ou').value) {
-            document.getElementById('csr-ou').value = dn.OU.replace('{username}', '').replace('{email}', '').trim();
-        }
-        if (dn.C && !document.getElementById('csr-country').value) {
-            document.getElementById('csr-country').value = dn.C;
-        }
-        if (dn.ST && !document.getElementById('csr-state').value) {
-            document.getElementById('csr-state').value = dn.ST;
-        }
-        if (dn.L && !document.getElementById('csr-locality').value) {
-            document.getElementById('csr-locality').value = dn.L;
-        }
-        
-        // Show toast
-        if (typeof showToast === 'function') {
-            showToast(`Template "${template.name}" applied`, 'success');
-        }
-    }).catch(err => {
-        console.error('Failed to load template:', err);
-        if (typeof showToast === 'function') {
-            showToast('Failed to load template', 'error');
-        }
-    });
+    // fetch() is OK because fetch-wrapper.js is loaded and auto-injects JWT
+    fetch('/api/ui/templates/' + templateId + '/json')
+        .then(r => r.json())
+        .then(template => {
+            // Apply key configuration
+            const keyType = template.key_type || '4096';
+            document.getElementById('csr-key-type').value = keyType;
+            
+            const digest = template.digest || 'sha256';
+            document.getElementById('csr-digest').value = digest;
+            
+            // Apply DN defaults (but don't overwrite if user already entered something)
+            const dn = template.dn_template || {};
+            if (dn.O && !document.getElementById('csr-org').value) {
+                document.getElementById('csr-org').value = dn.O.replace('{username}', '').replace('{email}', '').trim();
+            }
+            if (dn.OU && !document.getElementById('csr-ou').value) {
+                document.getElementById('csr-ou').value = dn.OU.replace('{username}', '').replace('{email}', '').trim();
+            }
+            if (dn.C && !document.getElementById('csr-country').value) {
+                document.getElementById('csr-country').value = dn.C;
+            }
+            if (dn.ST && !document.getElementById('csr-state').value) {
+                document.getElementById('csr-state').value = dn.ST;
+            }
+            if (dn.L && !document.getElementById('csr-locality').value) {
+                document.getElementById('csr-locality').value = dn.L;
+            }
+            
+            // Show toast
+            if (typeof showToast === 'function') {
+                showToast(`Template "${template.name}" applied`, 'success');
+            }
+        })
+        .catch(err => {
+            console.error('Failed to load template:', err);
+            if (typeof showToast === 'function') {
+                showToast('Failed to load template', 'error');
+            }
+        });
 }
 </script>
 
