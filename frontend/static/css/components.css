@@ -834,12 +834,15 @@ textarea.form-control {
 
 /* Info Boxes - Unified style for informational content */
 .info-box {
-    background: var(--surface-elevated);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--info-color);
+    background: linear-gradient(135deg, 
+        rgba(59, 130, 246, 0.08) 0%, 
+        rgba(59, 130, 246, 0.04) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-left: 5px solid var(--info-color);
     border-radius: 8px;
     padding: 1.25rem;
     margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .info-box-title {
@@ -877,6 +880,10 @@ textarea.form-control {
 
 /* Warning variant */
 .info-box.warning {
+    background: linear-gradient(135deg, 
+        rgba(245, 158, 11, 0.08) 0%, 
+        rgba(245, 158, 11, 0.04) 100%);
+    border-color: rgba(245, 158, 11, 0.2);
     border-left-color: var(--warning-color);
 }
 
@@ -886,6 +893,10 @@ textarea.form-control {
 
 /* Success variant */
 .info-box.success {
+    background: linear-gradient(135deg, 
+        rgba(16, 185, 129, 0.08) 0%, 
+        rgba(16, 185, 129, 0.04) 100%);
+    border-color: rgba(16, 185, 129, 0.2);
     border-left-color: var(--success-color);
 }
 
