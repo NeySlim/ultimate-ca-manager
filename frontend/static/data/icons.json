@@ -5,8 +5,14 @@
       "stroke": true,
       "paths": [
         {
-          "d": "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
+          "d": "M3 13h8V3H3v10zm0 8h8v-6H3v6z",
           "gradient": "primary",
+          "fill": "none",
+          "stroke-width": "1.5"
+        },
+        {
+          "d": "M13 21h8V11h-8v10zm0-18v6h8V3h-8z",
+          "gradient": "complement",
           "fill": "none",
           "stroke-width": "1.5"
         }
@@ -24,9 +30,9 @@
         },
         {
           "d": "M12 9v3m0 3h.01",
-          "gradient": "accent",
+          "gradient": "complement",
           "fill": "none",
-          "stroke-width": "2",
+          "stroke-width": "2.2",
           "stroke-linecap": "round"
         }
       ]
@@ -67,17 +73,26 @@
       "stroke": true,
       "paths": [
         {
-          "d": "M20 6H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z",
+          "d": "M20 6L9 17l-5-5",
           "gradient": "primary",
           "fill": "none",
-          "stroke-width": "1.5"
+          "stroke-width": "2",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
         },
         {
-          "d": "M2 10h20M7 14h3",
-          "gradient": "accent",
+          "d": "M12 2L2 7l10 5 10-5-10-5z",
+          "gradient": "complement",
           "fill": "none",
           "stroke-width": "1.5",
-          "stroke-linecap": "round"
+          "stroke-linejoin": "round"
+        },
+        {
+          "d": "M2 17l10 5 10-5M2 12l10 5 10-5",
+          "gradient": "complement",
+          "fill": "none",
+          "stroke-width": "1.5",
+          "stroke-linejoin": "round"
         }
       ]
     },
@@ -114,16 +129,16 @@
       "stroke": true,
       "paths": [
         {
-          "d": "M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z",
-          "gradient": "accent",
+          "d": "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+          "gradient": "primary",
           "fill": "none",
           "stroke-width": "1.5"
         },
         {
-          "d": "M19.43 12.98c.04-.32.07-.64.07-.98 0-.34-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98 0 .33.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65z",
-          "gradient": "primary",
+          "d": "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z",
+          "gradient": "complement",
           "fill": "none",
-          "stroke-width": "1.5"
+          "stroke-width": "1.2"
         }
       ]
     },
@@ -406,23 +421,24 @@
       "stroke": true,
       "paths": [
         {
-          "d": "M12 2.5L3.5 6v5.5c0 5.25 3.63 10.16 8.5 11.35 4.87-1.19 8.5-6.1 8.5-11.35V6l-8.5-3.5z",
+          "d": "M12 2L2 7v10c0 5.5 4.5 10 10 10s10-4.5 10-10V7l-10-5z",
           "gradient": "primary",
           "fill": "none",
           "stroke-width": "1.5"
         },
         {
-          "d": "M13 10l-4 4m0-4l4 4",
-          "gradient": "accent",
+          "d": "M12 8v8M8 12h8",
+          "gradient": "complement",
           "fill": "none",
           "stroke-width": "2",
           "stroke-linecap": "round"
         },
         {
-          "d": "M16 8.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z",
-          "gradient": "accent",
+          "d": "M9 9l6 6M15 9l-6 6",
+          "gradient": "success",
           "fill": "none",
-          "stroke-width": "1.5"
+          "stroke-width": "1.2",
+          "stroke-linecap": "round"
         }
       ]
     },
@@ -587,11 +603,17 @@
           "stroke-width": "1.5"
         },
         {
-          "d": "M8 16c0 0 2-2 4-2s4 2 4 2",
-          "gradient": "accent",
+          "d": "M8 13h8M8 17h4",
+          "gradient": "complement",
           "fill": "none",
-          "stroke-width": "1.5",
+          "stroke-width": "1.6",
           "stroke-linecap": "round"
+        },
+        {
+          "d": "M12 20.5c2.5 0 4.5-1 4.5-2.5s-2-2.5-4.5-2.5-4.5 1-4.5 2.5 2 2.5 4.5 2.5z",
+          "gradient": "complement",
+          "fill": "none",
+          "stroke-width": "1.5"
         }
       ]
     },
@@ -842,27 +864,20 @@
       "stroke": true,
       "paths": [
         {
-          "d": "M9 12l2 2 4-4",
-          "gradient": "primary",
-          "fill": "none",
-          "stroke-width": "2.5",
-          "stroke-linecap": "round",
-          "stroke-linejoin": "round"
-        },
-        {
-          "d": "M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z",
-          "gradient": "accent",
-          "fill": "none",
-          "stroke-width": "1.5"
-        },
-        {
-          "d": "M16 8v2a2 2 0 0 1-2 2h-2",
+          "d": "M22 11.08V12a10 10 0 1 1-5.93-9.14",
           "gradient": "primary",
           "fill": "none",
           "stroke-width": "1.5",
           "stroke-linecap": "round",
-          "stroke-linejoin": "round",
-          "opacity": "0.6"
+          "stroke-linejoin": "round"
+        },
+        {
+          "d": "M22 4L12 14.01l-3-3",
+          "gradient": "success",
+          "fill": "none",
+          "stroke-width": "2.2",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
         }
       ]
     },
