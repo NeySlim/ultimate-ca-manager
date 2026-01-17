@@ -5354,24 +5354,24 @@ def templates_options():
     """Get templates as HTML options for select dropdown"""
     try:
         token = session.get('access_token')
+        if not token:
+            return '<option value="">-- No template (session error) --</option>', 200
+        
         headers = {'Authorization': f'Bearer {token}'}
         
-        response = requests.get(
-            f"{request.url_root}api/v1/templates",
-            headers=headers,
-            verify=False
-        )
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/templates")
         
-        if response.status_code == 200:
+        if response and response.status_code == 200:
             templates = response.json()
             html = '<option value="">-- No Template (Manual) --</option>'
             for t in templates:
                 html += f'<option value="{t["id"]}">{t["name"]} ({t["type"]})</option>'
             return html, 200
         else:
-            return '<option value="">-- No Template (Manual) --</option>', 200
+            return '<option value="">-- No templates found --</option>', 200
     except Exception as e:
-        return f'<option value="">Error loading templates</option>', 500
+        app.logger.error(f"Error loading templates: {str(e)}")
+        return f'<option value="">-- Error: {str(e)[:30]} --</option>', 200
 
 
 @ui_bp.route('/api/ui/templates/<int:template_id>/json')
@@ -5380,17 +5380,17 @@ def template_json(template_id):
     """Get single template as JSON (for CSR auto-fill)"""
     try:
         token = session.get('access_token')
+        if not token:
+            return {'error': 'No session token'}, 401
+        
         headers = {'Authorization': f'Bearer {token}'}
         
-        response = requests.get(
-            f"{request.url_root}api/v1/templates/{template_id}",
-            headers=headers,
-            verify=False
-        )
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/templates/{template_id}")
         
-        if response.status_code == 200:
+        if response and response.status_code == 200:
             return response.json(), 200
         else:
-            return {'error': 'Template not found'}, response.status_code
+            return {'error': 'Template not found'}, 404
     except Exception as e:
+        app.logger.error(f"Error loading template {template_id}: {str(e)}")
         return {'error': str(e)}, 500
