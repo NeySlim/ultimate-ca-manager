@@ -29,14 +29,17 @@
         <button class="tab-button active" onclick="ucm_switchTab('general')" id="btn-tab-general" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 600; color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
             <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-info-circle"/></svg> General
         </button>
-        <button class="tab-button" onclick="ucm_switchTab('security')" id="btn-tab-security" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
-            <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-shield-check"/></svg> Security
+        <button class="tab-button" onclick="ucm_switchTab('https')" id="btn-tab-https" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+            <svg class="ucm-icon" width="18" height="18"><use href="#icon-lock"/></svg> HTTPS
         </button>
         <button class="tab-button" onclick="ucm_switchTab('authentication')" id="btn-tab-authentication" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
             <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-key"/></svg> Authentication
         </button>
         <button class="tab-button" onclick="ucm_switchTab('email')" id="btn-tab-email" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
-            <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-mail"/></svg> Email
+            <svg class="ucm-icon" width="18" height="18"><use href="#icon-mail"/></svg> Email & Notifications
+        </button>
+        <button class="tab-button" onclick="ucm_switchTab('users')" id="btn-tab-users">
+            <svg class="ucm-icon" width="18" height="18"><use href="#icon-users"/></svg> Users
         </button>
         <button class="tab-button" onclick="ucm_switchTab('database')" id="btn-tab-database" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
             <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-database"/></svg> Database
@@ -182,10 +185,39 @@
         </div>
     </div>
     
+    <!-- Default Certificate Settings -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-award"/></svg>
+                Default Certificate Settings
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form hx-post="/api/ui/config/system-save" hx-swap="none" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div>
+                    <label class="form-label">Default Certificate Validity (days)</label>
+                    <input type="number" name="default_cert_validity" value="365" min="1" max="7300" class="form-input" style="max-width: 200px;">
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                        Default validity period for new certificates (1-7300 days)
+                    </small>
+                </div>
+                
+                <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                    <button type="submit" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
+                        Save Certificate Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    
     </div><!-- End Tab: General -->
     
-    <!-- Tab: Security -->
-    <div id="tab-security" class="tab-content">
+    <!-- Tab: HTTPS Certificate -->
+    <div id="tab-https" class="tab-content">
     
     <!-- Password Policy -->
     <div class="card">
@@ -437,7 +469,7 @@
         </div>
     </div>
     
-    </div><!-- End Tab: Security -->
+    </div><!-- End Tab: HTTPS -->
     
     <!-- Tab: Authentication -->
     <div id="tab-authentication" class="tab-content">
@@ -538,8 +570,42 @@
         </div>
     </div>
     
-    </div><!-- End Tab: Email -->
+    </div><!-- End Tab: Email & Notifications -->
     
+    
+    
+    <!-- ========================================== -->
+    <!-- TAB 5: USERS -->
+    <!-- ========================================== -->
+    <div id="tab-users" class="tab-content">
+    
+    <!-- User Management -->
+    <div class="card">
+        <div class="card-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                    <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-users"/></svg>
+                    User Management
+                </h2>
+                <button onclick="openModal('addUserModal')" class="btn-primary">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-user-plus"/></svg> Add User
+                </button>
+            </div>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div hx-get="/api/ui/config/users" hx-trigger="load, refreshUsers from:body" hx-target="#users-list">
+                <div id="users-list">
+                    <div style="text-align: center; padding: 2rem 0;">
+                        <svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>
+                        <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading users...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    </div><!-- End Tab: Users -->
+
     <!-- Tab: Database -->
     <div id="tab-database" class="tab-content">
     

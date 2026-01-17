@@ -11,10 +11,31 @@
         </h1>
     </div>
     
+    <!-- Account Tabs (4 tabs) -->
+    <div class="tabs-container">
+        <button class="tab-button active" onclick="ucm_switchTab('profile')" id="btn-tab-profile">
+            <svg class="ucm-icon" width="18" height="18"><use href="#icon-user"/></svg> Profile
+        </button>
+        <button class="tab-button" onclick="ucm_switchTab('preferences')" id="btn-tab-preferences">
+            <svg class="ucm-icon" width="18" height="18"><use href="#icon-palette"/></svg> Preferences
+        </button>
+        <button class="tab-button" onclick="ucm_switchTab('security')" id="btn-tab-security">
+            <svg class="ucm-icon" width="18" height="18"><use href="#icon-shield-check"/></svg> Security
+        </button>
+        <button class="tab-button" onclick="ucm_switchTab('notifications')" id="btn-tab-notifications">
+            <svg class="ucm-icon" width="18" height="18"><use href="#icon-bell"/></svg> Notifications
+        </button>
+    </div>
+    
+    <!-- ========================================== -->
+    <!-- TAB 1: PROFILE -->
+    <!-- ========================================== -->
+    <div id="tab-profile" class="tab-content active">
+    
     <!-- User Profile -->
-    <div class="card" style="padding: 0;">
+    <div class="card">
         <div class="card-header">
-            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                 <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-user"/></svg>
                 Profile Information
             </h2>
@@ -49,9 +70,9 @@
     </div>
     
     <!-- Password Change -->
-    <div class="card" style="padding: 0;">
+    <div class="card">
         <div class="card-header">
-            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                 <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
                 Change Password
             </h2>
@@ -80,241 +101,153 @@
         </div>
     </div>
     
-    <!-- Theme Preferences -->
-    <div class="card" style="padding: 0;">
+    </div><!-- End Tab: Profile -->
+
+    
+    <!-- ========================================== -->
+    <!-- TAB 3: SECURITY -->
+    <!-- ========================================== -->
+    <div id="tab-security" class="tab-content">
+    
+    <!-- Active Sessions -->
+    <div class="card">
         <div class="card-header">
-            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-palette"/></svg>
-                Theme Preferences
+            <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-activity"/></svg>
+                Active Sessions
             </h2>
         </div>
         <div style="padding: 1.5rem;">
-            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Current theme: <span id="current-theme-name" style="font-weight: 600; color: var(--text-primary);"></span>
-            </p>
-            <div style="display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap: 1rem; max-width: 100%;">
-                <!-- First row: Light themes -->
-                <!-- Sentinel Light -->
-                <button data-action="set-theme" data-theme="sentinel-light" style="all: unset; cursor: pointer; position: relative; border-radius: 0.5rem; overflow: hidden; border: 2px solid var(--border-color); transition: all 0.2s; min-width: 0;" onmouseover="this.style.borderColor='#3b82f6'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(59,130,246,0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                    <div style="padding: 0.75rem; background: #f8fafc;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.375rem;">
-                                <svg width="12" height="12" style="color: #3b82f6;"><use href="#icon-sun"/></svg>
-                                <span style="font-weight: 600; color: #1e293b; font-size: 0.75rem;">Sentinel Light</span>
-                            </div>
-                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
-                        </div>
-                        <div style="background: #ffffff; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #e2e8f0;">
-                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
-                                <div style="flex: 1; height: 1rem; background: #3b82f6; border-radius: 0.25rem;"></div>
-                                <div style="flex: 1; height: 1rem; background: #e2e8f0; border-radius: 0.25rem;"></div>
-                            </div>
-                            <div style="height: 0.5rem; background: #cbd5e1; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
-                            <div style="height: 0.5rem; background: #e2e8f0; border-radius: 0.25rem; width: 60%;"></div>
-                        </div>
+            <div hx-get="/api/ui/my-account/sessions" hx-trigger="load" hx-target="#sessions-list">
+                <div id="sessions-list">
+                    <div style="text-align: center; padding: 2rem 0;">
+                        <svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>
+                        <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading sessions...</p>
                     </div>
-                </button>
-
-                <!-- Sentinel Dark -->
-                <button data-action="set-theme" data-theme="sentinel-dark" style="all: unset; cursor: pointer; position: relative; border-radius: 0.5rem; overflow: hidden; border: 2px solid var(--border-color); transition: all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(59,130,246,0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                    <div style="padding: 0.75rem; background: #0f172a;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.375rem;">
-                                <svg width="12" height="12" style="color: #60a5fa;"><use href="#icon-moon"/></svg>
-                                <span style="font-weight: 600; color: #f1f5f9; font-size: 0.75rem;">Sentinel Dark</span>
-                            </div>
-                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
-                        </div>
-                        <div style="background: #1e293b; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #334155;">
-                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
-                                <div style="flex: 1; height: 1rem; background: #3b82f6; border-radius: 0.25rem;"></div>
-                                <div style="flex: 1; height: 1rem; background: #334155; border-radius: 0.25rem;"></div>
-                            </div>
-                            <div style="height: 0.5rem; background: #475569; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
-                            <div style="height: 0.5rem; background: #334155; border-radius: 0.25rem; width: 60%;"></div>
-                        </div>
-                    </div>
-                </button>
-
-                <!-- Amber Light -->
-                <button data-action="set-theme" data-theme="amber-light" style="all: unset; cursor: pointer; position: relative; border-radius: 0.5rem; overflow: hidden; border: 2px solid var(--border-color); transition: all 0.2s;" onmouseover="this.style.borderColor='#f97316'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(249,115,22,0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                    <div style="padding: 0.75rem; background: #fffbeb;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.375rem;">
-                                <svg width="12" height="12" style="color: #f97316;"><use href="#icon-sun"/></svg>
-                                <span style="font-weight: 600; color: #78350f; font-size: 0.75rem;">Amber Light</span>
-                            </div>
-                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #f97316, #ea580c);"></div>
-                        </div>
-                        <div style="background: #ffffff; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #fed7aa;">
-                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
-                                <div style="flex: 1; height: 1rem; background: #f97316; border-radius: 0.25rem;"></div>
-                                <div style="flex: 1; height: 1rem; background: #fed7aa; border-radius: 0.25rem;"></div>
-                            </div>
-                            <div style="height: 0.5rem; background: #fde68a; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
-                            <div style="height: 0.5rem; background: #fed7aa; border-radius: 0.25rem; width: 60%;"></div>
-                        </div>
-                    </div>
-                </button>
-
-                <!-- Amber Dark -->
-                <button data-action="set-theme" data-theme="amber-dark" style="all: unset; cursor: pointer; position: relative; border-radius: 0.5rem; overflow: hidden; border: 2px solid var(--border-color); transition: all 0.2s;" onmouseover="this.style.borderColor='#f97316'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(249,115,22,0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                    <div style="padding: 0.75rem; background: #1c1917;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.375rem;">
-                                <svg width="12" height="12" style="color: #fb923c;"><use href="#icon-moon"/></svg>
-                                <span style="font-weight: 600; color: #fef3c7; font-size: 0.75rem;">Amber Dark</span>
-                            </div>
-                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #f97316, #ea580c);"></div>
-                        </div>
-                        <div style="background: #292524; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #44403c;">
-                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
-                                <div style="flex: 1; height: 1rem; background: #f97316; border-radius: 0.25rem;"></div>
-                                <div style="flex: 1; height: 1rem; background: #44403c; border-radius: 0.25rem;"></div>
-                            </div>
-                            <div style="height: 0.5rem; background: #57534e; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
-                            <div style="height: 0.5rem; background: #44403c; border-radius: 0.25rem; width: 60%;"></div>
-                        </div>
-                    </div>
-                </button>
-
-                <!-- Blossom Light -->
-                <button data-action="set-theme" data-theme="blossom-light" style="all: unset; cursor: pointer; position: relative; border-radius: 0.5rem; overflow: hidden; border: 2px solid var(--border-color); transition: all 0.2s;" onmouseover="this.style.borderColor='#ec4899'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(236,72,153,0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                    <div style="padding: 0.75rem; background: #fdf2f8;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.375rem;">
-                                <svg width="12" height="12" style="color: #ec4899;"><use href="#icon-sun"/></svg>
-                                <span style="font-weight: 600; color: #831843; font-size: 0.75rem;">Blossom Light</span>
-                            </div>
-                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #ec4899, #db2777);"></div>
-                        </div>
-                        <div style="background: #ffffff; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #fbcfe8;">
-                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
-                                <div style="flex: 1; height: 1rem; background: #ec4899; border-radius: 0.25rem;"></div>
-                                <div style="flex: 1; height: 1rem; background: #fbcfe8; border-radius: 0.25rem;"></div>
-                            </div>
-                            <div style="height: 0.5rem; background: #f9a8d4; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
-                            <div style="height: 0.5rem; background: #fbcfe8; border-radius: 0.25rem; width: 60%;"></div>
-                        </div>
-                    </div>
-                </button>
-
-                <!-- Blossom Dark -->
-                <button data-action="set-theme" data-theme="blossom-dark" style="all: unset; cursor: pointer; position: relative; border-radius: 0.5rem; overflow: hidden; border: 2px solid var(--border-color); transition: all 0.2s;" onmouseover="this.style.borderColor='#ec4899'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(236,72,153,0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                    <div style="padding: 0.75rem; background: #1e1b20;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.375rem;">
-                                <svg width="12" height="12" style="color: #f472b6;"><use href="#icon-moon"/></svg>
-                                <span style="font-weight: 600; color: #fce7f3; font-size: 0.75rem;">Blossom Dark</span>
-                            </div>
-                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #ec4899, #db2777);"></div>
-                        </div>
-                        <div style="background: #2d1b28; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #4a2640;">
-                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
-                                <div style="flex: 1; height: 1rem; background: #ec4899; border-radius: 0.25rem;"></div>
-                                <div style="flex: 1; height: 1rem; background: #4a2640; border-radius: 0.25rem;"></div>
-                            </div>
-                            <div style="height: 0.5rem; background: #5e3450; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
-                            <div style="height: 0.5rem; background: #4a2640; border-radius: 0.25rem; width: 60%;"></div>
-                        </div>
-                    </div>
-                </button>
-
-                <!-- Nebula Light -->
-                <button data-action="set-theme" data-theme="nebula-light" style="all: unset; cursor: pointer; position: relative; border-radius: 0.5rem; overflow: hidden; border: 2px solid var(--border-color); transition: all 0.2s;" onmouseover="this.style.borderColor='#8b5cf6'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(139,92,246,0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                    <div style="padding: 0.75rem; background: #faf5ff;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.375rem;">
-                                <svg width="12" height="12" style="color: #8b5cf6;"><use href="#icon-sun"/></svg>
-                                <span style="font-weight: 600; color: #581c87; font-size: 0.75rem;">Nebula Light</span>
-                            </div>
-                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></div>
-                        </div>
-                        <div style="background: #ffffff; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #e9d5ff;">
-                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
-                                <div style="flex: 1; height: 1rem; background: #8b5cf6; border-radius: 0.25rem;"></div>
-                                <div style="flex: 1; height: 1rem; background: #e9d5ff; border-radius: 0.25rem;"></div>
-                            </div>
-                            <div style="height: 0.5rem; background: #d8b4fe; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
-                            <div style="height: 0.5rem; background: #e9d5ff; border-radius: 0.25rem; width: 60%;"></div>
-                        </div>
-                    </div>
-                </button>
-
-                <!-- Nebula Dark -->
-                <button data-action="set-theme" data-theme="nebula-dark" style="all: unset; cursor: pointer; position: relative; border-radius: 0.5rem; overflow: hidden; border: 2px solid var(--border-color); transition: all 0.2s;" onmouseover="this.style.borderColor='#8b5cf6'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(139,92,246,0.15)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
-                    <div style="padding: 0.75rem; background: #1e1b2e;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <div style="display: flex; align-items: center; gap: 0.375rem;">
-                                <svg width="12" height="12" style="color: #a78bfa;"><use href="#icon-moon"/></svg>
-                                <span style="font-weight: 600; color: #e9d5ff; font-size: 0.75rem;">Nebula Dark</span>
-                            </div>
-                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></div>
-                        </div>
-                        <div style="background: #2e1f47; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #4c3565;">
-                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
-                                <div style="flex: 1; height: 1rem; background: #8b5cf6; border-radius: 0.25rem;"></div>
-                                <div style="flex: 1; height: 1rem; background: #4c3565; border-radius: 0.25rem;"></div>
-                            </div>
-                            <div style="height: 0.5rem; background: #5e4578; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
-                            <div style="height: 0.5rem; background: #4c3565; border-radius: 0.25rem; width: 60%;"></div>
-                        </div>
-                    </div>
-                </button>
+                </div>
             </div>
         </div>
     </div>
     
-    <!-- Client Certificates -->
-    <div class="card" style="padding: 0;">
+    <!-- API Keys -->
+    <div class="card">
         <div class="card-header">
-            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
-                Client Certificates
-            </h2>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                    <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
+                    API Keys
+                </h2>
+                <button onclick="openModal('createApiKeyModal')" class="btn-primary">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Create API Key
+                </button>
+            </div>
         </div>
         <div style="padding: 1.5rem;">
-            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Manage your client certificates for mTLS authentication and secure communications.
-            </p>
-            <a href="/my-account/mtls" class="btn-secondary">
-                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-key"/></svg>
-                Manage My Certificates
-            </a>
-        </div>
-    </div>
-
-    <!-- Session Information -->
-    <div class="card" style="padding: 0;">
-        <div class="card-header">
-            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-clock"/></svg>
-                Session Information
-            </h2>
-        </div>
-        <div style="padding: 1.5rem;">
-            <div style="display: flex; flex-direction: column; gap: 1rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 500; color: var(--text-secondary);">Session Status</span>
-                    <span class="badge-outline badge-success">
-                        <svg class="ucm-icon" width="12" height="12"><use href="#icon-check"/></svg>
-                        Active
-                    </span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 500; color: var(--text-secondary);">Login Method</span>
-                    <span style="font-weight: 600; color: var(--text-primary);">Password</span>
-                </div>
-                <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
-                    <a href="/logout" class="btn-danger">
-                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-logout"/></svg>
-                        Logout
-                    </a>
+            <div hx-get="/api/ui/my-account/api-keys" hx-trigger="load" hx-target="#api-keys-list">
+                <div id="api-keys-list">
+                    <div style="text-align: center; padding: 2rem 0;">
+                        <svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>
+                        <p style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">Loading API keys...</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+    
+    <!-- mTLS Certificates -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-shield-check"/></svg>
+                mTLS Client Certificates
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                Manage your mTLS client certificates for browser-based authentication.
+            </p>
+            <a href="/my-account/mtls" class="btn-secondary">
+                <svg class="ucm-icon" width="16" height="16"><use href="#icon-shield-check"/></svg> Manage mTLS Certificates
+            </a>
+        </div>
+    </div>
+    
+    </div><!-- End Tab: Security -->
+
+    
+    <!-- ========================================== -->
+    <!-- TAB 4: NOTIFICATIONS -->
+    <!-- ========================================== -->
+    <div id="tab-notifications" class="tab-content">
+    
+    <!-- Email Notifications -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-bell"/></svg>
+                Email Notification Preferences
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form hx-post="/api/ui/my-account/notification-settings" hx-swap="none">
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <div>
+                        <label class="form-label">Notification Email</label>
+                        <input type="email" name="notification_email" class="form-input" value="{{ session.get('email', '') }}" placeholder="your.email@example.com">
+                        <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                            Email address where you want to receive notifications
+                        </small>
+                    </div>
+                    
+                    <div>
+                        <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">Notify me about:</h3>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <label style="display: flex; align-items: start; cursor: pointer;">
+                                <input type="checkbox" name="notify_cert_expiry" checked style="margin-top: 4px;">
+                                <div style="margin-left: 0.75rem;">
+                                    <div style="font-weight: 500; color: var(--text-primary);">Certificate Expiration</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">Get notified when certificates are about to expire</div>
+                                </div>
+                            </label>
+                            
+                            <label style="display: flex; align-items: start; cursor: pointer;">
+                                <input type="checkbox" name="notify_cert_issued" checked style="margin-top: 4px;">
+                                <div style="margin-left: 0.75rem;">
+                                    <div style="font-weight: 500; color: var(--text-primary);">Certificate Issued</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">Get notified when new certificates are issued</div>
+                                </div>
+                            </label>
+                            
+                            <label style="display: flex; align-items: start; cursor: pointer;">
+                                <input type="checkbox" name="notify_cert_revoked" checked style="margin-top: 4px;">
+                                <div style="margin-left: 0.75rem;">
+                                    <div style="font-weight: 500; color: var(--text-primary);">Certificate Revoked</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">Get notified when certificates are revoked</div>
+                                </div>
+                            </label>
+                            
+                            <label style="display: flex; align-items: start; cursor: pointer;">
+                                <input type="checkbox" name="notify_system_alerts" style="margin-top: 4px;">
+                                <div style="margin-left: 0.75rem;">
+                                    <div style="font-weight: 500; color: var(--text-primary);">System Alerts</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">Get notified about system events and maintenance</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                        <button type="submit" class="btn-primary">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-check"/></svg> Save Notification Preferences
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    </div><!-- End Tab: Notifications -->
 
 <script>
 // Display current theme
