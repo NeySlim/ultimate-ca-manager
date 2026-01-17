@@ -61,7 +61,7 @@
             <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
                     <span style="font-weight: 500; color: var(--text-secondary);">Version</span>
-                    <span style="font-weight: 600; color: var(--text-primary);">1.5.0</span>
+                    <span style="font-weight: 600; color: var(--text-primary);">1.8.6</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
                     <span style="font-weight: 500; color: var(--text-secondary);">HTTPS Port</span>
@@ -86,9 +86,99 @@
                             <svg class="ucm-icon" width="10" height="10"><use href="#icon-shield"/></svg>
                             SCEP
                         </span>
+                        <span class="badge-outline badge-info">
+                            <svg class="ucm-icon" width="10" height="10"><use href="#icon-globe"/></svg>
+                            ACME
+                        </span>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+    
+    <!-- Session Configuration -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-clock"/></svg>
+                Session Configuration
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form id="session-config-form" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div>
+                    <label class="form-label">Session Timeout (minutes)</label>
+                    <input type="number" id="session-timeout" class="form-input" value="30" min="5" max="1440" style="max-width: 200px;">
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                        Idle sessions will expire after this duration (5-1440 minutes)
+                    </small>
+                </div>
+                
+                <div>
+                    <label class="form-label">Remember Me Duration (days)</label>
+                    <input type="number" id="remember-duration" class="form-input" value="30" min="1" max="365" style="max-width: 200px;">
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                        Users can stay logged in for this duration if "Remember Me" is checked
+                    </small>
+                </div>
+                
+                <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                    <button type="submit" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
+                        Save Session Settings
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- UI Preferences -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-palette"/></svg>
+                UI Preferences
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form id="ui-preferences-form" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div>
+                    <label class="form-label">Default Theme</label>
+                    <select id="default-theme" class="form-input" style="max-width: 300px;">
+                        <option value="sentinel-light">Sentinel Light</option>
+                        <option value="sentinel-dark" selected>Sentinel Dark</option>
+                        <option value="amber-light">Amber Light</option>
+                        <option value="amber-dark">Amber Dark</option>
+                        <option value="blossom-light">Blossom Light</option>
+                        <option value="blossom-dark">Blossom Dark</option>
+                        <option value="nebula-light">Nebula Light</option>
+                        <option value="nebula-dark">Nebula Dark</option>
+                    </select>
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                        Default theme for new users and before login
+                    </small>
+                </div>
+                
+                <div>
+                    <label class="form-label">Date Format</label>
+                    <select id="date-format" class="form-input" style="max-width: 300px;">
+                        <option value="YYYY-MM-DD" selected>YYYY-MM-DD (2026-01-17)</option>
+                        <option value="DD/MM/YYYY">DD/MM/YYYY (17/01/2026)</option>
+                        <option value="MM/DD/YYYY">MM/DD/YYYY (01/17/2026)</option>
+                        <option value="DD.MM.YYYY">DD.MM.YYYY (17.01.2026)</option>
+                    </select>
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                        Display format for dates throughout the application
+                    </small>
+                </div>
+                
+                <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                    <button type="submit" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
+                        Save UI Preferences
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
     
@@ -97,11 +187,123 @@
     <!-- Tab: Security -->
     <div id="tab-security" class="tab-content">
     
+    <!-- Password Policy -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-lock"/></svg>
+                Password Policy
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form id="password-policy-form" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div>
+                    <label class="form-label">Minimum Password Length</label>
+                    <input type="number" id="min-password-length" class="form-input" value="8" min="4" max="64" style="max-width: 200px;">
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                        Minimum number of characters required for passwords (4-64)
+                    </small>
+                </div>
+                
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                        <input type="checkbox" id="require-uppercase" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-weight: 500; color: var(--text-primary);">Require uppercase letters (A-Z)</span>
+                    </label>
+                </div>
+                
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                        <input type="checkbox" id="require-lowercase" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-weight: 500; color: var(--text-primary);">Require lowercase letters (a-z)</span>
+                    </label>
+                </div>
+                
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                        <input type="checkbox" id="require-numbers" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-weight: 500; color: var(--text-primary);">Require numbers (0-9)</span>
+                    </label>
+                </div>
+                
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                        <input type="checkbox" id="require-special" style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-weight: 500; color: var(--text-primary);">Require special characters (!@#$%^&*)</span>
+                    </label>
+                </div>
+                
+                <div>
+                    <label class="form-label">Password Expiration (days)</label>
+                    <input type="number" id="password-expiry" class="form-input" value="0" min="0" max="365" style="max-width: 200px;">
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                        Force password change after N days (0 = never expire)
+                    </small>
+                </div>
+                
+                <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                    <button type="submit" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
+                        Save Password Policy
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Session Security -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-shield"/></svg>
+                Session Security
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form id="session-security-form" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                        <input type="checkbox" id="force-https" checked disabled style="width: 18px; height: 18px; cursor: not-allowed; opacity: 0.6;">
+                        <span style="font-weight: 500; color: var(--text-primary);">Force HTTPS (always enabled)</span>
+                    </label>
+                </div>
+                
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                        <input type="checkbox" id="httponly-cookies" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-weight: 500; color: var(--text-primary);">HttpOnly cookies (prevent JavaScript access)</span>
+                    </label>
+                </div>
+                
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                        <input type="checkbox" id="secure-cookies" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-weight: 500; color: var(--text-primary);">Secure cookies (HTTPS only)</span>
+                    </label>
+                </div>
+                
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                        <input type="checkbox" id="samesite-strict" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-weight: 500; color: var(--text-primary);">SameSite=Strict (prevent CSRF attacks)</span>
+                    </label>
+                </div>
+                
+                <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                    <button type="submit" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
+                        Save Session Security
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <!-- HTTPS Certificate -->
     <div class="card">
         <div class="card-header">
             <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20"><use href="#icon-lock"/></svg>
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-file-text"/></svg>
                 HTTPS Certificate
             </h2>
         </div>
@@ -588,18 +790,153 @@
     <!-- Tab: Advanced -->
     <div id="tab-advanced" class="tab-content">
     
+    <!-- Logging Configuration -->
     <div class="card">
         <div class="card-header">
             <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-settings"/></svg>
-                Advanced Settings
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-file-text"/></svg>
+                Logging Configuration
             </h2>
         </div>
-        <div style="padding: 3rem; text-align: center;">
-            <svg class="ucm-icon" width="48" height="48" style="opacity: 0.3; margin: 0 auto 1rem auto;"><use href="#icon-info"/></svg>
-            <p style="color: var(--text-secondary); font-size: 0.875rem;">
-                Advanced configuration options will be available in future updates.
+        <div style="padding: 1.5rem;">
+            <form id="logging-form" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div>
+                    <label class="form-label">Log Level</label>
+                    <select id="log-level" class="form-input" style="max-width: 300px;">
+                        <option value="DEBUG">DEBUG (Most Verbose)</option>
+                        <option value="INFO" selected>INFO (Recommended)</option>
+                        <option value="WARNING">WARNING</option>
+                        <option value="ERROR">ERROR</option>
+                        <option value="CRITICAL">CRITICAL (Minimal)</option>
+                    </select>
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                        Controls verbosity of application logs. DEBUG is useful for troubleshooting.
+                    </small>
+                </div>
+                
+                <div>
+                    <label class="form-label">Log Retention (days)</label>
+                    <input type="number" id="log-retention" class="form-input" value="30" min="1" max="365" style="max-width: 200px;">
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                        Automatically delete logs older than N days
+                    </small>
+                </div>
+                
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                        <input type="checkbox" id="enable-access-logs" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-weight: 500; color: var(--text-primary);">Enable access logs (HTTP requests)</span>
+                    </label>
+                </div>
+                
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                        <input type="checkbox" id="enable-audit-logs" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-weight: 500; color: var(--text-primary);">Enable audit logs (security events)</span>
+                    </label>
+                </div>
+                
+                <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color); display: flex; gap: 1rem; align-items: center;">
+                    <button type="submit" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
+                        Save Logging Settings
+                    </button>
+                    <a href="/logs" class="btn-secondary">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-file-text"/></svg>
+                        View Logs
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Maintenance Mode -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-warning-triangle"/></svg>
+                Maintenance Mode
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Temporarily restrict access to UCM for system maintenance. Only administrators can access the system in maintenance mode.
             </p>
+            
+            <div style="background: var(--bg-secondary); border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div>
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Current Status</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary);">System is currently operational</div>
+                    </div>
+                    <span id="maintenance-status-badge" class="badge-outline badge-success">
+                        <svg class="ucm-icon" width="10" height="10"><use href="#icon-check"/></svg> Active
+                    </span>
+                </div>
+                
+                <div id="maintenance-message-container" style="display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Message displayed to users:</div>
+                    <div style="padding: 0.75rem; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.375rem; font-size: 0.875rem; color: var(--text-primary);" id="maintenance-message-display">
+                        -
+                    </div>
+                </div>
+            </div>
+            
+            <form id="maintenance-mode-form" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div>
+                    <label class="form-label">Maintenance Message</label>
+                    <textarea id="maintenance-message" class="form-input" rows="3" placeholder="e.g., System maintenance in progress. We'll be back shortly.">System maintenance in progress. We'll be back shortly.</textarea>
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                        This message will be shown to non-admin users trying to access UCM
+                    </small>
+                </div>
+                
+                <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color); display: flex; gap: 1rem;">
+                    <button type="button" onclick="enableMaintenanceMode()" class="btn-warning" id="btn-enable-maintenance">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-warning-triangle"/></svg>
+                        Enable Maintenance Mode
+                    </button>
+                    <button type="button" onclick="disableMaintenanceMode()" class="btn-success" id="btn-disable-maintenance" style="display: none;">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
+                        Disable Maintenance Mode
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- API Rate Limiting -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-shield"/></svg>
+                API Rate Limiting
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form id="rate-limiting-form" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <div>
+                    <label class="form-label">Requests per Minute (per IP)</label>
+                    <input type="number" id="rate-limit-requests" class="form-input" value="60" min="10" max="1000" style="max-width: 200px;">
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+                        Maximum API requests from a single IP per minute (10-1000)
+                    </small>
+                </div>
+                
+                <div>
+                    <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; padding: 0.75rem; background: var(--bg-secondary); border-radius: 0.5rem;">
+                        <input type="checkbox" id="enable-rate-limiting" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="font-weight: 500; color: var(--text-primary);">Enable rate limiting (recommended)</span>
+                    </label>
+                </div>
+                
+                <div style="padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                    <button type="submit" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-check"/></svg>
+                        Save Rate Limiting
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
     
