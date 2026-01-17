@@ -381,6 +381,10 @@
     
     <!-- Scripts at end -->
     <script src="{{ url_for('static', filename='vendor/js/htmx.min.js') }}"></script>
+    
+    <!-- Fetch Wrapper - Auto JWT injection BEFORE any other scripts -->
+    <script src="{{ url_for('static', filename='js/fetch-wrapper.js') }}"></script>
+    
     <script src="{{ url_for('static', filename='vendor/js/alpine.min.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/modal-utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/icon-system.js') }}?v=3.5"></script>
