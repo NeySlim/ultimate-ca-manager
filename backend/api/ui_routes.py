@@ -4998,3 +4998,70 @@ def ui_templates_delete(template_id):
             
     except Exception as e:
         return f'<div style="color: var(--danger-color); padding: 1rem;">Error: {html_escape(str(e))}</div>', 500
+
+
+# CA Detail - Fingerprints
+@ui_bp.route('/api/ui/ca/<ca_id>/fingerprints')
+@login_required
+def ca_fingerprints(ca_id):
+    """Get CA fingerprints (for HTMX)"""
+    try:
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/ca/{ca_id}/fingerprints")
+        
+        if not response or response.status_code != 200:
+            return '<p style="color: var(--danger-color);">Failed to load fingerprints</p>'
+        
+        data = response.json()
+        html = f'''
+            <dl style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">SHA-256</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-primary); font-family: monospace; word-break: break-all; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem;">{data.get('sha256', 'N/A')}</dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">SHA-1</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-primary); font-family: monospace; word-break: break-all; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem;">{data.get('sha1', 'N/A')}</dd>
+                </div>
+                <div>
+                    <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">MD5</dt>
+                    <dd style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-primary); font-family: monospace; word-break: break-all; background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem;">{data.get('md5', 'N/A')}</dd>
+                </div>
+            </dl>
+        '''
+        return html
+    except Exception as e:
+        return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
+
+
+# CA Detail - X509 Details
+@ui_bp.route('/api/ui/ca/<ca_id>/x509details')
+@login_required
+def ca_x509_details(ca_id):
+    """Get CA X.509 details (for HTMX)"""
+    try:
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/ca/{ca_id}/details")
+        
+        if not response or response.status_code != 200:
+            return '<p style="color: var(--danger-color);">Failed to load certificate details</p>'
+        
+        data = response.json()
+        
+        # Build extensions HTML
+        extensions_html = ''
+        if data.get('extensions'):
+            extensions_html = '<dl style="display: flex; flex-direction: column; gap: 0.75rem;">'
+            for ext_name, ext_value in data['extensions'].items():
+                value_str = str(ext_value) if not isinstance(ext_value, dict) else '<br>'.join([f"{k}: {v}" for k, v in ext_value.items()])
+                extensions_html += f'''
+                    <div>
+                        <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">{html_escape(ext_name)}</dt>
+                        <dd style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-primary); background: var(--bg-secondary); padding: 0.5rem; border-radius: 0.25rem;">{value_str}</dd>
+                    </div>
+                '''
+            extensions_html += '</dl>'
+        else:
+            extensions_html = '<p style="color: var(--text-secondary);">No extensions</p>'
+        
+        return extensions_html
+    except Exception as e:
+        return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
