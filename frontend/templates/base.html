@@ -209,13 +209,17 @@
                 </button>
             </a>
             
-            <a href="/ca" class="sidebar-link {% if request.path.startswith('/ca') or request.path.startswith('/import-ca') %}active{% endif %}"
+            <a href="/ca" class="sidebar-link sidebar-parent {% if request.path.startswith('/ca') or request.path.startswith('/import-ca') %}active{% endif %}"
                hx-get="/ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
-               data-tooltip="Certificate Authorities">
+               data-tooltip="Certificate Authorities"
+               data-submenu="ca-submenu">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-certificate-authority"/></svg>
                 <span>Certificate Authorities</span>
+                <button class="submenu-toggle-btn" title="Toggle submenu" onclick="event.preventDefault(); event.stopPropagation();">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-down"/></svg>
+                </button>
             </a>
-            <div class="sidebar-submenu">
+            <div class="sidebar-submenu" id="ca-submenu">
                 <a href="/ca" class="sidebar-link" hx-get="/ca" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                     <svg class="ucm-icon" width="14" height="14"><use href="#icon-grid"/></svg>
                     <span>All CAs</span>
@@ -230,13 +234,17 @@
                 </a>
             </div>
             
-            <a href="/certificates" class="sidebar-link {% if request.path.startswith('/certificates') or request.path.startswith('/import') %}active{% endif %}"
+            <a href="/certificates" class="sidebar-link sidebar-parent {% if request.path.startswith('/certificates') or request.path.startswith('/import') %}active{% endif %}"
                hx-get="/certificates" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
-               data-tooltip="Certificates">
+               data-tooltip="Certificates"
+               data-submenu="certificates-submenu">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-certificate"/></svg>
                 <span>Certificates</span>
+                <button class="submenu-toggle-btn" title="Toggle submenu" onclick="event.preventDefault(); event.stopPropagation();">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-down"/></svg>
+                </button>
             </a>
-            <div class="sidebar-submenu">
+            <div class="sidebar-submenu" id="certificates-submenu">
                 <a href="/certificates" class="sidebar-link" hx-get="/certificates" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                     <svg class="ucm-icon" width="14" height="14"><use href="#icon-grid"/></svg>
                     <span>All Certificates</span>
@@ -251,13 +259,17 @@
                 </a>
             </div>
             
-            <a href="/scep" class="sidebar-link {% if request.path.startswith('/scep') %}active{% endif %}"
+            <a href="/scep" class="sidebar-link sidebar-parent {% if request.path.startswith('/scep') %}active{% endif %}"
                hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
-               data-tooltip="SCEP">
+               data-tooltip="SCEP"
+               data-submenu="scep-submenu">
                 <svg class="ucm-icon" width="20" height="20"><use href="#icon-scep"/></svg>
                 <span>SCEP</span>
+                <button class="submenu-toggle-btn" title="Toggle submenu" onclick="event.preventDefault(); event.stopPropagation();">
+                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-chevron-down"/></svg>
+                </button>
             </a>
-            <div class="sidebar-submenu">
+            <div class="sidebar-submenu" id="scep-submenu">
                 <a href="/scep" class="sidebar-link" hx-get="/scep" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true">
                     <svg class="ucm-icon" width="14" height="14"><use href="#icon-settings"/></svg>
                     <span>Configuration</span>
@@ -653,6 +665,50 @@
                 localStorage.setItem('ucm-sidebar-collapsed', isCollapsed);
                 updateIcon(isCollapsed);
             });
+            
+            // ===========================
+            // SUBMENU TOGGLE HANDLERS
+            // ===========================
+            
+            // Initialize submenu states from localStorage
+            function initializeSubmenus() {
+                document.querySelectorAll('.sidebar-parent').forEach(function(parent) {
+                    const submenuId = parent.getAttribute('data-submenu');
+                    if (!submenuId) return;
+                    
+                    const submenu = document.getElementById(submenuId);
+                    const toggleBtn = parent.querySelector('.submenu-toggle-btn');
+                    if (!submenu || !toggleBtn) return;
+                    
+                    // Check localStorage for saved state
+                    const isCollapsed = localStorage.getItem('ucm-submenu-' + submenuId) === 'true';
+                    
+                    if (isCollapsed) {
+                        submenu.classList.add('collapsed');
+                        toggleBtn.querySelector('use').setAttribute('href', '#icon-chevron-right');
+                    } else {
+                        submenu.classList.remove('collapsed');
+                        toggleBtn.querySelector('use').setAttribute('href', '#icon-chevron-down');
+                    }
+                    
+                    // Add click handler
+                    toggleBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const isNowCollapsed = submenu.classList.toggle('collapsed');
+                        localStorage.setItem('ucm-submenu-' + submenuId, isNowCollapsed);
+                        
+                        if (isNowCollapsed) {
+                            toggleBtn.querySelector('use').setAttribute('href', '#icon-chevron-right');
+                        } else {
+                            toggleBtn.querySelector('use').setAttribute('href', '#icon-chevron-down');
+                        }
+                    });
+                });
+            }
+            
+            initializeSubmenus();
         });
     })();
     </script>

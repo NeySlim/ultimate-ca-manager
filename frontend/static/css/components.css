@@ -2486,9 +2486,13 @@ body.sidebar-collapsed main {
 
 /* Hide text in collapsed state */
 body.sidebar-collapsed .sidebar-link span,
-body.sidebar-collapsed .sidebar-submenu,
 body.sidebar-collapsed .sidebar-section-title,
 body.sidebar-collapsed .sidebar-toggle-btn {
+    display: none;
+}
+
+/* But keep submenus hidden when sidebar is collapsed (they can be toggled separately) */
+body.sidebar-collapsed .sidebar-submenu {
     display: none;
 }
 
@@ -2520,6 +2524,53 @@ body.sidebar-collapsed .sidebar-link:first-child .sidebar-toggle-btn .ucm-icon {
 
 /* Hide logo text when collapsed */
 body.sidebar-collapsed nav .navbar-brand-text {
+    display: none;
+}
+
+/* ===========================
+   SUBMENU TOGGLE BUTTONS
+   =========================== */
+
+.submenu-toggle-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.sidebar-parent {
+    position: relative;
+}
+
+.submenu-toggle-btn:hover {
+    opacity: 0.8;
+    background: var(--surface-hover);
+}
+
+.submenu-toggle-btn .ucm-icon {
+    width: 12px;
+    height: 12px;
+}
+
+/* Submenu collapsed state */
+.sidebar-submenu.collapsed {
+    display: none !important;
+}
+
+/* When sidebar is collapsed, hide submenu toggle buttons */
+body.sidebar-collapsed .submenu-toggle-btn {
     display: none;
 }
 
