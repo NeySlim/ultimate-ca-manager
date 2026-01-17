@@ -97,7 +97,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                     <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">Type</dt>
                     <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--text-primary);">
                         {% if ca.is_root %}
-                        <span class="badge" style="background: var(--info-bg); color: var(--info-color);">Root CA</span>
+                        <span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--info-color);">Root CA</span>
                         {% else %}
                         <span class="badge badge-success">Intermediate CA</span>
                         {% endif %}
@@ -186,7 +186,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                 {% if ca.cdp_enabled and ca.cdp_url %}
                 <div>
                     <dt style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);">CDP URL</dt>
-                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--primary-color); font-family: monospace; background: var(--info-bg); padding: 0.5rem; border-radius: 0.25rem;">
+                    <dd style="margin-top: 0.25rem; font-size: 0.875rem; color: var(--primary-color); font-family: monospace; background: rgba(59, 130, 246, 0.1); padding: 0.5rem; border-radius: 0.25rem;">
                         {{ ca.cdp_url.replace('{ca_refid}', ca.refid) }}
                     </dd>
                 </div>
