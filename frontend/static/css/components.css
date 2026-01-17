@@ -479,7 +479,8 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
     cursor: pointer;
     text-decoration: none;
     white-space: nowrap;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.15s ease-in-out;
+    position: relative;
 }
 
 /* Button Sizes */
@@ -504,8 +505,14 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
 
 .btn-primary:hover:not(:disabled) {
     background: var(--primary-dark, var(--primary-color));
-    opacity: 0.9;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    filter: brightness(1.1);
+}
+
+.btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary .ucm-icon {
@@ -603,6 +610,13 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
 .btn-outline-primary:hover:not(:disabled) {
     background: var(--primary-color);
     color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-outline-primary:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .btn-outline-primary:hover .ucm-icon {
@@ -619,6 +633,13 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
     background: var(--bg-secondary);
     color: var(--text-primary);
     border-color: var(--primary-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.btn-outline-secondary:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
 }
 
 .btn-outline-danger {
@@ -630,6 +651,13 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
 .btn-outline-danger:hover:not(:disabled) {
     background: var(--status-danger);
     color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-outline-danger:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
 }
 
 .btn-outline-danger:hover .ucm-icon {
@@ -645,6 +673,13 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
 .btn-outline-success:hover:not(:disabled) {
     background: var(--status-success);
     color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.btn-outline-success:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(34, 197, 94, 0.2);
 }
 
 .btn-outline-success:hover .ucm-icon {
@@ -659,11 +694,18 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
 
 .btn-outline-warning:hover:not(:disabled) {
     background: var(--status-warning);
-    color: white;
+    color: var(--text-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(234, 179, 8, 0.3);
+}
+
+.btn-outline-warning:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(234, 179, 8, 0.2);
 }
 
 .btn-outline-warning:hover .ucm-icon {
-    filter: brightness(0) invert(1);
+    filter: none;
 }
 
 /* Disabled State - All Buttons */
@@ -681,6 +723,8 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
     opacity: 0.5;
     cursor: not-allowed;
     pointer-events: none;
+    transform: none;
+    box-shadow: none;
 }
 
 /* Icon colors in buttons */
@@ -869,6 +913,11 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
 .card:has(.card-header),
 .card:has(.stat-card) {
     padding: 0;
+}
+
+/* Ensure stat cards have uniform height */
+.stat-card {
+    min-height: 88px; /* 56px icon + 2*16px padding */
 }
 
 /* ===========================
