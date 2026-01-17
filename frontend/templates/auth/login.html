@@ -269,9 +269,9 @@
         
         /* Session expired alert */
         .alert-warning {
-            background: var(--bg-warning, #fef3c7);
-            border: 1px solid var(--warning-color, #f59e0b);
-            border-left: 4px solid var(--warning-color, #f59e0b);
+            background: var(--warning-bg);
+            border: 1px solid var(--warning-color);
+            border-left: 4px solid var(--warning-color);
             border-radius: 8px;
             padding: 1rem;
             margin-bottom: 1.5rem;
@@ -283,7 +283,7 @@
         .alert-icon {
             width: 20px;
             height: 20px;
-            color: var(--warning-color, #f59e0b);
+            color: var(--warning-color);
             flex-shrink: 0;
             margin-top: 2px;
         }
@@ -294,14 +294,15 @@
         
         .alert-title {
             font-weight: 600;
-            color: var(--text-primary);
+            color: var(--warning-text);
             font-size: 0.875rem;
             margin-bottom: 0.25rem;
         }
         
         .alert-message {
             font-size: 0.8125rem;
-            color: var(--text-secondary);
+            color: var(--warning-text);
+            opacity: 0.9;
         }
         
         /* Form styles */
