@@ -50,7 +50,7 @@
             </button>
         </div>
         <div id="viewTemplateContent" style="padding: 1.5rem; overflow-y: auto; max-height: calc(90vh - 100px);">
-            <div class="spinner" style="margin: 2rem auto;"></div>
+            <svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>
         </div>
     </div>
 </div>
@@ -83,7 +83,7 @@
 <script>
 function viewTemplateDetail(id) {
     openModal('viewTemplateModal'); // View-only, overlay closes automatically
-    document.getElementById('viewTemplateContent').innerHTML = '<div class="spinner" style="margin: 2rem auto;"></div>';
+    document.getElementById('viewTemplateContent').innerHTML = '<svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>';
     
     fetch('/api/v1/templates/' + id)
         .then(r => r.json())
