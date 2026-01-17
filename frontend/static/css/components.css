@@ -2569,9 +2569,18 @@ body.sidebar-collapsed nav .navbar-brand-text {
     display: none !important;
 }
 
-/* When sidebar is collapsed, hide submenu toggle buttons */
+/* When sidebar is collapsed, keep submenu toggle buttons visible but smaller */
 body.sidebar-collapsed .submenu-toggle-btn {
-    display: none;
+    display: flex !important;
+    right: 4px;
+    width: 14px;
+    height: 14px;
+    opacity: 0.3;
+}
+
+body.sidebar-collapsed .submenu-toggle-btn .ucm-icon {
+    width: 10px;
+    height: 10px;
 }
 
 /* Tooltip for collapsed sidebar links */
