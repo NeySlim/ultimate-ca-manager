@@ -2401,20 +2401,9 @@ def import_ca_page():
 def import_config_form():
     """Get import configuration form with support for API key or username/password"""
     try:
-        token = session.get('access_token')
-        import sys
-        sys.stderr.write(f"DEBUG import_config_form: Token={token[:30] if token else 'None'}...\n")
-        sys.stderr.flush()
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/import/config")
         
-        headers = {'Authorization': f'Bearer {token}'}
-        
-        response = requests.get(
-            f"{request.url_root}api/v1/import/config",
-            headers=headers,
-            verify=False
-        )
-        
-        config = response.json() if response.status_code == 200 else {}
+        config = response.json() if response and response.status_code == 200 else {}
         auth_method = config.get('auth_method', 'web')
         
         html = f'''
@@ -2612,7 +2601,7 @@ def import_history():
     try:
         response = api_call_with_retry('GET', f"{request.url_root}api/v1/import/history")
         
-        if response.status_code != 200:
+        if response is None or response.status_code != 200:
             return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No history</div>'
         
         data = response.json()
@@ -2991,7 +2980,7 @@ def config_users():
     try:
         response = api_call_with_retry('GET', f"{request.url_root}api/v1/auth/users")
         
-        if response.status_code != 200:
+        if response is None or response.status_code != 200:
             return '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No users</div>'
         
         users = response.json()
