@@ -832,6 +832,67 @@ textarea.form-control {
     color: var(--status-info);
 }
 
+/* Info Boxes - Unified style for informational content */
+.info-box {
+    background: var(--surface-elevated);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--info-color);
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-box-title {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 0.75rem 0;
+}
+
+.info-box-title .ucm-icon {
+    color: var(--info-color);
+    flex-shrink: 0;
+}
+
+.info-box-content {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.info-box-content p {
+    margin: 0 0 0.75rem 0;
+}
+
+.info-box-content p:last-child {
+    margin-bottom: 0;
+}
+
+.info-box-content strong {
+    color: var(--text-primary);
+}
+
+/* Warning variant */
+.info-box.warning {
+    border-left-color: var(--warning-color);
+}
+
+.info-box.warning .info-box-title .ucm-icon {
+    color: var(--warning-color);
+}
+
+/* Success variant */
+.info-box.success {
+    border-left-color: var(--success-color);
+}
+
+.info-box.success .info-box-title .ucm-icon {
+    color: var(--success-color);
+}
+
 /* ===========================
    UTILITIES
    =========================== */

@@ -17,16 +17,16 @@
     </div>
     
     <!-- Info Banner -->
-    <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid var(--info-border, var(--border-color)); border-radius: 0.5rem; padding: 1rem;">
-        <div style="display: flex; align-items: flex-start;">
-            <svg class="ucm-icon" width="20" height="20" style="color: var(--info-color); margin-top: 0.25rem; margin-right: 0.75rem;"><use href="#icon-info"/></svg>
-            <div>
-                <h3 style="font-weight: 600; color: var(--text-primary);">Certificate Revocation Lists (CRL)</h3>
-                <p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                    CRLs contain lists of revoked certificates. They are automatically generated when certificates are revoked
-                    and can be distributed via public CDP endpoints for certificate validation.
-                </p>
-            </div>
+    <div class="info-box">
+        <div class="info-box-title">
+            <svg class="ucm-icon" width="20" height="20"><use href="#icon-info"/></svg>
+            <span>Certificate Revocation Lists (CRL)</span>
+        </div>
+        <div class="info-box-content">
+            <p>
+                CRLs contain lists of revoked certificates. They are automatically generated when certificates are revoked
+                and can be distributed via public CDP endpoints for certificate validation.
+            </p>
         </div>
     </div>
     
