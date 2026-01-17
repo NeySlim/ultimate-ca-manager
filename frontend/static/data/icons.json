@@ -43,22 +43,22 @@
         },
         {
           "d": "M14 2v6h6",
-          "gradient": "primary",
+          "gradient": "secondary",
           "fill": "none",
           "stroke-width": "1.5"
         },
         {
-          "d": "M12 13.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z",
-          "gradient": "accent",
-          "fill": "none",
-          "stroke-width": "1.5"
-        },
-        {
-          "d": "M9 17h6",
-          "gradient": "accent",
+          "d": "M8 13h8M8 17h3",
+          "gradient": "secondary",
           "fill": "none",
           "stroke-width": "1.5",
           "stroke-linecap": "round"
+        },
+        {
+          "d": "M16 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+          "gradient": "neutral",
+          "fill": "none",
+          "stroke-width": "1.5"
         }
       ]
     },
@@ -652,6 +652,12 @@
           "stroke-width": "1.5",
           "stroke-linecap": "round",
           "stroke-linejoin": "round"
+        },
+        {
+          "d": "M7 15a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+          "gradient": "neutral",
+          "fill": "none",
+          "stroke-width": "1.8"
         }
       ]
     },
@@ -811,22 +817,22 @@
         },
         {
           "d": "M8 12h8M8 16h4",
-          "gradient": "primary",
+          "gradient": "secondary",
           "fill": "none",
           "stroke-width": "1.5",
           "stroke-linecap": "round"
         },
         {
           "d": "M16 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z",
-          "gradient": "accent",
+          "gradient": "neutral",
           "fill": "none",
-          "stroke-width": "1.5"
+          "stroke-width": "1.8"
         },
         {
           "d": "M18 13.5L14 17.5",
-          "gradient": "accent",
+          "gradient": "danger",
           "fill": "none",
-          "stroke-width": "2",
+          "stroke-width": "2.2",
           "stroke-linecap": "round"
         }
       ]
@@ -914,9 +920,9 @@
         },
         {
           "d": "M9 12l2 2 4-4",
-          "gradient": "accent",
+          "gradient": "success",
           "fill": "none",
-          "stroke-width": "2",
+          "stroke-width": "2.2",
           "stroke-linecap": "round",
           "stroke-linejoin": "round"
         }
@@ -1365,10 +1371,16 @@
       "stroke": true,
       "paths": [
         {
-          "d": "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z",
+          "d": "M3 3h7v7H3zM14 14h7v7h-7z",
           "gradient": "primary",
           "fill": "none",
-          "stroke-width": "1.5"
+          "stroke-width": "2"
+        },
+        {
+          "d": "M14 3h7v7h-7zM3 14h7v7H3z",
+          "gradient": "neutral",
+          "fill": "none",
+          "stroke-width": "2"
         }
       ]
     },
@@ -1380,14 +1392,14 @@
           "d": "M9 5h12M9 12h12M9 19h12",
           "gradient": "primary",
           "fill": "none",
-          "stroke-width": "1.5",
+          "stroke-width": "1.8",
           "stroke-linecap": "round"
         },
         {
           "d": "M3 5.5l1.5 1.5L7 4.5M3 12.5l1.5 1.5L7 11.5M3 19.5l1.5 1.5L7 18.5",
-          "gradient": "accent",
+          "gradient": "success",
           "fill": "none",
-          "stroke-width": "1.5",
+          "stroke-width": "2",
           "stroke-linecap": "round",
           "stroke-linejoin": "round"
         }
@@ -1405,15 +1417,15 @@
         },
         {
           "d": "M14 2v6h6",
-          "gradient": "primary",
+          "gradient": "secondary",
           "fill": "none",
           "stroke-width": "1.5"
         },
         {
           "d": "M9 15l6-6m0 6l-6-6",
-          "gradient": "accent",
+          "gradient": "danger",
           "fill": "none",
-          "stroke-width": "2",
+          "stroke-width": "2.2",
           "stroke-linecap": "round"
         }
       ]
@@ -1425,9 +1437,17 @@
         "#0066cc",
         "#004d99"
       ],
-      "accent": [
-        "#0066cc",
-        "#3399ff"
+      "secondary": [
+        "#3399ff",
+        "#0066cc"
+      ],
+      "neutral": [
+        "#64748b",
+        "#475569"
+      ],
+      "danger": [
+        "#dc3545",
+        "#c82333"
       ],
       "success": [
         "#28a745",
@@ -1436,18 +1456,6 @@
       "warning": [
         "#ffc107",
         "#e0a800"
-      ],
-      "danger": [
-        "#dc3545",
-        "#c82333"
-      ],
-      "info": [
-        "#17a2b8",
-        "#138496"
-      ],
-      "trash": [
-        "#ef4444",
-        "#dc2626"
       ]
     },
     "sentinel-dark": {
@@ -1455,9 +1463,17 @@
         "#3b82f6",
         "#60a5fa"
       ],
-      "accent": [
+      "secondary": [
         "#60a5fa",
         "#93c5fd"
+      ],
+      "neutral": [
+        "#94a3b8",
+        "#64748b"
+      ],
+      "danger": [
+        "#ef4444",
+        "#f87171"
       ],
       "success": [
         "#10b981",
@@ -1466,18 +1482,6 @@
       "warning": [
         "#f59e0b",
         "#fbbf24"
-      ],
-      "danger": [
-        "#ef4444",
-        "#f87171"
-      ],
-      "info": [
-        "#3b82f6",
-        "#60a5fa"
-      ],
-      "trash": [
-        "#ef4444",
-        "#dc2626"
       ]
     },
     "amber-light": {
@@ -1485,9 +1489,17 @@
         "#d77610",
         "#ff8c1a"
       ],
-      "accent": [
+      "secondary": [
         "#ff8c1a",
         "#ffa347"
+      ],
+      "neutral": [
+        "#64748b",
+        "#475569"
+      ],
+      "danger": [
+        "#d9534f",
+        "#c9302c"
       ],
       "success": [
         "#28a745",
@@ -1496,18 +1508,6 @@
       "warning": [
         "#f0ad4e",
         "#ec971f"
-      ],
-      "danger": [
-        "#d9534f",
-        "#c9302c"
-      ],
-      "info": [
-        "#5bc0de",
-        "#46b8da"
-      ],
-      "trash": [
-        "#ef4444",
-        "#dc2626"
       ]
     },
     "amber-dark": {
@@ -1515,9 +1515,17 @@
         "#ff9f43",
         "#ffb366"
       ],
-      "accent": [
+      "secondary": [
         "#ffb366",
         "#ffc894"
+      ],
+      "neutral": [
+        "#94a3b8",
+        "#64748b"
+      ],
+      "danger": [
+        "#e74c3c",
+        "#ec7063"
       ],
       "success": [
         "#2ecc71",
@@ -1526,18 +1534,6 @@
       "warning": [
         "#f39c12",
         "#f5b041"
-      ],
-      "danger": [
-        "#e74c3c",
-        "#ec7063"
-      ],
-      "info": [
-        "#3498db",
-        "#5dade2"
-      ],
-      "trash": [
-        "#ef4444",
-        "#dc2626"
       ]
     },
     "nebula-light": {
@@ -1545,9 +1541,17 @@
         "#0078cf",
         "#3399ff"
       ],
-      "accent": [
+      "secondary": [
         "#3399ff",
         "#66b3ff"
+      ],
+      "neutral": [
+        "#64748b",
+        "#475569"
+      ],
+      "danger": [
+        "#dc3545",
+        "#c82333"
       ],
       "success": [
         "#28a745",
@@ -1556,18 +1560,6 @@
       "warning": [
         "#ffc107",
         "#e0a800"
-      ],
-      "danger": [
-        "#dc3545",
-        "#c82333"
-      ],
-      "info": [
-        "#17a2b8",
-        "#138496"
-      ],
-      "trash": [
-        "#ef4444",
-        "#dc2626"
       ]
     },
     "nebula-dark": {
@@ -1575,9 +1567,17 @@
         "#3b9eea",
         "#5aadee"
       ],
-      "accent": [
+      "secondary": [
         "#5aadee",
         "#7dc0f2"
+      ],
+      "neutral": [
+        "#94a3b8",
+        "#64748b"
+      ],
+      "danger": [
+        "#ea4335",
+        "#ed5f52"
       ],
       "success": [
         "#34a853",
@@ -1586,18 +1586,6 @@
       "warning": [
         "#fbbc04",
         "#fcc635"
-      ],
-      "danger": [
-        "#ea4335",
-        "#ed5f52"
-      ],
-      "info": [
-        "#4285f4",
-        "#5c97f5"
-      ],
-      "trash": [
-        "#ef4444",
-        "#dc2626"
       ]
     },
     "blossom-light": {
@@ -1605,9 +1593,17 @@
         "#8b6f9e",
         "#9d7fb0"
       ],
-      "accent": [
+      "secondary": [
         "#9d7fb0",
         "#b095c4"
+      ],
+      "neutral": [
+        "#64748b",
+        "#475569"
+      ],
+      "danger": [
+        "#d9534f",
+        "#c9302c"
       ],
       "success": [
         "#5cb85c",
@@ -1616,18 +1612,6 @@
       "warning": [
         "#f0ad4e",
         "#ec971f"
-      ],
-      "danger": [
-        "#d9534f",
-        "#c9302c"
-      ],
-      "info": [
-        "#5bc0de",
-        "#46b8da"
-      ],
-      "trash": [
-        "#ef4444",
-        "#dc2626"
       ]
     },
     "blossom-dark": {
@@ -1635,9 +1619,17 @@
         "#d88c92",
         "#e39b6f"
       ],
-      "accent": [
+      "secondary": [
         "#e39b6f",
         "#f0b088"
+      ],
+      "neutral": [
+        "#94a3b8",
+        "#64748b"
+      ],
+      "danger": [
+        "#e88b8b",
+        "#eda3a3"
       ],
       "success": [
         "#a3d5a3",
@@ -1646,18 +1638,6 @@
       "warning": [
         "#f0c987",
         "#f5d8a5"
-      ],
-      "danger": [
-        "#e88b8b",
-        "#eda3a3"
-      ],
-      "info": [
-        "#8bb8e8",
-        "#a3c7ed"
-      ],
-      "trash": [
-        "#ef4444",
-        "#dc2626"
       ]
     }
   }
