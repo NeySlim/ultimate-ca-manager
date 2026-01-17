@@ -805,18 +805,18 @@ async function loadCertificates() {
                         </td>
                         <td>
                             <div style="display: flex; gap: 0.5rem;">
-                                <button onclick="downloadCertificate(${cert.id})" class="btn-outline-secondary" style="padding: 0.5rem;" title="Download">
+                                <button onclick="downloadCertificate(${cert.id})" class="btn-outline-secondary btn-sm" title="Download">
                                     <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
                                 </button>
                                 ${cert.enabled 
-                                    ? `<button onclick="revokeCertificate(${cert.id})" class="btn-outline-warning" style="padding: 0.5rem;" title="Revoke">
+                                    ? `<button onclick="revokeCertificate(${cert.id})" class="btn-outline-warning btn-sm" title="Revoke">
                                         <svg class="ucm-icon" width="16" height="16"><use href="#icon-times"/></svg>
                                     </button>`
-                                    : `<button onclick="enableCertificate(${cert.id})" class="btn-outline-success" style="padding: 0.5rem;" title="Enable">
+                                    : `<button onclick="enableCertificate(${cert.id})" class="btn-outline-success btn-sm" title="Enable">
                                         <svg class="ucm-icon" width="16" height="16"><use href="#icon-check"/></svg>
                                     </button>`
                                 }
-                                <button onclick="deleteCertificate(${cert.id})" class="btn-outline-danger" style="padding: 0.5rem;" title="Delete">
+                                <button onclick="deleteCertificate(${cert.id})" class="btn-outline-danger btn-sm" title="Delete">
                                     <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
                                 </button>
                             </div>
