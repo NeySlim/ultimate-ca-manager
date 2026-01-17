@@ -1341,6 +1341,64 @@
           "stroke-linecap": "round"
         }
       ]
+    },
+    "grid": {
+      "viewBox": "0 0 24 24",
+      "stroke": true,
+      "paths": [
+        {
+          "d": "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z",
+          "gradient": "primary",
+          "fill": "none",
+          "stroke-width": "1.5"
+        }
+      ]
+    },
+    "list-check": {
+      "viewBox": "0 0 24 24",
+      "stroke": true,
+      "paths": [
+        {
+          "d": "M9 5h12M9 12h12M9 19h12",
+          "gradient": "primary",
+          "fill": "none",
+          "stroke-width": "1.5",
+          "stroke-linecap": "round"
+        },
+        {
+          "d": "M3 5.5l1.5 1.5L7 4.5M3 12.5l1.5 1.5L7 11.5M3 19.5l1.5 1.5L7 18.5",
+          "gradient": "accent",
+          "fill": "none",
+          "stroke-width": "1.5",
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round"
+        }
+      ]
+    },
+    "certificate-revoke": {
+      "viewBox": "0 0 24 24",
+      "stroke": true,
+      "paths": [
+        {
+          "d": "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z",
+          "gradient": "primary",
+          "fill": "none",
+          "stroke-width": "1.5"
+        },
+        {
+          "d": "M14 2v6h6",
+          "gradient": "primary",
+          "fill": "none",
+          "stroke-width": "1.5"
+        },
+        {
+          "d": "M9 15l6-6m0 6l-6-6",
+          "gradient": "accent",
+          "fill": "none",
+          "stroke-width": "2",
+          "stroke-linecap": "round"
+        }
+      ]
     }
   },
   "gradients": {
