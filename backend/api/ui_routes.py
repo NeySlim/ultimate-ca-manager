@@ -114,6 +114,30 @@ def login_required(f):
     return decorated_function
 
 
+# Helper to check if user is admin
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # First check if logged in
+        if 'user_id' not in session:
+            if request.headers.get('HX-Request'):
+                return jsonify({'error': 'Session expired'}), 401
+            return redirect(url_for('ui.login', expired='1'))
+        
+        # Check if admin role
+        if session.get('role') != 'admin':
+            if request.headers.get('HX-Request'):
+                return jsonify({'error': 'Admin access required'}), 403
+            flash('Accès administrateur requis', 'error')
+            return redirect(url_for('ui.dashboard'))
+        
+        # Update last activity
+        session['last_activity'] = time.time()
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 # Auth routes
 @ui_bp.route('/')
 def index():
