@@ -317,6 +317,23 @@
               hx-on::after-request="if(event.detail.successful){closeCSRModal();htmx.trigger('body','refreshCerts');if(typeof showToast==='function')showToast('CSR generated successfully','success');}">
             <div style="padding: 1.5rem;">
                 
+                <!-- Template Selection (Optional) -->
+                <div style="margin-bottom: 1.5rem; padding: 1rem; background: var(--info-bg, rgba(59, 130, 246, 0.1)); border-left: 4px solid var(--info-color, #3b82f6); border-radius: 0.375rem;">
+                    <div style="display: flex; align-items: start; gap: 0.5rem;">
+                        <svg class="ucm-icon" width="20" height="20" style="margin-top: 0.125rem; flex-shrink: 0;"><use href="#icon-info-circle"/></svg>
+                        <div style="flex: 1;">
+                            <h3 style="font-weight: 600; color: var(--text-primary); margin: 0 0 0.5rem 0; font-size: 0.875rem;">Use a Template (Optional)</h3>
+                            <select id="csr-template-select" onchange="applyCSRTemplate(this.value)"
+                                    class="modal-form-input" style="margin-bottom: 0.5rem;">
+                                <option value="">-- No Template (Manual) --</option>
+                            </select>
+                            <p style="margin: 0; font-size: 0.75rem; color: var(--text-muted);">
+                                Select a template to auto-fill fields, or leave empty for manual configuration
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Basic Information -->
                 <div>
                     <h3 class="modal-form-heading">Basic Information</h3>
@@ -325,7 +342,7 @@
                         <label class="modal-form-label">
                             Description <span style="color: var(--danger-color);">*</span>
                         </label>
-                        <input type="text" name="descr" required placeholder="My CSR for external CA"
+                        <input type="text" id="csr-descr" name="descr" required placeholder="My CSR for external CA"
                                class="modal-form-input">
                         <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
                             Internal identifier for this CSR
@@ -342,7 +359,7 @@
                             <label class="modal-form-label">
                                 Key Type <span style="color: var(--danger-color);">*</span>
                             </label>
-                            <select name="key_type" required
+                            <select id="csr-key-type" name="key_type" required
                                     class="modal-form-input">
                                 <option value="2048">RSA 2048</option>
                                 <option value="4096" selected>RSA 4096</option>
@@ -354,7 +371,7 @@
                             <label class="modal-form-label">
                                 Digest Algorithm <span style="color: var(--danger-color);">*</span>
                             </label>
-                            <select name="digest"
+                            <select id="csr-digest" name="digest"
                                     class="modal-form-input">
                                 <option value="sha256" selected>SHA-256</option>
                                 <option value="sha384">SHA-384</option>
@@ -372,7 +389,7 @@
                         <label class="modal-form-label">
                             Common Name (CN) <span style="color: var(--danger-color);">*</span>
                         </label>
-                        <input type="text" name="common_name" required placeholder="example.com"
+                        <input type="text" id="csr-cn" name="common_name" required placeholder="example.com"
                                class="modal-form-input">
                         <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
                             Fully Qualified Domain Name (FQDN) or email address
@@ -384,35 +401,35 @@
                             <label class="modal-form-label">
                                 Organization (O)
                             </label>
-                            <input type="text" name="organization" placeholder="My Company"
+                            <input type="text" id="csr-org" name="organization" placeholder="My Company"
                                    class="modal-form-input">
                         </div>
                         <div>
                             <label class="modal-form-label">
                                 Organizational Unit (OU)
                             </label>
-                            <input type="text" name="organizational_unit" placeholder="IT Department"
+                            <input type="text" id="csr-ou" name="organizational_unit" placeholder="IT Department"
                                    class="modal-form-input">
                         </div>
                         <div>
                             <label class="modal-form-label">
                                 Country Code (C)
                             </label>
-                            <input type="text" name="country" placeholder="FR" maxlength="2"
+                            <input type="text" id="csr-country" name="country" placeholder="FR" maxlength="2"
                                    class="modal-form-input">
                         </div>
                         <div>
                             <label class="modal-form-label">
                                 State or Province (ST)
                             </label>
-                            <input type="text" name="state" placeholder="Occitanie"
+                            <input type="text" id="csr-state" name="state" placeholder="Occitanie"
                                    class="modal-form-input">
                         </div>
                         <div>
                             <label class="modal-form-label">
                                 Locality / City (L)
                             </label>
-                            <input type="text" name="locality" placeholder="Montpellier"
+                            <input type="text" id="csr-locality" name="locality" placeholder="Montpellier"
                                    class="modal-form-input">
                         </div>
                     </div>
@@ -426,7 +443,7 @@
                         <label class="modal-form-label">
                             Alternative Names
                         </label>
-                        <textarea name="altnames" rows="3" placeholder="DNS:www.example.com&#10;DNS:*.example.com&#10;IP:192.168.1.1&#10;EMAIL:admin@example.com"
+                        <textarea id="csr-san" name="altnames" rows="3" placeholder="DNS:www.example.com&#10;DNS:*.example.com&#10;IP:192.168.1.1&#10;EMAIL:admin@example.com"
                                   class="modal-form-input" style="resize: vertical;"></textarea>
                         <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
                             One per line. Format: DNS:name, IP:address, EMAIL:address
@@ -449,6 +466,90 @@
         </form>
     </div>
 </div>
+
+<script>
+// Load templates for CSR modal
+function loadCSRTemplates() {
+    fetch('/api/v1/templates')
+        .then(r => r.json())
+        .then(templates => {
+            const select = document.getElementById('csr-template-select');
+            if (!select) return;
+            
+            // Keep the "No Template" option
+            select.innerHTML = '<option value="">-- No Template (Manual) --</option>';
+            
+            if (templates && templates.length > 0) {
+                templates.forEach(t => {
+                    const option = document.createElement('option');
+                    option.value = t.id;
+                    option.textContent = `${t.name} (${t.type})`;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(err => console.error('Failed to load templates:', err));
+}
+
+// Apply template to CSR form
+function applyCSRTemplate(templateId) {
+    if (!templateId) {
+        // Reset form when "No Template" selected
+        document.getElementById('csr-key-type').value = '4096';
+        document.getElementById('csr-digest').value = 'sha256';
+        return;
+    }
+    
+    fetch('/api/v1/templates/' + templateId)
+        .then(r => r.json())
+        .then(template => {
+            // Apply key configuration
+            const keyType = template.key_type || '4096';
+            document.getElementById('csr-key-type').value = keyType;
+            
+            const digest = template.digest || 'sha256';
+            document.getElementById('csr-digest').value = digest;
+            
+            // Apply DN defaults (but don't overwrite if user already entered something)
+            const dn = template.dn_template || {};
+            if (dn.O && !document.getElementById('csr-org').value) {
+                document.getElementById('csr-org').value = dn.O.replace('{username}', '').replace('{email}', '').trim();
+            }
+            if (dn.OU && !document.getElementById('csr-ou').value) {
+                document.getElementById('csr-ou').value = dn.OU.replace('{username}', '').replace('{email}', '').trim();
+            }
+            if (dn.C && !document.getElementById('csr-country').value) {
+                document.getElementById('csr-country').value = dn.C;
+            }
+            if (dn.ST && !document.getElementById('csr-state').value) {
+                document.getElementById('csr-state').value = dn.ST;
+            }
+            if (dn.L && !document.getElementById('csr-locality').value) {
+                document.getElementById('csr-locality').value = dn.L;
+            }
+            
+            // Show toast
+            if (typeof showToast === 'function') {
+                showToast(`Template "${template.name}" applied`, 'success');
+            }
+        })
+        .catch(err => {
+            console.error('Failed to load template:', err);
+            if (typeof showToast === 'function') {
+                showToast('Failed to load template', 'error');
+            }
+        });
+}
+
+// Load templates when CSR modal opens
+document.addEventListener('DOMContentLoaded', function() {
+    const origOpenCSRModal = window.openCSRModal;
+    window.openCSRModal = function() {
+        if (origOpenCSRModal) origOpenCSRModal();
+        loadCSRTemplates();
+    };
+});
+</script>
 
 <script>
 // ============================================================================
