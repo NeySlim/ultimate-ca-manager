@@ -2440,6 +2440,18 @@ button.htmx-request .ucm-icon use[href="#icon-refresh"] {
    SIDEBAR COLLAPSE
    =========================== */
 
+/* Make sidebar-nav a flex container to push bottom section down */
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+
+/* Push My Account section to bottom */
+.sidebar-bottom-section {
+    margin-top: auto;
+}
+
 /* Toggle button */
 /* Ensure dashboard link (first link) is positioned relative for toggle */
 .sidebar-nav > .sidebar-link:first-child {
