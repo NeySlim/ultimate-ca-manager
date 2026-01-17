@@ -16,50 +16,50 @@
 
     <!-- OCSP Overview -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
-        <div class="card" style="padding: 0;">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div>
-                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin: 0 0 0.5rem 0;">OCSP Enabled CAs</p>
-                    <p style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary); margin: 0;" 
-                       hx-get="/api/ui/ocsp/stats" 
-                       hx-trigger="load" 
-                       hx-swap="innerHTML"
-                       hx-select=".ocsp-enabled-count">
-                        <svg class="ucm-icon icon-spin" width="20" height="20"><use href="#icon-spinner"/></svg>
-                    </p>
+        <div class="card">
+            <div class="stat-card">
+                <div class="stat-card-icon">
+                    <svg class="ucm-icon" width="28" height="28"><use href="#icon-shield-check"/></svg>
                 </div>
-                <div style="padding: 0.75rem; background: var(--primary-bg); border-radius: 50%;">
-                    <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-check-circle"/></svg>
+                <div class="stat-card-content">
+                    <div class="stat-card-value"
+                         hx-get="/api/ui/ocsp/stats" 
+                         hx-trigger="load" 
+                         hx-swap="innerHTML"
+                         hx-select=".ocsp-enabled-count">
+                        <svg class="ucm-icon icon-spin" width="20" height="20"><use href="#icon-spinner"/></svg>
+                    </div>
+                    <div class="stat-card-label">OCSP Enabled CAs</div>
                 </div>
             </div>
         </div>
 
-        <div class="card" style="padding: 0;">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div>
-                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin: 0 0 0.5rem 0;">Cached Responses</p>
-                    <p style="font-size: 1.5rem; font-weight: bold; color: var(--text-primary); margin: 0;"
-                       hx-get="/api/ui/ocsp/stats"
-                       hx-trigger="load"
-                       hx-swap="innerHTML"
-                       hx-select=".cached-responses-count">
-                        <svg class="ucm-icon icon-spin" width="20" height="20"><use href="#icon-spinner"/></svg>
-                    </p>
+        <div class="card">
+            <div class="stat-card">
+                <div class="stat-card-icon success">
+                    <svg class="ucm-icon" width="28" height="28"><use href="#icon-database"/></svg>
                 </div>
-                <div style="padding: 0.75rem; background: var(--success-bg); border-radius: 50%;">
-                    <svg class="ucm-icon" width="20" height="20" style="color: var(--success-color);"><use href="#icon-database"/></svg>
+                <div class="stat-card-content">
+                    <div class="stat-card-value"
+                         hx-get="/api/ui/ocsp/stats"
+                         hx-trigger="load"
+                         hx-swap="innerHTML"
+                         hx-select=".cached-responses-count">
+                        <svg class="ucm-icon icon-spin" width="20" height="20"><use href="#icon-spinner"/></svg>
+                    </div>
+                    <div class="stat-card-label">Cached Responses</div>
                 </div>
             </div>
         </div>
 
-        <div class="card" style="padding: 0;">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div>
-                    <p style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); margin: 0 0 0.5rem 0;">Responder Endpoint</p>
-                    <p style="font-size: 0.875rem; font-family: monospace; color: var(--text-primary); margin: 0;">/ocsp</p>
+        <div class="card">
+            <div class="stat-card">
+                <div class="stat-card-icon">
+                    <svg class="ucm-icon" width="28" height="28"><use href="#icon-server"/></svg>
                 </div>
-                <div style="padding: 0.75rem; background: var(--primary-bg); border-radius: 50%;">
-                    <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-server"/></svg>
+                <div class="stat-card-content">
+                    <div class="stat-card-value" style="font-size: 1.125rem; font-family: monospace;">/ocsp</div>
+                    <div class="stat-card-label">Responder Endpoint</div>
                 </div>
             </div>
         </div>
