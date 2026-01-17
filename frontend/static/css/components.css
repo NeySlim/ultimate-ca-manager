@@ -911,21 +911,29 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
     padding: 1.5rem;
 }
 
-/* Stat card wrapper - explicit class for better browser support */
-.stat-card-wrapper {
-    padding: 0 !important;
-    margin-bottom: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
+/* Stats Grid - Global container for stat cards */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    align-items: stretch; /* Force equal height */
+    margin-bottom: 2rem;
 }
 
-/* Legacy :has() support (for modern browsers) */
-.card:has(.card-header),
-.card:has(.stat-card) {
+/* Cards in stats grid need flex layout */
+.stats-grid > .card {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    margin-bottom: 0;
+    height: 100%; /* Fill grid cell */
+}
+
+/* Legacy :has() support for other card types */
+.card:has(.card-header) {
     padding: 0;
     display: flex;
     flex-direction: column;
-    margin-bottom: 0;
 }
 
 /* ===========================
