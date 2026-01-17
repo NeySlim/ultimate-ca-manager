@@ -911,13 +911,21 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
     padding: 1.5rem;
 }
 
-/* Remove default card padding when using card-header or stat-card */
+/* Stat card wrapper - explicit class for better browser support */
+.stat-card-wrapper {
+    padding: 0 !important;
+    margin-bottom: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* Legacy :has() support (for modern browsers) */
 .card:has(.card-header),
 .card:has(.stat-card) {
     padding: 0;
     display: flex;
     flex-direction: column;
-    margin-bottom: 0; /* Override default margin in grid layouts */
+    margin-bottom: 0;
 }
 
 /* ===========================
