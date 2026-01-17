@@ -1140,41 +1140,38 @@ async function validateBackup() {
         
         // Create dashboard-style stat widgets
         const statsDiv = document.getElementById('backup-stats');
+        
         const stats = [
             { 
-                icon: 'fa-lock', 
-                color: '#3b82f6', 
+                icon: 'shield-check', 
+                colorVar: 'info-color', 
                 value: data.contents.cas, 
-                label: 'Certificate Authorities',
-                gradient: 'rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.15)'
+                label: 'Certificate Authorities'
             },
             { 
-                icon: 'fa-certificate', 
-                color: '#10b981', 
+                icon: 'certificate', 
+                colorVar: 'success-color', 
                 value: data.contents.certificates, 
-                label: 'Certificates',
-                gradient: 'rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.15)'
+                label: 'Certificates'
             },
             { 
-                icon: 'fa-users', 
-                color: '#8b5cf6', 
+                icon: 'users', 
+                colorVar: 'primary-color', 
                 value: data.contents.users, 
-                label: 'Users',
-                gradient: 'rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.15)'
+                label: 'Users'
             },
             { 
-                icon: 'fa-key', 
-                color: '#f59e0b', 
+                icon: 'key', 
+                colorVar: 'warning-color', 
                 value: data.contents.acme_accounts, 
-                label: 'ACME Accounts',
-                gradient: 'rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.15)'
+                label: 'ACME Accounts'
             }
         ];
         
         statsDiv.innerHTML = stats.map(stat => `
             <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.375rem; padding: 0.5rem; display: flex; gap: 0.5rem; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                <div style="width: 32px; height: 32px; border-radius: 5px; background: linear-gradient(135deg, ${stat.gradient}); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <i class="fas ${stat.icon}" style="background: linear-gradient(135deg, ${stat.color} 0%, ${stat.color} 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 16px;"></i>
+                <div style="width: 32px; height: 32px; border-radius: 5px; background: var(--surface-elevated); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <svg class="ucm-icon" width="16" height="16" style="color: var(--${stat.colorVar});"><use href="#icon-${stat.icon}"/></svg>
                 </div>
                 <div style="flex: 1; min-width: 0;">
                     <div style="font-size: 18px; font-weight: 600; color: var(--text-primary); line-height: 1;">
