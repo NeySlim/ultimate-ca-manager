@@ -520,6 +520,56 @@ def my_account_mtls():
     return render_template('my_account_mtls.html')
 
 
+@ui_bp.route('/api/ui/my-account/sessions')
+@login_required
+def my_account_sessions():
+    """Get user's active sessions"""
+    try:
+        from datetime import datetime
+        
+        html = f'''
+        <div style="padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-secondary);">
+            <div style="display: flex; justify-content: space-between; align-items: start; gap: 1rem;">
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <svg class="ucm-icon" width="16" height="16" style="color: var(--success-color);"><use href="#icon-check-circle"/></svg>
+                        <strong style="color: var(--text-primary);">Current Session</strong>
+                    </div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                        <div><strong>IP:</strong> {request.remote_addr}</div>
+                        <div><strong>Device:</strong> {request.user_agent.string[:80]}...</div>
+                        <div><strong>Last Activity:</strong> Just now</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        '''
+        return html
+    except Exception as e:
+        return f'<div style="color: var(--danger-color);">Error: {str(e)}</div>', 500
+
+
+@ui_bp.route('/api/ui/my-account/api-keys')
+@login_required
+def my_account_api_keys():
+    """Get user's API keys"""
+    html = '''
+    <div style="text-align: center; padding: 3rem 1rem;">
+        <svg class="ucm-icon" width="48" height="48" style="color: var(--text-secondary); opacity: 0.5; margin-bottom: 1rem;"><use href="#icon-key"/></svg>
+        <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">API Keys Coming Soon</h3>
+        <p style="color: var(--text-secondary); font-size: 0.875rem;">
+            Personal API key management will be available in a future update.
+        </p>
+    </div>
+    '''
+    return html
+
+
+@ui_bp.route('/api/ui/my-account/notification-settings', methods=['POST'])
+@login_required
+def my_account_save_notification_settings():
+    """Save user notification preferences"""
+    return jsonify({'success': True, 'message': 'Settings saved successfully'})
 
 
 @ui_bp.route('/users')

@@ -105,6 +105,198 @@
 
     
     <!-- ========================================== -->
+    <!-- TAB 2: PREFERENCES -->
+    <!-- ========================================== -->
+    <div id="tab-preferences" class="tab-content">
+    
+    <!-- Theme Preferences -->
+    <div class="card">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-palette"/></svg>
+                Theme Preferences
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Current theme: <span id="current-theme-name" style="font-weight: 600; color: var(--text-primary);"></span>
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap: 1rem; max-width: 100%;">
+                <!-- Sentinel Light -->
+                <button data-action="set-theme" data-theme="sentinel-light" class="theme-card">
+                    <div style="padding: 0.75rem; background: #f8fafc;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.375rem;">
+                                <svg class="ucm-icon" width="12" height="12" style="color: #3b82f6;"><use href="#icon-sun"/></svg>
+                                <span style="font-weight: 600; color: #1e293b; font-size: 0.75rem;">Sentinel Light</span>
+                            </div>
+                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+                        </div>
+                        <div style="background: #ffffff; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #e2e8f0;">
+                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
+                                <div style="flex: 1; height: 1rem; background: #3b82f6; border-radius: 0.25rem;"></div>
+                                <div style="flex: 1; height: 1rem; background: #e2e8f0; border-radius: 0.25rem;"></div>
+                            </div>
+                            <div style="height: 0.5rem; background: #cbd5e1; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
+                            <div style="height: 0.5rem; background: #e2e8f0; border-radius: 0.25rem; width: 60%;"></div>
+                        </div>
+                    </div>
+                </button>
+
+                <!-- Sentinel Dark -->
+                <button data-action="set-theme" data-theme="sentinel-dark" class="theme-card">
+                    <div style="padding: 0.75rem; background: #0f172a;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.375rem;">
+                                <svg class="ucm-icon" width="12" height="12" style="color: #60a5fa;"><use href="#icon-moon"/></svg>
+                                <span style="font-weight: 600; color: #f1f5f9; font-size: 0.75rem;">Sentinel Dark</span>
+                            </div>
+                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+                        </div>
+                        <div style="background: #1e293b; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #334155;">
+                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
+                                <div style="flex: 1; height: 1rem; background: #3b82f6; border-radius: 0.25rem;"></div>
+                                <div style="flex: 1; height: 1rem; background: #334155; border-radius: 0.25rem;"></div>
+                            </div>
+                            <div style="height: 0.5rem; background: #475569; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
+                            <div style="height: 0.5rem; background: #334155; border-radius: 0.25rem; width: 60%;"></div>
+                        </div>
+                    </div>
+                </button>
+
+                <!-- Amber Light -->
+                <button data-action="set-theme" data-theme="amber-light" class="theme-card">
+                    <div style="padding: 0.75rem; background: #fffbeb;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.375rem;">
+                                <svg class="ucm-icon" width="12" height="12" style="color: #f97316;"><use href="#icon-sun"/></svg>
+                                <span style="font-weight: 600; color: #78350f; font-size: 0.75rem;">Amber Light</span>
+                            </div>
+                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #f97316, #ea580c);"></div>
+                        </div>
+                        <div style="background: #ffffff; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #fed7aa;">
+                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
+                                <div style="flex: 1; height: 1rem; background: #f97316; border-radius: 0.25rem;"></div>
+                                <div style="flex: 1; height: 1rem; background: #fed7aa; border-radius: 0.25rem;"></div>
+                            </div>
+                            <div style="height: 0.5rem; background: #fde68a; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
+                            <div style="height: 0.5rem; background: #fed7aa; border-radius: 0.25rem; width: 60%;"></div>
+                        </div>
+                    </div>
+                </button>
+
+                <!-- Amber Dark -->
+                <button data-action="set-theme" data-theme="amber-dark" class="theme-card">
+                    <div style="padding: 0.75rem; background: #1c1917;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.375rem;">
+                                <svg class="ucm-icon" width="12" height="12" style="color: #fb923c;"><use href="#icon-moon"/></svg>
+                                <span style="font-weight: 600; color: #fef3c7; font-size: 0.75rem;">Amber Dark</span>
+                            </div>
+                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #f97316, #ea580c);"></div>
+                        </div>
+                        <div style="background: #292524; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #44403c;">
+                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
+                                <div style="flex: 1; height: 1rem; background: #f97316; border-radius: 0.25rem;"></div>
+                                <div style="flex: 1; height: 1rem; background: #44403c; border-radius: 0.25rem;"></div>
+                            </div>
+                            <div style="height: 0.5rem; background: #57534e; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
+                            <div style="height: 0.5rem; background: #44403c; border-radius: 0.25rem; width: 60%;"></div>
+                        </div>
+                    </div>
+                </button>
+
+                <!-- Blossom Light -->
+                <button data-action="set-theme" data-theme="blossom-light" class="theme-card">
+                    <div style="padding: 0.75rem; background: #fdf2f8;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.375rem;">
+                                <svg class="ucm-icon" width="12" height="12" style="color: #ec4899;"><use href="#icon-sun"/></svg>
+                                <span style="font-weight: 600; color: #831843; font-size: 0.75rem;">Blossom Light</span>
+                            </div>
+                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #ec4899, #db2777);"></div>
+                        </div>
+                        <div style="background: #ffffff; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #fbcfe8;">
+                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
+                                <div style="flex: 1; height: 1rem; background: #ec4899; border-radius: 0.25rem;"></div>
+                                <div style="flex: 1; height: 1rem; background: #fbcfe8; border-radius: 0.25rem;"></div>
+                            </div>
+                            <div style="height: 0.5rem; background: #f9a8d4; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
+                            <div style="height: 0.5rem; background: #fbcfe8; border-radius: 0.25rem; width: 60%;"></div>
+                        </div>
+                    </div>
+                </button>
+
+                <!-- Blossom Dark -->
+                <button data-action="set-theme" data-theme="blossom-dark" class="theme-card">
+                    <div style="padding: 0.75rem; background: #1e1b20;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.375rem;">
+                                <svg class="ucm-icon" width="12" height="12" style="color: #f472b6;"><use href="#icon-moon"/></svg>
+                                <span style="font-weight: 600; color: #fce7f3; font-size: 0.75rem;">Blossom Dark</span>
+                            </div>
+                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #ec4899, #db2777);"></div>
+                        </div>
+                        <div style="background: #2d1b28; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #4a2640;">
+                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
+                                <div style="flex: 1; height: 1rem; background: #ec4899; border-radius: 0.25rem;"></div>
+                                <div style="flex: 1; height: 1rem; background: #4a2640; border-radius: 0.25rem;"></div>
+                            </div>
+                            <div style="height: 0.5rem; background: #5e3450; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
+                            <div style="height: 0.5rem; background: #4a2640; border-radius: 0.25rem; width: 60%;"></div>
+                        </div>
+                    </div>
+                </button>
+
+                <!-- Nebula Light -->
+                <button data-action="set-theme" data-theme="nebula-light" class="theme-card">
+                    <div style="padding: 0.75rem; background: #faf5ff;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.375rem;">
+                                <svg class="ucm-icon" width="12" height="12" style="color: #8b5cf6;"><use href="#icon-sun"/></svg>
+                                <span style="font-weight: 600; color: #581c87; font-size: 0.75rem;">Nebula Light</span>
+                            </div>
+                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></div>
+                        </div>
+                        <div style="background: #ffffff; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #e9d5ff;">
+                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
+                                <div style="flex: 1; height: 1rem; background: #8b5cf6; border-radius: 0.25rem;"></div>
+                                <div style="flex: 1; height: 1rem; background: #e9d5ff; border-radius: 0.25rem;"></div>
+                            </div>
+                            <div style="height: 0.5rem; background: #d8b4fe; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
+                            <div style="height: 0.5rem; background: #e9d5ff; border-radius: 0.25rem; width: 60%;"></div>
+                        </div>
+                    </div>
+                </button>
+
+                <!-- Nebula Dark -->
+                <button data-action="set-theme" data-theme="nebula-dark" class="theme-card">
+                    <div style="padding: 0.75rem; background: #1e1b2e;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.375rem;">
+                                <svg class="ucm-icon" width="12" height="12" style="color: #a78bfa;"><use href="#icon-moon"/></svg>
+                                <span style="font-weight: 600; color: #e9d5ff; font-size: 0.75rem;">Nebula Dark</span>
+                            </div>
+                            <div style="width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #7c3aed);"></div>
+                        </div>
+                        <div style="background: #28243a; border-radius: 0.375rem; padding: 0.5rem; border: 1px solid #3f3558;">
+                            <div style="display: flex; gap: 0.375rem; margin-bottom: 0.375rem;">
+                                <div style="flex: 1; height: 1rem; background: #8b5cf6; border-radius: 0.25rem;"></div>
+                                <div style="flex: 1; height: 1rem; background: #3f3558; border-radius: 0.25rem;"></div>
+                            </div>
+                            <div style="height: 0.5rem; background: #4c4263; border-radius: 0.25rem; margin-bottom: 0.25rem;"></div>
+                            <div style="height: 0.5rem; background: #3f3558; border-radius: 0.25rem; width: 60%;"></div>
+                        </div>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    </div><!-- End Tab: Preferences -->
+
+    
+    <!-- ========================================== -->
     <!-- TAB 3: SECURITY -->
     <!-- ========================================== -->
     <div id="tab-security" class="tab-content">
@@ -256,7 +448,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const [base, variant] = theme.split('-');
     const themeName = base.charAt(0).toUpperCase() + base.slice(1) + ' ' + 
                      variant.charAt(0).toUpperCase() + variant.slice(1);
-    document.getElementById('current-theme-name').textContent = themeName;
+    const themeNameEl = document.getElementById('current-theme-name');
+    if (themeNameEl) themeNameEl.textContent = themeName;
 });
 
 // Handle password change form

@@ -2793,3 +2793,40 @@ main {
     font-size: 0.875rem;
     color: var(--text-primary);
 }
+
+/* Theme selection cards */
+.theme-card {
+    all: unset;
+    cursor: pointer;
+    position: relative;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border: 2px solid var(--border-color);
+    transition: all 0.2s;
+    min-width: 0;
+}
+
+.theme-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.theme-card[data-theme="sentinel-light"]:hover,
+.theme-card[data-theme="sentinel-dark"]:hover {
+    border-color: #3b82f6;
+}
+
+.theme-card[data-theme="amber-light"]:hover,
+.theme-card[data-theme="amber-dark"]:hover {
+    border-color: #f97316;
+}
+
+.theme-card[data-theme="blossom-light"]:hover,
+.theme-card[data-theme="blossom-dark"]:hover {
+    border-color: #ec4899;
+}
+
+.theme-card[data-theme="nebula-light"]:hover,
+.theme-card[data-theme="nebula-dark"]:hover {
+    border-color: #8b5cf6;
+}
