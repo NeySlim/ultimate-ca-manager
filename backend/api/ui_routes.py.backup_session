@@ -3379,14 +3379,15 @@ def cert_new():
 def ca_certificates(ca_id):
     """Get certificates issued by a CA"""
     try:
-        # Get CA to find its refid (with auto token refresh)
-        ca_response = api_call_with_retry(
-            'GET',
-            f"{request.url_root}api/v1/ca/{ca_id}"
-        )
+        token = session.get('access_token')
+        headers = {'Authorization': f'Bearer {token}'}
         
-        if not ca_response or ca_response.status_code == 401:
-            return '<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Session expired. Please <a href="/logout?expired=1" style="text-decoration: underline;">login again</a>.</div>', 401
+        # Get CA to find its refid
+        ca_response = requests.get(
+            f"{request.url_root}api/v1/ca/{ca_id}",
+            headers=headers,
+            verify=False
+        )
         
         if ca_response.status_code != 200:
             return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">CA not found</div>'
@@ -3394,14 +3395,12 @@ def ca_certificates(ca_id):
         ca = ca_response.json()
         ca_refid = ca.get('refid')
         
-        # Get all certificates (with auto token refresh)
-        response = api_call_with_retry(
-            'GET',
-            f"{request.url_root}api/v1/certificates/"
+        # Get all certificates
+        response = requests.get(
+            f"{request.url_root}api/v1/certificates/",
+            headers=headers,
+            verify=False
         )
-        
-        if not response or response.status_code == 401:
-            return '<div style="padding: 2rem; text-align: center; color: var(--danger-color);">Session expired. Please <a href="/logout?expired=1" style="text-decoration: underline;">login again</a>.</div>', 401
         
         if response.status_code != 200:
             return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No certificates</div>'
