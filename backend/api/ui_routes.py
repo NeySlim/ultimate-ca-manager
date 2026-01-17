@@ -2336,7 +2336,8 @@ def import_config_form():
                         Save Configuration
                     </button>
                     <button type="button" onclick="testImportConnection()"
-                            class="btn btn-success">
+                            class="btn btn-outline-secondary">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-check-circle"/></svg>
                         Test Connection
                     </button>
                     <button type="button" onclick="executeImport()"
