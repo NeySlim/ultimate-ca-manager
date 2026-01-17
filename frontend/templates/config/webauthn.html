@@ -397,7 +397,7 @@ function renderCredentials(credentials) {
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
                     <button onclick="toggleCredential('${cred.id}', ${!cred.enabled})"
-                            class="btn-secondary btn-sm">
+                            class="btn-danger btn-sm">
                         <svg class="ucm-icon" width="16" height="16">
                             <use href="#icon-eye${cred.enabled ? '-slash' : ''}"/>
                         </svg>

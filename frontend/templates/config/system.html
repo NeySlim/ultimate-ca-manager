@@ -52,13 +52,13 @@
 
                 <!-- Actions -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                    <button @click="$dispatch('open-modal', 'uploadHttpsModal')" class="btn-primary">
+                    <button @click="$dispatch('open-modal', 'uploadHttpsModal')" class="btn-secondary">
                         <svg class="ucm-icon" width="16" height="16"><use href="#icon-upload"/></svg> Import Certificate Chain
                     </button>
                     <button @click="$dispatch('open-modal', 'selectManagedCertModal')" class="btn-success">
                         <svg class="ucm-icon" width="16" height="16"><use href="#icon-award"/></svg> Use Managed Certificate
                     </button>
-                    <button hx-post="/api/ui/config/regenerate-https" hx-confirm="Are you sure you want to regenerate the HTTPS certificate? The service will restart automatically." class="btn-warning">
+                    <button hx-post="/api/ui/config/regenerate-https" hx-confirm="Are you sure you want to regenerate the HTTPS certificate? The service will restart automatically." class="btn-primary">
                         <svg class="ucm-icon ucm-icon-refresh" width="16" height="16"><use href="#icon-refresh"/></svg> Regenerate Self-Signed
                     </button>
                 </div>
@@ -234,7 +234,7 @@
                     <button type="button" @click="open = false" class="btn-secondary">
                         Cancel
                     </button>
-                    <button type="submit" class="btn-primary">
+                    <button type="submit" class="btn-secondary">
                         <svg class="ucm-icon" width="16" height="16"><use href="#icon-upload"/></svg> Import & Restart
                     </button>
                 </div>
