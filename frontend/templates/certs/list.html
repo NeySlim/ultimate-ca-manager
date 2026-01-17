@@ -497,6 +497,8 @@ function loadCSRTemplates() {
 // Apply template to CSR form
 // Note: fetch() is OK here because fetch-wrapper.js auto-injects JWT token
 function applyCSRTemplate(templateId) {
+    console.log('applyCSRTemplate called with:', templateId);
+    
     if (!templateId) {
         // Reset form when "No Template" selected
         document.getElementById('csr-key-type').value = '4096';
@@ -504,32 +506,50 @@ function applyCSRTemplate(templateId) {
         return;
     }
     
+    console.log('Fetching template:', templateId);
+    
     // fetch() is OK because fetch-wrapper.js is loaded and auto-injects JWT
     fetch('/api/ui/templates/' + templateId + '/json')
-        .then(r => r.json())
+        .then(r => {
+            console.log('Response status:', r.status);
+            return r.json();
+        })
         .then(template => {
+            console.log('Template received:', template);
+            
             // Apply key configuration
             const keyType = template.key_type || '4096';
+            console.log('Setting key_type to:', keyType);
             document.getElementById('csr-key-type').value = keyType;
             
             const digest = template.digest || 'sha256';
+            console.log('Setting digest to:', digest);
             document.getElementById('csr-digest').value = digest;
             
             // Apply DN defaults (but don't overwrite if user already entered something)
             const dn = template.dn_template || {};
+            console.log('DN template:', dn);
+            
             if (dn.O && !document.getElementById('csr-org').value) {
-                document.getElementById('csr-org').value = dn.O.replace('{username}', '').replace('{email}', '').trim();
+                const orgValue = dn.O.replace('{username}', '').replace('{email}', '').trim();
+                console.log('Setting organization to:', orgValue);
+                document.getElementById('csr-org').value = orgValue;
             }
             if (dn.OU && !document.getElementById('csr-ou').value) {
-                document.getElementById('csr-ou').value = dn.OU.replace('{username}', '').replace('{email}', '').trim();
+                const ouValue = dn.OU.replace('{username}', '').replace('{email}', '').trim();
+                console.log('Setting OU to:', ouValue);
+                document.getElementById('csr-ou').value = ouValue;
             }
             if (dn.C && !document.getElementById('csr-country').value) {
+                console.log('Setting country to:', dn.C);
                 document.getElementById('csr-country').value = dn.C;
             }
             if (dn.ST && !document.getElementById('csr-state').value) {
+                console.log('Setting state to:', dn.ST);
                 document.getElementById('csr-state').value = dn.ST;
             }
             if (dn.L && !document.getElementById('csr-locality').value) {
+                console.log('Setting locality to:', dn.L);
                 document.getElementById('csr-locality').value = dn.L;
             }
             
@@ -538,6 +558,13 @@ function applyCSRTemplate(templateId) {
                 showToast(`Template "${template.name}" applied`, 'success');
             }
         })
+        .catch(err => {
+            console.error('Failed to load template:', err);
+            if (typeof showToast === 'function') {
+                showToast('Failed to load template', 'error');
+            }
+        });
+}
         .catch(err => {
             console.error('Failed to load template:', err);
             if (typeof showToast === 'function') {
