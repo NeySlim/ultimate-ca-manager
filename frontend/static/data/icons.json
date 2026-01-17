@@ -43,22 +43,22 @@
         },
         {
           "d": "M14 2v6h6",
-          "gradient": "secondary",
+          "gradient": "primary",
           "fill": "none",
           "stroke-width": "1.5"
         },
         {
           "d": "M8 13h8M8 17h3",
-          "gradient": "secondary",
+          "gradient": "complement",
           "fill": "none",
-          "stroke-width": "1.5",
+          "stroke-width": "1.6",
           "stroke-linecap": "round"
         },
         {
           "d": "M16 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
-          "gradient": "neutral",
+          "gradient": "complement",
           "fill": "none",
-          "stroke-width": "1.5"
+          "stroke-width": "2"
         }
       ]
     },
@@ -655,9 +655,9 @@
         },
         {
           "d": "M7 15a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
-          "gradient": "neutral",
+          "gradient": "complement",
           "fill": "none",
-          "stroke-width": "1.8"
+          "stroke-width": "2.2"
         }
       ]
     },
@@ -817,22 +817,22 @@
         },
         {
           "d": "M8 12h8M8 16h4",
-          "gradient": "secondary",
+          "gradient": "complement",
           "fill": "none",
-          "stroke-width": "1.5",
+          "stroke-width": "1.8",
           "stroke-linecap": "round"
         },
         {
           "d": "M16 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z",
-          "gradient": "neutral",
+          "gradient": "complement",
           "fill": "none",
-          "stroke-width": "1.8"
+          "stroke-width": "2"
         },
         {
           "d": "M18 13.5L14 17.5",
           "gradient": "danger",
           "fill": "none",
-          "stroke-width": "2.2",
+          "stroke-width": "2.5",
           "stroke-linecap": "round"
         }
       ]
@@ -1374,13 +1374,13 @@
           "d": "M3 3h7v7H3zM14 14h7v7h-7z",
           "gradient": "primary",
           "fill": "none",
-          "stroke-width": "2"
+          "stroke-width": "2.2"
         },
         {
           "d": "M14 3h7v7h-7zM3 14h7v7H3z",
-          "gradient": "neutral",
+          "gradient": "complement",
           "fill": "none",
-          "stroke-width": "2"
+          "stroke-width": "2.2"
         }
       ]
     },
@@ -1417,7 +1417,7 @@
         },
         {
           "d": "M14 2v6h6",
-          "gradient": "secondary",
+          "gradient": "primary",
           "fill": "none",
           "stroke-width": "1.5"
         },
@@ -1425,7 +1425,7 @@
           "d": "M9 15l6-6m0 6l-6-6",
           "gradient": "danger",
           "fill": "none",
-          "stroke-width": "2.2",
+          "stroke-width": "2.5",
           "stroke-linecap": "round"
         }
       ]
@@ -1437,13 +1437,9 @@
         "#0066cc",
         "#004d99"
       ],
-      "secondary": [
-        "#3399ff",
-        "#0066cc"
-      ],
-      "neutral": [
-        "#64748b",
-        "#475569"
+      "complement": [
+        "#ff8c1a",
+        "#d77610"
       ],
       "danger": [
         "#dc3545",
@@ -1463,13 +1459,9 @@
         "#3b82f6",
         "#60a5fa"
       ],
-      "secondary": [
-        "#60a5fa",
-        "#93c5fd"
-      ],
-      "neutral": [
-        "#94a3b8",
-        "#64748b"
+      "complement": [
+        "#ff9f43",
+        "#ffb366"
       ],
       "danger": [
         "#ef4444",
@@ -1489,13 +1481,9 @@
         "#d77610",
         "#ff8c1a"
       ],
-      "secondary": [
-        "#ff8c1a",
-        "#ffa347"
-      ],
-      "neutral": [
-        "#64748b",
-        "#475569"
+      "complement": [
+        "#0066cc",
+        "#3399ff"
       ],
       "danger": [
         "#d9534f",
@@ -1515,13 +1503,9 @@
         "#ff9f43",
         "#ffb366"
       ],
-      "secondary": [
-        "#ffb366",
-        "#ffc894"
-      ],
-      "neutral": [
-        "#94a3b8",
-        "#64748b"
+      "complement": [
+        "#3b82f6",
+        "#60a5fa"
       ],
       "danger": [
         "#e74c3c",
@@ -1541,13 +1525,9 @@
         "#0078cf",
         "#3399ff"
       ],
-      "secondary": [
-        "#3399ff",
-        "#66b3ff"
-      ],
-      "neutral": [
-        "#64748b",
-        "#475569"
+      "complement": [
+        "#ff8c1a",
+        "#ffa347"
       ],
       "danger": [
         "#dc3545",
@@ -1567,13 +1547,9 @@
         "#3b9eea",
         "#5aadee"
       ],
-      "secondary": [
-        "#5aadee",
-        "#7dc0f2"
-      ],
-      "neutral": [
-        "#94a3b8",
-        "#64748b"
+      "complement": [
+        "#ff9f43",
+        "#ffb366"
       ],
       "danger": [
         "#ea4335",
@@ -1593,13 +1569,9 @@
         "#8b6f9e",
         "#9d7fb0"
       ],
-      "secondary": [
-        "#9d7fb0",
-        "#b095c4"
-      ],
-      "neutral": [
-        "#64748b",
-        "#475569"
+      "complement": [
+        "#f0c987",
+        "#f5d8a5"
       ],
       "danger": [
         "#d9534f",
@@ -1619,13 +1591,9 @@
         "#d88c92",
         "#e39b6f"
       ],
-      "secondary": [
-        "#e39b6f",
-        "#f0b088"
-      ],
-      "neutral": [
-        "#94a3b8",
-        "#64748b"
+      "complement": [
+        "#a3d5a3",
+        "#b8e0b8"
       ],
       "danger": [
         "#e88b8b",
