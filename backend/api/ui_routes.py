@@ -1841,7 +1841,7 @@ def crl_list_data():
 
         # Build HTML
         html = f'''
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; align-items: stretch;">
             <!-- Active CRLs -->
             <div class="card">
                 <div class="stat-card">
