@@ -23,15 +23,15 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
         <!-- CA Count -->
         <div class="card">
-            <div class="card-body" style="display: flex; align-items: center; gap: 1rem;">
-                <div style="width: 56px; height: 56px; border-radius: 0.5rem; background: linear-gradient(135deg, rgba(var(--primary-rgb, 59, 130, 246), 0.1) 0%, rgba(var(--primary-rgb, 59, 130, 246), 0.05) 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <div class="stat-card">
+                <div class="stat-card-icon">
                     <svg class="ucm-icon" width="28" height="28"><use href="#icon-certificate-authority"/></svg>
                 </div>
-                <div style="flex: 1; min-width: 0;">
-                    <div style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary); line-height: 1;">
+                <div class="stat-card-content">
+                    <div class="stat-card-value">
                         {{ stats.total_cas or 0 }}
                     </div>
-                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500; margin-top: 0.25rem;">
+                    <div class="stat-card-label">
                         Certificate Authorities
                     </div>
                 </div>
@@ -40,15 +40,15 @@
         
         <!-- Total Certificates -->
         <div class="card">
-            <div class="card-body" style="display: flex; align-items: center; gap: 1rem;">
-                <div style="width: 56px; height: 56px; border-radius: 0.5rem; background: linear-gradient(135deg, rgba(var(--primary-rgb, 59, 130, 246), 0.1) 0%, rgba(var(--primary-rgb, 59, 130, 246), 0.05) 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <div class="stat-card">
+                <div class="stat-card-icon">
                     <svg class="ucm-icon" width="28" height="28"><use href="#icon-certificate"/></svg>
                 </div>
-                <div style="flex: 1; min-width: 0;">
-                    <div style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary); line-height: 1;">
+                <div class="stat-card-content">
+                    <div class="stat-card-value">
                         {{ stats.total_certificates or 0 }}
                     </div>
-                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500; margin-top: 0.25rem;">
+                    <div class="stat-card-label">
                         Total Certificates
                     </div>
                 </div>
@@ -57,15 +57,15 @@
         
         <!-- Valid Certificates -->
         <div class="card">
-            <div class="card-body" style="display: flex; align-items: center; gap: 1rem;">
-                <div style="width: 56px; height: 56px; border-radius: 0.5rem; background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <div class="stat-card">
+                <div class="stat-card-icon success">
                     <svg class="ucm-icon" width="28" height="28"><use href="#icon-check-circle"/></svg>
                 </div>
-                <div style="flex: 1; min-width: 0;">
-                    <div style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary); line-height: 1;">
+                <div class="stat-card-content">
+                    <div class="stat-card-value">
                         {{ stats.valid_certificates or 0 }}
                     </div>
-                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500; margin-top: 0.25rem;">
+                    <div class="stat-card-label">
                         Valid Certificates
                     </div>
                 </div>
@@ -74,15 +74,15 @@
         
         <!-- Expiring Soon -->
         <div class="card">
-            <div class="card-body" style="display: flex; align-items: center; gap: 1rem;">
-                <div style="width: 56px; height: 56px; border-radius: 0.5rem; background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <div class="stat-card">
+                <div class="stat-card-icon warning">
                     <svg class="ucm-icon" width="28" height="28"><use href="#icon-warning-triangle"/></svg>
                 </div>
-                <div style="flex: 1; min-width: 0;">
-                    <div style="font-size: 1.875rem; font-weight: 700; color: var(--text-primary); line-height: 1;">
+                <div class="stat-card-content">
+                    <div class="stat-card-value">
                         {{ stats.expiring_soon or 0 }}
                     </div>
-                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500; margin-top: 0.25rem;">
+                    <div class="stat-card-label">
                         Expiring Soon (30d)
                     </div>
                 </div>
