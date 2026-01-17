@@ -386,10 +386,10 @@
     <script src="{{ url_for('static', filename='js/fetch-wrapper.js') }}"></script>
     
     <script src="{{ url_for('static', filename='vendor/js/alpine.min.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='js/modal-utils.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modal-utils.js') }}?v=2"></script>
     <script src="{{ url_for('static', filename='js/icon-system.js') }}?v=3.5"></script>
-    <script src="{{ url_for('static', filename='js/modal-system.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/ucm-global.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modal-system.js') }}?v=2"></script>
+    <script src="{{ url_for('static', filename='js/ucm-global.js') }}?v=2"></script>
     <script src="{{ url_for('static', filename='js/theme-switcher.js') }}?v=2"></script>
     <script src="{{ url_for('static', filename='js/spa-navigation.js') }}"></script>
     {% if request.endpoint and request.endpoint != 'ui.login' %}
