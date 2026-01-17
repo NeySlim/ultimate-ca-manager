@@ -23,7 +23,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                 <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-left"/></svg> Back to List
             </a>
             <button data-action="download-crl-pem" data-id="{{ ca.id }}" class="btn-primary">
-                <svg class="ucm-icon" width="16" height="16"><use href="#icon-slash"/></svg> Download CRL
+                <svg class="ucm-icon" width="16" height="16"><use href="#icon-ban"/></svg> Download CRL
             </button>
             <div style="position: relative; display: inline-block;">
                 <button data-action="toggle-export-menu" class="btn-primary">
@@ -45,7 +45,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-archive"/></svg> Full Chain + Key (PEM)
                         </button>
                         <button data-action="export-ca-der" data-id="{{ ca.id }}" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
-                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-file"/></svg> Certificate (DER)
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-file-text"/></svg> Certificate (DER)
                         </button>
                         <button data-action="show-pkcs12-modal" data-id="{{ ca.id }}" data-type="ca" style="display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; color: var(--text-primary); background: none; border: none; cursor: pointer;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-lock"/></svg> PKCS#12 (.p12/.pfx)
@@ -178,7 +178,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                             </span>
                         {% else %}
                             <span class="badge" style="background: var(--bg-secondary); color: var(--text-secondary);">
-                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-x"/></svg> Disabled
+                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-times"/></svg> Disabled
                             </span>
                         {% endif %}
                     </dd>
@@ -248,7 +248,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save Configuration
                         </button>
                         <button type="button" data-action="cancel-cdp-edit" class="btn-secondary">
-                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-x"/></svg> Cancel
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-times"/></svg> Cancel
                         </button>
                     </div>
                 </div>
@@ -279,7 +279,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                             </span>
                         {% else %}
                             <span class="badge" style="background: var(--bg-secondary); color: var(--text-secondary);">
-                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-x"/></svg> Disabled
+                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-times"/></svg> Disabled
                             </span>
                         {% endif %}
                     </dd>
@@ -347,7 +347,7 @@ const DEFAULT_SERVER_URL = window.location.protocol + '//' + window.location.hos
                             <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save Configuration
                         </button>
                         <button type="button" data-action="cancel-ocsp-edit" class="btn-secondary">
-                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-x"/></svg> Cancel
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-times"/></svg> Cancel
                         </button>
                     </div>
                 </div>
@@ -734,7 +734,7 @@ function toggleOCSPEdit() {
     if (document.getElementById('ocsp-edit-mode').classList.contains('hidden')) {
         btn.innerHTML = '<svg class="ucm-icon" width="16" height="16"><use href="#icon-edit"/></svg> Configure';
     } else {
-        btn.innerHTML = '<svg class="ucm-icon" width="16" height="16"><use href="#icon-x"/></svg> Close';
+        btn.innerHTML = '<svg class="ucm-icon" width="16" height="16"><use href="#icon-times"/></svg> Close';
     }
 }
 
