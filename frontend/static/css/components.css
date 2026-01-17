@@ -916,17 +916,17 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 1rem;
-    align-items: stretch; /* Force equal height */
+    align-items: start; /* Align to top of grid cells */
     margin-bottom: 2rem;
 }
 
-/* Cards in stats grid need flex layout */
+/* Cards in stats grid need flex layout - IMPORTANT: Must override default .card */
 .stats-grid > .card {
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-    margin-bottom: 0;
-    height: 100%; /* Fill grid cell */
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    margin: 0 !important; /* No margins at all */
+    align-self: stretch !important; /* Stretch to fill grid cell height */
 }
 
 /* Legacy :has() support for other card types */
