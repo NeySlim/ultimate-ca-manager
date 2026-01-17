@@ -841,9 +841,11 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
 
 .stat-card {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 1rem;
     padding: 1.25rem;
+    min-height: 88px; /* 56px icon + 2*16px padding */
+    height: 100%;
 }
 
 .stat-card-icon {
@@ -913,11 +915,7 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
 .card:has(.card-header),
 .card:has(.stat-card) {
     padding: 0;
-}
-
-/* Ensure stat cards have uniform height */
-.stat-card {
-    min-height: 88px; /* 56px icon + 2*16px padding */
+    height: 100%; /* For grid alignment */
 }
 
 /* ===========================
