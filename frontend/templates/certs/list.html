@@ -565,13 +565,6 @@ function applyCSRTemplate(templateId) {
             }
         });
 }
-        .catch(err => {
-            console.error('Failed to load template:', err);
-            if (typeof showToast === 'function') {
-                showToast('Failed to load template', 'error');
-            }
-        });
-}
 </script>
 
 <script>
