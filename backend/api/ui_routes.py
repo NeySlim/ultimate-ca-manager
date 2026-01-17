@@ -1843,31 +1843,44 @@ def crl_list_data():
         html = f'''
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
             <!-- Active CRLs -->
-            <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
-                <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(var(--primary-rgb), 0.1); display: flex; align-items: center; justify-content: center; color: var(--primary-color);">
-                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-activity"/></svg>
-                </div>
-                <div>
-                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Active CRLs</div>
-                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">{active_crls} <span style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 400;">/ {total_cas} CAs</span></div>
+            <div class="card">
+                <div class="stat-card">
+                    <div class="stat-card-icon">
+                        <svg class="ucm-icon" width="28" height="28"><use href="#icon-activity"/></svg>
+                    </div>
+                    <div class="stat-card-content">
+                        <div class="stat-card-value">{active_crls} <span style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 400;">/ {total_cas}</span></div>
+                        <div class="stat-card-label">Active CRLs</div>
+                    </div>
                 </div>
             </div>
             
             <!-- Total Revoked -->
-            <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
-                <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(var(--danger-rgb), 0.1); display: flex; align-items: center; justify-content: center; color: var(--danger-color);">
-                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-slash"/></svg>
-                </div>
-                <div>
-                    <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Revoked Certs</div>
-                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">{total_revoked}</div>
+            <div class="card">
+                <div class="stat-card">
+                    <div class="stat-card-icon danger">
+                        <svg class="ucm-icon" width="28" height="28"><use href="#icon-slash"/></svg>
+                    </div>
+                    <div class="stat-card-content">
+                        <div class="stat-card-value">{total_revoked}</div>
+                        <div class="stat-card-label">Revoked Certificates</div>
+                    </div>
                 </div>
             </div>
             
             <!-- Scheduler Status -->
-            <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
-                <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(var(--success-rgb), 0.1); display: flex; align-items: center; justify-content: center; color: var(--success-color);">
-                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-clock"/></svg>
+            <div class="card">
+                <div class="stat-card">
+                    <div class="stat-card-icon success">
+                        <svg class="ucm-icon" width="28" height="28"><use href="#icon-clock"/></svg>
+                    </div>
+                    <div class="stat-card-content">
+                        <div class="stat-card-value" style="font-size: 1.25rem;">{scheduler_status}</div>
+                        <div class="stat-card-label">Auto-Regeneration</div>
+                    </div>
+                </div>
+            </div>
+        </div>
                 </div>
                 <div>
                     <div style="font-size: 0.875rem; color: var(--text-secondary); font-weight: 500;">Auto-Regeneration</div>
