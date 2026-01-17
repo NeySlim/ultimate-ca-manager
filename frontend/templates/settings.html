@@ -2288,8 +2288,7 @@ document.getElementById('mtls-settings-form')?.addEventListener('submit', async 
         const response = await fetch('/api/ui/mtls/settings', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(data)
         });
@@ -2322,8 +2321,7 @@ document.getElementById('create-managed-cert-form')?.addEventListener('submit', 
         const response = await fetch('/api/ui/mtls/certificates/create', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(data)
         });
@@ -2359,8 +2357,7 @@ document.getElementById('create-selfsigned-cert-form')?.addEventListener('submit
         const response = await fetch('/api/ui/mtls/certificates/create', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(data)
         });
@@ -2392,8 +2389,7 @@ async function validateImportedCert() {
         const response = await fetch('/api/ui/mtls/validate-certificate', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({certificate: certPem})
         });
@@ -2444,8 +2440,7 @@ document.getElementById('import-cert-form')?.addEventListener('submit', async (e
         const response = await fetch('/api/ui/mtls/certificates/enroll', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(data)
         });
@@ -3177,8 +3172,7 @@ document.getElementById('smtp-form').addEventListener('submit', async (e) => {
         const response = await fetch('/api/ui/notifications/smtp/config', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(data)
         });
@@ -3210,8 +3204,7 @@ document.getElementById('user-notification-form')?.addEventListener('submit', as
         const response = await fetch('/api/ui/notifications/user/settings', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(data)
         });
@@ -3277,8 +3270,7 @@ window.testSMTP = async function() {
         const response = await fetch('/api/ui/notifications/smtp/test', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({email})
         });
@@ -3369,8 +3361,7 @@ async function updateRule(type) {
         const response = await fetch(`/api/ui/notifications/config/${type}`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({enabled, days_before: days, recipients})
         });
@@ -4239,8 +4230,7 @@ async function createBackup() {
         const response = await fetch('/api/ui/backup/create', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + getToken()
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 password: password,
