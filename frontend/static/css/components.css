@@ -917,6 +917,7 @@ svg.ucm-icon:has(use[href="#icon-palette"]) path {
     padding: 0;
     display: flex;
     flex-direction: column;
+    margin-bottom: 0; /* Override default margin in grid layouts */
 }
 
 /* ===========================
