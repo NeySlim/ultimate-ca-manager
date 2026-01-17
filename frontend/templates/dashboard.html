@@ -121,14 +121,14 @@
     </div>
 
     <!-- Recent Certificates -->
-    <div class="card">
-        <div class="card-header">
+    <div class="card" style="padding: 0;">
+        <div class="card-header" style="padding: 1.5rem;">
             <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
                 <svg class="ucm-icon" width="18" height="18"><use href="#icon-certificate"/></svg>
                 <span>Recent Certificates</span>
             </h2>
         </div>
-        <div class="card-body">
+        <div>
             <div hx-get="/api/ui/config/managed-certs"
                  hx-trigger="load"
                  hx-swap="innerHTML">
@@ -141,14 +141,14 @@
     </div>
 
     <!-- SCEP Requests -->
-    <div class="card">
-        <div class="card-header">
+    <div class="card" style="padding: 0;">
+        <div class="card-header" style="padding: 1.5rem;">
             <h2 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
                 <svg class="ucm-icon" width="18" height="18"><use href="#icon-scep"/></svg>
                 <span>Recent SCEP Requests</span>
             </h2>
         </div>
-        <div class="card-body">
+        <div>
             <div class="table-responsive">
                 <table class="table">
                     <thead>
