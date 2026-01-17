@@ -68,7 +68,7 @@
                             <p style="color: var(--text-primary); margin: 0 0 0.5rem 0; font-size: 0.875rem; font-weight: 500;">Trusted CA:</p>
                             <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                                 <span id="ca-name" style="color: var(--text-primary); font-weight: 500;"></span>
-                                <button type="button" id="download-ca-btn" class="btn-outline btn-sm">
+                                <button type="button" id="download-ca-btn" class="btn-outline-secondary btn-sm">
                                     <svg class="ucm-icon" width="14" height="14"><use href="#icon-download"/></svg>
                                     Download CA Certificate
                                 </button>
@@ -146,7 +146,7 @@
                             <svg class="ucm-icon" width="16" height="16" style="color: var(--success-color);"><use href="#icon-server"/></svg>
                             Nginx Configuration
                         </h3>
-                        <button type="button" onclick="copyToClipboard('nginx-config-code', 'Nginx config')" class="btn-outline btn-sm">
+                        <button type="button" onclick="copyToClipboard('nginx-config-code', 'Nginx config')" class="btn-outline-secondary btn-sm">
                             <svg class="ucm-icon" width="14" height="14"><use href="#icon-copy"/></svg>
                             Copy
                         </button>
@@ -170,7 +170,7 @@
                             <svg class="ucm-icon" width="16" height="16" style="color: var(--danger-color);"><use href="#icon-server"/></svg>
                             Apache Configuration
                         </h3>
-                        <button type="button" onclick="copyToClipboard('apache-config-code', 'Apache config')" class="btn-outline btn-sm">
+                        <button type="button" onclick="copyToClipboard('apache-config-code', 'Apache config')" class="btn-outline-secondary btn-sm">
                             <svg class="ucm-icon" width="14" height="14"><use href="#icon-copy"/></svg>
                             Copy
                         </button>
@@ -362,7 +362,7 @@
                                     <svg class="ucm-icon" width="16" height="16"><use href="#icon-check-circle"/></svg>
                                     Validate Certificate
                                 </button>
-                                <button type="submit" class="btn-primary">
+                                <button type="submit" class="btn-secondary">
                                     <svg class="ucm-icon" width="16" height="16"><use href="#icon-upload"/></svg>
                                     Import Certificate
                                 </button>
@@ -920,7 +920,7 @@ async function loadCertificates() {
                         <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
                             <svg class="ucm-icon" width="32" height="32" style="opacity: 0.5;"><use href="#icon-key"/></svg>
                             <p style="margin-top: 0.5rem;">No certificates enrolled</p>
-                            <button onclick="ucm_switchTab('create')" class="btn btn-sm btn-primary" style="margin-top: 1rem;">
+                            <button onclick="ucm_switchTab('create')" class="btn btn-primary btn-primary" style="margin-top: 1rem;">
                                 <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Create Your First Certificate
                             </button>
                         </td>
