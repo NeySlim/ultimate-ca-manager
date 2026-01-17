@@ -73,7 +73,7 @@
     <!-- Statistics Cards -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
         <div class="card" style="text-align: center; padding: 20px;">
-            <i class="bi bi-person-badge" style="font-size: 2rem; color: var(--primary-color);"></i>
+            <svg class="ucm-icon" width="32" height="32" style="color: var(--primary-color);"><use href="#icon-user-check"/></svg>
             <div style="font-size: 2rem; font-weight: bold; margin: 8px 0; color: var(--text-primary);" id="total-accounts">-</div>
             <div style="font-size: 13px; color: var(--text-secondary);">ACME Accounts</div>
         </div>
@@ -97,7 +97,10 @@
     <!-- ACME Accounts -->
     <div class="card" style="margin-bottom: 20px; padding: 0;">
         <div style="padding: 1.5rem 1.5rem 0.75rem 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <h2 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0;">ACME Accounts</h2>
+            <h2 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="18" height="18"><use href="#icon-user-check"/></svg>
+                ACME Accounts
+            </h2>
         </div>
         <div id="accounts-table" 
              hx-get="/api/ui/acme/accounts" 
@@ -113,7 +116,10 @@
     <!-- ACME Orders -->
     <div class="card" style="margin-bottom: 20px; padding: 0;">
         <div style="padding: 1.5rem 1.5rem 0.75rem 1.5rem; border-bottom: 1px solid var(--border-color);">
-            <h2 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0;">ACME Orders</h2>
+            <h2 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="18" height="18"><use href="#icon-inbox"/></svg>
+                ACME Orders
+            </h2>
         </div>
         <div id="orders-table" 
              hx-get="/api/ui/acme/orders" 
