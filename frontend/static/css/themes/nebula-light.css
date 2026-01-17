@@ -62,7 +62,10 @@
     --scrollbar-thumb: rgba(0, 0, 0, 0.2);
     --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
     
-    /* Warning Alert Variables */
+    /* Status Colors */
+    --info-color: #8b5cf6;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
     --warning-color: #f59e0b;
     --warning-hover: #d97706;
     --warning-bg: #fef3c7;
