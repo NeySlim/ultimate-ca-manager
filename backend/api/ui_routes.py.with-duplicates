@@ -5460,469 +5460,855 @@ def template_json(template_id):
     except Exception as e:
         current_app.logger.error(f"Error loading template {template_id}: {str(e)}")
         return {'error': str(e)}, 500
-"""
-Additional UI routes for settings.html refactoring
-To be appended to ui_routes.py
-"""
 
-# ============================================================================
-# mTLS UI Routes (Session-based)
-# ============================================================================
+
+# ============================================
+# mTLS ROUTES (for settings page)
+# ============================================
 
 @ui_bp.route('/api/ui/mtls/settings', methods=['GET'])
 @login_required
-def ui_mtls_settings_get():
-    """Get mTLS settings"""
+def mtls_settings_get():
+    """Get mTLS configuration"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/mtls/settings")
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to fetch mTLS settings'}, 500
+        response = requests.get(f"{request.url_root}api/v1/mtls/settings", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error fetching mTLS settings: {e}")
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Error getting mTLS settings: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/mtls/settings', methods=['POST'])
 @login_required
-@admin_required
-def ui_mtls_settings_post():
-    """Update mTLS settings (admin only)"""
+def mtls_settings_post():
+    """Update mTLS configuration"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/mtls/settings", json=request.json)
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to update mTLS settings'}, 500
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/mtls/settings",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
     except Exception as e:
         current_app.logger.error(f"Error updating mTLS settings: {e}")
-        return {'error': str(e)}, 500
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/mtls/ca-list', methods=['GET'])
 @login_required
-def ui_mtls_ca_list():
-    """Get list of CAs for mTLS dropdown"""
+def mtls_ca_list():
+    """Get list of CAs for mTLS selection"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/ca")
-        if response and response.status_code == 200:
-            cas = response.json()
-            html = '<option value="">-- Select CA --</option>'
-            for ca in cas:
-                html += f'<option value="{ca.get("id", "")}">{ca.get("common_name", "Unknown CA")}</option>'
-            return html, 200
-        return '<option value="">-- Error loading CAs --</option>', 500
+        response = requests.get(f"{request.url_root}api/v1/ca", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error fetching CA list: {e}")
-        return '<option value="">-- Error --</option>', 500
+        current_app.logger.error(f"Error getting CA list: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/mtls/certificates', methods=['GET'])
 @login_required
-def ui_mtls_certificates_list():
-    """Get user's mTLS certificates as HTML fragment"""
+def mtls_certificates_list():
+    """Get user's mTLS certificates"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/mtls/certificates")
-        if response and response.status_code == 200:
-            certs = response.json()
-            
-            if not certs:
-                return '''
-                    <div class="empty-state">
-                        <svg class="ucm-icon" width="48" height="48"><use href="#icon-certificate"/></svg>
-                        <p>No mTLS certificates yet</p>
-                    </div>
-                ''', 200
-            
-            html = '<div class="certificates-grid">'
-            for cert in certs:
-                status_class = 'active' if cert.get('status') == 'active' else 'revoked'
-                html += f'''
-                    <div class="certificate-card {status_class}">
-                        <div class="cert-info">
-                            <strong>{cert.get('common_name', 'Unknown')}</strong>
-                            <span class="cert-serial">{cert.get('serial', 'N/A')}</span>
-                            <span class="cert-status">{cert.get('status', 'unknown')}</span>
-                        </div>
-                        <div class="cert-actions">
-                            <button hx-get="/api/ui/mtls/certificates/{cert.get('id')}/download" 
-                                    class="btn-sm btn-secondary">Download</button>
-                            <button hx-delete="/api/ui/mtls/certificates/{cert.get('id')}" 
-                                    hx-confirm="Revoke this certificate?"
-                                    hx-target="#mtls-certificates-list"
-                                    class="btn-sm btn-danger">Revoke</button>
-                        </div>
-                    </div>
-                '''
-            html += '</div>'
-            return html, 200
-        return '<div class="error">Failed to load certificates</div>', 500
+        response = requests.get(f"{request.url_root}api/v1/mtls/certificates", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error fetching mTLS certificates: {e}")
-        return f'<div class="error">Error: {str(e)}</div>', 500
+        current_app.logger.error(f"Error getting certificates: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
-@ui_bp.route('/api/ui/mtls/certificates', methods=['POST'])
+@ui_bp.route('/api/ui/mtls/certificates/create', methods=['POST'])
 @login_required
-def ui_mtls_certificates_create():
+def mtls_certificate_create():
     """Create new mTLS certificate"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/mtls/certificates/create", 
-                                      json=request.json)
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to create certificate'}, 500
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/mtls/certificates/create",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error creating mTLS certificate: {e}")
-        return {'error': str(e)}, 500
-
-
-@ui_bp.route('/api/ui/mtls/certificates/<int:cert_id>', methods=['DELETE'])
-@login_required
-def ui_mtls_certificate_delete(cert_id):
-    """Delete/revoke mTLS certificate and return refreshed list"""
-    try:
-        # Revoke certificate
-        response = api_call_with_retry('DELETE', f"{request.url_root}api/v1/mtls/certificates/{cert_id}")
-        
-        if response and response.status_code in [200, 204]:
-            # Return refreshed list
-            return ui_mtls_certificates_list()
-        return '<div class="error">Failed to revoke certificate</div>', 500
-    except Exception as e:
-        current_app.logger.error(f"Error revoking mTLS certificate {cert_id}: {e}")
-        return f'<div class="error">Error: {str(e)}</div>', 500
-
-
-@ui_bp.route('/api/ui/mtls/certificates/<int:cert_id>/download', methods=['GET'])
-@login_required
-def ui_mtls_certificate_download(cert_id):
-    """Download mTLS certificate"""
-    try:
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/mtls/certificates/{cert_id}/download")
-        if response and response.status_code == 200:
-            # Return certificate file
-            return response.content, 200, {
-                'Content-Type': 'application/x-pem-file',
-                'Content-Disposition': f'attachment; filename="mtls-cert-{cert_id}.pem"'
-            }
-        return 'Certificate not found', 404
-    except Exception as e:
-        current_app.logger.error(f"Error downloading certificate {cert_id}: {e}")
-        return f'Error: {str(e)}', 500
-
-
-@ui_bp.route('/api/ui/mtls/validate', methods=['POST'])
-@login_required
-def ui_mtls_validate_certificate():
-    """Validate uploaded certificate"""
-    try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/mtls/validate-certificate", 
-                                      json=request.json)
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Validation failed'}, 400
-    except Exception as e:
-        current_app.logger.error(f"Error validating certificate: {e}")
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Error creating certificate: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/mtls/certificates/enroll', methods=['POST'])
 @login_required
-def ui_mtls_certificate_enroll():
-    """Enroll existing certificate"""
+def mtls_certificate_enroll():
+    """Enroll/import mTLS certificate"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/mtls/certificates/enroll", 
-                                      json=request.json)
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Enrollment failed'}, 500
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/mtls/certificates/enroll",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
     except Exception as e:
         current_app.logger.error(f"Error enrolling certificate: {e}")
-        return {'error': str(e)}, 500
+        return jsonify({"error": str(e)}), 500
 
 
-# ============================================================================
-# WebAuthn UI Routes (Session-based)
-# ============================================================================
+@ui_bp.route('/api/ui/mtls/validate', methods=['POST'])
+@login_required
+def mtls_validate_certificate():
+    """Validate certificate before import"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/mtls/validate-certificate",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error validating certificate: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/mtls/certificates/<int:cert_id>/download', methods=['GET'])
+@login_required
+def mtls_certificate_download(cert_id):
+    """Download certificate"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.get(
+            f"{request.url_root}api/v1/mtls/certificates/{cert_id}/download",
+            headers=headers,
+            verify=False
+        )
+        
+        if response.status_code == 200:
+            return response.content, 200, {
+                'Content-Type': response.headers.get('Content-Type', 'application/x-pem-file'),
+                'Content-Disposition': response.headers.get('Content-Disposition', f'attachment; filename="certificate_{cert_id}.pem"')
+            }
+        else:
+            return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error downloading certificate: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/mtls/certificates/<int:cert_id>/revoke', methods=['POST'])
+@login_required
+def mtls_certificate_revoke(cert_id):
+    """Revoke certificate"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.post(
+            f"{request.url_root}api/v1/mtls/certificates/{cert_id}/revoke",
+            headers=headers,
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error revoking certificate: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/mtls/certificates/<int:cert_id>/enable', methods=['POST'])
+@login_required
+def mtls_certificate_enable(cert_id):
+    """Enable certificate"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.post(
+            f"{request.url_root}api/v1/mtls/certificates/{cert_id}/enable",
+            headers=headers,
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error enabling certificate: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/mtls/certificates/<int:cert_id>', methods=['DELETE'])
+@login_required
+def mtls_certificate_delete(cert_id):
+    """Delete certificate"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.delete(
+            f"{request.url_root}api/v1/mtls/certificates/{cert_id}",
+            headers=headers,
+            verify=False
+        )
+        return jsonify(response.json() if response.content else {}), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error deleting certificate: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================
+# WEBAUTHN ROUTES (for settings page)
+# ============================================
 
 @ui_bp.route('/api/ui/webauthn/credentials', methods=['GET'])
 @login_required
-def ui_webauthn_credentials_list():
-    """Get user's WebAuthn credentials as HTML fragment"""
+def webauthn_credentials_list():
+    """Get user's WebAuthn credentials"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/webauthn/credentials")
-        if response and response.status_code == 200:
-            credentials = response.json()
-            
-            if not credentials:
-                return '''
-                    <div class="empty-state">
-                        <svg class="ucm-icon" width="48" height="48"><use href="#icon-key"/></svg>
-                        <p>No security keys registered</p>
-                    </div>
-                ''', 200
-            
-            html = '<div class="credentials-grid">'
-            for cred in credentials:
-                html += f'''
-                    <div class="credential-card">
-                        <div class="cred-info">
-                            <strong>{cred.get('name', 'Security Key')}</strong>
-                            <span class="cred-date">Registered: {cred.get('registered_at', 'N/A')}</span>
-                        </div>
-                        <div class="cred-actions">
-                            <button hx-delete="/api/ui/webauthn/credentials/{cred.get('id')}" 
-                                    hx-confirm="Remove this security key?"
-                                    hx-target="#webauthn-credentials-list"
-                                    class="btn-sm btn-danger">Remove</button>
-                        </div>
-                    </div>
-                '''
-            html += '</div>'
-            return html, 200
-        return '<div class="error">Failed to load credentials</div>', 500
+        response = requests.get(f"{request.url_root}api/v1/webauthn/credentials", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error fetching WebAuthn credentials: {e}")
-        return f'<div class="error">Error: {str(e)}</div>', 500
+        current_app.logger.error(f"Error getting WebAuthn credentials: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/webauthn/register/options', methods=['POST'])
 @login_required
-def ui_webauthn_register_options():
-    """Get registration options for WebAuthn"""
+def webauthn_register_options():
+    """Get WebAuthn registration options"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/webauthn/register/options", 
-                                      json=request.json)
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to generate options'}, 500
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/webauthn/register/options",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error generating WebAuthn options: {e}")
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Error getting WebAuthn options: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/webauthn/register/verify', methods=['POST'])
 @login_required
-def ui_webauthn_register_verify():
+def webauthn_register_verify():
     """Verify WebAuthn registration"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/webauthn/register/verify", 
-                                      json=request.json)
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Verification failed'}, 400
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/webauthn/register/verify",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
     except Exception as e:
         current_app.logger.error(f"Error verifying WebAuthn registration: {e}")
-        return {'error': str(e)}, 500
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/webauthn/credentials/<int:cred_id>/toggle', methods=['POST'])
+@login_required
+def webauthn_credential_toggle(cred_id):
+    """Toggle WebAuthn credential enabled/disabled"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.post(
+            f"{request.url_root}api/v1/webauthn/credentials/{cred_id}/toggle",
+            headers=headers,
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error toggling credential: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/webauthn/credentials/<int:cred_id>', methods=['DELETE'])
 @login_required
-def ui_webauthn_credential_delete(cred_id):
-    """Delete WebAuthn credential and return refreshed list"""
+def webauthn_credential_delete(cred_id):
+    """Delete WebAuthn credential"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('DELETE', f"{request.url_root}api/v1/webauthn/credentials/{cred_id}")
-        
-        if response and response.status_code in [200, 204]:
-            # Return refreshed list
-            return ui_webauthn_credentials_list()
-        return '<div class="error">Failed to remove credential</div>', 500
+        response = requests.delete(
+            f"{request.url_root}api/v1/webauthn/credentials/{cred_id}",
+            headers=headers,
+            verify=False
+        )
+        return jsonify(response.json() if response.content else {}), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error removing WebAuthn credential {cred_id}: {e}")
-        return f'<div class="error">Error: {str(e)}</div>', 500
+        current_app.logger.error(f"Error deleting credential: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
-# ============================================================================
-# Notifications UI Routes (Session-based)
-# ============================================================================
+# ============================================
+# NOTIFICATIONS ROUTES (for settings page)
+# ============================================
 
 @ui_bp.route('/api/ui/notifications/smtp/config', methods=['GET'])
 @login_required
-@admin_required
-def ui_notifications_smtp_get():
+def notifications_smtp_config_get():
     """Get SMTP configuration"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/notifications/smtp/config")
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to fetch SMTP config'}, 500
+        response = requests.get(f"{request.url_root}api/v1/notifications/smtp/config", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error fetching SMTP config: {e}")
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Error getting SMTP config: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/notifications/smtp/config', methods=['POST'])
 @login_required
-@admin_required
-def ui_notifications_smtp_post():
+def notifications_smtp_config_post():
     """Update SMTP configuration"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/notifications/smtp/config", 
-                                      json=request.json)
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to update SMTP config'}, 500
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/notifications/smtp/config",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
     except Exception as e:
         current_app.logger.error(f"Error updating SMTP config: {e}")
-        return {'error': str(e)}, 500
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/notifications/smtp/test', methods=['POST'])
 @login_required
-@admin_required
-def ui_notifications_smtp_test():
+def notifications_smtp_test():
     """Send test email"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/notifications/smtp/test", 
-                                      json=request.json)
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to send test email'}, 500
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/notifications/smtp/test",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
     except Exception as e:
         current_app.logger.error(f"Error sending test email: {e}")
-        return {'error': str(e)}, 500
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/notifications/user/settings', methods=['GET'])
-@login_required
-def ui_notifications_user_settings_get():
+@login_required  
+def notifications_user_settings_get():
     """Get user notification settings"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/notifications/user/settings")
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to fetch notification settings'}, 500
+        response = requests.get(f"{request.url_root}api/v1/notifications/user/settings", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error fetching notification settings: {e}")
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Error getting user settings: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/notifications/user/settings', methods=['POST'])
 @login_required
-def ui_notifications_user_settings_post():
+def notifications_user_settings_post():
     """Update user notification settings"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/notifications/user/settings", 
-                                      json=request.json)
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to update notification settings'}, 500
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/notifications/user/settings",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error updating notification settings: {e}")
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Error updating user settings: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/notifications/config', methods=['GET'])
 @login_required
-@admin_required
-def ui_notifications_config_get():
+def notifications_config_get():
     """Get notification configuration"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/notifications/config")
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to fetch notification config'}, 500
+        response = requests.get(f"{request.url_root}api/v1/notifications/config", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error fetching notification config: {e}")
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Error getting notification config: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/notifications/config/<notification_type>', methods=['POST'])
 @login_required
-@admin_required
-def ui_notifications_config_type_post(notification_type):
-    """Update specific notification type configuration"""
+def notifications_config_type_post(notification_type):
+    """Update notification type configuration"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('POST', 
-                                      f"{request.url_root}api/v1/notifications/config/{notification_type}", 
-                                      json=request.json)
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': f'Failed to update {notification_type} config'}, 500
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/notifications/config/{notification_type}",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error updating notification config {notification_type}: {e}")
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Error updating notification type config: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/notifications/history', methods=['GET'])
 @login_required
-def ui_notifications_history():
-    """Get notification history as HTML fragment"""
+def notifications_history():
+    """Get notification history"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        limit = request.args.get('limit', 20)
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/notifications/history?limit={limit}")
-        
-        if response and response.status_code == 200:
-            notifications = response.json()
-            
-            if not notifications:
-                return '''
-                    <div class="empty-state">
-                        <svg class="ucm-icon" width="48" height="48"><use href="#icon-inbox"/></svg>
-                        <p>No notifications yet</p>
-                    </div>
-                ''', 200
-            
-            html = '<div class="notifications-list">'
-            for notif in notifications:
-                html += f'''
-                    <div class="notification-item">
-                        <span class="notif-type">{notif.get('type', 'info')}</span>
-                        <span class="notif-message">{notif.get('message', 'N/A')}</span>
-                        <span class="notif-date">{notif.get('created_at', 'N/A')}</span>
-                    </div>
-                '''
-            html += '</div>'
-            return html, 200
-        return '<div class="error">Failed to load notifications</div>', 500
+        limit = request.args.get('limit', '20')
+        response = requests.get(
+            f"{request.url_root}api/v1/notifications/history?limit={limit}",
+            headers=headers,
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error fetching notification history: {e}")
-        return f'<div class="error">Error: {str(e)}</div>', 500
+        current_app.logger.error(f"Error getting notification history: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/notifications/stats', methods=['GET'])
 @login_required
-@admin_required
-def ui_notifications_stats():
+def notifications_stats():
     """Get notification statistics"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/notifications/stats")
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to fetch notification stats'}, 500
+        response = requests.get(f"{request.url_root}api/v1/notifications/stats", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error fetching notification stats: {e}")
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Error getting notification stats: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @ui_bp.route('/api/ui/notifications/check', methods=['POST'])
 @login_required
-@admin_required
-def ui_notifications_check():
-    """Manually trigger notification check"""
+def notifications_check():
+    """Check notifications"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/notifications/check")
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to check notifications'}, 500
+        response = requests.post(f"{request.url_root}api/v1/notifications/check", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
     except Exception as e:
         current_app.logger.error(f"Error checking notifications: {e}")
-        return {'error': str(e)}, 500
+        return jsonify({"error": str(e)}), 500
 
 
-# ============================================================================
-# System Info UI Route (was missing)
-# ============================================================================
+# ============================================
+# ACME ROUTES (for settings page)
+# ============================================
+
+@ui_bp.route('/api/ui/acme/server/config', methods=['GET'])
+@login_required
+def acme_server_config_get():
+    """Get ACME server configuration"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.get(f"{request.url_root}api/v1/acme/server/config", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error getting ACME server config: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/acme/server/config', methods=['POST'])
+@login_required
+def acme_server_config_post():
+    """Update ACME server configuration"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/acme/server/config",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error updating ACME server config: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/acme/server/status', methods=['GET'])
+@login_required
+def acme_server_status():
+    """Get ACME server status"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.get(f"{request.url_root}api/v1/acme/server/status", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error getting ACME server status: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/acme/proxy/config', methods=['GET'])
+@login_required
+def acme_proxy_config_get():
+    """Get ACME proxy configuration"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.get(f"{request.url_root}api/v1/acme/proxy/config", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error getting ACME proxy config: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/acme/proxy/config', methods=['POST'])
+@login_required
+def acme_proxy_config_post():
+    """Update ACME proxy configuration"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/acme/proxy/config",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error updating ACME proxy config: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/acme/proxy/status', methods=['GET'])
+@login_required
+def acme_proxy_status():
+    """Get ACME proxy status"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.get(f"{request.url_root}api/v1/acme/proxy/status", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error getting ACME proxy status: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/acme/external-cas', methods=['GET'])
+@login_required
+def acme_external_cas_list():
+    """Get list of external ACME CAs"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.get(f"{request.url_root}api/v1/acme/proxy/external-cas", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error getting external CAs: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/acme/external-cas/add', methods=['POST'])
+@login_required
+def acme_external_ca_add():
+    """Add external ACME CA"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/acme/proxy/external-cas",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error adding external CA: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/acme/external-cas/<int:ca_id>/edit', methods=['POST'])
+@login_required
+def acme_external_ca_edit(ca_id):
+    """Edit external ACME CA"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        headers['Content-Type'] = 'application/json'
+        response = requests.put(
+            f"{request.url_root}api/v1/acme/proxy/external-cas/{ca_id}",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error editing external CA: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/acme/external-cas/<int:ca_id>/delete', methods=['DELETE'])
+@login_required
+def acme_external_ca_delete(ca_id):
+    """Delete external ACME CA"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.delete(
+            f"{request.url_root}api/v1/acme/proxy/external-cas/{ca_id}",
+            headers=headers,
+            verify=False
+        )
+        return jsonify(response.json() if response.content else {}), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error deleting external CA: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================
+# TEMPLATES ROUTES (for settings page)
+# ============================================
+
+@ui_bp.route('/api/ui/templates/list', methods=['GET'])
+@login_required
+def templates_list_ui():
+    """Get list of certificate templates"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.get(f"{request.url_root}api/v1/templates", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error getting templates: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/templates/create', methods=['POST'])
+@login_required
+def templates_create_ui():
+    """Create new certificate template"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        headers['Content-Type'] = 'application/json'
+        response = requests.post(
+            f"{request.url_root}api/v1/templates",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error creating template: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/templates/<int:template_id>', methods=['GET'])
+@login_required
+def templates_get_ui(template_id):
+    """Get certificate template details"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.get(f"{request.url_root}api/v1/templates/{template_id}", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error getting template: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/templates/<int:template_id>/edit', methods=['POST'])
+@login_required
+def templates_edit_ui(template_id):
+    """Edit certificate template"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        headers['Content-Type'] = 'application/json'
+        response = requests.put(
+            f"{request.url_root}api/v1/templates/{template_id}",
+            headers=headers,
+            json=request.get_json(),
+            verify=False
+        )
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error editing template: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/templates/<int:template_id>/delete', methods=['DELETE'])
+@login_required
+def templates_delete_ui(template_id):
+    """Delete certificate template"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.delete(
+            f"{request.url_root}api/v1/templates/{template_id}",
+            headers=headers,
+            verify=False
+        )
+        return jsonify(response.json() if response.content else {}), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error deleting template: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@ui_bp.route('/api/ui/templates/presets', methods=['GET'])
+@login_required
+def templates_presets():
+    """Get template presets"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
+    try:
+        response = requests.get(f"{request.url_root}api/v1/templates/presets", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        current_app.logger.error(f"Error getting template presets: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================
+# SYSTEM INFO ROUTES (for settings page)
+# ============================================
 
 @ui_bp.route('/api/ui/system/info', methods=['GET'])
 @login_required
-def ui_system_info():
+def system_info_ui():
     """Get system information"""
+    token, headers = get_valid_jwt_token()
+    if not token:
+        return jsonify({"error": "Session expired"}), 401
+    
     try:
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/system/info")
-        if response and response.status_code == 200:
-            return response.json(), 200
-        return {'error': 'Failed to fetch system info'}, 500
+        response = requests.get(f"{request.url_root}api/v1/system/info", headers=headers, verify=False)
+        return jsonify(response.json()), response.status_code
     except Exception as e:
-        current_app.logger.error(f"Error fetching system info: {e}")
-        return {'error': str(e)}, 500
+        current_app.logger.error(f"Error getting system info: {e}")
+        return jsonify({"error": str(e)}), 500
