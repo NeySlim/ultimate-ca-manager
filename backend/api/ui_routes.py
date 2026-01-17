@@ -1758,13 +1758,26 @@ def cert_csr():
         # Filter out empty values
         dn = {k: v for k, v in dn.items() if v}
         
+        # Parse SANs if provided
+        altnames = []
+        altnames_raw = request.form.get('altnames', '').strip()
+        if altnames_raw:
+            for line in altnames_raw.split('\n'):
+                line = line.strip()
+                if line:
+                    altnames.append(line)
+        
         data = {
             'action': 'csr',  # CRITICAL: use action=csr
             'descr': request.form.get('descr'),
             'dn': dn,
             'key_type': request.form.get('key_type'),
-            'digest': 'sha256'
+            'digest': request.form.get('digest', 'sha256')
         }
+        
+        # Add SANs if provided
+        if altnames:
+            data['altnames'] = altnames
         
         response = requests.post(
             f"{request.url_root}api/v1/certificates",  # FIXED: correct endpoint
