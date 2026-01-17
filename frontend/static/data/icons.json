@@ -183,7 +183,7 @@
         },
         {
           "d": "M6.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm3-3.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm5 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm3 3.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z",
-          "gradient": "accent",
+          "gradient": "complement",
           "fill": "currentColor"
         }
       ]
@@ -290,13 +290,13 @@
       "paths": [
         {
           "d": "M12 2a10 10 0 100 20 10 10 0 000-20z",
-          "gradient": "info",
+          "gradient": "primary",
           "fill": "none",
           "stroke-width": "1.5"
         },
         {
           "d": "M12 16v-4m0-4h.01",
-          "gradient": "info",
+          "gradient": "primary",
           "fill": "none",
           "stroke-width": "2",
           "stroke-linecap": "round"
@@ -321,7 +321,7 @@
         },
         {
           "d": "M2 6c0 2.21 4.5 4 10 4s10-1.79 10-4",
-          "gradient": "accent",
+          "gradient": "complement",
           "fill": "none",
           "stroke-width": "1.5"
         }
@@ -339,7 +339,7 @@
         },
         {
           "d": "M9 12l2 2 4-4",
-          "gradient": "accent",
+          "gradient": "complement",
           "fill": "none",
           "stroke-width": "1.5",
           "stroke-linecap": "round",
@@ -437,7 +437,7 @@
       "paths": [
         {
           "d": "M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2",
-          "gradient": "trash",
+          "gradient": "danger",
           "fill": "none",
           "stroke-linecap": "round",
           "stroke-linejoin": "round",
@@ -445,7 +445,7 @@
         },
         {
           "d": "M10 11v6m4-6v6",
-          "gradient": "trash",
+          "gradient": "danger",
           "fill": "none",
           "stroke-linecap": "round",
           "stroke-width": "1.5"
@@ -1158,7 +1158,7 @@
         },
         {
           "d": "M6.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm3-3.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm5 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm3 3.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z",
-          "gradient": "accent",
+          "gradient": "complement",
           "fill": "currentColor"
         }
       ]
