@@ -403,14 +403,7 @@ def dashboard_stats():
 def dashboard_recent_cas():
     """Get recent CAs"""
     try:
-        token = session.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
-        
-        response = requests.get(
-            f"{request.url_root}api/v1/ca/",
-            headers=headers,
-            verify=False
-        )
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/ca/")
         
         if response.status_code != 200:
             return '<p style="color: var(--text-secondary);">No CAs found</p>'
@@ -445,14 +438,7 @@ def dashboard_recent_cas():
 def dashboard_scep_status():
     """Get SCEP status"""
     try:
-        token = session.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
-        
-        response = requests.get(
-            f"{request.url_root}scep/config",
-            headers=headers,
-            verify=False
-        )
+        response = api_call_with_retry('GET', f"{request.url_root}scep/config")
         
         if response.status_code != 200:
             return '<p style="color: var(--danger-color);">Failed to load SCEP status</p>'
@@ -1226,14 +1212,7 @@ def cert_list():
 def ca_options():
     """Get CA options for select dropdown"""
     try:
-        token = session.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
-        
-        response = requests.get(
-            f"{request.url_root}api/v1/ca/",
-            headers=headers,
-            verify=False
-        )
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/ca/")
         
         if response.status_code != 200:
             return '<option>Error loading CAs</option>'
@@ -2145,14 +2124,7 @@ def scep_save():
 def scep_requests():
     """Get SCEP requests list"""
     try:
-        token = session.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
-        
-        response = requests.get(
-            f"{request.url_root}scep/requests",
-            headers=headers,
-            verify=False
-        )
+        response = api_call_with_retry('GET', f"{request.url_root}scep/requests")
         
         if response.status_code != 200:
             return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">Failed to load requests</div>'
@@ -2522,14 +2494,7 @@ def import_save():
 def import_history():
     """Get import history"""
     try:
-        token = session.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
-        
-        response = requests.get(
-            f"{request.url_root}api/v1/import/history",
-            headers=headers,
-            verify=False
-        )
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/import/history")
         
         if response.status_code != 200:
             return '<div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No history</div>'
@@ -2908,14 +2873,7 @@ def config_regenerate_https():
 def config_users():
     """Get users list"""
     try:
-        token = session.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
-        
-        response = requests.get(
-            f"{request.url_root}api/v1/auth/users",
-            headers=headers,
-            verify=False
-        )
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/auth/users")
         
         if response.status_code != 200:
             return '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);">No users</div>'
@@ -3166,14 +3124,7 @@ def config_system_save():
 def config_db_stats():
     """Get database statistics"""
     try:
-        token = session.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
-        
-        response = requests.get(
-            f"{request.url_root}api/v1/system/stats",
-            headers=headers,
-            verify=False
-        )
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/system/stats")
         
         if response.status_code != 200:
             return '<div style="color: var(--danger-color);">Error loading stats</div>'
@@ -3308,14 +3259,19 @@ def config_system_info():
 def ca_detail(ca_id):
     """View CA details"""
     try:
-        token = session.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
-        
-        response = requests.get(
-            f"{request.url_root}api/v1/ca/{ca_id}",
-            headers=headers,
-            verify=False
+        # Get CA details (with auto token refresh)
+        response = api_call_with_retry(
+            'GET',
+            f"{request.url_root}api/v1/ca/{ca_id}"
         )
+        
+        if not response:
+            flash('Failed to connect to API', 'error')
+            return redirect(url_for('ui.ca_list'))
+        
+        if response.status_code == 401:
+            # Session expired
+            return redirect(url_for('ui.login', expired='1'))
         
         if response.status_code != 200:
             flash('CA not found', 'error')
@@ -3324,6 +3280,7 @@ def ca_detail(ca_id):
         ca = response.json()
         return render_template('ca/detail.html', ca=ca)
     except Exception as e:
+        current_app.logger.error(f"Error in ca_detail: {e}")
         flash(f'Error loading CA: {str(e)}', 'error')
         return redirect(url_for('ui.ca_list'))
 
@@ -3344,14 +3301,7 @@ def ca_new():
 def cert_detail(cert_id):
     """View certificate details"""
     try:
-        token = session.get('access_token')
-        headers = {'Authorization': f'Bearer {token}'}
-        
-        response = requests.get(
-            f"{request.url_root}api/v1/certificates/{cert_id}",
-            headers=headers,
-            verify=False
-        )
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/certificates/{cert_id}")
         
         if response.status_code != 200:
             flash('Certificate not found', 'error')
