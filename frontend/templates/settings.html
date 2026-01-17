@@ -473,103 +473,760 @@
     
     <!-- Tab: Authentication -->
     <div id="tab-authentication" class="tab-content">
-    
-    <!-- mTLS Authentication -->
-    <div class="card">
+
+    <!-- ============================================ -->
+    <!-- mTLS CLIENT CERTIFICATE AUTHENTICATION     -->
+    <!-- ============================================ -->
+
+    <div class="card" style="padding: 0;">
         <div class="card-header">
-            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-shield-check"/></svg>
-                mTLS Authentication
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-settings"/></svg>
+                Administrator Settings
             </h2>
         </div>
         <div style="padding: 1.5rem;">
-            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Configure mutual TLS (mTLS) authentication for secure client certificate-based access.
-            </p>
-            <div style="background: var(--info-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--info-color); margin-bottom: 1.5rem;">
-                <p style="font-size: 0.875rem; color: var(--text-primary); margin: 0;">
-                    <strong>ℹ️ Note:</strong> Full mTLS configuration is available in the <a href="/config/mtls" style="color: var(--primary-color); text-decoration: underline;">mTLS Configuration</a> page.
+            <!-- Warning box - shown when mTLS is disabled -->
+            <div id="mtls-disabled-warning" style="background: var(--warning-bg); border-left: 4px solid var(--warning-color); padding: 1.25rem; margin-bottom: 1.5rem; border-radius: 0.25rem; display: none;">
+                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                    <svg class="ucm-icon" width="20" height="20" style="color: var(--warning-color); flex-shrink: 0; margin-top: 2px;"><use href="#icon-alert-triangle"/></svg>
+                    <div style="flex: 1;">
+                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">⚠️ Important: Reverse Proxy Required</strong>
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.875rem; line-height: 1.6;">
+                            mTLS client certificate authentication <strong>requires a reverse proxy</strong> (Nginx or Apache) to function properly.
+                            The UCM application server cannot request client certificates from browsers directly.
+                        </p>
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: var(--card-bg); border-radius: 0.25rem;">
+                            <p style="color: var(--text-primary); margin: 0 0 0.5rem 0; font-size: 0.875rem; font-weight: 500;">Without reverse proxy:</p>
+                            <ul style="margin: 0; padding-left: 1.25rem; color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6;">
+                                <li>✅ Users can still <strong>create</strong> and <strong>manage</strong> client certificates</li>
+                                <li>✅ Certificates work for <strong>API authentication</strong> (curl, scripts)</li>
+                                <li>❌ Browsers will <strong>not be prompted</strong> for certificates</li>
+                                <li>❌ Auto-login via certificate will <strong>not work</strong> in browsers</li>
+                                <li>✅ Password authentication remains <strong>fully functional</strong></li>
+                            </ul>
+                        </div>
+                        <p style="color: var(--text-secondary); margin: 0.75rem 0 0 0; font-size: 0.875rem;">
+                            <strong>After enabling:</strong> See the configuration guide below for complete Nginx/Apache setup instructions.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Success box - shown when mTLS is enabled with CA configured -->
+            <div id="mtls-enabled-info" style="background: var(--success-bg); border-left: 4px solid var(--success-color); padding: 1.25rem; margin-bottom: 1.5rem; border-radius: 0.25rem; display: none;">
+                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                    <svg class="ucm-icon" width="20" height="20" style="color: var(--success-color); flex-shrink: 0; margin-top: 2px;"><use href="#icon-check-circle"/></svg>
+                    <div style="flex: 1;">
+                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">✓ mTLS Enabled</strong>
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.875rem; line-height: 1.6;">
+                            Client certificate authentication is enabled. See the <strong>Reverse Proxy Configuration</strong> section below for setup instructions.
+                        </p>
+                        <div id="ca-download-section" style="margin-top: 0.75rem; padding: 0.75rem; background: var(--card-bg); border-radius: 0.25rem; display: none;">
+                            <p style="color: var(--text-primary); margin: 0 0 0.5rem 0; font-size: 0.875rem; font-weight: 500;">Trusted CA:</p>
+                            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                                <span id="ca-name" style="color: var(--text-primary); font-weight: 500;"></span>
+                                <button type="button" id="download-ca-btn" class="btn-outline-secondary btn-sm">
+                                    <svg class="ucm-icon" width="14" height="14"><use href="#icon-download"/></svg>
+                                    Download CA Certificate
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <form id="mtls-settings-form">
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <!-- Enable mTLS -->
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; font-weight: 500;">
+                            <input type="checkbox" id="mtls_enabled">
+                            <div>
+                                <div style="color: var(--text-primary);">Enable mTLS Authentication</div>
+                                <div style="color: var(--text-secondary); font-size: 0.875rem; font-weight: normal;">
+                                    Allow users to authenticate using client certificates
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Require Certificate -->
+                    <div id="mtls-require-wrapper" style="display: none;">
+                        <label style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; font-weight: 500;">
+                            <input type="checkbox" id="mtls_required">
+                            <div>
+                                <div style="color: var(--text-primary);">Require Client Certificate</div>
+                                <div style="color: var(--text-secondary); font-size: 0.875rem; font-weight: normal;">
+                                    Disable password authentication (certificate only)
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Trusted CA Selection -->
+                    <div id="mtls-ca-wrapper" style="display: none;">
+                        <label class="form-label">Trusted CA for Client Certificates</label>
+                        <select id="mtls_trusted_ca_id" class="form-control">
+                            <option value="">None - Users can use self-signed or any valid certificate</option>
+                        </select>
+                        <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 0.5rem;">
+                            <strong>If CA selected:</strong> Users must create/import certificates signed by this CA<br>
+                            <strong>If None:</strong> Users can create self-signed certificates or import any valid certificate
+                        </small>
+                    </div>
+
+                    <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                        <button type="submit" class="btn-primary">
+                            <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> 
+                            Save Settings
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reverse Proxy Configuration Guide -->
+    <div class="card" style="padding: 0;">
+        <div class="card-header">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-book-open"/></svg>
+                Reverse Proxy Configuration Guide
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div style="display: grid; gap: 1.5rem;">
+                <!-- Nginx -->
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <h3 style="font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg class="ucm-icon" width="16" height="16" style="color: var(--success-color);"><use href="#icon-server"/></svg>
+                            Nginx Configuration
+                        </h3>
+                        <button type="button" onclick="copyToClipboard('nginx-config-code', 'Nginx config')" class="btn-outline-secondary btn-sm">
+                            <svg class="ucm-icon" width="14" height="14"><use href="#icon-copy"/></svg>
+                            Copy
+                        </button>
+                    </div>
+                    <pre style="background: var(--card-bg-secondary); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.875rem; color: var(--text-primary);"><code id="nginx-config-code">Loading...</code></pre>
+                    <div style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.25rem;">
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.8125rem; line-height: 1.5;">
+                            <strong>Steps:</strong><br>
+                            1. Download the CA certificate above<br>
+                            2. Save as <code>/etc/ssl/certs/ucm-client-ca.pem</code><br>
+                            3. Add this configuration to Nginx<br>
+                            4. Reload Nginx: <code>sudo nginx -s reload</code>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Apache -->
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <h3 style="font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <svg class="ucm-icon" width="16" height="16" style="color: var(--danger-color);"><use href="#icon-server"/></svg>
+                            Apache Configuration
+                        </h3>
+                        <button type="button" onclick="copyToClipboard('apache-config-code', 'Apache config')" class="btn-outline-secondary btn-sm">
+                            <svg class="ucm-icon" width="14" height="14"><use href="#icon-copy"/></svg>
+                            Copy
+                        </button>
+                    </div>
+                    <pre style="background: var(--card-bg-secondary); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.875rem; color: var(--text-primary);"><code id="apache-config-code">Loading...</code></pre>
+                    <div style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.25rem;">
+                        <p style="color: var(--text-secondary); margin: 0; font-size: 0.8125rem; line-height: 1.5;">
+                            <strong>Steps:</strong><br>
+                            1. Download the CA certificate above<br>
+                            2. Save as <code>/etc/ssl/certs/ucm-client-ca.pem</code><br>
+                            3. Add this configuration to Apache<br>
+                            4. Reload Apache: <code>sudo systemctl reload apache2</code>
+                        </p>
+                    </div>
+                </div>
+    # Server certificate
+    SSLCertificateFile /path/to/server.crt
+    SSLCertificateKeyFile /path/to/server.key
+    
+    # Client certificate validation
+    # Export your trusted CA from UCM and reference it here
+    SSLCACertificateFile /path/to/trusted-ca.pem
+    SSLVerifyClient optional  # or 'require'
+    SSLVerifyDepth 2
+    
+    # Forward client certificate info
+    RequestHeader set X-SSL-Client-Cert "%{SSL_CLIENT_CERT}s"
+    RequestHeader set X-SSL-Client-Verify "%{SSL_CLIENT_VERIFY}s"
+    RequestHeader set X-SSL-Client-S-DN "%{SSL_CLIENT_S_DN}s"
+    RequestHeader set X-SSL-Client-M-Serial "%{SSL_CLIENT_M_SERIAL}s"
+    
+    ProxyPass / https://127.0.0.1:5000/
+    ProxyPassReverse / https://127.0.0.1:5000/
+&lt;/VirtualHost&gt;</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================================= -->
+    <!-- SECTION 2: USER CERTIFICATES -->
+    <!-- ========================================= -->
+    <div id="user-section" style="display: none;">
+        <div class="card" style="padding: 0;">
+            <div class="card-header">
+                <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                    <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
+                    My Client Certificates
+                </h2>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs-container" style="display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 2px solid var(--border-color);">
+                <button class="tab-button active" onclick="ucm_switchTab('create')" id="btn-tab-create" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 600; color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+                    <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-plus"/></svg>
+                    Create
+                </button>
+                <button class="tab-button" onclick="ucm_switchTab('import')" id="btn-tab-import" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+                    <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-upload"/></svg>
+                    Import
+                </button>
+                <button class="tab-button" onclick="ucm_switchTab('manage'); loadCertificates()" id="btn-tab-manage" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+                    <svg class="ucm-icon" width="20" height="20" style="margin-right: 8px;"><use href="#icon-inbox"/></svg>
+                    Manage
+                </button>
+            </div>
+
+            <!-- Tab Content -->
+            <div style="padding: 1.5rem;">
+                <!-- TAB 1: Create Certificate -->
+                <div id="tab-create" class="tab-content">
+                    <div id="create-with-ca" style="display: none;">
+                        <div style="background: var(--success-bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--success-color);">
+                            <strong style="color: var(--text-primary);">✓ Managed Certificate</strong>
+                            <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
+                                Your certificate will be signed by: <strong id="ca-name-display"></strong>
+                            </p>
+                        </div>
+
+                        <form id="create-managed-cert-form">
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <div>
+                                    <label class="form-label">Common Name (CN) *</label>
+                                    <input type="text" id="create_cn" class="form-control" placeholder="john.doe" required>
+                                    <small style="color: var(--text-secondary); font-size: 0.75rem;">Your username or identifier</small>
+                                </div>
+
+                                <div>
+                                    <label class="form-label">Email Address</label>
+                                    <input type="email" id="create_email" class="form-control" placeholder="john.doe@company.com">
+                                </div>
+
+                                <div>
+                                    <label class="form-label">Validity (days)</label>
+                                    <input type="number" id="create_validity" class="form-control" value="365" min="1" max="3650">
+                                </div>
+
+                                <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                                    <button type="submit" class="btn-primary">
+                                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-key"/></svg>
+                                        Generate Certificate
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div id="create-self-signed" style="display: none;">
+                        <div style="background: var(--warning-bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--warning-color);">
+                            <strong style="color: var(--text-primary);">⚠️ Self-Signed Certificate</strong>
+                            <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
+                                Your certificate will be self-signed and not managed by UCM
+                            </p>
+                        </div>
+
+                        <form id="create-selfsigned-cert-form">
+                            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                                <div>
+                                    <label class="form-label">Common Name (CN) *</label>
+                                    <input type="text" id="selfsigned_cn" class="form-control" placeholder="john.doe" required>
+                                </div>
+
+                                <div>
+                                    <label class="form-label">Email Address</label>
+                                    <input type="email" id="selfsigned_email" class="form-control" placeholder="john.doe@company.com">
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                    <div>
+                                        <label class="form-label">Validity (days)</label>
+                                        <input type="number" id="selfsigned_validity" class="form-control" value="365" min="1" max="3650">
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Key Size</label>
+                                        <select id="selfsigned_keysize" class="form-control">
+                                            <option value="2048">2048 bits</option>
+                                            <option value="3072">3072 bits</option>
+                                            <option value="4096" selected>4096 bits</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                                    <button type="submit" class="btn-primary">
+                                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-key"/></svg>
+                                        Generate Self-Signed Certificate
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- TAB 2: Import Certificate -->
+                <div id="tab-import" class="tab-content" style="display: none;">
+                    <div id="import-info-ca" style="display: none; background: rgba(59, 130, 246, 0.1); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--info-color);">
+                        <strong style="color: var(--text-primary);">ℹ️ Validation Required</strong>
+                        <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
+                            Imported certificates must be signed by: <strong id="import-ca-name-display"></strong>
+                        </p>
+                    </div>
+
+                    <div id="import-info-any" style="display: none; background: var(--warning-bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; border-left: 4px solid var(--warning-color);">
+                        <strong style="color: var(--text-primary);">⚠️ Any Valid Certificate</strong>
+                        <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.875rem;">
+                            You can import any valid X.509 certificate
+                        </p>
+                    </div>
+
+                    <form id="import-cert-form">
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <div>
+                                <label class="form-label">Certificate Name (Optional)</label>
+                                <input type="text" id="import_name" class="form-control" placeholder="My YubiKey Certificate">
+                                <small style="color: var(--text-secondary); font-size: 0.75rem;">Friendly name to identify this certificate</small>
+                            </div>
+
+                            <div>
+                                <label class="form-label">Certificate (PEM format) *</label>
+                                <textarea id="import_cert_pem" class="form-control" rows="12" 
+                                          placeholder="-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----" required></textarea>
+                            </div>
+
+                            <div style="display: flex; gap: 1rem;">
+                                <button type="button" onclick="validateImportedCert()" class="btn btn-outline-secondary">
+                                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-check-circle"/></svg>
+                                    Validate Certificate
+                                </button>
+                                <button type="submit" class="btn-secondary">
+                                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-upload"/></svg>
+                                    Import Certificate
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div id="import-validation-result" style="margin-top: 1rem; display: none;"></div>
+                </div>
+
+                <!-- TAB 3: Manage Certificates -->
+                <div id="tab-manage" class="tab-content" style="display: none;">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Subject</th>
+                                    <th>Serial</th>
+                                    <th>Valid Until</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="certificates-tbody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                                        <svg class="ucm-icon" width="32" height="32" style="opacity: 0.5;"><use href="#icon-key"/></svg>
+                                        <p style="margin-top: 0.5rem;">Loading certificates...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- mTLS Disabled Message -->
+    <div id="mtls-disabled-message" style="display: none;">
+        <div class="card" style="padding: 0;">
+            <div style="padding: 3rem; text-align: center;">
+                <svg class="ucm-icon" width="64" height="64" style="opacity: 0.3; margin-bottom: 1rem;"><use href="#icon-shield-check"/></svg>
+                <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">mTLS Authentication is Disabled</h3>
+                <p style="color: var(--text-secondary);">
+                    {% if session.get('role') == 'admin' %}
+                    Enable mTLS in the settings above to allow certificate-based authentication.
+                    {% else %}
+                    Contact your administrator to enable mTLS authentication.
+                    {% endif %}
                 </p>
             </div>
-            <a href="/config/mtls" class="btn-primary">
-                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-settings"/></svg>
-                Configure mTLS
-            </a>
         </div>
     </div>
-    
-    <!-- WebAuthn / FIDO2 -->
-    <div class="card">
-        <div class="card-header">
-            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
-                WebAuthn / FIDO2
-            </h2>
-        </div>
-        <div style="padding: 1.5rem;">
-            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Passwordless authentication using hardware security keys (YubiKey, etc.).
-            </p>
-            <div style="background: var(--info-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--info-color); margin-bottom: 1.5rem;">
-                <p style="font-size: 0.875rem; color: var(--text-primary); margin: 0;">
-                    <strong>ℹ️ Note:</strong> Users can manage their security keys in <a href="/config/webauthn" style="color: var(--primary-color); text-decoration: underline;">WebAuthn Settings</a>.
+
+    <!-- ============================================ -->
+    <!-- WEBAUTHN / FIDO2 PASSWORDLESS AUTH         -->
+    <!-- ============================================ -->
+
+        <div style="display: flex; align-items: start; gap: 1rem;">
+            <svg class="ucm-icon" width="16" height="16" style="color: var(--warning-color); flex-shrink: 0; margin-top: 0.25rem;"><use href="#icon-warning-triangle"/></svg>
+            <div style="flex: 1;">
+                <strong style="color: var(--warning-text); display: block; margin-bottom: 0.5rem;">⚠️ Incompatible Hostname Detected</strong>
+                <p style="color: var(--warning-text); opacity: 0.9; margin: 0 0 0.75rem 0; font-size: 0.875rem;">
+                    WebAuthn requires a valid domain name or IP address. You are currently accessing UCM via "<span id="current-hostname" style="font-family: monospace; font-weight: 600;"></span>" which is not compatible.
                 </p>
+                <p style="color: var(--warning-text); opacity: 0.9; margin: 0 0 0.75rem 0; font-size: 0.875rem;">
+                    <strong>To use WebAuthn, please access UCM using one of these URLs:</strong>
+                </p>
+                <div id="valid-urls" style="font-size: 0.875rem; margin-left: 1rem;"></div>
             </div>
-            <a href="/config/webauthn" class="btn-primary">
-                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-settings"/></svg>
-                Configure WebAuthn
-            </a>
         </div>
     </div>
-    
-    <!-- User Management -->
-    <div class="card">
+
+    <!-- Info Alert -->
+    <div class="info-box">
+        <div class="info-box-title">
+            <svg class="ucm-icon" width="20" height="20" ><use href="#icon-key"/></svg>
+            <span>Passwordless Authentication</span>
+        </div>
+        <div class="info-box-content">
+            <p>
+                Register your security keys (YubiKey, Nitrokey) or platform authenticators (TouchID, Windows Hello, Face ID) for passwordless login.
+                Your credentials are encrypted and stored securely, never leaving your device.
+            </p>
+        </div>
+    </div>
+
+    <!-- My Registered Keys -->
+    <div class="card" style="padding: 0;">
         <div class="card-header">
-            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-users"/></svg>
-                Local Users
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
+                My Registered Keys
             </h2>
         </div>
-        <div style="padding: 1.5rem;">
-            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Manage local user accounts and permissions.
-            </p>
-            <a href="/config" class="btn-primary">
-                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-users"/></svg>
-                Manage Users
-            </a>
+        <div id="credentials-list" style="padding: 1.5rem;">
+            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                <svg class="ucm-icon" width="32" height="32" style="  margin-bottom: 0.5rem;"><use href="#icon-spinner"/></svg>
+                <p>Loading credentials...</p>
+            </div>
         </div>
     </div>
-    
+
+    <!-- Statistics Card -->
+    <div class="card" style="padding: 0;">
+        <div class="card-header">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-chart-bar"/></svg>
+                Usage Statistics
+            </h2>
+        </div>
+        <div style="padding: 1.5rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: var(--primary-color);" id="total-credentials">-</div>
+                <div style="color: var(--text-secondary); font-size: 0.875rem;">Total Keys</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: var(--success-color);" id="active-credentials">-</div>
+                <div style="color: var(--text-secondary); font-size: 0.875rem;">Active Keys</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: var(--text-secondary);" id="last-used">-</div>
+                <div style="color: var(--text-secondary); font-size: 0.875rem;">Last Used</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Registration Modal -->
+<div id="registration-modal" style="display: none; position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+    <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0;">
+                Register Security Key
+            </h3>
+            <button onclick="hideRegistrationModal()" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.25rem;">
+                <svg class="ucm-icon" width="24" height="24" style=" "><use href="#icon-times"/></svg>
+            </button>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div id="registration-step-1">
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">
+                        Key Name <span style="color: var(--error-color);">*</span>
+                    </label>
+                    <input type="text" id="credential-name" placeholder="e.g., YubiKey 5C, TouchID Macbook" 
+                           style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.25rem; background: var(--input-bg); color: var(--text-primary);">
+                    <small style="color: var(--text-secondary); font-size: 0.875rem;">Give your security key a descriptive name</small>
+                </div>
+
+                <div style="background: var(--warning-bg); border-left: 4px solid var(--warning-color); padding: 1rem; margin-bottom: 1.5rem; border-radius: 0.25rem;">
+                    <p style="color: var(--warning-text); margin: 0; font-size: 0.875rem;">
+                        <strong>📱 Before proceeding:</strong><br>
+                        • Have your security key ready<br>
+                        • Make sure it's plugged in (for USB keys)<br>
+                        • Your browser may prompt for biometric or PIN verification
+                    </p>
+                </div>
+
+                <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                    <button onclick="hideRegistrationModal()" class="btn-secondary">Cancel</button>
+                    <button onclick="startRegistration()" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-shield-check"/></svg> Start Registration
+                    </button>
+                </div>
+            </div>
+
+            <div id="registration-step-2" style="display: none; text-align: center;">
+                <div style="padding: 2rem;">
+                    <svg class="ucm-icon" width="48" height="48" style="  color: var(--primary-color); margin-bottom: 1rem;"><use href="#icon-spinner"/></svg>
+                    <h4 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+                        Touch Your Security Key
+                    </h4>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        Follow your browser's prompts to complete registration
+                    </p>
+                </div>
+                <button onclick="cancelRegistration()" class="btn-secondary">Cancel</button>
+            </div>
+
+            <div id="registration-step-3" style="display: none; text-align: center;">
+                <div style="padding: 2rem;">
+                    <div style="width: 4rem; height: 4rem; background: var(--success-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+                        <svg class="ucm-icon" width="32" height="32" style="  color: white;"><use href="#icon-check-circle"/></svg>
+                    </div>
+                    <h4 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+                        Registration Successful!
+                    </h4>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        Your security key has been registered and is ready to use
+                    </p>
+                </div>
+                <button onclick="hideRegistrationModal(); loadCredentials();" class="btn-primary">Done</button>
+            </div>
+
+            <div id="registration-step-error" style="display: none; text-align: center;">
+                <div style="padding: 2rem;">
+                    <div style="width: 4rem; height: 4rem; background: var(--error-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+                        <svg class="ucm-icon" width="32" height="32" style="  color: white;"><use href="#icon-times"/></svg>
+                    </div>
+                    <h4 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+                        Registration Failed
+                    </h4>
+                    <p id="registration-error-message" style="color: var(--text-secondary); font-size: 0.875rem;"></p>
+                </div>
+                <div style="display: flex; gap: 0.75rem; justify-content: center;">
+                    <button onclick="hideRegistrationModal()" class="btn-secondary">Close</button>
+                    <button onclick="resetRegistrationModal()" class="btn-primary">Try Again</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
     </div><!-- End Tab: Authentication -->
     
     <!-- Tab: Email & Notifications -->
-    <div id="tab-email" class="tab-content">
-    
-    <!-- SMTP Server -->
-    <div class="card">
-        <div class="card-header">
-            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                <svg class="ucm-icon" width="20" height="20" style="color: var(--primary-color);"><use href="#icon-mail"/></svg>
+    <div id="tab-email" class="tab-content" style="display: none;">
+
+    <!-- ============================================ -->
+    <!-- EMAIL & SMTP CONFIGURATION                  -->
+    <!-- ============================================ -->
+
+    <div class="card" style="padding: 0;">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-server"/></svg>
                 SMTP Server Configuration
+                <span class="badge-outline badge-warning" style="margin-left: 0.5rem; font-size: 0.75rem;">Admin Only</span>
+            </h2>
+            <span id="smtp-status-badge" class="badge-outline badge-secondary">
+                <svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg>
+                Not Configured
+            </span>
+        </div>
+        <div style="padding: 1.5rem;">
+            <form id="smtp-form">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                    <!-- SMTP Host -->
+                    <div>
+                        <label class="form-label">SMTP Host *</label>
+                        <input type="text" id="smtp_host" class="form-input" placeholder="smtp.gmail.com" required>
+                    </div>
+                    
+                    <!-- SMTP Port -->
+                    <div>
+                        <label class="form-label">SMTP Port *</label>
+                        <input type="number" id="smtp_port" class="form-input" placeholder="587" value="587" required>
+                    </div>
+                    
+                    <!-- SMTP User -->
+                    <div>
+                        <label class="form-label">Username</label>
+                        <input type="text" id="smtp_user" class="form-input" placeholder="user@gmail.com">
+                    </div>
+                    
+                    <!-- SMTP Password -->
+                    <div>
+                        <label class="form-label">Password</label>
+                        <input type="password" id="smtp_password" class="form-input" placeholder="••••••••">
+                        <small style="color: var(--text-secondary); font-size: 0.75rem;">Leave blank to keep current password</small>
+                    </div>
+                    
+                    <!-- From Email -->
+                    <div>
+                        <label class="form-label">From Email *</label>
+                        <input type="email" id="smtp_from" class="form-input" placeholder="noreply@ucm.local" required>
+                    </div>
+                    
+                    <!-- From Name -->
+                    <div>
+                        <label class="form-label">From Name</label>
+                        <input type="text" id="smtp_from_name" class="form-input" placeholder="UCM Notifications" value="UCM Notifications">
+                    </div>
+                    
+                    <!-- Security Options -->
+                    <div style="grid-column: 1 / -1;">
+                        <label class="form-label">Security</label>
+                        <div style="display: flex; gap: 2rem; margin-top: 0.5rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="smtp_use_tls" checked>
+                                Use TLS (STARTTLS)
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="smtp_use_ssl">
+                                Use SSL
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="smtp_enabled">
+                                <strong>Enable SMTP</strong>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                    <button type="submit" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save SMTP Configuration
+                    </button>
+                    <button type="button" onclick="testSMTP()" class="btn btn-outline-secondary">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-envelope"/></svg>
+                        Send Test Email
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- My Notification Settings -->
+    <div class="card" style="padding: 0;">
+        <div class="card-header">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-user"/></svg>
+                My Notification Settings
             </h2>
         </div>
         <div style="padding: 1.5rem;">
-            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Configure outbound email settings for notifications and alerts.
-            </p>
-            <div style="background: var(--info-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--info-color); margin-bottom: 1.5rem;">
-                <p style="font-size: 0.875rem; color: var(--text-primary); margin: 0;">
-                    <strong>ℹ️ Note:</strong> Full email configuration is available in the <a href="/config/notifications" style="color: var(--primary-color); text-decoration: underline;">Notifications</a> page.
-                </p>
-            </div>
-            <a href="/config/notifications" class="btn-primary">
-                <svg class="ucm-icon" width="16" height="16" style="margin-right: 0.5rem;"><use href="#icon-settings"/></svg>
-                Configure Email
-            </a>
+            <form id="user-notification-form">
+                <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; max-width: 600px;">
+                    <div>
+                        <label class="form-label">
+                            <svg class="ucm-icon" width="14" height="14" style="margin-right: 0.25rem;"><use href="#icon-envelope"/></svg>
+                            Email Address for Notifications
+                        </label>
+                        <input type="email" id="user_notification_email" class="form-input" 
+                               placeholder="your.email@example.com" 
+                               value="{{ session.get('email', '') }}">
+                        <small style="color: var(--text-secondary); font-size: 0.875rem; display: block; margin-top: 0.5rem;">
+                            All certificate expiration and system notifications will be sent to this email address.
+                        </small>
+                    </div>
+                    
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="user_notifications_enabled" checked>
+                            <strong>Enable email notifications for my account</strong>
+                        </label>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+                    <button type="submit" class="btn-primary">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save My Settings
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
-    
+
+    <!-- Notification Rules -->
+    <div class="card" style="padding: 0;">
+        <div class="card-header">
+            <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-bell"/></svg>
+                Notification Rules
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div id="notification-rules" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Rules will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification History -->
+    <div class="card" style="padding: 0;">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-clock"/></svg>
+                Notification History
+            </h2>
+            <div id="notification-stats" style="display: flex; gap: 1rem;">
+                <!-- Stats will be loaded here -->
+            </div>
+        </div>
+        <div style="padding: 1.5rem;">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Recipient</th>
+                            <th>Subject</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="notification-history-tbody">
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                                <svg class="ucm-icon" width="32" height="32" style=" opacity: 0.5;"><use href="#icon-inbox"/></svg>
+                                <p style="margin-top: 0.5rem;">Loading history...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+
     </div><!-- End Tab: Email & Notifications -->
     
     
@@ -854,7 +1511,321 @@
     </div><!-- End Tab: Database -->
     
     <!-- Tab: Advanced -->
-    <div id="tab-advanced" class="tab-content">
+    <div id="tab-advanced" class="tab-content" style="display: none;">
+
+    <!-- ============================================ -->
+    <!-- ACME SERVER & PROXY CONFIGURATION           -->
+    <!-- ============================================ -->
+
+<div class="tabs-container" style="display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 2px solid var(--border-color);">
+    <button class="tab-button active" onclick="ucm_switchTab('server')" id="btn-tab-server" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 600; color: var(--primary-color); border-bottom: 3px solid var(--primary-color); background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+        <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-certificate-authority"/></svg> Local Server
+    </button>
+    <button class="tab-button" onclick="ucm_switchTab('proxy')" id="btn-tab-proxy" style="padding: 1rem 2rem; font-size: 0.95rem; font-weight: 500; color: var(--text-secondary); border-bottom: 3px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; min-height: 3.5rem;">
+        <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px;"><use href="#icon-shield-check"/></svg> Proxy Client
+    </button>
+</div>
+
+<!-- Tab: Local Server -->
+<div id="tab-server" class="tab-content" style="display: block;">
+    <!-- ACME Status Card -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: auto 1fr 1fr; gap: 24px; align-items: start;">
+            <!-- Status Badge -->
+            <div>
+                <span class="badge badge-success" id="acme-status-badge" style="font-size: 14px; padding: 6px 12px;">
+                    <i class="bi bi-check-circle-fill"></i> Active
+                </span>
+            </div>
+            
+            <!-- CA Info -->
+            <div>
+                <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">ACME Server</div>
+                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 8px;" id="acme-ca-display">Loading CA...</div>
+                
+                <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Supported Features</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                    <span class="badge bg-secondary" style="font-size: 11px;" title="Account registration">new-account</span>
+                    <span class="badge bg-secondary" style="font-size: 11px;" title="Order creation">new-order</span>
+                    <span class="badge bg-secondary" style="font-size: 11px;" title="HTTP-01 validation">HTTP-01</span>
+                    <span class="badge bg-secondary" style="font-size: 11px;" title="DNS-01 validation">DNS-01</span>
+                </div>
+            </div>
+            
+            <!-- Directory URL -->
+            <div>
+                <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">
+                    Directory URL
+                </label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" class="form-control" readonly 
+                           value="https://{{ request.host }}/acme/directory" 
+                           style="font-family: monospace; font-size: 13px; flex: 1;">
+                    <button class="btn btn-secondary" type="button" 
+                            onclick="copyToClipboard('https://{{ request.host }}/acme/directory')"
+                            title="Copy to clipboard">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-copy"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div class="card" style="text-align: center; padding: 20px;">
+            <svg class="ucm-icon" width="32" height="32" style="color: var(--primary-color);"><use href="#icon-user-check"/></svg>
+            <div style="font-size: 2rem; font-weight: bold; margin: 8px 0; color: var(--text-primary);" id="total-accounts">-</div>
+            <div style="font-size: 13px; color: var(--text-secondary);">ACME Accounts</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 20px;">
+            <svg class="ucm-icon" width="32" height="32" style="color: var(--warning-color);"><use href="#icon-clock"/></svg>
+            <div style="font-size: 2rem; font-weight: bold; margin: 8px 0; color: var(--text-primary);" id="active-orders">-</div>
+            <div style="font-size: 13px; color: var(--text-secondary);">Active Orders</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 20px;">
+            <svg class="ucm-icon" width="32" height="32" style="color: var(--success-color);"><use href="#icon-check-circle"/></svg>
+            <div style="font-size: 2rem; font-weight: bold; margin: 8px 0; color: var(--text-primary);" id="completed-orders">-</div>
+            <div style="font-size: 13px; color: var(--text-secondary);">Completed Orders</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 20px;">
+            <svg class="ucm-icon" width="32" height="32" style="color: var(--info-color);"><use href="#icon-certificate"/></svg>
+            <div style="font-size: 2rem; font-weight: bold; margin: 8px 0; color: var(--text-primary);" id="issued-certs">-</div>
+            <div style="font-size: 13px; color: var(--text-secondary);">Certificates Issued</div>
+        </div>
+    </div>
+
+    <!-- ACME Accounts -->
+    <div class="card" style="margin-bottom: 20px; padding: 0;">
+        <div style="padding: 1.5rem 1.5rem 0.75rem 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="18" height="18"><use href="#icon-user-check"/></svg>
+                ACME Accounts
+            </h2>
+        </div>
+        <div id="accounts-table" 
+             hx-get="/api/ui/acme/accounts" 
+             hx-trigger="load"
+             hx-indicator="#accounts-loading">
+            <div id="accounts-loading" style="text-align: center; padding: 40px;">
+                <svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>
+                <p style="margin-top: 8px; font-size: 13px; color: var(--text-secondary);">Loading accounts...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACME Orders -->
+    <div class="card" style="margin-bottom: 20px; padding: 0;">
+        <div style="padding: 1.5rem 1.5rem 0.75rem 1.5rem; border-bottom: 1px solid var(--border-color);">
+            <h2 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="18" height="18"><use href="#icon-inbox"/></svg>
+                ACME Orders
+            </h2>
+        </div>
+        <div id="orders-table" 
+             hx-get="/api/ui/acme/orders" 
+             hx-trigger="load"
+             hx-indicator="#orders-loading">
+            <div id="orders-loading" style="text-align: center; padding: 40px;">
+                <svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>
+                <p style="margin-top: 8px; font-size: 13px; color: var(--text-secondary);">Loading orders...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACME Configuration -->
+    <div class="card" style="padding: 0;">
+        <div style="padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 16px;">
+            <h2 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="18" height="18"><use href="#icon-settings"/></svg>
+                ACME Configuration
+            </h2>
+        </div>
+        <form id="acme-settings-form" 
+              hx-post="/api/ui/acme/settings" 
+              hx-swap="none">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px;">
+                <div>
+                    <label class="form-label">Default CA for ACME</label>
+                    <select name="default_ca" class="form-control" id="acme-default-ca"
+                            hx-get="/api/ui/ca/options" 
+                            hx-trigger="load"
+                            hx-swap="innerHTML">
+                        <option>Loading CAs...</option>
+                    </select>
+                    <small style="display: block; margin-top: 4px; font-size: 12px; color: var(--text-secondary);">
+                        CA used to sign ACME certificates
+                    </small>
+                </div>
+
+                <div>
+                    <label class="form-label">Certificate Validity (days)</label>
+                    <input type="number" name="cert_validity" class="form-control" 
+                           value="90" min="1" max="397">
+                    <small style="display: block; margin-top: 4px; font-size: 12px; color: var(--text-secondary);">
+                        Default: 90 days, Max: 397 days
+                    </small>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary">
+                <i class="bi bi-check-circle"></i> Save Settings
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Tab: Proxy Client -->
+<div id="tab-proxy" class="tab-content" style="display: none;">
+    
+    <!-- Info Card -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+             <h2 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0;">
+                <svg class="ucm-icon" width="18" height="18" style="margin-right: 8px; vertical-align: text-bottom; color: var(--info-color);"><use href="#icon-info-circle"/></svg>
+                About ACME Proxy
+            </h2>
+        </div>
+        <div style="padding: 1.5rem;">
+            {% if is_self_signed %}
+            <div class="alert alert-warning" style="margin-bottom: 16px; font-size: 13px;">
+                <svg class="ucm-icon" width="16" height="16" style="margin-right: 6px;"><use href="#icon-warning-triangle"/></svg>
+                <strong>Self-Signed Certificate Detected</strong><br>
+                This server is using a self-signed certificate. ACME clients (like Certbot) will fail to connect unless you:
+                <ul style="margin-bottom: 0; padding-left: 20px; margin-top: 4px;">
+                    <li>Install the root CA on the client machine</li>
+                    <li>Or configure the client to skip SSL verification (e.g. <code>--no-verify-ssl</code>)</li>
+                </ul>
+            </div>
+            {% endif %}
+            <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 0;">
+                The ACME Proxy acts as a secure gateway between your internal clients (Certbot, Traefik, etc.) and Let's Encrypt. 
+                Instead of each client managing its own account, the Proxy uses a <strong>shared upstream account</strong> to communicate with the provider.
+                This allows for centralized rate limiting, logging, and policy enforcement.
+            </p>
+        </div>
+    </div>
+
+    <!-- Proxy Status & Actions Card -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: auto 1fr 1fr; gap: 24px; align-items: start;">
+            <!-- Service Status -->
+            <div>
+                <span class="badge badge-info" id="proxy-status-badge" style="font-size: 14px; padding: 6px 12px;">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-server"/></svg> Service Running
+                </span>
+            </div>
+            
+            <!-- Upstream Connection -->
+            <div>
+                <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Upstream Provider</div>
+                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 16px;" id="proxy-upstream-display">Let's Encrypt Staging</div>
+                
+                <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Connection Status</div>
+                <div id="proxy-account-container">
+                    <!-- Loaded dynamically -->
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Checking...
+                </div>
+            </div>
+            
+            <!-- Directory URL -->
+            <div>
+                <label style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 4px;">
+                    Proxy Endpoint (Directory URL)
+                </label>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <input type="text" class="form-control" readonly 
+                           id="proxy-directory-url"
+                           value="https://{{ request.host }}/acme/proxy/directory" 
+                           style="font-family: monospace; font-size: 13px; flex: 1;">
+                    <button class="btn btn-secondary" type="button" 
+                            onclick="copyToClipboard(document.getElementById('proxy-directory-url').value)"
+                            title="Copy to clipboard">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-copy"/></svg>
+                    </button>
+                </div>
+                <p style="font-size: 12px; color: var(--text-secondary); margin: 0;">
+                    Configure your ACME clients to use this URL.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    <!-- ============================================ -->
+    <!-- CERTIFICATE TEMPLATES MANAGEMENT            -->
+    <!-- ============================================ -->
+
+    </div>
+
+    <!-- Stats Cards -->
+    <div id="templates-stats" 
+         style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;"
+         hx-get="/api/ui/templates/stats" 
+         hx-trigger="load, refreshTemplates from:body"
+         hx-swap="innerHTML">
+        <div class="stats-card skeleton"></div>
+    </div>
+
+    <!-- Templates List -->
+    <div class="card" style="padding: 1.5rem;">
+        <div id="templates-list"
+             hx-get="/api/ui/templates/list"
+             hx-trigger="load, refreshTemplates from:body"
+             hx-swap="innerHTML">
+            <div style="text-align: center; padding: 3rem;">
+                <p style="color: var(--text-secondary);">Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Template Modal (Custom HTML) - View only, overlay can close -->
+<div id="viewTemplateModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+    <div onclick="event.stopPropagation()" style="background: var(--card-bg); border-radius: 8px; max-width: 700px; width: 90%; max-height: 90vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--text-primary); margin: 0;">Template Details</h2>
+            <button onclick="closeModal('viewTemplateModal')" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.25rem;">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-times"/></svg>
+            </button>
+        </div>
+        <div id="viewTemplateContent" style="padding: 1.5rem; overflow-y: auto; max-height: calc(90vh - 100px);">
+            <svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Template Modal - Has form, no overlay close -->
+<div id="createTemplateModal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+    <div onclick="event.stopPropagation()" style="background: var(--card-bg); border-radius: 8px; max-width: 800px; width: 90%; max-height: 90vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+        <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <h2 id="createModalTitle" style="font-size: 1.5rem; font-weight: 600; color: var(--text-primary); margin: 0;">Create Template</h2>
+            <button onclick="closeModal('createTemplateModal', true)" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0.25rem;">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-times"/></svg>
+            </button>
+        </div>
+        <div style="padding: 1.5rem; overflow-y: auto; max-height: calc(90vh - 180px);">
+            <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1.5rem;">
+                <svg class="ucm-icon" width="16" height="16" style="vertical-align: middle; margin-right: 0.25rem;"><use href="#icon-info-circle"/></svg>
+                Create/edit modal will be implemented in the next phase when templates are integrated with certificate creation.
+            </p>
+            <div style="padding: 2rem; background: var(--bg-secondary); border-radius: 6px; text-align: center;">
+                <svg class="ucm-icon" width="48" height="48" style="opacity: 0.3; margin-bottom: 1rem;"><use href="#icon-plus"/></svg>
+                <p style="color: var(--text-secondary);">Coming soon in Phase 2</p>
+            </div>
+        </div>
+        <div style="padding: 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button onclick="closeModal('createTemplateModal', true)" class="btn-secondary">Close</button>
+        </div>
+    </div>
+</div>
+
+
+    <!-- ============================================ -->
+    <!-- EXISTING ADVANCED SETTINGS                  -->
+    <!-- ============================================ -->
+
     
     <!-- Logging Configuration -->
     <div class="card">
@@ -1011,7 +1982,1845 @@
     {% endif %}
 </div>
 
+
 <script>
+// ============================================
+// UCM SETTINGS PAGE - CONSOLIDATED JAVASCRIPT
+// ============================================
+
+// ============================================
+// mTLS AUTHENTICATION
+// ============================================
+(function() {
+const token = '{{ session.get("access_token") }}';
+let currentSettings = {};
+
+// Toast helper
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 10000;
+        padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        background: ${type === 'success' ? 'var(--success-color)' : type === 'error' ? 'var(--danger-color)' : 'var(--info-color)'};
+        color: white; font-weight: 500; max-width: 400px;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+// Copy to clipboard
+function copyToClipboard(elementId, name) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    navigator.clipboard.writeText(element.textContent).then(() => {
+        showToast(`✓ ${name} copied to clipboard`, 'success');
+    }).catch(err => {
+        showToast(`✗ Failed to copy: ${err.message}`, 'error');
+    });
+}
+
+// Tab switching - Handled by ucm_switchTab global function
+// document.querySelectorAll('.tab-button').forEach(btn => ... removed ...);
+
+// Load mTLS settings
+async function loadMTLSSettings() {
+    try {
+        {% if session.get('role') == 'admin' %}
+        // Load CA list
+        const casResponse = await fetch('/api/v1/ca', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (casResponse.ok) {
+            const casData = await casResponse.json();
+            const select = document.getElementById('mtls_trusted_ca_id');
+            
+            casData.forEach(ca => {
+                const option = document.createElement('option');
+                option.value = ca.refid;
+                option.textContent = `${ca.descr}`;
+                select.appendChild(option);
+            });
+        }
+        {% endif %}
+        
+        // Load current settings
+        const response = await fetch('/api/v1/mtls/settings', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            currentSettings = await response.json();
+            
+            {% if session.get('role') == 'admin' %}
+            document.getElementById('mtls_enabled').checked = currentSettings.enabled;
+            document.getElementById('mtls_required').checked = currentSettings.required;
+            document.getElementById('mtls_trusted_ca_id').value = currentSettings.trusted_ca_id || '';
+            
+            // Show/hide dependent fields
+            toggleMTLSFields();
+            
+            // Update status badge
+            const badge = document.getElementById('mtls-status-badge');
+            if (currentSettings.enabled) {
+                badge.className = 'badge-outline badge-success';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Enabled';
+            } else {
+                badge.className = 'badge-outline badge-secondary';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Disabled';
+            }
+            {% endif %}
+            
+            // Show/hide user section
+            updateUserSection();
+        }
+    } catch (error) {
+        console.error('Error loading mTLS settings:', error);
+    }
+}
+
+// Toggle admin fields based on enabled state
+function toggleMTLSFields() {
+    const enabled = document.getElementById('mtls_enabled').checked;
+    const trustedCaId = document.getElementById('mtls_trusted_ca_id').value;
+    
+    // Show/hide dependent fields
+    document.getElementById('mtls-require-wrapper').style.display = enabled ? 'block' : 'none';
+    document.getElementById('mtls-ca-wrapper').style.display = enabled ? 'block' : 'none';
+    
+    // Show/hide warning boxes
+    const disabledWarning = document.getElementById('mtls-disabled-warning');
+    const enabledInfo = document.getElementById('mtls-enabled-info');
+    const caDownloadSection = document.getElementById('ca-download-section');
+    
+    if (enabled) {
+        disabledWarning.style.display = 'none';
+        enabledInfo.style.display = 'block';
+        
+        // Show CA download if CA is selected
+        if (trustedCaId) {
+            caDownloadSection.style.display = 'block';
+            // Update CA name
+            const selectedOption = document.getElementById('mtls_trusted_ca_id').selectedOptions[0];
+            if (selectedOption) {
+                document.getElementById('ca-name').textContent = selectedOption.textContent;
+            }
+        } else {
+            caDownloadSection.style.display = 'none';
+        }
+    } else {
+        disabledWarning.style.display = 'block';
+        enabledInfo.style.display = 'none';
+    }
+    
+    // Update configuration examples
+    updateConfigExamples();
+}
+
+// Update configuration examples with real values
+function updateConfigExamples() {
+    const enabled = document.getElementById('mtls_enabled').checked;
+    const required = document.getElementById('mtls_required').checked;
+    const trustedCaId = document.getElementById('mtls_trusted_ca_id').value;
+    
+    // Get current hostname and port
+    const hostname = window.location.hostname;
+    const port = window.location.port || '8443';
+    
+    // Determine verify mode
+    const nginxVerifyMode = required ? 'on' : 'optional';
+    const apacheVerifyMode = required ? 'require' : 'optional';
+    
+    // Update Nginx example
+    const nginxCode = document.getElementById('nginx-config-code');
+    if (nginxCode) {
+        nginxCode.textContent = `server {
+    listen ${port} ssl;
+    server_name ${hostname};
+    
+    # Server SSL certificate
+    ssl_certificate /etc/ssl/certs/ucm-server.crt;
+    ssl_certificate_key /etc/ssl/private/ucm-server.key;
+    
+    # Client certificate verification${trustedCaId ? '' : ' (DISABLED - No CA selected)'}
+    ${trustedCaId ? `ssl_client_certificate /etc/ssl/certs/ucm-client-ca.pem;
+    ssl_verify_client ${nginxVerifyMode};` : '# ssl_client_certificate /path/to/client-ca.pem;\n    # ssl_verify_client optional;'}
+    ssl_verify_depth 2;
+    
+    location / {
+        # Proxy to UCM backend
+        proxy_pass https://127.0.0.1:8443;
+        proxy_ssl_verify off;  # Backend uses self-signed cert
+        
+        # Forward client certificate information
+        proxy_set_header X-SSL-Client-Verify $ssl_client_verify;
+        proxy_set_header X-SSL-Client-S-DN $ssl_client_s_dn;
+        proxy_set_header X-SSL-Client-I-DN $ssl_client_i_dn;
+        proxy_set_header X-SSL-Client-Serial $ssl_client_serial;
+        proxy_set_header X-SSL-Client-Cert $ssl_client_escaped_cert;
+        
+        # Standard proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}`;
+    }
+    
+    // Update Apache example
+    const apacheCode = document.getElementById('apache-config-code');
+    if (apacheCode) {
+        apacheCode.textContent = `<VirtualHost *:${port}>
+    ServerName ${hostname}
+    
+    # Server SSL certificate
+    SSLEngine on
+    SSLCertificateFile /etc/ssl/certs/ucm-server.crt
+    SSLCertificateKeyFile /etc/ssl/private/ucm-server.key
+    
+    # Client certificate verification${trustedCaId ? '' : ' (DISABLED - No CA selected)'}
+    ${trustedCaId ? `SSLCACertificateFile /etc/ssl/certs/ucm-client-ca.pem
+    SSLVerifyClient ${apacheVerifyMode}` : '# SSLCACertificateFile /path/to/client-ca.pem\n    # SSLVerifyClient optional'}
+    SSLVerifyDepth 2
+    
+    # Proxy to UCM backend
+    ProxyPass / https://127.0.0.1:8443/
+    ProxyPassReverse / https://127.0.0.1:8443/
+    SSLProxyEngine on
+    SSLProxyVerify none
+    
+    # Forward client certificate information
+    RequestHeader set X-SSL-Client-Verify "%{SSL_CLIENT_VERIFY}s"
+    RequestHeader set X-SSL-Client-S-DN "%{SSL_CLIENT_S_DN}s"
+    RequestHeader set X-SSL-Client-I-DN "%{SSL_CLIENT_I_DN}s"
+    RequestHeader set X-SSL-Client-Serial "%{SSL_CLIENT_M_SERIAL}s"
+    RequestHeader set X-SSL-Client-Cert "%{SSL_CLIENT_CERT}s"
+</VirtualHost>`;
+    }
+}
+
+document.getElementById('mtls_enabled')?.addEventListener('change', toggleMTLSFields);
+document.getElementById('mtls_trusted_ca_id')?.addEventListener('change', toggleMTLSFields);
+
+// Download CA certificate
+document.getElementById('download-ca-btn')?.addEventListener('click', async () => {
+    const caId = document.getElementById('mtls_trusted_ca_id').value;
+    if (!caId) {
+        showToast('✗ No CA selected', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/v1/ca/${caId}/export?format=pem`, {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ucm-client-ca.pem';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            showToast('✓ CA certificate downloaded', 'success');
+        } else {
+            showToast('✗ Failed to download CA', 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+});
+
+// Update user section visibility and content
+async function updateUserSection() {
+    const userSection = document.getElementById('user-section');
+    const disabledMessage = document.getElementById('mtls-disabled-message');
+    
+    if (currentSettings.enabled) {
+        userSection.style.display = 'block';
+        disabledMessage.style.display = 'none';
+        
+        // Show appropriate create form
+        const trustedCAId = currentSettings.trusted_ca_id;
+        const createWithCA = document.getElementById('create-with-ca');
+        const createSelfSigned = document.getElementById('create-self-signed');
+        
+        if (trustedCAId) {
+            // Fetch CA details
+            try {
+                const response = await fetch(`/api/v1/ca/${trustedCAId}`, {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                if (response.ok) {
+                    const ca = await response.json();
+                    document.getElementById('ca-name-display').textContent = ca.descr;
+                    document.getElementById('import-ca-name-display').textContent = ca.descr;
+                }
+            } catch (e) {}
+            
+            createWithCA.style.display = 'block';
+            createSelfSigned.style.display = 'none';
+            document.getElementById('import-info-ca').style.display = 'block';
+            document.getElementById('import-info-any').style.display = 'none';
+        } else {
+            createWithCA.style.display = 'none';
+            createSelfSigned.style.display = 'block';
+            document.getElementById('import-info-ca').style.display = 'none';
+            document.getElementById('import-info-any').style.display = 'block';
+        }
+    } else {
+        userSection.style.display = 'none';
+        disabledMessage.style.display = 'block';
+    }
+}
+
+// Save mTLS settings (admin)
+{% if session.get('role') == 'admin' %}
+document.getElementById('mtls-settings-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        enabled: document.getElementById('mtls_enabled').checked,
+        required: document.getElementById('mtls_required').checked,
+        trusted_ca_id: document.getElementById('mtls_trusted_ca_id').value
+    };
+    
+    try {
+        const response = await fetch('/api/v1/mtls/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Settings saved successfully', 'success');
+            loadMTLSSettings();
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to save'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+});
+{% endif %}
+
+// Create managed certificate
+document.getElementById('create-managed-cert-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        cn: document.getElementById('create_cn').value,
+        email: document.getElementById('create_email').value,
+        validity_days: parseInt(document.getElementById('create_validity').value)
+    };
+    
+    try {
+        const response = await fetch('/api/v1/mtls/certificates/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Certificate created successfully', 'success');
+            // Switch to manage tab
+            ucm_switchTab('manage');
+            loadCertificates();
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+});
+
+// Create self-signed certificate
+document.getElementById('create-selfsigned-cert-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        cn: document.getElementById('selfsigned_cn').value,
+        email: document.getElementById('selfsigned_email').value,
+        validity_days: parseInt(document.getElementById('selfsigned_validity').value),
+        key_size: parseInt(document.getElementById('selfsigned_keysize').value),
+        self_signed: true
+    };
+    
+    try {
+        const response = await fetch('/api/v1/mtls/certificates/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Self-signed certificate created', 'success');
+            ucm_switchTab('manage');
+            loadCertificates();
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+});
+
+// Validate imported certificate
+async function validateImportedCert() {
+    const certPem = document.getElementById('import_cert_pem').value;
+    
+    if (!certPem) {
+        showToast('Please paste a certificate first', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/v1/mtls/validate-certificate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({certificate: certPem})
+        });
+        
+        const result = await response.json();
+        const resultDiv = document.getElementById('import-validation-result');
+        
+        if (response.ok && result.success) {
+            const info = result.info;
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+                <div style="background: ${result.valid ? 'var(--success-bg)' : 'var(--danger-bg)'}; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid ${result.valid ? 'var(--success-color)' : 'var(--danger-color)'};">
+                    <strong>${result.valid ? '✓ Valid Certificate' : '✗ Invalid Certificate'}</strong>
+                    ${result.already_enrolled ? '<p style="color: var(--warning-color); margin-top: 0.5rem;"><strong>⚠️ Certificate already enrolled</strong></p>' : ''}
+                    <div style="margin-top: 1rem; font-size: 0.875rem;">
+                        <p><strong>Subject:</strong> ${info.subject}</p>
+                        <p><strong>Issuer:</strong> ${info.issuer}</p>
+                        <p><strong>Serial:</strong> <code>${info.serial}</code></p>
+                        <p><strong>Valid Until:</strong> ${info.valid_until ? new Date(info.valid_until).toLocaleString() : 'N/A'}</p>
+                    </div>
+                </div>
+            `;
+        } else {
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+                <div style="background: var(--danger-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--danger-color);">
+                    <strong>✗ Validation Failed</strong>
+                    <p style="margin-top: 0.5rem;">${result.error || 'Unknown error'}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        showToast('✗ Validation error: ' + error.message, 'error');
+    }
+}
+window.validateImportedCert = validateImportedCert;
+
+// Import certificate
+document.getElementById('import-cert-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        certificate: document.getElementById('import_cert_pem').value,
+        name: document.getElementById('import_name').value
+    };
+    
+    try {
+        const response = await fetch('/api/v1/mtls/certificates/enroll', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Certificate imported successfully', 'success');
+            document.getElementById('import-cert-form').reset();
+            document.getElementById('import-validation-result').style.display = 'none';
+            ucm_switchTab('manage');
+            loadCertificates();
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to import certificate'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+});
+
+// Load certificates
+async function loadCertificates() {
+    try {
+        const response = await fetch('/api/v1/mtls/certificates', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const tbody = document.getElementById('certificates-tbody');
+            
+            if (data.certificates.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                            <svg class="ucm-icon" width="32" height="32" style="opacity: 0.5;"><use href="#icon-key"/></svg>
+                            <p style="margin-top: 0.5rem;">No certificates enrolled</p>
+                            <button onclick="ucm_switchTab('create')" class="btn btn-primary btn-primary" style="margin-top: 1rem;">
+                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Create Your First Certificate
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = data.certificates.map(cert => {
+                const validUntil = cert.valid_until ? new Date(cert.valid_until) : null;
+                const isExpired = validUntil && validUntil < new Date();
+                const daysLeft = validUntil ? Math.ceil((validUntil - new Date()) / (1000 * 60 * 60 * 24)) : null;
+                
+                // Escape user-controlled data to prevent XSS
+                const safeName = escapeHtml(cert.name || 'Unnamed');
+                const safeSubject = escapeHtml(cert.cert_subject);
+                const safeSerial = escapeHtml(cert.cert_serial.substring(0, 16));
+                
+                return `
+                    <tr>
+                        <td><strong>${safeName}</strong></td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${safeSubject}</td>
+                        <td><code style="font-size: 0.875rem;">${safeSerial}...</code></td>
+                        <td>
+                            ${validUntil ? validUntil.toLocaleDateString() : 'N/A'}
+                            ${daysLeft !== null && daysLeft < 30 ? `<br><small style="color: var(--warning-color);">${daysLeft} days left</small>` : ''}
+                        </td>
+                        <td>
+                            ${cert.enabled 
+                                ? (isExpired 
+                                    ? '<span class="badge-outline badge-danger"><svg class="ucm-icon" width="10" height="10"><use href="#icon-times"/></svg> Expired</span>'
+                                    : '<span class="badge-outline badge-success"><svg class="ucm-icon" width="10" height="10"><use href="#icon-check"/></svg> Active</span>')
+                                : '<span class="badge-outline badge-secondary"><svg class="ucm-icon" width="10" height="10"><use href="#icon-times"/></svg> Disabled</span>'
+                            }
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button onclick="downloadCertificate(${cert.id})" class="btn btn-sm btn-outline-secondary" title="Download">
+                                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg>
+                                </button>
+                                ${cert.enabled 
+                                    ? `<button onclick="revokeCertificate(${cert.id})" class="btn btn-sm btn-outline-warning" title="Revoke">
+                                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-times"/></svg>
+                                    </button>`
+                                    : `<button onclick="enableCertificate(${cert.id})" class="btn btn-sm btn-outline-success" title="Enable">
+                                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-check"/></svg>
+                                    </button>`
+                                }
+                                <button onclick="deleteCertificate(${cert.id})" class="btn btn-sm btn-outline-danger" title="Delete">
+                                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-trash"/></svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    } catch (error) {
+        console.error('Error loading certificates:', error);
+    }
+}
+
+// Certificate actions
+async function downloadCertificate(certId) {
+    try {
+        const response = await fetch(`/api/v1/mtls/certificates/${certId}/download`, {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `client-cert-${certId}.pem`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        } else {
+            showToast('✗ Failed to download certificate', 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+}
+window.downloadCertificate = downloadCertificate;
+
+async function revokeCertificate(certId) {
+    const confirmed = await ucmConfirm(
+        'Are you sure you want to revoke this certificate? You can re-enable it later.',
+        'Revoke Certificate',
+        { danger: true, confirmText: 'Revoke', icon: 'warning-triangle' }
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+        const response = await fetch(`/api/v1/mtls/certificates/${certId}/revoke`, {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            showToast('✓ Certificate revoked', 'success');
+            loadCertificates();
+        } else {
+            showToast('✗ Failed to revoke', 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+}
+window.revokeCertificate = revokeCertificate;
+
+async function enableCertificate(certId) {
+    try {
+        const response = await fetch(`/api/v1/mtls/certificates/${certId}/enable`, {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            showToast('✓ Certificate enabled', 'success');
+            loadCertificates();
+        } else {
+            showToast('✗ Failed to enable', 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+}
+window.enableCertificate = enableCertificate;
+
+async function deleteCertificate(certId) {
+    const confirmed = await ucmConfirm(
+        'Are you sure you want to permanently delete this certificate? This action cannot be undone.',
+        'Delete Certificate',
+        { danger: true, confirmText: 'Delete', icon: 'trash' }
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+        const response = await fetch(`/api/v1/mtls/certificates/${certId}`, {
+            method: 'DELETE',
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            showToast('✓ Certificate deleted', 'success');
+            loadCertificates();
+        } else {
+            showToast('✗ Failed to delete', 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+}
+window.deleteCertificate = deleteCertificate;
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadMTLSSettings();
+});
+})();
+
+// ============================================
+// WEBAUTHN / FIDO2
+// ============================================
+(function() {
+const token = '{{ session.get("access_token") }}';
+
+// Toast helper
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 10000;
+        padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+        color: white; font-weight: 500; max-width: 400px;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+// Check if hostname is WebAuthn-compatible
+function isWebAuthnCompatibleHostname(hostname) {
+    // WebAuthn requires:
+    // 1. localhost or 127.0.0.1
+    // 2. A valid IP address (IPv4 or IPv6)
+    // 3. A domain with a TLD (e.g., .com, .local, .lan, .pet)
+    
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+        return true;
+    }
+    
+    // Check if it's an IP address
+    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (ipv4Regex.test(hostname)) {
+        return true;
+    }
+    
+    // Check if it has a TLD (contains at least one dot)
+    if (hostname.includes('.')) {
+        return true;
+    }
+    
+    return false;
+}
+
+// Get the proper FQDN for this server
+async function getServerFQDN() {
+    try {
+        // Try to get server info from API
+        const response = await fetch('/api/v1/system/info', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.fqdn) {
+                return data.fqdn;
+            }
+        }
+    } catch (e) {
+        // Fallback: construct from current hostname
+    }
+    
+    // Fallback: if hostname is just "netsuit", append common TLD
+    const hostname = window.location.hostname;
+    if (!hostname.includes('.')) {
+        // Common patterns: hostname.local or hostname.lan.domain
+        return `${hostname}.lan.pew.pet`;
+    }
+    
+    return hostname;
+}
+
+// Show hostname warning and suggest valid URLs or auto-redirect
+async function checkHostnameCompatibility() {
+    const hostname = window.location.hostname;
+    
+    if (!isWebAuthnCompatibleHostname(hostname)) {
+        const warning = document.getElementById('hostname-warning');
+        document.getElementById('current-hostname').textContent = hostname;
+        
+        // Get the proper FQDN
+        const fqdn = await getServerFQDN();
+        const port = window.location.port;
+        const protocol = window.location.protocol;
+        const currentPath = window.location.pathname;
+        
+        // Build the redirect URL
+        const redirectUrl = `${protocol}//${fqdn}:${port}${currentPath}`;
+        
+        // Build valid URL suggestions
+        const validUrls = document.getElementById('valid-urls');
+        validUrls.innerHTML = `
+            <div style="margin-bottom: 1rem;">
+                <strong style="color: var(--text-primary);">Recommended URL:</strong>
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <a href="${redirectUrl}" 
+                   style="color: var(--primary-color); text-decoration: none; font-weight: 600; font-size: 1rem;">
+                    ${protocol}//${fqdn}:${port}
+                </a>
+                <button onclick="window.location.href='${redirectUrl}'" 
+                        class="btn-primary" 
+                        style="margin-left: 1rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg> Switch to this URL
+                </button>
+            </div>
+            <div style="color: var(--text-secondary); margin-top: 0.75rem; font-size: 0.8125rem;">
+                <strong>Alternative options:</strong><br>
+                • Access via server IP address<br>
+                • Use localhost if on the server itself
+            </div>
+        `;
+        
+        warning.style.display = 'block';
+        
+        // Disable register button
+        const registerBtn = document.querySelector('button[onclick="showRegistrationModal()"]');
+        if (registerBtn) {
+            registerBtn.disabled = true;
+            registerBtn.title = 'WebAuthn not available with current hostname';
+            registerBtn.style.opacity = '0.5';
+            registerBtn.style.cursor = 'not-allowed';
+        }
+        
+        return false;
+    }
+    
+    return true;
+}
+
+// Convert base64url to ArrayBuffer
+function base64urlToBuffer(base64url) {
+    // Convert base64url to base64
+    let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    
+    // Add padding if needed
+    const padLength = (4 - (base64.length % 4)) % 4;
+    base64 += '='.repeat(padLength);
+    
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+// Convert ArrayBuffer to base64url
+function bufferToBase64url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+// Load credentials list
+window.loadCredentials = async function() {
+    try {
+        const response = await fetch('/api/v1/webauthn/credentials', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        
+        if (response.ok && result.credentials) {
+            renderCredentials(result.credentials);
+            updateStats(result.credentials);
+        } else {
+            document.getElementById('credentials-list').innerHTML = `
+                <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                    <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
+                    <p>${result.error || 'Failed to load credentials'}</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        document.getElementById('credentials-list').innerHTML = `
+            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
+                <p>Error: ${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+function renderCredentials(credentials) {
+    const container = document.getElementById('credentials-list');
+    
+    if (credentials.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem;"><use href="#icon-key"/></svg>
+                <p>No security keys registered yet</p>
+                <button onclick="showRegistrationModal()" class="btn-primary" style="margin-top: 1rem;">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-plus"/></svg> Register Your First Key
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = credentials.map(cred => `
+        <div style="border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                        <svg class="ucm-icon" width="16" height="16" style="color: var(--primary-color);"><use href="#icon-key"/></svg>
+                        <h4 style="font-weight: 600; color: var(--text-primary); margin: 0;">${cred.name}</h4>
+                        ${cred.enabled ? 
+                            '<span class="badge-outline badge-success">Active</span>' : 
+                            '<span class="badge-outline badge-secondary">Disabled</span>'
+                        }
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.875rem; margin-left: 2rem;">
+                        <div><strong>Registered:</strong> ${new Date(cred.created_at).toLocaleString()}</div>
+                        ${cred.last_used_at ? 
+                            `<div><strong>Last used:</strong> ${new Date(cred.last_used_at).toLocaleString()}</div>` : 
+                            '<div><strong>Last used:</strong> Never</div>'
+                        }
+                        <div><strong>Sign count:</strong> ${cred.sign_count}</div>
+                        ${cred.backup_eligible ? '<div style="color: var(--success-color);">✓ Backup eligible</div>' : ''}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button onclick="toggleCredential('${cred.id}', ${!cred.enabled})"
+                            class="btn-danger btn-sm">
+                        <svg class="ucm-icon" width="16" height="16">
+                            <use href="#icon-eye${cred.enabled ? '-slash' : ''}"/>
+                        </svg>
+                        ${cred.enabled ? 'Disable' : 'Enable'}
+                    </button>
+                    <button onclick="deleteCredential('${cred.id}')" 
+                            class="btn btn-sm btn-danger" title="Delete">
+                        <svg class="ucm-icon" width="16" height="16">
+                            <use href="#icon-trash"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateStats(credentials) {
+    document.getElementById('total-credentials').textContent = credentials.length;
+    document.getElementById('active-credentials').textContent = credentials.filter(c => c.enabled).length;
+    
+    const lastUsed = credentials
+        .filter(c => c.last_used_at)
+        .map(c => new Date(c.last_used_at))
+        .sort((a, b) => b - a)[0];
+    
+    if (lastUsed) {
+        const now = new Date();
+        const diff = now - lastUsed;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        
+        if (days > 0) {
+            document.getElementById('last-used').textContent = `${days}d ago`;
+        } else if (hours > 0) {
+            document.getElementById('last-used').textContent = `${hours}h ago`;
+        } else {
+            document.getElementById('last-used').textContent = 'Today';
+        }
+    } else {
+        document.getElementById('last-used').textContent = 'Never';
+    }
+}
+
+// Registration modal functions
+window.showRegistrationModal = function() {
+    document.getElementById('registration-modal').style.display = 'flex';
+    resetRegistrationModal();
+}
+
+window.hideRegistrationModal = function() {
+    document.getElementById('registration-modal').style.display = 'none';
+}
+
+window.resetRegistrationModal = function() {
+    document.getElementById('registration-step-1').style.display = 'block';
+    document.getElementById('registration-step-2').style.display = 'none';
+    document.getElementById('registration-step-3').style.display = 'none';
+    document.getElementById('registration-step-error').style.display = 'none';
+    document.getElementById('credential-name').value = '';
+}
+
+window.cancelRegistration = function() {
+    resetRegistrationModal();
+}
+
+// Start WebAuthn registration
+window.startRegistration = async function() {
+    const name = document.getElementById('credential-name').value.trim();
+    
+    if (!name) {
+        showToast('Please enter a name for your security key', 'error');
+        return;
+    }
+    
+    // Show loading state
+    document.getElementById('registration-step-1').style.display = 'none';
+    document.getElementById('registration-step-2').style.display = 'block';
+    
+    try {
+        // Step 1: Get registration options from server
+        const optionsResponse = await fetch('/api/v1/webauthn/register/options', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!optionsResponse.ok) {
+            const error = await optionsResponse.json();
+            throw new Error(error.error || 'Failed to get registration options');
+        }
+        
+        const options = await optionsResponse.json();
+        console.log('WebAuthn registration options received:', options);
+        console.log('Current window.location:', {
+            hostname: window.location.hostname,
+            host: window.location.host,
+            origin: window.location.origin
+        });
+        
+        // Convert base64url strings to ArrayBuffers
+        // Use server's RP ID (should match current hostname)
+        const publicKeyOptions = {
+            publicKey: {
+                ...options,
+                challenge: base64urlToBuffer(options.challenge),
+                user: {
+                    ...options.user,
+                    id: base64urlToBuffer(options.user.id)
+                },
+                excludeCredentials: options.excludeCredentials ? 
+                    options.excludeCredentials.map(cred => ({
+                        ...cred,
+                        id: base64urlToBuffer(cred.id)
+                    })) : []
+            }
+        };
+        console.log('Converted publicKeyOptions:', publicKeyOptions);
+        console.log('RP ID from server:', options.rp.id);
+        
+        // Step 2: Call WebAuthn API
+        const credential = await navigator.credentials.create(publicKeyOptions);
+        
+        if (!credential) {
+            throw new Error('Registration was cancelled');
+        }
+        
+        // Step 3: Send credential to server
+        const verifyResponse = await fetch('/api/v1/webauthn/register/verify', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: name,
+                credential: {
+                    id: credential.id,
+                    rawId: bufferToBase64url(credential.rawId),
+                    type: credential.type,
+                    response: {
+                        clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                        attestationObject: bufferToBase64url(credential.response.attestationObject)
+                    }
+                }
+            })
+        });
+        
+        if (!verifyResponse.ok) {
+            const error = await verifyResponse.json();
+            throw new Error(error.error || 'Failed to verify registration');
+        }
+        
+        // Success!
+        document.getElementById('registration-step-2').style.display = 'none';
+        document.getElementById('registration-step-3').style.display = 'block';
+        
+    } catch (error) {
+        console.error('Registration error:', error);
+        document.getElementById('registration-step-2').style.display = 'none';
+        document.getElementById('registration-step-error').style.display = 'block';
+        document.getElementById('registration-error-message').textContent = error.message;
+    }
+}
+
+// Toggle credential active state
+window.toggleCredential = async function(credentialId, newState) {
+    try {
+        const response = await fetch(`/api/v1/webauthn/credentials/${credentialId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ enabled: newState })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast(newState ? '✓ Key enabled' : '✓ Key disabled', 'success');
+            loadCredentials();
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to update'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+}
+
+// Delete credential
+window.deleteCredential = async function(credentialId) {
+    const confirmed = await ucmConfirm(
+        'Are you sure you want to delete this security key? This cannot be undone.',
+        'Delete Security Key',
+        { danger: true, confirmText: 'Delete', icon: 'trash' }
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+        const response = await fetch(`/api/v1/webauthn/credentials/${credentialId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Key deleted', 'success');
+            loadCredentials();
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to delete'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+}
+
+// Initialize - call immediately if DOM already loaded (HTMX swap), otherwise wait for DOMContentLoaded
+function init() {
+    checkHostnameCompatibility();
+    loadCredentials();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+})();
+
+// ============================================
+// EMAIL & NOTIFICATIONS
+// ============================================
+// Get JWT token from session (global scope for all functions)
+const token = '{{ session.get("access_token") }}';
+
+(function() {
+// Toast notification helper
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 10000;
+        padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+        color: white; font-weight: 500; max-width: 400px;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+}
+
+// Load SMTP configuration
+async function loadSMTPConfig() {
+    try {
+        const response = await fetch('/api/v1/notifications/smtp/config', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const config = await response.json();
+            document.getElementById('smtp_host').value = config.smtp_host || '';
+            document.getElementById('smtp_port').value = config.smtp_port || 587;
+            document.getElementById('smtp_user').value = config.smtp_user || '';
+            document.getElementById('smtp_from').value = config.smtp_from || '';
+            document.getElementById('smtp_from_name').value = config.smtp_from_name || 'UCM Notifications';
+            document.getElementById('smtp_use_tls').checked = config.smtp_use_tls !== false;
+            document.getElementById('smtp_use_ssl').checked = config.smtp_use_ssl === true;
+            document.getElementById('smtp_enabled').checked = config.enabled === true;
+            
+            // Update status badge
+            const badge = document.getElementById('smtp-status-badge');
+            if (config.enabled) {
+                badge.className = 'badge-outline badge-success';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-check-circle"/></svg> Enabled';
+            } else {
+                badge.className = 'badge-outline badge-secondary';
+                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg> Disabled';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading SMTP config:', error);
+    }
+}
+
+// Save SMTP configuration
+document.getElementById('smtp-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        smtp_host: document.getElementById('smtp_host').value,
+        smtp_port: parseInt(document.getElementById('smtp_port').value),
+        smtp_user: document.getElementById('smtp_user').value,
+        smtp_from: document.getElementById('smtp_from').value,
+        smtp_from_name: document.getElementById('smtp_from_name').value,
+        smtp_use_tls: document.getElementById('smtp_use_tls').checked,
+        smtp_use_ssl: document.getElementById('smtp_use_ssl').checked,
+        enabled: document.getElementById('smtp_enabled').checked
+    };
+    
+    // Only include password if it's been changed
+    const password = document.getElementById('smtp_password').value;
+    if (password) {
+        data.smtp_password = password;
+    }
+    
+    try {
+        const response = await fetch('/api/v1/notifications/smtp/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('SMTP configuration saved successfully', 'success');
+            document.getElementById('smtp_password').value = ''; // Clear password field
+            loadSMTPConfig(); // Reload to update status
+        } else {
+            showToast(result.error || 'Failed to save configuration', 'error');
+        }
+    } catch (error) {
+        showToast('Error saving configuration: ' + error.message, 'error');
+    }
+});
+
+// Save user notification settings
+document.getElementById('user-notification-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        email: document.getElementById('user_notification_email').value,
+        enabled: document.getElementById('user_notifications_enabled').checked
+    };
+    
+    try {
+        const response = await fetch('/api/v1/notifications/user/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Notification settings saved', 'success');
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to save settings'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Error: ' + error.message, 'error');
+    }
+});
+
+// Load user notification settings
+async function loadUserNotificationSettings() {
+    try {
+        const response = await fetch('/api/v1/notifications/user/settings', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const settings = await response.json();
+            document.getElementById('user_notification_email').value = settings.email || '';
+            document.getElementById('user_notifications_enabled').checked = settings.enabled !== false;
+        }
+    } catch (error) {
+        console.error('Error loading user notification settings:', error);
+    }
+}
+
+
+// Test SMTP
+window.testSMTP = async function() {
+    // First check if SMTP is configured
+    const smtpEnabled = document.getElementById('smtp_enabled').checked;
+    const smtpHost = document.getElementById('smtp_host').value;
+    
+    if (!smtpHost) {
+        showToast('Please configure SMTP host first', 'error');
+        return;
+    }
+    
+    if (!smtpEnabled) {
+        showToast('Please enable SMTP first by checking "Enable SMTP" and saving', 'error');
+        return;
+    }
+    
+    const email = prompt('Enter email address to send test email:');
+    if (!email) return;
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        showToast('Invalid email address format', 'error');
+        return;
+    }
+    
+    showToast('Sending test email...', 'info');
+    
+    try {
+        const response = await fetch('/api/v1/notifications/smtp/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({email})
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('✓ Test email sent successfully to ' + email, 'success');
+        } else {
+            showToast('✗ ' + (result.error || 'Failed to send test email'), 'error');
+        }
+    } catch (error) {
+        showToast('✗ Network error: ' + error.message, 'error');
+    }
+}
+
+// Load notification rules
+async function loadNotificationRules() {
+    try {
+        const response = await fetch('/api/v1/notifications/config', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const configs = await response.json();
+            const container = document.getElementById('notification-rules');
+            
+            container.innerHTML = configs.map((config, index) => `
+                <div class="card" style="background: var(--card-bg-secondary);">
+                    <div style="padding: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                            <div>
+                                <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">
+                                    ${config.type === 'cert_expiring' ? 'Certificate Expiration' : 'CRL Expiration'}
+                                </h3>
+                                <p style="color: var(--text-secondary); font-size: 0.875rem;">${config.description || ''}</p>
+                            </div>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="rule-enabled-${index}" ${config.enabled ? 'checked' : ''} 
+                                       onchange="toggleRule('${config.type}', this.checked)">
+                                <strong>Enabled</strong>
+                            </label>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                            <div>
+                                <label class="form-label">Alert Days Before</label>
+                                <input type="number" id="rule-days-${index}" class="form-input" 
+                                       value="${config.days_before || 30}" min="1" max="365"
+                                       onchange="updateRule('${config.type}')">
+                            </div>
+                            <div style="grid-column: 1 / -1;">
+                                <label class="form-label">Recipients (comma-separated emails)</label>
+                                <input type="text" id="rule-recipients-${index}" class="form-input" 
+                                       value="${(config.recipients || []).join(', ')}" 
+                                       placeholder="admin@example.com, ops@example.com"
+                                       onchange="updateRule('${config.type}')">
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                            <button onclick="updateRule('${config.type}')" class="btn btn-primary btn-primary">
+                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save Rule
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error loading notification rules:', error);
+    }
+}
+
+// Toggle rule enabled/disabled
+async function toggleRule(type, enabled) {
+    await updateRule(type);
+}
+
+// Update notification rule
+async function updateRule(type) {
+    const index = type === 'cert_expiring' ? 0 : 1;
+    const enabled = document.getElementById(`rule-enabled-${index}`).checked;
+    const days = parseInt(document.getElementById(`rule-days-${index}`).value);
+    const recipientsStr = document.getElementById(`rule-recipients-${index}`).value;
+    const recipients = recipientsStr.split(',').map(e => e.trim()).filter(e => e);
+    
+    try {
+        const response = await fetch(`/api/v1/notifications/config/${type}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({enabled, days_before: days, recipients})
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('Notification rule updated', 'success');
+        } else {
+            showToast(result.error || 'Failed to update rule', 'error');
+        }
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+// Load notification history
+async function loadNotificationHistory() {
+    try {
+        const response = await fetch('/api/v1/notifications/history?limit=20', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const tbody = document.getElementById('notification-history-tbody');
+            
+            if (data.logs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                            <svg class="ucm-icon" width="32" height="32" style=" opacity: 0.5;"><use href="#icon-inbox"/></svg>
+                            <p style="margin-top: 0.5rem;">No notifications sent yet</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = data.logs.map(log => {
+                // Escape user-controlled data to prevent XSS
+                const safeType = escapeHtml(log.type);
+                const safeRecipient = escapeHtml(log.recipient);
+                const safeSubject = escapeHtml(log.subject || 'N/A');
+                
+                return `
+                <tr>
+                    <td>${new Date(log.sent_at).toLocaleString()}</td>
+                    <td><span class="badge-outline badge-info">${safeType}</span></td>
+                    <td>${safeRecipient}</td>
+                    <td>${safeSubject}</td>
+                    <td>
+                        ${log.status === 'sent' 
+                            ? '<span class="badge-outline badge-success"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> Sent</span>'
+                            : '<span class="badge-outline badge-danger"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> Failed</span>'
+                        }
+                    </td>
+                </tr>
+            `}).join('');
+        }
+    } catch (error) {
+        console.error('Error loading notification history:', error);
+    }
+}
+
+// Load notification stats
+async function loadNotificationStats() {
+    try {
+        const response = await fetch('/api/v1/notifications/stats', {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        if (response.ok) {
+            const stats = await response.json();
+            const container = document.getElementById('notification-stats');
+            
+            container.innerHTML = `
+                <span class="badge-outline badge-success">
+                    <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> ${stats.recent_sent_30d} sent (30d)
+                </span>
+                ${stats.recent_failed_30d > 0 ? `
+                    <span class="badge-outline badge-danger">
+                        <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> ${stats.recent_failed_30d} failed (30d)
+                    </span>
+                ` : ''}
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+// Manual notification check
+async function testNotifications() {
+    const confirmed = await ucmConfirm(
+        'This will check for expiring certificates and CRLs and send notifications if configured. Continue?',
+        'Test Notifications',
+        { confirmText: 'Continue', icon: 'check' }
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+        const response = await fetch('/api/v1/notifications/check', {
+            method: 'POST',
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('Notification check completed', 'success');
+            loadNotificationHistory();
+            loadNotificationStats();
+        } else {
+            showToast(result.error || 'Check failed', 'error');
+        }
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadUserNotificationSettings();
+    loadSMTPConfig();
+    loadNotificationRules();
+    loadNotificationHistory();
+    loadNotificationStats();
+});
+})();
+
+// ============================================
+// ACME CONFIGURATION
+// ============================================
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied to clipboard!', 'success');
+    });
+}
+
+// Load statistics and settings on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initAcmePage();
+    // Auto-load proxy status if tab is active (from previous session)
+    if (localStorage.getItem('ucm-tab-config') === 'proxy') {
+       ucm_switchTab('proxy');
+       loadProxyStatus();
+    }
+});
+
+// Also trigger on HTMX content swap
+document.addEventListener('htmx:afterSwap', function(event) {
+    if (event.detail.target.id === 'main-content' || document.getElementById('acme-status-badge')) {
+        initAcmePage();
+    }
+});
+
+function initAcmePage() {
+    loadStatistics();
+    loadAcmeCA();
+    loadSettings();
+    loadProxyStatus();
+    
+    // Handle form submission success
+    const form = document.getElementById('acme-settings-form');
+    if (form && !form.hasAttribute('data-listener-added')) {
+        form.setAttribute('data-listener-added', 'true');
+        form.addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.successful && event.detail.requestConfig.verb === 'post') {
+                window.showToast('ACME settings saved successfully', 'success');
+                setTimeout(() => loadAcmeCA(), 200);
+            }
+        });
+    }
+}
+
+function loadStatistics() {
+    fetch('/api/ui/acme/statistics')
+        .then(response => response.json())
+        .then(data => {
+            const totalAccounts = document.getElementById('total-accounts');
+            const activeOrders = document.getElementById('active-orders');
+            const completedOrders = document.getElementById('completed-orders');
+            const issuedCerts = document.getElementById('issued-certs');
+            
+            if (totalAccounts) totalAccounts.textContent = data.total_accounts || 0;
+            if (activeOrders) activeOrders.textContent = data.active_orders || 0;
+            if (completedOrders) completedOrders.textContent = data.completed_orders || 0;
+            if (issuedCerts) issuedCerts.textContent = data.issued_certs || 0;
+        })
+        .catch(error => console.error('Error loading stats:', error));
+}
+
+function loadAcmeCA() {
+    const badge = document.getElementById('acme-status-badge');
+    const caDisplay = document.getElementById('acme-ca-display');
+    if (!badge) return;
+    
+    fetch('/api/ui/acme/settings/load')
+        .then(response => response.json())
+        .then(data => {
+            if (data.default_ca) {
+                badge.className = 'badge badge-success';
+                badge.style.fontSize = '14px';
+                badge.style.padding = '6px 12px';
+                badge.innerHTML = '<svg class="ucm-icon" width="14" height="14" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-check-circle"/></svg> Active';
+                
+                const caSelect = document.getElementById('acme-default-ca');
+                if (caSelect && caSelect.options.length > 1) {
+                    const selectedOption = Array.from(caSelect.options).find(opt => opt.value === data.default_ca);
+                    caDisplay.textContent = selectedOption ? selectedOption.text : data.default_ca;
+                } else {
+                    caDisplay.textContent = 'CA: ' + data.default_ca;
+                }
+            } else {
+                badge.className = 'badge badge-danger';
+                badge.style.fontSize = '14px';
+                badge.style.padding = '6px 12px';
+                badge.innerHTML = '<svg class="ucm-icon" width="14" height="14" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-ban"/></svg> Not Configured';
+                caDisplay.textContent = 'No CA configured';
+            }
+        })
+        .catch(error => console.error('Error loading CA:', error));
+}
+
+function loadSettings() {
+    fetch('/api/ui/acme/settings/load')
+        .then(response => response.json())
+        .then(data => {
+            if (data.default_ca) {
+                const select = document.getElementById('acme-default-ca');
+                if (select) setTimeout(() => select.value = data.default_ca, 500);
+            }
+            if (data.cert_validity) {
+                const validityInput = document.querySelector('input[name="cert_validity"]');
+                if (validityInput) validityInput.value = data.cert_validity;
+            }
+        });
+}
+
+function loadProxyStatus() {
+    fetch('/api/ui/acme/proxy/status')
+        .then(response => response.json())
+        .then(data => {
+            // Check if elements exist (user might not be on proxy tab)
+            const upstreamDisplay = document.getElementById('proxy-upstream-display');
+            const directoryUrl = document.getElementById('proxy-directory-url');
+            const container = document.getElementById('proxy-account-container');
+            
+            if (!upstreamDisplay || !directoryUrl || !container) {
+                // Elements not in DOM, silently return
+                return;
+            }
+            
+            upstreamDisplay.textContent = data.upstream_url;
+            directoryUrl.value = data.directory_url;
+            
+            if (data.is_registered) {
+                container.innerHTML = `
+                    <div style="color: var(--success-color); font-weight: 500; font-size: 14px;">
+                        <svg class="ucm-icon" width="16" height="16" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-check-circle"/></svg> Registered & Active
+                    </div>`;
+            } else {
+                container.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="badge badge-warning">Not Registered</span>
+                        <button id="btn-register-proxy" class="btn btn-primary btn-primary" onclick="registerProxyAccount()">
+                            Register Account
+                        </button>
+                    </div>`;
+            }
+        })
+        .catch(err => console.error("Proxy status error", err));
+}
+
+function registerProxyAccount() {
+    const btn = document.getElementById('btn-register-proxy');
+    if (!btn) return;
+    
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+    
+    fetch('/api/ui/acme/proxy/register', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.showToast('Upstream account registered successfully', 'success');
+                loadProxyStatus();
+            } else {
+                window.showToast('Error: ' + (data.message || 'Registration failed'), 'error');
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            window.showToast('Network error during registration', 'error');
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+        });
+}
+
+// ============================================
+// CERTIFICATE TEMPLATES
+// ============================================
+function viewTemplateDetail(id) {
+    openModal('viewTemplateModal'); // View-only, overlay closes automatically
+    document.getElementById('viewTemplateContent').innerHTML = '<svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>';
+    
+    fetch('/api/v1/templates/' + id)
+        .then(r => r.json())
+        .then(t => {
+            // Format DN template nicely
+            const dnEntries = Object.entries(t.dn_template)
+                .filter(([k, v]) => v && v.trim())
+                .map(([k, v]) => `<div><strong>${k}:</strong> ${escapeHtml(v)}</div>`)
+                .join('');
+            
+            // Format extensions nicely
+            const ku = t.extensions_template.key_usage || [];
+            const eku = t.extensions_template.extended_key_usage || [];
+            const san = t.extensions_template.san_types || [];
+            
+            const html = `
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <!-- Header -->
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0;">${escapeHtml(t.name)}</h3>
+                            <span style="padding: 0.125rem 0.5rem; background: ${t.is_system ? 'var(--info-color)' : 'var(--success-color)'}20; color: ${t.is_system ? 'var(--info-color)' : 'var(--success-color)'}; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">
+                                ${t.is_system ? 'System' : 'Custom'}
+                            </span>
+                        </div>
+                        ${t.description ? `<p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">${escapeHtml(t.description)}</p>` : ''}
+                    </div>
+
+                    <!-- Configuration -->
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 6px;">
+                        <div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Type</div>
+                            <div style="font-weight: 500; color: var(--text-primary);">${escapeHtml(t.template_type)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Key Type</div>
+                            <div style="font-weight: 500; color: var(--text-primary);">${escapeHtml(t.key_type)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Validity</div>
+                            <div style="font-weight: 500; color: var(--text-primary);">${t.validity_days} days</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Digest Algorithm</div>
+                            <div style="font-weight: 500; color: var(--text-primary);">${escapeHtml(t.digest)}</div>
+                        </div>
+                    </div>
+
+                    <!-- DN Template -->
+                    <div>
+                        <h4 style="font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">
+                            <svg class="ucm-icon" width="16" height="16" style="vertical-align: middle; margin-right: 0.375rem;"><use href="#icon-file-text"/></svg>
+                            Distinguished Name Template
+                        </h4>
+                        <div style="padding: 1rem; background: var(--bg-primary); border-radius: 4px; font-family: monospace; font-size: 0.875rem;">
+                            ${dnEntries || '<div style="color: var(--text-secondary);">No DN template</div>'}
+                        </div>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                            Variables: {hostname}, {email}, {username}
+                        </p>
+                    </div>
+
+                    <!-- Extensions -->
+                    <div>
+                        <h4 style="font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">
+                            <svg class="ucm-icon" width="16" height="16" style="vertical-align: middle; margin-right: 0.375rem;"><use href="#icon-shield"/></svg>
+                            Certificate Extensions
+                        </h4>
+                        
+                        <div style="display: grid; gap: 1rem;">
+                            ${ku.length ? `
+                            <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Key Usage</div>
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                                    ${ku.map(k => `<span style="padding: 0.25rem 0.5rem; background: var(--primary-color)20; color: var(--primary-color); border-radius: 4px; font-size: 0.75rem;">${escapeHtml(k)}</span>`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            ${eku.length ? `
+                            <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Extended Key Usage</div>
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                                    ${eku.map(k => `<span style="padding: 0.25rem 0.5rem; background: var(--success-color)20; color: var(--success-color); border-radius: 4px; font-size: 0.75rem;">${escapeHtml(k)}</span>`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            ${san.length ? `
+                            <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">SAN Types Supported</div>
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                                    ${san.map(k => `<span style="padding: 0.25rem 0.5rem; background: var(--info-color)20; color: var(--info-color); border-radius: 4px; font-size: 0.75rem;">${escapeHtml(k)}</span>`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('viewTemplateContent').innerHTML = html;
+        })
+        .catch(e => {
+            document.getElementById('viewTemplateContent').innerHTML = `<div style="color: var(--danger-color); text-align: center; padding: 2rem;">Error: ${escapeHtml(e.message)}</div>`;
+        });
+}
+
+
+
+function openEditModal(id) {
+    showToast('Edit modal - Coming soon', 'info');
+}
+
+window.showToast = window.showToast || function(msg, type) { console.log('[' + type + '] ' + msg); };
+
+// ============================================
+// EXISTING SETTINGS JAVASCRIPT
+// ============================================
 // Restore last active tab on page load
 document.addEventListener('DOMContentLoaded', function() {
     const lastTab = localStorage.getItem('ucm-tab-settings');
