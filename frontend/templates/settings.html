@@ -2026,8 +2026,7 @@ async function loadMTLSSettings() {
     try {
         {% if session.get('role') == 'admin' %}
         // Load CA list
-        const casResponse = await fetch('/api/ui/ca/list', {
-            `}
+        const casResponse = await fetch('/api/ui/ca/list', 
         });
         
         if (casResponse.ok) {
@@ -2044,8 +2043,7 @@ async function loadMTLSSettings() {
         {% endif %}
         
         // Load current settings
-        const response = await fetch('/api/ui/mtls/settings', {
-            `}
+        const response = await fetch('/api/ui/mtls/settings', 
         });
         
         if (response.ok) {
@@ -2211,8 +2209,7 @@ document.getElementById('download-ca-btn')?.addEventListener('click', async () =
     }
     
     try {
-        const response = await fetch(`/api/ui/ca/${caId}/export?format=pem`, {
-            `}
+        const response = await fetch(`/api/ui/ca/${caId}/export?format=pem`, 
         });
         
         if (response.ok) {
@@ -2251,8 +2248,7 @@ async function updateUserSection() {
         if (trustedCAId) {
             // Fetch CA details
             try {
-                const response = await fetch(`/api/ui/ca/${trustedCAId}`, {
-                    `}
+                const response = await fetch(`/api/ui/ca/${trustedCAId}`, 
                 });
                 if (response.ok) {
                     const ca = await response.json();
@@ -2473,8 +2469,7 @@ document.getElementById('import-cert-form')?.addEventListener('submit', async (e
 // Load certificates
 async function loadCertificates() {
     try {
-        const response = await fetch('/api/ui/mtls/certificates', {
-            `}
+        const response = await fetch('/api/ui/mtls/certificates', 
         });
         
         if (response.ok) {
@@ -2553,8 +2548,7 @@ async function loadCertificates() {
 // Certificate actions
 async function downloadCertificate(certId) {
     try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}/download`, {
-            `}
+        const response = await fetch(`/api/ui/mtls/certificates/${certId}/download`, 
         });
         
         if (response.ok) {
@@ -2585,7 +2579,7 @@ async function revokeCertificate(certId) {
     
     try {
         const response = await fetch(`/api/ui/mtls/certificates/${certId}/revoke`, {
-            method: 'POST'`}
+            method: 'POST'}
         });
         
         if (response.ok) {
@@ -2603,7 +2597,7 @@ window.revokeCertificate = revokeCertificate;
 async function enableCertificate(certId) {
     try {
         const response = await fetch(`/api/ui/mtls/certificates/${certId}/enable`, {
-            method: 'POST'`}
+            method: 'POST'}
         });
         
         if (response.ok) {
@@ -2629,7 +2623,7 @@ async function deleteCertificate(certId) {
     
     try {
         const response = await fetch(`/api/ui/mtls/certificates/${certId}`, {
-            method: 'DELETE'`}
+            method: 'DELETE'}
         });
         
         if (response.ok) {
@@ -3129,8 +3123,7 @@ function showToast(message, type = 'info') {
 // Load SMTP configuration
 async function loadSMTPConfig() {
     try {
-        const response = await fetch('/api/ui/notifications/smtp/config', {
-            `}
+        const response = await fetch('/api/ui/notifications/smtp/config', 
         });
         
         if (response.ok) {
@@ -3238,8 +3231,7 @@ document.getElementById('user-notification-form')?.addEventListener('submit', as
 // Load user notification settings
 async function loadUserNotificationSettings() {
     try {
-        const response = await fetch('/api/ui/notifications/user/settings', {
-            `}
+        const response = await fetch('/api/ui/notifications/user/settings', 
         });
         
         if (response.ok) {
@@ -3306,8 +3298,7 @@ window.testSMTP = async function() {
 // Load notification rules
 async function loadNotificationRules() {
     try {
-        const response = await fetch('/api/ui/notifications/config', {
-            `}
+        const response = await fetch('/api/ui/notifications/config', 
         });
         
         if (response.ok) {
@@ -3399,8 +3390,7 @@ async function updateRule(type) {
 // Load notification history
 async function loadNotificationHistory() {
     try {
-        const response = await fetch('/api/ui/notifications/history?limit=20', {
-            `}
+        const response = await fetch('/api/ui/notifications/history?limit=20', 
         });
         
         if (response.ok) {
@@ -3448,8 +3438,7 @@ async function loadNotificationHistory() {
 // Load notification stats
 async function loadNotificationStats() {
     try {
-        const response = await fetch('/api/ui/notifications/stats', {
-            `}
+        const response = await fetch('/api/ui/notifications/stats', 
         });
         
         if (response.ok) {
@@ -3484,7 +3473,7 @@ async function testNotifications() {
     
     try {
         const response = await fetch('/api/ui/notifications/check', {
-            method: 'POST'`}
+            method: 'POST'}
         });
         
         const result = await response.json();
