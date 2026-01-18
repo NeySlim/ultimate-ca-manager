@@ -85,7 +85,7 @@ function viewTemplateDetail(id) {
     openModal('viewTemplateModal'); // View-only, overlay closes automatically
     document.getElementById('viewTemplateContent').innerHTML = '<svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>';
     
-    const requestPath = '/api/v1/templates/' + id;
+    const requestPath = '/api/ui/templates/' + id + '/json';
     const handler = function(evt) {
         if (evt.detail.pathInfo.requestPath !== requestPath) return;
         document.body.removeEventListener('htmx:afterRequest', handler);
