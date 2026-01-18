@@ -30,6 +30,14 @@ background: var(--bg-hover) !important;
     transition: background-color 0.2s ease, 
                 border-color 0.2s ease, 
                 color 0.2s ease,
+                opacity 0.2s ease;
+}
+
+/* Only apply transform transitions to interactive elements */
+button, a, input, select, textarea, .card, .modal {
+    transition: background-color 0.2s ease, 
+                border-color 0.2s ease, 
+                color 0.2s ease,
                 opacity 0.2s ease,
                 transform 0.2s ease;
 }
