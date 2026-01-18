@@ -164,6 +164,14 @@ mkdir -p /app/backend/data/{cas,certs,backups,logs,temp}
 chmod 755 /app/backend/data
 chmod 700 /app/backend/data/{cas,certs,backups}
 
+# Fix permissions to ensure UCM user can write
+echo -e "${BLUE}🔧 Fixing file permissions...${NC}"
+# In Docker, we run as root initially, then su to ucm user
+# Ensure all data files are owned by the app user
+if [ -d /app/backend/data ]; then
+    chown -R 1000:1000 /app/backend/data 2>/dev/null || true
+fi
+
 # Check data directory permissions
 if [ ! -w /app/backend/data ]; then
     echo -e "${RED}❌ Data directory is not writable!${NC}"
