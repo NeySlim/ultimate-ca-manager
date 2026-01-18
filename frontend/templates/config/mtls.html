@@ -1115,8 +1115,16 @@ async function deleteCertificate(certId) {
 window.deleteCertificate = deleteCertificate;
 
 // Initialize
+// Initialize page on load (protected against multiple calls)
+if (typeof window.mtlsPageInitialized === 'undefined') {
+    window.mtlsPageInitialized = false;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    loadMTLSSettings();
+    if (!window.mtlsPageInitialized) {
+        window.mtlsPageInitialized = true;
+        loadMTLSSettings();
+    }
 });
 })();
 </script>

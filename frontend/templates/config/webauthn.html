@@ -641,7 +641,16 @@ window.deleteCredential = function(credentialId) {
 }
 
 // Initialize - call immediately if DOM already loaded (HTMX swap), otherwise wait for DOMContentLoaded
+// Protected against multiple calls
+if (typeof window.webauthnPageInitialized === 'undefined') {
+    window.webauthnPageInitialized = false;
+}
+
 function init() {
+    if (window.webauthnPageInitialized) {
+        return;
+    }
+    window.webauthnPageInitialized = true;
     checkHostnameCompatibility();
     loadCredentials();
 }

@@ -607,12 +607,20 @@ async function testNotifications() {
 }
 
 // Initialize
+// Initialize page on load (protected against multiple calls)
+if (typeof window.notificationsPageInitialized === 'undefined') {
+    window.notificationsPageInitialized = false;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    loadUserNotificationSettings();
-    loadSMTPConfig();
-    loadNotificationRules();
-    loadNotificationHistory();
-    loadNotificationStats();
+    if (!window.notificationsPageInitialized) {
+        window.notificationsPageInitialized = true;
+        loadUserNotificationSettings();
+        loadSMTPConfig();
+        loadNotificationRules();
+        loadNotificationHistory();
+        loadNotificationStats();
+    }
 });
 })();
 </script>
