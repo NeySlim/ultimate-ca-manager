@@ -5098,6 +5098,102 @@ def cert_fingerprints(cert_id):
         return f'<p style="color: var(--danger-color);">Error: {str(e)}</p>'
 
 
+# Certificate Operations - Delete by refid
+@ui_bp.route('/api/ui/certificates/by-refid/<refid>', methods=['DELETE'])
+@login_required
+def ui_cert_delete_by_refid(refid):
+    """Delete certificate by refid (proxy to /api/v1)"""
+    try:
+        response = api_call_with_retry('DELETE', f"{request.url_root}api/v1/certificates/by-refid/{refid}")
+        
+        if response and response.status_code in [200, 204]:
+            return jsonify({"success": True, "message": "Certificate deleted"}), 200
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to delete certificate"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Certificate Operations - Revoke by refid
+@ui_bp.route('/api/ui/certificates/by-refid/<refid>/revoke', methods=['POST'])
+@login_required
+def ui_cert_revoke_by_refid(refid):
+    """Revoke certificate by refid (proxy to /api/v1)"""
+    try:
+        response = api_call_with_retry('POST', f"{request.url_root}api/v1/certificates/by-refid/{refid}/revoke")
+        
+        if response and response.status_code in [200, 204]:
+            return jsonify({"success": True, "message": "Certificate revoked"}), 200
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to revoke certificate"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# CA Operations - Delete by refid
+@ui_bp.route('/api/ui/ca/<refid>', methods=['DELETE'])
+@login_required
+def ui_ca_delete_by_refid(refid):
+    """Delete CA by refid (proxy to /api/v1)"""
+    try:
+        response = api_call_with_retry('DELETE', f"{request.url_root}api/v1/ca/{refid}")
+        
+        if response and response.status_code in [200, 204]:
+            return jsonify({"success": True, "message": "CA deleted"}), 200
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to delete CA"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# CRL Operations - Generate
+@ui_bp.route('/api/ui/ca/<refid>/crl/generate', methods=['POST'])
+@login_required
+def ui_ca_generate_crl(refid):
+    """Generate CRL for CA (proxy to /api/v1)"""
+    try:
+        response = api_call_with_retry('POST', f"{request.url_root}api/v1/ca/{refid}/crl/generate")
+        
+        if response and response.status_code in [200, 201]:
+            return response.json(), response.status_code
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to generate CRL"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# SCEP Operations - Approve
+@ui_bp.route('/api/ui/scep/<refid>/approve', methods=['POST'])
+@login_required
+def ui_scep_approve(refid):
+    """Approve SCEP request (proxy to /api/v1)"""
+    try:
+        response = api_call_with_retry('POST', f"{request.url_root}api/v1/scep/{refid}/approve")
+        
+        if response and response.status_code in [200, 201]:
+            return response.json(), response.status_code
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to approve SCEP"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# SCEP Operations - Reject
+@ui_bp.route('/api/ui/scep/<refid>/reject', methods=['POST'])
+@login_required
+def ui_scep_reject(refid):
+    """Reject SCEP request (proxy to /api/v1)"""
+    try:
+        response = api_call_with_retry('POST', f"{request.url_root}api/v1/scep/{refid}/reject")
+        
+        if response and response.status_code in [200, 204]:
+            return jsonify({"success": True, "message": "SCEP request rejected"}), 200
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to reject SCEP"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # Certificate Detail - X509 Details  
 @ui_bp.route('/api/ui/certificates/<cert_id>/x509details')
 @login_required
