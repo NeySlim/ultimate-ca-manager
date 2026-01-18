@@ -275,27 +275,26 @@ function revokeCert(certId) {
     ).then(confirmed => {
         if (!confirmed) return;
         
-        const token = '{{ session.get("access_token") }}';
-        fetch(`/api/v1/certificates/${certId}/revoke`, {
-            method: 'POST',
-            headers: { 
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ reason: 'unspecified' })
-        })
-        .then(response => {
-            if (response.ok) {
+        const requestPath = `/api/v1/certificates/${certId}/revoke`;
+        const handler = function(evt) {
+            if (evt.detail.pathInfo.requestPath !== requestPath) return;
+            document.body.removeEventListener('htmx:afterRequest', handler);
+            
+            if (evt.detail.successful) {
                 showToast('Certificate revoked successfully', 'success');
                 setTimeout(() => location.reload(), 1000);
             } else {
-                return response.json().then(data => {
-                    throw new Error(data.error || 'Revoke failed');
-                });
+                const result = JSON.parse(evt.detail.xhr.responseText || '{}');
+                showToast('Failed to revoke certificate: ' + (result.error || 'Revoke failed'), 'error');
             }
-        })
-        .catch(error => {
-            showToast('Failed to revoke certificate: ' + error.message, 'error');
+        };
+        
+        document.body.addEventListener('htmx:afterRequest', handler);
+        
+        htmx.ajax('POST', requestPath, {
+            swap: 'none',
+            headers: { 'Content-Type': 'application/json' },
+            values: JSON.stringify({ reason: 'unspecified' })
         });
     });
 }
@@ -360,26 +359,32 @@ function exportPKCS12() {
 }
 
 function exportWithToken(url) {
-    const token = '{{ session.get("access_token") }}';
-    fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
-    })
-    .then(response => {
-        if (!response.ok) throw new Error('Export failed');
-        return response.blob();
-    })
-    .then(blob => {
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = ''; // Browser will use filename from Content-Disposition
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(downloadUrl);
-    })
-    .catch(error => {
-        ucmAlert('Export failed: ' + error.message, 'Error');
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath !== url) return;
+        document.body.removeEventListener('htmx:afterRequest', handler);
+        
+        if (!evt.detail.successful) {
+            ucmAlert('Export failed', 'Error');
+            return;
+        }
+        
+        const response = evt.detail.xhr;
+        response.blob().then(blob => {
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = ''; // Browser will use filename from Content-Disposition
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(downloadUrl);
+        });
+    };
+    
+    document.body.addEventListener('htmx:afterRequest', handler);
+    
+    htmx.ajax('GET', url, {
+        swap: 'none'
     });
 }
 </script>

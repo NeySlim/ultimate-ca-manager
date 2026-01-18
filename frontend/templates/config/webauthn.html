@@ -217,30 +217,32 @@ function isWebAuthnCompatibleHostname(hostname) {
 
 // Get the proper FQDN for this server
 async function getServerFQDN() {
-    try {
-        // Try to get server info from API
-        const response = await fetch('/api/v1/system/info', {
+    return new Promise((resolve) => {
+        const handler = (evt) => {
+            const detail = evt.detail;
+            if (detail.pathInfo.requestPath === '/api/ui/system/info') {
+                document.body.removeEventListener('htmx:afterRequest', handler);
+                if (detail.successful && detail.xhr.response) {
+                    const data = JSON.parse(detail.xhr.response);
+                    if (data.fqdn) {
+                        resolve(data.fqdn);
+                        return;
+                    }
+                }
+                // Fallback: if hostname is just "netsuit", append common TLD
+                const hostname = window.location.hostname;
+                if (!hostname.includes('.')) {
+                    resolve(`${hostname}.lan.pew.pet`);
+                } else {
+                    resolve(hostname);
+                }
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', handler);
+        htmx.ajax('GET', '/api/ui/system/info', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
-        if (response.ok) {
-            const data = await response.json();
-            if (data.fqdn) {
-                return data.fqdn;
-            }
-        }
-    } catch (e) {
-        // Fallback: construct from current hostname
-    }
-    
-    // Fallback: if hostname is just "netsuit", append common TLD
-    const hostname = window.location.hostname;
-    if (!hostname.includes('.')) {
-        // Common patterns: hostname.local or hostname.lan.domain
-        return `${hostname}.lan.pew.pet`;
-    }
-    
-    return hostname;
+    });
 }
 
 // Show hostname warning and suggest valid URLs or auto-redirect
@@ -329,32 +331,39 @@ function bufferToBase64url(buffer) {
 }
 
 // Load credentials list
-window.loadCredentials = async function() {
-    try {
-        const response = await fetch('/api/v1/webauthn/credentials', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const result = await response.json();
-        
-        if (response.ok && result.credentials) {
-            renderCredentials(result.credentials);
-            updateStats(result.credentials);
-        } else {
-            document.getElementById('credentials-list').innerHTML = `
-                <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                    <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
-                    <p>${result.error || 'Failed to load credentials'}</p>
-                </div>
-            `;
+window.loadCredentials = function() {
+    const handler = (evt) => {
+        const detail = evt.detail;
+        if (detail.pathInfo.requestPath === '/api/ui/webauthn/credentials') {
+            document.body.removeEventListener('htmx:afterRequest', handler);
+            if (detail.successful && detail.xhr.response) {
+                const result = JSON.parse(detail.xhr.response);
+                if (result.credentials) {
+                    renderCredentials(result.credentials);
+                    updateStats(result.credentials);
+                } else {
+                    document.getElementById('credentials-list').innerHTML = `
+                        <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                            <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
+                            <p>${result.error || 'Failed to load credentials'}</p>
+                        </div>
+                    `;
+                }
+            } else {
+                const result = detail.xhr.response ? JSON.parse(detail.xhr.response) : {};
+                document.getElementById('credentials-list').innerHTML = `
+                    <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                        <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
+                        <p>${result.error || 'Failed to load credentials'}</p>
+                    </div>
+                `;
+            }
         }
-    } catch (error) {
-        document.getElementById('credentials-list').innerHTML = `
-            <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-                <svg class="ucm-icon" width="48" height="48" style="  margin-bottom: 0.5rem; color: var(--error-color);"><use href="#icon-exclamation-circle"/></svg>
-                <p>Error: ${error.message}</p>
-            </div>
-        `;
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('GET', '/api/ui/webauthn/credentials', {
+        headers: { 'Authorization': `Bearer ${token}` }
+    });
 }
 
 function renderCredentials(credentials) {
@@ -465,7 +474,7 @@ window.cancelRegistration = function() {
 }
 
 // Start WebAuthn registration
-window.startRegistration = async function() {
+window.startRegistration = function() {
     const name = document.getElementById('credential-name').value.trim();
     
     if (!name) {
@@ -477,146 +486,158 @@ window.startRegistration = async function() {
     document.getElementById('registration-step-1').style.display = 'none';
     document.getElementById('registration-step-2').style.display = 'block';
     
-    try {
-        // Step 1: Get registration options from server
-        const optionsResponse = await fetch('/api/v1/webauthn/register/options', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+    // Step 1: Get registration options from server
+    const optionsHandler = (evt) => {
+        const detail = evt.detail;
+        if (detail.pathInfo.requestPath === '/api/ui/webauthn/register/options') {
+            document.body.removeEventListener('htmx:afterRequest', optionsHandler);
+            if (!detail.successful) {
+                const error = detail.xhr.response ? JSON.parse(detail.xhr.response) : {};
+                document.getElementById('registration-step-2').style.display = 'none';
+                document.getElementById('registration-step-error').style.display = 'block';
+                document.getElementById('registration-error-message').textContent = error.error || 'Failed to get registration options';
+                return;
             }
-        });
-        
-        if (!optionsResponse.ok) {
-            const error = await optionsResponse.json();
-            throw new Error(error.error || 'Failed to get registration options');
-        }
-        
-        const options = await optionsResponse.json();
-        console.log('WebAuthn registration options received:', options);
-        console.log('Current window.location:', {
-            hostname: window.location.hostname,
-            host: window.location.host,
-            origin: window.location.origin
-        });
-        
-        // Convert base64url strings to ArrayBuffers
-        // Use server's RP ID (should match current hostname)
-        const publicKeyOptions = {
-            publicKey: {
-                ...options,
-                challenge: base64urlToBuffer(options.challenge),
-                user: {
-                    ...options.user,
-                    id: base64urlToBuffer(options.user.id)
-                },
-                excludeCredentials: options.excludeCredentials ? 
-                    options.excludeCredentials.map(cred => ({
-                        ...cred,
-                        id: base64urlToBuffer(cred.id)
-                    })) : []
-            }
-        };
-        console.log('Converted publicKeyOptions:', publicKeyOptions);
-        console.log('RP ID from server:', options.rp.id);
-        
-        // Step 2: Call WebAuthn API
-        const credential = await navigator.credentials.create(publicKeyOptions);
-        
-        if (!credential) {
-            throw new Error('Registration was cancelled');
-        }
-        
-        // Step 3: Send credential to server
-        const verifyResponse = await fetch('/api/v1/webauthn/register/verify', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                name: name,
-                credential: {
-                    id: credential.id,
-                    rawId: bufferToBase64url(credential.rawId),
-                    type: credential.type,
-                    response: {
-                        clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
-                        attestationObject: bufferToBase64url(credential.response.attestationObject)
-                    }
+            
+            const options = JSON.parse(detail.xhr.response);
+            console.log('WebAuthn registration options received:', options);
+            console.log('Current window.location:', {
+                hostname: window.location.hostname,
+                host: window.location.host,
+                origin: window.location.origin
+            });
+            
+            // Convert base64url strings to ArrayBuffers
+            const publicKeyOptions = {
+                publicKey: {
+                    ...options,
+                    challenge: base64urlToBuffer(options.challenge),
+                    user: {
+                        ...options.user,
+                        id: base64urlToBuffer(options.user.id)
+                    },
+                    excludeCredentials: options.excludeCredentials ? 
+                        options.excludeCredentials.map(cred => ({
+                            ...cred,
+                            id: base64urlToBuffer(cred.id)
+                        })) : []
                 }
-            })
-        });
-        
-        if (!verifyResponse.ok) {
-            const error = await verifyResponse.json();
-            throw new Error(error.error || 'Failed to verify registration');
+            };
+            console.log('Converted publicKeyOptions:', publicKeyOptions);
+            console.log('RP ID from server:', options.rp.id);
+            
+            // Step 2: Call WebAuthn API
+            navigator.credentials.create(publicKeyOptions).then(credential => {
+                if (!credential) {
+                    throw new Error('Registration was cancelled');
+                }
+                
+                // Step 3: Send credential to server
+                const verifyHandler = (evt) => {
+                    const detail = evt.detail;
+                    if (detail.pathInfo.requestPath === '/api/ui/webauthn/register/verify') {
+                        document.body.removeEventListener('htmx:afterRequest', verifyHandler);
+                        if (!detail.successful) {
+                            const error = detail.xhr.response ? JSON.parse(detail.xhr.response) : {};
+                            document.getElementById('registration-step-2').style.display = 'none';
+                            document.getElementById('registration-step-error').style.display = 'block';
+                            document.getElementById('registration-error-message').textContent = error.error || 'Failed to verify registration';
+                            return;
+                        }
+                        
+                        // Success!
+                        document.getElementById('registration-step-2').style.display = 'none';
+                        document.getElementById('registration-step-3').style.display = 'block';
+                    }
+                };
+                document.body.addEventListener('htmx:afterRequest', verifyHandler);
+                htmx.ajax('POST', '/api/ui/webauthn/register/verify', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    values: JSON.stringify({
+                        name: name,
+                        credential: {
+                            id: credential.id,
+                            rawId: bufferToBase64url(credential.rawId),
+                            type: credential.type,
+                            response: {
+                                clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+                                attestationObject: bufferToBase64url(credential.response.attestationObject)
+                            }
+                        }
+                    })
+                });
+            }).catch(error => {
+                console.error('Registration error:', error);
+                document.getElementById('registration-step-2').style.display = 'none';
+                document.getElementById('registration-step-error').style.display = 'block';
+                document.getElementById('registration-error-message').textContent = error.message;
+            });
         }
-        
-        // Success!
-        document.getElementById('registration-step-2').style.display = 'none';
-        document.getElementById('registration-step-3').style.display = 'block';
-        
-    } catch (error) {
-        console.error('Registration error:', error);
-        document.getElementById('registration-step-2').style.display = 'none';
-        document.getElementById('registration-step-error').style.display = 'block';
-        document.getElementById('registration-error-message').textContent = error.message;
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', optionsHandler);
+    htmx.ajax('POST', '/api/ui/webauthn/register/options', {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
 }
 
 // Toggle credential active state
-window.toggleCredential = async function(credentialId, newState) {
-    try {
-        const response = await fetch(`/api/v1/webauthn/credentials/${credentialId}/toggle`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ enabled: newState })
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast(newState ? '✓ Key enabled' : '✓ Key disabled', 'success');
-            loadCredentials();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to update'), 'error');
+window.toggleCredential = function(credentialId, newState) {
+    const handler = (evt) => {
+        const detail = evt.detail;
+        if (detail.pathInfo.requestPath === `/api/ui/webauthn/credentials/${credentialId}/toggle`) {
+            document.body.removeEventListener('htmx:afterRequest', handler);
+            if (detail.successful) {
+                showToast(newState ? '✓ Key enabled' : '✓ Key disabled', 'success');
+                loadCredentials();
+            } else {
+                const result = detail.xhr.response ? JSON.parse(detail.xhr.response) : {};
+                showToast('✗ ' + (result.error || 'Failed to update'), 'error');
+            }
         }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('POST', `/api/ui/webauthn/credentials/${credentialId}/toggle`, {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        values: JSON.stringify({ enabled: newState })
+    });
 }
 
 // Delete credential
-window.deleteCredential = async function(credentialId) {
-    const confirmed = await ucmConfirm(
+window.deleteCredential = function(credentialId) {
+    ucmConfirm(
         'Are you sure you want to delete this security key? This cannot be undone.',
         'Delete Security Key',
         { danger: true, confirmText: 'Delete', icon: 'trash' }
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch(`/api/v1/webauthn/credentials/${credentialId}`, {
-            method: 'DELETE',
+    ).then(confirmed => {
+        if (!confirmed) return;
+        
+        const handler = (evt) => {
+            const detail = evt.detail;
+            if (detail.pathInfo.requestPath === `/api/ui/webauthn/credentials/${credentialId}`) {
+                document.body.removeEventListener('htmx:afterRequest', handler);
+                if (detail.successful) {
+                    showToast('✓ Key deleted', 'success');
+                    loadCredentials();
+                } else {
+                    const result = detail.xhr.response ? JSON.parse(detail.xhr.response) : {};
+                    showToast('✗ ' + (result.error || 'Failed to delete'), 'error');
+                }
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', handler);
+        htmx.ajax('DELETE', `/api/ui/webauthn/credentials/${credentialId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Key deleted', 'success');
-            loadCredentials();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to delete'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+    });
 }
 
 // Initialize - call immediately if DOM already loaded (HTMX swap), otherwise wait for DOMContentLoaded

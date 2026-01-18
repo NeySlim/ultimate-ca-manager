@@ -459,30 +459,31 @@ async function loadMTLSSettings() {
     try {
         {% if session.get('role') == 'admin' %}
         // Load CA list
-        const casResponse = await fetch('/api/v1/ca', {
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (casResponse.ok) {
-            const casData = await casResponse.json();
-            const select = document.getElementById('mtls_trusted_ca_id');
-            
-            casData.forEach(ca => {
-                const option = document.createElement('option');
-                option.value = ca.refid;
-                option.textContent = `${ca.descr}`;
-                select.appendChild(option);
-            });
-        }
+        const casHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === '/api/ui/ca/list') {
+                if (evt.detail.xhr.status === 200) {
+                    const casData = JSON.parse(evt.detail.xhr.responseText);
+                    const select = document.getElementById('mtls_trusted_ca_id');
+                    
+                    casData.forEach(ca => {
+                        const option = document.createElement('option');
+                        option.value = ca.refid;
+                        option.textContent = `${ca.descr}`;
+                        select.appendChild(option);
+                    });
+                }
+                document.body.removeEventListener('htmx:afterRequest', casHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', casHandler);
+        htmx.ajax('GET', '/api/ui/ca/list', {swap: 'none'});
         {% endif %}
         
         // Load current settings
-        const response = await fetch('/api/v1/mtls/settings', {
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            currentSettings = await response.json();
+        const loadSettingsHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === '/api/ui/mtls/settings') {
+                if (evt.detail.xhr.status === 200) {
+                    currentSettings = JSON.parse(evt.detail.xhr.responseText);
             
             {% if session.get('role') == 'admin' %}
             document.getElementById('mtls_enabled').checked = currentSettings.enabled;
@@ -505,7 +506,14 @@ async function loadMTLSSettings() {
             
             // Show/hide user section
             updateUserSection();
-        }
+                } else {
+                    showToast('✗ Failed to load settings', 'error');
+                }
+                document.body.removeEventListener('htmx:afterRequest', loadSettingsHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', loadSettingsHandler);
+        htmx.ajax('GET', '/api/ui/mtls/settings', {swap: 'none'});
     } catch (error) {
         console.error('Error loading mTLS settings:', error);
     }
@@ -644,24 +652,27 @@ document.getElementById('download-ca-btn')?.addEventListener('click', async () =
     }
     
     try {
-        const response = await fetch(`/api/v1/ca/${caId}/export?format=pem`, {
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'ucm-client-ca.pem';
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            showToast('✓ CA certificate downloaded', 'success');
-        } else {
-            showToast('✗ Failed to download CA', 'error');
-        }
+        const caExportHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === `/api/ui/ca/${caId}/export`) {
+                if (evt.detail.xhr.status === 200) {
+                    const blob = evt.detail.xhr.response;
+                    const url = window.URL.createObjectURL(new Blob([blob]));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'ucm-client-ca.pem';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    showToast('✓ CA certificate downloaded', 'success');
+                } else {
+                    showToast('✗ Failed to download CA', 'error');
+                }
+                document.body.removeEventListener('htmx:afterRequest', caExportHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', caExportHandler);
+        htmx.ajax('GET', `/api/ui/ca/${caId}/export?format=pem`, {swap: 'none'});
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
@@ -684,14 +695,18 @@ async function updateUserSection() {
         if (trustedCAId) {
             // Fetch CA details
             try {
-                const response = await fetch(`/api/v1/ca/${trustedCAId}`, {
-                    headers: {'Authorization': `Bearer ${token}`}
-                });
-                if (response.ok) {
-                    const ca = await response.json();
-                    document.getElementById('ca-name-display').textContent = ca.descr;
-                    document.getElementById('import-ca-name-display').textContent = ca.descr;
-                }
+                const caDetailsHandler = function(evt) {
+                    if (evt.detail.pathInfo.requestPath === `/api/ui/ca/${trustedCAId}`) {
+                        if (evt.detail.xhr.status === 200) {
+                            const ca = JSON.parse(evt.detail.xhr.responseText);
+                            document.getElementById('ca-name-display').textContent = ca.descr;
+                            document.getElementById('import-ca-name-display').textContent = ca.descr;
+                        }
+                        document.body.removeEventListener('htmx:afterRequest', caDetailsHandler);
+                    }
+                };
+                document.body.addEventListener('htmx:afterRequest', caDetailsHandler);
+                htmx.ajax('GET', `/api/ui/ca/${trustedCAId}`, {swap: 'none'});
             } catch (e) {}
             
             createWithCA.style.display = 'block';
@@ -722,23 +737,24 @@ document.getElementById('mtls-settings-form')?.addEventListener('submit', async 
     };
     
     try {
-        const response = await fetch('/api/v1/mtls/settings', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(data)
+        const saveSettingsHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === '/api/ui/mtls/settings') {
+                const result = JSON.parse(evt.detail.xhr.responseText);
+                
+                if (evt.detail.xhr.status === 200) {
+                    showToast('✓ Settings saved successfully', 'success');
+                    loadMTLSSettings();
+                } else {
+                    showToast('✗ ' + (result.error || 'Failed to save'), 'error');
+                }
+                document.body.removeEventListener('htmx:afterRequest', saveSettingsHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', saveSettingsHandler);
+        htmx.ajax('POST', '/api/ui/mtls/settings', {
+            swap: 'none',
+            values: data
         });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Settings saved successfully', 'success');
-            loadMTLSSettings();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to save'), 'error');
-        }
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
@@ -756,25 +772,26 @@ document.getElementById('create-managed-cert-form')?.addEventListener('submit', 
     };
     
     try {
-        const response = await fetch('/api/v1/mtls/certificates/create', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(data)
+        const createManagedHandler2 = function(evt) {
+            if (evt.detail.pathInfo.requestPath === '/api/ui/mtls/certificates') {
+                const result = JSON.parse(evt.detail.xhr.responseText);
+                
+                if (evt.detail.xhr.status === 200) {
+                    showToast('✓ Certificate created successfully', 'success');
+                    // Switch to manage tab
+                    ucm_switchTab('manage');
+                    loadCertificates();
+                } else {
+                    showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
+                }
+                document.body.removeEventListener('htmx:afterRequest', createManagedHandler2);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', createManagedHandler2);
+        htmx.ajax('POST', '/api/ui/mtls/certificates', {
+            swap: 'none',
+            values: data
         });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Certificate created successfully', 'success');
-            // Switch to manage tab
-            ucm_switchTab('manage');
-            loadCertificates();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
-        }
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
@@ -793,24 +810,25 @@ document.getElementById('create-selfsigned-cert-form')?.addEventListener('submit
     };
     
     try {
-        const response = await fetch('/api/v1/mtls/certificates/create', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(data)
+        const createSelfSignedHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === '/api/ui/mtls/certificates') {
+                const result = JSON.parse(evt.detail.xhr.responseText);
+                
+                if (evt.detail.xhr.status === 200) {
+                    showToast('✓ Self-signed certificate created', 'success');
+                    ucm_switchTab('manage');
+                    loadCertificates();
+                } else {
+                    showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
+                }
+                document.body.removeEventListener('htmx:afterRequest', createSelfSignedHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', createSelfSignedHandler);
+        htmx.ajax('POST', '/api/ui/mtls/certificates', {
+            swap: 'none',
+            values: data
         });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Self-signed certificate created', 'success');
-            ucm_switchTab('manage');
-            loadCertificates();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
-        }
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
@@ -826,19 +844,12 @@ async function validateImportedCert() {
     }
     
     try {
-        const response = await fetch('/api/v1/mtls/validate-certificate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({certificate: certPem})
-        });
+        const validateHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === '/api/ui/mtls/validate-certificate') {
+                const result = JSON.parse(evt.detail.xhr.responseText);
+                const resultDiv = document.getElementById('import-validation-result');
         
-        const result = await response.json();
-        const resultDiv = document.getElementById('import-validation-result');
-        
-        if (response.ok && result.success) {
+        if (evt.detail.xhr.status === 200 && result.success) {
             const info = result.info;
             resultDiv.style.display = 'block';
             resultDiv.innerHTML = `
@@ -862,6 +873,14 @@ async function validateImportedCert() {
                 </div>
             `;
         }
+                document.body.removeEventListener('htmx:afterRequest', validateHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', validateHandler);
+        htmx.ajax('POST', '/api/ui/mtls/validate-certificate', {
+            swap: 'none',
+            values: {certificate: certPem}
+        });
     } catch (error) {
         showToast('✗ Validation error: ' + error.message, 'error');
     }
@@ -878,26 +897,27 @@ document.getElementById('import-cert-form')?.addEventListener('submit', async (e
     };
     
     try {
-        const response = await fetch('/api/v1/mtls/certificates/enroll', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(data)
+        const enrollHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === '/api/ui/mtls/certificates/enroll') {
+                const result = JSON.parse(evt.detail.xhr.responseText);
+                
+                if (evt.detail.xhr.status === 200) {
+                    showToast('✓ Certificate imported successfully', 'success');
+                    document.getElementById('import-cert-form').reset();
+                    document.getElementById('import-validation-result').style.display = 'none';
+                    ucm_switchTab('manage');
+                    loadCertificates();
+                } else {
+                    showToast('✗ ' + (result.error || 'Failed to import certificate'), 'error');
+                }
+                document.body.removeEventListener('htmx:afterRequest', enrollHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', enrollHandler);
+        htmx.ajax('POST', '/api/ui/mtls/certificates/enroll', {
+            swap: 'none',
+            values: data
         });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Certificate imported successfully', 'success');
-            document.getElementById('import-cert-form').reset();
-            document.getElementById('import-validation-result').style.display = 'none';
-            ucm_switchTab('manage');
-            loadCertificates();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to import certificate'), 'error');
-        }
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
@@ -906,13 +926,11 @@ document.getElementById('import-cert-form')?.addEventListener('submit', async (e
 // Load certificates
 async function loadCertificates() {
     try {
-        const response = await fetch('/api/v1/mtls/certificates', {
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            const tbody = document.getElementById('certificates-tbody');
+        const listCertsHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === '/api/ui/mtls/certificates') {
+                if (evt.detail.xhr.status === 200) {
+                    const data = JSON.parse(evt.detail.xhr.responseText);
+                    const tbody = document.getElementById('certificates-tbody');
             
             if (data.certificates.length === 0) {
                 tbody.innerHTML = `
@@ -977,7 +995,14 @@ async function loadCertificates() {
                     </tr>
                 `;
             }).join('');
-        }
+                } else {
+                    showToast('✗ Failed to load certificates', 'error');
+                }
+                document.body.removeEventListener('htmx:afterRequest', listCertsHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', listCertsHandler);
+        htmx.ajax('GET', '/api/ui/mtls/certificates', {swap: 'none'});
     } catch (error) {
         console.error('Error loading certificates:', error);
     }
@@ -986,21 +1011,24 @@ async function loadCertificates() {
 // Certificate actions
 async function downloadCertificate(certId) {
     try {
-        const response = await fetch(`/api/v1/mtls/certificates/${certId}/download`, {
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `client-cert-${certId}.pem`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-        } else {
-            showToast('✗ Failed to download certificate', 'error');
-        }
+        const downloadHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === `/api/ui/mtls/certificates/${certId}/download`) {
+                if (evt.detail.xhr.status === 200) {
+                    const blob = evt.detail.xhr.response;
+                    const url = window.URL.createObjectURL(new Blob([blob]));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `client-cert-${certId}.pem`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    showToast('✗ Failed to download certificate', 'error');
+                }
+                document.body.removeEventListener('htmx:afterRequest', downloadHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', downloadHandler);
+        htmx.ajax('GET', `/api/ui/mtls/certificates/${certId}/download`, {swap: 'none'});
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
@@ -1017,17 +1045,19 @@ async function revokeCertificate(certId) {
     if (!confirmed) return;
     
     try {
-        const response = await fetch(`/api/v1/mtls/certificates/${certId}/revoke`, {
-            method: 'POST',
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            showToast('✓ Certificate revoked', 'success');
-            loadCertificates();
-        } else {
-            showToast('✗ Failed to revoke', 'error');
-        }
+        const revokeHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === `/api/ui/mtls/certificates/${certId}/revoke`) {
+                if (evt.detail.xhr.status === 200) {
+                    showToast('✓ Certificate revoked', 'success');
+                    loadCertificates();
+                } else {
+                    showToast('✗ Failed to revoke', 'error');
+                }
+                document.body.removeEventListener('htmx:afterRequest', revokeHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', revokeHandler);
+        htmx.ajax('POST', `/api/ui/mtls/certificates/${certId}/revoke`, {swap: 'none'});
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
@@ -1036,17 +1066,19 @@ window.revokeCertificate = revokeCertificate;
 
 async function enableCertificate(certId) {
     try {
-        const response = await fetch(`/api/v1/mtls/certificates/${certId}/enable`, {
-            method: 'POST',
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            showToast('✓ Certificate enabled', 'success');
-            loadCertificates();
-        } else {
-            showToast('✗ Failed to enable', 'error');
-        }
+        const enableHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === `/api/ui/mtls/certificates/${certId}/enable`) {
+                if (evt.detail.xhr.status === 200) {
+                    showToast('✓ Certificate enabled', 'success');
+                    loadCertificates();
+                } else {
+                    showToast('✗ Failed to enable', 'error');
+                }
+                document.body.removeEventListener('htmx:afterRequest', enableHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', enableHandler);
+        htmx.ajax('POST', `/api/ui/mtls/certificates/${certId}/enable`, {swap: 'none'});
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }
@@ -1063,17 +1095,19 @@ async function deleteCertificate(certId) {
     if (!confirmed) return;
     
     try {
-        const response = await fetch(`/api/v1/mtls/certificates/${certId}`, {
-            method: 'DELETE',
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            showToast('✓ Certificate deleted', 'success');
-            loadCertificates();
-        } else {
-            showToast('✗ Failed to delete', 'error');
-        }
+        const deleteHandler = function(evt) {
+            if (evt.detail.pathInfo.requestPath === `/api/ui/mtls/certificates/${certId}`) {
+                if (evt.detail.xhr.status === 200) {
+                    showToast('✓ Certificate deleted', 'success');
+                    loadCertificates();
+                } else {
+                    showToast('✗ Failed to delete', 'error');
+                }
+                document.body.removeEventListener('htmx:afterRequest', deleteHandler);
+            }
+        };
+        document.body.addEventListener('htmx:afterRequest', deleteHandler);
+        htmx.ajax('DELETE', `/api/ui/mtls/certificates/${certId}`, {swap: 'none'});
     } catch (error) {
         showToast('✗ Error: ' + error.message, 'error');
     }

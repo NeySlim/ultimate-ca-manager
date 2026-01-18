@@ -85,110 +85,120 @@ function viewTemplateDetail(id) {
     openModal('viewTemplateModal'); // View-only, overlay closes automatically
     document.getElementById('viewTemplateContent').innerHTML = '<svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>';
     
-    fetch('/api/v1/templates/' + id)
-        .then(r => r.json())
-        .then(t => {
-            // Format DN template nicely
-            const dnEntries = Object.entries(t.dn_template)
-                .filter(([k, v]) => v && v.trim())
-                .map(([k, v]) => `<div><strong>${k}:</strong> ${escapeHtml(v)}</div>`)
-                .join('');
-            
-            // Format extensions nicely
-            const ku = t.extensions_template.key_usage || [];
-            const eku = t.extensions_template.extended_key_usage || [];
-            const san = t.extensions_template.san_types || [];
-            
-            const html = `
-                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-                    <!-- Header -->
-                    <div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                            <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0;">${escapeHtml(t.name)}</h3>
-                            <span style="padding: 0.125rem 0.5rem; background: ${t.is_system ? 'var(--info-color)' : 'var(--success-color)'}20; color: ${t.is_system ? 'var(--info-color)' : 'var(--success-color)'}; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">
-                                ${t.is_system ? 'System' : 'Custom'}
-                            </span>
-                        </div>
-                        ${t.description ? `<p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">${escapeHtml(t.description)}</p>` : ''}
+    const requestPath = '/api/v1/templates/' + id;
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath !== requestPath) return;
+        document.body.removeEventListener('htmx:afterRequest', handler);
+        
+        if (!evt.detail.successful) {
+            document.getElementById('viewTemplateContent').innerHTML = `<div style="color: var(--danger-color); text-align: center; padding: 2rem;">Error loading template</div>`;
+            return;
+        }
+        
+        const t = JSON.parse(evt.detail.xhr.responseText);
+        
+        // Format DN template nicely
+        const dnEntries = Object.entries(t.dn_template)
+            .filter(([k, v]) => v && v.trim())
+            .map(([k, v]) => `<div><strong>${k}:</strong> ${escapeHtml(v)}</div>`)
+            .join('');
+        
+        // Format extensions nicely
+        const ku = t.extensions_template.key_usage || [];
+        const eku = t.extensions_template.extended_key_usage || [];
+        const san = t.extensions_template.san_types || [];
+        
+        const html = `
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Header -->
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0;">${escapeHtml(t.name)}</h3>
+                        <span style="padding: 0.125rem 0.5rem; background: ${t.is_system ? 'var(--info-color)' : 'var(--success-color)'}20; color: ${t.is_system ? 'var(--info-color)' : 'var(--success-color)'}; border-radius: 4px; font-size: 0.75rem; font-weight: 500;">
+                            ${t.is_system ? 'System' : 'Custom'}
+                        </span>
                     </div>
+                    ${t.description ? `<p style="color: var(--text-secondary); font-size: 0.875rem; margin: 0;">${escapeHtml(t.description)}</p>` : ''}
+                </div>
 
-                    <!-- Configuration -->
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 6px;">
-                        <div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Type</div>
-                            <div style="font-weight: 500; color: var(--text-primary);">${escapeHtml(t.template_type)}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Key Type</div>
-                            <div style="font-weight: 500; color: var(--text-primary);">${escapeHtml(t.key_type)}</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Validity</div>
-                            <div style="font-weight: 500; color: var(--text-primary);">${t.validity_days} days</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Digest Algorithm</div>
-                            <div style="font-weight: 500; color: var(--text-primary);">${escapeHtml(t.digest)}</div>
-                        </div>
-                    </div>
-
-                    <!-- DN Template -->
+                <!-- Configuration -->
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 6px;">
                     <div>
-                        <h4 style="font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">
-                            <svg class="ucm-icon" width="16" height="16" style="vertical-align: middle; margin-right: 0.375rem;"><use href="#icon-file-text"/></svg>
-                            Distinguished Name Template
-                        </h4>
-                        <div style="padding: 1rem; background: var(--bg-primary); border-radius: 4px; font-family: monospace; font-size: 0.875rem;">
-                            ${dnEntries || '<div style="color: var(--text-secondary);">No DN template</div>'}
-                        </div>
-                        <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                            Variables: {hostname}, {email}, {username}
-                        </p>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Type</div>
+                        <div style="font-weight: 500; color: var(--text-primary);">${escapeHtml(t.template_type)}</div>
                     </div>
-
-                    <!-- Extensions -->
                     <div>
-                        <h4 style="font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">
-                            <svg class="ucm-icon" width="16" height="16" style="vertical-align: middle; margin-right: 0.375rem;"><use href="#icon-shield"/></svg>
-                            Certificate Extensions
-                        </h4>
-                        
-                        <div style="display: grid; gap: 1rem;">
-                            ${ku.length ? `
-                            <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Key Usage</div>
-                                <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
-                                    ${ku.map(k => `<span style="padding: 0.25rem 0.5rem; background: var(--primary-color)20; color: var(--primary-color); border-radius: 4px; font-size: 0.75rem;">${escapeHtml(k)}</span>`).join('')}
-                                </div>
-                            </div>
-                            ` : ''}
-                            
-                            ${eku.length ? `
-                            <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Extended Key Usage</div>
-                                <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
-                                    ${eku.map(k => `<span style="padding: 0.25rem 0.5rem; background: var(--success-color)20; color: var(--success-color); border-radius: 4px; font-size: 0.75rem;">${escapeHtml(k)}</span>`).join('')}
-                                </div>
-                            </div>
-                            ` : ''}
-                            
-                            ${san.length ? `
-                            <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">SAN Types Supported</div>
-                                <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
-                                    ${san.map(k => `<span style="padding: 0.25rem 0.5rem; background: var(--info-color)20; color: var(--info-color); border-radius: 4px; font-size: 0.75rem;">${escapeHtml(k)}</span>`).join('')}
-                                </div>
-                            </div>
-                            ` : ''}
-                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Key Type</div>
+                        <div style="font-weight: 500; color: var(--text-primary);">${escapeHtml(t.key_type)}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Validity</div>
+                        <div style="font-weight: 500; color: var(--text-primary);">${t.validity_days} days</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Digest Algorithm</div>
+                        <div style="font-weight: 500; color: var(--text-primary);">${escapeHtml(t.digest)}</div>
                     </div>
                 </div>
-            `;
-            document.getElementById('viewTemplateContent').innerHTML = html;
-        })
-        .catch(e => {
-            document.getElementById('viewTemplateContent').innerHTML = `<div style="color: var(--danger-color); text-align: center; padding: 2rem;">Error: ${escapeHtml(e.message)}</div>`;
-        });
+
+                <!-- DN Template -->
+                <div>
+                    <h4 style="font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">
+                        <svg class="ucm-icon" width="16" height="16" style="vertical-align: middle; margin-right: 0.375rem;"><use href="#icon-file-text"/></svg>
+                        Distinguished Name Template
+                    </h4>
+                    <div style="padding: 1rem; background: var(--bg-primary); border-radius: 4px; font-family: monospace; font-size: 0.875rem;">
+                        ${dnEntries || '<div style="color: var(--text-secondary);">No DN template</div>'}
+                    </div>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                        Variables: {hostname}, {email}, {username}
+                    </p>
+                </div>
+
+                <!-- Extensions -->
+                <div>
+                    <h4 style="font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">
+                        <svg class="ucm-icon" width="16" height="16" style="vertical-align: middle; margin-right: 0.375rem;"><use href="#icon-shield"/></svg>
+                        Certificate Extensions
+                    </h4>
+                    
+                    <div style="display: grid; gap: 1rem;">
+                        ${ku.length ? `
+                        <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Key Usage</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                                ${ku.map(k => `<span style="padding: 0.25rem 0.5rem; background: var(--primary-color)20; color: var(--primary-color); border-radius: 4px; font-size: 0.75rem;">${escapeHtml(k)}</span>`).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        ${eku.length ? `
+                        <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Extended Key Usage</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                                ${eku.map(k => `<span style="padding: 0.25rem 0.5rem; background: var(--success-color)20; color: var(--success-color); border-radius: 4px; font-size: 0.75rem;">${escapeHtml(k)}</span>`).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        ${san.length ? `
+                        <div style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">SAN Types Supported</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                                ${san.map(k => `<span style="padding: 0.25rem 0.5rem; background: var(--info-color)20; color: var(--info-color); border-radius: 4px; font-size: 0.75rem;">${escapeHtml(k)}</span>`).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        document.getElementById('viewTemplateContent').innerHTML = html;
+    };
+    
+    document.body.addEventListener('htmx:afterRequest', handler);
+    
+    htmx.ajax('GET', requestPath, { swap: 'none' });
 }
 
 

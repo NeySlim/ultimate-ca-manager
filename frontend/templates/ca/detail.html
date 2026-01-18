@@ -516,27 +516,33 @@ function exportPKCS12() {
 }
 
 function exportWithToken(url) {
-    const token = '{{ session.get("access_token") }}';
-    fetch(url, {
-        credentials: 'same-origin',
-        headers: { }
-    })
-    .then(response => {
-        if (!response.ok) throw new Error('Export failed');
-        return response.blob();
-    })
-    .then(blob => {
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = '';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(downloadUrl);
-    })
-    .catch(error => {
-        ucmAlert('Export failed: ' + error.message, 'Error');
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath !== url) return;
+        document.body.removeEventListener('htmx:afterRequest', handler);
+        
+        if (!evt.detail.successful) {
+            ucmAlert('Export failed', 'Error');
+            return;
+        }
+        
+        const response = evt.detail.xhr;
+        response.blob().then(blob => {
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = '';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(downloadUrl);
+        });
+    };
+    
+    document.body.addEventListener('htmx:afterRequest', handler);
+    
+    htmx.ajax('GET', url, {
+        swap: 'none',
+        headers: {}
     });
 }
 
@@ -605,31 +611,32 @@ function saveCDPConfig() {
         return;
     }
     
-    const token = '{{ session.get("access_token") }}';
     const data = {
         cdp_enabled: enabled,
         cdp_url: url || null
     };
     
-    fetch('/api/v1/ca/{{ ca.id }}', {
-        method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(err => { throw new Error(err.error || 'Update failed'); });
+    const requestPath = '/api/v1/ca/{{ ca.id }}';
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath !== requestPath) return;
+        document.body.removeEventListener('htmx:afterRequest', handler);
+        
+        if (!evt.detail.successful) {
+            const result = JSON.parse(evt.detail.xhr.responseText || '{}');
+            ucmAlert('Failed to update CDP configuration: ' + (result.error || 'Update failed'), 'Error');
+            return;
         }
-        return response.json();
-    })
-    .then(() => {
+        
         ucmAlert('CDP configuration updated successfully', 'Success');
         location.reload();
-    })
-    .catch(error => {
-        ucmAlert('Failed to update CDP configuration: ' + error.message, 'Error');
+    };
+    
+    document.body.addEventListener('htmx:afterRequest', handler);
+    
+    htmx.ajax('PATCH', requestPath, {
+        swap: 'none',
+        headers: { 'Content-Type': 'application/json' },
+        values: JSON.stringify(data)
     });
 }
 
@@ -670,24 +677,30 @@ function saveOCSPConfig() {
         ocsp_url: enabled ? url : null
     };
     
-    fetch(`/api/v1/ca/{{ ca.id }}`, {
-        method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.message) {
+    const requestPath = `/api/v1/ca/{{ ca.id }}`;
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath !== requestPath) return;
+        document.body.removeEventListener('htmx:afterRequest', handler);
+        
+        if (!evt.detail.successful) {
+            ucmAlert('Failed to update OCSP configuration', 'Error');
+            return;
+        }
+        
+        const result = JSON.parse(evt.detail.xhr.responseText || '{}');
+        if (result.message) {
             location.reload();
         } else {
             ucmAlert('Failed to update OCSP configuration', 'Error');
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        ucmAlert('Failed to update OCSP configuration', 'Error');
+    };
+    
+    document.body.addEventListener('htmx:afterRequest', handler);
+    
+    htmx.ajax('PATCH', requestPath, {
+        swap: 'none',
+        headers: { 'Content-Type': 'application/json' },
+        values: JSON.stringify(data)
     });
 }
 

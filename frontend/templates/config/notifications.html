@@ -215,40 +215,43 @@ function showToast(message, type = 'info') {
 }
 
 // Load SMTP configuration
-async function loadSMTPConfig() {
-    try {
-        const response = await fetch('/api/v1/notifications/smtp/config', {
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            const config = await response.json();
-            document.getElementById('smtp_host').value = config.smtp_host || '';
-            document.getElementById('smtp_port').value = config.smtp_port || 587;
-            document.getElementById('smtp_user').value = config.smtp_user || '';
-            document.getElementById('smtp_from').value = config.smtp_from || '';
-            document.getElementById('smtp_from_name').value = config.smtp_from_name || 'UCM Notifications';
-            document.getElementById('smtp_use_tls').checked = config.smtp_use_tls !== false;
-            document.getElementById('smtp_use_ssl').checked = config.smtp_use_ssl === true;
-            document.getElementById('smtp_enabled').checked = config.enabled === true;
-            
-            // Update status badge
-            const badge = document.getElementById('smtp-status-badge');
-            if (config.enabled) {
-                badge.className = 'badge-outline badge-success';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-check-circle"/></svg> Enabled';
-            } else {
-                badge.className = 'badge-outline badge-secondary';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg> Disabled';
+function loadSMTPConfig() {
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/notifications/smtp/config') {
+            try {
+                if (evt.detail.successful) {
+                    const config = JSON.parse(evt.detail.xhr.responseText);
+                    document.getElementById('smtp_host').value = config.smtp_host || '';
+                    document.getElementById('smtp_port').value = config.smtp_port || 587;
+                    document.getElementById('smtp_user').value = config.smtp_user || '';
+                    document.getElementById('smtp_from').value = config.smtp_from || '';
+                    document.getElementById('smtp_from_name').value = config.smtp_from_name || 'UCM Notifications';
+                    document.getElementById('smtp_use_tls').checked = config.smtp_use_tls !== false;
+                    document.getElementById('smtp_use_ssl').checked = config.smtp_use_ssl === true;
+                    document.getElementById('smtp_enabled').checked = config.enabled === true;
+                    
+                    // Update status badge
+                    const badge = document.getElementById('smtp-status-badge');
+                    if (config.enabled) {
+                        badge.className = 'badge-outline badge-success';
+                        badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-check-circle"/></svg> Enabled';
+                    } else {
+                        badge.className = 'badge-outline badge-secondary';
+                        badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg> Disabled';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading SMTP config:', error);
             }
+            document.body.removeEventListener('htmx:afterRequest', handler);
         }
-    } catch (error) {
-        console.error('Error loading SMTP config:', error);
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('GET', '/api/ui/notifications/smtp/config', {swap: 'none'});
 }
 
 // Save SMTP configuration
-document.getElementById('smtp-form').addEventListener('submit', async (e) => {
+document.getElementById('smtp-form').addEventListener('submit', (e) => {
     e.preventDefault();
     
     const data = {
@@ -268,32 +271,32 @@ document.getElementById('smtp-form').addEventListener('submit', async (e) => {
         data.smtp_password = password;
     }
     
-    try {
-        const response = await fetch('/api/v1/notifications/smtp/config', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('SMTP configuration saved successfully', 'success');
-            document.getElementById('smtp_password').value = ''; // Clear password field
-            loadSMTPConfig(); // Reload to update status
-        } else {
-            showToast(result.error || 'Failed to save configuration', 'error');
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/notifications/smtp/config') {
+            try {
+                const result = JSON.parse(evt.detail.xhr.responseText);
+                if (evt.detail.successful) {
+                    showToast('SMTP configuration saved successfully', 'success');
+                    document.getElementById('smtp_password').value = ''; // Clear password field
+                    loadSMTPConfig(); // Reload to update status
+                } else {
+                    showToast(result.error || 'Failed to save configuration', 'error');
+                }
+            } catch (error) {
+                showToast('Error saving configuration: ' + error.message, 'error');
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
         }
-    } catch (error) {
-        showToast('Error saving configuration: ' + error.message, 'error');
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('POST', '/api/ui/notifications/smtp/config', {
+        swap: 'none',
+        values: data
+    });
 });
 
 // Save user notification settings
-document.getElementById('user-notification-form')?.addEventListener('submit', async (e) => {
+document.getElementById('user-notification-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     
     const data = {
@@ -301,48 +304,51 @@ document.getElementById('user-notification-form')?.addEventListener('submit', as
         enabled: document.getElementById('user_notifications_enabled').checked
     };
     
-    try {
-        const response = await fetch('/api/v1/notifications/user/settings', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Notification settings saved', 'success');
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to save settings'), 'error');
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/notifications/user/settings') {
+            try {
+                const result = JSON.parse(evt.detail.xhr.responseText);
+                if (evt.detail.successful) {
+                    showToast('✓ Notification settings saved', 'success');
+                } else {
+                    showToast('✗ ' + (result.error || 'Failed to save settings'), 'error');
+                }
+            } catch (error) {
+                showToast('✗ Error: ' + error.message, 'error');
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
         }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('POST', '/api/ui/notifications/user/settings', {
+        swap: 'none',
+        values: data
+    });
 });
 
 // Load user notification settings
-async function loadUserNotificationSettings() {
-    try {
-        const response = await fetch('/api/v1/notifications/user/settings', {
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            const settings = await response.json();
-            document.getElementById('user_notification_email').value = settings.email || '';
-            document.getElementById('user_notifications_enabled').checked = settings.enabled !== false;
+function loadUserNotificationSettings() {
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/notifications/user/settings') {
+            try {
+                if (evt.detail.successful) {
+                    const settings = JSON.parse(evt.detail.xhr.responseText);
+                    document.getElementById('user_notification_email').value = settings.email || '';
+                    document.getElementById('user_notifications_enabled').checked = settings.enabled !== false;
+                }
+            } catch (error) {
+                console.error('Error loading user notification settings:', error);
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
         }
-    } catch (error) {
-        console.error('Error loading user notification settings:', error);
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('GET', '/api/ui/notifications/user/settings', {swap: 'none'});
 }
 
 
 // Test SMTP
-window.testSMTP = async function() {
+window.testSMTP = function() {
     // First check if SMTP is configured
     const smtpEnabled = document.getElementById('smtp_enabled').checked;
     const smtpHost = document.getElementById('smtp_host').value;
@@ -369,195 +375,204 @@ window.testSMTP = async function() {
     
     showToast('Sending test email...', 'info');
     
-    try {
-        const response = await fetch('/api/v1/notifications/smtp/test', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({email})
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('✓ Test email sent successfully to ' + email, 'success');
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to send test email'), 'error');
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/notifications/smtp/test') {
+            try {
+                const result = JSON.parse(evt.detail.xhr.responseText);
+                if (evt.detail.successful) {
+                    showToast('✓ Test email sent successfully to ' + email, 'success');
+                } else {
+                    showToast('✗ ' + (result.error || 'Failed to send test email'), 'error');
+                }
+            } catch (error) {
+                showToast('✗ Network error: ' + error.message, 'error');
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
         }
-    } catch (error) {
-        showToast('✗ Network error: ' + error.message, 'error');
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('POST', '/api/ui/notifications/smtp/test', {
+        swap: 'none',
+        values: {email: email}
+    });
 }
 
 // Load notification rules
-async function loadNotificationRules() {
-    try {
-        const response = await fetch('/api/v1/notifications/config', {
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            const configs = await response.json();
-            const container = document.getElementById('notification-rules');
-            
-            container.innerHTML = configs.map((config, index) => `
-                <div class="card" style="background: var(--card-bg-secondary);">
-                    <div style="padding: 1.25rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
-                            <div>
-                                <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">
-                                    ${config.type === 'cert_expiring' ? 'Certificate Expiration' : 'CRL Expiration'}
-                                </h3>
-                                <p style="color: var(--text-secondary); font-size: 0.875rem;">${config.description || ''}</p>
+function loadNotificationRules() {
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/notifications/config') {
+            try {
+                if (evt.detail.successful) {
+                    const configs = JSON.parse(evt.detail.xhr.responseText);
+                    const container = document.getElementById('notification-rules');
+                    
+                    container.innerHTML = configs.map((config, index) => `
+                        <div class="card" style="background: var(--card-bg-secondary);">
+                            <div style="padding: 1.25rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                                    <div>
+                                        <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">
+                                            ${config.type === 'cert_expiring' ? 'Certificate Expiration' : 'CRL Expiration'}
+                                        </h3>
+                                        <p style="color: var(--text-secondary); font-size: 0.875rem;">${config.description || ''}</p>
+                                    </div>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                        <input type="checkbox" id="rule-enabled-${index}" ${config.enabled ? 'checked' : ''} 
+                                               onchange="toggleRule('${config.type}', this.checked)">
+                                        <strong>Enabled</strong>
+                                    </label>
+                                </div>
+                                
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                                    <div>
+                                        <label class="form-label">Alert Days Before</label>
+                                        <input type="number" id="rule-days-${index}" class="form-input" 
+                                               value="${config.days_before || 30}" min="1" max="365"
+                                               onchange="updateRule('${config.type}')">
+                                    </div>
+                                    <div style="grid-column: 1 / -1;">
+                                        <label class="form-label">Recipients (comma-separated emails)</label>
+                                        <input type="text" id="rule-recipients-${index}" class="form-input" 
+                                               value="${(config.recipients || []).join(', ')}" 
+                                               placeholder="admin@example.com, ops@example.com"
+                                               onchange="updateRule('${config.type}')">
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                                    <button onclick="updateRule('${config.type}')" class="btn btn-primary btn-primary">
+                                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save Rule
+                                    </button>
+                                </div>
                             </div>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                <input type="checkbox" id="rule-enabled-${index}" ${config.enabled ? 'checked' : ''} 
-                                       onchange="toggleRule('${config.type}', this.checked)">
-                                <strong>Enabled</strong>
-                            </label>
                         </div>
-                        
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                            <div>
-                                <label class="form-label">Alert Days Before</label>
-                                <input type="number" id="rule-days-${index}" class="form-input" 
-                                       value="${config.days_before || 30}" min="1" max="365"
-                                       onchange="updateRule('${config.type}')">
-                            </div>
-                            <div style="grid-column: 1 / -1;">
-                                <label class="form-label">Recipients (comma-separated emails)</label>
-                                <input type="text" id="rule-recipients-${index}" class="form-input" 
-                                       value="${(config.recipients || []).join(', ')}" 
-                                       placeholder="admin@example.com, ops@example.com"
-                                       onchange="updateRule('${config.type}')">
-                            </div>
-                        </div>
-                        
-                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
-                            <button onclick="updateRule('${config.type}')" class="btn btn-primary btn-primary">
-                                <svg class="ucm-icon" width="16" height="16"><use href="#icon-save"/></svg> Save Rule
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading notification rules:', error);
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
         }
-    } catch (error) {
-        console.error('Error loading notification rules:', error);
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('GET', '/api/ui/notifications/config', {swap: 'none'});
 }
 
 // Toggle rule enabled/disabled
-async function toggleRule(type, enabled) {
-    await updateRule(type);
+function toggleRule(type, enabled) {
+    updateRule(type);
 }
 
 // Update notification rule
-async function updateRule(type) {
+function updateRule(type) {
     const index = type === 'cert_expiring' ? 0 : 1;
     const enabled = document.getElementById(`rule-enabled-${index}`).checked;
     const days = parseInt(document.getElementById(`rule-days-${index}`).value);
     const recipientsStr = document.getElementById(`rule-recipients-${index}`).value;
     const recipients = recipientsStr.split(',').map(e => e.trim()).filter(e => e);
     
-    try {
-        const response = await fetch(`/api/v1/notifications/config/${type}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({enabled, days_before: days, recipients})
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('Notification rule updated', 'success');
-        } else {
-            showToast(result.error || 'Failed to update rule', 'error');
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === `/api/ui/notifications/config/${type}`) {
+            try {
+                const result = JSON.parse(evt.detail.xhr.responseText);
+                if (evt.detail.successful) {
+                    showToast('Notification rule updated', 'success');
+                } else {
+                    showToast(result.error || 'Failed to update rule', 'error');
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
         }
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('POST', `/api/ui/notifications/config/${type}`, {
+        swap: 'none',
+        values: {enabled: enabled, days_before: days, recipients: recipients}
+    });
 }
 
 // Load notification history
-async function loadNotificationHistory() {
-    try {
-        const response = await fetch('/api/v1/notifications/history?limit=20', {
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            const tbody = document.getElementById('notification-history-tbody');
-            
-            if (data.logs.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
-                            <svg class="ucm-icon" width="32" height="32" style=" opacity: 0.5;"><use href="#icon-inbox"/></svg>
-                            <p style="margin-top: 0.5rem;">No notifications sent yet</p>
-                        </td>
-                    </tr>
-                `;
-                return;
+function loadNotificationHistory() {
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/notifications/history') {
+            try {
+                if (evt.detail.successful) {
+                    const data = JSON.parse(evt.detail.xhr.responseText);
+                    const tbody = document.getElementById('notification-history-tbody');
+                    
+                    if (data.logs.length === 0) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                                    <svg class="ucm-icon" width="32" height="32" style=" opacity: 0.5;"><use href="#icon-inbox"/></svg>
+                                    <p style="margin-top: 0.5rem;">No notifications sent yet</p>
+                                </td>
+                            </tr>
+                        `;
+                        return;
+                    }
+                    
+                    tbody.innerHTML = data.logs.map(log => {
+                        // Escape user-controlled data to prevent XSS
+                        const safeType = escapeHtml(log.type);
+                        const safeRecipient = escapeHtml(log.recipient);
+                        const safeSubject = escapeHtml(log.subject || 'N/A');
+                        
+                        return `
+                        <tr>
+                            <td>${new Date(log.sent_at).toLocaleString()}</td>
+                            <td><span class="badge-outline badge-info">${safeType}</span></td>
+                            <td>${safeRecipient}</td>
+                            <td>${safeSubject}</td>
+                            <td>
+                                ${log.status === 'sent' 
+                                    ? '<span class="badge-outline badge-success"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> Sent</span>'
+                                    : '<span class="badge-outline badge-danger"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> Failed</span>'
+                                }
+                            </td>
+                        </tr>
+                    `}).join('');
+                }
+            } catch (error) {
+                console.error('Error loading notification history:', error);
             }
-            
-            tbody.innerHTML = data.logs.map(log => {
-                // Escape user-controlled data to prevent XSS
-                const safeType = escapeHtml(log.type);
-                const safeRecipient = escapeHtml(log.recipient);
-                const safeSubject = escapeHtml(log.subject || 'N/A');
-                
-                return `
-                <tr>
-                    <td>${new Date(log.sent_at).toLocaleString()}</td>
-                    <td><span class="badge-outline badge-info">${safeType}</span></td>
-                    <td>${safeRecipient}</td>
-                    <td>${safeSubject}</td>
-                    <td>
-                        ${log.status === 'sent' 
-                            ? '<span class="badge-outline badge-success"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> Sent</span>'
-                            : '<span class="badge-outline badge-danger"><svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> Failed</span>'
-                        }
-                    </td>
-                </tr>
-            `}).join('');
+            document.body.removeEventListener('htmx:afterRequest', handler);
         }
-    } catch (error) {
-        console.error('Error loading notification history:', error);
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('GET', '/api/ui/notifications/history', {swap: 'none'});
 }
 
 // Load notification stats
-async function loadNotificationStats() {
-    try {
-        const response = await fetch('/api/v1/notifications/stats', {
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        if (response.ok) {
-            const stats = await response.json();
-            const container = document.getElementById('notification-stats');
-            
-            container.innerHTML = `
-                <span class="badge-outline badge-success">
-                    <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> ${stats.recent_sent_30d} sent (30d)
-                </span>
-                ${stats.recent_failed_30d > 0 ? `
-                    <span class="badge-outline badge-danger">
-                        <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> ${stats.recent_failed_30d} failed (30d)
-                    </span>
-                ` : ''}
-            `;
+function loadNotificationStats() {
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/notifications/stats') {
+            try {
+                if (evt.detail.successful) {
+                    const stats = JSON.parse(evt.detail.xhr.responseText);
+                    const container = document.getElementById('notification-stats');
+                    
+                    container.innerHTML = `
+                        <span class="badge-outline badge-success">
+                            <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-check"/></svg> ${stats.recent_sent_30d} sent (30d)
+                        </span>
+                        ${stats.recent_failed_30d > 0 ? `
+                            <span class="badge-outline badge-danger">
+                                <svg class="ucm-icon" width="10" height="10" style=""><use href="#icon-times"/></svg> ${stats.recent_failed_30d} failed (30d)
+                            </span>
+                        ` : ''}
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
         }
-    } catch (error) {
-        console.error('Error loading stats:', error);
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('GET', '/api/ui/notifications/stats', {swap: 'none'});
 }
 
 // Manual notification check
@@ -570,24 +585,25 @@ async function testNotifications() {
     
     if (!confirmed) return;
     
-    try {
-        const response = await fetch('/api/v1/notifications/check', {
-            method: 'POST',
-            headers: {'Authorization': `Bearer ${token}`}
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('Notification check completed', 'success');
-            loadNotificationHistory();
-            loadNotificationStats();
-        } else {
-            showToast(result.error || 'Check failed', 'error');
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/notifications/check') {
+            try {
+                const result = JSON.parse(evt.detail.xhr.responseText);
+                if (evt.detail.successful) {
+                    showToast('Notification check completed', 'success');
+                    loadNotificationHistory();
+                    loadNotificationStats();
+                } else {
+                    showToast(result.error || 'Check failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
         }
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-    }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('POST', '/api/ui/notifications/check', {swap: 'none'});
 }
 
 // Initialize

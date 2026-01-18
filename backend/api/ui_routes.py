@@ -5194,6 +5194,152 @@ def ui_scep_reject(refid):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# mTLS Operations - Revoke certificate
+@ui_bp.route('/api/ui/mtls/certificates/<int:cert_id>/revoke', methods=['POST'])
+@login_required
+def ui_mtls_cert_revoke(cert_id):
+    """Revoke mTLS certificate (proxy to /api/v1)"""
+    try:
+        response = api_call_with_retry('POST', f"{request.url_root}api/v1/mtls/certificates/{cert_id}/revoke")
+        
+        if response and response.status_code in [200, 204]:
+            return jsonify({"success": True, "message": "Certificate revoked"}), 200
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to revoke certificate"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# mTLS Operations - Enable certificate
+@ui_bp.route('/api/ui/mtls/certificates/<int:cert_id>/enable', methods=['POST'])
+@login_required
+def ui_mtls_cert_enable(cert_id):
+    """Enable mTLS certificate (proxy to /api/v1)"""
+    try:
+        response = api_call_with_retry('POST', f"{request.url_root}api/v1/mtls/certificates/{cert_id}/enable")
+        
+        if response and response.status_code in [200, 204]:
+            return jsonify({"success": True, "message": "Certificate enabled"}), 200
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to enable certificate"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# WebAuthn Operations - Toggle credential
+@ui_bp.route('/api/ui/webauthn/credentials/<int:cred_id>/toggle', methods=['POST'])
+@login_required
+def ui_webauthn_toggle(cred_id):
+    """Toggle WebAuthn credential status (proxy to /api/v1)"""
+    try:
+        response = api_call_with_retry('POST', f"{request.url_root}api/v1/webauthn/credentials/{cred_id}/toggle")
+        
+        if response and response.status_code in [200, 204]:
+            return response.json(), response.status_code
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to toggle credential"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Authentication - Get available methods
+@ui_bp.route('/api/ui/auth/methods', methods=['GET'])
+def ui_auth_methods():
+    """Get available auth methods for user (proxy to /api/v1) - PUBLIC route"""
+    try:
+        username = request.args.get('username')
+        if not username:
+            return jsonify({"error": "Username required"}), 400
+        
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/auth/methods?username={username}")
+        
+        if response and response.status_code == 200:
+            return response.json(), response.status_code
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to get auth methods"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# WebAuthn Authentication - Get options
+@ui_bp.route('/api/ui/webauthn/authenticate/options', methods=['POST'])
+def ui_webauthn_auth_options():
+    """Get WebAuthn authentication options (proxy to /api/v1) - PUBLIC route"""
+    try:
+        response = api_call_with_retry('POST', f"{request.url_root}api/v1/webauthn/authenticate/options", json=request.json)
+        
+        if response and response.status_code in [200, 201]:
+            return response.json(), response.status_code
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to get authentication options"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# WebAuthn Authentication - Verify
+@ui_bp.route('/api/ui/webauthn/authenticate/verify', methods=['POST'])
+def ui_webauthn_auth_verify():
+    """Verify WebAuthn authentication (proxy to /api/v1) - PUBLIC route"""
+    try:
+        response = api_call_with_retry('POST', f"{request.url_root}api/v1/webauthn/authenticate/verify", json=request.json)
+        
+        if response and response.status_code in [200, 201]:
+            return response.json(), response.status_code
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to verify authentication"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Session Management - Extend session
+@ui_bp.route('/api/ui/session/extend', methods=['POST'])
+@login_required
+def ui_session_extend():
+    """Extend user session (proxy to /api/session)"""
+    try:
+        # Update session activity timestamp
+        session['last_activity'] = time.time()
+        return jsonify({"success": True, "message": "Session extended"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Authentication - Change password
+@ui_bp.route('/api/ui/auth/change-password', methods=['POST'])
+@login_required
+def ui_auth_change_password():
+    """Change user password (proxy to /api/auth)"""
+    try:
+        response = api_call_with_retry('POST', f"{request.url_root}api/auth/change-password", json=request.json)
+        
+        if response and response.status_code == 200:
+            return response.json(), response.status_code
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to change password"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# CA Management - Export CA
+@ui_bp.route('/api/ui/ca/<ca_id>/export', methods=['GET'])
+@login_required
+def ui_ca_export(ca_id):
+    """Export CA certificate (proxy to /api/v1)"""
+    try:
+        format_type = request.args.get('format', 'pem')
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/ca/{ca_id}/export?format={format_type}")
+        
+        if response and response.status_code == 200:
+            # For downloads, we need to proxy the response properly
+            return response.content, 200, {
+                'Content-Type': response.headers.get('Content-Type', 'application/x-pem-file'),
+                'Content-Disposition': response.headers.get('Content-Disposition', f'attachment; filename="ca-{ca_id}.{format_type}"')
+            }
+        elif response:
+            return response.json(), response.status_code
+        return jsonify({"error": "Failed to export CA"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 # Certificate Detail - X509 Details  
 @ui_bp.route('/api/ui/certificates/<cert_id>/x509details')
 @login_required
