@@ -11,6 +11,86 @@
 
 ## 🚧 Work In Progress
 
+### Certificate Templates (COMPLETE) ✅
+
+**Database Model:** `CertificateTemplate`
+- Template configuration (name, type, description)
+- Key configuration (RSA-2048/4096, EC-P256/P384)
+- DN template with variable substitution `{username}`, `{email}`, `{hostname}`
+- Extensions template (key usage, extended key usage, SAN types)
+- System vs custom templates (system templates can't be deleted)
+- Audit trail (created_by, updated_by, timestamps)
+
+**6 System Templates Pre-configured:**
+1. **Web Server (TLS/SSL)** - serverAuth, TLS web server certificates
+2. **Email Certificate (S/MIME)** - emailProtection, S/MIME signing/encryption
+3. **VPN Server** - serverAuth, IPsec/SSL VPN servers
+4. **VPN Client** - clientAuth, IPsec/SSL VPN clients
+5. **Code Signing** - codeSigning, software signing certificates
+6. **Client Authentication** - clientAuth, mutual TLS authentication
+
+**Service Layer:** `template_service.py` (379 lines)
+- `get_all_templates()` - List all templates
+- `get_template(id)` - Get single template
+- `create_template()` - Create custom template
+- `update_template()` - Modify custom template
+- `delete_template()` - Delete custom template (not system)
+- `render_template()` - Apply template with variable substitution
+- Template validation and DN/extension parsing
+
+**REST API:** `/api/v1/templates` (154 lines)
+- `GET /api/v1/templates` - List all templates
+- `POST /api/v1/templates` - Create custom template
+- `GET /api/v1/templates/<id>` - Get template details
+- `PUT /api/v1/templates/<id>` - Update custom template (admin only)
+- `DELETE /api/v1/templates/<id>` - Delete custom template (admin only)
+- `POST /api/v1/templates/<id>/render` - Render template with variables
+
+**Frontend UI:** `/config/templates` (13KB HTMX page)
+- Template list with system/custom badges
+- Template details modal
+- Create/edit custom template form
+- Variable substitution preview
+- Delete confirmation (custom templates only)
+- HTMX-powered, zero fetch() calls
+
+**Seed Script:** `seed_templates.py`
+- Populates 6 system templates on first run
+- Idempotent (safe to run multiple times)
+- DN and extension templates for each type
+
+---
+
+### Settings → Users Tab (COMPLETE) ✅
+
+**Change Password Modal:**
+- Real-time password strength meter (4 bars: weak/medium/strong)
+- Requirements checklist (8+ chars, upper, lower, number, special)
+- Password match confirmation indicator
+- Toast notification on success
+- Auto-close after submission
+
+**Change Role Modal:**
+- 3 roles with descriptions (Viewer, Operator, Administrator)
+- Visual feedback on selection with color coding
+- Table auto-refresh after role change (`hx-trigger="refreshUsers"`)
+- Toast notification on success
+- Auto-close after submission
+
+**Bug Fixes:**
+- Fixed `window.window.openModal()` typo → `window.openModal()`
+- Fixed HTMX form swap destroying modal content (added `hx-swap="none"`)
+- Fixed missing password validation in settings.html
+- Fixed table auto-refresh with `hx-trigger="revealed, refreshUsers from:body"`
+
+**Architecture:**
+- 100% HTMX (zero fetch() calls)
+- Global `window.openModal/closeModal` functions
+- Modals in settings.html (single source of truth)
+- `hx-swap="none"` prevents form content destruction
+
+---
+
 ### UI & Icon System Improvements (COMPLETE) ✅
 
 **Submenu Toggle Buttons**
@@ -52,28 +132,7 @@
 
 ## 🎯 Planned Features
 
-### 1. Certificate Templates ⭐ Priority 1
-**Status:** Not started  
-**Estimated:** 12-15 hours
-
-Pre-configured certificate profiles for common use cases:
-- Web Server (TLS/SSL)
-- Email (S/MIME)
-- VPN Client/Server
-- Code Signing
-- Client Authentication
-
-**Features:**
-- Database model: `CertificateTemplate`
-- CRUD API endpoints
-- Template selector in cert creation
-- Pre-filled DN fields and extensions
-- Custom user-defined templates
-- Template export/import (JSON)
-
----
-
-### 2. S/MIME Certificate Generation ⭐ Priority 1
+### 1. S/MIME Certificate Generation ⭐ Priority 1
 **Status:** Not started  
 **Estimated:** 8-10 hours
 
@@ -88,7 +147,7 @@ Full support for email encryption/signing certificates:
 
 ---
 
-### 3. Smart Card Support (PIV/CAC) ⭐ Priority 2
+### 2. Smart Card Support (PIV/CAC) ⭐ Priority 2
 **Status:** Not started  
 **Estimated:** 15-20 hours
 
@@ -102,7 +161,7 @@ PIV-compliant certificates (NIST SP 800-73-4):
 
 ---
 
-### 4. Bulk Operations ⭐ Priority 1
+### 3. Bulk Operations ⭐ Priority 1
 **Status:** Not started  
 **Estimated:** 12-15 hours
 
@@ -122,9 +181,9 @@ Manage multiple certificates simultaneously:
 
 ## 🔧 Technical Changes
 
-### Database Schema (Planned)
+### Database Schema
 
-**New Table: `certificate_templates`**
+**New Table: `certificate_templates`** ✅ IMPLEMENTED
 ```sql
 CREATE TABLE certificate_templates (
     id INTEGER PRIMARY KEY,
@@ -143,12 +202,30 @@ CREATE TABLE certificate_templates (
 );
 ```
 
-**Certificate Model Update:**
-- Add: `template_id` (nullable FK to certificate_templates)
+**Certificate Model Update:** ✅ IMPLEMENTED
+- Added: `template_id` (nullable FK to certificate_templates)
 
 ---
 
-## 📦 Commits (dev/v1.12.0)
+## 📦 Commits (dev/v2.0.0)
+
+### 2026-01-18 - Settings Users Tab & Modal Fixes (2 commits)
+
+1. **fix(settings): Complete Settings→Users modal functionality** (a4199fd)
+   - Fixed `window.window.openModal()` typo → `window.openModal()`
+   - Fixed HTMX form swap destroying modal content (added `hx-swap="none"`)
+   - Added password validation with real-time strength meter (4 bars)
+   - Added password requirements checklist and match confirmation
+   - Fixed table auto-refresh with `hx-trigger="revealed, refreshUsers from:body"`
+   - Toast notifications on success, both modals work infinitely
+   - 100% HTMX architecture (zero fetch() calls)
+   - Files: 13 modified, +1614/-380 lines
+
+2. **fix(settings): Remove duplicate route definitions causing 404s** (ea0762b)
+   - Removed duplicate `/api/ui/settings/*` route definitions
+   - Fixed settings endpoints returning 404
+
+---
 
 ### 2026-01-17 - UI Improvements (6 commits)
 
@@ -187,15 +264,20 @@ CREATE TABLE certificate_templates (
 - ✅ Icon system finalization (68% with complement colors)
 - ✅ Sidebar UX improvements
 - ✅ Settings page icons
+- ✅ Settings → Users tab (password/role modals)
 
-**Phase 1: Certificate Templates** 🔄 Ready to start
-- [ ] Database model
-- [ ] Service layer
-- [ ] API endpoints
-- [ ] UI pages
-- [ ] Tests
+**Phase 1: Certificate Templates** ✅ COMPLETE
+- ✅ Database model (`CertificateTemplate`)
+- ✅ Service layer (`template_service.py`)
+- ✅ API endpoints (`/api/v1/templates/*`)
+- ✅ UI page (`/config/templates`)
+- ✅ 6 system templates seeded
 
-**Phase 2: S/MIME Support** ⏳ Planned
+**Phase 2: S/MIME Support** ⏳ Next
+- [ ] Enhanced email validation
+- [ ] P12/PFX export improvements
+- [ ] Client installation guides
+
 **Phase 3: PIV/CAC Support** ⏳ Planned
 **Phase 4: Bulk Operations** ⏳ Planned
 **Phase 5: Integration & Testing** ⏳ Planned
