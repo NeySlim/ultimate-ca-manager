@@ -1,0 +1,44 @@
+"""
+API v2 - Unified API
+All routes use @require_auth() decorator
+"""
+
+from flask import Blueprint
+
+# Import all route blueprints
+from backend.api.v2.auth import bp as auth_bp
+from backend.api.v2.account import bp as account_bp
+from backend.api.v2.cas import bp as cas_bp
+from backend.api.v2.certificates import bp as certificates_bp
+from backend.api.v2.acme import bp as acme_bp
+from backend.api.v2.scep import bp as scep_bp
+from backend.api.v2.settings import bp as settings_bp
+from backend.api.v2.dashboard import bp as dashboard_bp
+from backend.api.v2.crl import bp as crl_bp
+
+# List of all blueprints to register
+API_V2_BLUEPRINTS = [
+    auth_bp,
+    account_bp,
+    cas_bp,
+    certificates_bp,
+    acme_bp,
+    scep_bp,
+    settings_bp,
+    dashboard_bp,
+    crl_bp
+]
+
+
+def register_api_v2(app):
+    """
+    Register all API v2 blueprints
+    
+    Usage in app.py:
+        from backend.api.v2 import register_api_v2
+        register_api_v2(app)
+    """
+    for blueprint in API_V2_BLUEPRINTS:
+        app.register_blueprint(blueprint)
+    
+    print(f"✅ Registered {len(API_V2_BLUEPRINTS)} API v2 blueprints")
