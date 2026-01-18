@@ -4,6 +4,7 @@ Handles certificate generation, signing, revocation, and operations
 """
 import base64
 import uuid
+import re
 from datetime import datetime
 from typing import Dict, List, Optional
 from pathlib import Path
@@ -17,9 +18,19 @@ from services.trust_store import TrustStoreService
 from services.template_service import TemplateService
 from config.settings import Config
 
+# RFC 5322 simplified email validation regex
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9.!#$%&\'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$')
+
 
 class CertificateService:
     """Service for Certificate operations"""
+    
+    @staticmethod
+    def validate_email(email: str) -> bool:
+        """Validate email address against RFC 5322 (simplified)"""
+        if not email or not isinstance(email, str):
+            return False
+        return bool(EMAIL_REGEX.match(email.strip()))
     
     @staticmethod
     def create_certificate(
@@ -70,6 +81,12 @@ class CertificateService:
                 key_type = key_type if key_type != '2048' else template.key_type or key_type
                 validity_days = validity_days if validity_days != 397 else template.validity_days or validity_days
                 digest = digest if digest != 'sha256' else template.digest or digest
+        
+        # Validate SAN emails if provided
+        if san_email:
+            invalid_emails = [email for email in san_email if not CertificateService.validate_email(email)]
+            if invalid_emails:
+                raise ValueError(f"Invalid email address(es) in SAN: {', '.join(invalid_emails)}")
         
         # Get CA
         ca = CA.query.filter_by(refid=caref).first()
