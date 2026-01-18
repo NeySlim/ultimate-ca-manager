@@ -307,25 +307,24 @@ function deleteCA(refid, name) {
 }
 
 function performCADelete(refid) {
-    const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === `/api/v1/ca/${refid}`) {
-            if (evt.detail.xhr.status === 200 || evt.detail.xhr.status === 204) {
-                showToast('CA deleted successfully', 'success');
-                htmx.trigger('body', 'refreshCAs');
-            } else {
-                try {
-                    const data = JSON.parse(evt.detail.xhr.responseText);
-                    showToast('Error: ' + (data.error || 'Delete failed'), 'error');
-                } catch (err) {
-                    showToast('Error: Delete failed', 'error');
-                }
-            }
-            document.body.removeEventListener('htmx:afterRequest', handler);
+    fetch(`/api/v1/ca/${refid}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => {
+        if (response.ok) {
+            showToast('CA deleted successfully', 'success');
+            htmx.trigger('body', 'refreshCAs');
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Delete failed');
+            });
         }
-    };
-    
-    document.body.addEventListener('htmx:afterRequest', handler);
-    htmx.ajax('DELETE', `/api/v1/ca/${refid}`, {swap: 'none'});
+    })
+    .catch(e => {
+        showToast('Error: ' + e.message, 'error');
+    });
 }
 
 function deleteCert(refid, name) {
@@ -346,25 +345,24 @@ function deleteCert(refid, name) {
 }
 
 function performCertDelete(refid) {
-    const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === `/api/v1/certificates/by-refid/${refid}`) {
-            if (evt.detail.xhr.status === 200 || evt.detail.xhr.status === 204) {
-                showToast('Certificate deleted successfully', 'success');
-                htmx.trigger('body', 'refreshCerts');
-            } else {
-                try {
-                    const data = JSON.parse(evt.detail.xhr.responseText);
-                    showToast('Error: ' + (data.error || 'Delete failed'), 'error');
-                } catch (err) {
-                    showToast('Error: Delete failed', 'error');
-                }
-            }
-            document.body.removeEventListener('htmx:afterRequest', handler);
+    fetch(`/api/v1/certificates/by-refid/${refid}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => {
+        if (response.ok) {
+            showToast('Certificate deleted successfully', 'success');
+            htmx.trigger('body', 'refreshCerts');
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Delete failed');
+            });
         }
-    };
-    
-    document.body.addEventListener('htmx:afterRequest', handler);
-    htmx.ajax('DELETE', `/api/v1/certificates/by-refid/${refid}`, {swap: 'none'});
+    })
+    .catch(e => {
+        showToast('Error: ' + e.message, 'error');
+    });
 }
 
 function revokeCert(refid, name) {
@@ -386,27 +384,26 @@ function revokeCert(refid, name) {
 }
 
 function performCertRevoke(refid) {
-    const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === `/api/v1/certificates/by-refid/${refid}/revoke`) {
-            if (evt.detail.xhr.status === 200 || evt.detail.xhr.status === 204) {
-                showToast('Certificate revoked successfully', 'success');
-                htmx.trigger('body', 'refreshCerts');
-            } else {
-                try {
-                    const data = JSON.parse(evt.detail.xhr.responseText);
-                    showToast('Error: ' + (data.error || 'Revoke failed'), 'error');
-                } catch (err) {
-                    showToast('Error: Revoke failed', 'error');
-                }
-            }
-            document.body.removeEventListener('htmx:afterRequest', handler);
+    fetch(`/api/v1/certificates/by-refid/${refid}/revoke`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason: 'unspecified' })
+    })
+    .then(response => {
+        if (response.ok) {
+            showToast('Certificate revoked successfully', 'success');
+            htmx.trigger('body', 'refreshCerts');
+        } else {
+            return response.json().then(data => {
+                throw new Error(data.error || 'Revoke failed');
+            });
         }
-    };
-    
-    document.body.addEventListener('htmx:afterRequest', handler);
-    htmx.ajax('POST', `/api/v1/certificates/by-refid/${refid}/revoke`, {
-        swap: 'none',
-        values: { reason: 'unspecified' }
+    })
+    .catch(e => {
+        showToast('Error: ' + e.message, 'error');
     });
 }
 
@@ -503,40 +500,40 @@ function generateCRL(caId, caName) {
 }
 
 function performGenerateCRL(caId) {
-    const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === `/api/v1/crl/${caId}/generate`) {
-            try {
-                const data = JSON.parse(evt.detail.xhr.responseText);
-                if (data.error) {
-                    if (typeof ucmAlert !== 'undefined') {
-                        ucmAlert(`Error: ${data.error}`, 'Error');
-                    } else {
-                        showToast(`Error: ${data.error}`, 'error');
-                    }
-                } else {
-                    const message = `CRL #${data.crl.crl_number} generated successfully`;
-                    if (typeof ucmAlert !== 'undefined') {
-                        ucmAlert(message, 'Success').then(() => {
-                            if (typeof refreshCRLs !== 'undefined') refreshCRLs();
-                        });
-                    } else {
-                        showToast(message, 'success');
-                        if (typeof refreshCRLs !== 'undefined') refreshCRLs();
-                    }
-                }
-            } catch (error) {
-                if (typeof ucmAlert !== 'undefined') {
-                    ucmAlert(`Failed to generate CRL: ${error.message}`, 'Error');
-                } else {
-                    showToast(`Failed to generate CRL: ${error.message}`, 'error');
-                }
-            }
-            document.body.removeEventListener('htmx:afterRequest', handler);
+    fetch(`/api/v1/crl/${caId}/generate`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json'
         }
-    };
-    
-    document.body.addEventListener('htmx:afterRequest', handler);
-    htmx.ajax('POST', `/api/v1/crl/${caId}/generate`, {swap: 'none'});
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            if (typeof ucmAlert !== 'undefined') {
+                ucmAlert(`Error: ${data.error}`, 'Error');
+            } else {
+                showToast(`Error: ${data.error}`, 'error');
+            }
+        } else {
+            const message = `CRL #${data.crl.crl_number} generated successfully`;
+            if (typeof ucmAlert !== 'undefined') {
+                ucmAlert(message, 'Success').then(() => {
+                    if (typeof refreshCRLs !== 'undefined') refreshCRLs();
+                });
+            } else {
+                showToast(message, 'success');
+                if (typeof refreshCRLs !== 'undefined') refreshCRLs();
+            }
+        }
+    })
+    .catch(error => {
+        if (typeof ucmAlert !== 'undefined') {
+            ucmAlert(`Failed to generate CRL: ${error.message}`, 'Error');
+        } else {
+            showToast(`Failed to generate CRL: ${error.message}`, 'error');
+        }
+    });
 }
 
 function downloadCRL(caId, format) {
@@ -562,44 +559,36 @@ function refreshCRLs() {
 // ============================================================================
 
 function approveSCEP(txid) {
-    const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === '/scep/requests/' + txid + '/approve') {
-            if (evt.detail.xhr.status === 200) {
-                showToast('Request approved', 'success');
-                if (typeof htmx !== 'undefined') {
-                    htmx.trigger('body', 'refreshSCEP');
-                }
-            } else {
-                showToast('Error approving request', 'error');
-            }
-            document.body.removeEventListener('htmx:afterRequest', handler);
+    fetch('/scep/requests/' + txid + '/approve', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(() => {
+        showToast('Request approved', 'success');
+        if (typeof htmx !== 'undefined') {
+            htmx.trigger('body', 'refreshSCEP');
         }
-    };
-    
-    document.body.addEventListener('htmx:afterRequest', handler);
-    htmx.ajax('POST', '/scep/requests/' + txid + '/approve', {swap: 'none'});
+    })
+    .catch(e => showToast('Error: ' + e, 'error'));
 }
 
 function rejectSCEP(txid) {
-    const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === '/scep/requests/' + txid + '/reject') {
-            if (evt.detail.xhr.status === 200) {
-                showToast('Request rejected', 'success');
-                if (typeof htmx !== 'undefined') {
-                    htmx.trigger('body', 'refreshSCEP');
-                }
-            } else {
-                showToast('Error rejecting request', 'error');
-            }
-            document.body.removeEventListener('htmx:afterRequest', handler);
+    fetch('/scep/requests/' + txid + '/reject', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Rejected by administrator' })
+    })
+    .then(r => r.json())
+    .then(() => {
+        showToast('Request rejected', 'success');
+        if (typeof htmx !== 'undefined') {
+            htmx.trigger('body', 'refreshSCEP');
         }
-    };
-    
-    document.body.addEventListener('htmx:afterRequest', handler);
-    htmx.ajax('POST', '/scep/requests/' + txid + '/reject', {
-        swap: 'none',
-        values: { reason: 'Rejected by administrator' }
-    });
+    })
+    .catch(e => showToast('Error: ' + e, 'error'));
 }
 
 // ============================================================================
