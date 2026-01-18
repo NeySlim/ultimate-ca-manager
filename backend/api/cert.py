@@ -1,7 +1,7 @@
 """
 Certificate API - Certificate Management
 """
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, current_app, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from io import BytesIO
 
@@ -286,6 +286,7 @@ def delete_certificate_by_refid(refid):
         else:
             return jsonify({"error": "Failed to delete certificate"}), 500
     except Exception as e:
+        current_app.logger.error(f"Failed to delete certificate {refid}: {str(e)}")
         return jsonify({"error": f"Failed to delete certificate: {str(e)}"}), 500
 
 

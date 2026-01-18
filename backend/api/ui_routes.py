@@ -58,13 +58,18 @@ def api_call_with_retry(method, url, headers=None, **kwargs):
     """
     token, api_headers = get_valid_jwt_token()
     if not token:
+        current_app.logger.error(f"api_call_with_retry: get_valid_jwt_token returned None for {method} {url}")
         return None
     
     if headers:
         api_headers.update(headers)
     
     # First attempt
-    response = requests.request(method, url, headers=api_headers, verify=False, **kwargs)
+    try:
+        response = requests.request(method, url, headers=api_headers, verify=False, **kwargs)
+    except Exception as e:
+        current_app.logger.error(f"api_call_with_retry: request failed: {e}")
+        return None
     
     # If 401, refresh token and retry once
     if response.status_code == 401:
@@ -5112,6 +5117,7 @@ def ui_cert_delete_by_refid(refid):
             return response.json(), response.status_code
         return jsonify({"error": "Failed to delete certificate"}), 500
     except Exception as e:
+        current_app.logger.error(f"ui_cert_delete_by_refid error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 # Certificate Operations - Revoke by refid
