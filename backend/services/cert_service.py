@@ -12,8 +12,9 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
-from models import db, CA, Certificate, AuditLog
+from models import db, CA, Certificate, AuditLog, CertificateTemplate
 from services.trust_store import TrustStoreService
+from services.template_service import TemplateService
 from config.settings import Config
 
 
@@ -35,6 +36,7 @@ class CertificateService:
         san_email: Optional[List[str]] = None,
         ocsp_uri: Optional[str] = None,
         private_key_location: str = 'stored',
+        template_id: Optional[int] = None,
         username: str = 'system'
     ) -> Certificate:
         """
@@ -54,11 +56,21 @@ class CertificateService:
             san_email: Email SANs
             ocsp_uri: OCSP responder URI
             private_key_location: 'stored' or 'download_only'
+            template_id: Certificate template ID (optional)
             username: User creating certificate
             
         Returns:
             Certificate model instance
         """
+        # Apply template if provided
+        if template_id:
+            template = CertificateTemplate.query.get(template_id)
+            if template:
+                # Use template defaults if values not explicitly provided
+                key_type = key_type if key_type != '2048' else template.key_type or key_type
+                validity_days = validity_days if validity_days != 397 else template.validity_days or validity_days
+                digest = digest if digest != 'sha256' else template.digest or digest
+        
         # Get CA
         ca = CA.query.filter_by(refid=caref).first()
         if not ca:
@@ -134,6 +146,8 @@ class CertificateService:
             # OCSP and key location
             ocsp_uri=ocsp_uri,
             private_key_location=private_key_location,
+            # Template reference
+            template_id=template_id,
             # Other fields
             revoked=False,
             imported_from='generated',
