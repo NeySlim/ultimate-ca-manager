@@ -6498,3 +6498,18 @@ def ui_settings_database_stats():
     except Exception as e:
         current_app.logger.error(f"Error with database stats: {e}")
         return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+# Settings page alias for mTLS (redirects to main mTLS endpoint)
+@ui_bp.route('/api/ui/settings/mtls', methods=['GET'])
+@login_required
+@admin_required
+def ui_settings_mtls_get():
+    """Get mTLS settings (settings page alias)"""
+    return ui_mtls_settings_get()
+
+@ui_bp.route('/api/ui/settings/mtls', methods=['POST'])
+@login_required
+@admin_required  
+def ui_settings_mtls_post():
+    """Update mTLS settings (settings page alias)"""
+    return ui_mtls_settings_post()
