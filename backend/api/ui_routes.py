@@ -1796,6 +1796,7 @@ def cert_create():
             'digest_alg': request.form.get('digest_alg', 'sha256'),
             'ocsp_uri': request.form.get('ocsp_uri', '').strip() or None,
             'private_key_location': request.form.get('private_key_location', 'stored'),
+            'template_id': int(request.form.get('template_id')) if request.form.get('template_id') else None,
         }
         
         response = requests.post(
