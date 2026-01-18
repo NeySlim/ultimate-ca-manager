@@ -268,8 +268,12 @@
                         <label class="modal-form-label">
                             Email Addresses (one per line)
                         </label>
-                        <textarea name="san_email" rows="2" placeholder="user@example.com"
+                        <textarea id="san-email-input" name="san_email" rows="3" placeholder="user@example.com&#10;admin@example.com"
                                   class="form-input" style="width: 100%; font-family: monospace; font-size: 0.875rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--card-bg); color: var(--text-primary);"></textarea>
+                        <div id="san-email-validation" style="margin-top: 0.5rem; font-size: 0.75rem;"></div>
+                        <p style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+                            For S/MIME certificates: enter recipient email addresses
+                        </p>
                     </div>
                     
                     <div style="margin-bottom: 1rem;">
@@ -685,6 +689,82 @@ function applyCertTemplate(templateId) {
             }
         });
 }
+
+// ============================================================================
+// EMAIL VALIDATION (RFC 5322 simplified)
+// ============================================================================
+
+// RFC 5322 simplified email validation regex
+// More permissive than full spec but catches 99% of real emails
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+function validateEmail(email) {
+    return EMAIL_REGEX.test(email.trim());
+}
+
+function validateSANEmails() {
+    const textarea = document.getElementById('san-email-input');
+    const feedback = document.getElementById('san-email-validation');
+    
+    if (!textarea || !feedback) return;
+    
+    const value = textarea.value.trim();
+    
+    // Empty is valid (optional field)
+    if (!value) {
+        feedback.innerHTML = '';
+        textarea.style.borderColor = 'var(--border-color)';
+        return;
+    }
+    
+    const lines = value.split('\n').map(line => line.trim()).filter(line => line);
+    const validEmails = [];
+    const invalidEmails = [];
+    
+    lines.forEach(email => {
+        if (validateEmail(email)) {
+            validEmails.push(email);
+        } else {
+            invalidEmails.push(email);
+        }
+    });
+    
+    // Build feedback HTML
+    let html = '';
+    
+    if (validEmails.length > 0) {
+        html += `<div style="color: var(--success-color); display: flex; align-items: center; gap: 0.25rem;">
+            <svg class="ucm-icon" width="14" height="14"><use href="#icon-check-circle"/></svg>
+            <span>${validEmails.length} valid email${validEmails.length > 1 ? 's' : ''}</span>
+        </div>`;
+    }
+    
+    if (invalidEmails.length > 0) {
+        html += `<div style="color: var(--danger-color); display: flex; align-items: start; gap: 0.25rem; margin-top: 0.25rem;">
+            <svg class="ucm-icon" width="14" height="14" style="margin-top: 0.125rem;"><use href="#icon-exclamation-circle"/></svg>
+            <div>
+                <div>${invalidEmails.length} invalid email${invalidEmails.length > 1 ? 's' : ''}:</div>
+                <div style="font-family: monospace; font-size: 0.7rem; margin-top: 0.125rem;">
+                    ${invalidEmails.map(e => `• ${e}`).join('<br>')}
+                </div>
+            </div>
+        </div>`;
+        textarea.style.borderColor = 'var(--danger-color)';
+    } else {
+        textarea.style.borderColor = 'var(--success-color)';
+    }
+    
+    feedback.innerHTML = html;
+}
+
+// Attach email validation on input
+document.addEventListener('DOMContentLoaded', function() {
+    const emailInput = document.getElementById('san-email-input');
+    if (emailInput) {
+        emailInput.addEventListener('input', validateSANEmails);
+        emailInput.addEventListener('blur', validateSANEmails);
+    }
+});
 </script>
 
 <script>
