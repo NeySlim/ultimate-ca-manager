@@ -2995,7 +2995,7 @@ window.deleteCredential = async function(credentialId) {
     
     try {
         const response = await fetch(`/api/ui/webauthn/credentials/${credentialId}`, {
-            method: 'DELETE'` }
+            method: 'DELETE'
         });
         
         const result = await response.json();
