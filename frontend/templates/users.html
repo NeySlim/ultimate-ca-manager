@@ -132,7 +132,7 @@
             <form hx-post="/api/ui/config/change-password"
                   hx-trigger="submit"
                   hx-disabled-elt="find button[type='submit']"
-                  hx-on::after-request="if(event.detail.successful){{window.closeModal('changePasswordModal');if(typeof showToast==='function')showToast('Password changed successfully','success');}}">>
+                  hx-on::after-request="if(event.detail.successful){window.closeModal('changePasswordModal');if(typeof showToast==='function')showToast('Password changed successfully','success');}">
                 <input type="hidden" id="change-password-user-id" name="user_id">
                 
                 <div style="padding: 1.5rem;">
