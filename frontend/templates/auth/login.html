@@ -73,7 +73,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   try {
     const response = await api.auth.login(username, password);
     
-    if (response.success) {
+    // Success if we have data or message (no error field)
+    if (response.data || response.message) {
       window.location.href = '/dashboard';
     } else {
       throw new Error(response.message || 'Login failed');
