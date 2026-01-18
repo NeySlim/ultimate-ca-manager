@@ -5245,13 +5245,17 @@ def ui_webauthn_toggle(cred_id):
 # Authentication - Get available methods
 @ui_bp.route('/api/ui/auth/methods', methods=['GET'])
 def ui_auth_methods():
-    """Get available auth methods for user (proxy to /api/v1) - PUBLIC route"""
+    """Get available auth methods for user (PUBLIC route - no auth)"""
     try:
         username = request.args.get('username')
         if not username:
             return jsonify({"error": "Username required"}), 400
         
-        response = api_call_with_retry('GET', f"{request.url_root}api/v1/auth/methods?username={username}")
+        # PUBLIC route - call API directly without JWT
+        response = requests.get(
+            f"{request.url_root}api/v1/auth/methods?username={username}",
+            verify=False
+        )
         
         if response and response.status_code == 200:
             return response.json(), response.status_code
@@ -5264,9 +5268,14 @@ def ui_auth_methods():
 # WebAuthn Authentication - Get options
 @ui_bp.route('/api/ui/webauthn/authenticate/options', methods=['POST'])
 def ui_webauthn_auth_options():
-    """Get WebAuthn authentication options (proxy to /api/v1) - PUBLIC route"""
+    """Get WebAuthn authentication options (PUBLIC route - no auth)"""
     try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/webauthn/authenticate/options", json=request.json)
+        # PUBLIC route - call API directly without JWT
+        response = requests.post(
+            f"{request.url_root}api/v1/webauthn/authenticate/options",
+            json=request.json,
+            verify=False
+        )
         
         if response and response.status_code in [200, 201]:
             return response.json(), response.status_code
@@ -5279,9 +5288,14 @@ def ui_webauthn_auth_options():
 # WebAuthn Authentication - Verify
 @ui_bp.route('/api/ui/webauthn/authenticate/verify', methods=['POST'])
 def ui_webauthn_auth_verify():
-    """Verify WebAuthn authentication (proxy to /api/v1) - PUBLIC route"""
+    """Verify WebAuthn authentication (PUBLIC route - no auth)"""
     try:
-        response = api_call_with_retry('POST', f"{request.url_root}api/v1/webauthn/authenticate/verify", json=request.json)
+        # PUBLIC route - call API directly without JWT
+        response = requests.post(
+            f"{request.url_root}api/v1/webauthn/authenticate/verify",
+            json=request.json,
+            verify=False
+        )
         
         if response and response.status_code in [200, 201]:
             return response.json(), response.status_code
