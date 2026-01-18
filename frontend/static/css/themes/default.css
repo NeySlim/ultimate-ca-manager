@@ -1,0 +1,28 @@
+/* Dark Theme (Default) */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* Base Styles */
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Theme Toggle Animation */
+[data-theme="light"],
+[data-theme="dark"] {
+  transition: background-color var(--transition-base),
+              color var(--transition-base);
+}

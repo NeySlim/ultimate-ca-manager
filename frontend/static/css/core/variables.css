@@ -1,0 +1,164 @@
+/* Design Tokens - Snetch UI System */
+:root {
+  /* === COLORS === */
+  
+  /* Backgrounds - Dark Theme */
+  --bg-app: #0f0f0f;
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #2a2a2a;
+  --bg-tertiary: #333333;
+  --bg-elevated: #2a2a2a;
+  
+  /* Text Colors */
+  --text-primary: #ffffff;
+  --text-secondary: #e5e5e5;
+  --text-tertiary: #9ca3af;
+  --text-disabled: #6b7280;
+  --text-inverse: #111827;
+  
+  /* Brand - Indigo */
+  --primary-400: #818cf8;
+  --primary-500: #6366f1;
+  --primary-600: #4f46e5;
+  --primary-700: #4338ca;
+  
+  /* Status Colors */
+  --success-400: #34d399;
+  --success-500: #10b981;
+  --success-600: #059669;
+  
+  --warning-400: #fbbf24;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  
+  --danger-400: #f87171;
+  --danger-500: #ef4444;
+  --danger-600: #dc2626;
+  
+  --info-400: #60a5fa;
+  --info-500: #3b82f6;
+  --info-600: #2563eb;
+  
+  /* Borders */
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-hover: rgba(255, 255, 255, 0.2);
+  --border-focus: var(--primary-500);
+  
+  /* === SPACING SCALE === */
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px - BASE */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+  
+  /* === TYPOGRAPHY === */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", Monaco, "Cascadia Code", "Courier New", monospace;
+  
+  /* Font Sizes */
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.25rem;    /* 20px */
+  --text-2xl: 1.5rem;    /* 24px */
+  --text-3xl: 1.875rem;  /* 30px */
+  --text-4xl: 2.25rem;   /* 36px */
+  
+  /* Font Weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  
+  /* Line Heights */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.75;
+  
+  /* === TRANSITIONS === */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+  
+  /* === SHADOWS === */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+  
+  /* === BORDER RADIUS === */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  
+  /* === Z-INDEX === */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  
+  /* === COMPONENT TOKENS === */
+  
+  /* Buttons */
+  --btn-sm: 32px;
+  --btn-md: 40px;
+  --btn-lg: 48px;
+  --btn-padding-sm: 0 12px;
+  --btn-padding-md: 0 16px;
+  --btn-padding-lg: 0 24px;
+  
+  /* Cards */
+  --card-padding: var(--space-6);
+  --card-radius: var(--radius-lg);
+  --card-shadow: var(--shadow-md);
+  
+  /* Inputs */
+  --input-height-sm: 32px;
+  --input-height-md: 40px;
+  --input-height-lg: 48px;
+  --input-padding: 0 var(--space-3);
+  --input-radius: var(--radius-md);
+  
+  /* Sidebar */
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+  
+  /* Topbar */
+  --topbar-height: 64px;
+}
+
+/* Light Theme Override */
+[data-theme="light"] {
+  --bg-app: #f9fafb;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f4f6;
+  --bg-tertiary: #e5e7eb;
+  --bg-elevated: #ffffff;
+  
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-tertiary: #6b7280;
+  --text-disabled: #9ca3af;
+  --text-inverse: #ffffff;
+  
+  --border-color: rgba(0, 0, 0, 0.1);
+  --border-hover: rgba(0, 0, 0, 0.2);
+  
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+}

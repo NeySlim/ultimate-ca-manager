@@ -1,0 +1,90 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Login - UCM{% endblock %}
+
+{% block body %}
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg-app); padding: var(--space-4);">
+  <div class="card" style="width: 100%; max-width: 400px;">
+    <div class="card-body" style="padding: var(--space-8);">
+      <!-- Logo -->
+      <div style="text-align: center; margin-bottom: var(--space-8);">
+        <h1 style="font-size: var(--text-3xl); font-weight: var(--font-bold); color: var(--text-primary); margin-bottom: var(--space-2);">
+          UCM
+        </h1>
+        <p style="font-size: var(--text-sm); color: var(--text-tertiary);">
+          Universal Certificate Manager
+        </p>
+      </div>
+
+      <!-- Login Form -->
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="username" class="form-label">Username</label>
+          <input 
+            type="text" 
+            id="username" 
+            name="username" 
+            class="form-input" 
+            placeholder="Enter username"
+            required
+            autofocus
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="password" class="form-label">Password</label>
+          <input 
+            type="password" 
+            id="password" 
+            name="password" 
+            class="form-input" 
+            placeholder="Enter password"
+            required
+          >
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="loginBtn">
+          Login
+        </button>
+      </form>
+
+      <!-- Error Message -->
+      <div id="loginError" class="hidden" style="margin-top: var(--space-4); padding: var(--space-3); background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger-500); border-radius: var(--radius-md); color: var(--danger-500); font-size: var(--text-sm);">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const btn = document.getElementById('loginBtn');
+  const error = document.getElementById('loginError');
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+  
+  // Reset state
+  error.classList.add('hidden');
+  btn.disabled = true;
+  btn.classList.add('btn-loading');
+  btn.textContent = '';
+  
+  try {
+    const response = await api.auth.login(username, password);
+    
+    if (response.success) {
+      window.location.href = '/dashboard';
+    } else {
+      throw new Error(response.message || 'Login failed');
+    }
+  } catch (err) {
+    error.textContent = err.message || 'Invalid credentials';
+    error.classList.remove('hidden');
+    btn.disabled = false;
+    btn.classList.remove('btn-loading');
+    btn.textContent = 'Login';
+  }
+});
+</script>
+{% endblock %}

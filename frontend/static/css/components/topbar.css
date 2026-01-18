@@ -1,0 +1,216 @@
+/* Topbar - Clean & Functional */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--topbar-height);
+  padding: 0 var(--space-6);
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 1;
+}
+
+.topbar-title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+.topbar-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.topbar-breadcrumb-item {
+  color: var(--text-tertiary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.topbar-breadcrumb-item:hover {
+  color: var(--text-primary);
+}
+
+.topbar-breadcrumb-item.active {
+  color: var(--text-primary);
+  font-weight: var(--font-medium);
+}
+
+.topbar-breadcrumb-separator {
+  color: var(--text-disabled);
+}
+
+.topbar-center {
+  flex: 1;
+  max-width: 600px;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Topbar Search */
+.topbar-search {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+}
+
+.topbar-search-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--space-10);
+  font-size: var(--text-sm);
+  background: var(--bg-secondary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+}
+
+.topbar-search-input:focus {
+  outline: none;
+  background: var(--bg-primary);
+  border-color: var(--border-focus);
+}
+
+.topbar-search-icon {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  color: var(--text-tertiary);
+}
+
+/* Topbar Actions */
+.topbar-action {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.topbar-action:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.topbar-action-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--danger-500);
+  border: 2px solid var(--bg-primary);
+  border-radius: 50%;
+}
+
+/* User Menu */
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.topbar-user:hover {
+  background: var(--bg-secondary);
+}
+
+.topbar-user-avatar {
+  width: 32px;
+  height: 32px;
+  background: var(--primary-500);
+  color: white;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.topbar-user-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar-user-name {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.topbar-user-role {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  line-height: 1.2;
+}
+
+/* Theme Toggle */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.theme-toggle:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.theme-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .topbar {
+    padding: 0 var(--space-4);
+  }
+  
+  .topbar-breadcrumb,
+  .topbar-search {
+    display: none;
+  }
+  
+  .topbar-user-info {
+    display: none;
+  }
+}
