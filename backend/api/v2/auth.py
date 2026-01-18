@@ -38,7 +38,7 @@ def login():
     # Find user
     user = User.query.filter_by(username=username).first()
     
-    if not user or not user.is_active:
+    if not user or not user.active:
         return error_response('Invalid credentials', 401)
     
     # Verify password (assumes User has check_password method)
