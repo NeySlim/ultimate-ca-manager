@@ -304,13 +304,6 @@
                 <span>OCSP Status</span>
             </a>
             
-            <a href="/users" class="sidebar-link {% if request.path.startswith('/users') %}active{% endif %}"
-               hx-get="/users" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"
-               data-tooltip="Users">
-                <svg class="ucm-icon" width="20" height="20"><use href="#icon-users"/></svg>
-                <span>Users</span>
-            </a>
-            
             {% if session.get('role') == 'admin' %}
             <a href="/settings" class="sidebar-link {% if request.path.startswith('/settings') %}active{% endif %}"
                hx-get="/settings" hx-target="#main-content" hx-select="#main-content" hx-swap="outerHTML" hx-push-url="true"

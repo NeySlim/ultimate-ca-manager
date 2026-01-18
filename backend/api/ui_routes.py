@@ -603,12 +603,6 @@ def my_account_save_notification_settings():
     return jsonify({'success': True, 'message': 'Settings saved successfully'})
 
 
-@ui_bp.route('/users')
-@login_required
-def users():
-    """Users management page"""
-    return render_template('users.html')
-
 
 # CA Management
 @ui_bp.route('/ca')
