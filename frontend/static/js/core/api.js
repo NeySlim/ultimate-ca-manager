@@ -24,12 +24,19 @@ class API {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}`);
+        // Server returned an error
+        const error = new Error(data.message || `HTTP ${response.status}`);
+        error.status = response.status;
+        error.data = data;
+        throw error;
       }
 
       return data;
     } catch (error) {
-      console.error('API Error:', error);
+      // Network error or parsing error
+      if (!error.status) {
+        error.message = error.message || 'Network error';
+      }
       throw error;
     }
   }
