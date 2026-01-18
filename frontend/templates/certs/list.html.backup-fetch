@@ -508,49 +508,41 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Load templates for CSR dropdown (HTMX event-based)
+// Load templates for CSR dropdown (uses fetch-wrapper for JWT auth)
 function loadCSRTemplates() {
     const select = document.getElementById('csr-template-select');
     if (!select) return;
     
-    // Listen for the response via HTMX event
-    const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === '/api/ui/templates/options') {
-            select.innerHTML = evt.detail.xhr.responseText;
-            // Remove listener after use
-            document.body.removeEventListener('htmx:afterRequest', handler);
-        }
-    };
-    
-    document.body.addEventListener('htmx:afterRequest', handler);
-    
-    // Trigger HTMX request
-    htmx.ajax('GET', '/api/ui/templates/options', {swap: 'none'});
+    fetch('/api/ui/templates/options')
+        .then(r => r.text())
+        .then(html => {
+            select.innerHTML = html;
+        })
+        .catch(err => {
+            console.error('Failed to load templates:', err);
+            select.innerHTML = '<option value="">-- Error loading templates --</option>';
+        });
 }
 
-// Load templates for Create Cert dropdown (HTMX event-based)
+// Load templates for Create Cert dropdown (uses fetch-wrapper for JWT auth)
 function loadCertTemplates() {
     const select = document.getElementById('cert-template-select');
     if (!select) return;
     
-    // Listen for the response via HTMX event
-    const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === '/api/ui/templates/options') {
-            const html = evt.detail.xhr.responseText;
+    fetch('/api/ui/templates/options')
+        .then(r => r.text())
+        .then(html => {
             // Prepend "No template" option
             select.innerHTML = '<option value="">-- No template (manual configuration) --</option>' + html;
-            // Remove listener after use
-            document.body.removeEventListener('htmx:afterRequest', handler);
-        }
-    };
-    
-    document.body.addEventListener('htmx:afterRequest', handler);
-    
-    // Trigger HTMX request
-    htmx.ajax('GET', '/api/ui/templates/options', {swap: 'none'});
+        })
+        .catch(err => {
+            console.error('Failed to load templates:', err);
+            select.innerHTML = '<option value="">-- Error loading templates --</option>';
+        });
 }
 
-// Apply template to CSR form (HTMX event-based)
+// Apply template to CSR form
+// Note: fetch() is OK here because fetch-wrapper.js auto-injects JWT token
 function applyCSRTemplate(templateId) {
     console.log('applyCSRTemplate called with:', templateId);
     
@@ -563,67 +555,59 @@ function applyCSRTemplate(templateId) {
     
     console.log('Fetching template:', templateId);
     
-    // Listen for the response via HTMX event
-    const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === '/api/ui/templates/' + templateId + '/json') {
-            console.log('Response status:', evt.detail.xhr.status);
+    // fetch() is OK because fetch-wrapper.js is loaded and auto-injects JWT
+    fetch('/api/ui/templates/' + templateId + '/json')
+        .then(r => {
+            console.log('Response status:', r.status);
+            return r.json();
+        })
+        .then(template => {
+            console.log('Template received:', template);
             
-            try {
-                const template = JSON.parse(evt.detail.xhr.responseText);
-                console.log('Template received:', template);
-                
-                // Apply key configuration
-                const keyType = template.key_type || '4096';
-                document.getElementById('csr-key-type').value = keyType;
-                
-                const digest = template.digest || 'sha256';
-                document.getElementById('csr-digest').value = digest;
-                
-                // Apply DN defaults (but don't overwrite if user already entered something)
-                const dn = template.dn_template || {};
-                console.log('DN template:', dn);
-                
-                if (dn.O && !document.getElementById('csr-org').value) {
-                    const orgValue = dn.O.replace('{username}', '').replace('{email}', '').trim();
-                    document.getElementById('csr-org').value = orgValue;
-                }
-                if (dn.OU && !document.getElementById('csr-ou').value) {
-                    const ouValue = dn.OU.replace('{username}', '').replace('{email}', '').trim();
-                    document.getElementById('csr-ou').value = ouValue;
-                }
-                if (dn.C && !document.getElementById('csr-country').value) {
-                    document.getElementById('csr-country').value = dn.C;
-                }
-                if (dn.ST && !document.getElementById('csr-state').value) {
-                    document.getElementById('csr-state').value = dn.ST;
-                }
-                if (dn.L && !document.getElementById('csr-locality').value) {
-                    document.getElementById('csr-locality').value = dn.L;
-                }
-                
-                // Show toast
-                if (typeof showToast === 'function') {
-                    showToast(`Template "${template.name}" applied`, 'success');
-                }
-            } catch (err) {
-                console.error('Failed to parse template:', err);
-                if (typeof showToast === 'function') {
-                    showToast('Failed to load template', 'error');
-                }
+            // Apply key configuration
+            const keyType = template.key_type || '4096';
+            document.getElementById('csr-key-type').value = keyType;
+            
+            const digest = template.digest || 'sha256';
+            document.getElementById('csr-digest').value = digest;
+            
+            // Apply DN defaults (but don't overwrite if user already entered something)
+            const dn = template.dn_template || {};
+            console.log('DN template:', dn);
+            
+            if (dn.O && !document.getElementById('csr-org').value) {
+                const orgValue = dn.O.replace('{username}', '').replace('{email}', '').trim();
+                document.getElementById('csr-org').value = orgValue;
+            }
+            if (dn.OU && !document.getElementById('csr-ou').value) {
+                const ouValue = dn.OU.replace('{username}', '').replace('{email}', '').trim();
+                document.getElementById('csr-ou').value = ouValue;
+            }
+            if (dn.C && !document.getElementById('csr-country').value) {
+                document.getElementById('csr-country').value = dn.C;
+            }
+            if (dn.ST && !document.getElementById('csr-state').value) {
+                document.getElementById('csr-state').value = dn.ST;
+            }
+            if (dn.L && !document.getElementById('csr-locality').value) {
+                document.getElementById('csr-locality').value = dn.L;
             }
             
-            // Remove listener after use
-            document.body.removeEventListener('htmx:afterRequest', handler);
-        }
-    };
-    
-    document.body.addEventListener('htmx:afterRequest', handler);
-    
-    // Trigger HTMX request
-    htmx.ajax('GET', '/api/ui/templates/' + templateId + '/json', {swap: 'none'});
+            // Show toast
+            if (typeof showToast === 'function') {
+                showToast(`Template "${template.name}" applied`, 'success');
+            }
+        })
+        .catch(err => {
+            console.error('Failed to load template:', err);
+            if (typeof showToast === 'function') {
+                showToast('Failed to load template', 'error');
+            }
+        });
 }
 
-// Apply template to Certificate form (HTMX event-based)
+// Apply template to Certificate form
+// Note: fetch() is OK here because fetch-wrapper.js auto-injects JWT token
 function applyCertTemplate(templateId) {
     console.log('applyCertTemplate called with:', templateId);
     
@@ -637,82 +621,73 @@ function applyCertTemplate(templateId) {
     
     console.log('Fetching template:', templateId);
     
-    // Listen for the response via HTMX event
-    const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === '/api/ui/templates/' + templateId + '/json') {
-            console.log('Response status:', evt.detail.xhr.status);
+    // fetch() is OK because fetch-wrapper.js is loaded and auto-injects JWT
+    fetch('/api/ui/templates/' + templateId + '/json')
+        .then(r => {
+            console.log('Response status:', r.status);
+            return r.json();
+        })
+        .then(template => {
+            console.log('Template received:', template);
             
-            try {
-                const template = JSON.parse(evt.detail.xhr.responseText);
-                console.log('Template received:', template);
-                
-                // Apply key configuration
-                const keyType = template.key_type || '2048';
-                document.getElementById('cert-key-type').value = keyType;
-                
-                const digest = template.digest || 'sha256';
-                document.getElementById('cert-digest').value = digest;
-                
-                const validityDays = template.validity_days || 397;
-                document.getElementById('cert-lifetime').value = validityDays;
-                
-                // Apply DN defaults (but don't overwrite if user already entered something)
-                const dn = template.dn_template || {};
-                console.log('DN template:', dn);
-                
-                if (dn.O && !document.getElementById('cert-org').value) {
-                    const orgValue = dn.O.replace('{username}', '').replace('{email}', '').replace('{hostname}', '').trim();
-                    document.getElementById('cert-org').value = orgValue;
-                }
-                if (dn.OU && !document.getElementById('cert-ou').value) {
-                    const ouValue = dn.OU.replace('{username}', '').replace('{email}', '').replace('{hostname}', '').trim();
-                    document.getElementById('cert-ou').value = ouValue;
-                }
-                if (dn.C && !document.getElementById('cert-country').value) {
-                    document.getElementById('cert-country').value = dn.C;
-                }
-                if (dn.ST && !document.getElementById('cert-state').value) {
-                    document.getElementById('cert-state').value = dn.ST;
-                }
-                if (dn.L && !document.getElementById('cert-city').value) {
-                    document.getElementById('cert-city').value = dn.L;
-                }
-                
-                // Suggest cert_type based on template type
-                const typeMapping = {
-                    'web_server': 'server_cert',
-                    'email': 'client_cert',
-                    'vpn_server': 'server_cert',
-                    'vpn_client': 'client_cert',
-                    'code_signing': 'client_cert',
-                    'client_auth': 'client_cert'
-                };
-                const suggestedType = typeMapping[template.template_type];
-                if (suggestedType) {
-                    document.getElementById('cert-type').value = suggestedType;
-                    updateCertTypeHints(suggestedType);
-                }
-                
-                // Show toast
-                if (typeof showToast === 'function') {
-                    showToast(`Template "${template.name}" applied`, 'success');
-                }
-            } catch (err) {
-                console.error('Failed to parse template:', err);
-                if (typeof showToast === 'function') {
-                    showToast('Failed to load template', 'error');
-                }
+            // Apply key configuration
+            const keyType = template.key_type || '2048';
+            document.getElementById('cert-key-type').value = keyType;
+            
+            const digest = template.digest || 'sha256';
+            document.getElementById('cert-digest').value = digest;
+            
+            const validityDays = template.validity_days || 397;
+            document.getElementById('cert-lifetime').value = validityDays;
+            
+            // Apply DN defaults (but don't overwrite if user already entered something)
+            const dn = template.dn_template || {};
+            console.log('DN template:', dn);
+            
+            if (dn.O && !document.getElementById('cert-org').value) {
+                const orgValue = dn.O.replace('{username}', '').replace('{email}', '').replace('{hostname}', '').trim();
+                document.getElementById('cert-org').value = orgValue;
+            }
+            if (dn.OU && !document.getElementById('cert-ou').value) {
+                const ouValue = dn.OU.replace('{username}', '').replace('{email}', '').replace('{hostname}', '').trim();
+                document.getElementById('cert-ou').value = ouValue;
+            }
+            if (dn.C && !document.getElementById('cert-country').value) {
+                document.getElementById('cert-country').value = dn.C;
+            }
+            if (dn.ST && !document.getElementById('cert-state').value) {
+                document.getElementById('cert-state').value = dn.ST;
+            }
+            if (dn.L && !document.getElementById('cert-city').value) {
+                document.getElementById('cert-city').value = dn.L;
             }
             
-            // Remove listener after use
-            document.body.removeEventListener('htmx:afterRequest', handler);
-        }
-    };
-    
-    document.body.addEventListener('htmx:afterRequest', handler);
-    
-    // Trigger HTMX request
-    htmx.ajax('GET', '/api/ui/templates/' + templateId + '/json', {swap: 'none'});
+            // Suggest cert_type based on template type
+            const typeMapping = {
+                'web_server': 'server_cert',
+                'email': 'client_cert',
+                'vpn_server': 'server_cert',
+                'vpn_client': 'client_cert',
+                'code_signing': 'client_cert',
+                'client_auth': 'client_cert'
+            };
+            const suggestedType = typeMapping[template.template_type];
+            if (suggestedType) {
+                document.getElementById('cert-type').value = suggestedType;
+                updateCertTypeHints(suggestedType);
+            }
+            
+            // Show toast
+            if (typeof showToast === 'function') {
+                showToast(`Template "${template.name}" applied`, 'success');
+            }
+        })
+        .catch(err => {
+            console.error('Failed to load template:', err);
+            if (typeof showToast === 'function') {
+                showToast('Failed to load template', 'error');
+            }
+        });
 }
 
 // ============================================================================
