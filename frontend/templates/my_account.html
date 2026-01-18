@@ -470,6 +470,20 @@ document.getElementById('change-password-form').addEventListener('submit', funct
         return;
     }
     
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/auth/change-password') {
+            if (evt.detail.successful) {
+                ucmAlert('Password changed successfully!', 'Success').then(() => {
+                    document.getElementById('change-password-form').reset();
+                });
+            } else {
+                console.error('Error changing password');
+                ucmAlert('An error occurred while changing password', 'Error');
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
+        }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
     htmx.ajax('POST', '/api/ui/auth/change-password', {
         values: {
             current_password: currentPassword,
@@ -478,13 +492,6 @@ document.getElementById('change-password-form').addEventListener('submit', funct
         headers: {
             'Content-Type': 'application/json'
         }
-    }).then(() => {
-        ucmAlert('Password changed successfully!', 'Success').then(() => {
-            document.getElementById('change-password-form').reset();
-        });
-    }).catch((error) => {
-        console.error('Error:', error);
-        ucmAlert('An error occurred while changing password', 'Error');
     });
 });
 

@@ -382,18 +382,23 @@ function viewLogs(logType) {
     display.style.display = 'block';
     pre.textContent = 'Loading logs...';
     
-    htmx.ajax('GET', `/api/ui/system/logs/${logType}`, {swap: 'none'})
-        .then(xhr => {
-            const data = JSON.parse(xhr.responseText);
-            if (data.success && data.logs) {
-                pre.textContent = data.logs;
-            } else {
-                pre.textContent = 'No logs available';
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === `/api/ui/system/logs/${logType}`) {
+            try {
+                const data = JSON.parse(evt.detail.xhr.responseText);
+                if (data.success && data.logs) {
+                    pre.textContent = data.logs;
+                } else {
+                    pre.textContent = 'No logs available';
+                }
+            } catch (error) {
+                pre.textContent = 'Error loading logs: ' + error.message;
             }
-        })
-        .catch(error => {
-            pre.textContent = 'Error loading logs: ' + error.message;
-        });
+            document.body.removeEventListener('htmx:afterRequest', handler);
+        }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('GET', `/api/ui/system/logs/${logType}`, {swap: 'none'});
 }
 
 // ============================================
@@ -406,26 +411,36 @@ function restartService() {
     
     showToast('Restarting service...', 'info');
     
-    htmx.ajax('POST', '/api/ui/system/restart', {swap: 'none'})
-        .then(xhr => {
-            showToast('Service restarted successfully', 'success');
-            setTimeout(() => location.reload(), 2000);
-        })
-        .catch(error => {
-            showToast('Failed to restart service', 'error');
-        });
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/system/restart') {
+            if (evt.detail.successful) {
+                showToast('Service restarted successfully', 'success');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                showToast('Failed to restart service', 'error');
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
+        }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('POST', '/api/ui/system/restart', {swap: 'none'});
 }
 
 function reloadService() {
     showToast('Reloading service...', 'info');
     
-    htmx.ajax('POST', '/api/ui/system/reload', {swap: 'none'})
-        .then(xhr => {
-            showToast('Service reloaded successfully', 'success');
-        })
-        .catch(error => {
-            showToast('Failed to reload service', 'error');
-        });
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/system/reload') {
+            if (evt.detail.successful) {
+                showToast('Service reloaded successfully', 'success');
+            } else {
+                showToast('Failed to reload service', 'error');
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
+        }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('POST', '/api/ui/system/reload', {swap: 'none'});
 }
 
 function clearCache() {
@@ -435,13 +450,18 @@ function clearCache() {
     
     showToast('Clearing cache...', 'info');
     
-    htmx.ajax('POST', '/api/ui/system/clear-cache', {swap: 'none'})
-        .then(xhr => {
-            showToast('Cache cleared successfully', 'success');
-        })
-        .catch(error => {
-            showToast('Failed to clear cache', 'error');
-        });
+    const handler = function(evt) {
+        if (evt.detail.pathInfo.requestPath === '/api/ui/system/clear-cache') {
+            if (evt.detail.successful) {
+                showToast('Cache cleared successfully', 'success');
+            } else {
+                showToast('Failed to clear cache', 'error');
+            }
+            document.body.removeEventListener('htmx:afterRequest', handler);
+        }
+    };
+    document.body.addEventListener('htmx:afterRequest', handler);
+    htmx.ajax('POST', '/api/ui/system/clear-cache', {swap: 'none'});
 }
 
 // ============================================
