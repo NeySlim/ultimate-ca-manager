@@ -60,7 +60,7 @@
                     System Information
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/system-info" hx-trigger="load" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/system-info" hx-trigger="intersect once" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading system info...</p>
@@ -76,7 +76,7 @@
                     Session Configuration
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/session-config" hx-trigger="load" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/session-config" hx-trigger="intersect once" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading session config...</p>
@@ -92,7 +92,7 @@
                     UI Preferences
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/ui-prefs" hx-trigger="load" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/ui-prefs" hx-trigger="intersect once" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading UI preferences...</p>
@@ -108,7 +108,7 @@
                     Default Certificate Settings
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/cert-defaults" hx-trigger="load" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/cert-defaults" hx-trigger="intersect once" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading certificate defaults...</p>
@@ -129,7 +129,7 @@
                     Password Policy
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/password-policy" hx-trigger="load, tab-https" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/password-policy" hx-trigger="tab-https" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading password policy...</p>
@@ -145,7 +145,7 @@
                     Session Security
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/session-security" hx-trigger="load, tab-https" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/session-security" hx-trigger="tab-https" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading session security...</p>
@@ -161,7 +161,7 @@
                     HTTPS Certificate
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/https-cert" hx-trigger="load, tab-https" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/https-cert" hx-trigger="tab-https" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading certificate info...</p>
@@ -182,7 +182,7 @@
                     mTLS Authentication
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/mtls" hx-trigger="load, tab-authentication" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/mtls" hx-trigger="tab-authentication" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading mTLS settings...</p>
@@ -198,7 +198,7 @@
                     WebAuthn / FIDO2 Authentication
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/webauthn" hx-trigger="load, tab-authentication" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/webauthn" hx-trigger="tab-authentication" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading WebAuthn settings...</p>
@@ -219,7 +219,7 @@
                     SMTP Configuration
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/email" hx-trigger="load, tab-email" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/email" hx-trigger="tab-email" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading email settings...</p>
@@ -240,7 +240,7 @@
                     User Management
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/users" hx-trigger="load, tab-users" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/users" hx-trigger="tab-users" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading users...</p>
@@ -261,7 +261,7 @@
                     Database Statistics
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/database-stats" hx-trigger="load, tab-database" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/database-stats" hx-trigger="tab-database" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading database stats...</p>
@@ -277,7 +277,7 @@
                     Backup & Restore
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/backup" hx-trigger="load, tab-database" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/backup" hx-trigger="tab-database" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading backup options...</p>
@@ -298,7 +298,7 @@
                     ACME Server
                 </h2>
             </div>
-            <div hx-get="/api/ui/settings/acme" hx-trigger="load, tab-advanced" hx-swap="innerHTML" style="padding: 1.5rem;">
+            <div hx-get="/api/ui/settings/acme" hx-trigger="tab-advanced" hx-swap="innerHTML" style="padding: 1.5rem;">
                 <div style="text-align: center; padding: 2rem;">
                     <svg class="ucm-icon spinner" width="32" height="32"><use href="#icon-spinner"/></svg>
                     <p style="margin-top: 1rem; color: var(--text-secondary);">Loading ACME settings...</p>
@@ -399,6 +399,9 @@ function ucm_switchTab(tabName) {
         selectedBtn.style.color = 'var(--primary-color)';
         selectedBtn.style.borderBottom = '3px solid var(--primary-color)';
     }
+    
+    // Trigger HTMX event for lazy loading
+    htmx.trigger(document.body, 'tab-' + tabName);
     
     // Save last tab
     localStorage.setItem('ucm-settings-tab', tabName);
