@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}S/MIME Installation Guide - UCM{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto;">
+    <!-- Header -->
+    <div style="margin-bottom: 2rem;">
+        <h1 style="font-size: 2rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.5rem 0; display: flex; align-items: center; gap: 0.75rem;">
+            <svg class="ucm-icon" width="32" height="32"><use href="#icon-certificate"/></svg>
+            S/MIME Certificate Installation Guide
+        </h1>
+        <p style="color: var(--text-secondary); font-size: 1rem;">
+            Step-by-step instructions to install your S/MIME certificate for secure email encryption and digital signatures.
+        </p>
+    </div>
+
+    <!-- Overview -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0;">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-info-circle"/></svg>
+                What is S/MIME?
+            </h2>
+        </div>
+        <div class="card-body">
+            <p style="margin-bottom: 1rem; line-height: 1.6;">
+                <strong>S/MIME (Secure/Multipurpose Internet Mail Extensions)</strong> allows you to:
+            </p>
+            <ul style="margin: 0 0 1rem 1.5rem; line-height: 1.8;">
+                <li><strong>Sign emails:</strong> Recipients can verify the email came from you (authentication)</li>
+                <li><strong>Encrypt emails:</strong> Only the intended recipient can read the message (confidentiality)</li>
+                <li><strong>Prevent tampering:</strong> Recipients can detect if the email was modified (integrity)</li>
+            </ul>
+            <div style="padding: 1rem; background: var(--info-bg, rgba(59, 130, 246, 0.1)); border-left: 4px solid var(--info-color, #3b82f6); border-radius: 0.375rem; margin-top: 1rem;">
+                <strong style="color: var(--text-primary);">💡 Important:</strong> You need a <strong>PKCS#12 (.p12 or .pfx)</strong> file containing your certificate and private key to install S/MIME.
+            </div>
+        </div>
+    </div>
+
+    <!-- Microsoft Outlook -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-envelope"/></svg>
+                Microsoft Outlook (Windows/Mac)
+            </h2>
+        </div>
+        <div class="card-body">
+            <h3 style="font-size: 1rem; font-weight: 600; margin: 0 0 1rem 0; color: var(--text-primary);">Installation Steps:</h3>
+            <ol style="margin: 0 0 1.5rem 1.5rem; line-height: 2; counter-reset: step;">
+                <li><strong>Import Certificate:</strong>
+                    <ul style="margin: 0.5rem 0 0 1.5rem; line-height: 1.6;">
+                        <li>Click <strong>File → Options</strong></li>
+                        <li>Go to <strong>Trust Center → Trust Center Settings</strong></li>
+                        <li>Select <strong>Email Security</strong> tab</li>
+                        <li>Click <strong>Import/Export</strong> button</li>
+                        <li>Choose <strong>Import existing Digital ID</strong></li>
+                        <li>Browse to your <code>.p12</code> file and enter the password</li>
+                    </ul>
+                </li>
+                <li style="margin-top: 1rem;"><strong>Configure S/MIME Settings:</strong>
+                    <ul style="margin: 0.5rem 0 0 1.5rem; line-height: 1.6;">
+                        <li>In <strong>Email Security</strong>, click <strong>Settings</strong></li>
+                        <li>Choose your certificate from the dropdown</li>
+                        <li>Check <strong>"Send digitally signed messages"</strong> (optional: enable by default)</li>
+                        <li>Check <strong>"Encrypt message contents"</strong> (optional: enable by default)</li>
+                        <li>Click <strong>OK</strong> to save</li>
+                    </ul>
+                </li>
+                <li style="margin-top: 1rem;"><strong>Compose Signed/Encrypted Email:</strong>
+                    <ul style="margin: 0.5rem 0 0 1.5rem; line-height: 1.6;">
+                        <li>Create a new email</li>
+                        <li>Click <strong>Options</strong> tab in the ribbon</li>
+                        <li>Click <strong>Sign</strong> button (for digital signature)</li>
+                        <li>Click <strong>Encrypt</strong> button (for encryption - requires recipient's public key)</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <div style="padding: 1rem; background: var(--warning-bg, rgba(251, 191, 36, 0.1)); border-left: 4px solid var(--warning-color, #f59e0b); border-radius: 0.375rem;">
+                <strong style="color: var(--text-primary);">⚠️ Note:</strong> To <strong>encrypt</strong> emails to someone, you need their public certificate first. Have them send you a <strong>signed email</strong>, then Outlook will store their certificate automatically.
+            </div>
+        </div>
+    </div>
+
+    <!-- Mozilla Thunderbird -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-envelope"/></svg>
+                Mozilla Thunderbird
+            </h2>
+        </div>
+        <div class="card-body">
+            <h3 style="font-size: 1rem; font-weight: 600; margin: 0 0 1rem 0; color: var(--text-primary);">Installation Steps:</h3>
+            <ol style="margin: 0 0 1.5rem 1.5rem; line-height: 2;">
+                <li><strong>Import Certificate:</strong>
+                    <ul style="margin: 0.5rem 0 0 1.5rem; line-height: 1.6;">
+                        <li>Click <strong>☰ Menu → Settings</strong> (or <strong>Edit → Settings</strong>)</li>
+                        <li>Navigate to <strong>Privacy & Security</strong></li>
+                        <li>Scroll to <strong>Certificates</strong> section</li>
+                        <li>Click <strong>Manage Certificates</strong> button</li>
+                        <li>Go to <strong>Your Certificates</strong> tab</li>
+                        <li>Click <strong>Import</strong> button</li>
+                        <li>Select your <code>.p12</code> file and enter the password</li>
+                    </ul>
+                </li>
+                <li style="margin-top: 1rem;"><strong>Configure Email Account for S/MIME:</strong>
+                    <ul style="margin: 0.5rem 0 0 1.5rem; line-height: 1.6;">
+                        <li>Go to <strong>Account Settings</strong> (☰ Menu → Account Settings)</li>
+                        <li>Select your email account, then click <strong>End-to-End Encryption</strong></li>
+                        <li>Under <strong>S/MIME</strong> section, click <strong>Select</strong> next to Digital Signing</li>
+                        <li>Choose your certificate from the list</li>
+                        <li>Optionally check <strong>"Digitally sign messages by default"</strong></li>
+                        <li>Click <strong>OK</strong> to save</li>
+                    </ul>
+                </li>
+                <li style="margin-top: 1rem;"><strong>Send Signed Email:</strong>
+                    <ul style="margin: 0.5rem 0 0 1.5rem; line-height: 1.6;">
+                        <li>Compose a new email</li>
+                        <li>Click <strong>Security</strong> button in the toolbar</li>
+                        <li>Select <strong>Digitally Sign This Message</strong></li>
+                        <li>Send the email</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <div style="padding: 1rem; background: var(--success-bg, rgba(34, 197, 94, 0.1)); border-left: 4px solid var(--success-color, #22c55e); border-radius: 0.375rem;">
+                <strong style="color: var(--text-primary);">✓ Tip:</strong> Thunderbird automatically stores sender certificates from signed emails, making encryption easier.
+            </div>
+        </div>
+    </div>
+
+    <!-- Apple Mail -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-envelope"/></svg>
+                Apple Mail (macOS/iOS)
+            </h2>
+        </div>
+        <div class="card-body">
+            <h3 style="font-size: 1rem; font-weight: 600; margin: 0 0 1rem 0; color: var(--text-primary);">Installation Steps (macOS):</h3>
+            <ol style="margin: 0 0 1.5rem 1.5rem; line-height: 2;">
+                <li><strong>Import Certificate:</strong>
+                    <ul style="margin: 0.5rem 0 0 1.5rem; line-height: 1.6;">
+                        <li>Double-click the <code>.p12</code> file</li>
+                        <li><strong>Keychain Access</strong> will open automatically</li>
+                        <li>Enter the certificate password</li>
+                        <li>Select <strong>"login" keychain</strong> (default)</li>
+                        <li>Click <strong>OK</strong></li>
+                        <li>The certificate will appear in Keychain Access under <strong>My Certificates</strong></li>
+                    </ul>
+                </li>
+                <li style="margin-top: 1rem;"><strong>Configure Apple Mail:</strong>
+                    <ul style="margin: 0.5rem 0 0 1.5rem; line-height: 1.6;">
+                        <li>Open <strong>Mail</strong> app</li>
+                        <li>Go to <strong>Mail → Settings → Accounts</strong></li>
+                        <li>Select your email account</li>
+                        <li>Apple Mail will <strong>automatically detect</strong> the certificate for your email address</li>
+                        <li>No additional configuration needed!</li>
+                    </ul>
+                </li>
+                <li style="margin-top: 1rem;"><strong>Send Signed/Encrypted Email:</strong>
+                    <ul style="margin: 0.5rem 0 0 1.5rem; line-height: 1.6;">
+                        <li>Compose a new email</li>
+                        <li>Click the <strong>🔒 Lock icon</strong> next to the subject line to enable encryption</li>
+                        <li>Click the <strong>✓ Checkmark icon</strong> to enable signature</li>
+                        <li>Icons turn blue when enabled</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <h3 style="font-size: 1rem; font-weight: 600; margin: 1.5rem 0 1rem 0; color: var(--text-primary);">iOS Installation:</h3>
+            <ol style="margin: 0 0 1rem 1.5rem; line-height: 2;">
+                <li>Email the <code>.p12</code> file to yourself</li>
+                <li>Open the email on your iOS device</li>
+                <li>Tap the <code>.p12</code> attachment</li>
+                <li>Enter the certificate password</li>
+                <li>iOS will install it automatically</li>
+                <li>Go to <strong>Settings → Mail → Accounts → Your Account</strong></li>
+                <li>S/MIME settings will appear automatically</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Troubleshooting -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-wrench"/></svg>
+                Troubleshooting
+            </h2>
+        </div>
+        <div class="card-body">
+            <div style="margin-bottom: 1.5rem;">
+                <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.5rem 0; color: var(--text-primary);">❌ "Cannot encrypt email" error:</h3>
+                <p style="margin: 0; line-height: 1.6; color: var(--text-secondary);">
+                    You need the recipient's <strong>public certificate</strong> to encrypt. Ask them to send you a <strong>signed email</strong> first, then their certificate will be saved automatically.
+                </p>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.5rem 0; color: var(--text-primary);">❌ Certificate not appearing in email client:</h3>
+                <p style="margin: 0; line-height: 1.6; color: var(--text-secondary);">
+                    Ensure the certificate's email address <strong>exactly matches</strong> your email account. Check the certificate's Subject Alternative Name (SAN) field.
+                </p>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.5rem 0; color: var(--text-primary);">❌ "Invalid certificate" or "Untrusted" warning:</h3>
+                <p style="margin: 0; line-height: 1.6; color: var(--text-secondary);">
+                    Recipients need to trust your <strong>CA certificate</strong>. You may need to distribute your CA's root certificate for them to install.
+                </p>
+            </div>
+
+            <div>
+                <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.5rem 0; color: var(--text-primary);">❌ Password incorrect during import:</h3>
+                <p style="margin: 0; line-height: 1.6; color: var(--text-secondary);">
+                    Make sure you're using the password you set during PKCS#12 export. If lost, you'll need to export a new .p12 file with a new password.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Best Practices -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-header">
+            <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="ucm-icon" width="20" height="20"><use href="#icon-shield-check"/></svg>
+                Best Practices
+            </h2>
+        </div>
+        <div class="card-body">
+            <ul style="margin: 0; line-height: 2;">
+                <li><strong>Backup your .p12 file:</strong> Store it securely (password manager or encrypted drive)</li>
+                <li><strong>Use strong passwords:</strong> Minimum 12 characters with mixed case, numbers, and symbols</li>
+                <li><strong>Don't share your .p12:</strong> It contains your private key - never email it</li>
+                <li><strong>Set expiration reminders:</strong> Renew certificates before they expire</li>
+                <li><strong>Test before production:</strong> Send test emails to yourself first</li>
+                <li><strong>Exchange certificates early:</strong> Send signed emails to contacts you'll encrypt with later</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div style="margin-top: 2rem; text-align: center;">
+        <a href="/certs" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+            <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-left"/></svg>
+            Back to Certificates
+        </a>
+    </div>
+</div>
+{% endblock %}

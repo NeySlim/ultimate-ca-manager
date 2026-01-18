@@ -626,14 +626,19 @@
                     <div style="display: flex; align-items: start; gap: 0.5rem;">
                         <svg class="ucm-icon" width="20" height="20" style="margin-top: 0.125rem; flex-shrink: 0;"><use href="#icon-info-circle"/></svg>
                         <div style="flex: 1; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.6;">
-                            <strong style="color: var(--text-primary); display: block; margin-bottom: 0.25rem;">Installation Instructions:</strong>
-                            <ul style="margin: 0; padding-left: 1.25rem;">
-                                <li><strong>Outlook:</strong> File → Options → Trust Center → Email Security → Import</li>
-                                <li><strong>Thunderbird:</strong> Settings → Privacy & Security → Certificates → Import</li>
-                                <li><strong>Apple Mail:</strong> Double-click the .p12 file, enter password in Keychain Access</li>
+                            <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">Quick Installation:</strong>
+                            <ul style="margin: 0 0 0.5rem 1.25rem;">
+                                <li><strong>Outlook:</strong> File → Options → Trust Center → Import</li>
+                                <li><strong>Thunderbird:</strong> Settings → Privacy & Security → Import</li>
+                                <li><strong>Apple Mail:</strong> Double-click .p12, enter password</li>
                             </ul>
-                            <div style="margin-top: 0.5rem; color: var(--warning-color);">
-                                ⚠️ <strong>Remember this password!</strong> You'll need it to install the certificate.
+                            <div style="margin-top: 0.75rem;">
+                                <a href="/docs/smime-installation" target="_blank" style="color: var(--primary-color); font-weight: 600; text-decoration: underline;">
+                                    📖 View detailed installation guide →
+                                </a>
+                            </div>
+                            <div style="margin-top: 0.75rem; color: var(--warning-color);">
+                                ⚠️ <strong>Remember this password!</strong> You'll need it during installation.
                             </div>
                         </div>
                     </div>
