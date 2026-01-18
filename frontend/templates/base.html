@@ -582,23 +582,62 @@
         <div style="background: var(--card-bg); border-radius: 0.5rem; max-width: 600px; width: 100%; margin: 0 auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
             <div class="card-header">
                 <h3 style="font-size: 1.25rem; font-weight: bold; color: var(--text-primary);">
-                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-lock"/></svg> PKCS#12 Password
+                    <svg class="ucm-icon" width="24" height="24"><use href="#icon-lock"/></svg> Protect with Password
                 </h3>
             </div>
             <div style="padding: 1.5rem;">
                 <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
-                    Enter a password to protect the PKCS#12 file (minimum 4 characters):
+                    Enter a strong password to protect your PKCS#12 (.p12) file:
                 </p>
                 <form autocomplete="off">
-                <input type="password" id="pkcs12Password" 
-                       class="modal-form-input"
-                       placeholder="Enter password" minlength="4"
-                       autocomplete="new-password">
-                <input type="password" id="pkcs12PasswordConfirm" 
-                       style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); margin-top: 0.75rem;"
-                       placeholder="Confirm password" minlength="4"
-                       autocomplete="new-password">
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Password <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <input type="password" id="pkcs12Password" 
+                               class="modal-form-input"
+                               placeholder="Enter password (min. 4 characters)" minlength="4"
+                               autocomplete="new-password">
+                        <div id="p12-password-strength" style="margin-top: 0.5rem; font-size: 0.75rem; display: none;">
+                            <div style="display: flex; gap: 0.25rem; margin-bottom: 0.5rem;">
+                                <div class="strength-bar"></div>
+                                <div class="strength-bar"></div>
+                                <div class="strength-bar"></div>
+                                <div class="strength-bar"></div>
+                            </div>
+                            <div id="p12-strength-text" style="color: var(--text-secondary); margin-bottom: 0.5rem; font-weight: 600;"></div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label class="modal-form-label">
+                            Confirm Password <span style="color: var(--danger-color);">*</span>
+                        </label>
+                        <input type="password" id="pkcs12PasswordConfirm" 
+                               class="modal-form-input"
+                               placeholder="Confirm password" minlength="4"
+                               autocomplete="new-password">
+                        <div id="p12-password-match" style="margin-top: 0.5rem; font-size: 0.75rem; display: none;"></div>
+                    </div>
                 </form>
+                
+                <!-- S/MIME Instructions -->
+                <div style="margin-top: 1.5rem; padding: 1rem; background: var(--info-bg, rgba(59, 130, 246, 0.1)); border-left: 4px solid var(--info-color, #3b82f6); border-radius: 0.375rem;">
+                    <div style="display: flex; align-items: start; gap: 0.5rem;">
+                        <svg class="ucm-icon" width="20" height="20" style="margin-top: 0.125rem; flex-shrink: 0;"><use href="#icon-info-circle"/></svg>
+                        <div style="flex: 1; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.6;">
+                            <strong style="color: var(--text-primary); display: block; margin-bottom: 0.25rem;">Installation Instructions:</strong>
+                            <ul style="margin: 0; padding-left: 1.25rem;">
+                                <li><strong>Outlook:</strong> File → Options → Trust Center → Email Security → Import</li>
+                                <li><strong>Thunderbird:</strong> Settings → Privacy & Security → Certificates → Import</li>
+                                <li><strong>Apple Mail:</strong> Double-click the .p12 file, enter password in Keychain Access</li>
+                            </ul>
+                            <div style="margin-top: 0.5rem; color: var(--warning-color);">
+                                ⚠️ <strong>Remember this password!</strong> You'll need it to install the certificate.
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-form-footer">
                 <button data-action="close-pkcs12-modal" 
@@ -606,8 +645,8 @@
                     Cancel
                 </button>
                 <button data-action="download-pkcs12-with-password" 
-                        class="btn-secondary">
-                    Download
+                        class="btn-primary">
+                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-download"/></svg> Export PKCS#12
                 </button>
             </div>
         </div>
@@ -696,6 +735,85 @@
             
             initializeSubmenus();
         });
+    })();
+    </script>
+    
+    <!-- PKCS#12 Password Strength Validation -->
+    <script>
+    (function() {
+        const passwordInput = document.getElementById('pkcs12Password');
+        const confirmInput = document.getElementById('pkcs12PasswordConfirm');
+        const strengthContainer = document.getElementById('p12-password-strength');
+        const strengthText = document.getElementById('p12-strength-text');
+        const matchContainer = document.getElementById('p12-password-match');
+        
+        if (!passwordInput || !confirmInput) return;
+        
+        function checkPasswordStrength(password) {
+            let strength = 0;
+            
+            if (password.length >= 8) strength++;
+            if (password.length >= 12) strength++;
+            if (/[A-Z]/.test(password) && /[a-z]/.test(password)) strength++;
+            if (/[0-9]/.test(password)) strength++;
+            if (/[^A-Za-z0-9]/.test(password)) strength++;
+            
+            return Math.min(strength, 4);
+        }
+        
+        function updateStrengthIndicator() {
+            const password = passwordInput.value;
+            
+            if (!password) {
+                strengthContainer.style.display = 'none';
+                return;
+            }
+            
+            strengthContainer.style.display = 'block';
+            const strength = checkPasswordStrength(password);
+            const bars = strengthContainer.querySelectorAll('.strength-bar');
+            
+            const colors = [
+                'var(--danger-color)',
+                'var(--warning-color)',
+                'var(--warning-color)',
+                'var(--success-color)'
+            ];
+            const labels = ['Weak', 'Fair', 'Good', 'Strong'];
+            
+            bars.forEach((bar, i) => {
+                if (i < strength) {
+                    bar.style.background = colors[strength - 1];
+                } else {
+                    bar.style.background = 'var(--border-color)';
+                }
+            });
+            
+            strengthText.textContent = 'Password strength: ' + labels[strength - 1];
+            strengthText.style.color = colors[strength - 1];
+        }
+        
+        function checkPasswordMatch() {
+            const password = passwordInput.value;
+            const confirm = confirmInput.value;
+            
+            if (!confirm) {
+                matchContainer.style.display = 'none';
+                return;
+            }
+            
+            matchContainer.style.display = 'block';
+            
+            if (password === confirm) {
+                matchContainer.innerHTML = '<span style="color: var(--success-color);">✓ Passwords match</span>';
+            } else {
+                matchContainer.innerHTML = '<span style="color: var(--danger-color);">✗ Passwords do not match</span>';
+            }
+        }
+        
+        passwordInput.addEventListener('input', updateStrengthIndicator);
+        passwordInput.addEventListener('input', checkPasswordMatch);
+        confirmInput.addEventListener('input', checkPasswordMatch);
     })();
     </script>
     
