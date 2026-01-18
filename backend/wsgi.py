@@ -1,6 +1,13 @@
 """
 WSGI entry point for Gunicorn
 """
+import sys
+from pathlib import Path
+
+# Add backend directory to Python path
+backend_dir = Path(__file__).parent
+sys.path.insert(0, str(backend_dir))
+
 from app import create_app
 
 # Create Flask application instance

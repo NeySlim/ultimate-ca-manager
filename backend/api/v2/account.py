@@ -6,10 +6,10 @@ Focus: API Keys management (CRUD)
 """
 
 from flask import Blueprint, request, jsonify, g
-from backend.auth.unified import AuthManager, require_auth
-from backend.utils.response import success_response, error_response, created_response, no_content_response
-from backend.models.api_key import APIKey
-from backend.extensions import db
+from auth.unified import AuthManager, require_auth
+from utils.response import success_response, error_response, created_response, no_content_response
+from models.api_key import APIKey
+from models import db
 from datetime import datetime
 
 bp = Blueprint('account_v2', __name__)

@@ -4,9 +4,9 @@ CAs Management Routes v2.0
 """
 
 from flask import Blueprint, request, g
-from backend.auth.unified import require_auth
-from backend.utils.response import success_response, error_response, created_response, no_content_response
-from backend.utils.pagination import paginate
+from auth.unified import require_auth
+from utils.response import success_response, error_response, created_response, no_content_response
+from utils.pagination import paginate
 
 bp = Blueprint('cas_v2', __name__)
 

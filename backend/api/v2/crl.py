@@ -3,8 +3,8 @@ CRL & OCSP Routes v2.0
 """
 
 from flask import Blueprint, request, g
-from backend.auth.unified import require_auth
-from backend.utils.response import success_response
+from auth.unified import require_auth
+from utils.response import success_response
 
 bp = Blueprint('crl_v2', __name__)
 
