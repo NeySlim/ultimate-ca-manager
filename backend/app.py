@@ -308,54 +308,23 @@ def init_database(app):
 
 def register_blueprints(app):
     """Register all API blueprints"""
-    # Import blueprints
-    from api.auth import auth_bp
-    from api.ca import ca_bp
-    from api.cert import cert_bp
-    from api.crl import crl_bp
+    # Import UI and public routes
+    from api.ui_routes import ui_bp
     from api.cdp_routes import cdp_bp
     from api.ocsp_routes import ocsp_bp
-    from api.scep import scep_bp
-    from api.system import system_bp
-    from api.import_api import import_bp
-    from api.notification_api import notification_bp
-    from api.mtls_api import mtls_bp
-    from api.webauthn_api import webauthn_bp
-    from api.ui_routes import ui_bp
-    from api.acme import acme_bp
-    from api.acme.acme_proxy_api import acme_proxy_bp
-    from api.backup_routes import backup_bp
     from api.health_routes import health_bp
-    from api.template_api import bp as template_bp  # NEW: Certificate Templates
     
     # Register UI routes (no prefix - serve from root)
     app.register_blueprint(ui_bp)
     
-    # Register API with /api prefix
-    app.register_blueprint(auth_bp, url_prefix='/api/v1/auth')
-    app.register_blueprint(ca_bp, url_prefix='/api/v1/ca')
-    app.register_blueprint(cert_bp, url_prefix='/api/v1/certificates')
-    app.register_blueprint(crl_bp, url_prefix='/api/v1/crl')
-    
-    # Import and register OCSP API
-    from api.ocsp_api import ocsp_api_bp
-    app.register_blueprint(ocsp_api_bp, url_prefix='/api/v1/ocsp')
-    
-    app.register_blueprint(system_bp, url_prefix='/api/v1/system')
-    app.register_blueprint(import_bp, url_prefix='/api/v1/import')
-    app.register_blueprint(notification_bp, url_prefix='/api/v1/notifications')
-    app.register_blueprint(mtls_bp, url_prefix='/api/v1/mtls')
-    app.register_blueprint(webauthn_bp, url_prefix='/api/v1/webauthn')
-    app.register_blueprint(backup_bp)  # Already has /api/v1/backup prefix
-    app.register_blueprint(template_bp)  # Certificate Templates API
-    app.register_blueprint(health_bp)  # Health check endpoints (no auth)
+    # Register Unified API v2.0 (routes already have /api/* prefix)
+    from api.v2 import register_api_v2
+    register_api_v2(app)
     
     # Public endpoints (no auth, no /api prefix - standard paths)
-    app.register_blueprint(scep_bp, url_prefix='/scep')  # SCEP protocol
     app.register_blueprint(cdp_bp, url_prefix='/cdp')     # CRL Distribution Points
     app.register_blueprint(ocsp_bp)                        # OCSP Responder (/ocsp)
-    app.register_blueprint(acme_bp)                        # ACME protocol (/acme)
-    app.register_blueprint(acme_proxy_bp)                  # ACME Proxy (/acme/proxy)
+    app.register_blueprint(health_bp)  # Health check endpoints (no auth)
 
 
 def main():
