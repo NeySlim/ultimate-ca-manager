@@ -896,11 +896,12 @@
             
             try {
                 // Fetch available auth methods
-                const response = await fetch(`/api/v1/auth/methods?username=${encodeURIComponent(username)}`);
-                const data = await response.json();
+                const data = await htmx.ajax('GET', `/api/ui/auth/methods?username=${encodeURIComponent(username)}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
                 
-                if (!response.ok) {
-                    showAuthStatus(data.error || 'Failed to check authentication methods', 'error');
+                if (!data || data.error) {
+                    showAuthStatus(data?.error || 'Failed to check authentication methods', 'error');
                     return;
                 }
                 
@@ -1068,18 +1069,14 @@
                 }
                 
                 // Get authentication options from server
-                const optionsResponse = await fetch('/api/v1/webauthn/authenticate/options', {
-                    method: 'POST',
+                const options = await htmx.ajax('POST', '/api/ui/webauthn/authenticate/options', {
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: username })
+                    values: { username: username }
                 });
                 
-                if (!optionsResponse.ok) {
-                    const error = await optionsResponse.json();
-                    throw new Error(error.error || 'Failed to get authentication options');
+                if (!options || options.error) {
+                    throw new Error(options?.error || 'Failed to get authentication options');
                 }
-                
-                const options = await optionsResponse.json();
                 
                 // Convert base64url strings to ArrayBuffers
                 const publicKeyOptions = {
@@ -1106,10 +1103,9 @@
                 showAuthStatus('Verifying credential...', 'success');
                 
                 // Send credential to server
-                const verifyResponse = await fetch('/api/v1/webauthn/authenticate/verify', {
-                    method: 'POST',
+                const verifyData = await htmx.ajax('POST', '/api/ui/webauthn/authenticate/verify', {
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                    values: {
                         credential: {
                             id: credential.id,
                             rawId: bufferToBase64url(credential.rawId),
@@ -1122,12 +1118,11 @@
                                     bufferToBase64url(credential.response.userHandle) : null
                             }
                         }
-                    })
+                    }
                 });
                 
-                if (!verifyResponse.ok) {
-                    const error = await verifyResponse.json();
-                    throw new Error(error.error || 'Authentication failed');
+                if (!verifyData || verifyData.error) {
+                    throw new Error(verifyData?.error || 'Authentication failed');
                 }
                 
                 // Success! Redirect to dashboard

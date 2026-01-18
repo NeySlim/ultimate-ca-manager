@@ -73,14 +73,13 @@ function generateCRL(caId, caName) {
     ).then(confirmed => {
         if (!confirmed) return;
         
-        fetch(`/api/v1/crl/${caId}/generate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
+        const requestPath = `/api/v1/crl/${caId}/generate`;
+        const handler = function(evt) {
+            if (evt.detail.pathInfo.requestPath !== requestPath) return;
+            document.body.removeEventListener('htmx:afterRequest', handler);
+            
+            const data = JSON.parse(evt.detail.xhr.responseText || '{}');
+            
             if (data.error) {
                 ucmAlert(`Error: ${data.error}`, 'Error');
             } else {
@@ -88,9 +87,13 @@ function generateCRL(caId, caName) {
                     refreshCRLs();
                 });
             }
-        })
-        .catch(error => {
-            ucmAlert(`Failed to generate CRL: ${error.message}`, 'Error');
+        };
+        
+        document.body.addEventListener('htmx:afterRequest', handler);
+        
+        htmx.ajax('POST', requestPath, {
+            swap: 'none',
+            headers: { 'Content-Type': 'application/json' }
         });
     });
 }

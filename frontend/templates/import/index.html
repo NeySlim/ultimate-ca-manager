@@ -247,24 +247,30 @@ async function importManualCertificate() {
         
         showStatus(statusDiv, 'Importing certificate...', 'info');
         
-        const response = await fetch('/api/ui/certificates/import', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
+        const requestPath = '/api/ui/certificates/import';
+        const handler = function(evt) {
+            if (evt.detail.pathInfo.requestPath !== requestPath) return;
+            document.body.removeEventListener('htmx:afterRequest', handler);
+            
+            const result = JSON.parse(evt.detail.xhr.responseText || '{}');
+            
+            if (evt.detail.successful) {
+                showStatus(statusDiv, '✓ Certificate imported successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/certificates';
+                }, 1500);
+            } else {
+                showStatus(statusDiv, '✗ Import failed: ' + (result.error || result.message || 'Unknown error'), 'error');
+            }
+        };
+        
+        document.body.addEventListener('htmx:afterRequest', handler);
+        
+        htmx.ajax('POST', requestPath, {
+            swap: 'none',
+            headers: { 'Content-Type': 'application/json' },
+            values: JSON.stringify(formData)
         });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            showStatus(statusDiv, '✓ Certificate imported successfully!', 'success');
-            setTimeout(() => {
-                window.location.href = '/certificates';
-            }, 1500);
-        } else {
-            showStatus(statusDiv, '✗ Import failed: ' + (result.error || result.message || 'Unknown error'), 'error');
-        }
     } catch (error) {
         showStatus(statusDiv, '✗ Import failed: ' + error.message, 'error');
     }

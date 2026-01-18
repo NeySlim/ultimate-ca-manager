@@ -470,28 +470,19 @@ document.getElementById('change-password-form').addEventListener('submit', funct
         return;
     }
     
-    // TODO: Implement password change API call
-    fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+    htmx.ajax('POST', '/api/ui/auth/change-password', {
+        values: {
             current_password: currentPassword,
             new_password: newPassword
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            ucmAlert('Password changed successfully!', 'Success').then(() => {
-                document.getElementById('change-password-form').reset();
-            });
-        } else {
-            ucmAlert('Error: ' + (data.message || 'Failed to change password'), 'Error');
+        },
+        headers: {
+            'Content-Type': 'application/json'
         }
-    })
-    .catch(error => {
+    }).then(() => {
+        ucmAlert('Password changed successfully!', 'Success').then(() => {
+            document.getElementById('change-password-form').reset();
+        });
+    }).catch((error) => {
         console.error('Error:', error);
         ucmAlert('An error occurred while changing password', 'Error');
     });

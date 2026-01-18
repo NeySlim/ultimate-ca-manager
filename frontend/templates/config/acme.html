@@ -295,20 +295,20 @@ function initAcmePage() {
 }
 
 function loadStatistics() {
-    fetch('/api/ui/acme/statistics')
-        .then(response => response.json())
-        .then(data => {
-            const totalAccounts = document.getElementById('total-accounts');
-            const activeOrders = document.getElementById('active-orders');
-            const completedOrders = document.getElementById('completed-orders');
-            const issuedCerts = document.getElementById('issued-certs');
-            
-            if (totalAccounts) totalAccounts.textContent = data.total_accounts || 0;
-            if (activeOrders) activeOrders.textContent = data.active_orders || 0;
-            if (completedOrders) completedOrders.textContent = data.completed_orders || 0;
-            if (issuedCerts) issuedCerts.textContent = data.issued_certs || 0;
-        })
-        .catch(error => console.error('Error loading stats:', error));
+    htmx.ajax('GET', '/api/ui/acme/statistics', {
+        swap: 'none'
+    }).then(xhr => {
+        const data = JSON.parse(xhr.response);
+        const totalAccounts = document.getElementById('total-accounts');
+        const activeOrders = document.getElementById('active-orders');
+        const completedOrders = document.getElementById('completed-orders');
+        const issuedCerts = document.getElementById('issued-certs');
+        
+        if (totalAccounts) totalAccounts.textContent = data.total_accounts || 0;
+        if (activeOrders) activeOrders.textContent = data.active_orders || 0;
+        if (completedOrders) completedOrders.textContent = data.completed_orders || 0;
+        if (issuedCerts) issuedCerts.textContent = data.issued_certs || 0;
+    }).catch(error => console.error('Error loading stats:', error));
 }
 
 function loadAcmeCA() {
@@ -316,81 +316,82 @@ function loadAcmeCA() {
     const caDisplay = document.getElementById('acme-ca-display');
     if (!badge) return;
     
-    fetch('/api/ui/acme/settings/load')
-        .then(response => response.json())
-        .then(data => {
-            if (data.default_ca) {
-                badge.className = 'badge badge-success';
-                badge.style.fontSize = '14px';
-                badge.style.padding = '6px 12px';
-                badge.innerHTML = '<svg class="ucm-icon" width="14" height="14" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-check-circle"/></svg> Active';
-                
-                const caSelect = document.getElementById('acme-default-ca');
-                if (caSelect && caSelect.options.length > 1) {
-                    const selectedOption = Array.from(caSelect.options).find(opt => opt.value === data.default_ca);
-                    caDisplay.textContent = selectedOption ? selectedOption.text : data.default_ca;
-                } else {
-                    caDisplay.textContent = 'CA: ' + data.default_ca;
-                }
+    htmx.ajax('GET', '/api/ui/acme/settings/load', {
+        swap: 'none'
+    }).then(xhr => {
+        const data = JSON.parse(xhr.response);
+        if (data.default_ca) {
+            badge.className = 'badge badge-success';
+            badge.style.fontSize = '14px';
+            badge.style.padding = '6px 12px';
+            badge.innerHTML = '<svg class="ucm-icon" width="14" height="14" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-check-circle"/></svg> Active';
+            
+            const caSelect = document.getElementById('acme-default-ca');
+            if (caSelect && caSelect.options.length > 1) {
+                const selectedOption = Array.from(caSelect.options).find(opt => opt.value === data.default_ca);
+                caDisplay.textContent = selectedOption ? selectedOption.text : data.default_ca;
             } else {
-                badge.className = 'badge badge-danger';
-                badge.style.fontSize = '14px';
-                badge.style.padding = '6px 12px';
-                badge.innerHTML = '<svg class="ucm-icon" width="14" height="14" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-ban"/></svg> Not Configured';
-                caDisplay.textContent = 'No CA configured';
+                caDisplay.textContent = 'CA: ' + data.default_ca;
             }
-        })
-        .catch(error => console.error('Error loading CA:', error));
+        } else {
+            badge.className = 'badge badge-danger';
+            badge.style.fontSize = '14px';
+            badge.style.padding = '6px 12px';
+            badge.innerHTML = '<svg class="ucm-icon" width="14" height="14" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-ban"/></svg> Not Configured';
+            caDisplay.textContent = 'No CA configured';
+        }
+    }).catch(error => console.error('Error loading CA:', error));
 }
 
 function loadSettings() {
-    fetch('/api/ui/acme/settings/load')
-        .then(response => response.json())
-        .then(data => {
-            if (data.default_ca) {
-                const select = document.getElementById('acme-default-ca');
-                if (select) setTimeout(() => select.value = data.default_ca, 500);
-            }
-            if (data.cert_validity) {
-                const validityInput = document.querySelector('input[name="cert_validity"]');
-                if (validityInput) validityInput.value = data.cert_validity;
-            }
-        });
+    htmx.ajax('GET', '/api/ui/acme/settings/load', {
+        swap: 'none'
+    }).then(xhr => {
+        const data = JSON.parse(xhr.response);
+        if (data.default_ca) {
+            const select = document.getElementById('acme-default-ca');
+            if (select) setTimeout(() => select.value = data.default_ca, 500);
+        }
+        if (data.cert_validity) {
+            const validityInput = document.querySelector('input[name="cert_validity"]');
+            if (validityInput) validityInput.value = data.cert_validity;
+        }
+    });
 }
 
 function loadProxyStatus() {
-    fetch('/api/ui/acme/proxy/status')
-        .then(response => response.json())
-        .then(data => {
-            // Check if elements exist (user might not be on proxy tab)
-            const upstreamDisplay = document.getElementById('proxy-upstream-display');
-            const directoryUrl = document.getElementById('proxy-directory-url');
-            const container = document.getElementById('proxy-account-container');
-            
-            if (!upstreamDisplay || !directoryUrl || !container) {
-                // Elements not in DOM, silently return
-                return;
-            }
-            
-            upstreamDisplay.textContent = data.upstream_url;
-            directoryUrl.value = data.directory_url;
-            
-            if (data.is_registered) {
-                container.innerHTML = `
-                    <div style="color: var(--success-color); font-weight: 500; font-size: 14px;">
-                        <svg class="ucm-icon" width="16" height="16" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-check-circle"/></svg> Registered & Active
-                    </div>`;
-            } else {
-                container.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span class="badge badge-warning">Not Registered</span>
-                        <button id="btn-register-proxy" class="btn btn-primary btn-primary" onclick="registerProxyAccount()">
-                            Register Account
-                        </button>
-                    </div>`;
-            }
-        })
-        .catch(err => console.error("Proxy status error", err));
+    htmx.ajax('GET', '/api/ui/acme/proxy/status', {
+        swap: 'none'
+    }).then(xhr => {
+        const data = JSON.parse(xhr.response);
+        // Check if elements exist (user might not be on proxy tab)
+        const upstreamDisplay = document.getElementById('proxy-upstream-display');
+        const directoryUrl = document.getElementById('proxy-directory-url');
+        const container = document.getElementById('proxy-account-container');
+        
+        if (!upstreamDisplay || !directoryUrl || !container) {
+            // Elements not in DOM, silently return
+            return;
+        }
+        
+        upstreamDisplay.textContent = data.upstream_url;
+        directoryUrl.value = data.directory_url;
+        
+        if (data.is_registered) {
+            container.innerHTML = `
+                <div style="color: var(--success-color); font-weight: 500; font-size: 14px;">
+                    <svg class="ucm-icon" width="16" height="16" style="vertical-align: text-bottom; margin-right: 4px;"><use href="#icon-check-circle"/></svg> Registered & Active
+                </div>`;
+        } else {
+            container.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="badge badge-warning">Not Registered</span>
+                    <button id="btn-register-proxy" class="btn btn-primary btn-primary" onclick="registerProxyAccount()">
+                        Register Account
+                    </button>
+                </div>`;
+        }
+    }).catch(err => console.error("Proxy status error", err));
 }
 
 function registerProxyAccount() {
@@ -401,24 +402,24 @@ function registerProxyAccount() {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
     
-    fetch('/api/ui/acme/proxy/register', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                window.showToast('Upstream account registered successfully', 'success');
-                loadProxyStatus();
-            } else {
-                window.showToast('Error: ' + (data.message || 'Registration failed'), 'error');
-                btn.innerHTML = originalContent;
-                btn.disabled = false;
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            window.showToast('Network error during registration', 'error');
+    htmx.ajax('POST', '/api/ui/acme/proxy/register', {
+        swap: 'none'
+    }).then(xhr => {
+        const data = JSON.parse(xhr.response);
+        if (data.status === 'success') {
+            window.showToast('Upstream account registered successfully', 'success');
+            loadProxyStatus();
+        } else {
+            window.showToast('Error: ' + (data.message || 'Registration failed'), 'error');
             btn.innerHTML = originalContent;
             btn.disabled = false;
-        });
+        }
+    }).catch(err => {
+        console.error(err);
+        window.showToast('Network error during registration', 'error');
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    });
 }
 </script>
 {% endblock %}

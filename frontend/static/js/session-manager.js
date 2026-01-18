@@ -33,50 +33,62 @@ class SessionManager {
         setInterval(() => this.checkServerSession(), 60000); // Every minute
     }
     
-    async initializeFromServer() {
-        try {
-            const response = await fetch('/api/session/check', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                console.log('Session check response:', data);
-                
-                if (data.last_activity) {
-                    // Calculate time elapsed since last activity on server
-                    const serverLastActivity = data.last_activity * 1000; // Convert to milliseconds
-                    const now = Date.now();
-                    const elapsed = now - serverLastActivity;
+    initializeFromServer() {
+        htmx.ajax('GET', '/api/session/check', {
+            swap: 'none',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }).then(() => {
+            // Success handled by event listener
+        }).catch(() => {
+            console.error('Failed to initialize from server');
+            this.lastActivity = Date.now();
+            console.log('Starting timers...');
+            this.resetTimers();
+        });
+        
+        // Handle success response
+        document.addEventListener('htmx:afterOnLoad', (event) => {
+            if (event.detail.pathInfo.requestPath === '/api/session/check' && event.detail.successful) {
+                try {
+                    const data = JSON.parse(event.detail.xhr.responseText);
+                    console.log('Session check response:', data);
                     
-                    console.log('Server last activity:', new Date(serverLastActivity).toLocaleString());
-                    console.log('Time elapsed since last activity:', Math.round(elapsed / 1000), 'seconds');
-                    console.log('Time until expiration:', Math.round((this.sessionDuration - elapsed) / 1000), 'seconds');
-                    console.log('Time until warning:', Math.round((this.sessionDuration - this.warningTime - elapsed) / 1000), 'seconds');
-                    
-                    // Adjust our timer to match server
-                    this.lastActivity = now - elapsed;
-                } else {
-                    // No last_activity from server, use current time
-                    console.log('No last_activity from server, using current time');
+                    if (data.last_activity) {
+                        // Calculate time elapsed since last activity on server
+                        const serverLastActivity = data.last_activity * 1000; // Convert to milliseconds
+                        const now = Date.now();
+                        const elapsed = now - serverLastActivity;
+                        
+                        console.log('Server last activity:', new Date(serverLastActivity).toLocaleString());
+                        console.log('Time elapsed since last activity:', Math.round(elapsed / 1000), 'seconds');
+                        console.log('Time until expiration:', Math.round((this.sessionDuration - elapsed) / 1000), 'seconds');
+                        console.log('Time until warning:', Math.round((this.sessionDuration - this.warningTime - elapsed) / 1000), 'seconds');
+                        
+                        // Adjust our timer to match server
+                        this.lastActivity = now - elapsed;
+                    } else {
+                        // No last_activity from server, use current time
+                        console.log('No last_activity from server, using current time');
+                        this.lastActivity = Date.now();
+                    }
+                } catch (e) {
+                    console.error('Failed to parse session check response:', e);
                     this.lastActivity = Date.now();
                 }
-            } else {
+                
+                // Now start the timers with correct time
+                console.log('Starting timers...');
+                this.resetTimers();
+            } else if (event.detail.pathInfo.requestPath === '/api/session/check' && !event.detail.successful) {
                 // Server error, use current time
                 console.log('Server error, using current time');
                 this.lastActivity = Date.now();
+                console.log('Starting timers...');
+                this.resetTimers();
             }
-        } catch (error) {
-            console.error('Failed to initialize from server:', error);
-            this.lastActivity = Date.now();
-        }
-        
-        // Now start the timers with correct time
-        console.log('Starting timers...');
-        this.resetTimers();
+        }, { once: false });
     }
     
     setupActivityListeners() {
@@ -212,58 +224,53 @@ class SessionManager {
         }
     }
     
-    async extendSession(silent = false) {
-        try {
-            const response = await fetch('/api/session/extend', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (response.ok) {
-                this.lastActivity = Date.now();
-                this.resetTimers();
-                
-                if (!silent) {
-                    this.showNotification('Session prolongée de 30 minutes', 'success');
-                }
-                return true;
-            } else if (response.status === 401) {
-                // Session already expired on server - redirect immediately
-                this.redirectToLogin();
-                return false;
-            } else {
-                // Other error
-                this.expireSession();
-                return false;
+    extendSession(silent = false) {
+        htmx.ajax('POST', '/api/ui/session/extend', {
+            swap: 'none',
+            headers: {
+                'Content-Type': 'application/json'
             }
-        } catch (error) {
+        }).then(() => {
+            this.lastActivity = Date.now();
+            this.resetTimers();
+            
+            if (!silent) {
+                this.showNotification('Session prolongée de 30 minutes', 'success');
+            }
+            return true;
+        }).catch((error) => {
             console.error('Failed to extend session:', error);
             // Network error - assume session expired
             this.redirectToLogin();
             return false;
-        }
+        });
+        
+        // Handle 401 (session expired)
+        document.addEventListener('htmx:responseError', (event) => {
+            if (event.detail.pathInfo.requestPath === '/api/ui/session/extend' && event.detail.xhr.status === 401) {
+                this.redirectToLogin();
+            }
+        }, { once: false });
     }
     
-    async checkServerSession() {
-        try {
-            const response = await fetch('/api/session/check', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (response.status === 401) {
-                // Session expired on server - redirect immediately
-                this.redirectToLogin();
-            } else if (!response.ok) {
-                console.error('Session check failed:', response.status);
+    checkServerSession() {
+        htmx.ajax('GET', '/api/session/check', {
+            swap: 'none',
+            headers: {
+                'Content-Type': 'application/json'
             }
-        } catch (error) {
+        }).then(() => {
+            // Session OK, nothing to do
+        }).catch((error) => {
             console.error('Failed to check session:', error);
-        }
+        });
+        
+        // Handle 401 (session expired)
+        document.addEventListener('htmx:responseError', (event) => {
+            if (event.detail.pathInfo.requestPath === '/api/session/check' && event.detail.xhr.status === 401) {
+                this.redirectToLogin();
+            }
+        }, { once: false });
     }
     
     redirectToLogin() {

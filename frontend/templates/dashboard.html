@@ -249,14 +249,18 @@
         window.exportWithToken = function(url) {
             showToast('Preparing download...', 'info');
             
-            fetch(url, {
-                headers: { 'Authorization': 'Bearer ' + token }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('Export failed');
+            const handler = function(evt) {
+                if (evt.detail.pathInfo.requestPath !== url) return;
+                document.body.removeEventListener('htmx:afterRequest', handler);
                 
+                if (!evt.detail.successful) {
+                    showToast('Export failed', 'error');
+                    return;
+                }
+                
+                var response = evt.detail.xhr;
                 var filename = '';
-                var disposition = response.headers.get('Content-Disposition');
+                var disposition = response.getResponseHeader('Content-Disposition');
                 if (disposition && disposition.includes('filename=')) {
                     var matches = disposition.match(/filename[^;=\\n]*=(([\'"]).*?\\2|[^;\\n]*)/);
                     if (matches && matches[1]) {
@@ -269,22 +273,22 @@
                     filename = urlParts[urlParts.length - 1].split('?')[0] || 'download';
                 }
                 
-                return response.blob().then(blob => ({blob: blob, filename: filename}));
-            })
-            .then(function(result) {
-                var downloadUrl = window.URL.createObjectURL(result.blob);
-                var a = document.createElement('a');
-                a.href = downloadUrl;
-                a.download = result.filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(downloadUrl);
-                showToast('Download started: ' + result.filename, 'success');
-            })
-            .catch(error => {
-                showToast('Export failed: ' + error.message, 'error');
-            });
+                response.blob().then(blob => {
+                    var downloadUrl = window.URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(downloadUrl);
+                    showToast('Download started: ' + filename, 'success');
+                });
+            };
+            
+            document.body.addEventListener('htmx:afterRequest', handler);
+            
+            htmx.ajax('GET', url, { swap: 'none' });
         };
     }
     
