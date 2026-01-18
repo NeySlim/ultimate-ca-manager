@@ -258,19 +258,25 @@ function copyToClipboard(text) {
     });
 }
 
+// Global flag to prevent multiple page initializations
+let acmePageInitialized = false;
+
 // Load statistics and settings on page load
 document.addEventListener('DOMContentLoaded', function() {
-    initAcmePage();
-    // Auto-load proxy status if tab is active (from previous session)
-    if (localStorage.getItem('ucm-tab-config') === 'proxy') {
-       ucm_switchTab('proxy');
-       loadProxyStatus();
+    if (document.getElementById('acme-status-badge') && !acmePageInitialized) {
+        acmePageInitialized = true;
+        initAcmePage();
+        // Auto-load proxy status if tab is active (from previous session)
+        if (localStorage.getItem('ucm-tab-config') === 'proxy') {
+           ucm_switchTab('proxy');
+        }
     }
 });
 
-// Also trigger on HTMX content swap
+// Also trigger on HTMX content swap (but only once)
 document.addEventListener('htmx:afterSwap', function(event) {
-    if (event.detail.target.id === 'main-content' || document.getElementById('acme-status-badge')) {
+    if ((event.detail.target.id === 'main-content' || document.getElementById('acme-status-badge')) && !acmePageInitialized) {
+        acmePageInitialized = true;
         initAcmePage();
     }
 });
@@ -380,9 +386,18 @@ function loadSettings() {
     htmx.ajax('GET', '/api/ui/acme/settings/load', {swap: 'none'});
 }
 
+let loadProxyStatusInProgress = false;
 function loadProxyStatus() {
+    // Prevent concurrent calls
+    if (loadProxyStatusInProgress) {
+        console.log('loadProxyStatus already in progress, skipping');
+        return;
+    }
+    loadProxyStatusInProgress = true;
+    
     const handler = function(evt) {
         if (evt.detail.pathInfo.requestPath === '/api/ui/acme/proxy/status') {
+            loadProxyStatusInProgress = false;
             try {
                 const data = JSON.parse(evt.detail.xhr.responseText);
                 // Check if elements exist (user might not be on proxy tab)
@@ -415,6 +430,7 @@ function loadProxyStatus() {
                 }
             } catch (err) {
                 console.error("Proxy status error", err);
+                loadProxyStatusInProgress = false;
             }
             document.body.removeEventListener('htmx:afterRequest', handler);
         }
