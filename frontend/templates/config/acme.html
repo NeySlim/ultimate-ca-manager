@@ -258,13 +258,15 @@ function copyToClipboard(text) {
     });
 }
 
-// Global flag to prevent multiple page initializations
-let acmePageInitialized = false;
+// Global flag to prevent multiple page initializations (use window to avoid redeclaration error)
+if (typeof window.acmePageInitialized === 'undefined') {
+    window.acmePageInitialized = false;
+}
 
 // Load statistics and settings on page load
 document.addEventListener('DOMContentLoaded', function() {
-    if (document.getElementById('acme-status-badge') && !acmePageInitialized) {
-        acmePageInitialized = true;
+    if (document.getElementById('acme-status-badge') && !window.acmePageInitialized) {
+        window.acmePageInitialized = true;
         initAcmePage();
         // Auto-load proxy status if tab is active (from previous session)
         if (localStorage.getItem('ucm-tab-config') === 'proxy') {
@@ -275,8 +277,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Also trigger on HTMX content swap (but only once)
 document.addEventListener('htmx:afterSwap', function(event) {
-    if ((event.detail.target.id === 'main-content' || document.getElementById('acme-status-badge')) && !acmePageInitialized) {
-        acmePageInitialized = true;
+    if ((event.detail.target.id === 'main-content' || document.getElementById('acme-status-badge')) && !window.acmePageInitialized) {
+        window.acmePageInitialized = true;
         initAcmePage();
     }
 });
@@ -386,18 +388,17 @@ function loadSettings() {
     htmx.ajax('GET', '/api/ui/acme/settings/load', {swap: 'none'});
 }
 
-let loadProxyStatusInProgress = false;
 function loadProxyStatus() {
-    // Prevent concurrent calls
-    if (loadProxyStatusInProgress) {
+    // Prevent concurrent calls (use window to avoid redeclaration error)
+    if (window.loadProxyStatusInProgress) {
         console.log('loadProxyStatus already in progress, skipping');
         return;
     }
-    loadProxyStatusInProgress = true;
+    window.loadProxyStatusInProgress = true;
     
     const handler = function(evt) {
         if (evt.detail.pathInfo.requestPath === '/api/ui/acme/proxy/status') {
-            loadProxyStatusInProgress = false;
+            window.loadProxyStatusInProgress = false;
             try {
                 const data = JSON.parse(evt.detail.xhr.responseText);
                 // Check if elements exist (user might not be on proxy tab)
@@ -430,7 +431,7 @@ function loadProxyStatus() {
                 }
             } catch (err) {
                 console.error("Proxy status error", err);
-                loadProxyStatusInProgress = false;
+                window.loadProxyStatusInProgress = false;
             }
             document.body.removeEventListener('htmx:afterRequest', handler);
         }
