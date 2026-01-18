@@ -2879,7 +2879,8 @@ window.startRegistration = async function() {
     try {
         // Step 1: Get registration options from server
         const optionsResponse = await fetch('/api/ui/webauthn/register/options', {
-            method: 'POST'`,
+            method: 'POST',
+            headers: {
                 'Content-Type': 'application/json'
             }
         });
@@ -2926,7 +2927,8 @@ window.startRegistration = async function() {
         
         // Step 3: Send credential to server
         const verifyResponse = await fetch('/api/ui/webauthn/register/verify', {
-            method: 'POST'`,
+            method: 'POST',
+            headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -2964,7 +2966,8 @@ window.startRegistration = async function() {
 window.toggleCredential = async function(credentialId, newState) {
     try {
         const response = await fetch(`/api/ui/webauthn/credentials/${credentialId}/toggle`, {
-            method: 'POST'`,
+            method: 'POST',
+            headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ enabled: newState })
