@@ -230,11 +230,12 @@ def create_app(config_name=None):
                     print(f"🔄 Shutdown thread started, waiting 1 second...")
                     time.sleep(1)  # Wait for response to be sent
                     
-                    print(f"🔄 Executing os._exit(0) to trigger container restart...")
+                    print(f"🔄 Executing os._exit(1) to trigger systemd/docker restart...")
                     sys.stdout.flush()  # Ensure logs are written
                     
-                    # Graceful shutdown - let systemd/docker restart us
-                    os._exit(0)
+                    # Exit with code 1 to trigger systemd restart (Restart=on-failure)
+                    # Docker will restart regardless (restart: unless-stopped)
+                    os._exit(1)
                 
                 import threading
                 threading.Thread(target=do_shutdown, daemon=False).start()

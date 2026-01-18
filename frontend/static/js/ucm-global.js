@@ -80,23 +80,7 @@ window.escapeHtml = function(unsafe) {
 // MODAL UTILITY FUNCTIONS
 // ============================================================================
 
-function openModal(modalId) {
-    console.log('Opening modal:', modalId);
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.remove('hidden');
-        console.log('Modal opened:', modalId);
-    } else {
-        console.error('Modal not found:', modalId);
-    }
-}
-
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
+// Modal functions are defined in modal-utils.js as window.openModal() and window.closeModal()
 
 // ============================================================================
 // CERTIFICATE FUNCTIONS
@@ -104,7 +88,7 @@ function closeModal(modalId) {
 
 function openCreateCertModal() {
     console.log('Opening create cert modal');
-    openModal('createCertModal');
+    window.openModal('createCertModal');
     // Load CA options after modal is visible
     setTimeout(() => {
         const modal = document.getElementById('createCertModal');
@@ -136,28 +120,38 @@ function openCreateCertModal() {
 }
 
 function closeCertModal() {
-    closeModal('createCertModal');
+    window.closeModal('createCertModal');
 }
 
 function openAddUserModal() {
-    openModal('addUserModal');
+    window.openModal('addUserModal');
 }
 
 function closeAddUserModal() {
-    closeModal('addUserModal');
+    window.closeModal('addUserModal');
 }
 
 function openChangePasswordModal(userId, username) {
     document.getElementById('change-password-user-id').value = userId;
     document.getElementById('change-password-username').textContent = `User: ${username}`;
-    openModal('changePasswordModal');
+    window.openModal('changePasswordModal');
 }
 
 function closeChangePasswordModal() {
-    closeModal('changePasswordModal');
+    window.closeModal('changePasswordModal');
 }
 
 function openChangeRoleModal(userId, username, currentRole) {
+    const modal = document.getElementById('changeRoleModal');
+    const userIdInput = document.getElementById('change-role-user-id');
+    const usernameDisplay = document.getElementById('change-role-username');
+    const roleOptions = document.getElementById('role-options');
+    
+    if (!userIdInput || !usernameDisplay || !roleOptions) {
+        console.error('❌ Missing modal elements!');
+        return;
+    }
+    
     document.getElementById('change-role-user-id').value = userId;
     document.getElementById('change-role-username').textContent = `User: ${username} (Current: ${currentRole})`;
     
@@ -198,11 +192,11 @@ function openChangeRoleModal(userId, username, currentRole) {
         if (radio.checked) radio.dispatchEvent(new Event('change'));
     });
     
-    openModal('changeRoleModal');
+    window.openModal('changeRoleModal');
 }
 
 function closeChangeRoleModal() {
-    closeModal('changeRoleModal');
+    window.closeModal('changeRoleModal');
 }
 
 function updateCertTypeHints(certType) {
@@ -219,11 +213,11 @@ function updateCertTypeHints(certType) {
 }
 
 function openCSRModal() {
-    openModal('csrModal');
+    window.openModal('csrModal');
 }
 
 function closeCSRModal() {
-    closeModal('csrModal');
+    window.closeModal('csrModal');
 }
 
 function handleCertCreateResponse(event) {
@@ -259,19 +253,19 @@ function checkCreateHash() {
 // ============================================================================
 
 function openCreateCAModal() {
-    openModal('createCAModal');
+    window.openModal('createCAModal');
 }
 
 function closeCreateCAModal() {
-    closeModal('createCAModal', true);
+    window.closeModal('createCAModal', true);
 }
 
 function openImportCAModal() {
-    openModal('importCAModal');
+    window.openModal('importCAModal');
 }
 
 function closeImportCAModal() {
-    closeModal('importCAModal', true);
+    window.closeModal('importCAModal', true);
 }
 
 function handleCACreateResponse(event) {
@@ -989,7 +983,7 @@ function copyToClipboard(text) {
 
 function showPKCS12Modal(id, type) {
     window.pkcs12Params = { id, type };
-    openModal('pkcs12PasswordModal');
+    window.openModal('pkcs12PasswordModal');
     const pwdEl = document.getElementById('pkcs12Password');
     const confirmEl = document.getElementById('pkcs12PasswordConfirm');
     if (pwdEl) pwdEl.value = '';
@@ -1002,7 +996,7 @@ function showPKCS12ModalTable(id, type) {
 }
 
 function closePKCS12Modal() {
-    closeModal('pkcs12PasswordModal');
+    window.closeModal('pkcs12PasswordModal');
     window.pkcs12Params = {};
 }
 
@@ -1792,17 +1786,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Check for hash-based actions
     checkCreateHash();
-    
-    // Debug: Monitor all form submissions
-    document.addEventListener('submit', function(e) {
-        console.log('🔥 Form submit detected:', e.target.id || 'unnamed form', e);
-        const formData = new FormData(e.target);
-        console.log('Form data:', Object.fromEntries(formData.entries()));
-    }, true);
 });
 
 // Re-run after HTMX swaps (for SPA navigation)
-document.addEventListener('htmx:afterSwap', function() {
+document.addEventListener('htmx:beforeSwap', function(evt) {
+    if (evt.detail.target && evt.detail.target.id === 'main-content') {
+        // Remove existing modals that will be duplicated by the new content
+        const modalIds = ['changeRoleModal', 'changePasswordModal', 'addUserModal'];
+        modalIds.forEach(modalId => {
+            const existing = document.getElementById(modalId);
+            if (existing) {
+                existing.remove();
+            }
+        });
+    }
+});
+
+document.addEventListener('htmx:afterSwap', function(evt) {
     checkCreateHash();
 });
 

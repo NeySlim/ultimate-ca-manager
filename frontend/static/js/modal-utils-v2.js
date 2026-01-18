@@ -31,32 +31,22 @@ window.unlockBodyScroll = function() {
  * @param {object} options - Options { preventOverlayClose: boolean }
  */
 window.openModal = function(modalId, options = {}) {
-    console.log('🔓 window.openModal called with:', modalId, options);
     const modal = document.getElementById(modalId);
-    console.log('  Modal found:', modal);
     if (modal) {
-        console.log('  Removing hidden class...');
         modal.classList.remove('hidden');
-        console.log('  Locking body scroll...');
         lockBodyScroll();
         
         // Add close button if not exists
-        console.log('  Adding close button...');
         addCloseButtonToModal(modal);
         
         // Handle overlay click behavior
         if (options.preventOverlayClose || hasFormInputs(modal)) {
             // Modal with form inputs - don't close on overlay click
             modal.removeAttribute('onclick');
-            console.log('  Modal with forms - overlay close disabled');
         } else {
             // View-only modal - allow overlay click to close
             modal.setAttribute('onclick', `closeModal('${modalId}')`);
-            console.log('  View-only modal - overlay close enabled');
         }
-        console.log('✅ Modal should be visible now!');
-    } else {
-        console.error('❌ Modal not found:', modalId);
     }
 };
 
