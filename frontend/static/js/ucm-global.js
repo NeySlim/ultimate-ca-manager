@@ -86,7 +86,7 @@ window.escapeHtml = function(unsafe) {
 // CERTIFICATE FUNCTIONS
 // ============================================================================
 
-function openCreateCertModal() {
+window.openCreateCertModal = function() {
     console.log('Opening create cert modal');
     window.openModal('createCertModal');
     // Load CA options after modal is visible
@@ -119,7 +119,7 @@ function openCreateCertModal() {
     console.log('Modal opened');
 }
 
-function closeCertModal() {
+window.closeCertModal = function() {
     window.closeModal('createCertModal');
 }
 
@@ -212,11 +212,11 @@ function updateCertTypeHints(certType) {
     }
 }
 
-function openCSRModal() {
+window.openCSRModal = function() {
     window.openModal('csrModal');
 }
 
-function closeCSRModal() {
+window.closeCSRModal = function() {
     window.closeModal('csrModal');
 }
 
