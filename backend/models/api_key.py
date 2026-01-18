@@ -7,7 +7,7 @@ from datetime import datetime
 import json
 
 try:
-    from backend.extensions import db
+    from models import db
 except ImportError:
     # For testing
     db = None

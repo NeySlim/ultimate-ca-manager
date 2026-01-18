@@ -8,10 +8,9 @@ Supports:
 """
 
 from flask import Blueprint, request, jsonify, session, current_app
-from backend.auth.unified import AuthManager, require_auth
-from backend.utils.response import success_response, error_response
-from backend.models.user import User
-from backend.extensions import db
+from auth.unified import AuthManager, require_auth
+from utils.response import success_response, error_response
+from models import User, db
 import hashlib
 
 bp = Blueprint('auth_v2', __name__)
