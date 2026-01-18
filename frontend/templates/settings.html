@@ -2022,55 +2022,53 @@ function copyToClipboard(elementId, name) {
 // document.querySelectorAll('.tab-button').forEach(btn => ... removed ...);
 
 // Load mTLS settings
-async function loadMTLSSettings() {
+function loadMTLSSettings() {
     try {
         {% if session.get('role') == 'admin' %}
         // Load CA list
-        const casResponse = await fetch('/api/ui/ca/list', 
-        });
-        
-        if (casResponse.ok) {
-            const casData = await casResponse.json();
-            const select = document.getElementById('mtls_trusted_ca_id');
-            
-            casData.forEach(ca => {
-                const option = document.createElement('option');
-                option.value = ca.refid;
-                option.textContent = `${ca.descr}`;
-                select.appendChild(option);
-            });
-        }
+        htmx.ajax('GET', '/api/ui/ca/list', {swap: 'none'})
+            .then(xhr => {
+                const casData = JSON.parse(xhr.responseText);
+                const select = document.getElementById('mtls_trusted_ca_id');
+                
+                casData.forEach(ca => {
+                    const option = document.createElement('option');
+                    option.value = ca.refid;
+                    option.textContent = `${ca.descr}`;
+                    select.appendChild(option);
+                });
+            })
+            .catch(err => console.error(err));
         {% endif %}
         
         // Load current settings
-        const response = await fetch('/api/ui/mtls/settings', 
-        });
-        
-        if (response.ok) {
-            currentSettings = await response.json();
-            
-            {% if session.get('role') == 'admin' %}
-            document.getElementById('mtls_enabled').checked = currentSettings.enabled;
-            document.getElementById('mtls_required').checked = currentSettings.required;
-            document.getElementById('mtls_trusted_ca_id').value = currentSettings.trusted_ca_id || '';
-            
-            // Show/hide dependent fields
-            toggleMTLSFields();
-            
-            // Update status badge
-            const badge = document.getElementById('mtls-status-badge');
-            if (currentSettings.enabled) {
-                badge.className = 'badge-outline badge-success';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Enabled';
-            } else {
-                badge.className = 'badge-outline badge-secondary';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Disabled';
-            }
-            {% endif %}
-            
-            // Show/hide user section
-            updateUserSection();
-        }
+        htmx.ajax('GET', '/api/ui/mtls/settings', {swap: 'none'})
+            .then(xhr => {
+                currentSettings = JSON.parse(xhr.responseText);
+                
+                {% if session.get('role') == 'admin' %}
+                document.getElementById('mtls_enabled').checked = currentSettings.enabled;
+                document.getElementById('mtls_required').checked = currentSettings.required;
+                document.getElementById('mtls_trusted_ca_id').value = currentSettings.trusted_ca_id || '';
+                
+                // Show/hide dependent fields
+                toggleMTLSFields();
+                
+                // Update status badge
+                const badge = document.getElementById('mtls-status-badge');
+                if (currentSettings.enabled) {
+                    badge.className = 'badge-outline badge-success';
+                    badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Enabled';
+                } else {
+                    badge.className = 'badge-outline badge-secondary';
+                    badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-circle"/></svg> Disabled';
+                }
+                {% endif %}
+                
+                // Show/hide user section
+                updateUserSection();
+            })
+            .catch(err => console.error(err));
     } catch (error) {
         console.error('Error loading mTLS settings:', error);
     }
@@ -2201,19 +2199,16 @@ document.getElementById('mtls_enabled')?.addEventListener('change', toggleMTLSFi
 document.getElementById('mtls_trusted_ca_id')?.addEventListener('change', toggleMTLSFields);
 
 // Download CA certificate
-document.getElementById('download-ca-btn')?.addEventListener('click', async () => {
+document.getElementById('download-ca-btn')?.addEventListener('click', () => {
     const caId = document.getElementById('mtls_trusted_ca_id').value;
     if (!caId) {
         showToast('✗ No CA selected', 'error');
         return;
     }
     
-    try {
-        const response = await fetch(`/api/ui/ca/${caId}/export?format=pem`, 
-        });
-        
-        if (response.ok) {
-            const blob = await response.blob();
+    htmx.ajax('GET', `/api/ui/ca/${caId}/export?format=pem`, {swap: 'none'})
+        .then(xhr => {
+            const blob = new Blob([xhr.responseText], {type: 'application/x-pem-file'});
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -2223,16 +2218,14 @@ document.getElementById('download-ca-btn')?.addEventListener('click', async () =
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
             showToast('✓ CA certificate downloaded', 'success');
-        } else {
+        })
+        .catch(error => {
             showToast('✗ Failed to download CA', 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+        });
 });
 
 // Update user section visibility and content
-async function updateUserSection() {
+function updateUserSection() {
     const userSection = document.getElementById('user-section');
     const disabledMessage = document.getElementById('mtls-disabled-message');
     
@@ -2247,15 +2240,13 @@ async function updateUserSection() {
         
         if (trustedCAId) {
             // Fetch CA details
-            try {
-                const response = await fetch(`/api/ui/ca/${trustedCAId}`, 
-                });
-                if (response.ok) {
-                    const ca = await response.json();
+            htmx.ajax('GET', `/api/ui/ca/${trustedCAId}`, {swap: 'none'})
+                .then(xhr => {
+                    const ca = JSON.parse(xhr.responseText);
                     document.getElementById('ca-name-display').textContent = ca.descr;
                     document.getElementById('import-ca-name-display').textContent = ca.descr;
-                }
-            } catch (e) {}
+                })
+                .catch(e => console.error(e));
             
             createWithCA.style.display = 'block';
             createSelfSigned.style.display = 'none';
@@ -2275,7 +2266,7 @@ async function updateUserSection() {
 
 // Save mTLS settings (admin)
 {% if session.get('role') == 'admin' %}
-document.getElementById('mtls-settings-form')?.addEventListener('submit', async (e) => {
+document.getElementById('mtls-settings-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     
     const data = {
@@ -2284,31 +2275,23 @@ document.getElementById('mtls-settings-form')?.addEventListener('submit', async 
         trusted_ca_id: document.getElementById('mtls_trusted_ca_id').value
     };
     
-    try {
-        const response = await fetch('/api/ui/mtls/settings', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
+    htmx.ajax('POST', '/api/ui/mtls/settings', {
+        values: data,
+        swap: 'none'
+    })
+        .then(xhr => {
+            const result = JSON.parse(xhr.responseText);
             showToast('✓ Settings saved successfully', 'success');
             loadMTLSSettings();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to save'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+        })
+        .catch(err => {
+            showToast('✗ Failed to save settings', 'error');
+        });
 });
 {% endif %}
 
 // Create managed certificate
-document.getElementById('create-managed-cert-form')?.addEventListener('submit', async (e) => {
+document.getElementById('create-managed-cert-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     
     const data = {
@@ -2317,32 +2300,23 @@ document.getElementById('create-managed-cert-form')?.addEventListener('submit', 
         validity_days: parseInt(document.getElementById('create_validity').value)
     };
     
-    try {
-        const response = await fetch('/api/ui/mtls/certificates/create', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
+    htmx.ajax('POST', '/api/ui/mtls/certificates/create', {
+        values: data,
+        swap: 'none'
+    })
+        .then(xhr => {
             showToast('✓ Certificate created successfully', 'success');
             // Switch to manage tab
             ucm_switchTab('manage');
             loadCertificates();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+        })
+        .catch(err => {
+            showToast('✗ Failed to create certificate', 'error');
+        });
 });
 
 // Create self-signed certificate
-document.getElementById('create-selfsigned-cert-form')?.addEventListener('submit', async (e) => {
+document.getElementById('create-selfsigned-cert-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     
     const data = {
@@ -2353,31 +2327,22 @@ document.getElementById('create-selfsigned-cert-form')?.addEventListener('submit
         self_signed: true
     };
     
-    try {
-        const response = await fetch('/api/ui/mtls/certificates/create', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
+    htmx.ajax('POST', '/api/ui/mtls/certificates/create', {
+        values: data,
+        swap: 'none'
+    })
+        .then(xhr => {
             showToast('✓ Self-signed certificate created', 'success');
             ucm_switchTab('manage');
             loadCertificates();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to create certificate'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+        })
+        .catch(err => {
+            showToast('✗ Failed to create certificate', 'error');
+        });
 });
 
 // Validate imported certificate
-async function validateImportedCert() {
+function validateImportedCert() {
     const certPem = document.getElementById('import_cert_pem').value;
     
     if (!certPem) {
@@ -2385,50 +2350,47 @@ async function validateImportedCert() {
         return;
     }
     
-    try {
-        const response = await fetch('/api/ui/mtls/validate-certificate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({certificate: certPem})
-        });
-        
-        const result = await response.json();
-        const resultDiv = document.getElementById('import-validation-result');
-        
-        if (response.ok && result.success) {
-            const info = result.info;
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = `
-                <div style="background: ${result.valid ? 'var(--success-bg)' : 'var(--danger-bg)'}; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid ${result.valid ? 'var(--success-color)' : 'var(--danger-color)'};">
-                    <strong>${result.valid ? '✓ Valid Certificate' : '✗ Invalid Certificate'}</strong>
-                    ${result.already_enrolled ? '<p style="color: var(--warning-color); margin-top: 0.5rem;"><strong>⚠️ Certificate already enrolled</strong></p>' : ''}
-                    <div style="margin-top: 1rem; font-size: 0.875rem;">
-                        <p><strong>Subject:</strong> ${info.subject}</p>
-                        <p><strong>Issuer:</strong> ${info.issuer}</p>
-                        <p><strong>Serial:</strong> <code>${info.serial}</code></p>
-                        <p><strong>Valid Until:</strong> ${info.valid_until ? new Date(info.valid_until).toLocaleString() : 'N/A'}</p>
+    htmx.ajax('POST', '/api/ui/mtls/validate-certificate', {
+        values: {certificate: certPem},
+        swap: 'none'
+    })
+        .then(xhr => {
+            const result = JSON.parse(xhr.responseText);
+            const resultDiv = document.getElementById('import-validation-result');
+            
+            if (result.success) {
+                const info = result.info;
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div style="background: ${result.valid ? 'var(--success-bg)' : 'var(--danger-bg)'}; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid ${result.valid ? 'var(--success-color)' : 'var(--danger-color)'};">
+                        <strong>${result.valid ? '✓ Valid Certificate' : '✗ Invalid Certificate'}</strong>
+                        ${result.already_enrolled ? '<p style="color: var(--warning-color); margin-top: 0.5rem;"><strong>⚠️ Certificate already enrolled</strong></p>' : ''}
+                        <div style="margin-top: 1rem; font-size: 0.875rem;">
+                            <p><strong>Subject:</strong> ${info.subject}</p>
+                            <p><strong>Issuer:</strong> ${info.issuer}</p>
+                            <p><strong>Serial:</strong> <code>${info.serial}</code></p>
+                            <p><strong>Valid Until:</strong> ${info.valid_until ? new Date(info.valid_until).toLocaleString() : 'N/A'}</p>
+                        </div>
                     </div>
-                </div>
-            `;
-        } else {
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = `
-                <div style="background: var(--danger-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--danger-color);">
-                    <strong>✗ Validation Failed</strong>
-                    <p style="margin-top: 0.5rem;">${result.error || 'Unknown error'}</p>
-                </div>
-            `;
-        }
-    } catch (error) {
-        showToast('✗ Validation error: ' + error.message, 'error');
-    }
+                `;
+            } else {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div style="background: var(--danger-bg); padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--danger-color);">
+                        <strong>✗ Validation Failed</strong>
+                        <p style="margin-top: 0.5rem;">${result.error || 'Unknown error'}</p>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            showToast('✗ Validation error', 'error');
+        });
 }
 window.validateImportedCert = validateImportedCert;
 
 // Import certificate
-document.getElementById('import-cert-form')?.addEventListener('submit', async (e) => {
+document.getElementById('import-cert-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     
     const data = {
@@ -2436,39 +2398,27 @@ document.getElementById('import-cert-form')?.addEventListener('submit', async (e
         name: document.getElementById('import_name').value
     };
     
-    try {
-        const response = await fetch('/api/ui/mtls/certificates/enroll', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
+    htmx.ajax('POST', '/api/ui/mtls/certificates/enroll', {
+        values: data,
+        swap: 'none'
+    })
+        .then(xhr => {
             showToast('✓ Certificate imported successfully', 'success');
             document.getElementById('import-cert-form').reset();
             document.getElementById('import-validation-result').style.display = 'none';
             ucm_switchTab('manage');
             loadCertificates();
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to import certificate'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+        })
+        .catch(err => {
+            showToast('✗ Failed to import certificate', 'error');
+        });
 });
 
 // Load certificates
-async function loadCertificates() {
-    try {
-        const response = await fetch('/api/ui/mtls/certificates', 
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
+function loadCertificates() {
+    htmx.ajax('GET', '/api/ui/mtls/certificates', {swap: 'none'})
+        .then(xhr => {
+            const data = JSON.parse(xhr.responseText);
             const tbody = document.getElementById('certificates-tbody');
             
             if (data.certificates.length === 0) {
@@ -2534,102 +2484,79 @@ async function loadCertificates() {
                     </tr>
                 `;
             }).join('');
-        }
-    } catch (error) {
-        console.error('Error loading certificates:', error);
-    }
+        })
+        .catch(error => {
+            console.error('Error loading certificates:', error);
+        });
 }
 
 // Certificate actions
-async function downloadCertificate(certId) {
-    try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}/download`, 
-        });
-        
-        if (response.ok) {
-            const blob = await response.blob();
+function downloadCertificate(certId) {
+    htmx.ajax('GET', `/api/ui/mtls/certificates/${certId}/download`, {swap: 'none'})
+        .then(xhr => {
+            const blob = new Blob([xhr.responseText], {type: 'application/x-pem-file'});
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `client-cert-${certId}.pem`;
             a.click();
             window.URL.revokeObjectURL(url);
-        } else {
+        })
+        .catch(error => {
             showToast('✗ Failed to download certificate', 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+        });
 }
 window.downloadCertificate = downloadCertificate;
 
-async function revokeCertificate(certId) {
-    const confirmed = await ucmConfirm(
+function revokeCertificate(certId) {
+    ucmConfirm(
         'Are you sure you want to revoke this certificate? You can re-enable it later.',
         'Revoke Certificate',
         { danger: true, confirmText: 'Revoke', icon: 'warning-triangle' }
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}/revoke`, {
-            method: 'POST'}
-        });
+    ).then(confirmed => {
+        if (!confirmed) return;
         
-        if (response.ok) {
-            showToast('✓ Certificate revoked', 'success');
-            loadCertificates();
-        } else {
-            showToast('✗ Failed to revoke', 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+        htmx.ajax('POST', `/api/ui/mtls/certificates/${certId}/revoke`, {swap: 'none'})
+            .then(xhr => {
+                showToast('✓ Certificate revoked', 'success');
+                loadCertificates();
+            })
+            .catch(error => {
+                showToast('✗ Failed to revoke', 'error');
+            });
+    });
 }
 window.revokeCertificate = revokeCertificate;
 
-async function enableCertificate(certId) {
-    try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}/enable`, {
-            method: 'POST'}
-        });
-        
-        if (response.ok) {
+function enableCertificate(certId) {
+    htmx.ajax('POST', `/api/ui/mtls/certificates/${certId}/enable`, {swap: 'none'})
+        .then(xhr => {
             showToast('✓ Certificate enabled', 'success');
             loadCertificates();
-        } else {
+        })
+        .catch(error => {
             showToast('✗ Failed to enable', 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+        });
 }
 window.enableCertificate = enableCertificate;
 
-async function deleteCertificate(certId) {
-    const confirmed = await ucmConfirm(
+function deleteCertificate(certId) {
+    ucmConfirm(
         'Are you sure you want to permanently delete this certificate? This action cannot be undone.',
         'Delete Certificate',
         { danger: true, confirmText: 'Delete', icon: 'trash' }
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch(`/api/ui/mtls/certificates/${certId}`, {
-            method: 'DELETE'}
-        });
+    ).then(confirmed => {
+        if (!confirmed) return;
         
-        if (response.ok) {
-            showToast('✓ Certificate deleted', 'success');
-            loadCertificates();
-        } else {
-            showToast('✗ Failed to delete', 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+        htmx.ajax('DELETE', `/api/ui/mtls/certificates/${certId}`, {swap: 'none'})
+            .then(xhr => {
+                showToast('✓ Certificate deleted', 'success');
+                loadCertificates();
+            })
+            .catch(error => {
+                showToast('✗ Failed to delete', 'error');
+            });
+    });
 }
 window.deleteCertificate = deleteCertificate;
 
@@ -2685,35 +2612,37 @@ function isWebAuthnCompatibleHostname(hostname) {
 }
 
 // Get the proper FQDN for this server
-async function getServerFQDN() {
-    try {
-        // Try to get server info from API
-        const response = await fetch('/api/ui/system/info', {
-            ` }
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            if (data.fqdn) {
-                return data.fqdn;
-            }
-        }
-    } catch (e) {
-        // Fallback: construct from current hostname
-    }
-    
-    // Fallback: if hostname is just "netsuit", append common TLD
-    const hostname = window.location.hostname;
-    if (!hostname.includes('.')) {
-        // Common patterns: hostname.local or hostname.lan.domain
-        return `${hostname}.lan.pew.pet`;
-    }
-    
-    return hostname;
+function getServerFQDN() {
+    return new Promise((resolve, reject) => {
+        htmx.ajax('GET', '/api/ui/system/info', {swap: 'none'})
+            .then(xhr => {
+                const data = JSON.parse(xhr.responseText);
+                if (data.fqdn) {
+                    resolve(data.fqdn);
+                } else {
+                    // Fallback
+                    const hostname = window.location.hostname;
+                    if (!hostname.includes('.')) {
+                        resolve(`${hostname}.lan.pew.pet`);
+                    } else {
+                        resolve(hostname);
+                    }
+                }
+            })
+            .catch(e => {
+                // Fallback: construct from current hostname
+                const hostname = window.location.hostname;
+                if (!hostname.includes('.')) {
+                    resolve(`${hostname}.lan.pew.pet`);
+                } else {
+                    resolve(hostname);
+                }
+            });
+    });
 }
 
 // Show hostname warning and suggest valid URLs or auto-redirect
-async function checkHostnameCompatibility() {
+function checkHostnameCompatibility() {
     const hostname = window.location.hostname;
     
     if (!isWebAuthnCompatibleHostname(hostname)) {
@@ -2721,37 +2650,38 @@ async function checkHostnameCompatibility() {
         document.getElementById('current-hostname').textContent = hostname;
         
         // Get the proper FQDN
-        const fqdn = await getServerFQDN();
-        const port = window.location.port;
-        const protocol = window.location.protocol;
-        const currentPath = window.location.pathname;
-        
-        // Build the redirect URL
-        const redirectUrl = `${protocol}//${fqdn}:${port}${currentPath}`;
-        
-        // Build valid URL suggestions
-        const validUrls = document.getElementById('valid-urls');
-        validUrls.innerHTML = `
-            <div style="margin-bottom: 1rem;">
-                <strong style="color: var(--text-primary);">Recommended URL:</strong>
-            </div>
-            <div style="margin-bottom: 1rem;">
-                <a href="${redirectUrl}" 
-                   style="color: var(--primary-color); text-decoration: none; font-weight: 600; font-size: 1rem;">
-                    ${protocol}//${fqdn}:${port}
-                </a>
-                <button onclick="window.location.href='${redirectUrl}'" 
-                        class="btn-primary" 
-                        style="margin-left: 1rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
-                    <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg> Switch to this URL
-                </button>
-            </div>
-            <div style="color: var(--text-secondary); margin-top: 0.75rem; font-size: 0.8125rem;">
-                <strong>Alternative options:</strong><br>
-                • Access via server IP address<br>
-                • Use localhost if on the server itself
-            </div>
-        `;
+        getServerFQDN().then(fqdn => {
+            const port = window.location.port;
+            const protocol = window.location.protocol;
+            const currentPath = window.location.pathname;
+            
+            // Build the redirect URL
+            const redirectUrl = `${protocol}//${fqdn}:${port}${currentPath}`;
+            
+            // Build valid URL suggestions
+            const validUrls = document.getElementById('valid-urls');
+            validUrls.innerHTML = `
+                <div style="margin-bottom: 1rem;">
+                    <strong style="color: var(--text-primary);">Recommended URL:</strong>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <a href="${redirectUrl}" 
+                       style="color: var(--primary-color); text-decoration: none; font-weight: 600; font-size: 1rem;">
+                        ${protocol}//${fqdn}:${port}
+                    </a>
+                    <button onclick="window.location.href='${redirectUrl}'" 
+                            class="btn-primary" 
+                            style="margin-left: 1rem; padding: 0.5rem 1rem; font-size: 0.875rem;">
+                        <svg class="ucm-icon" width="16" height="16"><use href="#icon-arrow-right"/></svg> Switch to this URL
+                    </button>
+                </div>
+                <div style="color: var(--text-secondary); margin-top: 0.75rem; font-size: 0.8125rem;">
+                    <strong>Alternative options:</strong><br>
+                    • Access via server IP address<br>
+                    • Use localhost if on the server itself
+                </div>
+            `;
+        });
         
         warning.style.display = 'block';
         
@@ -3116,13 +3046,10 @@ function showToast(message, type = 'info') {
 }
 
 // Load SMTP configuration
-async function loadSMTPConfig() {
-    try {
-        const response = await fetch('/api/ui/notifications/smtp/config', 
-        });
-        
-        if (response.ok) {
-            const config = await response.json();
+function loadSMTPConfig() {
+    htmx.ajax('GET', '/api/ui/notifications/smtp/config', {swap: 'none'})
+        .then(xhr => {
+            const config = JSON.parse(xhr.responseText);
             document.getElementById('smtp_host').value = config.smtp_host || '';
             document.getElementById('smtp_port').value = config.smtp_port || 587;
             document.getElementById('smtp_user').value = config.smtp_user || '';
@@ -3141,14 +3068,14 @@ async function loadSMTPConfig() {
                 badge.className = 'badge-outline badge-secondary';
                 badge.innerHTML = '<svg class="ucm-icon" width="10" height="10" style=" "><use href="#icon-circle"/></svg> Disabled';
             }
-        }
-    } catch (error) {
-        console.error('Error loading SMTP config:', error);
-    }
+        })
+        .catch(error => {
+            console.error('Error loading SMTP config:', error);
+        });
 }
 
 // Save SMTP configuration
-document.getElementById('smtp-form').addEventListener('submit', async (e) => {
+document.getElementById('smtp-form').addEventListener('submit', (e) => {
     e.preventDefault();
     
     const data = {
@@ -3168,31 +3095,22 @@ document.getElementById('smtp-form').addEventListener('submit', async (e) => {
         data.smtp_password = password;
     }
     
-    try {
-        const response = await fetch('/api/ui/notifications/smtp/config', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
+    htmx.ajax('POST', '/api/ui/notifications/smtp/config', {
+        values: data,
+        swap: 'none'
+    })
+        .then(xhr => {
             showToast('SMTP configuration saved successfully', 'success');
             document.getElementById('smtp_password').value = ''; // Clear password field
             loadSMTPConfig(); // Reload to update status
-        } else {
-            showToast(result.error || 'Failed to save configuration', 'error');
-        }
-    } catch (error) {
-        showToast('Error saving configuration: ' + error.message, 'error');
-    }
+        })
+        .catch(error => {
+            showToast('Failed to save configuration', 'error');
+        });
 });
 
 // Save user notification settings
-document.getElementById('user-notification-form')?.addEventListener('submit', async (e) => {
+document.getElementById('user-notification-form')?.addEventListener('submit', (e) => {
     e.preventDefault();
     
     const data = {
@@ -3200,46 +3118,34 @@ document.getElementById('user-notification-form')?.addEventListener('submit', as
         enabled: document.getElementById('user_notifications_enabled').checked
     };
     
-    try {
-        const response = await fetch('/api/ui/notifications/user/settings', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
+    htmx.ajax('POST', '/api/ui/notifications/user/settings', {
+        values: data,
+        swap: 'none'
+    })
+        .then(xhr => {
             showToast('✓ Notification settings saved', 'success');
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to save settings'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Error: ' + error.message, 'error');
-    }
+        })
+        .catch(error => {
+            showToast('✗ Failed to save settings', 'error');
+        });
 });
 
 // Load user notification settings
-async function loadUserNotificationSettings() {
-    try {
-        const response = await fetch('/api/ui/notifications/user/settings', 
-        });
-        
-        if (response.ok) {
-            const settings = await response.json();
+function loadUserNotificationSettings() {
+    htmx.ajax('GET', '/api/ui/notifications/user/settings', {swap: 'none'})
+        .then(xhr => {
+            const settings = JSON.parse(xhr.responseText);
             document.getElementById('user_notification_email').value = settings.email || '';
             document.getElementById('user_notifications_enabled').checked = settings.enabled !== false;
-        }
-    } catch (error) {
-        console.error('Error loading user notification settings:', error);
-    }
+        })
+        .catch(error => {
+            console.error('Error loading user notification settings:', error);
+        });
 }
 
 
 // Test SMTP
-window.testSMTP = async function() {
+window.testSMTP = function() {
     // First check if SMTP is configured
     const smtpEnabled = document.getElementById('smtp_enabled').checked;
     const smtpHost = document.getElementById('smtp_host').value;
@@ -3266,35 +3172,23 @@ window.testSMTP = async function() {
     
     showToast('Sending test email...', 'info');
     
-    try {
-        const response = await fetch('/api/ui/notifications/smtp/test', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({email})
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
+    htmx.ajax('POST', '/api/ui/notifications/smtp/test', {
+        values: {email: email},
+        swap: 'none'
+    })
+        .then(xhr => {
             showToast('✓ Test email sent successfully to ' + email, 'success');
-        } else {
-            showToast('✗ ' + (result.error || 'Failed to send test email'), 'error');
-        }
-    } catch (error) {
-        showToast('✗ Network error: ' + error.message, 'error');
-    }
+        })
+        .catch(error => {
+            showToast('✗ Failed to send test email', 'error');
+        });
 }
 
 // Load notification rules
-async function loadNotificationRules() {
-    try {
-        const response = await fetch('/api/ui/notifications/config', 
-        });
-        
-        if (response.ok) {
-            const configs = await response.json();
+function loadNotificationRules() {
+    htmx.ajax('GET', '/api/ui/notifications/config', {swap: 'none'})
+        .then(xhr => {
+            const configs = JSON.parse(xhr.responseText);
             const container = document.getElementById('notification-rules');
             
             container.innerHTML = configs.map((config, index) => `
@@ -3338,54 +3232,42 @@ async function loadNotificationRules() {
                     </div>
                 </div>
             `).join('');
-        }
-    } catch (error) {
-        console.error('Error loading notification rules:', error);
-    }
+        })
+        .catch(error => {
+            console.error('Error loading notification rules:', error);
+        });
 }
 
 // Toggle rule enabled/disabled
-async function toggleRule(type, enabled) {
-    await updateRule(type);
+function toggleRule(type, enabled) {
+    updateRule(type);
 }
 
 // Update notification rule
-async function updateRule(type) {
+function updateRule(type) {
     const index = type === 'cert_expiring' ? 0 : 1;
     const enabled = document.getElementById(`rule-enabled-${index}`).checked;
     const days = parseInt(document.getElementById(`rule-days-${index}`).value);
     const recipientsStr = document.getElementById(`rule-recipients-${index}`).value;
     const recipients = recipientsStr.split(',').map(e => e.trim()).filter(e => e);
     
-    try {
-        const response = await fetch(`/api/ui/notifications/config/${type}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({enabled, days_before: days, recipients})
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
+    htmx.ajax('POST', `/api/ui/notifications/config/${type}`, {
+        values: {enabled, days_before: days, recipients},
+        swap: 'none'
+    })
+        .then(xhr => {
             showToast('Notification rule updated', 'success');
-        } else {
-            showToast(result.error || 'Failed to update rule', 'error');
-        }
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-    }
+        })
+        .catch(error => {
+            showToast('Failed to update rule', 'error');
+        });
 }
 
 // Load notification history
-async function loadNotificationHistory() {
-    try {
-        const response = await fetch('/api/ui/notifications/history?limit=20', 
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
+function loadNotificationHistory() {
+    htmx.ajax('GET', '/api/ui/notifications/history?limit=20', {swap: 'none'})
+        .then(xhr => {
+            const data = JSON.parse(xhr.responseText);
             const tbody = document.getElementById('notification-history-tbody');
             
             if (data.logs.length === 0) {
@@ -3420,20 +3302,17 @@ async function loadNotificationHistory() {
                     </td>
                 </tr>
             `}).join('');
-        }
-    } catch (error) {
-        console.error('Error loading notification history:', error);
-    }
+        })
+        .catch(error => {
+            console.error('Error loading notification history:', error);
+        });
 }
 
 // Load notification stats
-async function loadNotificationStats() {
-    try {
-        const response = await fetch('/api/ui/notifications/stats', 
-        });
-        
-        if (response.ok) {
-            const stats = await response.json();
+function loadNotificationStats() {
+    htmx.ajax('GET', '/api/ui/notifications/stats', {swap: 'none'})
+        .then(xhr => {
+            const stats = JSON.parse(xhr.responseText);
             const container = document.getElementById('notification-stats');
             
             container.innerHTML = `
@@ -3446,39 +3325,31 @@ async function loadNotificationStats() {
                     </span>
                 ` : ''}
             `;
-        }
-    } catch (error) {
-        console.error('Error loading stats:', error);
-    }
+        })
+        .catch(error => {
+            console.error('Error loading stats:', error);
+        });
 }
 
 // Manual notification check
-async function testNotifications() {
-    const confirmed = await ucmConfirm(
+function testNotifications() {
+    ucmConfirm(
         'This will check for expiring certificates and CRLs and send notifications if configured. Continue?',
         'Test Notifications',
         { confirmText: 'Continue', icon: 'check' }
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch('/api/ui/notifications/check', {
-            method: 'POST'}
-        });
+    ).then(confirmed => {
+        if (!confirmed) return;
         
-        const result = await response.json();
-        
-        if (response.ok) {
-            showToast('Notification check completed', 'success');
-            loadNotificationHistory();
-            loadNotificationStats();
-        } else {
-            showToast(result.error || 'Check failed', 'error');
-        }
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-    }
+        htmx.ajax('POST', '/api/ui/notifications/check', {swap: 'none'})
+            .then(xhr => {
+                showToast('Notification check completed', 'success');
+                loadNotificationHistory();
+                loadNotificationStats();
+            })
+            .catch(error => {
+                showToast('Check failed', 'error');
+            });
+    });
 }
 
 // Initialize
@@ -3537,7 +3408,7 @@ function initAcmePage() {
 }
 
 function loadStatistics() {
-    fetch('/api/ui/acme/statistics')
+    htmx.ajax('GET', '/api/ui/acme/statistics', {swap: 'none'})
         .then(response => response.json())
         .then(data => {
             const totalAccounts = document.getElementById('total-accounts');
@@ -3558,7 +3429,7 @@ function loadAcmeCA() {
     const caDisplay = document.getElementById('acme-ca-display');
     if (!badge) return;
     
-    fetch('/api/ui/acme/settings/load')
+    htmx.ajax('GET', '/api/ui/acme/settings/load', {swap: 'none'})
         .then(response => response.json())
         .then(data => {
             if (data.default_ca) {
@@ -3586,7 +3457,7 @@ function loadAcmeCA() {
 }
 
 function loadSettings() {
-    fetch('/api/ui/acme/settings/load')
+    htmx.ajax('GET', '/api/ui/acme/settings/load', {swap: 'none'})
         .then(response => response.json())
         .then(data => {
             if (data.default_ca) {
@@ -3601,7 +3472,7 @@ function loadSettings() {
 }
 
 function loadProxyStatus() {
-    fetch('/api/ui/acme/proxy/status')
+    htmx.ajax('GET', '/api/ui/acme/proxy/status', {swap: 'none'})
         .then(response => response.json())
         .then(data => {
             // Check if elements exist (user might not be on proxy tab)
@@ -3643,7 +3514,7 @@ function registerProxyAccount() {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
     
-    fetch('/api/ui/acme/proxy/register', { method: 'POST' })
+    htmx.ajax('POST', '/api/ui/acme/proxy/register', {swap: 'none'})
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
@@ -3670,8 +3541,8 @@ function viewTemplateDetail(id) {
     openModal('viewTemplateModal'); // View-only, overlay closes automatically
     document.getElementById('viewTemplateContent').innerHTML = '<svg class="ucm-icon icon-spin" width="24" height="24"><use href="#icon-spinner"/></svg>';
     
-    fetch('/api/ui/templates/' + id)
-        .then(r => r.json())
+    htmx.ajax('GET', '/api/ui/templates/' + id, {swap: 'none'})
+        .then(xhr => JSON.parse(xhr.responseText))
         .then(t => {
             // Format DN template nicely
             const dnEntries = Object.entries(t.dn_template)
@@ -3817,7 +3688,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function loadHTTPSCertInfo() {
     // First load certificate candidates, then load current cert info
     loadCertificateCandidates().then(() => {
-        fetch('/api/ui/system/https-cert-info')
+        htmx.ajax('GET', '/api/ui/system/https-cert-info', {swap: 'none'})
             .then(response => response.json())
             .then(data => {
                 // Check if elements exist before modifying
@@ -3859,7 +3730,7 @@ function loadCertificateCandidates() {
     const select = document.getElementById('managed-cert-id');
     if (!select) return Promise.resolve(); // Element not found yet
     
-    return fetch('/api/ui/system/https-cert-candidates')
+    return htmx.ajax('GET', '/api/ui/system/https-cert-candidates', {swap: 'none'})
         .then(response => response.json())
         .then(data => {
             select.innerHTML = '';
@@ -3923,7 +3794,7 @@ function setupCertSelectorListener() {
 }
 
 function loadPKIStats() {
-    fetch('/api/ui/system/pki-stats')
+    htmx.ajax('GET', '/api/ui/system/pki-stats', {swap: 'none'})
         .then(response => response.json())
         .then(data => {
             if (data.cas !== undefined) document.getElementById('pki-stat-cas').textContent = data.cas;
@@ -3959,12 +3830,11 @@ function applyHTTPSCertificate() {
             requestBody.cert_id = parseInt(document.getElementById('managed-cert-id').value);
         }
         
-        fetch('/api/ui/system/https-cert-apply', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
+        htmx.ajax('POST', '/api/ui/system/https-cert-apply', {
+            values: requestBody,
+            swap: 'none'
         })
-        .then(response => response.json())
+        .then(xhr => JSON.parse(xhr.responseText))
         .then(data => {
             if (data.success) {
                 showRestartCountdown(5, window.location.href);
@@ -3987,10 +3857,8 @@ function regenerateSelfSigned() {
     ).then(confirmed => {
         if (!confirmed) return;
         
-        fetch('/api/ui/system/https-cert-regenerate', {
-            method: 'POST'
-        })
-        .then(response => response.json())
+        htmx.ajax('POST', '/api/ui/system/https-cert-regenerate', {swap: 'none'})
+        .then(xhr => JSON.parse(xhr.responseText))
         .then(data => {
             if (data.success) {
                 showRestartCountdown(5, window.location.href);
@@ -4061,12 +3929,11 @@ function executePKIReset() {
     
     document.getElementById('ucm-modal-container').innerHTML = '';
     
-    fetch('/api/ui/system/pki-reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmation: 'RESET PKI DATA' })
+    htmx.ajax('POST', '/api/ui/system/pki-reset', {
+        values: { confirmation: 'RESET PKI DATA' },
+        swap: 'none'
     })
-    .then(response => response.json())
+    .then(xhr => JSON.parse(xhr.responseText))
     .then(data => {
         if (data.success) {
             ucmAlert('✅ PKI Database has been reset successfully!\n\nBackup created: ' + data.backup_file, 'Success');
@@ -4085,10 +3952,8 @@ function executePKIReset() {
 // mTLS Status Badge
 // ========================================
 function updateMTLSBadge() {
-    fetch('/api/ui/mtls/settings', {
-        ` }
-    })
-    .then(response => response.json())
+    htmx.ajax('GET', '/api/ui/mtls/settings', {swap: 'none'})
+    .then(xhr => JSON.parse(xhr.responseText))
     .then(data => {
         const badge = document.getElementById('mtls-status-badge');
         if (badge) {
@@ -4196,7 +4061,7 @@ function closeBackupModal() {
     document.getElementById('ucm-modal-container').innerHTML = '';
 }
 
-async function createBackup() {
+function createBackup() {
     const password = document.getElementById('backup-password').value;
     const passwordConfirm = document.getElementById('backup-password-confirm').value;
     
@@ -4227,36 +4092,46 @@ async function createBackup() {
     };
     
     try {
-        const response = await fetch('/api/ui/backup/create', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                password: password,
-                type: 'full',
-                include: include
-            })
-        });
+        // Use XMLHttpRequest for blob response
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/ui/backup/create', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.responseType = 'blob';
         
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Backup creation failed');
-        }
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                // Download the file
+                const blob = xhr.response;
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ucm-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.ucm-backup`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                closeBackupModal();
+                showToast('Backup created and downloaded successfully', 'success');
+            } else {
+                throw new Error('Backup creation failed');
+            }
+            hideButtonSpinner(createBtn);
+            document.getElementById('backup-progress').style.display = 'none';
+        };
         
-        // Download the file
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ucm-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.ucm-backup`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+        xhr.onerror = function() {
+            console.error('Backup error:', xhr.statusText);
+            showToast('Backup creation failed', 'error');
+            hideButtonSpinner(createBtn);
+            document.getElementById('backup-progress').style.display = 'none';
+        };
         
-        closeBackupModal();
-        showToast('Backup created and downloaded successfully', 'success');
+        xhr.send(JSON.stringify({
+            password: password,
+            type: 'full',
+            include: include
+        }));
         
     } catch (error) {
         console.error('Backup error:', error);
@@ -4382,7 +4257,7 @@ function closeRestoreModal() {
     document.getElementById('ucm-modal-container').innerHTML = '';
 }
 
-async function validateBackup() {
+function validateBackup() {
     const fileInput = document.getElementById('restore-file');
     const password = document.getElementById('restore-password').value;
     
@@ -4404,55 +4279,54 @@ async function validateBackup() {
     formData.append('password', password);
     
     try {
-        const response = await fetch('/api/ui/backup/validate', {
-            method: 'POST',
-            body: formData
-        });
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/ui/backup/validate', true);
         
-        const data = await response.json();
-        
-        if (!data.valid) {
-            hideButtonSpinner(validateBtn);
-            showToast('Invalid backup: ' + (data.error || 'Unknown error'), 'error');
-            return;
-        }
-        
-        // Create dashboard-style stat widgets
-        const statsDiv = document.getElementById('backup-stats');
-        
-        const stats = [
-            { 
-                icon: 'shield-check', 
-                colorVar: 'info-color', 
-                value: data.contents.cas, 
-                label: 'Certificate Authorities'
-            },
-            { 
-                icon: 'certificate', 
-                colorVar: 'success-color', 
-                value: data.contents.certificates, 
-                label: 'Certificates'
-            },
-            { 
-                icon: 'users', 
-                colorVar: 'primary-color', 
-                value: data.contents.users, 
-                label: 'Users'
-            },
-            { 
-                icon: 'key', 
-                colorVar: 'warning-color', 
-                value: data.contents.acme_accounts, 
-                label: 'ACME Accounts'
+        xhr.onload = function() {
+            const data = JSON.parse(xhr.responseText);
+            
+            if (!data.valid) {
+                hideButtonSpinner(validateBtn);
+                showToast('Invalid backup: ' + (data.error || 'Unknown error'), 'error');
+                return;
             }
-        ];
-        
-        statsDiv.innerHTML = stats.map(stat => `
-            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.375rem; padding: 0.5rem; display: flex; gap: 0.5rem; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                <div style="width: 32px; height: 32px; border-radius: 5px; background: var(--surface-elevated); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <svg class="ucm-icon" width="16" height="16" style="color: var(--${stat.colorVar});"><use href="#icon-${stat.icon}"/></svg>
-                </div>
-                <div style="flex: 1; min-width: 0;">
+            
+            // Create dashboard-style stat widgets
+            const statsDiv = document.getElementById('backup-stats');
+            
+            const stats = [
+                { 
+                    icon: 'shield-check', 
+                    colorVar: 'info-color', 
+                    value: data.contents.cas, 
+                    label: 'Certificate Authorities'
+                },
+                { 
+                    icon: 'certificate', 
+                    colorVar: 'success-color', 
+                    value: data.contents.certificates, 
+                    label: 'Certificates'
+                },
+                { 
+                    icon: 'users', 
+                    colorVar: 'primary-color', 
+                    value: data.contents.users, 
+                    label: 'Users'
+                },
+                { 
+                    icon: 'key', 
+                    colorVar: 'warning-color', 
+                    value: data.contents.acme_accounts, 
+                    label: 'ACME Accounts'
+                }
+            ];
+            
+            statsDiv.innerHTML = stats.map(stat => `
+                <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.375rem; padding: 0.5rem; display: flex; gap: 0.5rem; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                    <div style="width: 32px; height: 32px; border-radius: 5px; background: var(--surface-elevated); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <svg class="ucm-icon" width="16" height="16" style="color: var(--${stat.colorVar});"><use href="#icon-${stat.icon}"/></svg>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
                     <div style="font-size: 18px; font-weight: 600; color: var(--text-primary); line-height: 1;">
                         ${stat.value}
                     </div>
@@ -4508,6 +4382,15 @@ async function validateBackup() {
         
         // Show success toast (non-intrusive)
         showToast('Backup validated successfully', 'success');
+        };
+        
+        xhr.onerror = function() {
+            console.error('Validation error');
+            showToast('Validation failed', 'error');
+            hideButtonSpinner(validateBtn);
+        };
+        
+        xhr.send(formData);
         
     } catch (error) {
         console.error('Validation error:', error);
@@ -4557,24 +4440,33 @@ async function restoreBackup() {
     formData.append('options', JSON.stringify(options));
     
     try {
-        const response = await fetch('/api/ui/backup/restore', {
-            method: 'POST',
-            body: formData
-        });
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/ui/backup/restore', true);
         
-        console.log('Restore response status:', response.status);
-        const data = await response.json();
-        console.log('Restore response data:', data);
+        xhr.onload = function() {
+            console.log('Restore response status:', xhr.status);
+            const data = JSON.parse(xhr.responseText);
+            console.log('Restore response data:', data);
+            
+            if (xhr.status !== 200 || !data.success) {
+                throw new Error(data.error || 'Restore failed');
+            }
+            
+            console.log('Closing modal and showing countdown...');
+            closeRestoreModal();
+            
+            // Show restart countdown with spinner
+            showRestartCountdown(5, '/login');
+        };
         
-        if (!response.ok || !data.success) {
-            throw new Error(data.error || 'Restore failed');
-        }
+        xhr.onerror = function() {
+            console.error('Restore error');
+            showToast('Restore failed', 'error');
+            hideButtonSpinner(restoreBtn);
+            document.getElementById('restore-progress').style.display = 'none';
+        };
         
-        console.log('Closing modal and showing countdown...');
-        closeRestoreModal();
-        
-        // Show restart countdown with spinner
-        showRestartCountdown(5, '/login');
+        xhr.send(formData);
         
     } catch (error) {
         console.error('Restore error:', error);
@@ -4589,81 +4481,77 @@ async function restoreBackup() {
 // ============================================================================
 
 // Load database stats on page load
-async function loadDatabaseStats() {
-    try {
-        const response = await fetch('/api/ui/system/database/stats', {
+function loadDatabaseStats() {
+    htmx.ajax('GET', '/api/ui/system/database/stats', {swap: 'none'})
+        .then(xhr => {
+            const data = JSON.parse(xhr.responseText);
             
+            if (data.success && data.stats) {
+                const stats = data.stats;
+                
+                // Update stats
+                document.getElementById('db-stat-size').textContent = stats.size_formatted || '0 MB';
+                document.getElementById('db-stat-frag').textContent = stats.fragmentation_pct + '%';
+                
+                // Update last maintenance
+                if (stats.last_vacuum) {
+                    const vacuumDate = new Date(stats.last_vacuum);
+                    document.getElementById('db-last-vacuum').textContent = vacuumDate.toLocaleDateString();
+                }
+                if (stats.last_integrity_check) {
+                    const checkDate = new Date(stats.last_integrity_check);
+                    document.getElementById('db-last-check').textContent = checkDate.toLocaleDateString();
+                }
+                
+                // Update table counts
+                if (stats.tables) {
+                    if (stats.tables.certificate_authority !== undefined) 
+                        document.getElementById('pki-stat-cas').textContent = stats.tables.certificate_authority || 0;
+                    if (stats.tables.certificate !== undefined) 
+                        document.getElementById('pki-stat-certs').textContent = stats.tables.certificate || 0;
+                    if (stats.tables.crl !== undefined) 
+                        document.getElementById('pki-stat-crls').textContent = stats.tables.crl || 0;
+                    if (stats.tables.ocsp_response !== undefined) 
+                        document.getElementById('pki-stat-ocsp').textContent = stats.tables.ocsp_response || 0;
+                }
+            }
+            
+            // Load health status
+            loadDatabaseHealth();
+        })
+        .catch(error => {
+            console.error('Error loading database stats:', error);
         });
-        const data = await response.json();
-        
-        if (data.success && data.stats) {
-            const stats = data.stats;
-            
-            // Update stats
-            document.getElementById('db-stat-size').textContent = stats.size_formatted || '0 MB';
-            document.getElementById('db-stat-frag').textContent = stats.fragmentation_pct + '%';
-            
-            // Update last maintenance
-            if (stats.last_vacuum) {
-                const vacuumDate = new Date(stats.last_vacuum);
-                document.getElementById('db-last-vacuum').textContent = vacuumDate.toLocaleDateString();
-            }
-            if (stats.last_integrity_check) {
-                const checkDate = new Date(stats.last_integrity_check);
-                document.getElementById('db-last-check').textContent = checkDate.toLocaleDateString();
-            }
-            
-            // Update table counts
-            if (stats.tables) {
-                if (stats.tables.certificate_authority !== undefined) 
-                    document.getElementById('pki-stat-cas').textContent = stats.tables.certificate_authority || 0;
-                if (stats.tables.certificate !== undefined) 
-                    document.getElementById('pki-stat-certs').textContent = stats.tables.certificate || 0;
-                if (stats.tables.crl !== undefined) 
-                    document.getElementById('pki-stat-crls').textContent = stats.tables.crl || 0;
-                if (stats.tables.ocsp_response !== undefined) 
-                    document.getElementById('pki-stat-ocsp').textContent = stats.tables.ocsp_response || 0;
-            }
-        }
-        
-        // Load health status
-        loadDatabaseHealth();
-        
-    } catch (error) {
-        console.error('Error loading database stats:', error);
-    }
 }
 
-async function loadDatabaseHealth() {
-    try {
-        const response = await fetch('/api/ui/system/database/health', {
+function loadDatabaseHealth() {
+    htmx.ajax('GET', '/api/ui/system/database/health', {swap: 'none'})
+        .then(xhr => {
+            const data = JSON.parse(xhr.responseText);
             
-        });
-        const data = await response.json();
-        
-        if (data.success && data.health) {
-            const health = data.health;
-            const badge = document.getElementById('db-health-badge');
-            
-            // Update health badge
-            if (health.status === 'healthy') {
-                badge.className = 'badge-outline badge-success';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Healthy';
-            } else if (health.status === 'warning') {
-                badge.className = 'badge-outline badge-warning';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-warning-triangle"/></svg> Warnings';
-            } else {
-                badge.className = 'badge-outline badge-danger';
-                badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-exclamation-circle"/></svg> Issues';
+            if (data.success && data.health) {
+                const health = data.health;
+                const badge = document.getElementById('db-health-badge');
+                
+                // Update health badge
+                if (health.status === 'healthy') {
+                    badge.className = 'badge-outline badge-success';
+                    badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-check-circle"/></svg> Healthy';
+                } else if (health.status === 'warning') {
+                    badge.className = 'badge-outline badge-warning';
+                    badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-warning-triangle"/></svg> Warnings';
+                } else {
+                    badge.className = 'badge-outline badge-danger';
+                    badge.innerHTML = '<svg class="ucm-icon" width="10" height="10"><use href="#icon-exclamation-circle"/></svg> Issues';
+                }
             }
-        }
-        
-    } catch (error) {
-        console.error('Error loading database health:', error);
-    }
+        })
+        .catch(error => {
+            console.error('Error loading database health:', error);
+        });
 }
 
-async function optimizeDatabase() {
+function optimizeDatabase() {
     const confirmed = confirm('Optimize database?\n\nThis will run VACUUM and ANALYZE to:\n• Reclaim unused disk space\n• Defragment the database\n• Update query statistics\n\nThis may take a few moments.');
     
     if (!confirmed) return;
@@ -4671,39 +4559,37 @@ async function optimizeDatabase() {
     showToast('Optimizing database...', 'info');
     
     try {
-        const response = await fetch('/api/ui/system/database/optimize', {
-            method: 'POST'
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            const saved = data.vacuum.space_saved_formatted || '0 B';
-            showToast(`Database optimized successfully! Space saved: ${saved}`, 'success');
-            loadDatabaseStats(); // Refresh stats
-        } else {
-            throw new Error(data.error || 'Optimization failed');
-        }
+        htmx.ajax('POST', '/api/ui/system/database/optimize', {swap: 'none'})
+            .then(xhr => JSON.parse(xhr.responseText))
+            .then(data => {
+                if (data.success) {
+                    const saved = data.vacuum.space_saved_formatted || '0 B';
+                    showToast(`Database optimized successfully! Space saved: ${saved}`, 'success');
+                    loadDatabaseStats(); // Refresh stats
+                } else {
+                    throw new Error(data.error || 'Optimization failed');
+                }
+            })
+            .catch(error => {
+                showToast('Error: ' + error.message, 'error');
+            });
         
     } catch (error) {
         showToast('Error: ' + error.message, 'error');
     }
 }
 
-async function checkIntegrity() {
+function checkIntegrity() {
     showToast('Running integrity check...', 'info');
     
     try {
-        const response = await fetch('/api/ui/system/database/integrity-check', {
-            method: 'POST'
-        });
-        
-        const data = await response.json();
-        
-        if (data.healthy) {
-            showToast('Database integrity check passed - no errors found', 'success');
-        } else if (data.errors && data.errors.length > 0) {
-            showToast('Database integrity issues found: ' + data.errors.join(', '), 'error');
+        htmx.ajax('POST', '/api/ui/system/database/integrity-check', {swap: 'none'})
+            .then(xhr => JSON.parse(xhr.responseText))
+            .then(data => {
+                if (data.healthy) {
+                    showToast('Database integrity check passed - no errors found', 'success');
+                } else if (data.errors && data.errors.length > 0) {
+                    showToast('Database integrity issues found: ' + data.errors.join(', '), 'error');
         } else {
             showToast('Integrity check completed', 'success');
         }
@@ -4715,49 +4601,41 @@ async function checkIntegrity() {
     }
 }
 
-async function cleanExpiredCerts() {
+function cleanExpiredCerts() {
     const confirmed = confirm('Clean expired certificates?\n\nThis will permanently delete certificates that expired more than 30 days ago.\n\nRevoked certificates will be preserved for CRL generation.');
     
     if (!confirmed) return;
     
     showToast('Cleaning expired certificates...', 'info');
     
-    try {
-        const response = await fetch('/api/ui/system/database/clean-expired', {
-            method: 'POST',
-            body: JSON.stringify({ days_after_expiry: 30 })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
+    htmx.ajax('POST', '/api/ui/system/database/clean-expired', {
+        values: { days_after_expiry: 30 },
+        swap: 'none'
+    })
+        .then(xhr => {
+            const data = JSON.parse(xhr.responseText);
             showToast(`Deleted ${data.deleted_count} expired certificates`, 'success');
             loadDatabaseStats(); // Refresh stats
-        } else {
-            throw new Error(data.error || 'Cleanup failed');
-        }
-        
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
-    }
+        })
+        .catch(error => {
+            showToast('Cleanup failed', 'error');
+        });
 }
 
-async function exportDatabase() {
+function exportDatabase() {
     const confirmed = confirm('Export database?\n\nThis will download a compressed SQL dump of the entire database.');
     
     if (!confirmed) return;
     
     showToast('Exporting database...', 'info');
     
-    try {
-        const response = await fetch('/api/ui/system/database/export', {
-            method: 'POST',
-            body: JSON.stringify({ compress: true })
-        });
-        
-        if (response.ok) {
+    htmx.ajax('POST', '/api/ui/system/database/export', {
+        values: { compress: true },
+        swap: 'none'
+    })
+        .then(xhr => {
             // Download file
-            const blob = await response.blob();
+            const blob = new Blob([xhr.responseText], {type: 'application/gzip'});
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -4768,13 +4646,10 @@ async function exportDatabase() {
             document.body.removeChild(a);
             
             showToast('Database exported successfully', 'success');
-        } else {
-            const data = await response.json();
-            throw new Error(data.error || 'Export failed');
-        }
-        
-    } catch (error) {
-        showToast('Error: ' + error.message, 'error');
+        })
+        .catch(error => {
+            showToast('Export failed', 'error');
+        });
     }
 }
 
