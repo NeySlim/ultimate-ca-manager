@@ -6648,3 +6648,15 @@ def config_certs_list():
         return jsonify(certs_list), 200
     except Exception as e:
         return jsonify([]), 200
+
+
+# ============================================================================
+# DOCUMENTATION ROUTES
+# ============================================================================
+
+@ui_bp.route('/docs/smime-installation')
+@login_required
+def docs_smime_installation():
+    """S/MIME installation guide"""
+    return render_template('docs/smime-installation.html')
+

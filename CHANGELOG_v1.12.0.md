@@ -130,20 +130,72 @@
 
 ---
 
-## 🎯 Planned Features
+---
 
-### 1. S/MIME Certificate Generation ⭐ Priority 1
-**Status:** Not started  
-**Estimated:** 8-10 hours
+### S/MIME Certificate Support (COMPLETE) ✅
 
-Full support for email encryption/signing certificates:
-- Extended Key Usage: emailProtection
+**Phase 1: Certificate Templates Integration**
+- Backend: `template_id` parameter in `CertificateService.create_certificate()`
+- Template defaults automatically applied (key_type, validity_days, digest_algorithm)
+- Database: `certificates.template_id` stores audit trail
+- API: POST `/api/v1/certificates` accepts `template_id` in request
+
+**Phase 2: UI Template Integration**
+- Create Certificate Modal: Template dropdown selector (`/api/ui/templates/options`)
+- Auto-fill form fields from selected template
+- `applyCertTemplate(templateId)` JavaScript function
+- Template type mapping: email → client_cert, web_server → server_cert, etc.
+- Globalized modal functions: `window.openCreateCertModal`, `window.closeCertModal`
+
+**Phase 3: Email Validation**
+- Frontend: RFC 5322 email regex validation in SAN email field
+- Real-time validation on input/blur with visual feedback (green/red borders)
+- Display count of valid/invalid emails with error list
+- Backend: `CertificateService.validate_email()` prevents invalid emails
+- Raises `ValueError` before certificate creation if invalid emails detected
+
+**Phase 4: PKCS#12 Export Wizard**
+- Enhanced password modal with 4-bar strength meter (Weak/Fair/Good/Strong)
+- Password match confirmation indicator
+- Password strength calculation: length (8+, 12+), upper+lower, numbers, special chars
+- Color-coded strength bars: danger → warning → warning → success
+- S/MIME installation quick reference (Outlook, Thunderbird, Apple Mail)
+- Link to full documentation page
+
+**Phase 5: S/MIME Documentation**
+- New route: GET `/docs/smime-installation` (@login_required)
+- Comprehensive installation guide (900px centered layout)
+- Sections:
+  - What is S/MIME? (signing, encryption, integrity)
+  - Microsoft Outlook (Windows/Mac) step-by-step
+  - Mozilla Thunderbird installation guide
+  - Apple Mail (macOS/iOS) instructions
+  - Troubleshooting common issues
+  - Best practices (backup, passwords, expiration)
+- Accessible from PKCS#12 modal via "📖 View detailed installation guide →" link
+- Uses UCM design system (cards, icon system, color variables)
+
+**Email Certificate Template (Pre-configured):**
 - Key Usage: digitalSignature, keyEncipherment, dataEncipherment
-- RFC 822 email addresses in SAN (mandatory)
-- PKCS#12 export with password protection
-- Compatible with Outlook, Thunderbird, Apple Mail
-- Email address validation
-- Installation guides for popular clients
+- Extended Key Usage: emailProtection
+- RSA-2048 default (upgradable to 4096)
+- 365-day validity
+- SHA-256 digest
+- Subject DN template: CN={email}, emailAddress={email}, OU=Users, O={organization}
+- SAN: email:{email} (RFC 822)
+
+**Files Modified:**
+- `/backend/services/cert_service.py` - Template integration + email validation
+- `/backend/api/cert.py` - Added template_id to API docstring
+- `/backend/api/ui_routes.py` - Template extraction, docs route
+- `/frontend/templates/certs/list.html` - Template selector, email validation
+- `/frontend/templates/base.html` - Enhanced PKCS#12 modal
+- `/frontend/templates/docs/smime-installation.html` - **NEW** documentation page
+- `/frontend/static/js/ucm-global.js` - Globalized modal functions
+
+---
+
+## 🎯 Planned Features
 
 ---
 
