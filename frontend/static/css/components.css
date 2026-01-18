@@ -2830,3 +2830,13 @@ main {
 .theme-card[data-theme="nebula-dark"]:hover {
     border-color: #8b5cf6;
 }
+
+/* Windows 11 spinner animation - global */
+.icon-spin {
+    animation: icon-spin-rotate 1s linear infinite;
+}
+
+@keyframes icon-spin-rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

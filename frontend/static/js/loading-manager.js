@@ -18,24 +18,31 @@
             modalContainer.innerHTML = '';
         }
         
-        // Show global loader with countdown
+        // Show global loader with enhanced styling and countdown
         const loader = document.getElementById('global-loader');
         if (!loader) return;
         
+        // Enhanced overlay styling with dark background
         loader.style.display = 'flex';
+        loader.style.background = 'rgba(0, 0, 0, 0.85)';
+        loader.style.backdropFilter = 'blur(4px)';
+        loader.style.pointerEvents = 'auto';
+        loader.style.opacity = '1';
         
-        const messageEl = loader.querySelector('div > div:last-child');
-        if (!messageEl) return;
+        // Get the card container and replace its content entirely
+        const card = loader.querySelector('div');
+        if (!card) return;
         
         let remaining = seconds;
         
         const updateMessage = () => {
-            messageEl.innerHTML = `
-                <div style="font-weight: 600; font-size: 1.125rem; margin-bottom: 0.5rem;">
+            card.innerHTML = `
+                <svg class="ucm-icon icon-spin" width="48" height="48" style="margin-bottom: 1rem; color: var(--primary-color);"><use href="#icon-spinner"/></svg>
+                <div style="font-weight: 600; font-size: 1.5rem; margin-bottom: 1rem; color: var(--text-primary);">
                     UCM is restarting...
                 </div>
-                <div style="font-size: 0.875rem; color: var(--text-secondary);">
-                    Redirecting to login in <strong style="color: var(--primary-color);">${remaining}</strong> second${remaining !== 1 ? 's' : ''}
+                <div style="font-size: 1rem; color: var(--text-secondary);">
+                    Redirecting to login in <strong style="color: var(--primary-color); font-size: 1.25rem;">${remaining}</strong> second${remaining !== 1 ? 's' : ''}
                 </div>
             `;
         };
@@ -46,8 +53,9 @@
             remaining--;
             if (remaining <= 0) {
                 clearInterval(interval);
-                messageEl.innerHTML = `
-                    <div style="font-weight: 600; font-size: 1.125rem;">
+                card.innerHTML = `
+                    <svg class="ucm-icon icon-spin" width="48" height="48" style="color: var(--primary-color);"><use href="#icon-spinner"/></svg>
+                    <div style="font-weight: 600; font-size: 1.5rem; color: var(--text-primary); margin-top: 1rem;">
                         Redirecting now...
                     </div>
                 `;
