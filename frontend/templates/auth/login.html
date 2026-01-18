@@ -269,9 +269,9 @@
         
         /* Session expired alert */
         .alert-warning {
-            background: var(--warning-bg);
-            border: 1px solid var(--warning-color);
-            border-left: 4px solid var(--warning-color);
+            background: var(--bg-warning, #fef3c7);
+            border: 1px solid var(--warning-color, #f59e0b);
+            border-left: 4px solid var(--warning-color, #f59e0b);
             border-radius: 8px;
             padding: 1rem;
             margin-bottom: 1.5rem;
@@ -283,7 +283,7 @@
         .alert-icon {
             width: 20px;
             height: 20px;
-            color: var(--warning-color);
+            color: var(--warning-color, #f59e0b);
             flex-shrink: 0;
             margin-top: 2px;
         }
@@ -294,15 +294,14 @@
         
         .alert-title {
             font-weight: 600;
-            color: var(--warning-text);
+            color: var(--text-primary);
             font-size: 0.875rem;
             margin-bottom: 0.25rem;
         }
         
         .alert-message {
             font-size: 0.8125rem;
-            color: var(--warning-text);
-            opacity: 0.9;
+            color: var(--text-secondary);
         }
         
         /* Form styles */
@@ -896,12 +895,11 @@
             
             try {
                 // Fetch available auth methods
-                const data = await htmx.ajax('GET', `/api/ui/auth/methods?username=${encodeURIComponent(username)}`, {
-                    headers: { 'Accept': 'application/json' }
-                });
+                const response = await fetch(`/api/v1/auth/methods?username=${encodeURIComponent(username)}`);
+                const data = await response.json();
                 
-                if (!data || data.error) {
-                    showAuthStatus(data?.error || 'Failed to check authentication methods', 'error');
+                if (!response.ok) {
+                    showAuthStatus(data.error || 'Failed to check authentication methods', 'error');
                     return;
                 }
                 
@@ -1069,14 +1067,18 @@
                 }
                 
                 // Get authentication options from server
-                const options = await htmx.ajax('POST', '/api/ui/webauthn/authenticate/options', {
+                const optionsResponse = await fetch('/api/v1/webauthn/authenticate/options', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    values: { username: username }
+                    body: JSON.stringify({ username: username })
                 });
                 
-                if (!options || options.error) {
-                    throw new Error(options?.error || 'Failed to get authentication options');
+                if (!optionsResponse.ok) {
+                    const error = await optionsResponse.json();
+                    throw new Error(error.error || 'Failed to get authentication options');
                 }
+                
+                const options = await optionsResponse.json();
                 
                 // Convert base64url strings to ArrayBuffers
                 const publicKeyOptions = {
@@ -1103,9 +1105,10 @@
                 showAuthStatus('Verifying credential...', 'success');
                 
                 // Send credential to server
-                const verifyData = await htmx.ajax('POST', '/api/ui/webauthn/authenticate/verify', {
+                const verifyResponse = await fetch('/api/v1/webauthn/authenticate/verify', {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    values: {
+                    body: JSON.stringify({
                         credential: {
                             id: credential.id,
                             rawId: bufferToBase64url(credential.rawId),
@@ -1118,11 +1121,12 @@
                                     bufferToBase64url(credential.response.userHandle) : null
                             }
                         }
-                    }
+                    })
                 });
                 
-                if (!verifyData || verifyData.error) {
-                    throw new Error(verifyData?.error || 'Authentication failed');
+                if (!verifyResponse.ok) {
+                    const error = await verifyResponse.json();
+                    throw new Error(error.error || 'Authentication failed');
                 }
                 
                 // Success! Redirect to dashboard
