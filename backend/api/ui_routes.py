@@ -7,6 +7,8 @@ from functools import wraps
 from datetime import datetime, timedelta
 import requests
 import time
+import os
+import socket
 from html import escape as html_escape
 from config.settings import Config, DATA_DIR, restart_ucm_service
 from app import cache
@@ -5939,3 +5941,560 @@ def ui_system_info():
     except Exception as e:
         current_app.logger.error(f"Error fetching system info: {e}")
         return {'error': str(e)}, 500
+
+
+# ============================================================================
+# Settings UI Routes (Backend endpoints for settings page)
+# ============================================================================
+
+# 1. System Info
+@ui_bp.route('/api/ui/settings/system-info', methods=['GET'])
+@login_required
+def ui_settings_system_info():
+    """Get system information - hostname, version, uptime"""
+    try:
+        hostname = socket.gethostname()
+        uptime = ""
+        try:
+            with open('/proc/uptime', 'r') as f:
+                uptime_seconds = float(f.readline().split()[0])
+                days = int(uptime_seconds // 86400)
+                hours = int((uptime_seconds % 86400) // 3600)
+                uptime = f"{days}d {hours}h"
+        except:
+            uptime = "N/A"
+        
+        html = f'''
+        <div class="space-y-3">
+            <div class="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                <span class="font-medium text-gray-700 dark:text-gray-300">Hostname</span>
+                <span class="text-gray-900 dark:text-white">{html_escape(hostname)}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                <span class="font-medium text-gray-700 dark:text-gray-300">Version</span>
+                <span class="text-gray-900 dark:text-white">{html_escape(Config.APP_VERSION)}</span>
+            </div>
+            <div class="flex justify-between py-2">
+                <span class="font-medium text-gray-700 dark:text-gray-300">Uptime</span>
+                <span class="text-gray-900 dark:text-white">{uptime}</span>
+            </div>
+        </div>
+        '''
+        return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error fetching system info: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 2. Session Config
+@ui_bp.route('/api/ui/settings/session-config', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def ui_settings_session_config():
+    """Get/Update session configuration"""
+    try:
+        if request.method == 'POST':
+            response = api_call_with_retry('POST', f"{request.url_root}api/v1/settings/session", json=request.json)
+            if response is None or response.status_code != 200:
+                return {'error': 'Failed to update session config'}, 500
+            return response.json(), 200
+        else:
+            html = f'''
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Session Timeout (minutes)</label>
+                    <input type="number" name="timeout" value="30" class="input w-full" min="5" max="1440">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Max Concurrent Users</label>
+                    <input type="number" name="max_users" value="100" class="input w-full" min="1" max="1000">
+                </div>
+            </div>
+            '''
+            return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error with session config: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 3. Certificate Defaults
+@ui_bp.route('/api/ui/settings/cert-defaults', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def ui_settings_cert_defaults():
+    """Get/Update certificate default settings"""
+    try:
+        if request.method == 'POST':
+            response = api_call_with_retry('POST', f"{request.url_root}api/v1/settings/cert-defaults", json=request.json)
+            if response is None or response.status_code != 200:
+                return {'error': 'Failed to update cert defaults'}, 500
+            return response.json(), 200
+        else:
+            html = '''
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Certificate Duration (days)</label>
+                    <input type="number" name="duration" value="365" class="input w-full" min="1" max="3650">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Key Size (bits)</label>
+                    <select name="key_size" class="input w-full">
+                        <option value="2048">2048</option>
+                        <option value="3072">3072</option>
+                        <option value="4096" selected>4096</option>
+                    </select>
+                </div>
+            </div>
+            '''
+            return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error with cert defaults: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 4. UI Preferences
+@ui_bp.route('/api/ui/settings/ui-prefs', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def ui_settings_ui_prefs():
+    """Get/Update UI preferences"""
+    try:
+        if request.method == 'POST':
+            response = api_call_with_retry('POST', f"{request.url_root}api/v1/settings/ui", json=request.json)
+            if response is None or response.status_code != 200:
+                return {'error': 'Failed to update UI preferences'}, 500
+            return response.json(), 200
+        else:
+            html = '''
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Theme</label>
+                    <select name="theme" class="input w-full">
+                        <option value="auto" selected>Auto (System)</option>
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Language</label>
+                    <select name="language" class="input w-full">
+                        <option value="en" selected>English</option>
+                        <option value="fr">Français</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Timezone</label>
+                    <select name="timezone" class="input w-full">
+                        <option value="UTC" selected>UTC</option>
+                        <option value="Europe/Paris">Europe/Paris</option>
+                        <option value="America/New_York">America/New_York</option>
+                    </select>
+                </div>
+            </div>
+            '''
+            return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error with UI prefs: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 5. Password Policy
+@ui_bp.route('/api/ui/settings/password-policy', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def ui_settings_password_policy():
+    """Get/Update password policy"""
+    try:
+        if request.method == 'POST':
+            response = api_call_with_retry('POST', f"{request.url_root}api/v1/settings/password-policy", json=request.json)
+            if response is None or response.status_code != 200:
+                return {'error': 'Failed to update password policy'}, 500
+            return response.json(), 200
+        else:
+            html = '''
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Minimum Length</label>
+                    <input type="number" name="min_length" value="8" class="input w-full" min="6" max="32">
+                </div>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="require_uppercase" checked class="checkbox">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Require uppercase letters</span>
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="require_lowercase" checked class="checkbox">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Require lowercase letters</span>
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="require_numbers" checked class="checkbox">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Require numbers</span>
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="require_special" class="checkbox">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Require special characters</span>
+                    </label>
+                </div>
+            </div>
+            '''
+            return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error with password policy: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 6. Session Security
+@ui_bp.route('/api/ui/settings/session-security', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def ui_settings_session_security():
+    """Get/Update session security settings"""
+    try:
+        if request.method == 'POST':
+            response = api_call_with_retry('POST', f"{request.url_root}api/v1/settings/session-security", json=request.json)
+            if response is None or response.status_code != 200:
+                return {'error': 'Failed to update session security'}, 500
+            return response.json(), 200
+        else:
+            html = '''
+            <div class="space-y-4">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="secure_cookies" checked class="checkbox">
+                    <span class="text-sm text-gray-700 dark:text-gray-300">Secure cookies (HTTPS only)</span>
+                </label>
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="httponly" checked class="checkbox">
+                    <span class="text-sm text-gray-700 dark:text-gray-300">HttpOnly cookies</span>
+                </label>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SameSite Policy</label>
+                    <select name="samesite" class="input w-full">
+                        <option value="Lax" selected>Lax</option>
+                        <option value="Strict">Strict</option>
+                        <option value="None">None</option>
+                    </select>
+                </div>
+            </div>
+            '''
+            return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error with session security: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 7. HTTPS Certificate
+@ui_bp.route('/api/ui/settings/https-cert', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def ui_settings_https_cert():
+    """Get/Update HTTPS certificate info"""
+    try:
+        if request.method == 'POST':
+            response = api_call_with_retry('POST', f"{request.url_root}api/v1/settings/https-cert", json=request.json)
+            if response is None or response.status_code != 200:
+                return {'error': 'Failed to update HTTPS certificate'}, 500
+            return response.json(), 200
+        else:
+            cert_path = "/opt/ucm/certs/server.crt"
+            cert_info = "Not configured"
+            try:
+                if os.path.exists(cert_path):
+                    stat = os.stat(cert_path)
+                    mtime = datetime.fromtimestamp(stat.st_mtime)
+                    cert_info = f"Last modified: {mtime.strftime('%Y-%m-%d %H:%M')}"
+            except:
+                pass
+            
+            html = f'''
+            <div class="space-y-3">
+                <div class="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                    <span class="font-medium text-gray-700 dark:text-gray-300">Current Certificate</span>
+                    <span class="text-gray-900 dark:text-white">{html_escape(cert_info)}</span>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Certificate File</label>
+                    <input type="file" name="cert_file" class="input w-full" accept=".crt,.pem">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Key File</label>
+                    <input type="file" name="key_file" class="input w-full" accept=".key,.pem">
+                </div>
+            </div>
+            '''
+            return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error with HTTPS cert: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 8. Email Settings
+@ui_bp.route('/api/ui/settings/email', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def ui_settings_email():
+    """Get/Update email (SMTP) configuration"""
+    try:
+        if request.method == 'POST':
+            response = api_call_with_retry('POST', f"{request.url_root}api/v1/settings/email", json=request.json)
+            if response is None or response.status_code != 200:
+                return {'error': 'Failed to update email settings'}, 500
+            return response.json(), 200
+        else:
+            response = api_call_with_retry('GET', f"{request.url_root}api/v1/settings/email")
+            if response and response.status_code == 200:
+                data = response.json()
+                smtp_host = html_escape(data.get('smtp_host', ''))
+                smtp_port = data.get('smtp_port', 587)
+                smtp_user = html_escape(data.get('smtp_user', ''))
+                from_addr = html_escape(data.get('from_address', ''))
+                use_tls = 'checked' if data.get('use_tls', True) else ''
+            else:
+                smtp_host = smtp_user = from_addr = ''
+                smtp_port = 587
+                use_tls = 'checked'
+            
+            html = f'''
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SMTP Host</label>
+                    <input type="text" name="smtp_host" value="{smtp_host}" class="input w-full" placeholder="smtp.example.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">SMTP Port</label>
+                    <input type="number" name="smtp_port" value="{smtp_port}" class="input w-full" min="1" max="65535">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                    <input type="text" name="smtp_user" value="{smtp_user}" class="input w-full">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                    <input type="password" name="smtp_password" class="input w-full" placeholder="••••••••">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">From Address</label>
+                    <input type="email" name="from_address" value="{from_addr}" class="input w-full" placeholder="noreply@example.com">
+                </div>
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="use_tls" {use_tls} class="checkbox">
+                    <span class="text-sm text-gray-700 dark:text-gray-300">Use TLS</span>
+                </label>
+            </div>
+            '''
+            return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error with email settings: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 9. WebAuthn Status
+@ui_bp.route('/api/ui/settings/webauthn', methods=['GET'])
+@login_required
+def ui_settings_webauthn():
+    """Get WebAuthn status and stats"""
+    try:
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/webauthn/stats")
+        if response and response.status_code == 200:
+            data = response.json()
+            total = data.get('total_credentials', 0)
+            active = data.get('active_users', 0)
+            enabled = data.get('enabled', False)
+        else:
+            total = active = 0
+            enabled = False
+        
+        status = 'Enabled' if enabled else 'Disabled'
+        status_class = 'text-green-600' if enabled else 'text-gray-500'
+        
+        html = f'''
+        <div class="space-y-3">
+            <div class="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                <span class="font-medium text-gray-700 dark:text-gray-300">Status</span>
+                <span class="{status_class} font-semibold">{status}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                <span class="font-medium text-gray-700 dark:text-gray-300">Registered Credentials</span>
+                <span class="text-gray-900 dark:text-white">{total}</span>
+            </div>
+            <div class="flex justify-between py-2">
+                <span class="font-medium text-gray-700 dark:text-gray-300">Active Users</span>
+                <span class="text-gray-900 dark:text-white">{active}</span>
+            </div>
+        </div>
+        '''
+        return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error with WebAuthn stats: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 10. mTLS Settings (DÉJÀ EXISTANT - ne pas dupliquer)
+# Voir ligne 5487-5543
+
+
+# 11. Users List
+@ui_bp.route('/api/ui/settings/users', methods=['GET'])
+@login_required
+@admin_required
+def ui_settings_users():
+    """Get users list"""
+    try:
+        response = api_call_with_retry('GET', f"{request.url_root}api/v1/users")
+        if response is None or response.status_code != 200:
+            return '<div class="text-red-600">Failed to fetch users</div>', 500
+        
+        users = response.json()
+        if not users:
+            html = '<div class="text-gray-500 text-center py-8">No users found</div>'
+        else:
+            html = '<div class="space-y-2">'
+            for user in users:
+                username = html_escape(user.get('username', 'N/A'))
+                role = html_escape(user.get('role', 'viewer'))
+                role_badge = 'bg-blue-100 text-blue-800' if role == 'admin' else 'bg-gray-100 text-gray-800'
+                html += f'''
+                <div class="flex justify-between items-center p-3 border border-gray-200 dark:border-gray-700 rounded">
+                    <span class="font-medium text-gray-900 dark:text-white">{username}</span>
+                    <span class="px-2 py-1 text-xs rounded {role_badge}">{role}</span>
+                </div>
+                '''
+            html += '</div>'
+        return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error fetching users: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 12. ACME Settings
+@ui_bp.route('/api/ui/settings/acme', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def ui_settings_acme():
+    """Get/Update ACME configuration"""
+    try:
+        if request.method == 'POST':
+            response = api_call_with_retry('POST', f"{request.url_root}api/v1/acme/settings", json=request.json)
+            if response is None or response.status_code != 200:
+                return {'error': 'Failed to update ACME settings'}, 500
+            return response.json(), 200
+        else:
+            response = api_call_with_retry('GET', f"{request.url_root}api/v1/acme/settings")
+            if response and response.status_code == 200:
+                data = response.json()
+                enabled = 'checked' if data.get('enabled', False) else ''
+                directory_url = html_escape(data.get('directory_url', 'https://acme-v02.api.letsencrypt.org/directory'))
+            else:
+                enabled = ''
+                directory_url = 'https://acme-v02.api.letsencrypt.org/directory'
+            
+            html = f'''
+            <div class="space-y-4">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="enabled" {enabled} class="checkbox">
+                    <span class="text-sm text-gray-700 dark:text-gray-300">Enable ACME Server</span>
+                </label>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Directory URL</label>
+                    <input type="url" name="directory_url" value="{directory_url}" class="input w-full">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contact Email</label>
+                    <input type="email" name="contact_email" class="input w-full" placeholder="admin@example.com">
+                </div>
+            </div>
+            '''
+            return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error with ACME settings: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 13. Backup Settings
+@ui_bp.route('/api/ui/settings/backup', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def ui_settings_backup():
+    """Get/Update backup configuration"""
+    try:
+        if request.method == 'POST':
+            response = api_call_with_retry('POST', f"{request.url_root}api/v1/settings/backup", json=request.json)
+            if response is None or response.status_code != 200:
+                return {'error': 'Failed to update backup settings'}, 500
+            return response.json(), 200
+        else:
+            html = '''
+            <div class="space-y-4">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="auto_backup" checked class="checkbox">
+                    <span class="text-sm text-gray-700 dark:text-gray-300">Enable automatic backups</span>
+                </label>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Backup Frequency</label>
+                    <select name="frequency" class="input w-full">
+                        <option value="daily" selected>Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Retention (days)</label>
+                    <input type="number" name="retention" value="30" class="input w-full" min="1" max="365">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Backup Path</label>
+                    <input type="text" name="backup_path" value="/var/backups/ucm" class="input w-full">
+                </div>
+            </div>
+            '''
+            return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error with backup settings: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
+
+
+# 14. Database Stats
+@ui_bp.route('/api/ui/settings/database-stats', methods=['GET'])
+@login_required
+@admin_required
+def ui_settings_database_stats():
+    """Get database statistics"""
+    try:
+        db_path = os.path.join(DATA_DIR, "ucm.db")
+        db_size = "N/A"
+        last_backup = "Never"
+        
+        try:
+            if os.path.exists(db_path):
+                size_bytes = os.path.getsize(db_path)
+                if size_bytes < 1024:
+                    db_size = f"{size_bytes} B"
+                elif size_bytes < 1024 * 1024:
+                    db_size = f"{size_bytes / 1024:.2f} KB"
+                else:
+                    db_size = f"{size_bytes / (1024 * 1024):.2f} MB"
+                
+                mtime = datetime.fromtimestamp(os.path.getmtime(db_path))
+                last_backup = mtime.strftime('%Y-%m-%d %H:%M')
+        except Exception as e:
+            current_app.logger.error(f"Error reading DB stats: {e}")
+        
+        html = f'''
+        <div class="space-y-3">
+            <div class="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                <span class="font-medium text-gray-700 dark:text-gray-300">Database Size</span>
+                <span class="text-gray-900 dark:text-white">{db_size}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                <span class="font-medium text-gray-700 dark:text-gray-300">Last Modified</span>
+                <span class="text-gray-900 dark:text-white">{last_backup}</span>
+            </div>
+            <div class="flex justify-between py-2">
+                <span class="font-medium text-gray-700 dark:text-gray-300">Location</span>
+                <span class="text-gray-900 dark:text-white text-sm">{html_escape(db_path)}</span>
+            </div>
+        </div>
+        '''
+        return html, 200
+    except Exception as e:
+        current_app.logger.error(f"Error with database stats: {e}")
+        return f'<div class="text-red-600">Error: {html_escape(str(e))}</div>', 500
