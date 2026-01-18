@@ -382,6 +382,11 @@ function ucm_switchTab(tabName) {
     if (selectedTab) {
         selectedTab.style.display = 'block';
         selectedTab.classList.add('active');
+        
+        // Force HTMX to process all hx-trigger elements in the newly visible tab
+        setTimeout(() => {
+            htmx.process(selectedTab);
+        }, 10);
     }
     
     // Update tab buttons
