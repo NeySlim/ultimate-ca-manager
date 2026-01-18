@@ -308,7 +308,7 @@ function deleteCA(refid, name) {
 
 function performCADelete(refid) {
     const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === `/api/v1/ca/${refid}`) {
+        if (evt.detail.pathInfo.requestPath === `/api/ui/ca/${refid}`) {
             if (evt.detail.xhr.status === 200 || evt.detail.xhr.status === 204) {
                 showToast('CA deleted successfully', 'success');
                 htmx.trigger('body', 'refreshCAs');
@@ -325,7 +325,7 @@ function performCADelete(refid) {
     };
     
     document.body.addEventListener('htmx:afterRequest', handler);
-    htmx.ajax('DELETE', `/api/v1/ca/${refid}`, {swap: 'none'});
+    htmx.ajax('DELETE', `/api/ui/ca/${refid}`, {swap: 'none'});
 }
 
 function deleteCert(refid, name) {
@@ -347,7 +347,7 @@ function deleteCert(refid, name) {
 
 function performCertDelete(refid) {
     const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === `/api/v1/certificates/by-refid/${refid}`) {
+        if (evt.detail.pathInfo.requestPath === `/api/ui/certificates/by-refid/${refid}`) {
             if (evt.detail.xhr.status === 200 || evt.detail.xhr.status === 204) {
                 showToast('Certificate deleted successfully', 'success');
                 htmx.trigger('body', 'refreshCerts');
@@ -364,7 +364,7 @@ function performCertDelete(refid) {
     };
     
     document.body.addEventListener('htmx:afterRequest', handler);
-    htmx.ajax('DELETE', `/api/v1/certificates/by-refid/${refid}`, {swap: 'none'});
+    htmx.ajax('DELETE', `/api/ui/certificates/by-refid/${refid}`, {swap: 'none'});
 }
 
 function revokeCert(refid, name) {
@@ -387,7 +387,7 @@ function revokeCert(refid, name) {
 
 function performCertRevoke(refid) {
     const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === `/api/v1/certificates/by-refid/${refid}/revoke`) {
+        if (evt.detail.pathInfo.requestPath === `/api/ui/certificates/by-refid/${refid}/revoke`) {
             if (evt.detail.xhr.status === 200 || evt.detail.xhr.status === 204) {
                 showToast('Certificate revoked successfully', 'success');
                 htmx.trigger('body', 'refreshCerts');
@@ -404,7 +404,7 @@ function performCertRevoke(refid) {
     };
     
     document.body.addEventListener('htmx:afterRequest', handler);
-    htmx.ajax('POST', `/api/v1/certificates/by-refid/${refid}/revoke`, {
+    htmx.ajax('POST', `/api/ui/certificates/by-refid/${refid}/revoke`, {
         swap: 'none',
         values: { reason: 'unspecified' }
     });
@@ -504,7 +504,7 @@ function generateCRL(caId, caName) {
 
 function performGenerateCRL(caId) {
     const handler = function(evt) {
-        if (evt.detail.pathInfo.requestPath === `/api/v1/crl/${caId}/generate`) {
+        if (evt.detail.pathInfo.requestPath === `/api/ui/ca/${caId}/crl/generate`) {
             try {
                 const data = JSON.parse(evt.detail.xhr.responseText);
                 if (data.error) {
@@ -536,7 +536,7 @@ function performGenerateCRL(caId) {
     };
     
     document.body.addEventListener('htmx:afterRequest', handler);
-    htmx.ajax('POST', `/api/v1/crl/${caId}/generate`, {swap: 'none'});
+    htmx.ajax('POST', `/api/ui/ca/${caId}/crl/generate`, {swap: 'none'});
 }
 
 function downloadCRL(caId, format) {
