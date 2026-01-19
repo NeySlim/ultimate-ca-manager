@@ -323,10 +323,8 @@ def register_blueprints(app):
     from api.ocsp_routes import ocsp_bp
     from api.health_routes import health_bp
     
-    # Register UI routes (no prefix - serve from root)
-    app.register_blueprint(ui_bp)
-    
-    # Register Unified API v2.0 (routes already have /api/* prefix)
+    # Register Unified API v2.0 FIRST (routes already have /api/* prefix)
+    # This must be before ui_bp which has catch-all routing
     from api.v2 import register_api_v2
     register_api_v2(app)
     
@@ -334,6 +332,9 @@ def register_blueprints(app):
     app.register_blueprint(cdp_bp, url_prefix='/cdp')     # CRL Distribution Points
     app.register_blueprint(ocsp_bp)                        # OCSP Responder (/ocsp)
     app.register_blueprint(health_bp)  # Health check endpoints (no auth)
+    
+    # Register UI routes LAST (catch-all for React SPA)
+    app.register_blueprint(ui_bp)
 
 
 def main():
