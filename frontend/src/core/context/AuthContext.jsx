@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { api } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -14,23 +15,47 @@ export const AuthProvider = ({ children }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Check initial auth state
-    const storedAuth = localStorage.getItem('ucm-auth');
-    if (storedAuth === 'true') {
-      setIsAuthenticated(true);
-    }
-    setIsLoading(false);
+    checkAuth();
   }, []);
 
-  const login = (token) => {
-    localStorage.setItem('ucm-auth', 'true');
-    setIsAuthenticated(true);
-    // Navigate to origin or dashboard
-    const origin = location.state?.from?.pathname || '/';
-    navigate(origin);
+  const checkAuth = async () => {
+    try {
+      // Don't redirect on 401 during initial check
+      await api.get('/auth/verify', { redirectOn401: false });
+      setIsAuthenticated(true);
+      // Ensure local storage matches backend state
+      localStorage.setItem('ucm-auth', 'true');
+    } catch (error) {
+      console.log('Not authenticated');
+      setIsAuthenticated(false);
+      localStorage.removeItem('ucm-auth');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const logout = () => {
+  const login = async (username, password) => {
+    try {
+      await api.post('/auth/login', { username, password });
+      setIsAuthenticated(true);
+      localStorage.setItem('ucm-auth', 'true');
+      
+      // Navigate to origin or dashboard
+      const origin = location.state?.from?.pathname || '/';
+      navigate(origin);
+      return true;
+    } catch (error) {
+      console.error('Login failed:', error);
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (e) {
+      console.warn('Logout API call failed', e);
+    }
     localStorage.removeItem('ucm-auth');
     setIsAuthenticated(false);
     navigate('/login');

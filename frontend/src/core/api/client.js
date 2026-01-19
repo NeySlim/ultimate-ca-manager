@@ -14,14 +14,18 @@ class ApiClient {
     // const token = localStorage.getItem('ucm-token');
     // if (token) config.headers.Authorization = `Bearer ${token}`;
 
+    const redirectOn401 = options.redirectOn401 !== false;
+
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, config);
       
       if (response.status === 401) {
-        // Handle unauthorized (redirect to login)
-        // CRITICAL: Clear local storage to prevent redirect loop in AuthContext
-        localStorage.removeItem('ucm-auth');
-        window.location.href = '/login';
+        if (redirectOn401) {
+            // Handle unauthorized (redirect to login)
+            // CRITICAL: Clear local storage to prevent redirect loop in AuthContext
+            localStorage.removeItem('ucm-auth');
+            window.location.href = '/login';
+        }
         throw new Error('Unauthorized');
       }
 

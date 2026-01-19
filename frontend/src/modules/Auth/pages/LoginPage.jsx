@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, User, Lock, Eye, EyeSlash, SignIn, Info, WarningCircle, CheckCircle } from '@phosphor-icons/react';
+import { useAuth } from '../../../core/context/AuthContext';
 import './../auth.css';
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [step, setStep] = useState('checking'); // checking | login
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -14,29 +16,25 @@ const LoginPage = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setStep('login');
-    }, 1500);
+    }, 1000);
     return () => clearTimeout(timer);
   }, []);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    // Simulate API call
-    setTimeout(() => {
-      const username = e.target.username.value;
-      const password = e.target.password.value;
+    const username = e.target.username.value;
+    const password = e.target.password.value;
 
-      if (username === 'admin' && password === 'admin') {
-         // Success
-         localStorage.setItem('ucm-auth', 'true');
-         navigate('/');
-      } else {
-         setError('Invalid credentials (try admin/admin)');
+    const success = await login(username, password);
+    
+    if (!success) {
+         setError('Invalid credentials or server error');
          setLoading(false);
-      }
-    }, 1000);
+    }
+    // If success, AuthContext handles navigation
   };
 
   return (
