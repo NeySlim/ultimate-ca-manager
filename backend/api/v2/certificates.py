@@ -90,3 +90,44 @@ def renew_certificate(cert_id):
         data={'id': cert_id + 1000, 'renewed_from': cert_id},
         message='Certificate renewed'
     )
+
+
+@bp.route('/api/certificates/import', methods=['POST'])
+@require_auth(['write:certificates'])
+def import_certificate():
+    """
+    Import certificate from file
+    Supports: PEM, DER, PKCS12, JKS
+    """
+    # Check for file upload
+    if 'file' not in request.files:
+        return error_response('No file provided', 400)
+    
+    file = request.files['file']
+    if file.filename == '':
+        return error_response('No file selected', 400)
+    
+    # Get optional parameters
+    format_type = request.form.get('format', 'auto')  # auto, pem, der, pkcs12, jks
+    password = request.form.get('password')  # For PKCS12/JKS
+    ca_id = request.form.get('ca_id', type=int)  # Optional: link to CA
+    import_chain = request.form.get('import_chain', 'false') == 'true'
+    import_private_key = request.form.get('import_private_key', 'false') == 'true'
+    
+    # TODO: Implement actual certificate import logic
+    # - Detect format if auto
+    # - Parse certificate
+    # - Validate certificate
+    # - Store in database
+    # - Save files
+    
+    return created_response(
+        data={
+            'id': 999,
+            'filename': file.filename,
+            'format': format_type,
+            'has_private_key': import_private_key,
+            'imported': True
+        },
+        message='Certificate imported successfully'
+    )

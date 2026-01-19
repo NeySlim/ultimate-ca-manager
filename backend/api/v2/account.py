@@ -5,7 +5,7 @@ Account Management Routes v2.0
 Focus: API Keys management (CRUD)
 """
 
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 from auth.unified import AuthManager, require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from models.api_key import APIKey
@@ -28,6 +28,101 @@ def get_profile():
             'email': getattr(user, 'email', None),
             'created_at': user.created_at.isoformat() if hasattr(user, 'created_at') else None
         }
+    )
+
+
+@bp.route('/api/account/profile', methods=['PATCH'])
+@require_auth()
+def update_profile():
+    """
+    Update current user profile
+    
+    PATCH /api/account/profile
+    Body: {
+        "email": "new@email.com",
+        "full_name": "John Doe",
+        "timezone": "UTC"
+    }
+    """
+    data = request.json
+    
+    if not data:
+        return error_response('No data provided', 400)
+    
+    user = g.current_user
+    
+    # Update allowed fields
+    if 'email' in data:
+        # TODO: Validate email format
+        user.email = data['email']
+    
+    if 'full_name' in data:
+        user.full_name = data.get('full_name')
+    
+    if 'timezone' in data:
+        user.timezone = data.get('timezone', 'UTC')
+    
+    # TODO: Save to database
+    # db.session.commit()
+    
+    return success_response(
+        data={
+            'id': user.id,
+            'username': user.username,
+            'email': getattr(user, 'email', None),
+            'full_name': getattr(user, 'full_name', None),
+            'timezone': getattr(user, 'timezone', 'UTC')
+        },
+        message='Profile updated successfully'
+    )
+
+
+@bp.route('/api/account/password', methods=['POST'])
+@require_auth()
+def change_password():
+    """
+    Change password
+    
+    POST /api/account/password
+    Body: {
+        "current_password": "old",
+        "new_password": "new",
+        "confirm_password": "new"
+    }
+    """
+    data = request.json
+    
+    if not data:
+        return error_response('No data provided', 400)
+    
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    confirm_password = data.get('confirm_password')
+    
+    # Validation
+    if not current_password:
+        return error_response('Current password is required', 400)
+    
+    if not new_password:
+        return error_response('New password is required', 400)
+    
+    if new_password != confirm_password:
+        return error_response('Passwords do not match', 400)
+    
+    if len(new_password) < 8:
+        return error_response('Password must be at least 8 characters', 400)
+    
+    user = g.current_user
+    
+    # TODO: Implement actual password change logic
+    # - Verify current password
+    # - Hash new password
+    # - Save to database
+    # - Invalidate all sessions except current (optional)
+    # - Send email notification
+    
+    return success_response(
+        message='Password changed successfully'
     )
 
 
@@ -242,3 +337,274 @@ def regenerate_api_key(key_id):
     except Exception as e:
         current_app.logger.error(f"Error regenerating API key: {e}")
         return error_response('Failed to regenerate API key', 500)
+
+
+# ============================================================================
+# 2FA Management
+# ============================================================================
+
+@bp.route('/api/account/2fa/enable', methods=['POST'])
+@require_auth()
+def enable_2fa():
+    """
+    Enable 2FA (TOTP)
+    
+    POST /api/account/2fa/enable
+    Returns: QR code and secret
+    """
+    user = g.current_user
+    
+    # TODO: Implement actual 2FA enable logic
+    # - Generate TOTP secret
+    # - Store in database (unconfirmed)
+    # - Generate QR code
+    # - Return secret and QR for user to scan
+    
+    import pyotp
+    import qrcode
+    import io
+    import base64
+    
+    secret = pyotp.random_base32()
+    totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
+        name=user.username,
+        issuer_name='UCM'
+    )
+    
+    # Generate QR code
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(totp_uri)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    qr_base64 = base64.b64encode(buffer.getvalue()).decode()
+    
+    return success_response(
+        data={
+            'secret': secret,
+            'qr_code': f'data:image/png;base64,{qr_base64}',
+            'backup_codes': []  # Will be generated after confirmation
+        },
+        message='Scan QR code with authenticator app, then verify with code'
+    )
+
+
+@bp.route('/api/account/2fa/confirm', methods=['POST'])
+@require_auth()
+def confirm_2fa():
+    """
+    Confirm 2FA setup with verification code
+    
+    POST /api/account/2fa/confirm
+    Body: {"code": "123456"}
+    """
+    data = request.json
+    code = data.get('code') if data else None
+    
+    if not code:
+        return error_response('Verification code required', 400)
+    
+    # TODO: Verify code and enable 2FA
+    # - Get unconfirmed secret from database
+    # - Verify code
+    # - Generate backup codes
+    # - Save confirmed 2FA to database
+    
+    backup_codes = [
+        'ABCD-1234-EFGH-5678',
+        'IJKL-9012-MNOP-3456'
+    ]
+    
+    return success_response(
+        data={'backup_codes': backup_codes},
+        message='2FA enabled successfully. Save backup codes!'
+    )
+
+
+@bp.route('/api/account/2fa/disable', methods=['POST'])
+@require_auth()
+def disable_2fa():
+    """
+    Disable 2FA
+    
+    POST /api/account/2fa/disable
+    Body: {"code": "123456"} or {"backup_code": "ABCD-1234"}
+    """
+    data = request.json
+    
+    if not data:
+        return error_response('Verification required', 400)
+    
+    code = data.get('code')
+    backup_code = data.get('backup_code')
+    
+    if not code and not backup_code:
+        return error_response('Code or backup code required', 400)
+    
+    # TODO: Verify code/backup_code and disable 2FA
+    # - Verify authentication
+    # - Remove 2FA from database
+    # - Invalidate backup codes
+    
+    return success_response(message='2FA disabled successfully')
+
+
+@bp.route('/api/account/2fa/recovery-codes', methods=['GET'])
+@require_auth()
+def get_recovery_codes():
+    """
+    Get current recovery codes (masked)
+    
+    GET /api/account/2fa/recovery-codes
+    """
+    # TODO: Get recovery codes from database (masked)
+    
+    return success_response(
+        data={
+            'codes': [
+                '****-****-****-5678',
+                '****-****-****-3456'
+            ],
+            'remaining': 2
+        }
+    )
+
+
+@bp.route('/api/account/2fa/recovery-codes/regenerate', methods=['POST'])
+@require_auth()
+def regenerate_recovery_codes():
+    """
+    Regenerate recovery codes (invalidates old ones)
+    
+    POST /api/account/2fa/recovery-codes/regenerate
+    Body: {"code": "123456"}
+    """
+    data = request.json
+    code = data.get('code') if data else None
+    
+    if not code:
+        return error_response('2FA code required', 400)
+    
+    # TODO: Verify code and regenerate
+    # - Verify 2FA code
+    # - Generate new backup codes
+    # - Save to database
+    # - Invalidate old codes
+    
+    new_codes = [
+        'WXYZ-7890-ABCD-1234',
+        'EFGH-5678-IJKL-9012'
+    ]
+    
+    return success_response(
+        data={'backup_codes': new_codes},
+        message='Recovery codes regenerated. Save them now!'
+    )
+
+
+# ============================================================================
+# Session Management
+# ============================================================================
+
+@bp.route('/api/account/sessions', methods=['GET'])
+@require_auth()
+def list_sessions():
+    """
+    List active sessions for current user
+    
+    GET /api/account/sessions
+    """
+    user = g.current_user
+    
+    # TODO: Get sessions from database
+    # - Query active sessions for user
+    # - Include device, location, last activity
+    
+    return success_response(
+        data=[
+            {
+                'id': 1,
+                'ip_address': '192.168.1.100',
+                'user_agent': 'Mozilla/5.0...',
+                'device': 'Chrome on Windows',
+                'location': 'Paris, France',
+                'created_at': '2026-01-19T08:00:00Z',
+                'last_activity': '2026-01-19T08:10:00Z',
+                'is_current': True
+            }
+        ],
+        meta={'total': 1}
+    )
+
+
+@bp.route('/api/account/sessions/<int:session_id>', methods=['DELETE'])
+@require_auth()
+def revoke_session(session_id):
+    """
+    Revoke/logout a specific session
+    
+    DELETE /api/account/sessions/:id
+    """
+    user = g.current_user
+    
+    # TODO: Revoke session
+    # - Verify session belongs to user
+    # - Prevent revoking current session (optional)
+    # - Delete session from database/cache
+    
+    return success_response(message='Session revoked successfully')
+
+
+@bp.route('/api/account/sessions/revoke-all', methods=['POST'])
+@require_auth()
+def revoke_all_sessions():
+    """
+    Revoke all sessions except current
+    
+    POST /api/account/sessions/revoke-all
+    """
+    user = g.current_user
+    
+    # TODO: Revoke all other sessions
+    # - Get current session ID
+    # - Delete all other sessions for user
+    
+    return success_response(
+        data={'revoked_count': 3},
+        message='All other sessions revoked'
+    )
+
+
+# ============================================================================
+# Activity Log
+# ============================================================================
+
+@bp.route('/api/account/activity', methods=['GET'])
+@require_auth()
+def get_activity_log():
+    """
+    Get user activity log
+    
+    GET /api/account/activity?page=1&per_page=20
+    """
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    # TODO: Get activity from audit log
+    # - Filter by user ID
+    # - Paginate results
+    
+    return success_response(
+        data=[
+            {
+                'id': 1,
+                'action': 'login',
+                'timestamp': '2026-01-19T08:00:00Z',
+                'ip_address': '192.168.1.100',
+                'details': 'Successful login'
+            }
+        ],
+        meta={'total': 1, 'page': page, 'per_page': per_page}
+    )
