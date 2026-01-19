@@ -1,1 +1,0 @@
-export declare function useMutationObserver<T extends HTMLElement = any>(callback: MutationCallback, options: MutationObserverInit, target?: HTMLElement | (() => HTMLElement) | null): import("react").RefObject<T | null>;
