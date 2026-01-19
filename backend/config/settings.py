@@ -202,8 +202,9 @@ class Config:
     JWT_HEADER_TYPE = "Bearer"
     
     # Session Configuration
-    SESSION_TYPE = 'filesystem'  # Filesystem-based sessions for multi-worker support
-    SESSION_FILE_DIR = DATA_DIR / 'sessions'  # Store sessions in data directory
+    SESSION_TYPE = 'sqlalchemy'  # SQLAlchemy-based sessions for multi-worker support
+    SQLALCHEMY_DATABASE_URI = f'sqlite:///{DATA_DIR / "ucm.db"}'
+    SESSION_SQLALCHEMY_TABLE = 'sessions'
     SESSION_PERMANENT = True
     SESSION_USE_SIGNER = True  # Sign session cookies
     SESSION_KEY_PREFIX = 'ucm_session:'
