@@ -1,0 +1,53 @@
+.userButton {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--mantine-radius-sm);
+  transition: background-color 150ms ease;
+}
+
+.userButton:hover {
+  background-color: var(--mantine-color-gray-0);
+}
+
+[data-mantine-color-scheme='dark'] .userButton:hover {
+  background-color: var(--mantine-color-dark-6);
+}
+
+.navButton {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--mantine-radius-md);
+  transition: all 150ms ease;
+  color: var(--mantine-color-gray-7);
+  text-decoration: none;
+}
+
+.navButton:hover {
+  background-color: var(--mantine-color-gray-1);
+  color: var(--mantine-color-gray-9);
+}
+
+.navButton[data-active] {
+  background-color: var(--mantine-color-primary-6);
+  color: white;
+}
+
+.navButton[data-active]:hover {
+  background-color: var(--mantine-color-primary-7);
+}
+
+[data-mantine-color-scheme='dark'] .navButton {
+  color: var(--mantine-color-dark-0);
+}
+
+[data-mantine-color-scheme='dark'] .navButton:hover {
+  background-color: var(--mantine-color-dark-6);
+  color: white;
+}
+
+[data-mantine-color-scheme='dark'] .navButton[data-active] {
+  background-color: var(--mantine-color-primary-6);
+  color: white;
+}
