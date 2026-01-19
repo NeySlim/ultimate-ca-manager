@@ -3,7 +3,7 @@
  * 3 levels: compact, normal, comfortable
  */
 
-import { DensityLevel, DensityConfig } from '../types/theme';
+import type { DensityLevel, DensityConfig } from '../types/theme';
 
 export const DENSITY_CONFIGS: Record<DensityLevel, DensityConfig> = {
   compact: {

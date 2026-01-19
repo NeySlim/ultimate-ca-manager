@@ -3,7 +3,7 @@
  * 12 palettes: 6 cold tones + 6 warm tones
  */
 
-import { ColorPalette, PaletteColors } from '../types/theme';
+import type { ColorPalette, PaletteColors } from '../types/theme';
 
 export const PALETTES: Record<ColorPalette, PaletteColors> = {
   // ========== COLD TONES ==========
