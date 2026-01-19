@@ -1,25 +1,28 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { MantineProvider } from '@mantine/core';
-import { Notifications } from '@mantine/notifications';
-import { ModalsProvider } from '@mantine/modals';
-import App from './App';
-import { ucmTheme } from './theme/theme';
+import { BrowserRouter } from 'react-router-dom';
+import { AppThemeProvider } from './core/theme/ThemeProvider';
+import { ViewProvider } from './core/context/ViewContext';
+import { AuthProvider } from './core/context/AuthContext';
+import App from './App.jsx';
 
-// Import Mantine styles
+// Import Global Styles
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
-
-// Import global CSS
-import './index.css';
+import '@mantine/dates/styles.css';
+import './core/theme/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <MantineProvider theme={ucmTheme} defaultColorScheme="dark">
-      <Notifications position="bottom-center" />
-      <ModalsProvider>
-        <App />
-      </ModalsProvider>
-    </MantineProvider>
-  </React.StrictMode>
+    <BrowserRouter>
+      <AppThemeProvider>
+        <AuthProvider>
+          <ViewProvider>
+            <App />
+          </ViewProvider>
+        </AuthProvider>
+      </AppThemeProvider>
+    </BrowserRouter>
+  </React.StrictMode>,
 );
+

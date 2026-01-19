@@ -1,0 +1,15 @@
+/* src/core/theme/global.css */
+:root {
+  /* Will be populated from design extraction */
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* App-like feel */
+}

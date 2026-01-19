@@ -1,0 +1,240 @@
+/* Extracted from login-design.html */
+
+/* Variables (Scoped to login for now, but using global vars where possible) */
+.login-wrapper {
+  --accent-gradient-start: #5a8fc7;
+  --accent-gradient-end: #7aa5d9;
+  --bg-secondary: #1e1e1e;
+  --border-primary: #333;
+  --border-secondary: #3a3a3a;
+  --text-tertiary: #888;
+  --radius: 3px;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #1a1a1a;
+  color: #e8e8e8;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.icon-gradient {
+  background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-logo {
+  font-size: 64px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.login-title {
+  font-size: 24px;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+.login-subtitle {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.login-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-status {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.auth-status-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  display: inline-block;
+  color: #5a8fc7;
+}
+
+.auth-status-text {
+  font-size: 15px;
+  color: #e8e8e8;
+  margin-bottom: 4px;
+}
+
+.auth-status-subtext {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border-primary);
+  border-top-color: #5a8fc7;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.form-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px 0 40px; /* Left padding for icon */
+  background: #2a2a2a;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius);
+  color: #e8e8e8;
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #5a8fc7;
+  box-shadow: 0 0 0 3px rgba(90, 143, 199, 0.1);
+}
+
+.input-group {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  pointer-events: none;
+  color: #5a8fc7;
+}
+
+.input-action {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Checkbox */
+.form-checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+/* Buttons */
+.btn {
+  width: 100%;
+  height: 40px;
+  padding: 0 16px;
+  background: #333;
+  border: 1px solid #444;
+  border-radius: var(--radius);
+  color: #ccc;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #5a8fc7, #7aa5d9);
+  border-color: #5a8fc7;
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 24px 0;
+}
+
+.divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-primary);
+}
+
+.divider-text {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.info-box {
+  background: #1e2a35;
+  border: 1px solid #2d4a5f;
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-top: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #9cc5e8;
+  font-size: 12px;
+  line-height: 1.5;
+}
