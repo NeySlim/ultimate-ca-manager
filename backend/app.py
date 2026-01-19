@@ -68,9 +68,6 @@ def create_app(config_name=None):
     session_dir = app.config.get('SESSION_FILE_DIR')
     if session_dir:
         session_dir.mkdir(parents=True, exist_ok=True)
-        # Set permissions for multi-worker access
-        import os
-        os.chmod(session_dir, 0o777)
     
     # Initialize cache
     cache.init_app(app, config={
