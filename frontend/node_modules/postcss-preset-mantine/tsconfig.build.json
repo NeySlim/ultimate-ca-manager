@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "lib": ["es2018", "dom"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "target": "esnext",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "declaration": false
+  },
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/tests/**", "./scripts"]
+}

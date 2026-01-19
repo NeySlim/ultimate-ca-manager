@@ -1,0 +1,61 @@
+{
+  "name": "postcss-preset-mantine",
+  "version": "1.18.0",
+  "description": "PostCSS preset for Mantine (7.0+) applications",
+  "main": "dist/preset.js",
+  "types": "dist/index.d.ts",
+  "peerDependencies": {
+    "postcss": ">=8.0.0"
+  },
+  "dependencies": {
+    "postcss-mixins": "^12.0.0",
+    "postcss-nested": "^7.0.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.23.0",
+    "@types/fs-extra": "^11",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.13.14",
+    "@types/postcss-mixins": "^9.0.6",
+    "@types/signale": "^1",
+    "eslint": "^9.23.0",
+    "fs-extra": "^11.3.0",
+    "jest": "^29.7.0",
+    "postcss": "^8.5.3",
+    "prettier": "^3.5.3",
+    "signale": "^1.4.0",
+    "simple-git": "^3.27.0",
+    "ts-jest": "^29.3.0",
+    "tsc": "^2.0.4",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.28.0",
+    "version-next": "^1.0.2",
+    "zx": "^8.6.0"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && echo 'declare module \"postcss-preset-mantine\";' > dist/index.d.ts",
+    "lint": "eslint src --cache",
+    "prettier:check": "prettier --check src",
+    "typecheck": "tsc --noEmit",
+    "jest": "jest",
+    "jest:update-snapshots": "jest --updateSnapshot",
+    "prepublish": "yarn test && yarn build",
+    "test": "npm run lint && npm run prettier:check && npm run typecheck && npm run jest",
+    "clean": "rm -rf dist",
+    "release": "tsx scripts/release"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mantinedev/postcss-preset-mantine"
+  },
+  "keywords": [
+    "postcss",
+    "mantine",
+    "react",
+    "css"
+  ],
+  "author": "rtivital@gmail.com",
+  "license": "MIT",
+  "packageManager": "yarn@4.9.2"
+}
