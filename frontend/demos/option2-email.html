@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Option 2: Email Client - UCM</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fff;
+      color: #000;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    /* Topbar */
+    .topbar {
+      background: #0078d4;
+      color: white;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 20px;
+    }
+    .topbar .logo { font-size: 18px; font-weight: 600; }
+    .topbar .menu-item {
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 4px;
+    }
+    .topbar .menu-item:hover { background: rgba(255,255,255,0.1); }
+    .topbar .menu-item.active { background: rgba(255,255,255,0.2); }
+    .topbar .spacer { flex: 1; }
+    .topbar .search {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      color: white;
+      width: 300px;
+    }
+    .topbar .search::placeholder { color: rgba(255,255,255,0.7); }
+    
+    /* Layout */
+    .main-layout {
+      display: flex;
+      height: calc(100vh - 48px);
+    }
+    
+    /* Left Sidebar */
+    .left-sidebar {
+      width: 180px;
+      background: #f3f2f1;
+      border-right: 1px solid #e1dfdd;
+      padding: 12px 0;
+    }
+    .folder-item {
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .folder-item:hover { background: #edebe9; }
+    .folder-item.active {
+      background: #e1dfdd;
+      border-left: 3px solid #0078d4;
+      font-weight: 600;
+    }
+    .folder-item .count {
+      margin-left: auto;
+      color: #605e5c;
+      font-size: 12px;
+    }
+    .separator {
+      height: 1px;
+      background: #e1dfdd;
+      margin: 8px 0;
+    }
+    
+    /* Certificate List */
+    .cert-list {
+      width: 320px;
+      background: #faf9f8;
+      border-right: 1px solid #e1dfdd;
+      display: flex;
+      flex-direction: column;
+    }
+    .list-header {
+      padding: 12px 16px;
+      background: #fff;
+      border-bottom: 1px solid #e1dfdd;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .list-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e1dfdd;
+      cursor: pointer;
+      background: #fff;
+    }
+    .list-item:hover { background: #f3f2f1; }
+    .list-item.selected {
+      background: #e1dfdd;
+      border-left: 3px solid #0078d4;
+    }
+    .list-item .title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .list-item .subtitle {
+      font-size: 12px;
+      color: #605e5c;
+      margin-bottom: 4px;
+    }
+    .list-item .meta {
+      display: flex;
+      gap: 8px;
+      font-size: 11px;
+      color: #8a8886;
+    }
+    .list-item .status {
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .list-item .status.valid { background: #dff6dd; color: #107c10; }
+    .list-item .status.warning { background: #fff4ce; color: #ca5010; }
+    .list-item .status.error { background: #fde7e9; color: #a80000; }
+    
+    /* Detail Pane */
+    .detail-pane {
+      flex: 1;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+    }
+    .detail-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #e1dfdd;
+    }
+    .detail-header h2 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .detail-header .meta {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      color: #605e5c;
+    }
+    .detail-content {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+    }
+    .detail-section {
+      margin-bottom: 24px;
+    }
+    .detail-section .label {
+      font-size: 11px;
+      color: #605e5c;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .detail-section .value {
+      font-size: 14px;
+      padding: 8px 0;
+    }
+    .detail-section .value code {
+      background: #f3f2f1;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', monospace;
+      font-size: 12px;
+    }
+    .detail-actions {
+      padding: 20px 24px;
+      border-top: 1px solid #e1dfdd;
+      display: flex;
+      gap: 12px;
+    }
+    .detail-actions button {
+      padding: 8px 16px;
+      border: 1px solid #8a8886;
+      background: white;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .detail-actions button.primary {
+      background: #0078d4;
+      color: white;
+      border-color: #0078d4;
+    }
+    .detail-actions button:hover { background: #f3f2f1; }
+    .detail-actions button.primary:hover { background: #005a9e; }
+    
+    .back-btn {
+      position: fixed;
+      top: 56px;
+      right: 16px;
+      background: #0078d4;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <button class="back-btn" onclick="location.href='index.html'">← Back</button>
+  
+  <div class="topbar">
+    <div class="logo">UCM</div>
+    <div class="menu-item active">☰ Inbox</div>
+    <div class="menu-item">⭐ Starred</div>
+    <div class="menu-item">📤 Exported</div>
+    <div class="menu-item">🗑️ Trash</div>
+    <div class="spacer"></div>
+    <input type="text" class="search" placeholder="🔍 Search certificates..." />
+    <div class="menu-item">👤</div>
+  </div>
+  
+  <div class="main-layout">
+    <!-- Left Sidebar -->
+    <div class="left-sidebar">
+      <div class="folder-item active">
+        📥 All Certificates
+        <span class="count">24</span>
+      </div>
+      <div class="folder-item">
+        ⭐ Starred
+        <span class="count">3</span>
+      </div>
+      <div class="separator"></div>
+      <div class="folder-item">
+        ✅ Valid
+        <span class="count">20</span>
+      </div>
+      <div class="folder-item">
+        ⚠️ Expiring
+        <span class="count">2</span>
+      </div>
+      <div class="folder-item">
+        ❌ Revoked
+        <span class="count">1</span>
+      </div>
+      <div class="separator"></div>
+      <div class="folder-item">
+        📁 CAs
+      </div>
+      <div class="folder-item">
+        &nbsp;&nbsp;&nbsp;🔹 Root
+        <span class="count">1</span>
+      </div>
+      <div class="folder-item">
+        &nbsp;&nbsp;&nbsp;🔸 Intermediate
+        <span class="count">2</span>
+      </div>
+      <div class="separator"></div>
+      <div class="folder-item">
+        👥 Users
+        <span class="count">5</span>
+      </div>
+      <div class="folder-item">
+        ⚙️ Settings
+      </div>
+    </div>
+    
+    <!-- Certificate List -->
+    <div class="cert-list">
+      <div class="list-header">Certificates (24)</div>
+      
+      <div class="list-item selected">
+        <div class="title">api.example.com</div>
+        <div class="subtitle">Internal Intermediate CA</div>
+        <div class="meta">
+          <span class="status valid">Valid</span>
+          <span>245 days left</span>
+        </div>
+      </div>
+      
+      <div class="list-item">
+        <div class="title">web.app.com</div>
+        <div class="subtitle">Let's Encrypt Authority X3</div>
+        <div class="meta">
+          <span class="status warning">Expiring</span>
+          <span>45 days left</span>
+        </div>
+      </div>
+      
+      <div class="list-item">
+        <div class="title">mail.srv.com</div>
+        <div class="subtitle">Internal Intermediate CA</div>
+        <div class="meta">
+          <span class="status valid">Valid</span>
+          <span>320 days left</span>
+        </div>
+      </div>
+      
+      <div class="list-item">
+        <div class="title">vpn.gateway.lan</div>
+        <div class="subtitle">Internal Root CA</div>
+        <div class="meta">
+          <span class="status error">Expired</span>
+          <span>5 days ago</span>
+        </div>
+      </div>
+      
+      <div class="list-item">
+        <div class="title">ldap.corp.internal</div>
+        <div class="subtitle">Internal Intermediate CA</div>
+        <div class="meta">
+          <span class="status valid">Valid</span>
+          <span>180 days left</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Detail Pane -->
+    <div class="detail-pane">
+      <div class="detail-header">
+        <h2>api.example.com</h2>
+        <div class="meta">
+          <span>📅 Created: 2024-01-15</span>
+          <span>✅ Status: Valid</span>
+          <span>⏱️ 245 days remaining</span>
+        </div>
+      </div>
+      
+      <div class="detail-content">
+        <div class="detail-section">
+          <div class="label">Common Name</div>
+          <div class="value">api.example.com</div>
+        </div>
+        
+        <div class="detail-section">
+          <div class="label">Organization</div>
+          <div class="value">Acme Inc</div>
+        </div>
+        
+        <div class="detail-section">
+          <div class="label">Serial Number</div>
+          <div class="value"><code>A3:4F:2B:8E:91:CC:7D:45</code></div>
+        </div>
+        
+        <div class="detail-section">
+          <div class="label">Issuer</div>
+          <div class="value">CN=Internal Intermediate CA, O=Acme Inc, C=US</div>
+        </div>
+        
+        <div class="detail-section">
+          <div class="label">Validity Period</div>
+          <div class="value">
+            <strong>From:</strong> 2024-01-15 00:00:00 UTC<br>
+            <strong>To:</strong> 2025-12-31 23:59:59 UTC
+          </div>
+        </div>
+        
+        <div class="detail-section">
+          <div class="label">Subject Alternative Names</div>
+          <div class="value">
+            • DNS: api.example.com<br>
+            • DNS: *.api.example.com<br>
+            • DNS: staging-api.example.com
+          </div>
+        </div>
+        
+        <div class="detail-section">
+          <div class="label">Key Algorithm</div>
+          <div class="value">RSA 2048 bits</div>
+        </div>
+      </div>
+      
+      <div class="detail-actions">
+        <button class="primary">Export PEM</button>
+        <button>Renew Certificate</button>
+        <button>Revoke</button>
+        <button style="margin-left: auto; color: #a80000;">Delete</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
