@@ -201,13 +201,9 @@ class Config:
     JWT_HEADER_NAME = "Authorization"
     JWT_HEADER_TYPE = "Bearer"
     
-    # Session Configuration
-    SESSION_TYPE = 'sqlalchemy'  # SQLAlchemy-based sessions for multi-worker support
-    SQLALCHEMY_DATABASE_URI = f'sqlite:///{DATA_DIR / "ucm.db"}'
-    SESSION_SQLALCHEMY_TABLE = 'sessions'
-    SESSION_PERMANENT = True
-    SESSION_USE_SIGNER = True  # Sign session cookies
-    SESSION_KEY_PREFIX = 'ucm_session:'
+    # Session Configuration - Flask server-side sessions
+    SESSION_TYPE = 'filesystem'  # Server-side sessions for multi-worker support
+    SESSION_FILE_DIR = DATA_DIR / 'sessions'
     SESSION_COOKIE_SECURE = True  # HTTPS only
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
