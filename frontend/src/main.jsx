@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AppThemeProvider } from './core/theme/ThemeProvider';
 import { ViewProvider } from './core/context/ViewContext';
 import { AuthProvider } from './core/context/AuthContext';
+import { SelectionProvider } from './core/context/SelectionContext';
 import App from './App.jsx';
 
 // Import Global Styles
@@ -18,7 +19,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <AppThemeProvider>
         <AuthProvider>
           <ViewProvider>
-            <App />
+            <SelectionProvider>
+              <App />
+            </SelectionProvider>
           </ViewProvider>
         </AuthProvider>
       </AppThemeProvider>
