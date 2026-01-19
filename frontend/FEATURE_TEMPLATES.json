@@ -1,0 +1,85 @@
+{
+  "search": {
+    "component": "TextInput with IconSearch",
+    "state": "const [search, setSearch] = useState('')",
+    "filter": "items.filter(item => item.name.toLowerCase().includes(search.toLowerCase()))"
+  },
+  "pagination": {
+    "component": "Pagination from @mantine/core",
+    "state": "const [page, setPage] = useState(1); const [perPage, setPerPage] = useState(20)",
+    "logic": "items.slice((page-1)*perPage, page*perPage)"
+  },
+  "bulk_actions": {
+    "component": "Checkbox + ActionButtons",
+    "state": "const [selected, setSelected] = useState<number[]>([])",
+    "actions": [
+      "delete",
+      "export",
+      "archive",
+      "assign"
+    ]
+  },
+  "export_csv": {
+    "library": "papaparse or custom",
+    "function": "exportToCSV(data, filename)",
+    "trigger": "Button with IconDownload"
+  },
+  "export_pdf": {
+    "library": "jspdf or react-pdf",
+    "function": "exportToPDF(data, filename)",
+    "trigger": "Button with IconFilePdf"
+  },
+  "real_time_updates": {
+    "library": "WebSocket or Server-Sent Events",
+    "implementation": "useEffect with WebSocket connection",
+    "fallback": "polling with setInterval"
+  },
+  "drag_drop": {
+    "library": "@dnd-kit/core",
+    "components": "DndContext, Droppable, Draggable",
+    "handlers": "onDragEnd, onDragOver"
+  },
+  "charts": {
+    "library": "recharts (already installed)",
+    "types": [
+      "LineChart",
+      "BarChart",
+      "PieChart",
+      "AreaChart"
+    ],
+    "customization": "colors, tooltips, legends"
+  },
+  "advanced_filters": {
+    "component": "FilterBuilder with multiple conditions",
+    "operators": [
+      "equals",
+      "contains",
+      "greater_than",
+      "less_than",
+      "between",
+      "in"
+    ],
+    "combinators": [
+      "AND",
+      "OR"
+    ]
+  },
+  "audit_trail": {
+    "display": "Timeline component",
+    "data": "who, what, when, ip_address, user_agent",
+    "filters": [
+      "date_range",
+      "user",
+      "action_type"
+    ]
+  },
+  "ai_suggestions": {
+    "future_tech": "OpenAI API or local LLM",
+    "use_cases": [
+      "smart_defaults",
+      "anomaly_detection",
+      "predictive_maintenance"
+    ],
+    "placeholder": "// TODO: Integrate AI suggestions"
+  }
+}
