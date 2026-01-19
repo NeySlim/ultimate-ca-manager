@@ -74,6 +74,12 @@ def login():
         session['username'] = user.username
         session.permanent = True
         
+        # DEBUG: Log session info
+        current_app.logger.info(f"🔍 Session created for user {user.username}")
+        current_app.logger.info(f"🔍 Session ID: {session.get('_id', 'NO ID')}")
+        current_app.logger.info(f"🔍 Session user_id: {session.get('user_id')}")
+        current_app.logger.info(f"🔍 Session file dir: {current_app.config.get('SESSION_FILE_DIR')}")
+        
         return success_response(
             data={
                 'user': {

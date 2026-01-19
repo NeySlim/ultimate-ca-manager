@@ -1,3 +1,10 @@
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/*.local
+
 # Python
 __pycache__/
 *.py[cod]
