@@ -61,13 +61,27 @@ def create_app(config_name=None):
     migrate = Migrate(app, db)
     jwt = JWTManager(app)
     
-    # Initialize server-side session storage (multi-worker support)
+    # Initialize server-side session storage with existing db instance
+    app.config['SESSION_SQLALCHEMY'] = db  # Use existing SQLAlchemy instance
     Session(app)
     
-    # Ensure session directory exists
-    session_dir = app.config.get('SESSION_FILE_DIR')
-    if session_dir:
-        session_dir.mkdir(parents=True, exist_ok=True)
+    # Create sessions table if it doesn't exist
+    with app.app_context():
+        # Check if sessions table exists
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        if 'sessions' not in inspector.get_table_names():
+            # Create sessions table
+            db.session.execute(db.text('''
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id VARCHAR(255) UNIQUE NOT NULL,
+                    data BLOB,
+                    expiry DATETIME
+                )
+            '''))
+            db.session.commit()
+            app.logger.info("✅ Created sessions table")
     
     # Initialize cache
     cache.init_app(app, config={
