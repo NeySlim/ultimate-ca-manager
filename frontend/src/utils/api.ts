@@ -42,74 +42,92 @@ class ApiClient {
     return response.json();
   }
 
-  // Certificates
+  // Organized API methods
+  certificates = {
+    list: (params?: any) => this.request('/certificates', { params }),
+    get: (id: number) => this.request(`/certificates/${id}`),
+    create: (data: any) => this.request('/certificates', { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id: number) => this.request(`/certificates/${id}`, { method: 'DELETE' }),
+    revoke: (id: number, data: any) => this.request(`/certificates/${id}/revoke`, { method: 'POST', body: JSON.stringify(data) }),
+    export: (id: number, format: string) => this.request(`/certificates/${id}/export?format=${format}`)
+  };
+
+  cas = {
+    list: (params?: any) => this.request('/cas', { params }),
+    get: (id: number) => this.request(`/cas/${id}`),
+    create: (data: any) => this.request('/cas', { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id: number) => this.request(`/cas/${id}`, { method: 'DELETE' }),
+    getIssuedCertificates: (id: number) => this.request(`/cas/${id}/issued`)
+  };
+
+  users = {
+    list: (params?: any) => this.request('/settings/users', { params }),
+    get: (id: number) => this.request(`/settings/users/${id}`),
+    create: (data: any) => this.request('/settings/users', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: number, data: any) => this.request(`/settings/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: number) => this.request(`/settings/users/${id}`, { method: 'DELETE' })
+  };
+
+  settings = {
+    getGeneral: () => this.request('/settings/general'),
+    updateGeneral: (data: any) => this.request('/settings/general', { method: 'PUT', body: JSON.stringify(data) }),
+    getEmail: () => this.request('/settings/email'),
+    updateEmail: (data: any) => this.request('/settings/email', { method: 'PUT', body: JSON.stringify(data) })
+  };
+
+  // Legacy methods for backward compatibility
   async getCertificates(params?: { page?: number; per_page?: number; status?: string }) {
-    return this.request('/certificates', { params });
+    return this.certificates.list(params);
   }
 
   async getCertificate(id: number) {
-    return this.request(`/certificates/${id}`);
+    return this.certificates.get(id);
   }
 
   async createCertificate(data: any) {
-    return this.request('/certificates', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return this.certificates.create(data);
   }
 
   async deleteCertificate(id: number) {
-    return this.request(`/certificates/${id}`, { method: 'DELETE' });
+    return this.certificates.delete(id);
   }
 
   async revokeCertificate(id: number, reason?: string) {
-    return this.request(`/certificates/${id}/revoke`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    });
+    return this.certificates.revoke(id, { reason });
   }
 
   // CAs
   async getCAs(params?: { page?: number; per_page?: number }) {
-    return this.request('/cas', { params });
+    return this.cas.list(params);
   }
 
   async getCA(id: number) {
-    return this.request(`/cas/${id}`);
+    return this.cas.get(id);
   }
 
   async createCA(data: any) {
-    return this.request('/cas', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return this.cas.create(data);
   }
 
   async deleteCA(id: number) {
-    return this.request(`/cas/${id}`, { method: 'DELETE' });
+    return this.cas.delete(id);
   }
 
   // Users
   async getUsers(params?: { page?: number; per_page?: number }) {
-    return this.request('/settings/users', { params });
+    return this.users.list(params);
   }
 
   async createUser(data: any) {
-    return this.request('/settings/users', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return this.users.create(data);
   }
 
   async updateUser(id: number, data: any) {
-    return this.request(`/settings/users/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
+    return this.users.update(id, data);
   }
 
   async deleteUser(id: number) {
-    return this.request(`/settings/users/${id}`, { method: 'DELETE' });
+    return this.users.delete(id);
   }
 
   // Settings

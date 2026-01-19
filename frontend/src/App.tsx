@@ -7,6 +7,10 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { CertificatesPage } from './pages/CertificatesPage';
+import { CAsPage } from './pages/CAsPage';
+import { UsersPage } from './pages/UsersPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
 
@@ -30,6 +34,38 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <DashboardPage />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/certificates" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <CertificatesPage />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/cas" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <CAsPage />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/users" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <UsersPage />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <SettingsPage />
                 </AppLayout>
               </ProtectedRoute>
             } />
