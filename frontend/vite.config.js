@@ -1,30 +1,27 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  server: {
-    port: 3000,
-    proxy: {
-      '/api': {
-        target: 'https://localhost:8443',
-        changeOrigin: true,
-        secure: false
-      }
-    }
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
   },
   build: {
-    outDir: 'dist',
-    sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'mantine-core': ['@mantine/core', '@mantine/hooks'],
-          'mantine-extras': ['@mantine/notifications', '@mantine/modals'],
-          'icons': ['@phosphor-icons/react']
-        }
-      }
-    }
-  }
+    outDir: 'static',
+    assetsDir: 'assets',
+    emptyOutDir: false,
+  },
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'https://netsuit.lan.pew.pet:8443',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 });
