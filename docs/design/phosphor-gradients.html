@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UCM Phosphor Icons with Gradients</title>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --accent-primary: #5a8fc7;
+            --accent-secondary: #7aa5d9;
+            --accent-gradient-start: #5a8fc7;
+            --accent-gradient-end: #7aa5d9;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a1a;
+            color: #e8e8e8;
+            font-size: 13px;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* HEADER */
+        .header {
+            background: #1e1e1e;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+            border-radius: 3px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #888;
+            font-size: 13px;
+        }
+
+        /* COLOR SELECTOR */
+        .color-selector {
+            background: #1e1e1e;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+            border-radius: 3px;
+        }
+
+        .selector-label {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .color-option {
+            background: #252525;
+            border: 2px solid #333;
+            border-radius: 3px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .color-option:hover {
+            background: #2a2a2a;
+            border-color: #444;
+        }
+
+        .color-option.active {
+            border-color: var(--accent-primary);
+            background: #2a2a2a;
+        }
+
+        .color-preview {
+            width: 40px;
+            height: 40px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .color-info {
+            flex: 1;
+        }
+
+        .color-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #e8e8e8;
+            margin-bottom: 2px;
+        }
+
+        .color-hex {
+            font-size: 11px;
+            color: #888;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* SECTIONS */
+        .section {
+            background: #1e1e1e;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+            border-radius: 3px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #333;
+        }
+
+        .group {
+            margin-bottom: 20px;
+        }
+
+        .group:last-child {
+            margin-bottom: 0;
+        }
+
+        .group-label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        /* GRADIENT STYLES */
+        .icon-gradient {
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .icon-gradient-subtle {
+            color: var(--accent-primary);
+            filter: drop-shadow(0 0 8px var(--accent-primary));
+            opacity: 0.9;
+        }
+
+        .icon-gradient-glow {
+            color: var(--accent-primary);
+            filter: drop-shadow(0 0 4px var(--accent-gradient-start)) drop-shadow(0 0 8px var(--accent-gradient-end));
+        }
+
+        /* ICON SHOWCASE */
+        .icon-showcase {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .icon-card {
+            background: #252525;
+            border: 1px solid #333;
+            border-radius: 3px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s;
+        }
+
+        .icon-card:hover {
+            background: #2a2a2a;
+            border-color: var(--accent-primary);
+        }
+
+        .icon-display {
+            font-size: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-label {
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+        }
+
+        /* SIZE COMPARISON */
+        .size-demo {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            padding: 20px;
+            background: #252525;
+            border: 1px solid #333;
+            border-radius: 3px;
+            flex-wrap: wrap;
+        }
+
+        .size-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .size-label {
+            font-size: 11px;
+            color: #888;
+        }
+
+        /* BUTTONS */
+        .btn {
+            height: 26px;
+            padding: 0 12px;
+            background: #333;
+            border: 1px solid #444;
+            border-radius: 3px;
+            color: #ccc;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            background: #3a3a3a;
+        }
+
+        .btn-primary {
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .btn-primary:hover {
+            color: var(--accent-secondary);
+            border-color: var(--accent-secondary);
+        }
+
+        .btn-gradient {
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            border-color: var(--accent-primary);
+            color: #fff;
+        }
+
+        .btn-gradient:hover {
+            filter: brightness(1.1);
+        }
+
+        .btn-icon {
+            width: 26px;
+            padding: 0;
+            justify-content: center;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        /* BADGES */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        .badge-gradient {
+            border-color: var(--accent-primary);
+            background: linear-gradient(135deg, rgba(74, 158, 255, 0.1), rgba(107, 179, 255, 0.1));
+            color: var(--accent-primary);
+        }
+
+        .badge-active {
+            color: #81c784;
+        }
+
+        .badge-warning {
+            color: #ffb74d;
+        }
+
+        .badge-error {
+            color: #e57373;
+        }
+
+        /* TABLE */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1a1a1a;
+        }
+
+        thead {
+            background: #252525;
+        }
+
+        th {
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #333;
+        }
+
+        td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #2a2a2a;
+            font-size: 13px;
+        }
+
+        tr:hover {
+            background: #242424;
+        }
+
+        /* STYLE VARIANTS */
+        .variant-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .variant-card {
+            background: #252525;
+            border: 1px solid #333;
+            border-radius: 3px;
+            padding: 16px;
+        }
+
+        .variant-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #e8e8e8;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .variant-demo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: #1a1a1a;
+            border-radius: 3px;
+        }
+
+        /* COMPARISON */
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>Phosphor Icons + Gradients</h1>
+            <p>Icônes avec gradients subtils adaptatifs selon la couleur d'accentuation du thème</p>
+        </div>
+
+        <!-- COLOR SELECTOR -->
+        <div class="color-selector">
+            <label class="selector-label">Choisir la couleur d'accentuation du thème :</label>
+            <div class="color-grid">
+                <div class="color-option active" onclick="setAccent('#5a8fc7', '#7aa5d9', 'Blue Sky', this)">
+                    <div class="color-preview" style="background: linear-gradient(135deg, #5a8fc7, #7aa5d9);"></div>
+                    <div class="color-info">
+                        <div class="color-name">Blue Sky</div>
+                        <div class="color-hex">#5a8fc7 → #7aa5d9</div>
+                    </div>
+                </div>
+
+                <div class="color-option" onclick="setAccent('#9985c7', '#b5a3d9', 'Purple Dream', this)">
+                    <div class="color-preview" style="background: linear-gradient(135deg, #9985c7, #b5a3d9);"></div>
+                    <div class="color-info">
+                        <div class="color-name">Purple Dream</div>
+                        <div class="color-hex">#9985c7 → #b5a3d9</div>
+                    </div>
+                </div>
+
+                <div class="color-option" onclick="setAccent('#5eb89b', '#7bc9af', 'Mint Fresh', this)">
+                    <div class="color-preview" style="background: linear-gradient(135deg, #5eb89b, #7bc9af);"></div>
+                    <div class="color-info">
+                        <div class="color-name">Mint Fresh</div>
+                        <div class="color-hex">#5eb89b → #7bc9af</div>
+                    </div>
+                </div>
+
+                <div class="color-option" onclick="setAccent('#c99652', '#d9ac73', 'Amber Warm', this)">
+                    <div class="color-preview" style="background: linear-gradient(135deg, #c99652, #d9ac73);"></div>
+                    <div class="color-info">
+                        <div class="color-name">Amber Warm</div>
+                        <div class="color-hex">#c99652 → #d9ac73</div>
+                    </div>
+                </div>
+
+                <div class="color-option" onclick="setAccent('#c77799', '#d994ad', 'Pink Soft', this)">
+                    <div class="color-preview" style="background: linear-gradient(135deg, #c77799, #d994ad);"></div>
+                    <div class="color-info">
+                        <div class="color-name">Pink Soft</div>
+                        <div class="color-hex">#c77799 → #d994ad</div>
+                    </div>
+                </div>
+
+                <div class="color-option" onclick="setAccent('#b8926d', '#c9a687', 'Mokka', this)">
+                    <div class="color-preview" style="background: linear-gradient(135deg, #b8926d, #c9a687);"></div>
+                    <div class="color-info">
+                        <div class="color-name">Mokka</div>
+                        <div class="color-hex">#b8926d → #c9a687</div>
+                    </div>
+                </div>
+
+                <div class="color-option" onclick="setAccent('#5a9fb8', '#75b5c9', 'Cyan Calm', this)">
+                    <div class="color-preview" style="background: linear-gradient(135deg, #5a9fb8, #75b5c9);"></div>
+                    <div class="color-info">
+                        <div class="color-name">Cyan Calm</div>
+                        <div class="color-hex">#5a9fb8 → #75b5c9</div>
+                    </div>
+                </div>
+
+                <div class="color-option" onclick="setAccent('#c76b6b', '#d98787', 'Red Muted', this)">
+                    <div class="color-preview" style="background: linear-gradient(135deg, #c76b6b, #d98787);"></div>
+                    <div class="color-info">
+                        <div class="color-name">Red Muted</div>
+                        <div class="color-hex">#c76b6b → #d98787</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GRADIENT STYLES -->
+        <div class="section">
+            <h2 class="section-title">Styles de Gradient</h2>
+            
+            <div class="variant-grid">
+                <div class="variant-card">
+                    <div class="variant-title">Linear Gradient</div>
+                    <div class="variant-demo">
+                        <i class="ph ph-certificate icon-gradient" style="font-size: 64px;"></i>
+                    </div>
+                    <div style="margin-top: 12px; font-size: 11px; color: #888; text-align: center;">
+                        Gradient standard 135deg
+                    </div>
+                </div>
+
+                <div class="variant-card">
+                    <div class="variant-title">Subtle Glow</div>
+                    <div class="variant-demo">
+                        <i class="ph ph-certificate icon-gradient-subtle" style="font-size: 64px;"></i>
+                    </div>
+                    <div style="margin-top: 12px; font-size: 11px; color: #888; text-align: center;">
+                        Couleur unie + drop-shadow léger
+                    </div>
+                </div>
+
+                <div class="variant-card">
+                    <div class="variant-title">Double Glow</div>
+                    <div class="variant-demo">
+                        <i class="ph ph-certificate icon-gradient-glow" style="font-size: 64px;"></i>
+                    </div>
+                    <div style="margin-top: 12px; font-size: 11px; color: #888; text-align: center;">
+                        Drop-shadow avec 2 couleurs du gradient
+                    </div>
+                </div>
+
+                <div class="variant-card">
+                    <div class="variant-title">Solid Color</div>
+                    <div class="variant-demo">
+                        <i class="ph ph-certificate" style="font-size: 64px; color: var(--accent-primary);"></i>
+                    </div>
+                    <div style="margin-top: 12px; font-size: 11px; color: #888; text-align: center;">
+                        Couleur unie sans gradient (référence)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SIZE COMPARISON -->
+        <div class="section">
+            <h2 class="section-title">Sizes avec Gradient</h2>
+            <div class="size-demo">
+                <div class="size-item">
+                    <i class="ph ph-shield-check icon-gradient" style="font-size: 16px;"></i>
+                    <span class="size-label">16px (UI)</span>
+                </div>
+                <div class="size-item">
+                    <i class="ph ph-shield-check icon-gradient" style="font-size: 20px;"></i>
+                    <span class="size-label">20px (Normal)</span>
+                </div>
+                <div class="size-item">
+                    <i class="ph ph-shield-check icon-gradient" style="font-size: 24px;"></i>
+                    <span class="size-label">24px (Large)</span>
+                </div>
+                <div class="size-item">
+                    <i class="ph ph-shield-check icon-gradient" style="font-size: 32px;"></i>
+                    <span class="size-label">32px (XL)</span>
+                </div>
+                <div class="size-item">
+                    <i class="ph ph-shield-check icon-gradient" style="font-size: 48px;"></i>
+                    <span class="size-label">48px (XXL)</span>
+                </div>
+                <div class="size-item">
+                    <i class="ph ph-shield-check icon-gradient" style="font-size: 64px;"></i>
+                    <span class="size-label">64px (Hero)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ICON SHOWCASE -->
+        <div class="section">
+            <h2 class="section-title">Icônes Principales</h2>
+            
+            <div class="group">
+                <div class="group-label">Certificate & Security</div>
+                <div class="icon-showcase">
+                    <div class="icon-card">
+                        <div class="icon-display">
+                            <i class="ph ph-certificate icon-gradient"></i>
+                        </div>
+                        <div class="icon-label">Certificate</div>
+                    </div>
+                    <div class="icon-card">
+                        <div class="icon-display">
+                            <i class="ph ph-shield-check icon-gradient"></i>
+                        </div>
+                        <div class="icon-label">Shield Check</div>
+                    </div>
+                    <div class="icon-card">
+                        <div class="icon-display">
+                            <i class="ph ph-lock icon-gradient"></i>
+                        </div>
+                        <div class="icon-label">Lock</div>
+                    </div>
+                    <div class="icon-card">
+                        <div class="icon-display">
+                            <i class="ph ph-key icon-gradient"></i>
+                        </div>
+                        <div class="icon-label">Key</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Actions</div>
+                <div class="icon-showcase">
+                    <div class="icon-card">
+                        <div class="icon-display">
+                            <i class="ph ph-eye icon-gradient"></i>
+                        </div>
+                        <div class="icon-label">View</div>
+                    </div>
+                    <div class="icon-card">
+                        <div class="icon-display">
+                            <i class="ph ph-pencil-simple icon-gradient"></i>
+                        </div>
+                        <div class="icon-label">Edit</div>
+                    </div>
+                    <div class="icon-card">
+                        <div class="icon-display">
+                            <i class="ph ph-trash icon-gradient"></i>
+                        </div>
+                        <div class="icon-label">Delete</div>
+                    </div>
+                    <div class="icon-card">
+                        <div class="icon-display">
+                            <i class="ph ph-download-simple icon-gradient"></i>
+                        </div>
+                        <div class="icon-label">Download</div>
+                    </div>
+                    <div class="icon-card">
+                        <div class="icon-display">
+                            <i class="ph ph-copy icon-gradient"></i>
+                        </div>
+                        <div class="icon-label">Copy</div>
+                    </div>
+                    <div class="icon-card">
+                        <div class="icon-display">
+                            <i class="ph ph-arrow-clockwise icon-gradient"></i>
+                        </div>
+                        <div class="icon-label">Refresh</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- UI COMPONENTS -->
+        <div class="section">
+            <h2 class="section-title">Utilisation dans l'UI</h2>
+            
+            <div class="group">
+                <div class="group-label">Boutons avec Icônes</div>
+                <div class="btn-row">
+                    <button class="btn btn-primary">
+                        <i class="ph ph-plus icon-gradient"></i>
+                        New Certificate
+                    </button>
+                    <button class="btn btn-gradient">
+                        <i class="ph ph-download-simple"></i>
+                        Export All
+                    </button>
+                    <button class="btn">
+                        <i class="ph ph-funnel" style="color: var(--accent-primary);"></i>
+                        Filter
+                    </button>
+                    <button class="btn">
+                        <i class="ph ph-arrow-clockwise" style="color: var(--accent-primary);"></i>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Boutons Icônes Seuls</div>
+                <div class="btn-row">
+                    <button class="btn btn-icon">
+                        <i class="ph ph-eye icon-gradient"></i>
+                    </button>
+                    <button class="btn btn-icon">
+                        <i class="ph ph-pencil-simple icon-gradient"></i>
+                    </button>
+                    <button class="btn btn-icon">
+                        <i class="ph ph-download-simple icon-gradient"></i>
+                    </button>
+                    <button class="btn btn-icon">
+                        <i class="ph ph-copy icon-gradient"></i>
+                    </button>
+                    <button class="btn btn-icon">
+                        <i class="ph ph-trash" style="color: #e57373;"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Badges avec Icônes</div>
+                <div class="btn-row">
+                    <span class="badge badge-gradient">
+                        <i class="ph ph-certificate" style="font-size: 14px;"></i>
+                        CERTIFICATE
+                    </span>
+                    <span class="badge badge-active">
+                        <i class="ph ph-check-circle" style="font-size: 14px;"></i>
+                        VALID
+                    </span>
+                    <span class="badge badge-warning">
+                        <i class="ph ph-warning-circle" style="font-size: 14px;"></i>
+                        EXPIRING
+                    </span>
+                    <span class="badge badge-error">
+                        <i class="ph ph-x-circle" style="font-size: 14px;"></i>
+                        EXPIRED
+                    </span>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Tableau avec Icônes</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Expires</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <i class="ph ph-certificate icon-gradient" style="margin-right: 8px; vertical-align: middle; font-size: 18px;"></i>
+                                netsuit.lan.pew.pet
+                            </td>
+                            <td>
+                                <span class="badge badge-active">
+                                    <i class="ph ph-check-circle" style="font-size: 14px;"></i>
+                                    VALID
+                                </span>
+                            </td>
+                            <td>
+                                <i class="ph ph-calendar" style="margin-right: 6px; vertical-align: middle; color: #888;"></i>
+                                2027-01-19
+                            </td>
+                            <td>
+                                <button class="btn btn-icon" style="width: 28px; height: 28px;">
+                                    <i class="ph ph-eye icon-gradient"></i>
+                                </button>
+                                <button class="btn btn-icon" style="width: 28px; height: 28px;">
+                                    <i class="ph ph-download-simple icon-gradient"></i>
+                                </button>
+                                <button class="btn btn-icon" style="width: 28px; height: 28px;">
+                                    <i class="ph ph-trash" style="color: #e57373;"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <i class="ph ph-certificate icon-gradient" style="margin-right: 8px; vertical-align: middle; font-size: 18px;"></i>
+                                *.example.com
+                            </td>
+                            <td>
+                                <span class="badge badge-warning">
+                                    <i class="ph ph-warning-circle" style="font-size: 14px;"></i>
+                                    EXPIRING
+                                </span>
+                            </td>
+                            <td>
+                                <i class="ph ph-calendar" style="margin-right: 6px; vertical-align: middle; color: #888;"></i>
+                                2026-02-18
+                            </td>
+                            <td>
+                                <button class="btn btn-icon" style="width: 28px; height: 28px;">
+                                    <i class="ph ph-eye icon-gradient"></i>
+                                </button>
+                                <button class="btn btn-icon" style="width: 28px; height: 28px;">
+                                    <i class="ph ph-download-simple icon-gradient"></i>
+                                </button>
+                                <button class="btn btn-icon" style="width: 28px; height: 28px;">
+                                    <i class="ph ph-trash" style="color: #e57373;"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <i class="ph ph-shield-check icon-gradient" style="margin-right: 8px; vertical-align: middle; font-size: 18px;"></i>
+                                Root CA
+                            </td>
+                            <td>
+                                <span class="badge badge-gradient">
+                                    <i class="ph ph-shield-check" style="font-size: 14px;"></i>
+                                    ACTIVE CA
+                                </span>
+                            </td>
+                            <td>
+                                <i class="ph ph-calendar" style="margin-right: 6px; vertical-align: middle; color: #888;"></i>
+                                2035-01-01
+                            </td>
+                            <td>
+                                <button class="btn btn-icon" style="width: 28px; height: 28px;">
+                                    <i class="ph ph-eye icon-gradient"></i>
+                                </button>
+                                <button class="btn btn-icon" style="width: 28px; height: 28px;">
+                                    <i class="ph ph-gear icon-gradient"></i>
+                                </button>
+                                <button class="btn btn-icon" style="width: 28px; height: 28px;">
+                                    <i class="ph ph-dots-three-vertical icon-gradient"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- COMPARISON -->
+        <div class="section">
+            <h2 class="section-title">Avant / Après</h2>
+            
+            <div class="comparison-grid">
+                <div class="variant-card">
+                    <div class="variant-title">Sans Gradient (Original)</div>
+                    <div style="padding: 24px; background: #1a1a1a; border-radius: 3px;">
+                        <div style="display: flex; gap: 16px; align-items: center; justify-content: center; flex-wrap: wrap;">
+                            <i class="ph ph-certificate" style="font-size: 48px; color: #4a9eff;"></i>
+                            <i class="ph ph-shield-check" style="font-size: 48px; color: #4a9eff;"></i>
+                            <i class="ph ph-lock" style="font-size: 48px; color: #4a9eff;"></i>
+                            <i class="ph ph-key" style="font-size: 48px; color: #4a9eff;"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="variant-card">
+                    <div class="variant-title">Avec Gradient</div>
+                    <div style="padding: 24px; background: #1a1a1a; border-radius: 3px;">
+                        <div style="display: flex; gap: 16px; align-items: center; justify-content: center; flex-wrap: wrap;">
+                            <i class="ph ph-certificate icon-gradient" style="font-size: 48px;"></i>
+                            <i class="ph ph-shield-check icon-gradient" style="font-size: 48px;"></i>
+                            <i class="ph ph-lock icon-gradient" style="font-size: 48px;"></i>
+                            <i class="ph ph-key icon-gradient" style="font-size: 48px;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setAccent(primary, secondary, name, element) {
+            // Update CSS variables
+            document.documentElement.style.setProperty('--accent-primary', primary);
+            document.documentElement.style.setProperty('--accent-secondary', secondary);
+            document.documentElement.style.setProperty('--accent-gradient-start', primary);
+            document.documentElement.style.setProperty('--accent-gradient-end', secondary);
+            
+            // Update active state
+            document.querySelectorAll('.color-option').forEach(opt => {
+                opt.classList.remove('active');
+            });
+            element.classList.add('active');
+            
+            console.log(`Theme accent changed to: ${name}`);
+        }
+    </script>
+</body>
+</html>
