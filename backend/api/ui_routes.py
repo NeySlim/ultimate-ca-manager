@@ -1,39 +1,32 @@
 """
-UI Routes - Serve HTML templates
-Simple & modular routes for frontend pages
+UI Routes - Serve React SPA
+Single Page Application - all routes serve index.html
 """
-from flask import Blueprint, render_template, redirect, url_for, session
+from flask import Blueprint, send_from_directory, current_app
+import os
 
 ui_bp = Blueprint('ui', __name__)
 
 
-@ui_bp.route('/')
-def index():
-    """Root - redirect to login or dashboard"""
-    if session.get('user_id'):
-        return redirect(url_for('ui.dashboard'))
-    return redirect(url_for('ui.login'))
-
-
-@ui_bp.route('/login')
-def login():
-    """Login page"""
-    return render_template('auth/login.html')
-
-
-@ui_bp.route('/dashboard')
-def dashboard():
-    """Dashboard page"""
-    return render_template('index.html')
-
-
-@ui_bp.route('/certificates')
-def certificates():
-    """Certificates page"""
-    return render_template('index.html')
-
-
-@ui_bp.route('/cas')
-def cas():
-    """Certificate Authorities page"""
-    return render_template('index.html')
+@ui_bp.route('/', defaults={'path': ''})
+@ui_bp.route('/<path:path>')
+def spa(path):
+    """
+    Serve React SPA
+    - If path is a file (has extension), try to serve it from frontend/
+    - Otherwise serve index.html (React Router handles routing)
+    """
+    # Path to frontend build directory
+    frontend_dir = os.path.join(current_app.root_path, '..', 'frontend')
+    
+    # If path has an extension, it's likely a static file
+    if path and '.' in path.split('/')[-1]:
+        # Try to serve the file
+        try:
+            return send_from_directory(frontend_dir, path)
+        except:
+            # File not found, serve index.html
+            pass
+    
+    # Serve index.html for all other routes (React Router will handle)
+    return send_from_directory(frontend_dir, 'index.html')
