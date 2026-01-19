@@ -1,0 +1,37 @@
+{
+  "name": "postcss-mixins",
+  "version": "12.1.2",
+  "description": "PostCSS plugin for mixins",
+  "keywords": [
+    "postcss",
+    "css",
+    "postcss-plugin",
+    "mixins",
+    "sass"
+  ],
+  "author": "Andrey Sitnik <andrey@sitnik.ru>",
+  "license": "MIT",
+  "repository": "postcss/postcss-mixins",
+  "engines": {
+    "node": "^20.0 || ^22.0 || >=24.0"
+  },
+  "funding": [
+    {
+      "type": "opencollective",
+      "url": "https://opencollective.com/postcss/"
+    },
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/ai"
+    }
+  ],
+  "peerDependencies": {
+    "postcss": "^8.2.14"
+  },
+  "dependencies": {
+    "postcss-js": "^4.0.1",
+    "postcss-simple-vars": "^7.0.1",
+    "sugarss": "^5.0.0",
+    "tinyglobby": "^0.2.14"
+  }
+}

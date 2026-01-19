@@ -1,0 +1,6 @@
+export declare function useTimeout(callback: (...callbackParams: any[]) => void, delay: number, options?: {
+    autoInvoke: boolean;
+}): {
+    start: (...callbackParams: any[]) => void;
+    clear: () => void;
+};
