@@ -1,7 +1,7 @@
 // UCM API Client
 // Base client for all API calls with auth handling
 
-const API_BASE = '/api/v2';
+const API_BASE = '/api';
 
 class APIError extends Error {
   constructor(message, status, data) {
