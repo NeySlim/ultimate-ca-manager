@@ -1,148 +1,90 @@
-// API Client - Simple & Robust
-class API {
-  constructor(baseURL = '') {
-    this.baseURL = baseURL;
-  }
+/**
+ * API Client
+ * Handles communication with UCM Backend
+ */
+const API = {
+  baseUrl: document.querySelector('base')?.href || '/',
+  apiUrl: (document.querySelector('base')?.href || '/') + 'api/',
 
   async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
-      credentials: 'same-origin',
-      ...options
+    const url = endpoint.startsWith('http') ? endpoint : this.apiUrl + endpoint;
+    
+    const defaultHeaders = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
     };
 
-    if (options.body && typeof options.body === 'object') {
-      config.body = JSON.stringify(options.body);
-    }
+    const config = {
+      ...options,
+      headers: { ...defaultHeaders, ...options.headers }
+    };
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Server returned an error
-        const error = new Error(data.message || `HTTP ${response.status}`);
-        error.status = response.status;
-        error.data = data;
-        throw error;
+      
+      if (response.status === 401) {
+        // Unauthorized - redirect to login if not already there
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = 'login';
+        }
+        throw new Error('Unauthorized');
       }
 
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'API Request Failed');
+      }
+      
       return data;
     } catch (error) {
-      // Network error or parsing error
-      if (!error.status) {
-        error.message = error.message || 'Network error';
-      }
+      console.error('API Error:', error);
       throw error;
     }
-  }
+  },
 
-  get(endpoint, options = {}) {
-    return this.request(endpoint, { ...options, method: 'GET' });
-  }
+  get(endpoint) {
+    return this.request(endpoint, { method: 'GET' });
+  },
 
-  post(endpoint, body, options = {}) {
-    return this.request(endpoint, { ...options, method: 'POST', body });
-  }
+  post(endpoint, body) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+  },
 
-  put(endpoint, body, options = {}) {
-    return this.request(endpoint, { ...options, method: 'PUT', body });
-  }
+  put(endpoint, body) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(body)
+    });
+  },
 
-  delete(endpoint, options = {}) {
-    return this.request(endpoint, { ...options, method: 'DELETE' });
-  }
-}
+  delete(endpoint) {
+    return this.request(endpoint, { method: 'DELETE' });
+  },
 
-// Auth API
-class AuthAPI extends API {
-  async login(username, password) {
-    return this.post('/api/auth/login', { username, password });
-  }
+  // Auth methods
+  auth: {
+    login: async (username, password) => {
+      // Note: Backend seems to use /api/auth/login or similar. 
+      // Checking api/v2 routes might be needed.
+      // Assuming standard JWT login flow based on app.py
+      return API.post('auth/login', { username, password });
+    },
+    logout: async () => {
+      // Clear local storage if any
+      localStorage.removeItem('ucm-token'); // If we were using manual token storage
+      window.location.href = 'login';
+    }
+  },
 
-  async logout() {
-    return this.post('/api/auth/logout');
+  // Data methods
+  certs: {
+    list: () => API.get('certificates'),
+    stats: () => API.get('stats') // Hypothetical endpoint
   }
-
-  async verify() {
-    return this.get('/api/auth/verify');
-  }
-
-  async getCurrentUser() {
-    return this.get('/api/auth/me');
-  }
-}
-
-// Certificates API
-class CertificatesAPI extends API {
-  async list(params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return this.get(`/api/certificates${query ? '?' + query : ''}`);
-  }
-
-  async get(id) {
-    return this.get(`/api/certificates/${id}`);
-  }
-
-  async create(data) {
-    return this.post('/api/certificates', data);
-  }
-
-  async revoke(id, reason) {
-    return this.post(`/api/certificates/${id}/revoke`, { reason });
-  }
-
-  async delete(id) {
-    return this.delete(`/api/certificates/${id}`);
-  }
-
-  async download(id, format = 'pem') {
-    return this.get(`/api/certificates/${id}/download?format=${format}`);
-  }
-}
-
-// CAs API
-class CAsAPI extends API {
-  async list() {
-    return this.get('/api/cas');
-  }
-
-  async get(id) {
-    return this.get(`/api/cas/${id}`);
-  }
-
-  async create(data) {
-    return this.post('/api/cas', data);
-  }
-
-  async update(id, data) {
-    return this.put(`/api/cas/${id}`, data);
-  }
-
-  async delete(id) {
-    return this.delete(`/api/cas/${id}`);
-  }
-}
-
-// Dashboard API
-class DashboardAPI extends API {
-  async getStats() {
-    return this.get('/api/dashboard/stats');
-  }
-}
-
-// Export unified API client
-const api = {
-  auth: new AuthAPI(),
-  certificates: new CertificatesAPI(),
-  cas: new CAsAPI(),
-  dashboard: new DashboardAPI()
 };
 
-if (typeof window !== 'undefined') {
-  window.api = api;
-}
+window.API = API;

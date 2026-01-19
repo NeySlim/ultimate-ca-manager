@@ -1,190 +1,59 @@
-/* Buttons - Modular & Reusable */
-
+/* Button Component */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  height: var(--btn-md);
-  padding: var(--btn-padding-md);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  line-height: 1;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-  user-select: none;
-  text-decoration: none;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
 }
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-/* Sizes */
-.btn-sm {
-  height: var(--btn-sm);
-  padding: var(--btn-padding-sm);
-  font-size: var(--text-xs);
-}
-
-.btn-lg {
-  height: var(--btn-lg);
-  padding: var(--btn-padding-lg);
-  font-size: var(--text-base);
-}
-
-/* Variants */
 .btn-primary {
-  background: var(--primary-500);
+  background-color: var(--primary);
   color: white;
 }
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--primary-600);
-}
-
-.btn-primary:active:not(:disabled) {
-  background: var(--primary-700);
+.btn-primary:hover {
+  background-color: var(--primary-hover);
 }
 
 .btn-secondary {
-  background: var(--bg-secondary);
+  background-color: var(--bg-hover);
   color: var(--text-primary);
-  border-color: var(--border-color);
+  border: 1px solid var(--border-light);
+}
+.btn-secondary:hover {
+  background-color: var(--bg-active);
 }
 
-.btn-secondary:hover:not(:disabled) {
-  background: var(--bg-tertiary);
-  border-color: var(--border-hover);
+.btn-danger {
+  background-color: rgba(255, 59, 48, 0.1);
+  color: var(--error);
+}
+.btn-danger:hover {
+  background-color: var(--error);
+  color: white;
 }
 
 .btn-ghost {
   background: transparent;
   color: var(--text-secondary);
 }
-
-.btn-ghost:hover:not(:disabled) {
-  background: var(--bg-secondary);
+.btn-ghost:hover {
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 
-.btn-danger {
-  background: var(--danger-500);
-  color: white;
-}
+/* Sizes */
+.btn-sm { padding: 4px 8px; font-size: 12px; }
+.btn-lg { padding: 12px 24px; font-size: 16px; }
 
-.btn-danger:hover:not(:disabled) {
-  background: var(--danger-600);
-}
-
-.btn-success {
-  background: var(--success-500);
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background: var(--success-600);
-}
-
-.btn-outline {
-  background: transparent;
-  border-color: var(--primary-500);
-  color: var(--primary-500);
-}
-
-.btn-outline:hover:not(:disabled) {
-  background: var(--primary-500);
-  color: white;
-}
-
-/* Icon Button */
-.btn-icon {
-  width: var(--btn-md);
-  padding: 0;
-}
-
-.btn-icon.btn-sm {
-  width: var(--btn-sm);
-}
-
-.btn-icon.btn-lg {
-  width: var(--btn-lg);
-}
-
-.btn-icon svg {
-  width: 20px;
-  height: 20px;
-}
-
-.btn-icon.btn-sm svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Button Group */
-.btn-group {
-  display: inline-flex;
-  gap: 0;
-}
-
-.btn-group .btn {
-  border-radius: 0;
-}
-
-.btn-group .btn:first-child {
-  border-top-left-radius: var(--radius-md);
-  border-bottom-left-radius: var(--radius-md);
-}
-
-.btn-group .btn:last-child {
-  border-top-right-radius: var(--radius-md);
-  border-bottom-right-radius: var(--radius-md);
-}
-
-.btn-group .btn + .btn {
-  margin-left: -1px;
-}
-
-/* Loading State */
-.btn-loading {
-  position: relative;
-  color: transparent;
-  pointer-events: none;
-}
-
-.btn-loading::after {
-  content: '';
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  top: 50%;
-  left: 50%;
-  margin-left: -8px;
-  margin-top: -8px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  border-right-color: transparent;
-  animation: btn-spin 0.6s linear infinite;
-  color: var(--text-primary);
-}
-
-.btn-primary.btn-loading::after,
-.btn-danger.btn-loading::after,
-.btn-success.btn-loading::after {
-  color: white;
-}
-
-@keyframes btn-spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Full Width */
-.btn-block {
-  width: 100%;
-  display: flex;
+/* Disabled state */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

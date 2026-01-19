@@ -89,4 +89,4 @@ USER ucm
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command - Use Gunicorn for production
-CMD ["gunicorn", "--config", "/app/gunicorn.conf.py", "wsgi:app"]
+CMD ["sh", "-c", "UCM_BASE_PATH=/app gunicorn --config /app/gunicorn.conf.py wsgi:app"]
