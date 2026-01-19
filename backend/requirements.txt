@@ -51,3 +51,4 @@ flake8==7.3.0
 
 # Email validation (optional but recommended)
 email-validator==2.3.0
+Flask-Session==0.8.0
