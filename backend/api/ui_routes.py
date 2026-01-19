@@ -24,16 +24,16 @@ def login():
 @ui_bp.route('/dashboard')
 def dashboard():
     """Dashboard page"""
-    return render_template('dashboard.html')
+    return render_template('index.html')
 
 
 @ui_bp.route('/certificates')
 def certificates():
     """Certificates page"""
-    return render_template('dashboard.html')  # Temporary - same as dashboard
+    return render_template('index.html')
 
 
 @ui_bp.route('/cas')
 def cas():
     """Certificate Authorities page"""
-    return render_template('dashboard.html')  # Temporary - same as dashboard
+    return render_template('index.html')

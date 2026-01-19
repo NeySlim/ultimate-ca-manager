@@ -8,6 +8,7 @@ User=ucm
 Group=ucm
 WorkingDirectory=/opt/ucm/backend
 Environment="PATH=/opt/ucm/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/etc/ucm/ucm.env
 
 # Security hardening
 NoNewPrivileges=true

@@ -22,8 +22,8 @@ limit_request_fields = 100
 limit_request_field_size = 8190
 
 # SSL/TLS - paths for native installation
-certfile = os.getenv('HTTPS_CERT_PATH', '/var/lib/ucm/https_cert.pem')
-keyfile = os.getenv('HTTPS_KEY_PATH', '/var/lib/ucm/https_key.pem')
+certfile = os.getenv('HTTPS_CERT_PATH', '/opt/ucm/backend/data/https_cert.pem')
+keyfile = os.getenv('HTTPS_KEY_PATH', '/opt/ucm/backend/data/https_key.pem')
 ssl_version = 'TLSv1_2'
 cert_reqs = 0  # Don't require client certificate
 do_handshake_on_connect = True
