@@ -123,7 +123,7 @@ export const authAPI = {
 
   async getCurrentUser() {
     const api = new APIClient();
-    return api.get('/auth/me');
+    return api.get('/auth/verify');
   },
 
   async checkWebAuthn() {
@@ -187,7 +187,73 @@ export const casAPI = {
 export const statsAPI = {
   async dashboard() {
     const api = new APIClient();
-    return api.get('/stats/dashboard');
+    return api.get('/dashboard/stats');
+  }
+};
+
+// Users API  
+export const usersAPI = {
+  async list(params = {}) {
+    const api = new APIClient();
+    return api.get('/settings/users', params);
+  },
+
+  async create(data) {
+    const api = new APIClient();
+    return api.post('/settings/users', data);
+  },
+
+  async update(id, data) {
+    const api = new APIClient();
+    return api.patch(`/settings/users/${id}`, data);
+  },
+
+  async delete(id) {
+    const api = new APIClient();
+    return api.delete(`/settings/users/${id}`);
+  }
+};
+
+// Settings API
+export const settingsAPI = {
+  async getGeneral() {
+    const api = new APIClient();
+    return api.get('/settings/general');
+  },
+
+  async updateGeneral(data) {
+    const api = new APIClient();
+    return api.patch('/settings/general', data);
+  },
+
+  async getEmail() {
+    const api = new APIClient();
+    return api.get('/settings/email');
+  },
+
+  async updateEmail(data) {
+    const api = new APIClient();
+    return api.patch('/settings/email', data);
+  },
+
+  async testEmail() {
+    const api = new APIClient();
+    return api.post('/settings/email/test');
+  },
+
+  async getBackup() {
+    const api = new APIClient();
+    return api.get('/settings/backup');
+  },
+
+  async createBackup() {
+    const api = new APIClient();
+    return api.post('/settings/backup/create');
+  },
+
+  async restoreBackup(backupId) {
+    const api = new APIClient();
+    return api.post('/settings/backup/restore', { backup_id: backupId });
   }
 };
 
