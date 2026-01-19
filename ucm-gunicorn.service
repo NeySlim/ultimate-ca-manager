@@ -22,7 +22,7 @@ ExecStartPre=/opt/ucm/extract_mtls_ca.sh
 
 # Start Gunicorn with mTLS support
 ExecStart=/opt/ucm/venv/bin/gunicorn \
-  --workers 4 \
+  --workers 1 \
   --bind 0.0.0.0:8443 \
   --certfile=/opt/ucm/backend/data/https_cert.pem \
   --keyfile=/opt/ucm/backend/data/https_key.pem \
