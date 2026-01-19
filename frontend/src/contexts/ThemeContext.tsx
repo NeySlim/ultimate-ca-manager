@@ -3,17 +3,18 @@
  * Manages palette, color scheme, and density with localStorage persistence
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { MantineProvider, MantineTheme, createTheme, MantineColorsTuple } from '@mantine/core';
+import { createContext, useContext, useState } from 'react';
+import type { ReactNode } from 'react';
+import { MantineProvider, createTheme } from '@mantine/core';
+import type { MantineColorsTuple } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { ModalsProvider } from '@mantine/modals';
-import { ColorPalette, ColorScheme, DensityLevel, ThemeConfig } from '../types/theme';
+import type { ColorPalette, ColorScheme, DensityLevel } from '../types/theme';
 import { PALETTES } from '../styles/palettes';
 import { DENSITY_CONFIGS } from '../styles/density';
 
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
-import '@mantine/modals/styles.css';
 
 interface ThemeContextValue {
   palette: ColorPalette;
