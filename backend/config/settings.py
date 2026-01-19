@@ -205,6 +205,11 @@ class Config:
     JWT_HEADER_TYPE = "Bearer"
     
     # Session Configuration
+    SESSION_TYPE = 'filesystem'  # Filesystem-based sessions for multi-worker support
+    SESSION_FILE_DIR = DATA_DIR / 'sessions'  # Store sessions in data directory
+    SESSION_PERMANENT = True
+    SESSION_USE_SIGNER = True  # Sign session cookies
+    SESSION_KEY_PREFIX = 'ucm_session:'
     SESSION_COOKIE_SECURE = True  # HTTPS only
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
