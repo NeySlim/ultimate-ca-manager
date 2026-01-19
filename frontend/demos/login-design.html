@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UCM - Login</title>
+    
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        :root {
+            --accent-primary: #5a8fc7;
+            --accent-secondary: #7aa5d9;
+            --accent-gradient-start: #5a8fc7;
+            --accent-gradient-end: #7aa5d9;
+            
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #1e1e1e;
+            --bg-tertiary: #252525;
+            --bg-hover: #2a2a2a;
+            
+            --text-primary: #e8e8e8;
+            --text-secondary: #ccc;
+            --text-tertiary: #888;
+            --text-muted: #555;
+            
+            --border-primary: #333;
+            --border-secondary: #3a3a3a;
+            --border-tertiary: #444;
+            
+            --status-success: #81c784;
+            --status-warning: #ffb74d;
+            --status-error: #e57373;
+            --status-info: #64b5f6;
+            
+            --radius: 3px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* ICON GRADIENT */
+        .icon-gradient {
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* LOGIN CONTAINER */
+        .login-container {
+            width: 100%;
+            max-width: 420px;
+        }
+
+        /* LOGO & HEADER */
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-logo {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .login-title {
+            font-size: 24px;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .login-subtitle {
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }
+
+        /* LOGIN CARD */
+        .login-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius);
+            padding: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* AUTH METHODS */
+        .auth-method {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .auth-method.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* STATUS INDICATOR */
+        .auth-status {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .auth-status-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            display: inline-block;
+        }
+
+        .auth-status-icon.checking {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .auth-status-text {
+            font-size: 15px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .auth-status-subtext {
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }
+
+        /* SPINNER */
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border-primary);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* FORMS */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .form-input {
+            width: 100%;
+            height: 40px;
+            padding: 0 12px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(90, 143, 199, 0.1);
+        }
+
+        .form-input.error {
+            border-color: var(--status-error);
+        }
+
+        .form-input.success {
+            border-color: var(--status-success);
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            pointer-events: none;
+        }
+
+        .input-group .form-input {
+            padding-left: 40px;
+        }
+
+        .input-action {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .input-action:hover {
+            color: var(--text-primary);
+        }
+
+        /* CHECKBOX */
+        .form-checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .form-checkbox {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .form-checkbox-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* BUTTONS */
+        .btn {
+            width: 100%;
+            height: 40px;
+            padding: 0 16px;
+            background: #333;
+            border: 1px solid var(--border-tertiary);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: var(--bg-hover);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            border-color: var(--accent-primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            filter: brightness(1.1);
+        }
+
+        .btn-secondary {
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+            background: transparent;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(90, 143, 199, 0.1);
+        }
+
+        /* ERROR MESSAGE */
+        .error-message {
+            background: #2e1e1e;
+            border: 1px solid #4a2d2d;
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: var(--status-error);
+            font-size: 13px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: flex;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .error-message-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        /* SUCCESS MESSAGE */
+        .success-message {
+            background: #1e2e22;
+            border: 1px solid #2d4a35;
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: var(--status-success);
+            font-size: 13px;
+            display: none;
+        }
+
+        .success-message.show {
+            display: flex;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        /* DIVIDER */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        .divider-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border-primary);
+        }
+
+        .divider-text {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* FOOTER LINKS */
+        .login-footer {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .login-link {
+            color: var(--accent-primary);
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+
+        .login-link:hover {
+            color: var(--accent-secondary);
+            text-decoration: underline;
+        }
+
+        /* USER INFO (for "Not you?") */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .user-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .user-email {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .user-switch {
+            background: transparent;
+            border: none;
+            color: var(--text-tertiary);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .user-switch:hover {
+            color: var(--accent-primary);
+        }
+
+        /* ALTERNATIVE METHODS */
+        .alt-methods {
+            margin-top: 20px;
+        }
+
+        .alt-method-btn {
+            width: 100%;
+            height: 40px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .alt-method-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-primary);
+        }
+
+        .alt-method-btn i {
+            font-size: 18px;
+        }
+
+        /* INFO BOX */
+        .info-box {
+            background: #1e2a35;
+            border: 1px solid #2d4a5f;
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-top: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: #9cc5e8;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .info-box-icon {
+            font-size: 16px;
+            color: var(--status-info);
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <!-- HEADER -->
+        <div class="login-header">
+            <div class="login-logo">
+                <i class="ph ph-shield-check icon-gradient"></i>
+            </div>
+            <h1 class="login-title">UCM Login</h1>
+            <p class="login-subtitle">Ultimate Certificate Manager</p>
+        </div>
+
+        <!-- LOGIN CARD -->
+        <div class="login-card">
+            
+            <!-- METHOD 1: CHECKING AUTH -->
+            <div class="auth-method active" id="auth-checking">
+                <div class="auth-status">
+                    <div class="auth-status-icon checking">
+                        <div class="spinner"></div>
+                    </div>
+                    <div class="auth-status-text">Checking authentication...</div>
+                    <div class="auth-status-subtext">Trying certificate-based login</div>
+                </div>
+                
+                <div class="info-box">
+                    <div class="info-box-icon"><i class="ph ph-info"></i></div>
+                    <div>
+                        Attempting automatic authentication via client certificate (mTLS). If no certificate is found, we'll try WebAuthn, then fall back to password.
+                    </div>
+                </div>
+            </div>
+
+            <!-- METHOD 2: WEBAUTHN -->
+            <div class="auth-method" id="auth-webauthn">
+                <div class="auth-status">
+                    <div class="auth-status-icon">
+                        <i class="ph ph-fingerprint icon-gradient" style="font-size: 48px;"></i>
+                    </div>
+                    <div class="auth-status-text">Use your security key</div>
+                    <div class="auth-status-subtext">Touch your security key or use biometrics</div>
+                </div>
+
+                <button class="btn btn-primary" onclick="tryWebAuthn()">
+                    <i class="ph ph-fingerprint"></i>
+                    Authenticate with WebAuthn
+                </button>
+
+                <div class="divider">
+                    <div class="divider-line"></div>
+                    <div class="divider-text">or</div>
+                    <div class="divider-line"></div>
+                </div>
+
+                <button class="btn btn-secondary" onclick="switchToPassword()">
+                    <i class="ph ph-key"></i>
+                    Use password instead
+                </button>
+            </div>
+
+            <!-- METHOD 3: PASSWORD LOGIN -->
+            <div class="auth-method" id="auth-password">
+                <!-- User Info (if remembered) -->
+                <div class="user-info" id="user-info" style="display: none;">
+                    <div class="user-avatar">
+                        <i class="ph ph-user"></i>
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name" id="remembered-name">Admin User</div>
+                        <div class="user-email" id="remembered-email">admin@example.com</div>
+                    </div>
+                    <button class="user-switch" onclick="switchUser()" title="Not you?">
+                        <i class="ph ph-x"></i>
+                    </button>
+                </div>
+
+                <!-- Error Message -->
+                <div class="error-message" id="error-message">
+                    <div class="error-message-icon"><i class="ph ph-warning-circle"></i></div>
+                    <div id="error-text">Invalid username or password</div>
+                </div>
+
+                <!-- Success Message -->
+                <div class="success-message" id="success-message">
+                    <div class="error-message-icon"><i class="ph ph-check-circle"></i></div>
+                    <div>Login successful! Redirecting...</div>
+                </div>
+
+                <!-- Login Form -->
+                <form id="login-form" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="username">Username</label>
+                        <div class="input-group">
+                            <i class="input-icon ph ph-user icon-gradient"></i>
+                            <input 
+                                type="text" 
+                                id="username" 
+                                class="form-input" 
+                                placeholder="Enter your username"
+                                autocomplete="username"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="password">Password</label>
+                        <div class="input-group">
+                            <i class="input-icon ph ph-lock icon-gradient"></i>
+                            <input 
+                                type="password" 
+                                id="password" 
+                                class="form-input" 
+                                placeholder="Enter your password"
+                                autocomplete="current-password"
+                                required
+                            >
+                            <button type="button" class="input-action" onclick="togglePassword()" title="Show password">
+                                <i class="ph ph-eye" id="password-toggle-icon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-checkbox-group">
+                        <input type="checkbox" id="remember" class="form-checkbox">
+                        <label for="remember" class="form-checkbox-label">Remember me</label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="login-btn">
+                        <i class="ph ph-sign-in"></i>
+                        Sign In
+                    </button>
+                </form>
+
+                <div class="login-footer">
+                    <a href="#" class="login-link" onclick="alert('Password reset functionality'); return false;">
+                        Forgot password?
+                    </a>
+                </div>
+
+                <!-- Alternative Methods -->
+                <div class="alt-methods">
+                    <div class="divider">
+                        <div class="divider-line"></div>
+                        <div class="divider-text">Alternative Methods</div>
+                        <div class="divider-line"></div>
+                    </div>
+
+                    <button class="alt-method-btn" onclick="switchToWebAuthn()">
+                        <i class="ph ph-fingerprint icon-gradient"></i>
+                        Login with WebAuthn
+                    </button>
+
+                    <button class="alt-method-btn" onclick="alert('Certificate login'); return false;">
+                        <i class="ph ph-certificate icon-gradient"></i>
+                        Login with Certificate
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Simulate auth flow
+        let currentMethod = 'checking';
+        let passwordVisible = false;
+        let rememberUser = localStorage.getItem('ucm_remember_user');
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            // Simulate checking for mTLS
+            setTimeout(() => {
+                // No mTLS found, try WebAuthn
+                switchMethod('webauthn');
+            }, 2000);
+
+            // Check if user should be remembered
+            if (rememberUser) {
+                const userData = JSON.parse(rememberUser);
+                document.getElementById('remembered-name').textContent = userData.name;
+                document.getElementById('remembered-email').textContent = userData.email;
+                document.getElementById('username').value = userData.username;
+                document.getElementById('user-info').style.display = 'flex';
+            }
+        });
+
+        function switchMethod(method) {
+            // Hide all methods
+            document.querySelectorAll('.auth-method').forEach(el => {
+                el.classList.remove('active');
+            });
+
+            // Show selected method
+            document.getElementById('auth-' + method).classList.add('active');
+            currentMethod = method;
+        }
+
+        function tryWebAuthn() {
+            // Simulate WebAuthn attempt
+            const btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div> Waiting for security key...';
+
+            setTimeout(() => {
+                // WebAuthn failed or not available, fallback to password
+                switchToPassword();
+            }, 3000);
+        }
+
+        function switchToWebAuthn() {
+            switchMethod('webauthn');
+        }
+
+        function switchToPassword() {
+            switchMethod('password');
+        }
+
+        function switchUser() {
+            localStorage.removeItem('ucm_remember_user');
+            document.getElementById('user-info').style.display = 'none';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        function togglePassword() {
+            const input = document.getElementById('password');
+            const icon = document.getElementById('password-toggle-icon');
+            
+            passwordVisible = !passwordVisible;
+            
+            if (passwordVisible) {
+                input.type = 'text';
+                icon.className = 'ph ph-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'ph ph-eye';
+            }
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const remember = document.getElementById('remember').checked;
+            const btn = document.getElementById('login-btn');
+            const errorMsg = document.getElementById('error-message');
+            const successMsg = document.getElementById('success-message');
+
+            // Hide previous messages
+            errorMsg.classList.remove('show');
+            successMsg.classList.remove('show');
+
+            // Disable button
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div> Signing in...';
+
+            // Simulate API call
+            setTimeout(() => {
+                // Check credentials (demo)
+                if (username === 'admin' && password === 'changeme123') {
+                    // Success
+                    successMsg.classList.add('show');
+                    
+                    // Remember user if checked
+                    if (remember) {
+                        localStorage.setItem('ucm_remember_user', JSON.stringify({
+                            username: username,
+                            name: 'Admin User',
+                            email: 'admin@example.com'
+                        }));
+                    }
+
+                    // Redirect after 1.5s
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 1500);
+                } else {
+                    // Error
+                    errorMsg.classList.add('show');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="ph ph-sign-in"></i> Sign In';
+                    
+                    // Add error styling to inputs
+                    document.getElementById('username').classList.add('error');
+                    document.getElementById('password').classList.add('error');
+                    
+                    // Remove error styling after 3s
+                    setTimeout(() => {
+                        document.getElementById('username').classList.remove('error');
+                        document.getElementById('password').classList.remove('error');
+                    }, 3000);
+                }
+            }, 1500);
+        }
+    </script>
+</body>
+</html>
