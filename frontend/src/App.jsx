@@ -4,6 +4,10 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import CertificatesPage from './pages/CertificatesPage';
+import CAsPage from './pages/CAsPage';
+import UsersPage from './pages/UsersPage';
+import SettingsPage from './pages/SettingsPage';
 
 function App() {
   return (
@@ -22,13 +26,13 @@ function App() {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="certificates" element={<div>Certificates (TODO)</div>} />
-            <Route path="cas" element={<div>CAs (TODO)</div>} />
+            <Route path="certificates" element={<CertificatesPage />} />
+            <Route path="cas" element={<CAsPage />} />
             <Route path="acme" element={<div>ACME (TODO)</div>} />
             <Route path="scep" element={<div>SCEP (TODO)</div>} />
             <Route path="import" element={<div>Import (TODO)</div>} />
-            <Route path="users" element={<div>Users (TODO)</div>} />
-            <Route path="settings" element={<div>Settings (TODO)</div>} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

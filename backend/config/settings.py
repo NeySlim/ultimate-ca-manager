@@ -12,16 +12,13 @@ from dotenv import load_dotenv
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = BASE_DIR / "backend"
-DATA_DIR = BACKEND_DIR / "data"
+# In /opt/ucm: data is at same level as backend/, not inside it
+DATA_DIR = BASE_DIR / "data"
 
 # Ensure data directories exist
 DATA_DIR.mkdir(exist_ok=True)
-(DATA_DIR / "ca").mkdir(exist_ok=True)
-(DATA_DIR / "certs").mkdir(exist_ok=True)
-(DATA_DIR / "private").mkdir(mode=0o700, exist_ok=True)
-(DATA_DIR / "crl").mkdir(exist_ok=True)
-(DATA_DIR / "scep").mkdir(exist_ok=True)
-(DATA_DIR / "backups").mkdir(exist_ok=True)
+# Don't create subdirectories at module import time (permission issues)
+# They will be created on-demand when needed
 
 # Load environment variables
 load_dotenv(BASE_DIR / ".env")
