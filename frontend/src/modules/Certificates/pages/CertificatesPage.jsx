@@ -1,33 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useView } from '../../../core/context/ViewContext';
+import { useSelection } from '../../../core/context/SelectionContext';
 import CertificateListView from '../components/CertificateListView';
 import CertificateGridView from '../components/CertificateGridView';
-
-const MOCK_DATA = [
-  { id: 1, name: 'api.example.com', modified: '2 days ago', algo: 'RSA 2048', expiresIn: '245 days', status: 'Valid', icon: 'cert' },
-  { id: 2, name: 'web.app.com', modified: '5 days ago', algo: 'RSA 2048', expiresIn: '45 days', status: 'Warning', icon: 'cert' },
-  { id: 3, name: 'mail.srv.com', modified: '1 week ago', algo: 'RSA 4096', expiresIn: '320 days', status: 'Valid', icon: 'cert' },
-  { id: 4, name: 'vpn.gateway.lan', modified: '3 months ago', algo: 'EC P-256', expiresIn: '-5 days', status: 'Error', icon: 'lock' },
-  { id: 5, name: 'ldap.corp.internal', modified: '2 weeks ago', algo: 'RSA 2048', expiresIn: '180 days', status: 'Valid', icon: 'cert' },
-  { id: 6, name: 'db.prod.internal', modified: '1 month ago', algo: 'RSA 2048', expiresIn: '300 days', status: 'Valid', icon: 'cert' },
-  { id: 7, name: 'monitoring.sys', modified: '1 day ago', algo: 'EC P-384', expiresIn: '90 days', status: 'Valid', icon: 'cert' },
-];
+import { CertificateService } from '../services/certificates.service';
+import { Loader, Center } from '@mantine/core';
 
 const CertificatesPage = () => {
   const { viewMode } = useView();
-  const [selectedId, setSelectedId] = useState(1);
+  const { selectedItem, setSelectedItem } = useSelection();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const data = await CertificateService.getAll();
+            setItems(data);
+            // Auto-select first item if nothing selected
+            if (data.length > 0 && !selectedItem) {
+                setSelectedItem(data[0]);
+            }
+        } catch (error) {
+            console.error("Failed to load certificates", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    loadData();
+  }, []);
 
   const handleSelect = (item) => {
-    setSelectedId(item.id);
-    // In future: setGlobalSelection(item); for PreviewPanel
+    setSelectedItem(item);
   };
+
+  if (loading) {
+      return (
+          <Center style={{ height: '100%' }}>
+              <Loader color="blue" type="bars" />
+          </Center>
+      );
+  }
 
   const ViewComponent = viewMode === 'grid' ? CertificateGridView : CertificateListView;
 
   return (
     <ViewComponent 
-      items={MOCK_DATA} 
-      selectedId={selectedId} 
+      items={items} 
+      selectedId={selectedItem?.id} 
       onSelect={handleSelect} 
     />
   );
