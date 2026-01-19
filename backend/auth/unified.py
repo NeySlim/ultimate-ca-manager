@@ -15,9 +15,8 @@ import jwt
 
 # Import models (will be created)
 try:
-    from backend.models.api_key import APIKey
-    from backend.models.user import User
-    from backend.extensions import db
+    from models import User, db
+    from models.api_key import APIKey
 except ImportError:
     # For testing without full app
     APIKey = None
@@ -172,7 +171,7 @@ class AuthManager:
             return None
         
         user = User.query.get(user_id)
-        if not user or not user.is_active:
+        if not user or not user.active:
             return None
         
         return {
