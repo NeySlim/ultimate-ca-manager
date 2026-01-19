@@ -16,7 +16,8 @@ const API = {
 
     const config = {
       ...options,
-      headers: { ...defaultHeaders, ...options.headers }
+      headers: { ...defaultHeaders, ...options.headers },
+      credentials: 'include' // Send cookies with requests
     };
 
     try {
