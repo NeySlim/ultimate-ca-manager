@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UCM Design System - Reference</title>
+    
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        :root {
+            /* Accent Colors (changeable via theme) */
+            --accent-primary: #5a8fc7;
+            --accent-secondary: #7aa5d9;
+            --accent-gradient-start: #5a8fc7;
+            --accent-gradient-end: #7aa5d9;
+            
+            /* Base Colors */
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #1e1e1e;
+            --bg-tertiary: #252525;
+            --bg-hover: #2a2a2a;
+            
+            /* Text Colors */
+            --text-primary: #e8e8e8;
+            --text-secondary: #ccc;
+            --text-tertiary: #888;
+            --text-muted: #555;
+            
+            /* Border Colors */
+            --border-primary: #333;
+            --border-secondary: #3a3a3a;
+            --border-tertiary: #444;
+            
+            /* Status Colors */
+            --status-success: #81c784;
+            --status-warning: #ffb74d;
+            --status-error: #e57373;
+            --status-info: #64b5f6;
+            
+            /* Spacing */
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 12px;
+            --spacing-lg: 16px;
+            --spacing-xl: 20px;
+            
+            /* Border Radius */
+            --radius: 3px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* HEADER */
+        .header {
+            background: var(--bg-secondary);
+            padding: var(--spacing-xl);
+            margin-bottom: var(--spacing-xl);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius);
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: var(--spacing-sm);
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: var(--text-tertiary);
+            font-size: 13px;
+        }
+
+        /* THEME SELECTOR */
+        .theme-selector {
+            background: var(--bg-secondary);
+            padding: var(--spacing-lg) var(--spacing-xl);
+            margin-bottom: var(--spacing-xl);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius);
+        }
+
+        .theme-selector-label {
+            font-size: 13px;
+            color: var(--text-tertiary);
+            margin-bottom: var(--spacing-md);
+            display: block;
+            font-weight: 600;
+        }
+
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: var(--spacing-md);
+        }
+
+        .theme-option {
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-primary);
+            border-radius: var(--radius);
+            padding: var(--spacing-md);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .theme-option:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-tertiary);
+        }
+
+        .theme-option.active {
+            border-color: var(--accent-primary);
+            background: var(--bg-hover);
+        }
+
+        .theme-preview {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius);
+            flex-shrink: 0;
+        }
+
+        .theme-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .theme-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .theme-hex {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* SECTION */
+        .section {
+            background: var(--bg-secondary);
+            padding: var(--spacing-xl);
+            margin-bottom: var(--spacing-xl);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius);
+        }
+
+        .section-title {
+            font-size: 20px;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: var(--spacing-lg);
+            padding-bottom: var(--spacing-sm);
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        .group {
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .group:last-child {
+            margin-bottom: 0;
+        }
+
+        .group-label {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: var(--spacing-md);
+            font-weight: 600;
+        }
+
+        /* BUTTONS */
+        .btn {
+            height: 26px;
+            padding: 0 12px;
+            background: #333;
+            border: 1px solid var(--border-tertiary);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: var(--bg-hover);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            color: var(--accent-secondary);
+            border-color: var(--accent-secondary);
+        }
+
+        .btn-success {
+            color: var(--status-success);
+            border-color: var(--status-success);
+        }
+
+        .btn-danger {
+            color: var(--status-error);
+            border-color: var(--status-error);
+        }
+
+        .btn-icon {
+            width: 26px;
+            padding: 0;
+            justify-content: center;
+        }
+
+        .btn-sm {
+            height: 22px;
+            padding: 0 8px;
+            font-size: 11px;
+        }
+
+        .btn-lg {
+            height: 32px;
+            padding: 0 16px;
+            font-size: 14px;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: var(--spacing-sm);
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        /* ICON GRADIENT */
+        .icon-gradient {
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* BADGES */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius);
+            font-size: 11px;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        .badge-active {
+            color: var(--status-success);
+        }
+
+        .badge-warning {
+            color: var(--status-warning);
+        }
+
+        .badge-error {
+            color: var(--status-error);
+        }
+
+        .badge-info {
+            color: var(--status-info);
+        }
+
+        .badge-neutral {
+            color: var(--text-secondary);
+        }
+
+        /* FORMS */
+        .form-group {
+            margin-bottom: var(--spacing-md);
+        }
+
+        .form-label {
+            display: block;
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-bottom: var(--spacing-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            height: 30px;
+            padding: 0 10px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .form-textarea {
+            height: 80px;
+            padding: 8px 10px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: flex;
+            gap: var(--spacing-md);
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        /* TABLES */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .table-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-md);
+            gap: var(--spacing-md);
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 300px;
+        }
+
+        .items-per-page {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            color: var(--text-tertiary);
+            font-size: 13px;
+        }
+
+        .items-per-page select {
+            height: 28px;
+            padding: 0 8px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-primary);
+        }
+
+        thead {
+            background: var(--bg-tertiary);
+        }
+
+        th {
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-primary);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th:hover {
+            color: var(--accent-primary);
+        }
+
+        th.sortable::after {
+            content: ' ▼';
+            font-size: 9px;
+            color: var(--text-muted);
+            margin-left: 4px;
+        }
+
+        th.sort-active::after {
+            color: var(--accent-primary);
+        }
+
+        td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--bg-hover);
+            font-size: 13px;
+        }
+
+        tr:hover {
+            background: #242424;
+        }
+
+        .table-pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: var(--spacing-md);
+            padding-top: var(--spacing-md);
+            border-top: 1px solid var(--border-primary);
+        }
+
+        .pagination-info {
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }
+
+        .pagination-controls {
+            display: flex;
+            gap: 4px;
+        }
+
+        .page-btn {
+            min-width: 28px;
+            height: 28px;
+            padding: 0 8px;
+            background: var(--bg-hover);
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background: var(--border-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .page-btn.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: #fff;
+        }
+
+        /* MODALS */
+        .modal-demo {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-tertiary);
+            border-radius: var(--radius);
+            padding: var(--spacing-xl);
+            max-width: 500px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+            padding-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        .modal-title {
+            font-size: 17px;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            width: 26px;
+            height: 26px;
+            background: transparent;
+            border: none;
+            color: var(--text-tertiary);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            margin-bottom: var(--spacing-lg);
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--spacing-sm);
+            padding-top: var(--spacing-md);
+            border-top: 1px solid var(--border-primary);
+        }
+
+        /* ALERTS */
+        .alert {
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            margin-bottom: var(--spacing-md);
+            display: flex;
+            align-items: flex-start;
+            gap: var(--spacing-md);
+            border: 1px solid;
+        }
+
+        .alert-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .alert-content {
+            flex: 1;
+        }
+
+        .alert-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+
+        .alert-message {
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .alert-info {
+            background: #1e2a35;
+            border-color: #2d4a5f;
+            color: var(--status-info);
+        }
+
+        .alert-success {
+            background: #1e2e22;
+            border-color: #2d4a35;
+            color: var(--status-success);
+        }
+
+        .alert-warning {
+            background: #2e2519;
+            border-color: #4a3a25;
+            color: var(--status-warning);
+        }
+
+        .alert-error {
+            background: #2e1e1e;
+            border-color: #4a2d2d;
+            color: var(--status-error);
+        }
+
+        /* CARDS */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .card-header {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-md);
+            padding-bottom: var(--spacing-sm);
+            border-bottom: 1px solid var(--bg-hover);
+        }
+
+        .card-body {
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* TABS */
+        .tabs {
+            border-bottom: 1px solid var(--border-primary);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .tab-list {
+            display: flex;
+            gap: 0;
+        }
+
+        .tab-btn {
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-tertiary);
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-secondary);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-primary);
+            border-bottom-color: var(--accent-primary);
+        }
+
+        /* PROGRESS */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-hover);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-primary);
+            transition: width 0.3s;
+        }
+
+        /* MONOSPACE */
+        .mono {
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--status-success);
+            background: #0d0d0d;
+            padding: 2px 6px;
+            border-radius: 2px;
+        }
+
+        .code-block {
+            background: #0d0d0d;
+            border: 1px solid var(--bg-hover);
+            border-radius: var(--radius);
+            padding: var(--spacing-md);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--status-success);
+            overflow-x: auto;
+        }
+
+        /* GRID LAYOUTS */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--spacing-lg);
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--spacing-lg);
+        }
+
+        @media (max-width: 768px) {
+            .grid-2, .grid-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>UCM Design System</h1>
+            <p>Ultimate Certificate Manager - Design de référence avec Inter, Phosphor Icons et gradients subtils</p>
+        </div>
+
+        <!-- THEME SELECTOR -->
+        <div class="theme-selector">
+            <label class="theme-selector-label">Couleur d'accentuation du thème :</label>
+            <div class="theme-grid">
+                <div class="theme-option active" onclick="setTheme('#5a8fc7', '#7aa5d9', this)">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #5a8fc7, #7aa5d9);"></div>
+                    <div class="theme-info">
+                        <div class="theme-name">Blue Sky</div>
+                        <div class="theme-hex">#5a8fc7 → #7aa5d9</div>
+                    </div>
+                </div>
+                <div class="theme-option" onclick="setTheme('#9985c7', '#b5a3d9', this)">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #9985c7, #b5a3d9);"></div>
+                    <div class="theme-info">
+                        <div class="theme-name">Purple Dream</div>
+                        <div class="theme-hex">#9985c7 → #b5a3d9</div>
+                    </div>
+                </div>
+                <div class="theme-option" onclick="setTheme('#5eb89b', '#7bc9af', this)">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #5eb89b, #7bc9af);"></div>
+                    <div class="theme-info">
+                        <div class="theme-name">Mint Fresh</div>
+                        <div class="theme-hex">#5eb89b → #7bc9af</div>
+                    </div>
+                </div>
+                <div class="theme-option" onclick="setTheme('#c99652', '#d9ac73', this)">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #c99652, #d9ac73);"></div>
+                    <div class="theme-info">
+                        <div class="theme-name">Amber Warm</div>
+                        <div class="theme-hex">#c99652 → #d9ac73</div>
+                    </div>
+                </div>
+                <div class="theme-option" onclick="setTheme('#b8926d', '#c9a687', this)">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #b8926d, #c9a687);"></div>
+                    <div class="theme-info">
+                        <div class="theme-name">Mokka</div>
+                        <div class="theme-hex">#b8926d → #c9a687</div>
+                    </div>
+                </div>
+                <div class="theme-option" onclick="setTheme('#c77799', '#d994ad', this)">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #c77799, #d994ad);"></div>
+                    <div class="theme-info">
+                        <div class="theme-name">Pink Soft</div>
+                        <div class="theme-hex">#c77799 → #d994ad</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BUTTONS -->
+        <div class="section">
+            <h2 class="section-title">Buttons</h2>
+            
+            <div class="group">
+                <div class="group-label">Button Variants</div>
+                <div class="btn-row">
+                    <button class="btn">Secondary</button>
+                    <button class="btn btn-primary">Primary</button>
+                    <button class="btn btn-success">Success</button>
+                    <button class="btn btn-danger">Danger</button>
+                    <button class="btn" disabled>Disabled</button>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Buttons with Icons (Phosphor + Gradient)</div>
+                <div class="btn-row">
+                    <button class="btn btn-primary">
+                        <i class="ph ph-plus icon-gradient"></i>
+                        New Certificate
+                    </button>
+                    <button class="btn">
+                        <i class="ph ph-download-simple icon-gradient"></i>
+                        Export
+                    </button>
+                    <button class="btn">
+                        <i class="ph ph-arrow-clockwise icon-gradient"></i>
+                        Refresh
+                    </button>
+                    <button class="btn btn-danger">
+                        <i class="ph ph-trash"></i>
+                        Delete
+                    </button>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Icon-Only Buttons</div>
+                <div class="btn-row">
+                    <button class="btn btn-icon"><i class="ph ph-eye icon-gradient"></i></button>
+                    <button class="btn btn-icon"><i class="ph ph-pencil-simple icon-gradient"></i></button>
+                    <button class="btn btn-icon"><i class="ph ph-download-simple icon-gradient"></i></button>
+                    <button class="btn btn-icon"><i class="ph ph-copy icon-gradient"></i></button>
+                    <button class="btn btn-icon btn-danger"><i class="ph ph-trash"></i></button>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Button Sizes</div>
+                <div class="btn-row">
+                    <button class="btn btn-sm">Small</button>
+                    <button class="btn">Normal</button>
+                    <button class="btn btn-lg">Large</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- BADGES -->
+        <div class="section">
+            <h2 class="section-title">Badges</h2>
+            
+            <div class="group">
+                <div class="group-label">Badge Variants</div>
+                <div class="btn-row">
+                    <span class="badge badge-neutral">NEUTRAL</span>
+                    <span class="badge badge-info">INFO</span>
+                    <span class="badge badge-active">ACTIVE</span>
+                    <span class="badge badge-warning">WARNING</span>
+                    <span class="badge badge-error">ERROR</span>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Badges with Icons</div>
+                <div class="btn-row">
+                    <span class="badge badge-active">
+                        <i class="ph ph-check-circle" style="font-size: 14px;"></i>
+                        VALID
+                    </span>
+                    <span class="badge badge-warning">
+                        <i class="ph ph-warning-circle" style="font-size: 14px;"></i>
+                        EXPIRES IN 30D
+                    </span>
+                    <span class="badge badge-error">
+                        <i class="ph ph-x-circle" style="font-size: 14px;"></i>
+                        EXPIRED
+                    </span>
+                    <span class="badge badge-info">
+                        <i class="ph ph-shield-check" style="font-size: 14px;"></i>
+                        ROOT CA
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- FORMS -->
+        <div class="section">
+            <h2 class="section-title">Forms</h2>
+            
+            <div class="group">
+                <div class="group-label">Text Inputs</div>
+                <div class="form-group">
+                    <label class="form-label">Certificate Name</label>
+                    <input type="text" class="form-input" placeholder="Enter certificate name...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Common Name (CN)</label>
+                    <input type="text" class="form-input" value="netsuit.lan.pew.pet">
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Select & Textarea</div>
+                <div class="form-group">
+                    <label class="form-label">Certificate Type</label>
+                    <select class="form-select">
+                        <option>Root CA</option>
+                        <option>Intermediate CA</option>
+                        <option>Server Certificate</option>
+                        <option>Client Certificate</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-textarea" placeholder="Enter description..."></textarea>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Multi-Column Form</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Key Size</label>
+                        <select class="form-select">
+                            <option>2048 bits</option>
+                            <option>4096 bits</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Algorithm</label>
+                        <select class="form-select">
+                            <option>RSA</option>
+                            <option>ECDSA</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TABLES -->
+        <div class="section">
+            <h2 class="section-title">Data Tables</h2>
+            
+            <div class="group">
+                <div class="table-controls">
+                    <div class="search-box">
+                        <input type="text" class="form-input" placeholder="🔍 Search certificates...">
+                    </div>
+                    <div class="items-per-page">
+                        <span>Items per page:</span>
+                        <select>
+                            <option>10</option>
+                            <option selected>25</option>
+                            <option>50</option>
+                            <option>100</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="sortable sort-active">Name</th>
+                                <th class="sortable">Type</th>
+                                <th class="sortable">Status</th>
+                                <th class="sortable">Expires</th>
+                                <th class="sortable">Serial Number</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <i class="ph ph-certificate icon-gradient" style="margin-right: 8px; vertical-align: middle; font-size: 18px;"></i>
+                                    netsuit.lan.pew.pet
+                                </td>
+                                <td>Server</td>
+                                <td><span class="badge badge-active"><i class="ph ph-check-circle" style="font-size: 14px;"></i> VALID</span></td>
+                                <td>2027-01-19</td>
+                                <td><span class="mono">A3:4F:2D:91:E8:B7</span></td>
+                                <td>
+                                    <button class="btn btn-icon" style="width: 28px; height: 28px;"><i class="ph ph-eye icon-gradient"></i></button>
+                                    <button class="btn btn-icon" style="width: 28px; height: 28px;"><i class="ph ph-download-simple icon-gradient"></i></button>
+                                    <button class="btn btn-icon btn-danger" style="width: 28px; height: 28px;"><i class="ph ph-trash"></i></button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <i class="ph ph-certificate icon-gradient" style="margin-right: 8px; vertical-align: middle; font-size: 18px;"></i>
+                                    *.example.com
+                                </td>
+                                <td>Wildcard</td>
+                                <td><span class="badge badge-warning"><i class="ph ph-warning-circle" style="font-size: 14px;"></i> EXPIRING</span></td>
+                                <td>2026-02-18</td>
+                                <td><span class="mono">7B:2C:8F:44:A1:D3</span></td>
+                                <td>
+                                    <button class="btn btn-icon" style="width: 28px; height: 28px;"><i class="ph ph-eye icon-gradient"></i></button>
+                                    <button class="btn btn-icon" style="width: 28px; height: 28px;"><i class="ph ph-download-simple icon-gradient"></i></button>
+                                    <button class="btn btn-icon btn-danger" style="width: 28px; height: 28px;"><i class="ph ph-trash"></i></button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <i class="ph ph-shield-check icon-gradient" style="margin-right: 8px; vertical-align: middle; font-size: 18px;"></i>
+                                    Root CA
+                                </td>
+                                <td>Root</td>
+                                <td><span class="badge badge-info"><i class="ph ph-shield-check" style="font-size: 14px;"></i> ACTIVE CA</span></td>
+                                <td>2035-01-01</td>
+                                <td><span class="mono">F1:88:3A:B9:2D:C7</span></td>
+                                <td>
+                                    <button class="btn btn-icon" style="width: 28px; height: 28px;"><i class="ph ph-eye icon-gradient"></i></button>
+                                    <button class="btn btn-icon" style="width: 28px; height: 28px;"><i class="ph ph-gear icon-gradient"></i></button>
+                                    <button class="btn btn-icon" style="width: 28px; height: 28px;"><i class="ph ph-dots-three-vertical icon-gradient"></i></button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="table-pagination">
+                    <div class="pagination-info">Showing 1-25 of 247 certificates</div>
+                    <div class="pagination-controls">
+                        <button class="page-btn" disabled>Previous</button>
+                        <button class="page-btn active">1</button>
+                        <button class="page-btn">2</button>
+                        <button class="page-btn">3</button>
+                        <span style="color: var(--text-muted); padding: 0 4px;">...</span>
+                        <button class="page-btn">10</button>
+                        <button class="page-btn">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODALS -->
+        <div class="section">
+            <h2 class="section-title">Modals & Dialogs</h2>
+            
+            <div class="group">
+                <div class="group-label">Confirmation Dialog</div>
+                <div class="modal-demo">
+                    <div class="modal-header">
+                        <div class="modal-title">Revoke Certificate</div>
+                        <button class="modal-close">×</button>
+                    </div>
+                    <div class="modal-body">
+                        Are you sure you want to revoke the certificate "netsuit.lan.pew.pet"? This action cannot be undone.
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn">Cancel</button>
+                        <button class="btn btn-danger">Revoke Certificate</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ALERTS -->
+        <div class="section">
+            <h2 class="section-title">Alerts & Notifications</h2>
+            
+            <div class="group">
+                <div class="alert alert-info">
+                    <div class="alert-icon"><i class="ph ph-info"></i></div>
+                    <div class="alert-content">
+                        <div class="alert-title">Information</div>
+                        <div class="alert-message">Your certificate authority database has been successfully initialized.</div>
+                    </div>
+                </div>
+
+                <div class="alert alert-success">
+                    <div class="alert-icon"><i class="ph ph-check-circle"></i></div>
+                    <div class="alert-content">
+                        <div class="alert-title">Success</div>
+                        <div class="alert-message">Certificate "netsuit.lan.pew.pet" has been generated and signed successfully.</div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning">
+                    <div class="alert-icon"><i class="ph ph-warning-circle"></i></div>
+                    <div class="alert-content">
+                        <div class="alert-title">Warning</div>
+                        <div class="alert-message">5 certificates will expire within the next 30 days. Consider renewing them soon.</div>
+                    </div>
+                </div>
+
+                <div class="alert alert-error">
+                    <div class="alert-icon"><i class="ph ph-x-circle"></i></div>
+                    <div class="alert-content">
+                        <div class="alert-title">Error</div>
+                        <div class="alert-message">Failed to revoke certificate. The certificate authority is currently unreachable.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARDS & TABS -->
+        <div class="section">
+            <h2 class="section-title">Cards & Tabs</h2>
+            
+            <div class="group">
+                <div class="group-label">Tabbed Content</div>
+                <div class="tabs">
+                    <div class="tab-list">
+                        <button class="tab-btn active">Details</button>
+                        <button class="tab-btn">Extensions</button>
+                        <button class="tab-btn">Chain</button>
+                        <button class="tab-btn">Raw Data</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Certificate Information</div>
+                    <div class="card-body">
+                        <p style="margin-bottom: 8px;"><strong>Common Name:</strong> netsuit.lan.pew.pet</p>
+                        <p style="margin-bottom: 8px;"><strong>Organization:</strong> Example Corp</p>
+                        <p style="margin-bottom: 8px;"><strong>Serial Number:</strong> <span class="mono">A3:4F:2D:91:E8:B7:CC:21</span></p>
+                        <p style="margin-bottom: 8px;"><strong>Valid From:</strong> 2026-01-19 00:00:00 UTC</p>
+                        <p style="margin-bottom: 8px;"><strong>Valid Until:</strong> 2027-01-19 23:59:59 UTC</p>
+                        <p><strong>Status:</strong> <span class="badge badge-active"><i class="ph ph-check-circle" style="font-size: 14px;"></i> VALID</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MISC -->
+        <div class="section">
+            <h2 class="section-title">Miscellaneous</h2>
+            
+            <div class="group">
+                <div class="group-label">Progress Bar</div>
+                <div style="margin-bottom: 8px;">
+                    <div style="margin-bottom: 4px; font-size: 11px; color: var(--text-tertiary);">Certificate Generation Progress (75%)</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 75%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Code Block (JetBrains Mono)</div>
+                <div class="code-block">openssl req -new -x509 -days 365 -key ca.key -out ca.crt \
+  -subj "/C=US/ST=State/L=City/O=Org/CN=Root CA"</div>
+            </div>
+
+            <div class="group">
+                <div class="group-label">Icon Sizes (Phosphor with Gradient)</div>
+                <div style="display: flex; align-items: center; gap: 24px; padding: 20px; background: var(--bg-tertiary); border-radius: var(--radius);">
+                    <div style="text-align: center;">
+                        <i class="ph ph-certificate icon-gradient" style="font-size: 16px;"></i>
+                        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">16px</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <i class="ph ph-certificate icon-gradient" style="font-size: 24px;"></i>
+                        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">24px</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <i class="ph ph-certificate icon-gradient" style="font-size: 32px;"></i>
+                        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">32px</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <i class="ph ph-certificate icon-gradient" style="font-size: 48px;"></i>
+                        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">48px</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function setTheme(start, end, element) {
+            // Update CSS variables
+            document.documentElement.style.setProperty('--accent-primary', start);
+            document.documentElement.style.setProperty('--accent-secondary', end);
+            document.documentElement.style.setProperty('--accent-gradient-start', start);
+            document.documentElement.style.setProperty('--accent-gradient-end', end);
+            
+            // Update active state
+            document.querySelectorAll('.theme-option').forEach(opt => {
+                opt.classList.remove('active');
+            });
+            element.classList.add('active');
+        }
+    </script>
+</body>
+</html>
