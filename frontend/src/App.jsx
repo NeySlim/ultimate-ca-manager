@@ -1,50 +1,39 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Box, Text, Center, Stack } from '@mantine/core';
-import { CheckCircle } from '@phosphor-icons/react';
-
-function TestPage() {
-  return (
-    <Center h="100vh" style={{ background: '#1a1a1a' }}>
-      <Stack align="center" gap="lg">
-        <CheckCircle 
-          size={64} 
-          weight="duotone"
-          className="icon-gradient"
-          style={{
-            '--accent-start': '#5a8fc7',
-            '--accent-end': '#7aa5d9'
-          }}
-        />
-        <Text size="32px" fw={600}>UCM Frontend v2.0</Text>
-        <Text size="15px" c="dimmed">React + Mantine + Vite</Text>
-        <Box
-          p="md"
-          style={{
-            background: '#2a2a2a',
-            borderRadius: '3px',
-            border: '1px solid #3a3a3a'
-          }}
-        >
-          <Text size="13px" ff="JetBrains Mono">
-            ✅ React 18.2<br/>
-            ✅ Mantine 7.4<br/>
-            ✅ Phosphor Icons<br/>
-            ✅ Vite 5.0<br/>
-            ✅ API Proxy configured
-          </Text>
-        </Box>
-      </Stack>
-    </Center>
-  );
-}
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import AppLayout from './components/layout/AppLayout';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<TestPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="certificates" element={<div>Certificates (TODO)</div>} />
+            <Route path="cas" element={<div>CAs (TODO)</div>} />
+            <Route path="acme" element={<div>ACME (TODO)</div>} />
+            <Route path="scep" element={<div>SCEP (TODO)</div>} />
+            <Route path="import" element={<div>Import (TODO)</div>} />
+            <Route path="users" element={<div>Users (TODO)</div>} />
+            <Route path="settings" element={<div>Settings (TODO)</div>} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }
