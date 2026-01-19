@@ -10,6 +10,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 from flask_caching import Cache
+from flask_session import Session
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -59,6 +60,14 @@ def create_app(config_name=None):
     db.init_app(app)
     migrate = Migrate(app, db)
     jwt = JWTManager(app)
+    
+    # Initialize server-side session storage (multi-worker support)
+    Session(app)
+    
+    # Ensure session directory exists
+    session_dir = app.config.get('SESSION_FILE_DIR')
+    if session_dir:
+        session_dir.mkdir(parents=True, exist_ok=True)
     
     # Initialize cache
     cache.init_app(app, config={
