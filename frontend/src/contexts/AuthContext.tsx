@@ -3,8 +3,9 @@
  * Handles progressive auth flow: mTLS → WebAuthn → Password
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { AuthContext as IAuthContext, AuthState, User, AuthMethod, LoginCredentials } from '../types/auth';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { ReactNode } from 'react';
+import type { AuthContext as IAuthContext, AuthState, User, AuthMethod } from '../types/auth';
 import { notifications } from '@mantine/notifications';
 
 const AuthContext = createContext<IAuthContext | undefined>(undefined);
