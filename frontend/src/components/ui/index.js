@@ -11,3 +11,7 @@ export { Modal } from './Modal';
 export { Tabs, TabsList, TabsTab, TabsPanels, TabsPanel } from './Tabs';
 export { Select } from './Select';
 export { Pagination } from './Pagination';
+export { SegmentedControl } from './SegmentedControl';
+export { SimpleGrid } from './SimpleGrid';
+export { Tooltip } from './Tooltip';
+export { ActionIcon } from './ActionIcon';
