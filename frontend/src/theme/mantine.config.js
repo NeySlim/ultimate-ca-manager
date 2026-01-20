@@ -47,16 +47,16 @@ export const createMantineTheme = (paletteKey, density) => {
     colors: {
       brand: generateShades(palette.primary),
       dark: [
-        '#C1C2C5',
-        '#A6A7AB',
-        '#909296',
-        '#5C5F66',
-        '#373A40',
-        '#2C2E33',
-        '#25262B',
-        '#1A1B1E', // 7 (Standard Mantine Dark) -> We use #1a1a1a from design
-        '#141517',
-        '#101113',
+        '#e8e8e8', // 0 - text-primary
+        '#cccccc', // 1 - text-secondary
+        '#888888', // 2 - text-tertiary
+        '#555555', // 3 - text-muted
+        '#444444', // 4 - border-secondary
+        '#333333', // 5 - border-primary
+        '#2a2a2a', // 6 - bg-quaternary (hover)
+        '#252525', // 7 - bg-tertiary (surface) - MANTINE DEFAULT
+        '#1e1e1e', // 8 - bg-secondary (panel)
+        '#1a1a1a', // 9 - bg-primary (app)
       ],
     },
     
@@ -93,9 +93,9 @@ export const createMantineTheme = (paletteKey, density) => {
             return {
               root: {
                 '--button-bg': 'transparent', // Use transparent for outline effect
-                '--button-hover': '#3a3a3a',
-                '--button-color': '#e8e8e8',
-                '--button-bd': '1px solid #444444',
+                '--button-hover': 'var(--border-secondary)',
+                '--button-color': 'var(--text-primary)',
+                '--button-bd': '1px solid var(--border-secondary)',
               }
             };
           }
@@ -126,9 +126,9 @@ export const createMantineTheme = (paletteKey, density) => {
         },
         styles: {
           input: {
-            backgroundColor: '#2a2a2a',
-            borderColor: '#3a3a3a',
-            color: '#e8e8e8',
+            backgroundColor: 'var(--bg-quaternary)',
+            borderColor: 'var(--border-secondary)',
+            color: 'var(--text-primary)',
             minHeight: rem(30),
             height: rem(30),
             fontSize: rem(13),
@@ -142,22 +142,22 @@ export const createMantineTheme = (paletteKey, density) => {
         },
         styles: {
           input: {
-            backgroundColor: '#2a2a2a',
-            borderColor: '#3a3a3a',
-            color: '#e8e8e8',
+            backgroundColor: 'var(--bg-quaternary)',
+            borderColor: 'var(--border-secondary)',
+            color: 'var(--text-primary)',
             minHeight: rem(30),
             height: rem(30),
             fontSize: rem(13),
           },
           dropdown: {
-            backgroundColor: '#1e1e1e',
-            borderColor: '#333',
+            backgroundColor: 'var(--bg-secondary)',
+            borderColor: 'var(--border-primary)',
           },
           option: {
             fontSize: rem(13),
             padding: '6px 10px',
             '&:hover': {
-              backgroundColor: '#333',
+              backgroundColor: 'var(--border-primary)',
             }
           }
         }
@@ -178,12 +178,12 @@ export const createMantineTheme = (paletteKey, density) => {
         },
         styles: {
           content: {
-            backgroundColor: '#1e1e1e',
-            border: '1px solid #333',
+            backgroundColor: 'var(--bg-secondary)',
+            border: '1px solid var(--border-primary)',
           },
           header: {
-            backgroundColor: '#1e1e1e',
-            borderBottom: '1px solid #333',
+            backgroundColor: 'var(--bg-secondary)',
+            borderBottom: '1px solid var(--border-primary)',
           }
         }
       },
@@ -192,21 +192,21 @@ export const createMantineTheme = (paletteKey, density) => {
           stepIcon: {
             borderRadius: '3px',
             borderWidth: '1px',
-            backgroundColor: '#2a2a2a',
-            borderColor: '#333',
-            color: '#ccc'
+            backgroundColor: 'var(--bg-quaternary)',
+            borderColor: 'var(--border-primary)',
+            color: 'var(--text-secondary)'
           },
           separator: {
-            backgroundColor: '#333',
+            backgroundColor: 'var(--border-primary)',
             height: '1px'
           },
           stepLabel: {
             fontSize: '13px',
-            color: '#e8e8e8'
+            color: 'var(--text-primary)'
           },
           stepDescription: {
              fontSize: '11px',
-             color: '#888'
+             color: 'var(--text-tertiary)'
           }
         }
       }
