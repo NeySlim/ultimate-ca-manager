@@ -17,3 +17,13 @@ export { Tooltip } from './Tooltip';
 export { ActionIcon } from './ActionIcon';
 export { Container } from './Container';
 export { Textarea, NumberInput, Switch, Radio, Alert, Box } from './MoreComponents';
+export { CopyButton, Grid, GridCol } from './Grid';
+export { Avatar, Title, Anchor, Loader, ScrollArea, ThemeIcon, Table, Paper, Stepper, Center } from './MoreComponents2';
+
+Grid.Col = GridCol;
+Table.Thead = Table.Thead;
+Table.Tbody = Table.Tbody;
+Table.Tr = Table.Tr;
+Table.Th = Table.Th;
+Table.Td = Table.Td;
+Stepper.Step = Stepper.Step;
