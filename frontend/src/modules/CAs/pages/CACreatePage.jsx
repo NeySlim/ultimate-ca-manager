@@ -65,7 +65,7 @@ const CACreatePage = () => {
       />
 
       <Grid style={{ flex: 1, padding: '16px', display: 'flex', justifyContent: 'center' }}>
-        <Widget className="wizard-widget" style={{ width: '100%', maxWidth: '800px' }}>
+        <Widget className="wizard-widget" style={{ width: '100%', maxWidth: '1000px' }}>
           <Stepper active={active} onStepClick={setActive} color="blue" size="sm">
             
             {/* Step 1: CA Type */}
