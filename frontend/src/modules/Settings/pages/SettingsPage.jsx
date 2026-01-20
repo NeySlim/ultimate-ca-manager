@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Tabs } from '../../../components/ui';
 import { PenNib } from '@phosphor-icons/react';
-import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
+import { PageHeader, Grid, Widget } from '../../../components/ui';
 import GeneralTab from '../components/GeneralTab';
 import SecurityTab from '../components/SecurityTab';
 import DatabaseTab from '../components/DatabaseTab';

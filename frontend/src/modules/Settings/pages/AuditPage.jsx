@@ -19,7 +19,7 @@ import {
   Warning,
   User,
 } from '@phosphor-icons/react';
-import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
+import { PageHeader, Grid, Widget } from '../../../components/ui';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
 import './AuditPage.css';
 

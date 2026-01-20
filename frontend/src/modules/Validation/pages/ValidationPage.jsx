@@ -18,7 +18,7 @@ import {
   XCircle,
   ListDashes,
 } from '@phosphor-icons/react';
-import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
+import { PageHeader, Grid, Widget } from '../../../components/ui';
 import StatWidget from '../../Dashboard/components/widgets/StatWidget';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
 import { ValidationService } from '../services/validation.service';
