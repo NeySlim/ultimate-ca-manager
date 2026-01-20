@@ -18,17 +18,25 @@ export { Tooltip } from './Tooltip';
 export { ActionIcon } from './ActionIcon';
 export { Container } from './Container';
 export { Textarea, NumberInput, Switch, Radio, Alert, Box } from './MoreComponents';
-export { CopyButton, Grid, GridCol } from './Grid';
-export { Avatar, Title, Anchor, Loader, ScrollArea, ThemeIcon, Table, Paper, Stepper, Center, Code } from './MoreComponents2';
+export { CopyButton } from './Grid';
+export { Avatar, Title, Anchor, Loader, ScrollArea, ThemeIcon, Paper, Center, Code } from './MoreComponents2';
+
+// Grid - Import, assign nested properties, then export
+import GridComponent, { GridCol } from './Grid';
+GridComponent.Col = GridCol;
+export { GridComponent as Grid };
+export default GridComponent; // For backward compat with Layout/index.js
+
+// Table - Import, assign nested properties, then export
+import { Table as TableComponent, Stepper as StepperComponent, Loader } from './MoreComponents2';
+TableComponent.Thead = TableComponent.Thead;
+TableComponent.Tbody = TableComponent.Tbody;
+TableComponent.Tr = TableComponent.Tr;
+TableComponent.Th = TableComponent.Th;
+TableComponent.Td = TableComponent.Td;
+StepperComponent.Step = StepperComponent.Step;
+export { TableComponent as Table, StepperComponent as Stepper };
 
 // Layout components (for backward compatibility)
 export { default as PageHeader } from './Layout/PageHeader';
 export { default as Widget } from './Layout/Widget';
-
-Grid.Col = GridCol;
-Table.Thead = Table.Thead;
-Table.Tbody = Table.Tbody;
-Table.Tr = Table.Tr;
-Table.Th = Table.Th;
-Table.Td = Table.Td;
-Stepper.Step = Stepper.Step;
