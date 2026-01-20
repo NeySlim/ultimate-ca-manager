@@ -8,6 +8,7 @@ import {
   Avatar,
   ActionIcon,
   Tooltip,
+  TextInput,
 } from '@mantine/core';
 import {
   User,
@@ -18,6 +19,7 @@ import {
   PencilSimple,
   EnvelopeSimple,
   CheckCircle,
+  MagnifyingGlass,
 } from '@phosphor-icons/react';
 import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
@@ -56,6 +58,7 @@ const MOCK_USERS = [
 
 const UsersPage = () => {
   const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const columns = [
     {
@@ -158,6 +161,23 @@ const UsersPage = () => {
 
       <Grid style={{ flex: 1, padding: '16px' }}>
         <Widget className="widget-full" style={{ height: '100%', padding: 0, overflow: 'hidden' }}>
+          
+          {/* Integrated Toolbar matching Certificates */}
+          <div style={{ padding: '12px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '12px', alignItems: 'center', backgroundColor: 'var(--bg-panel)' }}>
+             <TextInput
+               placeholder="Search users..."
+               leftSection={<MagnifyingGlass size={16} className="icon-gradient-subtle" />}
+               value={searchTerm}
+               onChange={(e) => setSearchTerm(e.currentTarget.value)}
+               size="xs"
+               style={{ width: 250 }}
+             />
+             <div style={{ flex: 1 }} />
+             <Text size="xs" c="dimmed">
+               {MOCK_USERS.length} users
+             </Text>
+          </div>
+
           <ResizableTable 
             columns={columns}
             data={MOCK_USERS}

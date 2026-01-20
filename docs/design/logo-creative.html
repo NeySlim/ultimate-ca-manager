@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UCM Logo - Propositions Originales</title>
+    
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --accent-primary: #5a8fc7;
+            --accent-secondary: #7aa5d9;
+            --accent-gradient-start: #5a8fc7;
+            --accent-gradient-end: #7aa5d9;
+            
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #1e1e1e;
+            --bg-tertiary: #252525;
+            --bg-hover: #2a2a2a;
+            
+            --text-primary: #e8e8e8;
+            --text-secondary: #ccc;
+            --text-tertiary: #888;
+            
+            --border-primary: #333;
+            --border-secondary: #3a3a3a;
+            
+            --radius: 3px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 13px;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius);
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: var(--text-tertiary);
+            font-size: 13px;
+        }
+
+        /* THEME SELECTOR */
+        .theme-selector {
+            background: var(--bg-secondary);
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius);
+        }
+
+        .theme-label {
+            font-size: 13px;
+            color: var(--text-tertiary);
+            margin-bottom: 12px;
+            display: block;
+            font-weight: 600;
+        }
+
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .theme-option {
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-primary);
+            border-radius: var(--radius);
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .theme-option:hover {
+            background: var(--bg-hover);
+        }
+
+        .theme-option.active {
+            border-color: var(--accent-primary);
+        }
+
+        .theme-preview {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius);
+            flex-shrink: 0;
+        }
+
+        .theme-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* LOGO GRID */
+        .logo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .logo-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius);
+            padding: 24px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .logo-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-2px);
+        }
+
+        .logo-card.selected {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(90, 143, 199, 0.2);
+        }
+
+        .logo-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .logo-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            min-height: 220px;
+        }
+
+        .logo-description {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        /* LOGO 1: Hexagonal Chain */
+        .logo-1 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-1-hex {
+            width: 50px;
+            height: 58px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-1-hex::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            clip-path: polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%);
+        }
+
+        .logo-1-hex-inner {
+            position: relative;
+            z-index: 1;
+            font-size: 24px;
+            font-weight: 900;
+            color: #fff;
+        }
+
+        .logo-1-text {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* LOGO 2: Geometric Lock */
+        .logo-2 {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-2-lock {
+            width: 60px;
+            height: 70px;
+            position: relative;
+        }
+
+        .logo-2-lock-top {
+            position: absolute;
+            top: 0;
+            left: 15px;
+            width: 30px;
+            height: 25px;
+            border: 4px solid;
+            border-image: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end)) 1;
+            border-bottom: none;
+            border-radius: 15px 15px 0 0;
+        }
+
+        .logo-2-lock-body {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 45px;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-2-lock-dot {
+            width: 8px;
+            height: 8px;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        .logo-2-text {
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* LOGO 3: Certificate Chain */
+        .logo-3 {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-3-chain {
+            display: flex;
+            gap: 4px;
+        }
+
+        .logo-3-link {
+            width: 16px;
+            height: 24px;
+            border: 3px solid;
+            border-image: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end)) 1;
+            border-radius: 8px;
+        }
+
+        .logo-3-link:nth-child(2) {
+            transform: translateY(8px);
+        }
+
+        .logo-3-link:nth-child(3) {
+            transform: translateY(-4px);
+        }
+
+        .logo-3-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo-3-ucm {
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: -1px;
+            line-height: 1;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-3-subtitle {
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-top: 2px;
+        }
+
+        /* LOGO 4: Slashed Typography */
+        .logo-4 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 48px;
+            font-weight: 800;
+            position: relative;
+            display: inline-block;
+        }
+
+        .logo-4-u {
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-4-c {
+            color: var(--text-primary);
+        }
+
+        .logo-4-m {
+            color: var(--text-secondary);
+        }
+
+        .logo-4-slash {
+            position: absolute;
+            width: 120%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            top: 50%;
+            left: -10%;
+            transform: translateY(-50%) rotate(-15deg);
+        }
+
+        /* LOGO 5: Stacked Layers */
+        .logo-5 {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-5-layers {
+            position: relative;
+            width: 50px;
+            height: 50px;
+        }
+
+        .logo-5-layer {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 2px solid;
+            border-radius: var(--radius);
+        }
+
+        .logo-5-layer:nth-child(1) {
+            top: 0;
+            left: 0;
+            border-color: var(--accent-primary);
+            opacity: 0.4;
+        }
+
+        .logo-5-layer:nth-child(2) {
+            top: 5px;
+            left: 5px;
+            border-color: var(--accent-primary);
+            opacity: 0.7;
+        }
+
+        .logo-5-layer:nth-child(3) {
+            top: 10px;
+            left: 10px;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+        }
+
+        .logo-5-text {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            color: var(--text-primary);
+        }
+
+        /* LOGO 6: Circular Badge */
+        .logo-6 {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-6-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .logo-6-inner {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-6-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 1px;
+        }
+
+        /* LOGO 7: Glitch Style */
+        .logo-7 {
+            position: relative;
+            display: inline-block;
+        }
+
+        .logo-7-main {
+            font-size: 48px;
+            font-weight: 900;
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            position: relative;
+        }
+
+        .logo-7-glitch {
+            position: absolute;
+            top: 0;
+            left: 0;
+            font-size: 48px;
+            font-weight: 900;
+            font-family: 'JetBrains Mono', monospace;
+            opacity: 0.3;
+        }
+
+        .logo-7-glitch-1 {
+            color: var(--accent-primary);
+            transform: translate(-2px, 2px);
+        }
+
+        .logo-7-glitch-2 {
+            color: var(--accent-secondary);
+            transform: translate(2px, -2px);
+        }
+
+        /* LOGO 8: Minimalist Brackets */
+        .logo-8 {
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
+
+        .logo-8-bracket {
+            font-size: 56px;
+            font-weight: 300;
+            line-height: 1;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-8-text {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            margin: 0 8px;
+            color: var(--text-primary);
+        }
+
+        /* LOGO 9: Pixelated */
+        .logo-9 {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-9-pixels {
+            display: grid;
+            grid-template-columns: repeat(5, 8px);
+            gap: 2px;
+        }
+
+        .logo-9-pixel {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-primary);
+        }
+
+        .logo-9-pixel.off {
+            opacity: 0.2;
+        }
+
+        .logo-9-text {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* LOGO 10: Angular Modern */
+        .logo-10 {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-10-shape {
+            width: 60px;
+            height: 60px;
+            position: relative;
+        }
+
+        .logo-10-triangle {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+        }
+
+        .logo-10-triangle-1 {
+            border-width: 0 30px 52px 30px;
+            border-color: transparent transparent var(--accent-primary) transparent;
+            top: 0;
+            left: 0;
+        }
+
+        .logo-10-triangle-2 {
+            border-width: 52px 30px 0 30px;
+            border-color: var(--accent-secondary) transparent transparent transparent;
+            bottom: 0;
+            left: 0;
+            opacity: 0.6;
+        }
+
+        .logo-10-text {
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* LOGO 11: Neon Style */
+        .logo-11 {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-11-text {
+            font-size: 48px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            color: var(--accent-primary);
+            text-shadow: 
+                0 0 10px var(--accent-primary),
+                0 0 20px var(--accent-primary),
+                0 0 30px var(--accent-primary);
+        }
+
+        .logo-11-subtitle {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+        }
+
+        /* LOGO 12: Isometric */
+        .logo-12 {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-12-iso {
+            width: 60px;
+            height: 60px;
+            position: relative;
+        }
+
+        .logo-12-cube {
+            position: absolute;
+            width: 30px;
+            height: 52px;
+        }
+
+        .logo-12-cube-front {
+            width: 30px;
+            height: 26px;
+            background: var(--accent-primary);
+            transform-origin: bottom left;
+            transform: skewY(30deg);
+        }
+
+        .logo-12-cube-side {
+            width: 30px;
+            height: 26px;
+            background: var(--accent-secondary);
+            transform-origin: top left;
+            transform: skewY(-30deg);
+            margin-top: -26px;
+        }
+
+        .logo-12-text {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>UCM Logo - Propositions Originales</h1>
+            <p>Designs créatifs et novateurs pour Ultimate Certificate Manager</p>
+        </div>
+
+        <!-- THEME SELECTOR -->
+        <div class="theme-selector">
+            <label class="theme-label">Couleur d'accentuation :</label>
+            <div class="theme-grid">
+                <div class="theme-option active" onclick="setTheme('#5a8fc7', '#7aa5d9', this)">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #5a8fc7, #7aa5d9);"></div>
+                    <div class="theme-name">Blue Sky</div>
+                </div>
+                <div class="theme-option" onclick="setTheme('#9985c7', '#b5a3d9', this)">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #9985c7, #b5a3d9);"></div>
+                    <div class="theme-name">Purple Dream</div>
+                </div>
+                <div class="theme-option" onclick="setTheme('#5eb89b', '#7bc9af', this)">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #5eb89b, #7bc9af);"></div>
+                    <div class="theme-name">Mint Fresh</div>
+                </div>
+                <div class="theme-option" onclick="setTheme('#c99652', '#d9ac73', this)">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #c99652, #d9ac73);"></div>
+                    <div class="theme-name">Amber</div>
+                </div>
+                <div class="theme-option" onclick="setTheme('#b8926d', '#c9a687', this)">
+                    <div class="theme-preview" style="background: linear-gradient(135deg, #b8926d, #c9a687);"></div>
+                    <div class="theme-name">Mokka</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LOGO PROPOSALS -->
+        <div class="logo-grid">
+            <!-- Logo 1: Hexagonal -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">🔷 Hexagonal Tech</div>
+                <div class="logo-display">
+                    <div class="logo-1">
+                        <div class="logo-1-hex">
+                            <div class="logo-1-hex-inner">U</div>
+                        </div>
+                        <div class="logo-1-text">CM</div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Forme hexagonale évoquant la sécurité technique et les structures cryptographiques. Moderne et géométrique.
+                </div>
+            </div>
+
+            <!-- Logo 2: Geometric Lock -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">🔒 Geometric Lock</div>
+                <div class="logo-display">
+                    <div class="logo-2">
+                        <div class="logo-2-lock">
+                            <div class="logo-2-lock-top"></div>
+                            <div class="logo-2-lock-body">
+                                <div class="logo-2-lock-dot"></div>
+                            </div>
+                        </div>
+                        <div class="logo-2-text">UCM</div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Cadenas stylisé géométrique. Symbolise la sécurité de façon minimaliste et élégante.
+                </div>
+            </div>
+
+            <!-- Logo 3: Certificate Chain -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">⛓️ Certificate Chain</div>
+                <div class="logo-display">
+                    <div class="logo-3">
+                        <div class="logo-3-chain">
+                            <div class="logo-3-link"></div>
+                            <div class="logo-3-link"></div>
+                            <div class="logo-3-link"></div>
+                        </div>
+                        <div class="logo-3-text">
+                            <div class="logo-3-ucm">UCM</div>
+                            <div class="logo-3-subtitle">Certificate Manager</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Maillons de chaîne représentant la chaîne de certificats. Visuel unique et pertinent.
+                </div>
+            </div>
+
+            <!-- Logo 4: Slashed Typography -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">⚡ Slashed Type</div>
+                <div class="logo-display">
+                    <div class="logo-4">
+                        <span class="logo-4-u">U</span><span class="logo-4-c">C</span><span class="logo-4-m">M</span>
+                        <div class="logo-4-slash"></div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Typographie monospace avec slash dynamique. Look technique et moderne, rappelle le code.
+                </div>
+            </div>
+
+            <!-- Logo 5: Stacked Layers -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">📚 Stacked Layers</div>
+                <div class="logo-display">
+                    <div class="logo-5">
+                        <div class="logo-5-layers">
+                            <div class="logo-5-layer"></div>
+                            <div class="logo-5-layer"></div>
+                            <div class="logo-5-layer"></div>
+                        </div>
+                        <div class="logo-5-text">UCM</div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Couches empilées symbolisant les niveaux de sécurité et la hiérarchie des certificats.
+                </div>
+            </div>
+
+            <!-- Logo 6: Circular Badge -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">⭕ Circular Badge</div>
+                <div class="logo-display">
+                    <div class="logo-6">
+                        <div class="logo-6-circle">
+                            <div class="logo-6-inner">U</div>
+                        </div>
+                        <div class="logo-6-text">Certificate Manager</div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Badge circulaire avec anneau gradient. Évoque un sceau d'authentification. Très reconnaissable.
+                </div>
+            </div>
+
+            <!-- Logo 7: Glitch Style -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">👾 Glitch Tech</div>
+                <div class="logo-display">
+                    <div class="logo-7">
+                        <div class="logo-7-glitch logo-7-glitch-1">UCM</div>
+                        <div class="logo-7-glitch logo-7-glitch-2">UCM</div>
+                        <div class="logo-7-main">UCM</div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Effet glitch subtle avec couches décalées. Tech, cybersécurité, très moderne.
+                </div>
+            </div>
+
+            <!-- Logo 8: Brackets -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">〔〕 Code Brackets</div>
+                <div class="logo-display">
+                    <div class="logo-8">
+                        <div class="logo-8-bracket">〔</div>
+                        <div class="logo-8-text">UCM</div>
+                        <div class="logo-8-bracket">〕</div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Crochets de code encadrant UCM. Minimaliste mais distinctif. Évoque programmation et structure.
+                </div>
+            </div>
+
+            <!-- Logo 9: Pixelated -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">🟦 Pixel Art</div>
+                <div class="logo-display">
+                    <div class="logo-9">
+                        <div class="logo-9-pixels">
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel off"></div>
+                            <div class="logo-9-pixel off"></div>
+                            <div class="logo-9-pixel off"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel off"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel off"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel off"></div>
+                            <div class="logo-9-pixel off"></div>
+                            <div class="logo-9-pixel off"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                            <div class="logo-9-pixel"></div>
+                        </div>
+                        <div class="logo-9-text">UCM</div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Icône pixelisée formant un U stylisé. Rétro-futuriste, rappelle les systèmes legacy.
+                </div>
+            </div>
+
+            <!-- Logo 10: Angular -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">▲ Angular Modern</div>
+                <div class="logo-display">
+                    <div class="logo-10">
+                        <div class="logo-10-shape">
+                            <div class="logo-10-triangle logo-10-triangle-1"></div>
+                            <div class="logo-10-triangle logo-10-triangle-2"></div>
+                        </div>
+                        <div class="logo-10-text">UCM</div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Triangles superposés créant une forme dynamique. Moderne, tech, évoque mouvement et sécurité.
+                </div>
+            </div>
+
+            <!-- Logo 11: Neon -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">💡 Neon Glow</div>
+                <div class="logo-display">
+                    <div class="logo-11">
+                        <div class="logo-11-text">UCM</div>
+                        <div class="logo-11-subtitle">Certificate Manager</div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Effet néon lumineux avec glow. Cyberpunk, futuriste, très impactant visuellement.
+                </div>
+            </div>
+
+            <!-- Logo 12: Isometric -->
+            <div class="logo-card" onclick="selectLogo(this)">
+                <div class="logo-title">📦 Isometric Cube</div>
+                <div class="logo-display">
+                    <div class="logo-12">
+                        <div class="logo-12-iso">
+                            <div class="logo-12-cube">
+                                <div class="logo-12-cube-front"></div>
+                                <div class="logo-12-cube-side"></div>
+                            </div>
+                        </div>
+                        <div class="logo-12-text">UCM</div>
+                    </div>
+                </div>
+                <div class="logo-description">
+                    Cube isométrique 3D. Représente structure, architecture, organisation. Look professionnel unique.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedCard = null;
+
+        function setTheme(start, end, element) {
+            document.documentElement.style.setProperty('--accent-primary', start);
+            document.documentElement.style.setProperty('--accent-secondary', end);
+            document.documentElement.style.setProperty('--accent-gradient-start', start);
+            document.documentElement.style.setProperty('--accent-gradient-end', end);
+            
+            document.querySelectorAll('.theme-option').forEach(opt => {
+                opt.classList.remove('active');
+            });
+            element.classList.add('active');
+        }
+
+        function selectLogo(card) {
+            if (selectedCard) {
+                selectedCard.classList.remove('selected');
+            }
+            selectedCard = card;
+            card.classList.add('selected');
+        }
+    </script>
+</body>
+</html>
