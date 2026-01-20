@@ -4,40 +4,40 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  min-height: 140px;
-  padding: 16px !important;
+  min-height: 140px; /* Reduced fixed height */
+  padding: var(--table-spacing) !important;
 }
 
 .stat-icon {
-  font-size: 48px;
+  font-size: calc(var(--icon-size) * 3); /* Scale icon relative to density */
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 64px;
-  height: 64px;
+  width: calc(var(--control-height) * 2.5); /* Scale box */
+  height: calc(var(--control-height) * 2.5);
   border-radius: 8px;
   background-color: rgba(90, 143, 199, 0.1);
 }
 
 .stat-widget.green .stat-icon {
-  background-color: rgba(129, 199, 132, 0.1);
-  color: #81c784;
+  background-color: var(--mantine-color-green-light);
+  color: var(--mantine-color-green-6);
 }
 
 .stat-widget.orange .stat-icon {
-  background-color: rgba(255, 183, 77, 0.1);
-  color: #ffb74d;
+  background-color: var(--mantine-color-orange-light);
+  color: var(--mantine-color-orange-6);
 }
 
 .stat-widget.red .stat-icon {
-  background-color: rgba(229, 115, 115, 0.1);
-  color: #e57373;
+  background-color: var(--mantine-color-red-light);
+  color: var(--mantine-color-red-6);
 }
 
 .stat-widget.blue .stat-icon {
-  background-color: rgba(90, 143, 199, 0.1);
-  color: #5a8fc7;
+  background-color: var(--mantine-color-blue-light);
+  color: var(--mantine-color-blue-6);
 }
 
 .stat-content {
@@ -51,7 +51,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #909296;
+  color: var(--text-secondary);
   margin-bottom: 4px;
   font-weight: 600;
 }
@@ -59,7 +59,7 @@
 .stat-value {
   font-size: 32px;
   font-weight: 700;
-  color: #e8e8e8;
+  color: var(--text-primary);
   line-height: 1.2;
   margin-bottom: 4px;
 }
@@ -70,11 +70,11 @@
   gap: 4px;
   font-size: 12px;
   font-weight: 500;
-  color: #81c784;
+  color: var(--mantine-color-green-6);
 }
 
 .stat-trend.negative {
-  color: #e57373;
+  color: var(--mantine-color-red-6);
 }
 
 .stat-trend svg {

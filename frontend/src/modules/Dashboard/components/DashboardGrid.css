@@ -4,18 +4,18 @@
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   gap: var(--grid-gap, 16px);
-  padding: 16px;
-  background-color: #1a1b1e;
+  padding: var(--table-spacing);
+  background-color: var(--bg-app);
   /* Removed min-height constraint to allow natural flow */
   auto-rows: minmax(200px, auto);
 }
 
 /* Widget base styling */
 .dashboard-grid > * {
-  background-color: #25262b;
-  border: 1px solid #373a40;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
-  padding: 16px;
+  padding: var(--table-spacing);
   transition: all 0.2s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   min-height: 200px;

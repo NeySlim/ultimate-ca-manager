@@ -1,8 +1,8 @@
 /* Widget.css - Global Widget Styles */
 
 .ui-widget {
-  background-color: #25262b;
-  border: 1px solid #373a40;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   padding: 16px;
   transition: all 0.2s ease;
@@ -12,7 +12,7 @@
 }
 
 .ui-widget:hover {
-  border-color: #4a5568;
+  border-color: var(--text-muted);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -22,14 +22,14 @@
   align-items: center;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #373a40;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .ui-widget-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #e8e8e8;
+  color: var(--text-primary);
 }
 
 .ui-widget-actions {

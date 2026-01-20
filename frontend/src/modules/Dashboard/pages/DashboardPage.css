@@ -4,17 +4,18 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  background-color: #1a1b1e;
+  background-color: var(--bg-app);
 }
 
 .dashboard-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  background-color: #25262b;
-  border-bottom: 1px solid #373a40;
-  height: 52px;
+  padding: var(--table-spacing) 16px; /* Dynamic padding */
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+  height: auto; /* Allow height to adapt */
+  min-height: 52px;
   gap: 16px;
   position: sticky;
   top: 0;
@@ -31,7 +32,7 @@
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #e8e8e8;
+  color: var(--text-primary);
   white-space: nowrap;
 }
 
@@ -46,13 +47,13 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 12px;
-  height: 36px;
-  background-color: #2c2e33;
-  border: 1px solid #373a40;
-  border-radius: 4px;
-  color: #909296;
-  font-size: 12px;
+  padding: 0 var(--control-padding-x);
+  height: var(--control-height); /* Dynamic height */
+  background-color: var(--bg-element);
+  border: 1px solid var(--border-color);
+  border-radius: var(--control-radius);
+  color: var(--text-secondary);
+  font-size: var(--font-size-control);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -61,19 +62,19 @@
 }
 
 .toolbar-btn:hover:not(:disabled) {
-  background-color: #373a40;
-  color: #c1c2c5;
-  border-color: #4a5568;
+  background-color: var(--bg-element-hover);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
 }
 
 .toolbar-btn.active {
-  background-color: #5a8fc7;
-  border-color: #5a8fc7;
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
   color: #fff;
 }
 
 .toolbar-btn.active:hover {
-  background-color: #6b9fd8;
+  background-color: var(--accent-hover);
 }
 
 .toolbar-btn:disabled {
@@ -83,7 +84,7 @@
 
 .toolbar-btn svg {
   flex-shrink: 0;
-  font-size: 16px;
+  font-size: var(--icon-size);
 }
 
 /* Main content area - grid flows naturally */
@@ -101,10 +102,10 @@
 }
 
 .dashboard-page::-webkit-scrollbar-thumb {
-  background: #373a40;
+  background: var(--border-color);
   border-radius: 4px;
 }
 
 .dashboard-page::-webkit-scrollbar-thumb:hover {
-  background: #4a5568;
+  background: var(--text-muted);
 }

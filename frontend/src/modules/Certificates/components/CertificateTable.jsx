@@ -137,7 +137,7 @@ const CertificateTable = ({ data, onRowClick, onDelete, onDownload, onView, sele
         return (
           <Group gap="xs">
             <Text size="sm">{formatDate(row.expiryDate)}</Text>
-            {status === 'critical' && <WarningCircle size={16} color="#fa5252" weight="fill" />}
+            {status === 'critical' && <WarningCircle size={16} color="var(--accent-primary)" weight="fill" />}
           </Group>
         );
       }
@@ -172,7 +172,7 @@ const CertificateTable = ({ data, onRowClick, onDelete, onDownload, onView, sele
   return (
     <div className="certificate-table-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Filters Toolbar */}
-      <div className="certificate-toolbar" style={{ padding: '12px', borderBottom: '1px solid #333', display: 'flex', gap: '12px', alignItems: 'center' }}>
+      <div className="certificate-toolbar" style={{ padding: '12px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '12px', alignItems: 'center' }}>
         <TextInput
           placeholder="Search..."
           leftSection={<MagnifyingGlass size={16} className="icon-gradient-subtle" />}

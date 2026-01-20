@@ -26,7 +26,7 @@ const CertificateGridView = ({ items, onSelect, selectedId }) => {
                 style={{ 
                     cursor: 'pointer',
                     minHeight: '180px',
-                    borderColor: selectedId === item.id ? '#5a8fc7' : undefined
+                    borderColor: selectedId === item.id ? 'var(--accent-primary)' : undefined
                 }}
                 onClick={() => onSelect(item)}
                 >

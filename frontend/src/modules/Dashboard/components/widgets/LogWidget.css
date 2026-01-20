@@ -11,29 +11,29 @@
   align-items: center;
   margin-bottom: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #373a40;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .log-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #e8e8e8;
+  color: var(--text-primary);
 }
 
 .log-info {
   font-size: 11px;
-  color: #5c5f66;
+  color: var(--text-muted);
   font-weight: 500;
 }
 
 .log-container {
   flex: 1;
   overflow-y: auto;
-  background-color: #1a1b1e;
-  border: 1px solid #373a40;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-color);
   border-radius: 3px;
-  padding: 8px;
+  padding: var(--table-spacing);
   font-family: 'JetBrains Mono', 'Courier New', monospace;
   font-size: 12px;
   line-height: 1.6;
@@ -48,25 +48,25 @@
 }
 
 .log-container::-webkit-scrollbar-thumb {
-  background: #373a40;
+  background: var(--border-color);
   border-radius: 3px;
 }
 
 .log-container::-webkit-scrollbar-thumb:hover {
-  background: #4a5568;
+  background: var(--bg-element-hover);
 }
 
 .log-entry {
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 4px 8px;
+  padding: calc(var(--table-spacing) / 2) var(--table-spacing);
   border-radius: 2px;
   transition: background-color 0.2s ease;
 }
 
 .log-entry:hover {
-  background-color: #25262b;
+  background-color: var(--bg-panel);
 }
 
 .log-entry:not(:last-child) {
@@ -74,7 +74,7 @@
 }
 
 .log-timestamp {
-  color: #5c5f66;
+  color: var(--text-muted);
   font-size: 10px;
   white-space: nowrap;
   flex-shrink: 0;
@@ -92,7 +92,7 @@
 }
 
 .log-message {
-  color: #c1c2c5;
+  color: var(--text-primary);
   font-size: 11px;
   flex: 1;
   overflow: hidden;
@@ -101,7 +101,7 @@
 }
 
 .log-entry:hover .log-message {
-  color: #e8e8e8;
+  color: var(--text-primary);
 }
 
 .log-footer {
@@ -110,7 +110,7 @@
   justify-content: flex-end;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #373a40;
+  border-top: 1px solid var(--border-color);
 }
 
 .log-autoscroll {
@@ -118,7 +118,7 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #909296;
+  color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
 }
@@ -129,5 +129,5 @@
 }
 
 .log-autoscroll:hover {
-  color: #c1c2c5;
+  color: var(--text-primary);
 }
