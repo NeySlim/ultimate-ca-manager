@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSelection } from '../../../core/context/SelectionContext';
-import { Loader, Center, TextInput, Group, Button, Menu, Badge, Text } from '@mantine/core';
+import { Loader, Center, Input, Group, Button, Menu, Badge, Text } from '@mantine/core';
 import { MagnifyingGlass, Download, Plus, FileArchive, FileText, FileDashed } from '@phosphor-icons/react';
 import { PageHeader } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
@@ -82,7 +82,7 @@ const CSRListPage = () => {
         actions={
           <Group spacing="xs">
              <div style={{ width: 250 }}>
-                <TextInput 
+                <Input 
                     placeholder="Search CSRs..." 
                     size="xs"
                     leftSection={<MagnifyingGlass size={14} />}
@@ -110,7 +110,7 @@ const CSRListPage = () => {
          <div style={{ height: '100%', border: '1px solid var(--border-color)', borderRadius: 'var(--control-radius)', background: 'var(--bg-surface)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {loading ? (
                 <Center style={{ height: '100%' }}>
-                    <Loader size="sm" />
+                    <div className="spinner" size="sm" />
                 </Center>
             ) : (
                 <ResizableTable 

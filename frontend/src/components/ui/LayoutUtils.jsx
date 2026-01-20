@@ -1,5 +1,5 @@
 import React from 'react';
-import './Layout.css';
+import './LayoutUtils.css';
 
 /**
  * Stack - Vertical layout (replaces Mantine Stack)

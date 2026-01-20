@@ -123,7 +123,7 @@ const DatabaseTab = () => {
       }
   };
 
-  if (loading) return <Loader />;
+  if (loading) return <div className="spinner" />;
 
   return (
     <Stack spacing="lg">

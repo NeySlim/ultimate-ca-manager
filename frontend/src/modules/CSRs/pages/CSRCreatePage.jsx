@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  TextInput, Select, MultiSelect, Code, Group, Text, Paper
+  Input, Select, MultiSelect, Code, Group, Text, Paper
 } from '@mantine/core';
 import { CreationWizard, WizardStep } from '../../../components/ui/Wizards/CreationWizard';
 import { CsrService } from '../services/csr.service';
@@ -53,7 +53,7 @@ const CSRCreatePage = () => {
       content: (
         <WizardStep>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '400px', margin: '0 auto' }}>
-            <TextInput
+            <Input
               label="Common Name (CN)"
               placeholder="e.g. web.internal.corp"
               required
@@ -61,7 +61,7 @@ const CSRCreatePage = () => {
               onChange={(e) => handleChange('cn', e.currentTarget.value)}
               size="xs"
             />
-            <TextInput
+            <Input
               label="Department / Unit"
               placeholder="e.g. DevOps"
               value={formData.department}
