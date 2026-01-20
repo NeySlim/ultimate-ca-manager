@@ -22,7 +22,7 @@ import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
 import StatWidget from '../../Dashboard/components/widgets/StatWidget';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
 import { ValidationService } from '../services/validation.service';
-import { notifications } from '@mantine/notifications';
+import { notifications } from '../../../components/ui/notifications';
 import './ValidationPage.css';
 
 const ValidationPage = () => {
