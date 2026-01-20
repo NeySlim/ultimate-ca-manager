@@ -49,7 +49,7 @@ export const createMantineTheme = (paletteKey, density) => {
       dark: [
         '#e8e8e8', // 0 - text-primary
         '#cccccc', // 1 - text-secondary
-        '#888888', // 2 - text-tertiary
+        '#888888', // 2 - text-tertiary  (dimmed uses this!)
         '#555555', // 3 - text-muted
         '#444444', // 4 - border-secondary
         '#333333', // 5 - border-primary
@@ -59,6 +59,11 @@ export const createMantineTheme = (paletteKey, density) => {
         '#1a1a1a', // 9 - bg-primary (app)
       ],
     },
+    
+    // CRITICAL: Map Mantine's semantic colors to our design-system.html colors
+    white: '#e8e8e8',  // text-primary
+    black: '#1a1a1a',  // bg-primary  
+    primaryShade: { light: 6, dark: 6 },
     
     components: {
       Button: {
