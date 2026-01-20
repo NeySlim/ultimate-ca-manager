@@ -23,6 +23,7 @@ import {
   CaretLeft,
 } from '@phosphor-icons/react';
 import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
+import { caService } from '../services/ca.service';
 import './CACreatePage.css';
 
 const CACreatePage = () => {
@@ -48,13 +49,17 @@ const CACreatePage = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await caService.createCA(formData);
       navigate('/cas/tree');
-    }, 1500);
+    } catch (error) {
+      console.error("Failed to create CA", error);
+      // You might want to show a notification here
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

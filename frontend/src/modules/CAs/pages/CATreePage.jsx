@@ -28,9 +28,11 @@ import './CATreePage.css';
 // Flatten tree for table display
 const flattenTree = (nodes, expandedIds, level = 0) => {
   let flat = [];
+  if (!nodes) return flat;
+  
   nodes.forEach(node => {
     flat.push({ ...node, level });
-    if (expandedIds.includes(node.id) && node.children) {
+    if (expandedIds.includes(node.refid) && node.children) {
       flat = flat.concat(flattenTree(node.children, expandedIds, level + 1));
     }
   });
@@ -39,7 +41,7 @@ const flattenTree = (nodes, expandedIds, level = 0) => {
 
 const CATreePage = () => {
   const navigate = useNavigate();
-  const [expanded, setExpanded] = useState([1]); // Expand first root by default
+  const [expanded, setExpanded] = useState([]); // Don't pre-expand by default with real data unless we know ID
   const [treeData, setTreeData] = useState([]);
   const [orphansData, setOrphansData] = useState([]);
   const [flatData, setFlatData] = useState([]);
@@ -90,10 +92,10 @@ const CATreePage = () => {
             <ActionIcon 
               size="xs" 
               variant="subtle" 
-              onClick={(e) => { e.stopPropagation(); toggleExpand(row.id); }}
+              onClick={(e) => { e.stopPropagation(); toggleExpand(row.refid); }}
               style={{ marginRight: 8 }}
             >
-              {expanded.includes(row.id) ? <CaretDown /> : <CaretRight />}
+              {expanded.includes(row.refid) ? <CaretDown /> : <CaretRight />}
             </ActionIcon>
           ) : (
             <span style={{ width: 'var(--control-height)', display: 'inline-block' }} />
