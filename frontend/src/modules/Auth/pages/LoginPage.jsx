@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, User, Lock, Eye, EyeSlash, SignIn, Info, WarningCircle, CheckCircle } from '@phosphor-icons/react';
+import { ShieldCheck, Certificate, Key, Users, CheckCircle, User, Lock, Eye, EyeSlash, SignIn } from '@phosphor-icons/react';
 import { useAuth } from '../../../core/context/AuthContext';
+import { Button, Input, PasswordInput, Text } from '../../../components/ui';
 import './../auth.css';
 
 const LoginPage = () => {
@@ -9,34 +10,31 @@ const LoginPage = () => {
   const { login } = useAuth();
   const [step, setStep] = useState('checking'); // checking | login
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [stats, setStats] = useState({
+    cas: '—',
+    certs: '—',
+    acme: '—',
+    users: '—'
+  });
   
   // Initial authentication check
   useEffect(() => {
     let mounted = true;
 
     const checkStatus = async () => {
-      // 1. Check if we are already authenticated (via session/cookie)
-      // The AuthProvider does this on mount, but we double check here to handle mTLS auto-login
       try {
-        await new Promise(r => setTimeout(r, 800)); // Minimum visual delay for "checking" state
+        await new Promise(r => setTimeout(r, 800));
         
-        // Use the verify endpoint which checks session and mTLS
-        // We use /api/auth/verify because that's where the backend route is defined
-        // without the /v2 prefix in the route definition itself
         const response = await fetch('/api/auth/verify', { 
             headers: { 'Accept': 'application/json' }
         });
         
         if (response.ok) {
-            // Check if response is JSON
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
                 const data = await response.json();
-                // If authenticated (e.g. via mTLS), redirect to dashboard
                 if (data.authenticated && mounted) {
-                    // Let AuthContext know we are good
                     window.location.href = '/'; 
                     return;
                 }
@@ -46,13 +44,31 @@ const LoginPage = () => {
         console.error("Auth check failed", e);
       }
       
-      // If we reach here, automatic login failed/not available
       if (mounted) {
         setStep('login');
       }
     };
 
+    // Fetch stats for sidebar
+    const fetchStats = async () => {
+      try {
+        const res = await fetch('/api/stats/overview');
+        if (res.ok) {
+          const data = await res.json();
+          setStats({
+            cas: data.total_cas || '—',
+            certs: data.total_certs || '—',
+            acme: data.acme_accounts || '—',
+            users: data.active_users || '—'
+          });
+        }
+      } catch (e) {
+        console.error('Stats fetch failed', e);
+      }
+    };
+
     checkStatus();
+    fetchStats();
 
     return () => { mounted = false; };
   }, []);
@@ -71,113 +87,167 @@ const LoginPage = () => {
          setError('Invalid credentials or server error');
          setLoading(false);
     }
-    // If success, AuthContext handles navigation
   };
 
   return (
-    <div className="login-wrapper">
-      <div className="login-container">
-        <div className="login-header">
-          <div className="login-logo">
-            <ShieldCheck weight="duotone" className="icon-gradient" size={64} />
+    <div className="login-wrapper-v2">
+      {/* Left Sidebar - Stats & Info */}
+      <div className="login-sidebar">
+        <div className="sidebar-header">
+          <div className="sidebar-logo">
+            <ShieldCheck weight="duotone" size={28} style={{ color: 'white' }} />
           </div>
-          <h1 className="login-title">UCM Login</h1>
-          <p className="login-subtitle">Ultimate Certificate Manager</p>
+          <div className="sidebar-title">
+            <h1>Ultimate CA Manager</h1>
+            <Text size="sm" color="secondary">Enterprise Certificate Authority</Text>
+          </div>
         </div>
 
-        <div className="login-card">
+        {/* Stats Grid */}
+        <div className="stats-grid">
+          <div className="stat-card">
+            <Text size="xs" color="tertiary" transform="uppercase" className="stat-label">
+              Certificate Authorities
+            </Text>
+            <div className="stat-value">
+              <Certificate size={24} className="stat-icon icon-gradient" />
+              <span>{stats.cas}</span>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <Text size="xs" color="tertiary" transform="uppercase" className="stat-label">
+              Certificates
+            </Text>
+            <div className="stat-value">
+              <ShieldCheck size={24} className="stat-icon icon-gradient" />
+              <span>{stats.certs}</span>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <Text size="xs" color="tertiary" transform="uppercase" className="stat-label">
+              ACME Accounts
+            </Text>
+            <div className="stat-value">
+              <Key size={24} className="stat-icon icon-gradient" />
+              <span>{stats.acme}</span>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <Text size="xs" color="tertiary" transform="uppercase" className="stat-label">
+              Active Users
+            </Text>
+            <div className="stat-value">
+              <Users size={24} className="stat-icon icon-gradient" />
+              <span>{stats.users}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* System Status */}
+        <div className="system-status">
+          <div className="status-header">
+            <span className="status-indicator"></span>
+            <Text size="sm" weight={600}>System Status</Text>
+          </div>
+          <div className="status-list">
+            <div className="status-item">
+              <Text size="xs" color="tertiary">Platform</Text>
+              <Text size="xs" color="primary">Operational</Text>
+            </div>
+            <div className="status-item">
+              <Text size="xs" color="tertiary">Database</Text>
+              <Text size="xs" color="primary">Healthy</Text>
+            </div>
+            <div className="status-item">
+              <Text size="xs" color="tertiary">ACME Service</Text>
+              <Text size="xs" color="primary">Active</Text>
+            </div>
+          </div>
+        </div>
+
+        <div className="sidebar-footer">
+          <Text size="xs" color="tertiary">
+            <ShieldCheck size={14} weight="fill" style={{ marginRight: 4, verticalAlign: 'middle' }} />
+            Secured by UCM v2.0
+          </Text>
+        </div>
+      </div>
+
+      {/* Right Side - Login Form */}
+      <div className="login-main">
+        <div className="login-card-v2">
           {step === 'checking' && (
-             <div className="auth-method active">
-                <div className="auth-status">
-                    <div className="auth-status-icon">
-                        <div className="spinner"></div>
-                    </div>
-                    <div className="auth-status-text">Checking authentication...</div>
-                    <div className="auth-status-subtext">Trying certificate-based login</div>
-                </div>
-                
-                <div className="info-box">
-                    <div className="info-box-icon"><Info size={16} weight="bold" /></div>
-                    <div>
-                        Attempting automatic authentication via client certificate (mTLS).
-                    </div>
-                </div>
+            <div className="auth-checking">
+              <div className="spinner-large"></div>
+              <Text size="md" weight={600}>Checking authentication...</Text>
+              <Text size="sm" color="secondary">Trying certificate-based login</Text>
             </div>
           )}
 
           {step === 'login' && (
-            <div className="auth-method active">
-                {error && (
-                  <div className="alert alert-error">
-                    <div className="alert-icon">
-                      <WarningCircle size={16} weight="bold" />
-                    </div>
-                    <div className="alert-content">
-                      <div className="alert-message">{error}</div>
-                    </div>
+            <>
+              <div className="login-header-v2">
+                <h2>Welcome Back</h2>
+                <Text size="sm" color="secondary">Sign in to your account</Text>
+              </div>
+
+              {error && (
+                <div className="alert alert-error">
+                  <div className="alert-content">
+                    <div className="alert-message">{error}</div>
                   </div>
-                )}
+                </div>
+              )}
 
-                <form onSubmit={handleLogin}>
-                    <div className="form-group">
-                        <label className="form-label" htmlFor="username">Username</label>
-                        <div className="input-group">
-                            <span className="input-icon"><User weight="duotone" /></span>
-                            <input 
-                                type="text" 
-                                name="username"
-                                id="username" 
-                                className="form-input" 
-                                placeholder="Enter your username"
-                                required
-                            />
-                        </div>
-                    </div>
+              <form onSubmit={handleLogin} className="login-form">
+                <Input
+                  label="Username"
+                  name="username"
+                  type="text"
+                  placeholder="Enter your username"
+                  required
+                />
 
-                    <div className="form-group">
-                        <label className="form-label" htmlFor="password">Password</label>
-                        <div className="input-group">
-                            <span className="input-icon"><Lock weight="duotone" /></span>
-                            <input 
-                                type={showPassword ? "text" : "password"} 
-                                name="password"
-                                id="password" 
-                                className="form-input" 
-                                placeholder="Enter your password"
-                                required
-                            />
-                            <button 
-                                type="button" 
-                                className="input-action" 
-                                onClick={() => setShowPassword(!showPassword)}
-                            >
-                                {showPassword ? <EyeSlash /> : <Eye />}
-                            </button>
-                        </div>
-                    </div>
+                <PasswordInput
+                  label="Password"
+                  name="password"
+                  placeholder="Enter your password"
+                  required
+                />
 
-                    <div className="form-checkbox-group">
-                        <input type="checkbox" id="remember" style={{ accentColor: 'var(--accent-primary)' }} />
-                        <label htmlFor="remember" style={{ fontSize: 'var(--font-size-ui)', color: 'var(--text-secondary)' }}>Remember me</label>
-                    </div>
-
-                    <button type="submit" className="btn btn-primary" disabled={loading}>
-                        {loading ? <div className="spinner" style={{ width: '16px', height: '16px', borderTopColor: 'white' }}></div> : <SignIn weight="bold" />}
-                        {loading ? 'Signing In...' : 'Sign In'}
-                    </button>
-                </form>
-
-                <div className="divider">
-                    <div className="divider-line"></div>
-                    <div className="divider-text">Or continue with</div>
-                    <div className="divider-line"></div>
+                <div className="form-checkbox">
+                  <input type="checkbox" id="remember" />
+                  <label htmlFor="remember">
+                    <Text size="sm" color="secondary">Remember me</Text>
+                  </label>
                 </div>
 
-                <button className="btn" onClick={() => alert('WebAuthn not implemented in demo')}>
-                    <ShieldCheck weight="duotone" size={18} />
-                    Security Key (WebAuthn)
-                </button>
-            </div>
+                <Button 
+                  type="submit" 
+                  variant="primary" 
+                  disabled={loading}
+                  style={{ width: '100%', marginTop: '8px' }}
+                >
+                  {loading ? 'Signing In...' : 'Sign In'}
+                </Button>
+              </form>
+
+              <div className="login-divider">
+                <span>Or continue with</span>
+              </div>
+
+              <Button 
+                variant="default"
+                style={{ width: '100%' }}
+                onClick={() => alert('WebAuthn not implemented in demo')}
+              >
+                <ShieldCheck size={18} weight="duotone" style={{ marginRight: 8 }} />
+                Security Key (WebAuthn)
+              </Button>
+            </>
           )}
         </div>
       </div>
