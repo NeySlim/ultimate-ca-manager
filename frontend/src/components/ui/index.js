@@ -6,3 +6,6 @@ export { Text } from './Text';
 export { Badge } from './Badge';
 export { Input, PasswordInput } from './Input';
 export { Stack, Group, Card, Divider } from './LayoutUtils';
+export { Menu, MenuItem, MenuDivider } from './Menu';
+export { Modal } from './Modal';
+export { Tabs, TabsList, TabsTab, TabsPanels, TabsPanel } from './Tabs';
