@@ -21,6 +21,10 @@ export { Textarea, NumberInput, Switch, Radio, Alert, Box } from './MoreComponen
 export { CopyButton, Grid, GridCol } from './Grid';
 export { Avatar, Title, Anchor, Loader, ScrollArea, ThemeIcon, Table, Paper, Stepper, Center, Code } from './MoreComponents2';
 
+// Layout components (for backward compatibility)
+export { default as PageHeader } from './Layout/PageHeader';
+export { default as Widget } from './Layout/Widget';
+
 Grid.Col = GridCol;
 Table.Thead = Table.Thead;
 Table.Tbody = Table.Tbody;
