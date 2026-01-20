@@ -12,6 +12,7 @@ import {
   Tabs,
   ActionIcon,
 } from '@mantine/core';
+import { useModals } from '@mantine/modals';
 import {
   CaretLeft,
   PenNib,
@@ -23,6 +24,7 @@ import {
   Key,
 } from '@phosphor-icons/react';
 import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
+import SignCSRModal from '../components/SignCSRModal';
 import './CSRDetailPage.css';
 
 // Mock Data
@@ -54,7 +56,26 @@ BwwJU2FuIEZyYW4...
 const CSRDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const modals = useModals();
   const csr = MOCK_CSR_DETAILS[id] || MOCK_CSR_DETAILS[1]; // Fallback to 1 for demo
+
+  const handleSignClick = () => {
+    modals.openModal({
+        title: 'Sign Certificate Request',
+        centered: true,
+        children: (
+            <SignCSRModal 
+                csr={csr}
+                onSign={(data) => {
+                    console.log('Signed with:', data);
+                    modals.closeAll();
+                    navigate('/certificates');
+                }}
+                onCancel={() => modals.closeAll()}
+            />
+        )
+    });
+  };
 
   return (
     <div className="csr-detail-page">
@@ -74,6 +95,7 @@ const CSRDetailPage = () => {
             <Button 
               leftSection={<PenNib size={16} />} 
               size="xs"
+              onClick={handleSignClick}
             >
               Sign Request
             </Button>
