@@ -29,9 +29,20 @@ export const CopyButton = ({ value, timeout = 2000 }) => {
 };
 
 /**
- * Grid - CSS Grid layout
+ * Grid - CSS Grid layout (replaces both old ui-grid and new Grid)
+ * Supports both old API (editMode, gap) and new API (columns, gutter)
  */
-export const Grid = ({ children, columns = 12, gutter = 'md', className = '', ...props }) => {
+export const Grid = ({ 
+  children, 
+  // Old API
+  editMode = false, 
+  gap,
+  // New API
+  columns = 12, 
+  gutter = 'md', 
+  className = '', 
+  ...props 
+}) => {
   const gutterMap = {
     xs: '4px',
     sm: '8px',
@@ -40,13 +51,17 @@ export const Grid = ({ children, columns = 12, gutter = 'md', className = '', ..
     xl: '32px'
   };
 
+  // Use gap if provided (old API), otherwise use gutter (new API)
+  const finalGap = gap || gutterMap[gutter];
+
   return (
     <div
-      className={`grid ${className}`}
+      className={`ui-grid grid ${editMode ? 'edit-mode' : ''} ${className}`}
       style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${columns}, 1fr)`,
-        gap: gutterMap[gutter],
+        gap: finalGap,
+        '--grid-gap': finalGap,
         ...props.style
       }}
       {...props}
@@ -76,3 +91,6 @@ export const GridCol = ({ children, span = 12, offset = 0, className = '', ...pr
 };
 
 Grid.Col = GridCol;
+
+// Default export for backward compatibility with old imports
+export default Grid;
