@@ -1,5 +1,5 @@
 import React from 'react';
-import { Input, NumberInput, Switch, Button, Group, Stack, Select } from '@mantine/core';
+import { Input, NumberInput, Switch, Button, Group, Stack, Select } from '../../../components/ui';
 
 const AcmeConfigModal = ({ context, id, innerProps }) => {
   return (

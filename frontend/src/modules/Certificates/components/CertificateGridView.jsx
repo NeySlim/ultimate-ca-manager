@@ -1,7 +1,7 @@
 import React from 'react';
 import { Grid, Widget, PageHeader } from '../../../components/ui/Layout';
 import { FileText, ShieldCheck, Plus } from '@phosphor-icons/react';
-import { Button } from '@mantine/core';
+import { Button } from '../../../components/ui';
 
 const CertificateGridView = ({ items, onSelect, selectedId }) => {
   return (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Paper, Group, Text, Button, Box, Stepper, ScrollArea } from '@mantine/core';
+import { Paper, Group, Text, Button, Box, Stepper, ScrollArea } from '../../../components/ui';
 
 export const CreationWizard = ({ 
   title, 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Input, Select, MultiSelect, Code, Group, Text, Paper
-} from '@mantine/core';
+} from '../../../components/ui';
 import { CreationWizard, WizardStep } from '../../../components/ui/Wizards/CreationWizard';
 import { CsrService } from '../services/csr.service';
 import { notifications } from '../../../components/ui/notifications';

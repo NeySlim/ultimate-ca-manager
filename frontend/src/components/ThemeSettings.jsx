@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Button, Stack, SegmentedControl, Text, SimpleGrid } from '@mantine/core';
+import { Modal, Button, Stack, Text } from './ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { colorPalettes } from '../theme/colors';
 

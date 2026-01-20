@@ -15,11 +15,6 @@
   "dependencies": {
     "@floating-ui/react": "^0.27.16",
     "@headlessui/react": "^2.2.9",
-    "@mantine/core": "^8.3.12",
-    "@mantine/dates": "^8.3.12",
-    "@mantine/hooks": "^8.3.12",
-    "@mantine/modals": "^8.3.12",
-    "@mantine/notifications": "^8.3.12",
     "@phosphor-icons/react": "^2.1.10",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

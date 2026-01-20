@@ -5,7 +5,7 @@ import {
   Badge,
   Text,
   Group
-} from '@mantine/core';
+} from '../../../components/ui';
 import { ArrowLeft, User, CheckCircle, XCircle } from '@phosphor-icons/react';
 import { PageHeader } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';

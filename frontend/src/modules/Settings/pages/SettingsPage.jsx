@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Tabs } from '@mantine/core';
+import { Button, Tabs } from '../../../components/ui';
 import { PenNib } from '@phosphor-icons/react';
 import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
 import GeneralTab from '../components/GeneralTab';

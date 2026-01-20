@@ -9,7 +9,7 @@ import {
   Tabs,
   ActionIcon,
   Tooltip,
-} from '@mantine/core';
+} from '../../../components/ui';
 import {
   ShieldCheck,
   Certificate,

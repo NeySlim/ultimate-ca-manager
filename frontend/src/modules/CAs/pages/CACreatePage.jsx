@@ -11,7 +11,7 @@ import {
   Stack,
   Divider,
   Code
-} from '@mantine/core';
+} from '../../../components/ui';
 import {
   CheckCircle,
 } from '@phosphor-icons/react';

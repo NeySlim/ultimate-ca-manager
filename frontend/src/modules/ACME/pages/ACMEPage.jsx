@@ -4,7 +4,7 @@ import {
   Group,
   Text,
   Badge,
-} from '@mantine/core';
+} from '../../../components/ui';
 import {
   Globe,
   Gear,

@@ -11,7 +11,7 @@ import {
   Tooltip,
   Avatar,
   Switch,
-} from '@mantine/core';
+} from '../../../components/ui';
 import {
   User,
   EnvelopeSimple,

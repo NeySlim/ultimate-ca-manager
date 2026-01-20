@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Text, Group, Badge, Button, Stack, Loader, Grid, SimpleGrid, ThemeIcon, Alert, Table, Modal, PasswordInput } from '@mantine/core';
+import { Card, Text, Group, Badge, Button, Stack, Loader, Grid, SimpleGrid, ThemeIcon, Alert, Table, Modal, PasswordInput } from '../../../components/ui';
 import { Database, HardDrives, Trash, Download, Upload, CheckCircle, Warning, ArrowsClockwise, FileArchive } from '@phosphor-icons/react';
 import { api } from '../../../core/api/client';
 

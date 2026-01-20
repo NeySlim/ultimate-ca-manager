@@ -5,12 +5,10 @@ import { AppThemeProvider } from './core/theme/ThemeProvider';
 import { ViewProvider } from './core/context/ViewContext';
 import { AuthProvider } from './core/context/AuthContext';
 import { SelectionProvider } from './core/context/SelectionContext';
+import { Toaster } from './components/ui/notifications';
 import App from './App.jsx';
 
-// Import Global Styles
-import '@mantine/core/styles.css';
-import '@mantine/notifications/styles.css';
-import '@mantine/dates/styles.css';
+// Import Global Styles (NO MORE MANTINE!)
 import './core/theme/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -20,6 +18,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <AuthProvider>
           <ViewProvider>
             <SelectionProvider>
+              <Toaster position="top-right" />
               <App />
             </SelectionProvider>
           </ViewProvider>

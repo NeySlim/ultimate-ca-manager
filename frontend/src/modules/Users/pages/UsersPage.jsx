@@ -9,7 +9,7 @@ import {
   ActionIcon,
   Tooltip,
   Input,
-} from '@mantine/core';
+} from '../../../components/ui';
 import {
   User,
   Plus,
