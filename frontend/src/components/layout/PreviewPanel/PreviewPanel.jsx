@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Export, ArrowsClockwise, Trash } from '@phosphor-icons/react';
+import { X, Export, ArrowsClockwise, Trash, FileText } from '@phosphor-icons/react';
 import { useSelection } from '../../../core/context/SelectionContext';
 
 const DEFAULT_WIDTH = 320;
