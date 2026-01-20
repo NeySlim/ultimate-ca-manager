@@ -1,29 +1,14 @@
 import React from 'react';
-import { MantineProvider } from '@mantine/core';
-import { ModalsProvider } from '@mantine/modals';
-import { ThemeProvider as StateThemeProvider, useTheme } from '../../contexts/ThemeContext';
-import { createMantineTheme } from '../../theme/mantine.config';
+import { ThemeProvider as StateThemeProvider } from '../../contexts/ThemeContext';
 
-const MantineWrapper = ({ children }) => {
-  const { palette, density, colorScheme } = useTheme();
-  // Memoize theme creation if needed, but creates object is cheap
-  const theme = createMantineTheme(palette, density);
-
-  return (
-    <MantineProvider theme={theme} defaultColorScheme={colorScheme} forceColorScheme={colorScheme}>
-      <ModalsProvider>
-        {children}
-      </ModalsProvider>
-    </MantineProvider>
-  );
-};
-
+/**
+ * Simplified ThemeProvider - NO MORE MANTINE!
+ * Just wraps StateThemeProvider (ThemeContext)
+ */
 export const AppThemeProvider = ({ children }) => {
   return (
     <StateThemeProvider>
-      <MantineWrapper>
-        {children}
-      </MantineWrapper>
+      {children}
     </StateThemeProvider>
   );
 };

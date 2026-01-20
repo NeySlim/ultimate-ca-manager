@@ -8,7 +8,7 @@ import {
   Group,
   Text,
   Box,
-} from '@mantine/core';
+} from '../../../components/ui';
 import {
   MagnifyingGlass,
   Eye,

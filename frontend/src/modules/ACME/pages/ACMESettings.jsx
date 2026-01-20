@@ -9,7 +9,7 @@ import {
   Text,
   Group,
   Select
-} from '@mantine/core';
+} from '../../../components/ui';
 import { FloppyDisk, ArrowLeft } from '@phosphor-icons/react';
 import { PageHeader } from '../../../components/ui/Layout';
 import { AcmeService } from '../services/acme.service';

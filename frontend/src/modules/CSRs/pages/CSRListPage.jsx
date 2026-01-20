@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Badge, Text, Group, ActionIcon, Input, Pagination } from '@mantine/core';
+import { Button, Badge, Text, Group, ActionIcon, Input, Pagination } from '../../../components/ui';
 import { Plus, MagnifyingGlass, FileText, Trash, Key, User, CalendarBlank, PenNib } from '@phosphor-icons/react';
 import { PageHeader } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';

@@ -8,7 +8,7 @@ import {
   Badge,
   ActionIcon,
   Tooltip,
-} from '@mantine/core';
+} from '../../../components/ui';
 import {
   MagnifyingGlass,
   Funnel,

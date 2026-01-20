@@ -2,7 +2,7 @@ import React from 'react';
 import { Grid, Widget, PageHeader } from '../../../components/ui/Layout';
 import CertificateTable from './CertificateTable';
 import { Plus } from '@phosphor-icons/react';
-import { Button } from '@mantine/core';
+import { Button } from '../../../components/ui';
 
 const CertificateListView = ({ items, onSelect, selectedId }) => {
   return (

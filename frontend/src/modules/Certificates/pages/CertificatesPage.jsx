@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSelection } from '../../../core/context/SelectionContext';
 import { CertificateService } from '../services/certificates.service';
-import { Loader, Center, Input, Group, Button, Menu, Badge, Text, Pagination } from '@mantine/core';
+import { Loader, Center, Input, Group, Button, Menu, Badge, Text, Pagination } from '../../../components/ui';
 import { MagnifyingGlass, Download, Plus, FileArchive, FileText, Certificate as CertIcon } from '@phosphor-icons/react';
 import { PageHeader } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';

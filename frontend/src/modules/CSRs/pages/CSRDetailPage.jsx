@@ -11,7 +11,7 @@ import {
   Divider,
   Tabs,
   ActionIcon,
-} from '@mantine/core';
+} from '../../../components/ui';
 import { useModals } from '@mantine/modals';
 import {
   CaretLeft,

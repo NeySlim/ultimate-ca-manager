@@ -7,7 +7,7 @@ import {
   Stack,
   Text,
   Alert,
-} from '@mantine/core';
+} from '../../../components/ui';
 import { WarningCircle, PenNib } from '@phosphor-icons/react';
 
 const SignCSRModal = ({ csr, onSign, onCancel }) => {

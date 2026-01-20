@@ -17,7 +17,7 @@ import {
   Divider,
   Box,
   SimpleGrid,
-} from '@mantine/core';
+} from '../../../components/ui';
 import {
   ArrowLeft,
   Download,

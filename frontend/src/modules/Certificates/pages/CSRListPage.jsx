@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSelection } from '../../../core/context/SelectionContext';
-import { Loader, Center, Input, Group, Button, Menu, Badge, Text } from '@mantine/core';
+import { Loader, Center, Input, Group, Button, Menu, Badge, Text } from '../../../components/ui';
 import { MagnifyingGlass, Download, Plus, FileArchive, FileText, FileDashed } from '@phosphor-icons/react';
 import { PageHeader } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';

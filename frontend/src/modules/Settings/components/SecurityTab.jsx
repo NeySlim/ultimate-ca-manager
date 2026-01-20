@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Text, Group, Badge, Button, Stack, Loader, Radio, Select, Alert, Modal } from '@mantine/core';
+import { Card, Text, Group, Badge, Button, Stack, Select, Alert, Modal } from '../../../components/ui';
 import { ShieldCheck, LockKey, ArrowsClockwise, Warning, Check, Info } from '@phosphor-icons/react';
-import { useDisclosure } from '@mantine/hooks';
 import { api } from '../../../core/api/client';
 
 const SecurityTab = () => {
