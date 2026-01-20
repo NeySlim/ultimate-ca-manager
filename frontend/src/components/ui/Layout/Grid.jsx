@@ -7,13 +7,15 @@ import './Grid.css';
  * Standard 12-column grid for all pages.
  * Supports "Grafana-style" layout with resizable/draggable potential.
  */
-const Grid = ({ children, editMode = false, gap = '16px', className = '' }) => {
+const Grid = ({ children, editMode = false, gap = '16px', className = '', style = {}, ...props }) => {
   return (
     <div 
       className={`ui-grid ${editMode ? 'edit-mode' : ''} ${className}`}
       style={{
-        '--grid-gap': gap
+        '--grid-gap': gap,
+        ...style
       }}
+      {...props}
     >
       {children}
     </div>

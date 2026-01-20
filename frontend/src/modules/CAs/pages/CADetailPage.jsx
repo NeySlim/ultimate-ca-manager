@@ -94,90 +94,92 @@ const CADetailPage = () => {
         }
       />
 
-      <Grid style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' }}>
+      <Grid>
         {/* Top Info Widgets */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-            <Widget title="Identity" icon={<ShieldCheck size={18} className="icon-gradient-subtle" />} style={{ flex: 1 }}>
-                <Stack gap="xs">
-                    <Group justify="space-between">
-                        <Text size="sm" c="dimmed">Common Name</Text>
-                        <Text size="sm" fw={500}>{ca.commonName}</Text>
-                    </Group>
-                    <Group justify="space-between">
-                        <Text size="sm" c="dimmed">Organization</Text>
-                        <Text size="sm">{ca.org}, {ca.country}</Text>
-                    </Group>
-                    <Group justify="space-between">
-                        <Text size="sm" c="dimmed">Type</Text>
-                        <Badge variant="outline" color="gray" size="xs">{ca.type}</Badge>
-                    </Group>
-                </Stack>
-            </Widget>
+        <Widget className="col-4" title="Identity" icon={<ShieldCheck size={18} className="icon-gradient-subtle" />}>
+            <Stack gap="xs">
+                <Group justify="space-between">
+                    <Text size="sm" c="dimmed">Common Name</Text>
+                    <Text size="sm" fw={500}>{ca.commonName}</Text>
+                </Group>
+                <Group justify="space-between">
+                    <Text size="sm" c="dimmed">Organization</Text>
+                    <Text size="sm">{ca.org}, {ca.country}</Text>
+                </Group>
+                <Group justify="space-between">
+                    <Text size="sm" c="dimmed">Type</Text>
+                    <Badge variant="outline" color="gray" size="xs">{ca.type}</Badge>
+                </Group>
+            </Stack>
+        </Widget>
 
-            <Widget title="Status & Key" icon={<Key size={18} className="icon-gradient-subtle" />} style={{ flex: 1 }}>
-                <Stack gap="xs">
-                     <Group justify="space-between">
-                        <Text size="sm" c="dimmed">Status</Text>
-                        <Badge color="green" variant="dot" size="sm">{ca.status}</Badge>
-                    </Group>
+        <Widget className="col-4" title="Status & Key" icon={<Key size={18} className="icon-gradient-subtle" />}>
+            <Stack gap="xs">
                     <Group justify="space-between">
-                        <Text size="sm" c="dimmed">Algorithm</Text>
-                        <Text size="sm" className="mono-text">{ca.keyAlgo}</Text>
-                    </Group>
-                    <Group justify="space-between">
-                        <Text size="sm" c="dimmed">Serial</Text>
-                        <Text size="xs" className="mono-text">{ca.serial}</Text>
-                    </Group>
-                </Stack>
-            </Widget>
+                    <Text size="sm" c="dimmed">Status</Text>
+                    <Badge color="green" variant="dot" size="sm">{ca.status}</Badge>
+                </Group>
+                <Group justify="space-between">
+                    <Text size="sm" c="dimmed">Algorithm</Text>
+                    <Text size="sm" className="mono-text">{ca.keyAlgo}</Text>
+                </Group>
+                <Group justify="space-between">
+                    <Text size="sm" c="dimmed">Serial</Text>
+                    <Text size="xs" className="mono-text">{ca.serial}</Text>
+                </Group>
+            </Stack>
+        </Widget>
 
-            <Widget title="Validity" icon={<CalendarCheck size={18} className="icon-gradient-subtle" />} style={{ flex: 1 }}>
-                <Stack gap="xs">
-                    <Group justify="space-between">
-                        <Text size="sm" c="dimmed">Valid From</Text>
-                        <Text size="sm">{ca.validFrom}</Text>
-                    </Group>
-                    <Group justify="space-between">
-                        <Text size="sm" c="dimmed">Valid To</Text>
-                        <Text size="sm">{ca.validTo}</Text>
-                    </Group>
-                    <Group justify="space-between">
-                        <Text size="sm" c="dimmed">Next CRL Update</Text>
-                        <Text size="sm" c={ca.crlStatus === 'Active' ? 'dimmed' : 'red'}>{ca.nextCrlUpdate}</Text>
-                    </Group>
-                </Stack>
-            </Widget>
-        </div>
+        <Widget className="col-4" title="Validity" icon={<CalendarCheck size={18} className="icon-gradient-subtle" />}>
+            <Stack gap="xs">
+                <Group justify="space-between">
+                    <Text size="sm" c="dimmed">Valid From</Text>
+                    <Text size="sm">{ca.validFrom}</Text>
+                </Group>
+                <Group justify="space-between">
+                    <Text size="sm" c="dimmed">Valid To</Text>
+                    <Text size="sm">{ca.validTo}</Text>
+                </Group>
+                <Group justify="space-between">
+                    <Text size="sm" c="dimmed">Next CRL Update</Text>
+                    <Text size="sm" c={ca.crlStatus === 'Active' ? 'dimmed' : 'red'}>{ca.nextCrlUpdate}</Text>
+                </Group>
+            </Stack>
+        </Widget>
 
         {/* Tabs for Issued Certs, CRLs, etc */}
-        <Tabs value={activeTab} onChange={setActiveTab} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-            <Tabs.List style={{ marginBottom: 0, borderBottom: 'none', paddingLeft: 4 }}>
-                <Tabs.Tab value="issued" leftSection={<Certificate size={16} />}>
-                    Issued Certificates
-                </Tabs.Tab>
-                <Tabs.Tab value="crl" leftSection={<FileText size={16} />}>
-                    CRL History
-                </Tabs.Tab>
-                <Tabs.Tab value="stats" leftSection={<ChartLineUp size={16} />}>
-                    Statistics
-                </Tabs.Tab>
-            </Tabs.List>
+        <Widget className="col-12" style={{ padding: 0, overflow: 'hidden', minHeight: '500px' }}>
+            <Tabs value={activeTab} onChange={setActiveTab} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: '0 16px', borderBottom: '1px solid #333' }}>
+                    <Tabs.List style={{ borderBottom: 'none' }}>
+                        <Tabs.Tab value="issued" leftSection={<Certificate size={16} />}>
+                            Issued Certificates
+                        </Tabs.Tab>
+                        <Tabs.Tab value="crl" leftSection={<FileText size={16} />}>
+                            CRL History
+                        </Tabs.Tab>
+                        <Tabs.Tab value="stats" leftSection={<ChartLineUp size={16} />}>
+                            Statistics
+                        </Tabs.Tab>
+                    </Tabs.List>
+                </div>
 
-            <div className="widget-full" style={{ flex: 1, padding: 0, overflow: 'hidden', marginTop: 8, background: '#1e1e1e', border: '1px solid #333', borderRadius: '4px' }}>
-                <Tabs.Panel value="issued" style={{ height: '100%' }}>
-                     <CertificateTable 
-                        data={MOCK_ISSUED_CERTS}
-                        onRowClick={(row) => navigate(`/certificates/${row.id}`)}
-                     />
-                </Tabs.Panel>
-                <Tabs.Panel value="crl" style={{ padding: '16px' }}>
-                    <Text c="dimmed" size="sm">CRL History will be displayed here.</Text>
-                </Tabs.Panel>
-                 <Tabs.Panel value="stats" style={{ padding: '16px' }}>
-                    <Text c="dimmed" size="sm">Issuance statistics will be displayed here.</Text>
-                </Tabs.Panel>
-            </div>
-        </Tabs>
+                <div style={{ flex: 1, position: 'relative' }}>
+                    <Tabs.Panel value="issued" style={{ height: '100%' }}>
+                            <CertificateTable 
+                            data={MOCK_ISSUED_CERTS}
+                            onRowClick={(row) => navigate(`/certificates/${row.id}`)}
+                            />
+                    </Tabs.Panel>
+                    <Tabs.Panel value="crl" style={{ padding: '16px' }}>
+                        <Text c="dimmed" size="sm">CRL History will be displayed here.</Text>
+                    </Tabs.Panel>
+                        <Tabs.Panel value="stats" style={{ padding: '16px' }}>
+                        <Text c="dimmed" size="sm">Issuance statistics will be displayed here.</Text>
+                    </Tabs.Panel>
+                </div>
+            </Tabs>
+        </Widget>
       </Grid>
     </div>
   );

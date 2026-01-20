@@ -106,35 +106,37 @@ const AuditPage = () => {
         }
       />
 
-      <Grid style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' }}>
+      <Grid style={{ flex: 1, padding: '16px', gridTemplateRows: 'auto 1fr' }}>
         {/* Filters */}
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
-            <TextInput 
-                placeholder="Search logs..." 
-                leftSection={<MagnifyingGlass size={16} />} 
-                style={{ flex: 1, maxWidth: '400px' }}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Select 
-                placeholder="Event Type" 
-                data={['LOGIN', 'CERT_ISSUE', 'CERT_REVOKE', 'SYSTEM']}
-                style={{ width: '180px' }}
-            />
-            <Select 
-                placeholder="Status" 
-                data={['Success', 'Failure', 'Warning']}
-                style={{ width: '150px' }}
-            />
-            <Button variant="default" leftSection={<Funnel size={16} />}>
-                More Filters
-            </Button>
-            <div style={{ flex: 1 }} />
-            <Text size="sm" c="dimmed">Showing {MOCK_LOGS.length} events</Text>
-        </div>
+        <Widget className="col-12">
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <TextInput 
+                    placeholder="Search logs..." 
+                    leftSection={<MagnifyingGlass size={16} />} 
+                    style={{ flex: 1, maxWidth: '400px' }}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <Select 
+                    placeholder="Event Type" 
+                    data={['LOGIN', 'CERT_ISSUE', 'CERT_REVOKE', 'SYSTEM']}
+                    style={{ width: '180px' }}
+                />
+                <Select 
+                    placeholder="Status" 
+                    data={['Success', 'Failure', 'Warning']}
+                    style={{ width: '150px' }}
+                />
+                <Button variant="default" leftSection={<Funnel size={16} />}>
+                    More Filters
+                </Button>
+                <div style={{ flex: 1 }} />
+                <Text size="sm" c="dimmed">Showing {MOCK_LOGS.length} events</Text>
+            </div>
+        </Widget>
 
         {/* Table */}
-        <Widget className="widget-full" style={{ flex: 1, padding: 0, overflow: 'hidden' }}>
+        <Widget className="col-12" style={{ padding: 0, overflow: 'hidden', minHeight: 0 }}>
           <ResizableTable 
             columns={columns}
             data={MOCK_LOGS}

@@ -264,35 +264,39 @@ const CATreePage = () => {
         }
       />
 
-      <Grid style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' }}>
-        <Tabs value={activeTab} onChange={setActiveTab} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <Tabs.List style={{ marginBottom: 0, borderBottom: 'none', paddingLeft: 4 }}>
-                <Tabs.Tab value="hierarchy" leftSection={<TreeView size={16} />}>
-                    Hierarchy
-                </Tabs.Tab>
-                <Tabs.Tab value="orphans" leftSection={<ListDashes size={16} />}>
-                    Orphan Intermediates
-                </Tabs.Tab>
-            </Tabs.List>
+      <Grid style={{ flex: 1, padding: '16px' }}>
+        <Widget className="col-12" style={{ padding: 0, overflow: 'hidden', height: '100%' }}>
+            <Tabs value={activeTab} onChange={setActiveTab} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: '0 16px', borderBottom: '1px solid #333' }}>
+                    <Tabs.List style={{ borderBottom: 'none' }}>
+                        <Tabs.Tab value="hierarchy" leftSection={<TreeView size={16} />}>
+                            Hierarchy
+                        </Tabs.Tab>
+                        <Tabs.Tab value="orphans" leftSection={<ListDashes size={16} />}>
+                            Orphan Intermediates
+                        </Tabs.Tab>
+                    </Tabs.List>
+                </div>
 
-            <Widget className="widget-full" style={{ flex: 1, padding: 0, overflow: 'hidden', marginTop: 8 }}>
-                <Tabs.Panel value="hierarchy" style={{ height: '100%' }}>
-                    <ResizableTable 
-                        columns={columnsTree}
-                        data={data}
-                        onRowClick={(row) => console.log('Clicked', row)}
-                    />
-                </Tabs.Panel>
-                <Tabs.Panel value="orphans" style={{ height: '100%' }}>
-                    <ResizableTable 
-                        columns={columnsOrphans}
-                        data={MOCK_ORPHANS}
-                        onRowClick={(row) => console.log('Clicked orphan', row)}
-                        emptyMessage="No orphan intermediate CAs found"
-                    />
-                </Tabs.Panel>
-            </Widget>
-        </Tabs>
+                <div style={{ flex: 1, position: 'relative' }}>
+                    <Tabs.Panel value="hierarchy" style={{ height: '100%' }}>
+                        <ResizableTable 
+                            columns={columnsTree}
+                            data={data}
+                            onRowClick={(row) => console.log('Clicked', row)}
+                        />
+                    </Tabs.Panel>
+                    <Tabs.Panel value="orphans" style={{ height: '100%' }}>
+                        <ResizableTable 
+                            columns={columnsOrphans}
+                            data={MOCK_ORPHANS}
+                            onRowClick={(row) => console.log('Clicked orphan', row)}
+                            emptyMessage="No orphan intermediate CAs found"
+                        />
+                    </Tabs.Panel>
+                </div>
+            </Tabs>
+        </Widget>
       </Grid>
     </div>
   );
