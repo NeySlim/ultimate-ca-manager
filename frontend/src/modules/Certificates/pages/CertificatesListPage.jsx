@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader, Center, Button } from '@mantine/core';
+import { Button } from '../../../components/ui';
 import { Plus, Upload } from '@phosphor-icons/react';
 import { Grid, Widget, PageHeader } from '../../../components/ui/Layout';
 import CertificateTable from '../components/CertificateTable';
@@ -56,7 +56,7 @@ const CertificatesListPage = () => {
   if (loading) {
     return (
       <Center style={{ height: '100vh' }}>
-        <Loader color="blue" type="bars" />
+        <div className="spinner" color="blue" type="bars" />
       </Center>
     );
   }

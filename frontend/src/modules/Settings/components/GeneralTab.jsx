@@ -27,7 +27,7 @@ const GeneralTab = () => {
   }, []);
 
   if (loading) {
-      return <div style={{ padding: 20, textAlign: 'center' }}><Loader size="sm" /></div>;
+      return <div style={{ padding: 20, textAlign: 'center' }}><div className="spinner" size="sm" /></div>;
   }
 
   return (

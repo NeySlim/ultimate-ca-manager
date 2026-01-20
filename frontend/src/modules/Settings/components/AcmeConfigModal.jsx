@@ -1,10 +1,10 @@
 import React from 'react';
-import { TextInput, NumberInput, Switch, Button, Group, Stack, Select } from '@mantine/core';
+import { Input, NumberInput, Switch, Button, Group, Stack, Select } from '@mantine/core';
 
 const AcmeConfigModal = ({ context, id, innerProps }) => {
   return (
     <Stack spacing="md">
-      <TextInput 
+      <Input 
         label="ACME Directory URL" 
         placeholder="https://acme-v02.api.letsencrypt.org/directory"
         defaultValue={innerProps.url || ''}
@@ -31,8 +31,8 @@ const AcmeConfigModal = ({ context, id, innerProps }) => {
       />
 
       <Stack spacing="xs" style={{ border: '1px solid var(--border-primary)', padding: 'var(--spacing-md)', borderRadius: 'var(--radius)', background: 'var(--bg-tertiary)' }}>
-        <TextInput label="EAB Key ID" placeholder="Key ID" disabled />
-        <TextInput label="EAB HMAC Key" placeholder="HMAC Key" disabled />
+        <Input label="EAB Key ID" placeholder="Key ID" disabled />
+        <Input label="EAB HMAC Key" placeholder="HMAC Key" disabled />
       </Stack>
 
       <Group position="right" mt="md">

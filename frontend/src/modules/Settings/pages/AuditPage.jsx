@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Button,
   Group,
-  TextInput,
+  Input,
   Select,
   Text,
   Badge,
@@ -63,7 +63,7 @@ const AuditPage = () => {
         key: 'action',
         label: 'Event Type',
         width: 180,
-        render: (row) => <Badge variant="outline" variant="outline" size="sm">{row.action}</Badge>
+        render: (row) => <Badge variant="outline" size="sm">{row.action}</Badge>
     },
     {
         key: 'resource',
@@ -110,7 +110,7 @@ const AuditPage = () => {
         {/* Filters */}
         <Widget className="col-12">
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <TextInput 
+                <Input 
                     placeholder="Search logs..." 
                     leftSection={<MagnifyingGlass size={16} />} 
                     style={{ flex: 1, maxWidth: '400px' }}

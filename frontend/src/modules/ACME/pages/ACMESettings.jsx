@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
-  TextInput,
+  Input,
   Switch,
   Paper,
   Stack,
@@ -112,7 +112,7 @@ const ACMESettings = () => {
               onChange={(val) => setSettings({...settings, provider: val})}
             />
 
-            <TextInput
+            <Input
               label="Contact Email"
               description="Default contact email for ACME accounts"
               placeholder="admin@example.com"
