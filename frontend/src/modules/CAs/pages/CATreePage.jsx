@@ -1,17 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Group,
-  Badge,
-  Text,
-  ActionIcon,
-  TextInput,
-  Menu,
-  Pagination,
-  Loader,
-  Center
-} from '@mantine/core';
+import { Button, Group, Badge, Text, Input } from '../../../components/ui';
 import {
   Plus,
   CaretRight,
@@ -24,7 +13,8 @@ import {
   CloudArrowUp,
   FileArchive,
   FileText,
-  Upload
+  Upload,
+  DotsThree
 } from '@phosphor-icons/react';
 import { PageHeader } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
@@ -386,7 +376,7 @@ const CATreePage = () => {
 
       {/* Toolbar */}
       <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)', display: 'flex' }}>
-        <TextInput 
+        <Input 
             placeholder="Search CAs..." 
             size="xs"
             leftSection={<MagnifyingGlass size={16} className="icon-gradient-subtle" />}
@@ -399,9 +389,9 @@ const CATreePage = () => {
       <div style={{ flex: 1, overflow: 'hidden', padding: '12px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', border: '1px solid var(--border-color)', borderRadius: 'var(--control-radius)', background: 'var(--bg-surface)', overflow: 'hidden' }}>
         {loading ? (
-             <Center style={{ height: '100%' }}>
-                <Loader size="sm" />
-             </Center>
+             <div className="center" style={{ height: '100%' }}>
+                <div className="spinner" size="sm" />
+             </div>
         ) : (
             <>
                 {/* Hierarchy Section */}
