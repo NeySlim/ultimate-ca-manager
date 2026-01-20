@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -26,61 +26,71 @@ import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
 import StatWidget from '../../Dashboard/components/widgets/StatWidget';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
 import CertificateTable from '../../Certificates/components/CertificateTable';
+import { caService } from '../services/ca.service';
 import './CADetailPage.css';
-
-// Mock Data
-const MOCK_CA_DETAILS = {
-  1: {
-    id: 1,
-    name: 'Root CA - UCM Global',
-    type: 'Root CA',
-    status: 'Active',
-    commonName: 'UCM Global Root CA G1',
-    org: 'UCM Corp',
-    country: 'US',
-    validFrom: '2020-01-01',
-    validTo: '2040-01-01',
-    serial: '1234-5678-90AB-CDEF',
-    keyAlgo: 'RSA 4096',
-    issuedCount: 124,
-    crlStatus: 'Active',
-    nextCrlUpdate: '2024-03-27'
-  }
-};
-
-const MOCK_ISSUED_CERTS = [
-  {
-    id: 101,
-    commonName: 'web.internal.corp',
-    status: 'Valid',
-    serial: '5566-7788',
-    issuer: 'UCM Global Root CA G1',
-    issuedDate: '2023-01-15',
-    expiryDate: '2024-01-15',
-    ca: 'Root CA - UCM Global'
-  },
-  {
-    id: 102,
-    commonName: 'api.gateway.net',
-    status: 'Valid',
-    serial: '9900-1122',
-    issuer: 'UCM Global Root CA G1',
-    issuedDate: '2023-02-20',
-    expiryDate: '2024-02-20',
-    ca: 'Root CA - UCM Global'
-  }
-];
 
 const CADetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('issued');
-  const ca = MOCK_CA_DETAILS[1]; // Mock fallback
+  const [ca, setCa] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [certs, setCerts] = useState([]);
+  const [certsLoading, setCertsLoading] = useState(false);
+
+  // Helper to render value or dash
+  const renderValue = (val) => {
+    if (val === null || val === undefined || val === '') return '-';
+    return val;
+  };
+
+  // Helper for Organization/Country
+  const renderOrg = (org, country) => {
+    const parts = [org, country].filter(p => p);
+    if (parts.length === 0) return '-';
+    return parts.join(', ');
+  };
+
+  // Fetch CA Details
+  useEffect(() => {
+    const fetchCA = async () => {
+        setLoading(true);
+        try {
+            const data = await caService.getById(id);
+            setCa(data);
+        } catch (error) {
+            console.error("Failed to fetch CA:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    if (id) fetchCA();
+  }, [id]);
+
+  // Fetch Certificates when tab is active
+  useEffect(() => {
+    const fetchCerts = async () => {
+        if (!id || activeTab !== 'issued') return;
+        setCertsLoading(true);
+        try {
+            const response = await caService.getCertificates(id);
+            setCerts(response.data || []);
+        } catch (error) {
+            console.error("Failed to fetch certs:", error);
+        } finally {
+            setCertsLoading(false);
+        }
+    };
+    fetchCerts();
+  }, [id, activeTab]);
+
+  if (loading) return null; // Or loading spinner
+  if (!ca) return <div style={{ padding: 20 }}>CA Not Found</div>;
 
   return (
     <div className="ca-detail-page" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <PageHeader 
-        title={ca.name} 
+        title={ca.descr || ca.commonName} 
         backAction={() => navigate('/cas/tree')}
         actions={
             <Group gap="xs">
@@ -100,15 +110,15 @@ const CADetailPage = () => {
             <Stack gap="xs">
                 <Group justify="space-between">
                     <Text size="sm" c="dimmed">Common Name</Text>
-                    <Text size="sm" fw={500}>{ca.commonName}</Text>
+                    <Text size="sm" fw={500}>{renderValue(ca.commonName || ca.descr)}</Text>
                 </Group>
                 <Group justify="space-between">
                     <Text size="sm" c="dimmed">Organization</Text>
-                    <Text size="sm">{ca.org}, {ca.country}</Text>
+                    <Text size="sm">{renderOrg(ca.org, ca.country)}</Text>
                 </Group>
                 <Group justify="space-between">
                     <Text size="sm" c="dimmed">Type</Text>
-                    <Badge variant="outline" color="gray" size="xs">{ca.type}</Badge>
+                    <Badge variant="outline" color="gray" size="xs">{ca.is_root ? 'Root CA' : 'Intermediate'}</Badge>
                 </Group>
             </Stack>
         </Widget>
@@ -117,15 +127,15 @@ const CADetailPage = () => {
             <Stack gap="xs">
                     <Group justify="space-between">
                     <Text size="sm" c="dimmed">Status</Text>
-                    <Badge color="green" variant="dot" size="sm">{ca.status}</Badge>
+                    <Badge color="green" variant="dot" size="sm">Active</Badge>
                 </Group>
                 <Group justify="space-between">
                     <Text size="sm" c="dimmed">Algorithm</Text>
-                    <Text size="sm" className="mono-text">{ca.keyAlgo}</Text>
+                    <Text size="sm" className="mono-text">{renderValue(ca.keyAlgo)}</Text>
                 </Group>
                 <Group justify="space-between">
-                    <Text size="sm" c="dimmed">Serial</Text>
-                    <Text size="xs" className="mono-text">{ca.serial}</Text>
+                    <Text size="sm" c="dimmed">Key Size</Text>
+                    <Text size="xs" className="mono-text">{ca.keySize ? `${ca.keySize} bits` : '-'}</Text>
                 </Group>
             </Stack>
         </Widget>
@@ -134,15 +144,15 @@ const CADetailPage = () => {
             <Stack gap="xs">
                 <Group justify="space-between">
                     <Text size="sm" c="dimmed">Valid From</Text>
-                    <Text size="sm">{ca.validFrom}</Text>
+                    <Text size="sm">{renderValue(ca.valid_from ? new Date(ca.valid_from).toLocaleDateString() : null)}</Text>
                 </Group>
                 <Group justify="space-between">
                     <Text size="sm" c="dimmed">Valid To</Text>
-                    <Text size="sm">{ca.validTo}</Text>
+                    <Text size="sm">{renderValue(ca.valid_to ? new Date(ca.valid_to).toLocaleDateString() : null)}</Text>
                 </Group>
                 <Group justify="space-between">
                     <Text size="sm" c="dimmed">Next CRL Update</Text>
-                    <Text size="sm" c={ca.crlStatus === 'Active' ? 'dimmed' : 'red'}>{ca.nextCrlUpdate}</Text>
+                    <Text size="sm" c={ca.crlStatus === 'Active' ? 'dimmed' : 'red'}>{renderValue(ca.nextCrlUpdate)}</Text>
                 </Group>
             </Stack>
         </Widget>
@@ -167,8 +177,9 @@ const CADetailPage = () => {
                 <div style={{ flex: 1, position: 'relative' }}>
                     <Tabs.Panel value="issued" style={{ height: '100%' }}>
                             <CertificateTable 
-                            data={MOCK_ISSUED_CERTS}
-                            onRowClick={(row) => navigate(`/certificates/${row.id}`)}
+                                data={certs}
+                                loading={certsLoading}
+                                onRowClick={(row) => navigate(`/certificates/${row.id}`)}
                             />
                     </Tabs.Panel>
                     <Tabs.Panel value="crl" style={{ padding: '16px' }}>

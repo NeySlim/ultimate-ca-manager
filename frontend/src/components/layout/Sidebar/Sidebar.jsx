@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  Users, Certificate, ShieldCheck, HardDrives, Sliders, FileText
+  House, Users, Certificate, ShieldCheck, Sliders, FileText, Globe, Devices
 } from '@phosphor-icons/react';
 
 const SidebarItem = ({ to, icon: Icon, label, end }) => (
@@ -22,19 +22,30 @@ const SidebarItem = ({ to, icon: Icon, label, end }) => (
 const Sidebar = () => {
   return (
     <div className="sidebar">
-      {/* SECTION 1: Favorites */}
+      {/* SECTION 1: Overview */}
       <div className="sidebar-section">
-        <div className="sidebar-title">Favorites</div>
-        <SidebarItem to="/users" label="Users" icon={Users} />
-        <SidebarItem to="/certificates" label="Certificates" icon={Certificate} />
+        <SidebarItem to="/" label="Dashboard" icon={House} end />
+      </div>
+
+      {/* SECTION 2: PKI Management */}
+      <div className="sidebar-section">
+        <div className="sidebar-title">PKI Management</div>
         <SidebarItem to="/cas" label="Authorities" icon={ShieldCheck} />
+        <SidebarItem to="/certificates" label="Certificates" icon={Certificate} />
         <SidebarItem to="/csrs" label="CSRs" icon={FileText} />
       </div>
+
+      {/* SECTION 3: Services */}
+      <div className="sidebar-section">
+        <div className="sidebar-title">Services</div>
+        <SidebarItem to="/acme" label="ACME Protocol" icon={Globe} />
+        <SidebarItem to="/scep" label="SCEP Server" icon={Devices} />
+      </div>
       
-      {/* SECTION 2: System */}
+      {/* SECTION 4: System */}
       <div className="sidebar-section">
         <div className="sidebar-title">System</div>
-        <SidebarItem to="/backups" label="Backups" icon={HardDrives} />
+        <SidebarItem to="/users" label="Users" icon={Users} />
         <SidebarItem to="/settings" label="Settings" icon={Sliders} />
       </div>
     </div>

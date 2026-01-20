@@ -72,7 +72,7 @@ body {
 
 .icon-gradient-glow {
   color: var(--accent-primary);
-  filter: drop-shadow(0 0 4px var(--accent-gradient-start)) drop-shadow(0 0 8px var(--accent-gradient-end));
+  /* filter: drop-shadow(0 0 4px var(--accent-gradient-start)) drop-shadow(0 0 8px var(--accent-gradient-end)); */
 }
 
 /* Badge Gradients */
