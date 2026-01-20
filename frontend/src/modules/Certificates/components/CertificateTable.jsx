@@ -145,15 +145,10 @@ const CertificateTable = ({ data, onRowClick, onDelete, onDownload, onView, sele
     {
       key: 'actions',
       label: 'Actions',
-      width: 120,
-      minWidth: 100,
+      width: 100,
+      minWidth: 80,
       render: (row) => (
         <Group gap={4}>
-            <Tooltip label="View">
-                <ActionIcon size="sm" variant="subtle" onClick={(e) => { e.stopPropagation(); onView?.(row); }}>
-                    <Eye size={16} />
-                </ActionIcon>
-            </Tooltip>
             <Tooltip label="Download">
                 <ActionIcon size="sm" variant="subtle" onClick={(e) => { e.stopPropagation(); onDownload?.(row); }}>
                     <Download size={16} />
@@ -170,9 +165,9 @@ const CertificateTable = ({ data, onRowClick, onDelete, onDownload, onView, sele
   ];
 
   return (
-    <div className="certificate-table-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="certificate-table-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-surface)' }}>
       {/* Filters Toolbar */}
-      <div className="certificate-toolbar" style={{ padding: '12px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+      <div className="certificate-toolbar" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '12px', alignItems: 'center', background: 'var(--bg-surface)' }}>
         <TextInput
           placeholder="Search..."
           leftSection={<MagnifyingGlass size={16} className="icon-gradient-subtle" />}
@@ -210,7 +205,9 @@ const CertificateTable = ({ data, onRowClick, onDelete, onDownload, onView, sele
         <ResizableTable 
             columns={columns}
             data={filteredData}
-            onRowClick={onRowClick}
+            onRowClick={(row) => {
+                onRowClick?.(row);
+            }}
             rowClassName={(row) => row.id === selectedId ? 'selected' : ''}
         />
       </div>

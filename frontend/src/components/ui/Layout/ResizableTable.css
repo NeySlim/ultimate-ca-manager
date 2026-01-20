@@ -6,8 +6,8 @@
   height: 100%;
   overflow: hidden;
   background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: 4px; /* Optional: standard layout borders */
+  /* border: 1px solid var(--border-color); Removed for seamless integration */
+  /* border-radius: 4px; Removed */
 }
 
 /* Header */
@@ -18,6 +18,7 @@
   height: calc(var(--control-height) + 12px); /* Scale header with density */
   flex-shrink: 0;
   overflow-x: hidden; /* Hide header scrollbar, syncs with body via width */
+  min-width: 0; /* Critical from demo */
 }
 
 .rt-th {
@@ -78,6 +79,9 @@
   overflow-y: auto;
   overflow-x: auto; /* Allow horizontal scroll if cols are wide */
   background: var(--bg-surface);
+  min-width: 0; /* Critical from demo */
+  padding: 8px 0; /* Slight padding like demo */
+  display: block; /* Ensure block formatting context */
 }
 
 .rt-row {
@@ -85,7 +89,9 @@
   border-bottom: 1px solid var(--border-color);
   transition: all 0.15s ease; /* Enhanced transition */
   cursor: pointer;
-  min-width: max-content; /* Ensure row takes full width of columns */
+  width: 100%; /* Ensure row takes full width */
+  align-items: center; /* Match demo */
+  flex-shrink: 0; /* Don't shrink rows if container is small vertically */
 }
 
 .rt-row:hover {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  Users, Certificate, ShieldCheck, HardDrives, Sliders
+  Users, Certificate, ShieldCheck, HardDrives, Sliders, FileText
 } from '@phosphor-icons/react';
 
 const SidebarItem = ({ to, icon: Icon, label, end }) => (
@@ -10,8 +10,12 @@ const SidebarItem = ({ to, icon: Icon, label, end }) => (
     end={end}
     className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
   >
-    <Icon size={18} className="icon" />
-    <span className="label">{label}</span>
+    {({ isActive }) => (
+      <>
+        <Icon size={18} className={`icon ${isActive ? 'icon-gradient' : ''}`} weight={isActive ? "fill" : "regular"} />
+        <span className="label">{label}</span>
+      </>
+    )}
   </NavLink>
 );
 
@@ -24,6 +28,7 @@ const Sidebar = () => {
         <SidebarItem to="/users" label="Users" icon={Users} />
         <SidebarItem to="/certificates" label="Certificates" icon={Certificate} />
         <SidebarItem to="/cas" label="Authorities" icon={ShieldCheck} />
+        <SidebarItem to="/csrs" label="CSRs" icon={FileText} />
       </div>
       
       {/* SECTION 2: System */}

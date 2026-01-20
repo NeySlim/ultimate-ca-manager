@@ -88,9 +88,8 @@ const CertificatesListPage = () => {
       />
 
       {/* 2. Content (Standard Grid Layout) */}
-      <Grid style={{ flex: 1, padding: '16px' }}>
-         {/* Full Width Widget for Table */}
-         <Widget className="widget-full" style={{ height: '100%', padding: 0, overflow: 'hidden' }}>
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, background: 'var(--bg-panel)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <CertificateTable
               data={certificates}
               onRowClick={handleRowClick}
@@ -98,8 +97,8 @@ const CertificatesListPage = () => {
               onDownload={handleDownload}
               onDelete={handleDelete}
             />
-         </Widget>
-      </Grid>
+        </div>
+      </div>
     </div>
   );
 };

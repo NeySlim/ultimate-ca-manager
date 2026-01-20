@@ -356,6 +356,38 @@ class Certificate(db.Model):
             return json.loads(self.san_uri)
         except:
             return []
+            
+    @property
+    def key_type(self) -> str:
+        """Parse key type from certificate or CSR"""
+        try:
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives.asymmetric import rsa, ec, dsa
+            import base64
+            
+            # Try parsing CRT first
+            if self.crt:
+                pem_data = base64.b64decode(self.crt).decode('utf-8')
+                obj = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
+                public_key = obj.public_key()
+            # Then try parsing CSR
+            elif self.csr:
+                pem_data = base64.b64decode(self.csr).decode('utf-8')
+                obj = x509.load_pem_x509_csr(pem_data.encode(), default_backend())
+                public_key = obj.public_key()
+            else:
+                return "N/A"
+            
+            if isinstance(public_key, rsa.RSAPublicKey):
+                return f"RSA {public_key.key_size}"
+            elif isinstance(public_key, ec.EllipticCurvePublicKey):
+                return f"EC {public_key.curve.name}"
+            elif isinstance(public_key, dsa.DSAPublicKey):
+                return f"DSA {public_key.key_size}"
+            return "Unknown"
+        except Exception:
+            return "N/A"
     
     @property
     def common_name(self) -> str:
@@ -377,6 +409,17 @@ class Certificate(db.Model):
         for part in self.subject.split(','):
             if part.strip().startswith('O='):
                 return part.strip()[2:]
+        return ""
+
+    @property
+    def organizational_unit(self) -> str:
+        """Extract Organizational Unit from subject"""
+        if not self.subject:
+            return ""
+        # Subject format: "CN=example.com,O=Company,OU=Dept,..."
+        for part in self.subject.split(','):
+            if part.strip().startswith('OU='):
+                return part.strip()[3:]
         return ""
     
     @property

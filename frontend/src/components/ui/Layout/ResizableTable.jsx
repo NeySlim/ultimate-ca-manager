@@ -28,6 +28,22 @@ const ResizableTable = ({
 
   const [resizing, setResizing] = useState(null); // { colKey, startX, startWidth }
   const tableRef = useRef(null);
+  const headerRef = useRef(null);
+  const bodyRef = useRef(null);
+
+  // Sync Scroll
+  useEffect(() => {
+    const body = bodyRef.current;
+    const header = headerRef.current;
+    if (!body || !header) return;
+
+    const handleScroll = () => {
+      header.scrollLeft = body.scrollLeft;
+    };
+
+    body.addEventListener('scroll', handleScroll);
+    return () => body.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Mouse Move Handler (Global)
   const handleMouseMove = useCallback((e) => {
@@ -78,28 +94,35 @@ const ResizableTable = ({
   return (
     <div className="resizable-table-container" ref={tableRef}>
       {/* Table Header */}
-      <div className="rt-header">
+      <div className="rt-header" ref={headerRef}>
         {columns.map((col) => (
           <div 
             key={col.key} 
             className="rt-th" 
-            style={{ width: colWidths[col.key], minWidth: col.minWidth || 50 }}
+            style={{ 
+              width: col.flex ? '100%' : colWidths[col.key], 
+              minWidth: col.minWidth || 50, 
+              flex: col.flex ? '1 1 auto' : `0 0 ${colWidths[col.key]}px`,
+              maxWidth: col.flex ? 'none' : `${colWidths[col.key]}px`
+            }}
           >
             <div className="rt-th-content">
               {col.label}
               {col.sortable && <span className="rt-sort-icon">↕</span>}
             </div>
-            {/* Resize Handle */}
-            <div 
-              className={`rt-resize-handle ${resizing?.colKey === col.key ? 'active' : ''}`}
-              onMouseDown={(e) => startResize(e, col)}
-            />
+            {/* Resize Handle - Only for non-flex columns */}
+            {!col.flex && (
+              <div 
+                className={`rt-resize-handle ${resizing?.colKey === col.key ? 'active' : ''}`}
+                onMouseDown={(e) => startResize(e, col)}
+              />
+            )}
           </div>
         ))}
       </div>
 
       {/* Table Body */}
-      <div className="rt-body">
+      <div className="rt-body" ref={bodyRef}>
         {data.length === 0 ? (
           <div className="rt-empty">{emptyMessage}</div>
         ) : (
@@ -113,7 +136,12 @@ const ResizableTable = ({
                 <div 
                   key={`${row.id || rowIndex}-${col.key}`} 
                   className="rt-td"
-                  style={{ width: colWidths[col.key], minWidth: col.minWidth || 50 }}
+                  style={{ 
+                    width: col.flex ? '100%' : colWidths[col.key], 
+                    minWidth: col.minWidth || 50, 
+                    flex: col.flex ? '1 1 auto' : `0 0 ${colWidths[col.key]}px`,
+                    maxWidth: col.flex ? 'none' : `${colWidths[col.key]}px`
+                  }}
                 >
                   {col.render ? col.render(row) : row[col.key]}
                 </div>
