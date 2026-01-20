@@ -10,6 +10,7 @@ export { Menu, MenuItem, MenuDivider } from './Menu';
 export { Modal } from './Modal';
 export { Tabs, TabsList, TabsTab, TabsPanels, TabsPanel } from './Tabs';
 export { Select } from './Select';
+export { MultiSelect } from './MultiSelect';
 export { Pagination } from './Pagination';
 export { SegmentedControl } from './SegmentedControl';
 export { SimpleGrid } from './SimpleGrid';
