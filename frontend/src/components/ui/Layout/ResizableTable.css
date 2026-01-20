@@ -13,8 +13,8 @@
 /* Header */
 .rt-header {
   display: flex;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-tertiary); /* Matching Data Tables design */
+  border-bottom: 1px solid var(--border-primary);
   height: calc(var(--control-height) + 12px); /* Scale header with density */
   flex-shrink: 0;
   overflow-x: hidden; /* Hide header scrollbar, syncs with body via width */
@@ -26,13 +26,13 @@
   display: flex;
   align-items: center;
   padding: 0 var(--control-padding-x);
-  font-size: 11px;
+  font-size: 11px; /* Exact match from design-system.html */
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--text-muted); /* Changed to use variable */
+  color: var(--text-tertiary); /* Exact match */
   letter-spacing: 0.5px;
   user-select: none;
-  border-right: 1px solid var(--border-color); /* Added persistent separator */
+  /* border-right: 1px solid var(--border-color); Removed to match clean Data Table style */
   transition: color 0.2s;
 }
 
@@ -41,8 +41,8 @@
 }
 
 .rt-th:hover {
-  color: var(--text-primary);
-  background-color: var(--bg-element-hover);
+  color: var(--accent-primary); /* Exact match */
+  /* background-color: var(--bg-element-hover); Removed background hover on header */
 }
 
 .rt-th-content {
@@ -78,16 +78,16 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: auto; /* Allow horizontal scroll if cols are wide */
-  background: var(--bg-surface);
+  background: var(--bg-primary); /* Exact match design-system table background */
   min-width: 0; /* Critical from demo */
-  padding: 8px 0; /* Slight padding like demo */
+  padding: 0; /* Removed padding to match table structure */
   display: block; /* Ensure block formatting context */
 }
 
 .rt-row {
   display: flex;
-  border-bottom: 1px solid var(--border-color);
-  transition: all 0.15s ease; /* Enhanced transition */
+  border-bottom: 1px solid var(--bg-hover); /* Exact match design-system td border */
+  transition: background-color 0.15s ease;
   cursor: pointer;
   width: 100%; /* Ensure row takes full width */
   align-items: center; /* Match demo */
@@ -95,14 +95,14 @@
 }
 
 .rt-row:hover {
-  background: var(--bg-element-hover);
-  transform: translateY(-1px); /* Slight lift effect from demo */
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  background: var(--bg-hover); /* Exact match design-system tr:hover */
+  /* transform: translateY(-1px); Removed lift */
+  /* box-shadow: 0 2px 4px rgba(0,0,0,0.05); Removed shadow */
   z-index: 1;
 }
 
 .rt-row.selected {
-  background: var(--mantine-color-blue-light); /* Use theme variable */
+  background: rgba(90, 143, 199, 0.1); /* Subtle blue tint instead of full blue */
   border-color: var(--accent-primary);
 }
 

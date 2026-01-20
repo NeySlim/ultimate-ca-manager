@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Text, Group, Badge, Button, Stack, Loader, Grid, SimpleGrid, ThemeIcon, Alert } from '@mantine/core';
-import { Database, HardDrives, Trash, Download, Upload, CheckCircle, Warning, ArrowsClockwise } from '@phosphor-icons/react';
+import { Card, Text, Group, Badge, Button, Stack, Loader, Grid, SimpleGrid, ThemeIcon, Alert, Table, Modal, PasswordInput } from '@mantine/core';
+import { Database, HardDrives, Trash, Download, Upload, CheckCircle, Warning, ArrowsClockwise, FileArchive } from '@phosphor-icons/react';
 import { api } from '../../../core/api/client';
 
 const StatCard = ({ label, value, subtext }) => (
@@ -13,11 +13,17 @@ const StatCard = ({ label, value, subtext }) => (
 
 const DatabaseTab = () => {
   const [stats, setStats] = useState(null);
+  const [backups, setBackups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [backupModalOpen, setBackupModalOpen] = useState(false);
+  const [backupPassword, setBackupPassword] = useState('');
+  const [selectedBackup, setSelectedBackup] = useState(null);
+  const fileInputRef = React.useRef(null);
 
   useEffect(() => {
     loadStats();
+    loadBackups();
   }, []);
 
   const loadStats = async () => {
@@ -29,6 +35,77 @@ const DatabaseTab = () => {
       } finally {
           setLoading(false);
       }
+  };
+
+  const loadBackups = async () => {
+      try {
+          const res = await api.get('/system/backup/list');
+          setBackups(res.data || []);
+      } catch (err) {
+          console.error("Failed to load backups", err);
+      }
+  };
+
+  const handleCreateBackup = async () => {
+      if (!backupPassword || backupPassword.length < 12) {
+          alert("Password must be at least 12 characters");
+          return;
+      }
+      
+      setProcessing(true);
+      try {
+          await api.post('/system/backup/create', { password: backupPassword });
+          setBackupModalOpen(false);
+          setBackupPassword('');
+          loadBackups();
+          alert("Backup created successfully");
+      } catch (err) {
+          alert("Backup failed: " + err.message);
+      } finally {
+          setProcessing(false);
+      }
+  };
+
+  const handleRestoreFromFile = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!window.confirm(`Are you sure you want to restore from file: ${file.name}? Current data will be overwritten.`)) {
+        event.target.value = null;
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setProcessing(true);
+    try {
+        const res = await api.post('/system/backup/restore', formData);
+        alert(res.message || "Restore successful. System restarting...");
+        loadStats();
+    } catch (err) {
+        alert("Restore failed: " + err.message);
+    } finally {
+        setProcessing(false);
+        event.target.value = null;
+    }
+  };
+
+  const handleRestoreSelected = async () => {
+    if (!selectedBackup) return;
+    
+    if (!window.confirm(`Are you sure you want to restore from server backup: ${selectedBackup}? Current data will be overwritten.`)) return;
+
+    setProcessing(true);
+    try {
+        const res = await api.post('/system/backup/restore', { filename: selectedBackup });
+        alert(res.message || "Restore successful. System restarting...");
+        loadStats();
+    } catch (err) {
+        alert("Restore failed: " + err.message);
+    } finally {
+        setProcessing(false);
+    }
   };
 
   const handleAction = async (action, endpoint) => {
@@ -117,24 +194,96 @@ const DatabaseTab = () => {
                 Backups are encrypted with AES-256-GCM. Keep your password safe.
             </Alert>
             
-            <Group>
-                <div style={{ flex: 1 }}>
-                    <Button 
-                        leftSection={<Download size={16} />} 
-                        color="blue"
-                        mb={4}
-                        onClick={() => handleAction('Create Backup', '/system/backup/create')}
-                    >
-                        Full PKI Backup
-                    </Button>
-                    <Text size="xs" color="dimmed" style={{ lineHeight: 1.4 }}>
-                        Generates a single linear JSON file containing everything: CAs, Certificates, Users, Configuration, ACME Accounts.
-                        <br/>• Encrypted with AES-256-GCM (PBKDF2)
-                        <br/>• Private keys are individually encrypted
-                    </Text>
-                </div>
-                <Button variant="default" leftSection={<Upload size={16} />} onClick={() => handleAction('Restore Backup', '/system/backup/restore')}>Restore from Backup</Button>
-            </Group>
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                style={{ display: 'none' }} 
+                accept=".ucmbkp,.json.enc"
+                onChange={handleRestoreFromFile}
+            />
+
+            <SimpleGrid cols={3}>
+                <Button 
+                    leftSection={<Download size={16} />} 
+                    color="blue"
+                    onClick={() => setBackupModalOpen(true)}
+                    fullWidth
+                >
+                    Create Full PKI Backup
+                </Button>
+                <Button 
+                    variant="default" 
+                    leftSection={<Upload size={16} />} 
+                    onClick={() => fileInputRef.current?.click()}
+                    fullWidth
+                    loading={processing}
+                >
+                    Restore from File
+                </Button>
+                <Button 
+                    variant="light" 
+                    color="orange"
+                    leftSection={<ArrowsClockwise size={16} />} 
+                    onClick={handleRestoreSelected}
+                    disabled={!selectedBackup || processing}
+                    fullWidth
+                >
+                    Restore Selected Backup
+                </Button>
+            </SimpleGrid>
+            
+            <Text size="xs" color="dimmed" align="center">
+                Generates a single linear JSON file containing everything: CAs, Certificates, Users, Configuration, ACME Accounts.
+            </Text>
+
+            <Text weight={600} size="sm" mt="md">Available Backups</Text>
+            {backups.length === 0 ? (
+                <Text size="sm" color="dimmed" fs="italic">No backups found.</Text>
+            ) : (
+                <Table striped highlightOnHover withBorder>
+                    <thead>
+                        <tr>
+                            <th>Filename</th>
+                            <th>Date</th>
+                            <th>Size</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {backups.map((b) => (
+                            <tr 
+                                key={b.filename} 
+                                onClick={() => setSelectedBackup(b.filename)}
+                                style={{ 
+                                    cursor: 'pointer',
+                                    backgroundColor: selectedBackup === b.filename ? 'var(--mantine-color-blue-light)' : undefined
+                                }}
+                            >
+                                <td style={{ fontFamily: 'var(--font-mono)' }}>
+                                    <Group spacing="xs">
+                                        {selectedBackup === b.filename && <CheckCircle size={14} color="var(--mantine-color-blue-6)" />}
+                                        {b.filename}
+                                    </Group>
+                                </td>
+                                <td>{new Date(b.created_at).toLocaleString()}</td>
+                                <td>{(b.size / 1024).toFixed(2)} KB</td>
+                                <td>
+                                    <Button 
+                                        component="a" 
+                                        href={b.download_url} 
+                                        variant="subtle" 
+                                        size="xs" 
+                                        leftSection={<Download size={14}/>}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        Download
+                                    </Button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </Table>
+            )}
           </Stack>
        </Card>
 
@@ -153,6 +302,23 @@ const DatabaseTab = () => {
              <Button color="red" variant="outline" onClick={() => handleAction('Reset PKI', '/system/db/reset')}>Reset PKI</Button>
           </Group>
        </Card>
+
+       <Modal opened={backupModalOpen} onClose={() => setBackupModalOpen(false)} title="Create Encrypted Backup">
+           <Stack>
+               <Text size="sm">Enter a strong password to encrypt this backup archive.</Text>
+               <PasswordInput 
+                    label="Encryption Password" 
+                    placeholder="Min 12 characters" 
+                    value={backupPassword}
+                    onChange={(e) => setBackupPassword(e.target.value)}
+                    required
+               />
+               <Group position="right" mt="md">
+                   <Button variant="default" onClick={() => setBackupModalOpen(false)}>Cancel</Button>
+                   <Button onClick={handleCreateBackup} loading={processing}>Create Backup</Button>
+               </Group>
+           </Stack>
+       </Modal>
     </Stack>
   );
 };

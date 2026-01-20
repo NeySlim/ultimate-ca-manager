@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './ResizableTable.css';
 
+import { CaretUp, CaretDown, CaretUpDown } from '@phosphor-icons/react';
+
 /**
  * ResizableTable Component
  * 
@@ -14,6 +16,8 @@ const ResizableTable = ({
   columns, 
   data, 
   onRowClick, 
+  onSort,
+  sortConfig = { key: null, direction: 'asc' },
   rowClassName,
   emptyMessage = "No items found" 
 }) => {
@@ -106,9 +110,21 @@ const ResizableTable = ({
               maxWidth: col.flex ? 'none' : `${colWidths[col.key]}px`
             }}
           >
-            <div className="rt-th-content">
+            <div 
+              className="rt-th-content" 
+              onClick={() => col.sortable && onSort && onSort(col.key)}
+              style={{ cursor: col.sortable ? 'pointer' : 'default', userSelect: 'none' }}
+            >
               {col.label}
-              {col.sortable && <span className="rt-sort-icon">↕</span>}
+              {col.sortable && (
+                <span className="rt-sort-icon" style={{ marginLeft: 6, display: 'inline-flex', verticalAlign: 'middle' }}>
+                   {sortConfig?.key === col.key ? (
+                      sortConfig.direction === 'asc' ? <CaretUp size={12} weight="fill" /> : <CaretDown size={12} weight="fill" />
+                   ) : (
+                      <CaretUpDown size={12} color="var(--mantine-color-dimmed)" />
+                   )}
+                </span>
+              )}
             </div>
             {/* Resize Handle - Only for non-flex columns */}
             {!col.flex && (

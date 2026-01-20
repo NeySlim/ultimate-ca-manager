@@ -180,7 +180,16 @@ class BackupService:
             # Skip sensitive data unless explicitly included
             if sc.encrypted:
                 continue
-            config[sc.key] = sc.value
+            
+            val = sc.value
+            if isinstance(val, bytes):
+                try:
+                    val = val.decode('utf-8')
+                except:
+                    import base64
+                    val = base64.b64encode(val).decode('utf-8')
+            
+            config[sc.key] = val
         
         return {
             'system': {
@@ -216,10 +225,11 @@ class BackupService:
                 enabled=True
             ).all()
             
+            import base64
             user_data['webauthn_credentials'] = [
                 {
-                    'credential_id': cred.credential_id,
-                    'public_key': cred.public_key,
+                    'credential_id': base64.b64encode(cred.credential_id).decode('utf-8') if cred.credential_id else None,
+                    'public_key': base64.b64encode(cred.public_key).decode('utf-8') if cred.public_key else None,
                     'sign_count': cred.sign_count,
                     'name': cred.name,
                     'aaguid': cred.aaguid
@@ -315,11 +325,16 @@ class BackupService:
         
         accounts = []
         for account in AcmeAccount.query.all():
+            # Handle potential bytes in private_key
+            key_pem = account.private_key
+            if isinstance(key_pem, bytes):
+                key_pem = key_pem.decode('utf-8')
+            
             accounts.append({
                 'email': account.email,
                 'account_url': account.account_url,
                 'status': account.status,
-                'key_pem': account.private_key
+                'key_pem': key_pem
             })
         
         return accounts

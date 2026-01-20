@@ -9,7 +9,7 @@ import AuditPage from './modules/Settings/pages/AuditPage';
 import CATreePage from './modules/CAs/pages/CATreePage';
 import CACreatePage from './modules/CAs/pages/CACreatePage';
 import CADetailPage from './modules/CAs/pages/CADetailPage';
-import CSRListPage from './modules/CSRs/pages/CSRListPage';
+import CSRListPage from './modules/Certificates/pages/CSRListPage';
 import CSRCreatePage from './modules/CSRs/pages/CSRCreatePage';
 import ACMEPage from './modules/ACME/pages/ACMEPage';
 import ACMESettings from './modules/ACME/pages/ACMESettings';

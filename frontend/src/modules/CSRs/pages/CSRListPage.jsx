@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Badge, Text, Group, ActionIcon, TextInput } from '@mantine/core';
+import { Button, Badge, Text, Group, ActionIcon, TextInput, Pagination } from '@mantine/core';
 import { Plus, MagnifyingGlass, FileText, Trash, Key, User, CalendarBlank, PenNib } from '@phosphor-icons/react';
 import { PageHeader } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
@@ -13,6 +13,9 @@ const CSRListPage = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Fetch Data
   useEffect(() => {
@@ -39,13 +42,20 @@ const CSRListPage = () => {
     }
   };
 
-  // Filter
+  // Filter & Pagination
   const filteredData = useMemo(() => {
     return items.filter(item => 
       item.cn.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.requester.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [items, searchTerm]);
+
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredData.slice(start, start + itemsPerPage);
+  }, [filteredData, currentPage]);
+
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
   // Columns
   const columns = [
@@ -54,6 +64,7 @@ const CSRListPage = () => {
       label: 'Status',
       width: 100,
       minWidth: 80,
+      sortable: true,
       render: (row) => (
         <Badge 
           color={row.status === 'Approved' ? 'green' : row.status === 'Pending' ? 'orange' : 'gray'} 
@@ -69,6 +80,7 @@ const CSRListPage = () => {
       label: 'Common Name',
       minWidth: 200,
       flex: true, // This column will expand
+      sortable: true,
       render: (row) => (
         <Group gap="xs" wrap="nowrap">
             <FileText size={16} className="icon-gradient" />
@@ -80,6 +92,7 @@ const CSRListPage = () => {
       key: 'key_type',
       label: 'Key Type',
       width: 140,
+      sortable: true,
       render: (row) => (
         <Group gap="xs" wrap="nowrap" c="dimmed">
             <Key size={14} />
@@ -91,6 +104,7 @@ const CSRListPage = () => {
       key: 'requester',
       label: 'Requester',
       width: 150,
+      sortable: true,
       render: (row) => (
         <Group gap="xs" wrap="nowrap" c="dimmed">
             <User size={14} />
@@ -102,6 +116,7 @@ const CSRListPage = () => {
       key: 'created_at',
       label: 'Created',
       width: 150,
+      sortable: true,
       render: (row) => (
         <Group gap="xs" wrap="nowrap" c="dimmed">
             <CalendarBlank size={14} />
@@ -147,7 +162,7 @@ const CSRListPage = () => {
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
          <ResizableTable 
             columns={columns}
-            data={filteredData}
+            data={paginatedData}
             onRowClick={(row) => setSelectedItem({
                 ...row, 
                 type: 'CSR', 
@@ -155,10 +170,18 @@ const CSRListPage = () => {
                 subtitle: `${row.key_type} • ${row.status}`,
                 details: row
             })}
+            onSort={handleSort}
+            sortConfig={sortConfig}
             rowClassName={(row) => selectedItem?.id === row.id ? 'selected' : ''}
             emptyMessage="No CSRs found"
          />
       </div>
+      
+      {totalPages > 1 && (
+        <div style={{ padding: '8px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end' }}>
+            <Pagination total={totalPages} value={currentPage} onChange={setCurrentPage} size="xs" />
+        </div>
+      )}
     </div>
   );
 };

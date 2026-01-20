@@ -3,13 +3,14 @@ System Routes v2.0
 Handles system-level operations: database maintenance, HTTPS certificates, health
 """
 
-from flask import Blueprint, request, current_app, jsonify
+from flask import Blueprint, request, current_app, jsonify, send_from_directory
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, Certificate, CA, CRL, OCSPResponse
 import os
 import subprocess
 import shutil
+import werkzeug.utils
 from datetime import datetime
 
 bp = Blueprint('system_v2', __name__)
@@ -128,7 +129,76 @@ def reset_pki():
 @require_auth(['admin:system'])
 def create_backup():
     """Create encrypted backup"""
-    return success_response(message="Backup created", data={'download_url': '/api/downloads/backup.enc'})
+    try:
+        from services.backup_service import BackupService
+        data = request.json or {}
+        password = data.get('password')
+        
+        if not password:
+            return error_response("Password required for encryption")
+
+        service = BackupService()
+        backup_bytes = service.create_backup(password)
+        
+        # Save to disk
+        filename = f"ucm_backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.ucmbkp"
+        backup_dir = "/opt/ucm/data/backups"
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        filepath = os.path.join(backup_dir, filename)
+        with open(filepath, 'wb') as f:
+            f.write(backup_bytes)
+            
+        return success_response(
+            message="Backup created successfully", 
+            data={
+                'filename': filename,
+                'size': len(backup_bytes),
+                'download_url': f'/api/system/backup/{filename}/download'
+            }
+        )
+    except Exception as e:
+        return error_response(f"Backup failed: {str(e)}")
+
+@bp.route('/api/system/backup/list', methods=['GET'])
+@require_auth(['read:settings'])
+def list_backups():
+    """List available backups"""
+    try:
+        backup_dir = "/opt/ucm/data/backups"
+        if not os.path.exists(backup_dir):
+            return success_response(data=[])
+            
+        files = []
+        for f in os.listdir(backup_dir):
+            if f.endswith('.ucmbkp') or f.endswith('.json.enc'):
+                path = os.path.join(backup_dir, f)
+                stat = os.stat(path)
+                files.append({
+                    'filename': f,
+                    'size': stat.st_size,
+                    'created_at': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    'download_url': f'/api/system/backup/{f}/download'
+                })
+        
+        # Sort by date desc
+        files.sort(key=lambda x: x['created_at'], reverse=True)
+        return success_response(data=files)
+    except Exception as e:
+        return error_response(f"Failed to list backups: {str(e)}")
+
+@bp.route('/api/system/backup/<filename>/download', methods=['GET'])
+@require_auth(['read:settings'])
+def download_backup(filename):
+    """Download backup file"""
+    backup_dir = "/opt/ucm/data/backups"
+    filename = werkzeug.utils.secure_filename(filename)
+    return send_from_directory(
+        backup_dir, 
+        filename, 
+        as_attachment=True, 
+        mimetype='application/octet-stream'
+    )
 
 @bp.route('/api/system/backup/restore', methods=['POST'])
 @require_auth(['admin:system'])

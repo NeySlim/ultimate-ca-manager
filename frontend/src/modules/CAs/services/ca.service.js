@@ -1,6 +1,17 @@
 import { api } from '../../../core/api/client';
 
 class CAService {
+  async getAll() {
+    try {
+        const response = await api.get('/cas');
+        if (response.data) return response.data;
+        return response;
+    } catch (error) {
+        console.error("API Error getAll:", error);
+        return [];
+    }
+  }
+
   async getHierarchy() {
     try {
         const response = await api.get('/cas/tree');
