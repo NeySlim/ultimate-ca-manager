@@ -12,12 +12,45 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   
-  // Simulation of initial check (mTLS / WebAuthn)
+  // Initial authentication check
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setStep('login');
-    }, 1000);
-    return () => clearTimeout(timer);
+    let mounted = true;
+
+    const checkStatus = async () => {
+      // 1. Check if we are already authenticated (via session/cookie)
+      // The AuthProvider does this on mount, but we double check here to handle mTLS auto-login
+      try {
+        await new Promise(r => setTimeout(r, 800)); // Minimum visual delay for "checking" state
+        
+        // Use the verify endpoint which checks session and mTLS
+        // We use /api/auth/verify because that's where the backend route is defined
+        // without the /v2 prefix in the route definition itself
+        const response = await fetch('/api/auth/verify', { 
+            headers: { 'Accept': 'application/json' }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            // If authenticated (e.g. via mTLS), redirect to dashboard
+            if (data.authenticated && mounted) {
+                // Let AuthContext know we are good
+                window.location.href = '/'; 
+                return;
+            }
+        }
+      } catch (e) {
+        console.error("Auth check failed", e);
+      }
+      
+      // If we reach here, automatic login failed/not available
+      if (mounted) {
+        setStep('login');
+      }
+    };
+
+    checkStatus();
+
+    return () => { mounted = false; };
   }, []);
 
   const handleLogin = async (e) => {

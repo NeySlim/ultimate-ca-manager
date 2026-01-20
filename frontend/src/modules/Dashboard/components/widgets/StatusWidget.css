@@ -1,0 +1,138 @@
+/* StatusWidget.css */
+
+.status-widget {
+  display: flex;
+  flex-direction: column;
+}
+
+.status-header {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #373a40;
+}
+
+.status-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e8e8;
+}
+
+.status-overall {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.overall-icon {
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.overall-content {
+  flex: 1;
+}
+
+.overall-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #909296;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+.overall-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.status-components {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.status-component {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  background-color: #1a1b1e;
+  border: 1px solid #373a40;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.status-component:hover {
+  background-color: #25262b;
+  border-color: #4a5568;
+}
+
+.component-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.component-status-dot {
+  font-size: 12px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.component-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.component-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c1c2c5;
+  margin-bottom: 2px;
+}
+
+.component-metrics {
+  display: flex;
+  gap: 12px;
+  font-size: 10px;
+  color: #5c5f66;
+}
+
+.component-metrics span {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.component-badge {
+  padding: 3px 8px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+  border-top: 1px solid #373a40;
+  font-size: 11px;
+  color: #5c5f66;
+}

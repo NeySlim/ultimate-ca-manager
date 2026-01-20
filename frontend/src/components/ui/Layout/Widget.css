@@ -1,0 +1,45 @@
+/* Widget.css - Global Widget Styles */
+
+.ui-widget {
+  background-color: #25262b;
+  border: 1px solid #373a40;
+  border-radius: 4px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-widget:hover {
+  border-color: #4a5568;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.ui-widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #373a40;
+}
+
+.ui-widget-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e8e8;
+}
+
+.ui-widget-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ui-widget-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevent content overflow */
+}

@@ -1,0 +1,19 @@
+.certificate-table-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.certificate-toolbar {
+  background: #1e1e1e;
+}
+
+.mono-text {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Row Selection Highlighting - delegated to ResizableTable class */
+.rt-row.selected {
+  background-color: rgba(90, 143, 199, 0.15) !important;
+  border-left: 2px solid #5a8fc7;
+}

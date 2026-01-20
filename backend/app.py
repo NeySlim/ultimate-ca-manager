@@ -161,7 +161,7 @@ def create_app(config_name=None):
     @app.before_request
     def redirect_to_fqdn():
         # Skip for health checks and static files
-        if request.path in ['/api/health', '/health'] or request.path.startswith('/static/'):
+        if request.path in ['/api/health', '/health', '/api/auth/verify', '/api/v2/auth/verify'] or request.path.startswith('/static/') or request.path.startswith('/assets/'):
             return None
         
         # Get configured FQDN - check both UCM_FQDN (Docker) and FQDN env vars

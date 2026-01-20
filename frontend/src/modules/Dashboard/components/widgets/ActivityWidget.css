@@ -1,0 +1,160 @@
+/* ActivityWidget.css */
+
+.activity-widget {
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #373a40;
+}
+
+.activity-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e8e8;
+}
+
+.activity-table-wrapper {
+  flex: 1;
+  overflow-x: auto;
+  border: 1px solid #373a40;
+  border-radius: 3px;
+}
+
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.activity-table thead {
+  background-color: #1a1b1e;
+  border-bottom: 1px solid #373a40;
+  position: sticky;
+  top: 0;
+}
+
+.activity-table th {
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #909296;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.activity-table tbody tr {
+  border-bottom: 1px solid #373a40;
+  transition: background-color 0.2s ease;
+}
+
+.activity-table tbody tr:hover {
+  background-color: #25262b;
+}
+
+.activity-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.activity-table td {
+  padding: 10px 12px;
+  color: #c1c2c5;
+}
+
+.activity-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.activity-action {
+  color: #c1c2c5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-user,
+.activity-subject {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #c1c2c5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-icon,
+.subject-icon {
+  display: flex;
+  align-items: center;
+  color: #909296;
+  flex-shrink: 0;
+}
+
+.activity-time {
+  color: #5c5f66;
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.activity-row.activity-issue .activity-badge {
+  background-color: rgba(129, 199, 132, 0.15);
+  color: #81c784;
+}
+
+.activity-row.activity-revoke .activity-badge {
+  background-color: rgba(229, 115, 115, 0.15);
+  color: #e57373;
+}
+
+.activity-row.activity-renew .activity-badge {
+  background-color: rgba(255, 183, 77, 0.15);
+  color: #ffb74d;
+}
+
+.activity-row.activity-export .activity-badge {
+  background-color: rgba(100, 181, 246, 0.15);
+  color: #64b5f6;
+}
+
+.activity-row.activity-update .activity-badge {
+  background-color: rgba(186, 104, 200, 0.15);
+  color: #ba68c8;
+}
+
+.activity-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #373a40;
+}
+
+.activity-link {
+  color: #5a8fc7;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.activity-link:hover {
+  color: #7aa5d9;
+  text-decoration: underline;
+}

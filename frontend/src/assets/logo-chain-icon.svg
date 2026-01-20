@@ -1,0 +1,13 @@
+<svg width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="chainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5a8fc7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7aa5d9;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <g transform="translate(4, 4)">
+    <rect x="2" y="10" width="10" height="18" rx="5" fill="none" stroke="url(#chainGradient)" stroke-width="2.5"/>
+    <rect x="16" y="16" width="10" height="18" rx="5" fill="none" stroke="url(#chainGradient)" stroke-width="2.5"/>
+    <rect x="30" y="6" width="10" height="18" rx="5" fill="none" stroke="url(#chainGradient)" stroke-width="2.5"/>
+  </g>
+</svg>

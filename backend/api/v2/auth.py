@@ -104,7 +104,6 @@ def logout():
 
 
 @bp.route('/api/auth/verify', methods=['GET'])
-@require_auth()
 def verify():
     """
     Verify current authentication
@@ -116,7 +115,24 @@ def verify():
     - Determining auth method used
     """
     from flask import g
+    from auth.unified import verify_request_auth
     
+    # Manually verify auth to handle unauthenticated state gracefully
+    auth_result = verify_request_auth()
+    
+    if not auth_result:
+        # Check for mTLS certificate error in request context (set by middleware)
+        cert_error = getattr(g, 'cert_error', None)
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'authenticated': False,
+                'cert_error': cert_error
+            }
+        }), 200
+    
+    # If authenticated
     return success_response(
         data={
             'authenticated': True,

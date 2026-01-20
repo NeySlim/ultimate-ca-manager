@@ -1,0 +1,143 @@
+/* ResizableTable.css */
+
+.resizable-table-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px; /* Optional: standard layout borders */
+}
+
+/* Header */
+.rt-header {
+  display: flex;
+  background: #242424;
+  border-bottom: 1px solid #333;
+  height: 40px; /* Standard height */
+  flex-shrink: 0;
+  overflow-x: hidden; /* Hide header scrollbar, syncs with body via width */
+}
+
+.rt-th {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #888;
+  letter-spacing: 0.5px;
+  user-select: none;
+  border-right: 1px solid transparent; /* Placeholder for separators */
+  transition: color 0.2s;
+}
+
+.rt-th:hover {
+  color: #e8e8e8;
+  background-color: #2a2a2a;
+}
+
+.rt-th-content {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Resize Handle */
+.rt-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 10;
+  transition: background 0.2s;
+}
+
+.rt-resize-handle:hover,
+.rt-resize-handle.active {
+  background: #4a9eff; /* Accent color */
+}
+
+/* Separator line visualization on hover */
+.rt-th:hover .rt-resize-handle {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Body */
+.rt-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto; /* Allow horizontal scroll if cols are wide */
+  background: #1a1a1a;
+}
+
+.rt-row {
+  display: flex;
+  border-bottom: 1px solid #242424;
+  transition: background 0.15s ease;
+  cursor: pointer;
+  min-width: max-content; /* Ensure row takes full width of columns */
+}
+
+.rt-row:hover {
+  background: #242424;
+}
+
+.rt-row.selected {
+  background: rgba(74, 158, 255, 0.1); /* Accent faint */
+}
+
+.rt-td {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #e8e8e8;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-right: 1px solid transparent;
+}
+
+.rt-empty {
+  padding: 40px;
+  text-align: center;
+  color: #666;
+  font-size: 13px;
+}
+
+/* Scrollbars */
+.rt-body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.rt-body::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+.rt-body::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 5px;
+  border: 2px solid #1a1a1a;
+}
+
+.rt-body::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+/* Density Compact Override (if needed via class) */
+.resizable-table-container.compact .rt-header {
+  height: 32px;
+}
+.resizable-table-container.compact .rt-td {
+  padding: 4px 12px;
+  font-size: 12px;
+}

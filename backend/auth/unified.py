@@ -342,6 +342,31 @@ def has_permission(required, user_permissions):
     return False
 
 
+def verify_request_auth(request_obj=None):
+    """
+    Manually verify authentication without aborting with 401.
+    Useful for 'check auth' endpoints that should return {authenticated: false} instead of error.
+    
+    Returns:
+        dict: User info or None if not authenticated
+    """
+    if request_obj is None:
+        request_obj = request
+        
+    auth_manager = AuthManager()
+    result = auth_manager.authenticate_request(request_obj)
+    
+    if result:
+        # Inject into g context if successful, just like require_auth
+        g.current_user = result['user']
+        g.auth_method = result['auth_method']
+        g.permissions = result['permissions']
+        g.user_id = result['user_id']
+        return result
+        
+    return None
+
+
 # Convenience function for testing
 def mock_auth(user_id=1, permissions=None):
     """

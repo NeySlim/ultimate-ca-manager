@@ -1,0 +1,121 @@
+/* DashboardGrid.css - Grafana-style Grid Layout */
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--grid-gap, 16px);
+  padding: 16px;
+  background-color: #1a1b1e;
+  /* Removed min-height constraint to allow natural flow */
+  auto-rows: minmax(200px, auto);
+}
+
+/* Widget base styling */
+.dashboard-grid > * {
+  background-color: #25262b;
+  border: 1px solid #373a40;
+  border-radius: 4px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-grid > *:hover {
+  border-color: #4a5568;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Edit mode - visual cue for draggable widgets */
+.dashboard-grid.edit-mode > * {
+  cursor: grab;
+  border: 2px dashed #5a8fc7;
+}
+
+.dashboard-grid.edit-mode > *:hover {
+  border-style: solid;
+  background-color: rgba(90, 143, 199, 0.05);
+}
+
+/* Default grid positions for common widget sizes */
+
+/* 1/3 width widgets */
+.widget-1-3 {
+  grid-column: span 4;
+}
+
+/* 1/2 width widgets */
+.widget-1-2 {
+  grid-column: span 6;
+}
+
+/* 2/3 width widgets */
+.widget-2-3 {
+  grid-column: span 8;
+}
+
+/* Full width widgets */
+.widget-full {
+  grid-column: span 12;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(8, 1fr);
+  }
+  
+  .widget-1-3 {
+    grid-column: span 4;
+  }
+  
+  .widget-1-2 {
+    grid-column: span 4;
+  }
+  
+  .widget-2-3 {
+    grid-column: span 6;
+  }
+  
+  .widget-full {
+    grid-column: span 8;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  
+  .widget-1-3 {
+    grid-column: span 3;
+  }
+  
+  .widget-1-2 {
+    grid-column: span 3;
+  }
+  
+  .widget-2-3 {
+    grid-column: span 6;
+  }
+  
+  .widget-full {
+    grid-column: span 6;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .widget-1-3,
+  .widget-1-2,
+  .widget-2-3,
+  .widget-full {
+    grid-column: span 1;
+  }
+}
