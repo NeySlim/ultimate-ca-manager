@@ -15,6 +15,7 @@ from api.v2.scep import bp as scep_bp
 from api.v2.settings import bp as settings_bp
 from api.v2.dashboard import bp as dashboard_bp
 from api.v2.crl import bp as crl_bp
+from api.v2.csrs import bp as csrs_bp
 
 # List of all blueprints to register
 API_V2_BLUEPRINTS = [
@@ -22,6 +23,7 @@ API_V2_BLUEPRINTS = [
     account_bp,
     cas_bp,
     certificates_bp,
+    csrs_bp,
     acme_bp,
     scep_bp,
     settings_bp,

@@ -11,19 +11,23 @@
   --accent-gradient-start: #5a8fc7;
   --accent-gradient-end: #7aa5d9;
 
-  /* Default Theme Variables (Dark Mode Fallback) */
-  --bg-app: #1a1b1e;
-  --bg-panel: #25262b;
-  --bg-surface: #141517;
-  --bg-element: #2c2e33;
-  --bg-element-hover: #373a40;
-  --border-color: #373a40;
-  --text-primary: #c1c2c5;
-  --text-secondary: #909296;
-  --text-muted: #5c5f66;
+  /* Default Theme Variables (Dark Mode Fallback) - Matching design-system.html */
+  --bg-app: #1a1a1a;       /* --bg-primary */
+  --bg-panel: #1e1e1e;     /* --bg-secondary */
+  --bg-surface: #252525;   /* --bg-tertiary */
+  --bg-element: #2a2a2a;   /* --bg-hover */
+  --bg-element-hover: #333333;
+  --border-color: #333333; /* --border-primary */
+  --border-subtle: #3a3a3a;
   
-  /* Default Density Variables (Fallback) */
-  --control-height: 28px;
+  --text-primary: #e8e8e8;
+  --text-secondary: #cccccc;
+  --text-muted: #888888;
+  
+  /* Strict Compact Sizes */
+  --control-height: 26px; /* Strict 26px from design-system.html */
+  --input-height: 30px;   /* Strict 30px from design-system.html */
+  --control-radius: 3px;
   --control-padding-x: 12px;
   --control-radius: 3px;
   --font-size-control: 13px;
@@ -35,6 +39,10 @@
   --mantine-color-text: var(--text-primary);
   --mantine-color-body: var(--bg-app);
   --mantine-color-black: var(--text-primary);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
 body {
