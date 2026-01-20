@@ -155,7 +155,7 @@ const SecurityTab = () => {
             <ShieldCheck size={24} className="icon-gradient-subtle" />
             <Text weight={600} size="lg">mTLS Authentication</Text>
           </Group>
-          <Badge color="gray">Disabled</Badge>
+          <Badge variant="outline">Disabled</Badge>
         </Group>
         <Text size="sm" color="dimmed" mb="md">
             Require client certificates for access. Requires a reverse proxy (Nginx/Apache) for browser support.

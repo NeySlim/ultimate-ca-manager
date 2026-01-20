@@ -59,10 +59,10 @@ const GeneralTab = () => {
              <Group position="apart" className="detail-row">
                 <Text color="dimmed" size="sm">Active Features</Text>
                 <Group spacing={8}>
-                    {info.features.crl && <Badge size="sm" color="green" variant="light">CRL</Badge>}
-                    {info.features.ocsp && <Badge size="sm" color="green" variant="light">OCSP</Badge>}
-                    {info.features.scep && <Badge size="sm" color="blue" variant="light">SCEP</Badge>}
-                    {info.features.acme && <Badge size="sm" color="blue" variant="light">ACME</Badge>}
+                    {info.features.crl && <Badge size="sm" className="badge-active" variant="light">CRL</Badge>}
+                    {info.features.ocsp && <Badge size="sm" className="badge-active" variant="light">OCSP</Badge>}
+                    {info.features.scep && <Badge size="sm" className="badge-info" variant="light">SCEP</Badge>}
+                    {info.features.acme && <Badge size="sm" className="badge-info" variant="light">ACME</Badge>}
                 </Group>
             </Group>
         </Stack>

@@ -141,7 +141,7 @@ const CSRDetailPage = () => {
           <Stack gap="md">
             <Group justify="space-between">
               <Text size="sm" c="dimmed">Algorithm</Text>
-              <Badge variant="outline" color="gray">{csr.algo}</Badge>
+              <Badge variant="outline" variant="outline">{csr.algo}</Badge>
             </Group>
             
             <Divider />
@@ -158,7 +158,7 @@ const CSRDetailPage = () => {
             <Text size="sm" c="dimmed" mt="sm">Key Usage</Text>
             <Group gap="xs">
               {csr.keyUsage.map(usage => (
-                <Badge key={usage} variant="dot" color="gray" size="sm">
+                <Badge key={usage} variant="dot" variant="outline" size="sm">
                   {usage}
                 </Badge>
               ))}
@@ -170,7 +170,7 @@ const CSRDetailPage = () => {
           <Paper withBorder p="xs" bg="#0d0d0d" style={{ position: 'relative' }}>
             <ActionIcon 
               variant="subtle" 
-              color="gray" 
+              variant="outline" 
               size="sm" 
               style={{ position: 'absolute', top: 5, right: 5 }}
             >

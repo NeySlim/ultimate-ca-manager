@@ -63,7 +63,7 @@ const AuditPage = () => {
         key: 'action',
         label: 'Event Type',
         width: 180,
-        render: (row) => <Badge variant="outline" color="gray" size="sm">{row.action}</Badge>
+        render: (row) => <Badge variant="outline" variant="outline" size="sm">{row.action}</Badge>
     },
     {
         key: 'resource',

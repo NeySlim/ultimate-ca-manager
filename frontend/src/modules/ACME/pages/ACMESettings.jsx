@@ -38,7 +38,7 @@ const ACMESettings = () => {
       notifications.show({
         title: 'Error',
         message: 'Failed to load ACME settings',
-        color: 'red'
+        color: 'var(--status-error)'
       });
     } finally {
       setLoading(false);
@@ -52,13 +52,13 @@ const ACMESettings = () => {
       notifications.show({
         title: 'Success',
         message: 'ACME settings saved',
-        color: 'green'
+        color: 'var(--status-success)'
       });
     } catch (error) {
       notifications.show({
         title: 'Error',
         message: 'Failed to save settings',
-        color: 'red'
+        color: 'var(--status-error)'
       });
     } finally {
       setSaving(false);

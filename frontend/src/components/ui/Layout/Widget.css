@@ -1,10 +1,10 @@
 /* Widget.css - Global Widget Styles */
 
 .ui-widget {
-  background-color: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 16px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  padding: var(--spacing-lg);
   transition: all 0.2s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -12,7 +12,7 @@
 }
 
 .ui-widget:hover {
-  border-color: var(--text-muted);
+  border-color: var(--border-tertiary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -20,9 +20,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-color);
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .ui-widget-title {
@@ -34,7 +34,7 @@
 
 .ui-widget-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-sm);
 }
 
 .ui-widget-content {
