@@ -1,0 +1,27 @@
+.ca-create-page {
+  background: #1a1a1a;
+}
+
+.wizard-widget {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 32px;
+}
+
+.radio-card {
+    background: #252525;
+    border-color: #333;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.radio-card:hover {
+    background: #2a2a2a;
+    border-color: #444;
+}
+
+.radio-card.selected {
+    border-color: var(--accent-primary);
+    background: rgba(90, 143, 199, 0.1);
+}

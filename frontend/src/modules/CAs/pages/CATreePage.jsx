@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Button,
   Group,
@@ -98,6 +99,7 @@ const flattenTree = (nodes, expandedIds, level = 0) => {
 };
 
 const CATreePage = () => {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState([1]); // Expand first root by default
   const [data, setData] = useState([]);
   const [activeTab, setActiveTab] = useState('hierarchy');
@@ -183,7 +185,7 @@ const CATreePage = () => {
       render: (row) => (
         <Group gap={4}>
           <Tooltip label="View Details">
-            <ActionIcon size="sm" variant="light">
+            <ActionIcon size="sm" variant="light" onClick={(e) => { e.stopPropagation(); navigate(`/cas/${row.id}`); }}>
               <Eye size={16} />
             </ActionIcon>
           </Tooltip>
@@ -256,7 +258,7 @@ const CATreePage = () => {
       <PageHeader 
         title="Certificate Authorities" 
         actions={
-          <Button leftSection={<Plus size={16} />} size="xs">
+          <Button leftSection={<Plus size={16} />} size="xs" onClick={() => navigate('/cas/create')}>
             Create New CA
           </Button>
         }
