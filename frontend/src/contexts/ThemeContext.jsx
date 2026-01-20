@@ -29,16 +29,17 @@ export const ThemeProvider = ({ children }) => {
     root.style.setProperty('--accent-gradient-end', selectedPalette.light);
 
     // Apply Background/Surface variables based on Color Scheme
+    // STRICT: Use design-system.html colors
     if (colorScheme === 'dark') {
-      root.style.setProperty('--bg-app', '#1a1b1e');
-      root.style.setProperty('--bg-panel', '#25262b');
-      root.style.setProperty('--bg-surface', '#141517');
-      root.style.setProperty('--bg-element', '#2c2e33');
-      root.style.setProperty('--bg-element-hover', '#373a40');
-      root.style.setProperty('--border-color', '#373a40');
-      root.style.setProperty('--text-primary', '#c1c2c5');
-      root.style.setProperty('--text-secondary', '#909296');
-      root.style.setProperty('--text-muted', '#5c5f66');
+      root.style.setProperty('--bg-app', '#1a1a1a');  // design-system.html --bg-primary
+      root.style.setProperty('--bg-panel', '#1e1e1e'); // design-system.html --bg-secondary
+      root.style.setProperty('--bg-surface', '#252525'); // design-system.html --bg-tertiary
+      root.style.setProperty('--bg-element', '#2a2a2a'); // design-system.html --bg-hover
+      root.style.setProperty('--bg-element-hover', '#333333');
+      root.style.setProperty('--border-color', '#333333'); // design-system.html --border-primary
+      root.style.setProperty('--text-primary', '#e8e8e8'); // design-system.html
+      root.style.setProperty('--text-secondary', '#cccccc'); // design-system.html
+      root.style.setProperty('--text-muted', '#888888'); // design-system.html --text-tertiary
     } else {
       root.style.setProperty('--bg-app', '#eef0f2'); /* Darker grey for contrast */
       root.style.setProperty('--bg-panel', '#ffffff'); /* Pure white panels */
@@ -52,29 +53,30 @@ export const ThemeProvider = ({ children }) => {
     }
     
     // Apply Density Variables
+    // STRICT: Force design-system.html values (26px buttons, 30px inputs, 3px radius, 13px font)
     const densitySettings = {
       compact: {
-        '--control-height': '24px',
+        '--control-height': '22px',  // btn-sm from design-system.html
         '--control-padding-x': '8px',
-        '--control-radius': '2px',
-        '--font-size-control': '12px',
-        '--table-spacing': '4px',
-        '--table-font-size': '12px',
+        '--control-radius': '3px',   // STRICT: always 3px
+        '--font-size-control': '11px',
+        '--table-spacing': '6px',
+        '--table-font-size': '11px',
         '--icon-size': '14px',
       },
       normal: {
-        '--control-height': '28px',
-        '--control-padding-x': '12px',
-        '--control-radius': '3px',
-        '--font-size-control': '13px',
-        '--table-spacing': '8px',
-        '--table-font-size': '13px',
+        '--control-height': '26px',  // STRICT from design-system.html
+        '--control-padding-x': '12px', // STRICT from design-system.html
+        '--control-radius': '3px',   // STRICT: always 3px
+        '--font-size-control': '13px', // STRICT from design-system.html
+        '--table-spacing': '8px',    // STRICT from design-system.html
+        '--table-font-size': '13px',  // STRICT from design-system.html
         '--icon-size': '16px',
       },
       comfortable: {
-        '--control-height': '36px',
+        '--control-height': '32px',  // btn-lg from design-system.html
         '--control-padding-x': '16px',
-        '--control-radius': '6px',
+        '--control-radius': '3px',   // STRICT: always 3px
         '--font-size-control': '14px',
         '--table-spacing': '12px',
         '--table-font-size': '14px',

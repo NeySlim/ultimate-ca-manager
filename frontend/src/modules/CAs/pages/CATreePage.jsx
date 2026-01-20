@@ -304,7 +304,7 @@ const CATreePage = () => {
             <Certificate size={18} className="icon-gradient" style={{ marginRight: 8 }} />
           }
           
-          <Text size="sm" fw={500} style={{ color: 'var(--text-primary)' }}>{row.name}</Text>
+          <Text size="sm" fw={500} c="var(--text-primary)">{row.name}</Text>
         </div>
       )
     },
@@ -335,7 +335,7 @@ const CATreePage = () => {
       label: 'Issued',
       width: 80,
       sortable: true,
-      render: (row) => <Text size="sm" ta="center" style={{ color: 'var(--text-primary)' }}>{row.certs || 0}</Text>
+      render: (row) => <Text size="sm" ta="center" c="var(--text-primary)">{row.certs || 0}</Text>
     },
     {
       key: 'expiry',
@@ -343,7 +343,7 @@ const CATreePage = () => {
       minWidth: 120,
       flex: true,
       sortable: true,
-      render: (row) => <Text size="sm" style={{ color: 'var(--text-secondary)' }}>{row.expiry}</Text>
+      render: (row) => <Text size="sm" c="var(--text-secondary)">{row.expiry}</Text>
     }
   ];
 
