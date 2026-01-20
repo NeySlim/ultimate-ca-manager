@@ -225,11 +225,12 @@ const CATreePage = () => {
   };
 
   const getBadgeColor = (type) => {
+      // Use semantic color classes instead of Mantine color names
       switch(type) {
-          case 'Root CA': return 'yellow';
-          case 'Intermediate': return 'blue';
-          case 'Orphan': return 'orange';
-          default: return 'gray';
+          case 'Root CA': return { className: 'badge-warning' }; // Yellow
+          case 'Intermediate': return { className: 'badge-info' }; // Blue
+          case 'Orphan': return { className: 'badge-error' }; // Orange/Red
+          default: return { className: 'badge-neutral' }; // Gray
       }
   };
 
@@ -278,7 +279,7 @@ const CATreePage = () => {
           {row.level > 0 && (
             <ArrowElbowDownRight 
               size={14} 
-              color="var(--mantine-color-dimmed)" 
+              color="var(--text-tertiary)" 
               style={{ marginRight: 4, minWidth: 14 }} 
             />
           )}
@@ -299,11 +300,11 @@ const CATreePage = () => {
 
           {/* Icon */}
           {row.type === 'Root CA' ? 
-            <ShieldCheck size={18} weight="fill" color="var(--mantine-color-yellow-6)" style={{ marginRight: 8 }} /> : 
+            <ShieldCheck size={18} weight="fill" color="var(--status-warning)" style={{ marginRight: 8 }} /> : 
             <Certificate size={18} className="icon-gradient" style={{ marginRight: 8 }} />
           }
           
-          <Text size="sm" fw={500}>{row.name}</Text>
+          <Text size="sm" fw={500} style={{ color: 'var(--text-primary)' }}>{row.name}</Text>
         </div>
       )
     },
@@ -312,7 +313,7 @@ const CATreePage = () => {
       label: 'Type',
       width: 140,
       sortable: true,
-      render: (row) => <Badge variant="light" color={getBadgeColor(row.type)} size="sm">{row.type}</Badge>
+      render: (row) => <Badge {...getBadgeColor(row.type)} variant="outline" size="sm">{row.type}</Badge>
     },
     {
       key: 'status',
@@ -321,7 +322,7 @@ const CATreePage = () => {
       sortable: true,
       render: (row) => (
         <Badge 
-          color={row.status === 'Active' ? 'green' : 'red'} 
+          className={row.status === 'Active' ? 'badge-active' : 'badge-error'}
           variant="dot" 
           size="sm"
         >
@@ -334,7 +335,7 @@ const CATreePage = () => {
       label: 'Issued',
       width: 80,
       sortable: true,
-      render: (row) => <Text size="sm" ta="center">{row.certs || 0}</Text>
+      render: (row) => <Text size="sm" ta="center" style={{ color: 'var(--text-primary)' }}>{row.certs || 0}</Text>
     },
     {
       key: 'expiry',
@@ -342,7 +343,7 @@ const CATreePage = () => {
       minWidth: 120,
       flex: true,
       sortable: true,
-      render: (row) => <Text size="sm" c="dimmed">{row.expiry}</Text>
+      render: (row) => <Text size="sm" style={{ color: 'var(--text-secondary)' }}>{row.expiry}</Text>
     }
   ];
 
