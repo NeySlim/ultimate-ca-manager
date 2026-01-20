@@ -16,8 +16,8 @@ def spa(path):
     - If path is a file (has extension), try to serve it from frontend/
     - Otherwise serve index.html (React Router handles routing)
     """
-    # Path to frontend build directory
-    frontend_dir = os.path.join(current_app.root_path, '..', 'frontend')
+    # Path to frontend build directory (Vite builds to frontend/static)
+    frontend_dir = os.path.join(current_app.root_path, '..', 'frontend', 'static')
     
     # SPECIAL: Serve demo file if requested
     if path == 'topbar-demo.html':
