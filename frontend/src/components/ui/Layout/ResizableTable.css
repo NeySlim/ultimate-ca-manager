@@ -28,11 +28,15 @@
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-muted); /* Changed to use variable */
   letter-spacing: 0.5px;
   user-select: none;
-  border-right: 1px solid transparent; /* Placeholder for separators */
+  border-right: 1px solid var(--border-color); /* Added persistent separator */
   transition: color 0.2s;
+}
+
+.rt-th:last-child {
+  border-right: none;
 }
 
 .rt-th:hover {
@@ -42,6 +46,9 @@
 
 .rt-th-content {
   flex: 1;
+  display: flex; /* Added for sorting icon alignment */
+  align-items: center;
+  gap: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -52,7 +59,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  right: 0;
+  right: -2px; /* Centered on border */
   width: 4px;
   cursor: col-resize;
   background: transparent;
@@ -63,11 +70,6 @@
 .rt-resize-handle:hover,
 .rt-resize-handle.active {
   background: var(--accent-primary); /* Accent color */
-}
-
-/* Separator line visualization on hover */
-.rt-th:hover .rt-resize-handle {
-  background: var(--border-color);
 }
 
 /* Body */
@@ -81,17 +83,21 @@
 .rt-row {
   display: flex;
   border-bottom: 1px solid var(--border-color);
-  transition: background 0.15s ease;
+  transition: all 0.15s ease; /* Enhanced transition */
   cursor: pointer;
   min-width: max-content; /* Ensure row takes full width of columns */
 }
 
 .rt-row:hover {
   background: var(--bg-element-hover);
+  transform: translateY(-1px); /* Slight lift effect from demo */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  z-index: 1;
 }
 
 .rt-row.selected {
-  background: rgba(90, 143, 199, 0.1); /* Accent faint - consider variable for rgb */
+  background: var(--mantine-color-blue-light); /* Use theme variable */
+  border-color: var(--accent-primary);
 }
 
 .rt-td {
