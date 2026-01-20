@@ -170,62 +170,64 @@ const ValidationPage = () => {
         }
       />
 
-      <Grid style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' }}>
+      <Grid style={{ flex: 1, padding: '16px' }}>
         {/* Stats Row */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexShrink: 0 }}>
-             <div style={{ flex: 1 }}>
-                <StatWidget
-                    icon={<FileText size={32} weight="duotone" className="icon-gradient-glow" />}
-                    value="2"
-                    label="Active CRLs"
-                    color="blue"
-                />
-            </div>
-            <div style={{ flex: 1 }}>
-                <StatWidget
-                    icon={<Globe size={32} weight="duotone" className="icon-gradient-glow" />}
-                    value="99.9%"
-                    label="OCSP Uptime"
-                    color="green"
-                />
-            </div>
-            <div style={{ flex: 1 }}>
-                <StatWidget
-                    icon={<CheckCircle size={32} weight="duotone" className="icon-gradient-glow" />}
-                    value="15ms"
-                    label="Avg Latency"
-                    color="cyan"
-                />
-            </div>
+        <div className="widget-1-3">
+            <StatWidget
+                icon={<FileText size={32} weight="duotone" className="icon-gradient-glow" />}
+                value="2"
+                label="Active CRLs"
+                color="blue"
+            />
+        </div>
+        <div className="widget-1-3">
+            <StatWidget
+                icon={<Globe size={32} weight="duotone" className="icon-gradient-glow" />}
+                value="99.9%"
+                label="OCSP Uptime"
+                color="green"
+            />
+        </div>
+        <div className="widget-1-3">
+            <StatWidget
+                icon={<CheckCircle size={32} weight="duotone" className="icon-gradient-glow" />}
+                value="15ms"
+                label="Avg Latency"
+                color="cyan"
+            />
         </div>
 
-        <Tabs value={activeTab} onChange={setActiveTab} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-            <Tabs.List style={{ marginBottom: 0, borderBottom: 'none', paddingLeft: 4 }}>
-                <Tabs.Tab value="crl" leftSection={<FileText size={16} />}>
-                    Certificate Revocation Lists (CRL)
-                </Tabs.Tab>
-                <Tabs.Tab value="ocsp" leftSection={<Globe size={16} />}>
-                    OCSP Responder
-                </Tabs.Tab>
-            </Tabs.List>
+        <Widget className="widget-full" style={{ flex: 1, padding: 0, overflow: 'hidden' }}>
+            <Tabs value={activeTab} onChange={setActiveTab} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: '0 16px', borderBottom: '1px solid #333' }}>
+                    <Tabs.List style={{ borderBottom: 'none' }}>
+                        <Tabs.Tab value="crl" leftSection={<FileText size={16} />}>
+                            Certificate Revocation Lists (CRL)
+                        </Tabs.Tab>
+                        <Tabs.Tab value="ocsp" leftSection={<Globe size={16} />}>
+                            OCSP Responder
+                        </Tabs.Tab>
+                    </Tabs.List>
+                </div>
 
-            <Widget className="widget-full" style={{ flex: 1, padding: 0, overflow: 'hidden', marginTop: 8 }}>
-                <Tabs.Panel value="crl" style={{ height: '100%' }}>
-                    <ResizableTable 
-                        columns={crlColumns}
-                        data={MOCK_CRLS}
-                        onRowClick={(row) => console.log('Clicked CRL', row)}
-                    />
-                </Tabs.Panel>
-                <Tabs.Panel value="ocsp" style={{ height: '100%' }}>
-                    <ResizableTable 
-                        columns={ocspColumns}
-                        data={MOCK_OCSP_LOGS}
-                        onRowClick={(row) => console.log('Clicked OCSP', row)}
-                    />
-                </Tabs.Panel>
-            </Widget>
-        </Tabs>
+                <div style={{ flex: 1, position: 'relative' }}>
+                    <Tabs.Panel value="crl" style={{ height: '100%' }}>
+                        <ResizableTable 
+                            columns={crlColumns}
+                            data={MOCK_CRLS}
+                            onRowClick={(row) => console.log('Clicked CRL', row)}
+                        />
+                    </Tabs.Panel>
+                    <Tabs.Panel value="ocsp" style={{ height: '100%' }}>
+                        <ResizableTable 
+                            columns={ocspColumns}
+                            data={MOCK_OCSP_LOGS}
+                            onRowClick={(row) => console.log('Clicked OCSP', row)}
+                        />
+                    </Tabs.Panel>
+                </div>
+            </Tabs>
+        </Widget>
       </Grid>
     </div>
   );

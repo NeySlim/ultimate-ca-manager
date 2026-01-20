@@ -64,8 +64,8 @@ const CACreatePage = () => {
         backAction={() => navigate('/cas/tree')}
       />
 
-      <Grid style={{ flex: 1, padding: '16px', display: 'flex', justifyContent: 'center' }}>
-        <Widget className="wizard-widget" style={{ width: '100%', maxWidth: '1000px' }}>
+      <Grid style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
+        <Widget className="wizard-widget col-12" style={{ maxWidth: '1000px', margin: '0 auto', height: 'fit-content' }}>
           <Stepper active={active} onStepClick={setActive} color="blue" size="sm">
             
             {/* Step 1: CA Type */}
