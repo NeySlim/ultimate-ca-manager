@@ -15,3 +15,5 @@ export { SegmentedControl } from './SegmentedControl';
 export { SimpleGrid } from './SimpleGrid';
 export { Tooltip } from './Tooltip';
 export { ActionIcon } from './ActionIcon';
+export { Container } from './Container';
+export { Textarea, NumberInput, Switch, Radio, Alert, Box } from './MoreComponents';
