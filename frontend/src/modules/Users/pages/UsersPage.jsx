@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Button,
   Group,
@@ -54,6 +55,8 @@ const MOCK_USERS = [
 ];
 
 const UsersPage = () => {
+  const navigate = useNavigate();
+
   const columns = [
     {
       key: 'username',
@@ -123,7 +126,7 @@ const UsersPage = () => {
       render: (row) => (
         <Group gap={4}>
           <Tooltip label="Edit User">
-            <ActionIcon size="sm" variant="light">
+            <ActionIcon size="sm" variant="light" onClick={(e) => { e.stopPropagation(); navigate(`/users/${row.id}`); }}>
               <PencilSimple size={16} />
             </ActionIcon>
           </Tooltip>
