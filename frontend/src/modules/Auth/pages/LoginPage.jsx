@@ -111,7 +111,7 @@ const LoginPage = () => {
                   <div style={{ 
                       background: '#2e1e1e', 
                       border: '1px solid #4a2d2d', 
-                      borderRadius: '3px', 
+                      borderRadius: 'var(--radius)', 
                       padding: '12px', 
                       marginBottom: '16px', 
                       display: 'flex', 
@@ -165,7 +165,7 @@ const LoginPage = () => {
 
                     <div className="form-checkbox-group">
                         <input type="checkbox" id="remember" style={{ accentColor: 'var(--accent-primary)' }} />
-                        <label htmlFor="remember" style={{ fontSize: '13px', color: '#ccc' }}>Remember me</label>
+                        <label htmlFor="remember" style={{ fontSize: 'var(--font-size-ui)', color: 'var(--text-secondary)' }}>Remember me</label>
                     </div>
 
                     <button type="submit" className="btn btn-primary" disabled={loading}>

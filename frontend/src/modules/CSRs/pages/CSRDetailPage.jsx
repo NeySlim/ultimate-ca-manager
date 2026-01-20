@@ -176,7 +176,7 @@ const CSRDetailPage = () => {
             >
               <Copy size={14} />
             </ActionIcon>
-            <Code block color="dark" style={{ fontSize: '11px', whiteSpace: 'pre-wrap' }}>
+            <Code block color="dark" style={{ fontSize: 'var(--font-size-label)', whiteSpace: 'pre-wrap' }}>
               {csr.pem}
             </Code>
           </Paper>

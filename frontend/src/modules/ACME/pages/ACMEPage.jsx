@@ -138,7 +138,7 @@ const ACMEPage = () => {
                     {/* Command Section */}
                     <div>
                         <Text size="xs" weight={600} mb={4} color="dimmed">Client Example (Certbot)</Text>
-                        <div style={{ background: 'var(--bg-element)', padding: '6px 10px', borderRadius: 'var(--control-radius)', border: '1px solid var(--border-subtle)', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ background: 'var(--bg-element)', padding: '6px 10px', borderRadius: 'var(--control-radius)', border: '1px solid var(--border-subtle)', fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-label)', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             certbot register --server https://{window.location.hostname}:8443/acme/directory
                         </div>
                     </div>

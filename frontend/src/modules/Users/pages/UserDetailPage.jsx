@@ -105,7 +105,7 @@ const UserDetailPage = () => {
         }
       />
 
-      <Grid style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' }}>
+      <Grid style={{ flex: 1, padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column' }}>
         {/* Top Info Widgets */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
             <Widget title="Profile" icon={<User size={18} className="icon-gradient-subtle" />} style={{ flex: 1 }}>
@@ -114,7 +114,7 @@ const UserDetailPage = () => {
                     <Stack gap={4}>
                         <Text size="lg" fw={600}>{user.username}</Text>
                         <Group gap={4}>
-                            <EnvelopeSimple size={14} color="#888" />
+                            <EnvelopeSimple size={14} color="var(--text-tertiary)" />
                             <Text size="sm" c="dimmed">{user.email}</Text>
                         </Group>
                          <Badge variant="light" color="blue" mt={4}>{user.role}</Badge>
@@ -154,14 +154,14 @@ const UserDetailPage = () => {
                 </Tabs.Tab>
             </Tabs.List>
 
-            <div className="widget-full" style={{ flex: 1, padding: 0, overflow: 'hidden', marginTop: 8, background: '#1e1e1e', border: '1px solid #333', borderRadius: '4px' }}>
+            <div className="widget-full" style={{ flex: 1, padding: 0, overflow: 'hidden', marginTop: 'var(--spacing-sm)', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 'var(--radius)' }}>
                 <Tabs.Panel value="activity" style={{ height: '100%' }}>
                      <ResizableTable 
                         columns={columns}
                         data={MOCK_ACTIVITY}
                      />
                 </Tabs.Panel>
-                <Tabs.Panel value="permissions" style={{ padding: '16px' }}>
+                <Tabs.Panel value="permissions" style={{ padding: 'var(--spacing-lg)' }}>
                     <Stack gap="md">
                          <Group justify="space-between">
                             <div>

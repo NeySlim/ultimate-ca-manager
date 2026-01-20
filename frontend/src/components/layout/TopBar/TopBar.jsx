@@ -34,13 +34,13 @@ const TopBar = ({ isSidebarOpen, toggleSidebar, isDetailsOpen, toggleDetails, op
         <div 
           onClick={() => navigate('/')}
           style={{ 
-            display: 'flex', alignItems: 'center', gap: '8px', 
+            display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', 
             fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)', 
-            paddingRight: '12px', borderRight: '1px solid var(--border-color)',
+            paddingRight: 'var(--spacing-md)', borderRight: '1px solid var(--border-color)',
             cursor: 'pointer'
           }}
         >
-          <img src={LogoIcon} alt="UCM Logo" style={{ width: '20px', height: '20px' }} />
+          <img src={LogoIcon} alt="UCM Logo" style={{ width: 'var(--icon-size-xl)', height: 'var(--icon-size-xl)' }} />
           UCM
         </div>
 
@@ -67,7 +67,7 @@ const TopBar = ({ isSidebarOpen, toggleSidebar, isDetailsOpen, toggleDetails, op
       </div>
 
       {/* 2. CENTER: Command Palette */}
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 20px' }}>
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 var(--spacing-xl)' }}>
          <div className="command-palette">
             <MagnifyingGlass size={14} />
             <input 
@@ -104,7 +104,7 @@ const TopBar = ({ isSidebarOpen, toggleSidebar, isDetailsOpen, toggleDetails, op
             <PencilSimple size={14} /> Edit Layout
         </button>
 
-        <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border-color)' }}></div>
+        <div style={{ width: '1px', height: 'var(--spacing-xl)', backgroundColor: 'var(--border-color)' }}></div>
 
         <button className="action-btn" onClick={toggleDetails} title="Toggle Details">
            <SidebarSimple weight={isDetailsOpen ? "fill" : "regular"} style={{ transform: 'rotate(180deg)' }} />
@@ -122,7 +122,7 @@ const TopBar = ({ isSidebarOpen, toggleSidebar, isDetailsOpen, toggleDetails, op
            <Gear />
         </button>
 
-        <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border-color)' }}></div>
+        <div style={{ width: '1px', height: 'var(--spacing-xl)', backgroundColor: 'var(--border-color)' }}></div>
 
         {/* User Profile */}
         <div className="user-menu">

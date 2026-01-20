@@ -185,7 +185,7 @@ const ValidationPage = () => {
 
         <Widget className="widget-full" style={{ flex: 1, padding: 0, overflow: 'hidden' }}>
             <Tabs value={activeTab} onChange={handleTabChange} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '0 16px', borderBottom: '1px solid #333' }}>
+                <div style={{ padding: '0 var(--spacing-lg)', borderBottom: '1px solid var(--border-primary)' }}>
                     <Tabs.List style={{ borderBottom: 'none' }}>
                         <Tabs.Tab value="crl" leftSection={<FileText size={16} />}>
                             Certificate Revocation Lists (CRL)
@@ -205,7 +205,7 @@ const ValidationPage = () => {
                         />
                     </Tabs.Panel>
                     <Tabs.Panel value="ocsp" style={{ height: '100%' }}>
-                        <div style={{ padding: 20, textAlign: 'center', color: '#888' }}>
+                        <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
                             OCSP Logs are currently not available via API.
                         </div>
                     </Tabs.Panel>
