@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Group,
-  TextInput,
+  Input,
   Select,
   NumberInput,
   Paper,
@@ -91,7 +91,7 @@ const CACreatePage = () => {
         <WizardStep>
           <Stack mt="sm" gap="sm" style={{ maxWidth: '500px', margin: '0 auto' }}>
             <Text size="sm" fw={600}>CA Identity</Text>
-            <TextInput 
+            <Input 
               label="Common Name (CN)" 
               placeholder="e.g. MyCorp Root CA G1" 
               value={formData.commonName}
@@ -99,7 +99,7 @@ const CACreatePage = () => {
               required
               size="xs"
             />
-            <TextInput 
+            <Input 
               label="Organization (O)" 
               placeholder="e.g. MyCorp Inc."
               value={formData.organization}

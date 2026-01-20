@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Badge, Text, Group, ActionIcon, TextInput, Pagination } from '@mantine/core';
+import { Button, Badge, Text, Group, ActionIcon, Input, Pagination } from '@mantine/core';
 import { Plus, MagnifyingGlass, FileText, Trash, Key, User, CalendarBlank, PenNib } from '@phosphor-icons/react';
 import { PageHeader } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
@@ -149,7 +149,7 @@ const CSRListPage = () => {
 
       {/* Toolbar */}
       <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)', display: 'flex' }}>
-        <TextInput
+        <Input
             placeholder="Search CSRs..."
             leftSection={<MagnifyingGlass size={16} className="icon-gradient-subtle" />}
             value={searchTerm}

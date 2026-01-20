@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSelection } from '../../../core/context/SelectionContext';
 import { CertificateService } from '../services/certificates.service';
-import { Loader, Center, TextInput, Group, Button, Menu, Badge, Text, Pagination } from '@mantine/core';
+import { Loader, Center, Input, Group, Button, Menu, Badge, Text, Pagination } from '@mantine/core';
 import { MagnifyingGlass, Download, Plus, FileArchive, FileText, Certificate as CertIcon } from '@phosphor-icons/react';
 import { PageHeader } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
@@ -140,7 +140,7 @@ const CertificatesPage = () => {
       />
 
       <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)', display: 'flex' }}>
-        <TextInput 
+        <Input 
             placeholder="Search certificates..." 
             size="xs"
             leftSection={<MagnifyingGlass size={16} className="icon-gradient-subtle" />}
@@ -157,7 +157,7 @@ const CertificatesPage = () => {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', border: '1px solid var(--border-color)', borderRadius: 'var(--control-radius)', background: 'var(--bg-surface)', overflow: 'hidden' }}>
         {loading ? (
             <Center style={{ height: '100%' }}>
-                <Loader size="sm" />
+                <div className="spinner" size="sm" />
             </Center>
         ) : (
             <>

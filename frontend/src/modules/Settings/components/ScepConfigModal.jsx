@@ -1,5 +1,5 @@
 import React from 'react';
-import { TextInput, PasswordInput, Switch, Button, Group, Stack, Select, Alert } from '@mantine/core';
+import { Input, PasswordInput, Switch, Button, Group, Stack, Select, Alert } from '@mantine/core';
 import { Info } from '@phosphor-icons/react';
 
 const ScepConfigModal = ({ context, id, innerProps }) => {

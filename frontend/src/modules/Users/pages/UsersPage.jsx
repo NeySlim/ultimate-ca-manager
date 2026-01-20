@@ -8,7 +8,7 @@ import {
   Avatar,
   ActionIcon,
   Tooltip,
-  TextInput,
+  Input,
 } from '@mantine/core';
 import {
   User,
@@ -164,7 +164,7 @@ const UsersPage = () => {
           
           {/* Integrated Toolbar matching Certificates */}
           <div style={{ padding: '12px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '12px', alignItems: 'center', backgroundColor: 'var(--bg-panel)' }}>
-             <TextInput
+             <Input
                placeholder="Search users..."
                leftSection={<MagnifyingGlass size={16} className="icon-gradient-subtle" />}
                value={searchTerm}

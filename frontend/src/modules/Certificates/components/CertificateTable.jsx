@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Badge,
-  TextInput,
+  Input,
   Select,
   ActionIcon,
   Tooltip,
@@ -168,7 +168,7 @@ const CertificateTable = ({ data, onRowClick, onDelete, onDownload, onView, sele
     <div className="certificate-table-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-surface)' }}>
       {/* Filters Toolbar */}
       <div className="certificate-toolbar" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '12px', alignItems: 'center', background: 'var(--bg-surface)' }}>
-        <TextInput
+        <Input
           placeholder="Search..."
           leftSection={<MagnifyingGlass size={16} className="icon-gradient-subtle" />}
           value={searchTerm}

@@ -141,7 +141,7 @@ const CSRDetailPage = () => {
           <Stack gap="md">
             <Group justify="space-between">
               <Text size="sm" c="dimmed">Algorithm</Text>
-              <Badge variant="outline" variant="outline">{csr.algo}</Badge>
+              <Badge variant="outline">{csr.algo}</Badge>
             </Group>
             
             <Divider />
