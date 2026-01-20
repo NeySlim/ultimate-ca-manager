@@ -108,20 +108,13 @@ const LoginPage = () => {
           {step === 'login' && (
             <div className="auth-method active">
                 {error && (
-                  <div style={{ 
-                      background: '#2e1e1e', 
-                      border: '1px solid #4a2d2d', 
-                      borderRadius: 'var(--radius)', 
-                      padding: '12px', 
-                      marginBottom: '16px', 
-                      display: 'flex', 
-                      gap: '10px', 
-                      color: '#e57373', 
-                      fontSize: '13px',
-                      alignItems: 'center'
-                  }}>
-                    <WarningCircle size={16} weight="bold" />
-                    {error}
+                  <div className="alert alert-error">
+                    <div className="alert-icon">
+                      <WarningCircle size={16} weight="bold" />
+                    </div>
+                    <div className="alert-content">
+                      <div className="alert-message">{error}</div>
+                    </div>
                   </div>
                 )}
 

@@ -7,7 +7,7 @@
   overflow: hidden;
   background: var(--bg-surface);
   /* border: 1px solid var(--border-color); Removed for seamless integration */
-  /* border-radius: 4px; Removed */
+  /* border-radius: var(--radius); Removed */
 }
 
 /* Header */

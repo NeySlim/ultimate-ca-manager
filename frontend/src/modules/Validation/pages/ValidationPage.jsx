@@ -89,7 +89,7 @@ const ValidationPage = () => {
         notifications.show({
             title: 'Error',
             message: 'Failed to regenerate CRL',
-            color: 'red'
+            color: 'var(--status-error)'
         });
     }
   };
@@ -122,7 +122,7 @@ const ValidationPage = () => {
       key: 'lifetime',
       label: 'Lifetime',
       width: 100,
-      render: (row) => <Badge variant="outline" color="gray" size="xs">{row.lifetime} days</Badge>
+      render: (row) => <Badge variant="outline" variant="outline" size="xs">{row.lifetime} days</Badge>
     },
     {
       key: 'actions',

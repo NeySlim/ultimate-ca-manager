@@ -78,7 +78,7 @@ const ACMEPage = () => {
       key: 'method',
       label: 'Challenge',
       width: 100,
-      render: (row) => <Badge variant="outline" color="gray" size="xs">{renderValue(row.method)}</Badge>
+      render: (row) => <Badge variant="outline" variant="outline" size="xs">{renderValue(row.method)}</Badge>
     },
     {
       key: 'status',
