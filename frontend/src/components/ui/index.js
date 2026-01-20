@@ -19,7 +19,7 @@ export { ActionIcon } from './ActionIcon';
 export { Container } from './Container';
 export { Textarea, NumberInput, Switch, Radio, Alert, Box } from './MoreComponents';
 export { CopyButton, Grid, GridCol } from './Grid';
-export { Avatar, Title, Anchor, Loader, ScrollArea, ThemeIcon, Table, Paper, Stepper, Center } from './MoreComponents2';
+export { Avatar, Title, Anchor, Loader, ScrollArea, ThemeIcon, Table, Paper, Stepper, Center, Code } from './MoreComponents2';
 
 Grid.Col = GridCol;
 Table.Thead = Table.Thead;
