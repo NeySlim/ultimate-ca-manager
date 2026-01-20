@@ -13,6 +13,7 @@ import {
   Plus,
   CaretRight,
   CaretDown,
+  ArrowElbowDownRight,
   ShieldCheck,
   Certificate,
   Eye,
@@ -73,6 +74,11 @@ const CATreePage = () => {
 
   // Recalculate flat data when tree or expansion changes
   useEffect(() => {
+    // Ensure Root CAs are always expanded initially or handle default state
+    if (treeData.length > 0 && expanded.length === 0) {
+        // Optional: Expand roots by default
+        // setExpanded(treeData.map(n => n.refid));
+    }
     setFlatData(flattenTree(treeData, expanded));
   }, [expanded, treeData]);
 
@@ -90,6 +96,15 @@ const CATreePage = () => {
       minWidth: 200,
       render: (row) => (
         <div style={{ display: 'flex', alignItems: 'center', paddingLeft: `calc(var(--control-height) * ${row.level})` }}>
+          {/* Connector for children */}
+          {row.level > 0 && (
+            <ArrowElbowDownRight 
+              size={14} 
+              color="var(--mantine-color-dimmed)" 
+              style={{ marginRight: 4, minWidth: 14 }} 
+            />
+          )}
+
           {/* Toggle Button */}
           {row.children && row.children.length > 0 ? (
             <ActionIcon 
