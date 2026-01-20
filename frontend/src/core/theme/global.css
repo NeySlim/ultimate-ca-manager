@@ -3,6 +3,12 @@
   /* Will be populated from design extraction */
   --font-sans: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  
+  /* Accent Colors from phosphor-gradients.html */
+  --accent-primary: #5a8fc7;
+  --accent-secondary: #7aa5d9;
+  --accent-gradient-start: #5a8fc7;
+  --accent-gradient-end: #7aa5d9;
 }
 
 body {
@@ -12,4 +18,31 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden; /* App-like feel */
+}
+
+/* Phosphor Icon Gradients */
+.icon-gradient {
+  background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: inline-block;
+}
+
+.icon-gradient-subtle {
+  color: var(--accent-primary);
+  filter: drop-shadow(0 0 8px rgba(90, 143, 199, 0.4));
+  opacity: 0.9;
+}
+
+.icon-gradient-glow {
+  color: var(--accent-primary);
+  filter: drop-shadow(0 0 4px var(--accent-gradient-start)) drop-shadow(0 0 8px var(--accent-gradient-end));
+}
+
+/* Badge Gradients */
+.badge-gradient {
+  border-color: var(--accent-primary);
+  background: linear-gradient(135deg, rgba(90, 143, 199, 0.1), rgba(122, 165, 217, 0.1));
+  color: var(--accent-primary);
 }

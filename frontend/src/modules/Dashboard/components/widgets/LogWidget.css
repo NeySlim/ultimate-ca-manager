@@ -1,0 +1,133 @@
+/* LogWidget.css */
+
+.log-widget {
+  display: flex;
+  flex-direction: column;
+}
+
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #373a40;
+}
+
+.log-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e8e8;
+}
+
+.log-info {
+  font-size: 11px;
+  color: #5c5f66;
+  font-weight: 500;
+}
+
+.log-container {
+  flex: 1;
+  overflow-y: auto;
+  background-color: #1a1b1e;
+  border: 1px solid #373a40;
+  border-radius: 3px;
+  padding: 8px;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.log-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.log-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.log-container::-webkit-scrollbar-thumb {
+  background: #373a40;
+  border-radius: 3px;
+}
+
+.log-container::-webkit-scrollbar-thumb:hover {
+  background: #4a5568;
+}
+
+.log-entry {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
+}
+
+.log-entry:hover {
+  background-color: #25262b;
+}
+
+.log-entry:not(:last-child) {
+  margin-bottom: 2px;
+}
+
+.log-timestamp {
+  color: #5c5f66;
+  font-size: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.log-level {
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.log-message {
+  color: #c1c2c5;
+  font-size: 11px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-entry:hover .log-message {
+  color: #e8e8e8;
+}
+
+.log-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #373a40;
+}
+
+.log-autoscroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #909296;
+  cursor: pointer;
+  user-select: none;
+}
+
+.log-autoscroll input {
+  cursor: pointer;
+  accent-color: #5a8fc7;
+}
+
+.log-autoscroll:hover {
+  color: #c1c2c5;
+}

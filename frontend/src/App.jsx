@@ -1,9 +1,15 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout/MainLayout';
-import CertificatesPage from './modules/Certificates/pages/CertificatesPage';
+import CertificatesRoutes from './modules/Certificates/routes';
 import DashboardPage from './modules/Dashboard/pages/DashboardPage';
 import SettingsPage from './modules/Settings/pages/SettingsPage';
+import CATreePage from './modules/CAs/pages/CATreePage';
+import CSRListPage from './modules/CSRs/pages/CSRListPage';
+import ACMEPage from './modules/ACME/pages/ACMEPage';
+import SCEPPage from './modules/SCEP/pages/SCEPPage';
+import ValidationPage from './modules/Validation/pages/ValidationPage';
+import UsersPage from './modules/Users/pages/UsersPage';
 import LoginPage from './modules/Auth/pages/LoginPage';
 import { RequireAuth } from './core/context/AuthContext';
 
@@ -18,9 +24,14 @@ function App() {
         </RequireAuth>
       }>
         <Route index element={<DashboardPage />} />
-        <Route path="certificates/*" element={<CertificatesPage />} />
-        <Route path="cas/*" element={<div style={{padding: '20px'}}>Certificate Authorities Structure</div>} />
-        <Route path="users" element={<div style={{padding: '20px'}}>Users Management</div>} />
+        <Route path="certificates/*" element={<CertificatesRoutes />} />
+        <Route path="cas" element={<Navigate to="/cas/tree" replace />} />
+        <Route path="cas/tree" element={<CATreePage />} />
+        <Route path="csrs" element={<CSRListPage />} />
+        <Route path="acme" element={<ACMEPage />} />
+        <Route path="scep" element={<SCEPPage />} />
+        <Route path="validation" element={<ValidationPage />} />
+        <Route path="users" element={<UsersPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="analytics" element={<div style={{padding: '20px'}}>Analytics</div>} />
         <Route path="*" element={<Navigate to="/" replace />} />

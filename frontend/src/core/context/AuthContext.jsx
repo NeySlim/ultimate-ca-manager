@@ -21,12 +21,41 @@ export const AuthProvider = ({ children }) => {
   const checkAuth = async () => {
     try {
       // Don't redirect on 401 during initial check
-      await api.get('/auth/verify', { redirectOn401: false });
-      setIsAuthenticated(true);
-      // Ensure local storage matches backend state
-      localStorage.setItem('ucm-auth', 'true');
+      // Note: client.js prepends /api, so this becomes /api/auth/verify
+      const response = await api.get('/auth/verify', { redirectOn401: false });
+      
+      // Determine response structure
+      let authData = null;
+      
+      // Case 1: Response is the data object directly
+      if (response && response.authenticated !== undefined) {
+          authData = response;
+      }
+      // Case 2: Response is wrapped in { data: ... }
+      else if (response && response.data && response.data.authenticated !== undefined) {
+          authData = response.data;
+      }
+      // Case 3: Response is { user: ... } legacy format
+      else if (response && response.user) {
+          authData = { authenticated: true, user: response.user };
+      }
+
+      if (authData) {
+          if (authData.authenticated) {
+              setIsAuthenticated(true);
+              localStorage.setItem('ucm-auth', 'true');
+          } else {
+              console.log('Auth check: Not authenticated');
+              setIsAuthenticated(false);
+              localStorage.removeItem('ucm-auth');
+          }
+      } else {
+          console.log('Auth check: Unknown response format', response);
+          setIsAuthenticated(false);
+          localStorage.removeItem('ucm-auth');
+      }
     } catch (error) {
-      console.log('Not authenticated');
+      console.log('Not authenticated (error)', error);
       setIsAuthenticated(false);
       localStorage.removeItem('ucm-auth');
     } finally {

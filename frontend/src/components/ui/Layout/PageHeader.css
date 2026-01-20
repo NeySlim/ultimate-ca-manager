@@ -1,0 +1,35 @@
+/* PageHeader.css */
+
+.ui-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #25262b;
+  border-bottom: 1px solid #373a40;
+  height: 52px;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.ui-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ui-page-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #e8e8e8;
+  white-space: nowrap;
+}
+
+.ui-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
