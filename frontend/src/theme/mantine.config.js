@@ -65,6 +65,7 @@ export const createMantineTheme = (paletteKey, density) => {
         defaultProps: {
           size: 'sm',
           radius: 'xs',
+          variant: 'default', // Default to outline/default style
         },
         styles: (theme, props, u) => ({
           root: {
@@ -72,14 +73,26 @@ export const createMantineTheme = (paletteKey, density) => {
             padding: `0 ${rem(12)}`,
             fontSize: rem(13),
             fontWeight: 500,
-            border: '1px solid transparent',
+            // border: '1px solid transparent', // Let vars handle border
           },
         }),
         vars: (theme, props) => {
+          // Primary/Filled Button -> Transparent with Border (Accent Color)
+          if (props.variant === 'filled') {
+            return {
+              root: {
+                '--button-bg': 'transparent',
+                '--button-hover': 'rgba(var(--mantine-primary-color-rgb), 0.1)',
+                '--button-color': 'var(--mantine-primary-color-filled)',
+                '--button-bd': '1px solid var(--mantine-primary-color-filled)',
+              }
+            };
+          }
+          // Default/Outline Button -> Dark Grey with Light Border
           if (props.variant === 'default' || props.variant === 'outline') {
             return {
               root: {
-                '--button-bg': '#333333',
+                '--button-bg': 'transparent', // Use transparent for outline effect
                 '--button-hover': '#3a3a3a',
                 '--button-color': '#e8e8e8',
                 '--button-bd': '1px solid #444444',

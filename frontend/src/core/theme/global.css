@@ -12,17 +12,25 @@
   --accent-gradient-end: #7aa5d9;
 
   /* Default Theme Variables (Dark Mode Fallback) - Matching design-system.html */
-  --bg-app: #1a1a1a;       /* --bg-primary */
-  --bg-panel: #1e1e1e;     /* --bg-secondary */
-  --bg-surface: #252525;   /* --bg-tertiary */
-  --bg-element: #2a2a2a;   /* --bg-hover */
-  --bg-element-hover: #333333;
-  --border-color: #333333; /* --border-primary */
+  --bg-primary: #1a1a1a;       /* formerly --bg-app */
+  --bg-secondary: #1e1e1e;     /* formerly --bg-panel */
+  --bg-tertiary: #252525;      /* formerly --bg-surface */
+  --bg-hover: #2a2a2a;         /* formerly --bg-element */
+  --border-primary: #333333;   /* formerly --border-color */
+  --text-tertiary: #888888;    /* formerly --text-muted */
+
+  /* Aliases for backward compatibility with existing components */
+  --bg-app: var(--bg-primary);
+  --bg-panel: var(--bg-secondary);
+  --bg-surface: var(--bg-tertiary);
+  --bg-element: var(--bg-hover);
+  --bg-element-hover: #333333; /* Slightly lighter than bg-hover */
+  --border-color: var(--border-primary);
   --border-subtle: #3a3a3a;
+  --text-muted: var(--text-tertiary);
   
   --text-primary: #e8e8e8;
   --text-secondary: #cccccc;
-  --text-muted: #888888;
   
   /* Strict Compact Sizes */
   --control-height: 26px; /* Strict 26px from design-system.html */

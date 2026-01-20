@@ -164,6 +164,25 @@ const SecurityTab = () => {
             Configure mTLS
         </Button>
       </Card>
+
+      {/* OPNsense Import */}
+      <Card withBorder padding="lg" radius="md" id="opnsense-import">
+         <Group mb="md">
+            <ArrowsClockwise size={24} className="icon-gradient-subtle" />
+            <Text weight={600} size="lg">Import from OPNsense</Text>
+         </Group>
+         
+         <Stack spacing="md">
+             <Alert icon={<Info size={16} />} color="blue" variant="light">
+                 Import existing Certificate Authorities and Certificates from an OPNsense backup XML file.
+             </Alert>
+
+             <Group>
+                 <Button variant="default">Upload config.xml</Button>
+                 <Text size="xs" color="dimmed">Supported: CA, Certs, CRLs</Text>
+             </Group>
+         </Stack>
+      </Card>
     </Stack>
   );
 };

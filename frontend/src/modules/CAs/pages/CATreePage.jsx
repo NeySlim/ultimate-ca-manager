@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -6,8 +6,11 @@ import {
   Badge,
   Text,
   ActionIcon,
-  Tooltip,
-  Tabs,
+  TextInput,
+  Menu,
+  Pagination,
+  Loader,
+  Center
 } from '@mantine/core';
 import {
   Plus,
@@ -16,12 +19,14 @@ import {
   ArrowElbowDownRight,
   ShieldCheck,
   Certificate,
-  Eye,
-  Gear,
-  TreeView,
-  ListDashes,
+  MagnifyingGlass,
+  Download,
+  CloudArrowUp,
+  FileArchive,
+  FileText,
+  Upload
 } from '@phosphor-icons/react';
-import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
+import { PageHeader } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
 import { caService } from '../services/ca.service';
 import './CATreePage.css';
@@ -35,34 +40,105 @@ const flattenTree = (nodes, expandedIds, level = 0) => {
   
   nodes.forEach(node => {
     flat.push({ ...node, level });
-    if (expandedIds.includes(node.refid) && node.children) {
+    if (expandedIds.includes(node.refid || node.id) && node.children) {
       flat = flat.concat(flattenTree(node.children, expandedIds, level + 1));
     }
   });
   return flat;
 };
 
+// Auto-detect hierarchy from flat list
+const buildHierarchy = (cas) => {
+    const map = {};
+    const subjectMap = {};
+    const roots = [];
+    const orphans = [];
+    
+    // Index all CAs
+    cas.forEach(ca => {
+        map[ca.id] = { ...ca, children: [], refid: ca.id }; // Ensure refid exists
+        if (ca.subject) {
+            // Normalize subject for matching? (Removing spaces might help)
+            subjectMap[ca.subject] = map[ca.id];
+        }
+    });
+
+    // Build tree
+    cas.forEach(ca => {
+        const node = map[ca.id];
+        
+        // 1. Explicit Parent (DB Relationship)
+        if (ca.parent_ca_id && map[ca.parent_ca_id]) {
+            map[ca.parent_ca_id].children.push(node);
+            return;
+        } 
+        
+        // 2. Explicit Parent but missing in map -> Orphan
+        if (ca.parent_ca_id && !map[ca.parent_ca_id]) {
+            orphans.push(node);
+            return;
+        }
+        
+        // 3. No explicit parent. Check if Self-Signed (Root)
+        // Check issuer/subject equality. 
+        // Note: Imported CAs might have null issuer/subject if parsing failed, 
+        // but typically backend parses them.
+        const isSelfSigned = ca.subject && ca.issuer && ca.subject === ca.issuer;
+        
+        if (isSelfSigned) {
+            roots.push(node);
+            return;
+        }
+        
+        // 4. Not Self-Signed, No Parent ID. Try to soft-link by Issuer DN
+        if (ca.issuer && subjectMap[ca.issuer]) {
+             subjectMap[ca.issuer].children.push(node);
+             // Optionally mark as soft-linked?
+             return;
+        }
+
+        // 5. Fallback: It's an intermediate with no known parent -> Orphan
+        orphans.push(node);
+    });
+
+    return { hierarchy: roots, orphans };
+};
+
 const CATreePage = () => {
   const navigate = useNavigate();
-  const { setSelectedItem } = useSelection();
-  const [expanded, setExpanded] = useState([]); // Don't pre-expand by default with real data unless we know ID
+  const { setSelectedItem, selectedItem } = useSelection();
+  const [expanded, setExpanded] = useState([]); 
   const [treeData, setTreeData] = useState([]);
   const [orphansData, setOrphansData] = useState([]);
-  const [flatData, setFlatData] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('hierarchy');
+  
+  // Sorting
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  // Resizable Splitter
+  const [splitRatio, setSplitRatio] = useState(0.7); // 70% top, 30% bottom
+  const splitRef = useRef(null);
+  const containerRef = useRef(null);
+  const [isResizingSplit, setIsResizingSplit] = useState(false);
+
+  // Pagination States
+  const [orphanPage, setOrphanPage] = useState(1);
+  const orphanPageSize = 5;
 
   // Fetch Data
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [hierarchy, orphans] = await Promise.all([
-          caService.getHierarchy(),
-          caService.getOrphans()
-        ]);
+        const allCAs = await caService.getAll();
+        const { hierarchy, orphans } = buildHierarchy(allCAs);
         setTreeData(hierarchy);
         setOrphansData(orphans);
+        
+        // Expand all by default
+        const getAllIds = (nodes) => nodes.reduce((acc, n) => [...acc, n.refid, ...(n.children ? getAllIds(n.children) : [])], []);
+        setExpanded(getAllIds(hierarchy));
       } catch (error) {
         console.error("Failed to fetch CAs", error);
       } finally {
@@ -72,15 +148,75 @@ const CATreePage = () => {
     fetchData();
   }, []);
 
-  // Recalculate flat data when tree or expansion changes
-  useEffect(() => {
-    // Ensure Root CAs are always expanded initially or handle default state
-    if (treeData.length > 0 && expanded.length === 0) {
-        // Optional: Expand roots by default
-        // setExpanded(treeData.map(n => n.refid));
-    }
-    setFlatData(flattenTree(treeData, expanded));
-  }, [expanded, treeData]);
+  // Sorting Logic
+  const handleSort = (key) => {
+      let direction = 'asc';
+      if (sortConfig.key === key && sortConfig.direction === 'asc') {
+          direction = 'desc';
+      }
+      setSortConfig({ key, direction });
+  };
+
+  const sortData = (data) => {
+      if (!sortConfig.key) return data;
+      
+      return [...data].sort((a, b) => {
+          if (a[sortConfig.key] < b[sortConfig.key]) {
+              return sortConfig.direction === 'asc' ? -1 : 1;
+          }
+          if (a[sortConfig.key] > b[sortConfig.key]) {
+              return sortConfig.direction === 'asc' ? 1 : -1;
+          }
+          return 0;
+      });
+  };
+
+  // Filtering
+  const filterNodes = (nodes, query) => {
+      if (!query) return nodes;
+      return nodes.reduce((acc, node) => {
+        const matches = node.name.toLowerCase().includes(query.toLowerCase());
+        const filteredChildren = node.children ? filterNodes(node.children, query) : [];
+        if (matches || filteredChildren.length > 0) {
+            acc.push({ ...node, children: filteredChildren });
+        }
+        return acc;
+      }, []);
+  };
+
+  const finalTreeData = useMemo(() => {
+      let filtered = filterNodes(treeData, searchQuery);
+      // Note: Sorting tree data is complex as it breaks hierarchy structure if not careful.
+      // For now, we only sort siblings.
+      const sortNodes = (nodes) => {
+          if (!sortConfig.key) return nodes;
+          const sorted = [...nodes].sort((a, b) => {
+              // Custom sort for name to keep tree feel? No, standard sort.
+              if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
+              if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+              return 0;
+          });
+          return sorted.map(n => ({ ...n, children: sortNodes(n.children) }));
+      };
+      
+      filtered = sortNodes(filtered);
+      return flattenTree(filtered, expanded);
+  }, [treeData, expanded, searchQuery, sortConfig]);
+
+  const finalOrphansData = useMemo(() => {
+      let filtered = orphansData;
+      if (searchQuery) {
+          filtered = orphansData.filter(o => o.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      }
+      return sortData(filtered);
+  }, [orphansData, searchQuery, sortConfig]);
+
+  const paginatedOrphans = useMemo(() => {
+      const start = (orphanPage - 1) * orphanPageSize;
+      return finalOrphansData.slice(start, start + orphanPageSize);
+  }, [finalOrphansData, orphanPage]);
+
+  const orphanTotalPages = Math.ceil(finalOrphansData.length / orphanPageSize);
 
   const toggleExpand = (id) => {
     setExpanded(prev => 
@@ -88,15 +224,57 @@ const CATreePage = () => {
     );
   };
 
-  const columnsTree = [
+  const getBadgeColor = (type) => {
+      switch(type) {
+          case 'Root CA': return 'yellow';
+          case 'Intermediate': return 'blue';
+          case 'Orphan': return 'orange';
+          default: return 'gray';
+      }
+  };
+
+  // Splitter Logic
+  const handleSplitMouseDown = (e) => {
+      setIsResizingSplit(true);
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+  };
+
+  const handleSplitMouseMove = useCallback((e) => {
+      if (!isResizingSplit || !containerRef.current) return;
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const relativeY = e.clientY - containerRect.top;
+      const ratio = Math.max(0.2, Math.min(0.8, relativeY / containerRect.height));
+      setSplitRatio(ratio);
+  }, [isResizingSplit]);
+
+  const handleSplitMouseUp = useCallback(() => {
+      setIsResizingSplit(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+  }, []);
+
+  useEffect(() => {
+      if (isResizingSplit) {
+          window.addEventListener('mousemove', handleSplitMouseMove);
+          window.addEventListener('mouseup', handleSplitMouseUp);
+      }
+      return () => {
+          window.removeEventListener('mousemove', handleSplitMouseMove);
+          window.removeEventListener('mouseup', handleSplitMouseUp);
+      };
+  }, [isResizingSplit, handleSplitMouseMove, handleSplitMouseUp]);
+
+  const columns = [
     {
       key: 'name',
       label: 'Authority Name',
-      width: 300,
+      width: 350,
       minWidth: 200,
+      sortable: true,
       render: (row) => (
-        <div style={{ display: 'flex', alignItems: 'center', paddingLeft: `calc(var(--control-height) * ${row.level})` }}>
-          {/* Connector for children */}
+        <div style={{ display: 'flex', alignItems: 'center', paddingLeft: row.level ? `calc(var(--control-height) * ${row.level})` : 0 }}>
+          {/* Connector */}
           {row.level > 0 && (
             <ArrowElbowDownRight 
               size={14} 
@@ -116,7 +294,7 @@ const CATreePage = () => {
               {expanded.includes(row.refid) ? <CaretDown /> : <CaretRight />}
             </ActionIcon>
           ) : (
-            <span style={{ width: 'var(--control-height)', display: 'inline-block' }} />
+            <span style={{ width: 22, display: 'inline-block' }} />
           )}
 
           {/* Icon */}
@@ -132,13 +310,15 @@ const CATreePage = () => {
     {
       key: 'type',
       label: 'Type',
-      width: 120,
-      render: (row) => <Badge variant="outline" color="gray" size="xs">{row.type}</Badge>
+      width: 140,
+      sortable: true,
+      render: (row) => <Badge variant="light" color={getBadgeColor(row.type)} size="sm">{row.type}</Badge>
     },
     {
       key: 'status',
       label: 'Status',
       width: 100,
+      sortable: true,
       render: (row) => (
         <Badge 
           color={row.status === 'Active' ? 'green' : 'red'} 
@@ -151,57 +331,18 @@ const CATreePage = () => {
     },
     {
       key: 'certs',
-      label: 'Issued Certs',
-      width: 100,
-      render: (row) => <Text size="sm">{row.certs}</Text>
+      label: 'Issued',
+      width: 80,
+      sortable: true,
+      render: (row) => <Text size="sm" ta="center">{row.certs || 0}</Text>
     },
     {
       key: 'expiry',
       label: 'Expires',
       minWidth: 120,
       flex: true,
+      sortable: true,
       render: (row) => <Text size="sm" c="dimmed">{row.expiry}</Text>
-    }
-  ];
-
-  const columnsOrphans = [
-    {
-        key: 'name',
-        label: 'CA Name',
-        width: 250,
-        render: (row) => (
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-                <Certificate size={18} className="icon-gradient-subtle" style={{ marginRight: 8 }} />
-                <Text size="sm" fw={500}>{row.name}</Text>
-            </div>
-        )
-    },
-    {
-        key: 'issuer',
-        label: 'Issuer (Unknown/External)',
-        width: 200,
-        render: (row) => <Text size="sm" c="dimmed">{row.issuer}</Text>
-    },
-    {
-        key: 'status',
-        label: 'Status',
-        width: 100,
-        render: (row) => (
-          <Badge 
-            color={row.status === 'Active' ? 'green' : 'gray'} 
-            variant="dot" 
-            size="sm"
-          >
-            {row.status}
-          </Badge>
-        )
-    },
-    {
-        key: 'expiry',
-        label: 'Expires',
-        minWidth: 120,
-        flex: true,
-        render: (row) => <Text size="sm" c="dimmed">{row.expiry}</Text>
     }
   ];
 
@@ -210,61 +351,114 @@ const CATreePage = () => {
       <PageHeader 
         title="Certificate Authorities" 
         actions={
-          <Button leftSection={<Plus size={16} />} size="xs" onClick={() => navigate('/cas/create')}>
-            Create New CA
-          </Button>
+          <Group spacing="xs">
+             <Menu shadow="md" width={200}>
+                <Menu.Target>
+                  <Button variant="default" leftSection={<Upload size={16} />} size="xs">Import</Button>
+                </Menu.Target>
+                <Menu.Dropdown>
+                   <Menu.Label>Import From</Menu.Label>
+                   <Menu.Item leftSection={<CloudArrowUp size={14} />} onClick={() => navigate('/settings?tab=security')}>
+                     OPNsense Config
+                   </Menu.Item>
+                   <Menu.Item leftSection={<FileArchive size={14} />}>
+                     Backup File
+                   </Menu.Item>
+                </Menu.Dropdown>
+             </Menu>
+             <Menu shadow="md" width={200}>
+                <Menu.Target>
+                  <Button variant="default" leftSection={<Download size={16} />} size="xs">Export All</Button>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Label>Export Format</Menu.Label>
+                  <Menu.Item leftSection={<FileArchive size={14} />}>JSON (Full Backup)</Menu.Item>
+                  <Menu.Item leftSection={<FileText size={14} />}>CSV List</Menu.Item>
+                </Menu.Dropdown>
+             </Menu>
+             <Button leftSection={<Plus size={16} />} size="xs" onClick={() => navigate('/cas/create')}>
+                Create New CA
+             </Button>
+          </Group>
         }
       />
 
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <Tabs 
-              value={activeTab} 
-              onChange={setActiveTab} 
-              radius="xs"
-              style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
-              classNames={{
-                tab: 'custom-tab',
-                list: 'custom-tab-list',
-                panel: 'custom-tab-panel' // Add class for panel
-              }}
-            >
-                <div style={{ padding: '0 16px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
-                    <Tabs.List style={{ borderBottom: 'none' }}>
-                        <Tabs.Tab 
-                          value="hierarchy" 
-                          leftSection={<TreeView size={16} />}
-                          style={{ fontSize: 'var(--font-size-control)', fontWeight: 500 }}
-                        >
-                            Hierarchy
-                        </Tabs.Tab>
-                        <Tabs.Tab 
-                          value="orphans" 
-                          leftSection={<ListDashes size={16} />}
-                          style={{ fontSize: 'var(--font-size-control)', fontWeight: 500 }}
-                        >
-                            Orphan Intermediates
-                        </Tabs.Tab>
-                    </Tabs.List>
+      {/* Toolbar */}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)', display: 'flex' }}>
+        <TextInput 
+            placeholder="Search CAs..." 
+            size="xs"
+            leftSection={<MagnifyingGlass size={16} className="icon-gradient-subtle" />}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: 300 }}
+        />
+      </div>
+
+      <div style={{ flex: 1, overflow: 'hidden', padding: '12px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', border: '1px solid var(--border-color)', borderRadius: 'var(--control-radius)', background: 'var(--bg-surface)', overflow: 'hidden' }}>
+        {loading ? (
+             <Center style={{ height: '100%' }}>
+                <Loader size="sm" />
+             </Center>
+        ) : (
+            <>
+                {/* Hierarchy Section */}
+                <div style={{ height: `${splitRatio * 100}%`, display: 'flex', flexDirection: 'column', borderBottom: '1px solid var(--border-color)', minHeight: '100px' }}>
+                    <div style={{ padding: '8px 16px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text size="xs" fw={700} c="dimmed" tt="uppercase">Authority Hierarchy</Text>
+                        <Badge size="xs" variant="outline" color="gray">{finalTreeData.length} items</Badge>
+                    </div>
+                    <ResizableTable 
+                        columns={columns}
+                        data={finalTreeData}
+                        onRowClick={(row) => setSelectedItem({...row, type: 'CA', title: row.name, subtitle: row.status})}
+                        onSort={handleSort}
+                        sortConfig={sortConfig}
+                        rowClassName={(row) => selectedItem?.id === row.id ? 'selected' : ''}
+                        emptyMessage="No Certificate Authorities found"
+                    />
                 </div>
 
-                <div style={{ flex: 1, position: 'relative', background: 'var(--bg-app)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                    <Tabs.Panel value="hierarchy" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                        <ResizableTable 
-                            columns={columnsTree}
-                            data={flatData}
-                            onRowClick={(row) => setSelectedItem({...row, type: 'CA', title: row.name, subtitle: row.status})}
-                        />
-                    </Tabs.Panel>
-                    <Tabs.Panel value="orphans" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                        <ResizableTable 
-                            columns={columnsOrphans}
-                            data={orphansData}
-                            onRowClick={(row) => setSelectedItem({...row, type: 'CA', title: row.name, subtitle: row.issuer})}
-                            emptyMessage="No orphan intermediate CAs found"
-                        />
-                    </Tabs.Panel>
+                {/* Resizer Handle */}
+                <div 
+                    onMouseDown={handleSplitMouseDown}
+                    style={{ 
+                        height: '6px', 
+                        background: isResizingSplit ? 'var(--mantine-color-blue-filled)' : 'var(--bg-app)', 
+                        cursor: 'row-resize',
+                        zIndex: 10,
+                        margin: '-3px 0',
+                        position: 'relative',
+                        borderTop: '1px solid var(--border-color)',
+                        borderBottom: '1px solid var(--border-color)'
+                    }} 
+                />
+
+                {/* Orphans Section */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: '100px' }}>
+                    <div style={{ padding: '8px 16px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <Text size="xs" fw={700} c="dimmed" tt="uppercase">Orphan Intermediates</Text>
+                         <Badge size="xs" variant="outline" color="orange">{paginatedOrphans.length} orphans</Badge>
+                    </div>
+                    <ResizableTable 
+                        columns={columns}
+                        data={paginatedOrphans}
+                        onRowClick={(row) => setSelectedItem({...row, type: 'CA', title: row.name, subtitle: 'Orphan Intermediate'})}
+                        onSort={handleSort}
+                        sortConfig={sortConfig}
+                        rowClassName={(row) => selectedItem?.id === row.id ? 'selected' : ''}
+                        emptyMessage="No orphan intermediates found"
+                    />
+                    {orphanTotalPages > 1 && (
+                        <div style={{ padding: '4px 8px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end' }}>
+                            <Pagination total={orphanTotalPages} value={orphanPage} onChange={setOrphanPage} size="xs" />
+                        </div>
+                    )}
                 </div>
-            </Tabs>
+            </>
+        )}
+        </div>
       </div>
     </div>
   );
