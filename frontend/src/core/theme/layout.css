@@ -237,6 +237,14 @@
   background-color: #25262b;
   border-bottom: 1px solid #373a40;
   padding: 0 12px;
+  position: relative;
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.topbar button {
+  position: relative;
+  z-index: 1001;
 }
 
 /* Sidebar Refinements */

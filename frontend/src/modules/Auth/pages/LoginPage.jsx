@@ -30,12 +30,16 @@ const LoginPage = () => {
         });
         
         if (response.ok) {
-            const data = await response.json();
-            // If authenticated (e.g. via mTLS), redirect to dashboard
-            if (data.authenticated && mounted) {
-                // Let AuthContext know we are good
-                window.location.href = '/'; 
-                return;
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const data = await response.json();
+                // If authenticated (e.g. via mTLS), redirect to dashboard
+                if (data.authenticated && mounted) {
+                    // Let AuthContext know we are good
+                    window.location.href = '/'; 
+                    return;
+                }
             }
         }
       } catch (e) {
