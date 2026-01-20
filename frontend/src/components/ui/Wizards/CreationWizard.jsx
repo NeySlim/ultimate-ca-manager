@@ -58,7 +58,7 @@ export const CreationWizard = ({
               size="xs"
               styles={{
                 stepIcon: {
-                  borderRadius: '3px',
+                  borderRadius: 'var(--radius)',
                   borderWidth: '1px',
                   backgroundColor: 'var(--bg-element)',
                   borderColor: 'var(--border-color)',

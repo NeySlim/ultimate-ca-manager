@@ -160,7 +160,7 @@ const CADetailPage = () => {
         {/* Tabs for Issued Certs, CRLs, etc */}
         <Widget className="col-12" style={{ padding: 0, overflow: 'hidden', minHeight: '500px' }}>
             <Tabs value={activeTab} onChange={setActiveTab} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '0 16px', borderBottom: '1px solid #333' }}>
+                <div style={{ padding: '0 var(--spacing-lg)', borderBottom: '1px solid var(--border-primary)' }}>
                     <Tabs.List style={{ borderBottom: 'none' }}>
                         <Tabs.Tab value="issued" leftSection={<Certificate size={16} />}>
                             Issued Certificates

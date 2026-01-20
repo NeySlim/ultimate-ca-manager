@@ -59,8 +59,8 @@ const PreviewPanel = () => {
             onMouseDown={handleMouseDown}
         />
         <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.2 }}>👆</div>
-            <p style={{ fontSize: '13px' }}>Select an item to view details</p>
+            <div style={{ fontSize: 'var(--icon-size-xl)', marginBottom: 'var(--spacing-lg)', opacity: 0.2 }}>👆</div>
+            <p style={{ fontSize: 'var(--font-size-ui)' }}>Select an item to view details</p>
         </div>
       </div>
     );
@@ -76,9 +76,9 @@ const PreviewPanel = () => {
 
       {/* Header */}
       <div className="panel-header" style={{
-        height: '48px', padding: '0 16px', borderBottom: '1px solid var(--border-color)',
+        height: '48px', padding: '0 var(--spacing-lg)', borderBottom: '1px solid var(--border-color)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)'
+        fontWeight: 600, fontSize: 'var(--font-size-ui)', color: 'var(--text-primary)'
       }}>
         <span>{selectedItem.type || 'Item'} Details</span>
         <button 
@@ -90,38 +90,38 @@ const PreviewPanel = () => {
       </div>
       
       {/* Content */}
-      <div className="panel-content" style={{ padding: '16px', overflowY: 'auto', flex: 1 }}>
+      <div className="panel-content" style={{ padding: 'var(--spacing-lg)', overflowY: 'auto', flex: 1 }}>
         
         {/* Main Info */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 0 24px 0', borderBottom: '1px solid var(--border-color)', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'var(--spacing-lg) 0 var(--spacing-xl) 0', borderBottom: '1px solid var(--border-color)', marginBottom: 'var(--spacing-lg)' }}>
              <div style={{ 
-               width: '64px', height: '64px', fontSize: '24px', marginBottom: '12px',
-               background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', borderRadius: '3px',
+               width: '64px', height: '64px', fontSize: '24px', marginBottom: 'var(--spacing-md)',
+               background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', borderRadius: 'var(--radius)',
                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'
              }}>
                {selectedItem.avatar || selectedItem.name?.substring(0,2).toUpperCase() || 'IT'}
              </div>
-             <div style={{ fontWeight: 600, fontSize: '16px', marginBottom: '4px', color: 'var(--text-primary)' }}>
+             <div style={{ fontWeight: 600, fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-xs)', color: 'var(--text-primary)' }}>
                {selectedItem.title || selectedItem.name}
              </div>
-             <div style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+             <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-ui)' }}>
                {selectedItem.subtitle || 'No description'}
              </div>
         </div>
 
         {/* Dynamic Properties */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
         {Object.entries(selectedItem).map(([key, value]) => {
            if (['id', 'name', 'title', 'subtitle', 'avatar', 'type', 'children'].includes(key)) return null;
            // Skip empty values or complex objects for now
            if (value === null || value === undefined || typeof value === 'object') return null;
            
            return (
-             <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
-               <div style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px' }}>
+             <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)', fontSize: 'var(--font-size-mono)' }}>
+               <div style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 'var(--font-size-label)', fontWeight: 600, letterSpacing: '0.5px' }}>
                  {key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim()}
                </div>
-               <div style={{ color: 'var(--text-primary)', wordBreak: 'break-word', lineHeight: '1.4', background: 'var(--bg-app)', padding: '6px 8px', borderRadius: '3px', border: '1px solid var(--border-color)' }}>
+               <div style={{ color: 'var(--text-primary)', wordBreak: 'break-word', lineHeight: '1.4', background: 'var(--bg-app)', padding: 'var(--spacing-xs) var(--spacing-sm)', borderRadius: 'var(--radius)', border: '1px solid var(--border-color)' }}>
                  {String(value)}
                </div>
              </div>
@@ -130,19 +130,19 @@ const PreviewPanel = () => {
         </div>
         
         {/* Actions based on type */}
-        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ marginTop: 'var(--spacing-xl)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' }}>
             {selectedItem.type === 'Certificate' && (
                 <>
-                    <button style={{ padding: '8px', background: 'var(--bg-element)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '3px', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <button style={{ padding: 'var(--spacing-sm)', background: 'var(--bg-element)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 'var(--radius)', cursor: 'pointer', fontSize: 'var(--font-size-ui)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--spacing-sm)' }}>
                       <Export size={16} /> Download PEM
                     </button>
-                    <button style={{ padding: '8px', background: 'var(--bg-element)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '3px', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <button style={{ padding: 'var(--spacing-sm)', background: 'var(--bg-element)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 'var(--radius)', cursor: 'pointer', fontSize: 'var(--font-size-ui)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--spacing-sm)' }}>
                       <ArrowsClockwise size={16} /> Renew
                     </button>
                 </>
             )}
             
-            <button style={{ padding: '8px', background: 'rgba(255, 107, 107, 0.1)', border: '1px solid rgba(255, 107, 107, 0.2)', color: '#ff6b6b', borderRadius: '3px', cursor: 'pointer', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <button style={{ padding: 'var(--spacing-sm)', background: 'rgba(231, 115, 115, 0.1)', border: '1px solid rgba(231, 115, 115, 0.2)', color: 'var(--status-error)', borderRadius: 'var(--radius)', cursor: 'pointer', fontSize: 'var(--font-size-ui)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--spacing-sm)' }}>
               <Trash size={16} /> {selectedItem.type === 'CA' ? 'Delete CA' : 'Revoke'}
             </button>
         </div>

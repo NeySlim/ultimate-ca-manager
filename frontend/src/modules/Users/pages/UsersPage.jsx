@@ -71,7 +71,7 @@ const UsersPage = () => {
           <div>
             <Text size="sm" fw={500}>{row.username}</Text>
             <Group gap={4}>
-                <EnvelopeSimple size={12} color="#888" />
+                <EnvelopeSimple size={12} color="var(--text-tertiary)" />
                 <Text size="xs" c="dimmed">{row.email}</Text>
             </Group>
           </div>
@@ -110,7 +110,7 @@ const UsersPage = () => {
       render: (row) => (
         row.mfa ? 
         <Tooltip label="MFA Enabled">
-            <CheckCircle size={18} color="#69db7c" weight="fill" />
+            <CheckCircle size={18} color="var(--status-success)" weight="fill" />
         </Tooltip> 
         : 
         <Text size="xs" c="dimmed">-</Text>

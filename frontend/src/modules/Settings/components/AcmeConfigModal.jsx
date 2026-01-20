@@ -30,7 +30,7 @@ const AcmeConfigModal = ({ context, id, innerProps }) => {
         description="Required for some ACME providers like ZeroSSL"
       />
 
-      <Stack spacing="xs" style={{ border: '1px solid #333', padding: '12px', borderRadius: '4px', background: '#252525' }}>
+      <Stack spacing="xs" style={{ border: '1px solid var(--border-primary)', padding: 'var(--spacing-md)', borderRadius: 'var(--radius)', background: 'var(--bg-tertiary)' }}>
         <TextInput label="EAB Key ID" placeholder="Key ID" disabled />
         <TextInput label="EAB HMAC Key" placeholder="HMAC Key" disabled />
       </Stack>

@@ -140,7 +140,7 @@ const SCEPPage = () => {
                     {/* Info Section */}
                     <div>
                         <Text size="xs" weight={600} mb={4} color="dimmed">Configuration Status</Text>
-                        <div style={{ background: 'var(--bg-element)', padding: '6px 10px', borderRadius: 'var(--control-radius)', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        <div style={{ background: 'var(--bg-element)', padding: '6px 10px', borderRadius: 'var(--control-radius)', fontFamily: 'var(--font-mono)', fontSize: 'var(--font-size-label)', color: 'var(--text-secondary)' }}>
                              Auto-Approve: <span style={{ color: config?.auto_approve ? 'var(--mantine-color-green-5)' : 'var(--mantine-color-red-5)' }}>{config?.auto_approve ? 'Enabled' : 'Disabled'}</span> • RFC 8894
                         </div>
                     </div>

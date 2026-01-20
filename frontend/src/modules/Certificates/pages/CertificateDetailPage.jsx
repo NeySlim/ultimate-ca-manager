@@ -202,7 +202,7 @@ const CertificateDetailPage = () => {
                 <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
                   <div>
                     <Group gap="xs" mb="xs">
-                      <Hash size={16} color="#888" />
+                      <Hash size={16} color="var(--text-tertiary)" />
                       <Text size="sm" fw={600} c="dimmed">
                         Serial Number
                       </Text>
@@ -231,7 +231,7 @@ const CertificateDetailPage = () => {
 
                   <div>
                     <Group gap="xs" mb="xs">
-                      <LockKey size={16} color="#888" />
+                      <LockKey size={16} color="var(--text-tertiary)" />
                       <Text size="sm" fw={600} c="dimmed">
                         Algorithm
                       </Text>
@@ -447,7 +447,7 @@ const CertificateDetailPage = () => {
             <Stack gap="md">
               {certificate.extensions && certificate.extensions.length > 0 ? (
                 certificate.extensions.map((ext, idx) => (
-                  <Box key={idx} p="sm" style={{ border: '1px solid #333', borderRadius: '4px' }}>
+                  <Box key={idx} p="sm" style={{ border: '1px solid var(--border-primary)', borderRadius: 'var(--radius)' }}>
                     <Group justify="space-between" mb="xs">
                       <Text size="sm" fw={600}>
                         {ext.name}
