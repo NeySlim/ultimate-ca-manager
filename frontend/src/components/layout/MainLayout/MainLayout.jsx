@@ -3,11 +3,13 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from '../Sidebar/Sidebar';
 import TopBar from '../TopBar/TopBar';
 import PreviewPanel from '../PreviewPanel/PreviewPanel';
+import { ThemeSettings } from '../../ThemeSettings';
 import '../../../core/theme/layout.css';
 
 const MainLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isDetailsOpen, setIsDetailsOpen] = useState(true);
+  const [isThemeSettingsOpen, setIsThemeSettingsOpen] = useState(false);
 
   return (
     <div className="app-shell">
@@ -17,8 +19,11 @@ const MainLayout = () => {
         toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isDetailsOpen={isDetailsOpen}
         toggleDetails={() => setIsDetailsOpen(!isDetailsOpen)}
+        openThemeSettings={() => setIsThemeSettingsOpen(true)}
       />
       
+      <ThemeSettings opened={isThemeSettingsOpen} onClose={() => setIsThemeSettingsOpen(false)} />
+
       <div className="layout-body">
         {/* 2. Sidebar (Collapsible) */}
         {isSidebarOpen && <Sidebar />}

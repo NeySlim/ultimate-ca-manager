@@ -1,27 +1,27 @@
 .ca-create-page {
-  background: #1a1a1a;
+  background: var(--bg-app);
 }
 
 .wizard-widget {
-    background: #1e1e1e;
-    border: 1px solid #333;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 32px;
 }
 
 .radio-card {
-    background: #252525;
-    border-color: #333;
+    background: var(--bg-element);
+    border-color: var(--border-color);
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .radio-card:hover {
-    background: #2a2a2a;
-    border-color: #444;
+    background: var(--bg-element-hover);
+    border-color: var(--border-color);
 }
 
 .radio-card.selected {
     border-color: var(--accent-primary);
-    background: rgba(90, 143, 199, 0.1);
+    background: var(--mantine-color-blue-light);
 }

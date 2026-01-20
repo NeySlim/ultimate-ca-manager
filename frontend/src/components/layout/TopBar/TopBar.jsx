@@ -1,143 +1,133 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   SidebarSimple, 
   House, 
   MagnifyingGlass, 
   Moon, 
+  Sun,
   Bell, 
   Gear, 
   CaretDown,
-  SquaresFour,
   ListDashes,
+  Rows,
   PencilSimple
 } from '@phosphor-icons/react';
-import { useView } from '../../../core/context/ViewContext';
+import { useTheme } from '../../../contexts/ThemeContext';
+import LogoIcon from '../../../assets/logo-chain-icon.svg';
 
-const TopBar = ({ isSidebarOpen, toggleSidebar, isDetailsOpen, toggleDetails }) => {
-  const { viewMode, setViewMode } = useView();
+const TopBar = ({ isSidebarOpen, toggleSidebar, isDetailsOpen, toggleDetails, openThemeSettings }) => {
+  const { density, setDensity, colorScheme, setColorScheme } = useTheme();
+  const navigate = useNavigate();
+
+  const toggleColorScheme = () => {
+    setColorScheme(colorScheme === 'dark' ? 'light' : 'dark');
+  };
 
   return (
     <div className="topbar">
       
       {/* 1. LEFT: Logo + Nav */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="actions-group" style={{ marginRight: 'auto' }}>
         {/* Logo */}
-        <div style={{ 
-          display: 'flex', alignItems: 'center', gap: '8px', 
-          fontWeight: 700, fontSize: '14px', color: '#c1c2c5', 
-          paddingRight: '12px', borderRight: '1px solid #373a40' 
-        }}>
-          <i className="ph-fill ph-link" style={{ fontSize: '18px', color: '#5a8fc7' }}></i>
+        <div 
+          onClick={() => navigate('/')}
+          style={{ 
+            display: 'flex', alignItems: 'center', gap: '8px', 
+            fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)', 
+            paddingRight: '12px', borderRight: '1px solid var(--border-color)',
+            cursor: 'pointer'
+          }}
+        >
+          <img src={LogoIcon} alt="UCM Logo" style={{ width: '20px', height: '20px' }} />
           UCM
         </div>
 
         {/* Sidebar Toggle */}
         <button 
+          className="nav-btn"
           onClick={toggleSidebar}
-          style={{ 
-            background: 'none', border: 'none', color: isSidebarOpen ? '#5a8fc7' : '#909296', 
-            cursor: 'pointer', display: 'flex' 
-          }}
           title="Toggle Sidebar"
         >
-          <SidebarSimple size={18} weight={isSidebarOpen ? "fill" : "regular"} />
+          <SidebarSimple weight={isSidebarOpen ? "fill" : "regular"} />
         </button>
 
         {/* Breadcrumbs */}
-        <div style={{ display: 'flex', alignItems: 'center', fontSize: '13px', fontWeight: 500, color: '#909296' }}>
-           <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '2px 4px', borderRadius: '3px' }}>
-             <House size={14} style={{ marginRight: '4px' }} /> Home
+        <div className="breadcrumb">
+           <div 
+             className="breadcrumb-item" 
+             onClick={() => navigate('/')}
+           >
+             <House size={14} /> Home
            </div>
-           <span style={{ margin: '0 4px', opacity: 0.4 }}>/</span>
-           <div style={{ color: '#c1c2c5' }}>Dashboard</div>
+           <span className="breadcrumb-sep">/</span>
+           <div className="breadcrumb-item active">Dashboard</div>
         </div>
       </div>
 
       {/* 2. CENTER: Command Palette */}
       <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 20px' }}>
-         <div style={{ 
-           width: '100%', maxWidth: '480px', height: '30px', 
-           backgroundColor: '#1A1B1E', border: '1px solid #373a40', borderRadius: '3px',
-           display: 'flex', alignItems: 'center', padding: '0 8px', color: '#909296', fontSize: '12px'
-         }}>
+         <div className="command-palette">
             <MagnifyingGlass size={14} />
             <input 
               type="text" 
               placeholder="Search resources..." 
-              style={{ 
-                background: 'none', border: 'none', color: 'inherit', flex: 1, 
-                marginLeft: '8px', outline: 'none', fontSize: '12px' 
-              }} 
             />
-            <span style={{ 
-              background: '#2c2e33', border: '1px solid #373a40', borderRadius: '2px', 
-              padding: '1px 4px', fontSize: '10px', fontFamily: 'JetBrains Mono' 
-            }}>Ctrl+K</span>
+            <span className="command-shortcut">Ctrl+K</span>
          </div>
       </div>
 
       {/* 3. RIGHT: Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div className="actions-group" style={{ marginLeft: 'auto' }}>
         
-        {/* View Toggles */}
-        <div style={{ display: 'flex', background: '#2c2e33', borderRadius: '3px', padding: '2px', marginRight: '8px' }}>
+        {/* View Toggles (Density) */}
+        <div className="view-toggle-group">
            <button 
-             onClick={() => setViewMode('list')}
-             style={{ 
-               background: viewMode === 'list' ? '#373a40' : 'none', border: 'none', borderRadius: '2px',
-               color: viewMode === 'list' ? '#c1c2c5' : '#909296', cursor: 'pointer', padding: '2px 4px' 
-             }}
+             className={`view-toggle-btn ${density === 'normal' ? 'active' : ''}`}
+             onClick={() => setDensity('normal')}
+             title="Normal Density"
            >
-             <ListDashes size={18} />
+             <Rows size={16} />
            </button>
            <button 
-             onClick={() => setViewMode('grid')}
-             style={{ 
-                background: viewMode === 'grid' ? '#373a40' : 'none', border: 'none', borderRadius: '2px',
-                color: viewMode === 'grid' ? '#c1c2c5' : '#909296', cursor: 'pointer', padding: '2px 4px' 
-             }}
+             className={`view-toggle-btn ${density === 'compact' ? 'active' : ''}`}
+             onClick={() => setDensity('compact')}
+             title="Compact Density"
            >
-             <SquaresFour size={18} />
+             <ListDashes size={16} />
            </button>
         </div>
 
         {/* Layout Edit */}
-        <button style={{ 
-            background: 'none', border: '1px solid #373a40', color: '#909296', borderRadius: '3px', 
-            padding: '4px 10px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', marginRight: '8px'
-        }}>
+        <button className="btn" style={{ height: 'var(--control-height)', fontSize: 'var(--font-size-control)' }}>
             <PencilSimple size={14} /> Edit Layout
         </button>
 
-        <div style={{ width: '1px', height: '20px', backgroundColor: '#373a40', margin: '0 4px' }}></div>
+        <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border-color)' }}></div>
 
-        <button style={{ background: 'none', border: 'none', color: '#909296', cursor: 'pointer' }}>
-           <SidebarSimple size={18} weight={isDetailsOpen ? "fill" : "regular"} style={{ transform: 'rotate(180deg)' }} onClick={toggleDetails} />
+        <button className="action-btn" onClick={toggleDetails} title="Toggle Details">
+           <SidebarSimple weight={isDetailsOpen ? "fill" : "regular"} style={{ transform: 'rotate(180deg)' }} />
         </button>
         
-        <button style={{ background: 'none', border: 'none', color: '#909296', cursor: 'pointer' }}>
-           <Moon size={18} />
+        <button className="action-btn" onClick={toggleColorScheme} title="Toggle Theme">
+           {colorScheme === 'dark' ? <Moon weight="fill" /> : <Sun weight="fill" />}
         </button>
 
-        <button style={{ background: 'none', border: 'none', color: '#909296', cursor: 'pointer' }}>
-           <Bell size={18} />
+        <button className="action-btn">
+           <Bell />
         </button>
 
-        <button style={{ background: 'none', border: 'none', color: '#909296', cursor: 'pointer' }}>
-           <Gear size={18} />
+        <button className="action-btn" onClick={openThemeSettings}>
+           <Gear />
         </button>
 
-        <div style={{ width: '1px', height: '20px', backgroundColor: '#373a40', margin: '0 4px' }}></div>
+        <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border-color)' }}></div>
 
         {/* User Profile */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '2px 4px', borderRadius: '3px' }}>
-           <div style={{ 
-             width: '24px', height: '24px', background: 'linear-gradient(135deg, #5a8fc7, #7aa5d9)', 
-             borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-             fontSize: '11px', fontWeight: 600, color: 'white' 
-           }}>AD</div>
-           <div style={{ fontSize: '13px', fontWeight: 500, color: '#c1c2c5' }}>Admin</div>
-           <CaretDown size={12} color="#909296" />
+        <div className="user-menu">
+           <div className="user-avatar">AD</div>
+           <div className="user-name">Admin</div>
+           <CaretDown size={12} color="var(--text-secondary)" />
         </div>
 
       </div>

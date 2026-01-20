@@ -11,20 +11,20 @@
   align-items: center;
   margin-bottom: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #373a40;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .activity-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #e8e8e8;
+  color: var(--text-primary);
 }
 
 .activity-table-wrapper {
   flex: 1;
   overflow-x: auto;
-  border: 1px solid #373a40;
+  border: 1px solid var(--border-color);
   border-radius: 3px;
 }
 
@@ -35,8 +35,8 @@
 }
 
 .activity-table thead {
-  background-color: #1a1b1e;
-  border-bottom: 1px solid #373a40;
+  background-color: var(--bg-app);
+  border-bottom: 1px solid var(--border-color);
   position: sticky;
   top: 0;
 }
@@ -45,19 +45,19 @@
   padding: 8px 12px;
   text-align: left;
   font-weight: 600;
-  color: #909296;
+  color: var(--text-secondary);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .activity-table tbody tr {
-  border-bottom: 1px solid #373a40;
+  border-bottom: 1px solid var(--border-color);
   transition: background-color 0.2s ease;
 }
 
 .activity-table tbody tr:hover {
-  background-color: #25262b;
+  background-color: var(--bg-panel);
 }
 
 .activity-table tbody tr:last-child {
@@ -66,7 +66,7 @@
 
 .activity-table td {
   padding: 10px 12px;
-  color: #c1c2c5;
+  color: var(--text-primary);
 }
 
 .activity-badge {
@@ -80,7 +80,7 @@
 }
 
 .activity-action {
-  color: #c1c2c5;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -91,7 +91,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #c1c2c5;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -101,40 +101,40 @@
 .subject-icon {
   display: flex;
   align-items: center;
-  color: #909296;
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
 .activity-time {
-  color: #5c5f66;
+  color: var(--text-muted);
   font-size: 11px;
   text-align: right;
   white-space: nowrap;
 }
 
 .activity-row.activity-issue .activity-badge {
-  background-color: rgba(129, 199, 132, 0.15);
-  color: #81c784;
+  background-color: var(--mantine-color-green-light);
+  color: var(--mantine-color-green-6);
 }
 
 .activity-row.activity-revoke .activity-badge {
-  background-color: rgba(229, 115, 115, 0.15);
-  color: #e57373;
+  background-color: var(--mantine-color-red-light);
+  color: var(--mantine-color-red-6);
 }
 
 .activity-row.activity-renew .activity-badge {
-  background-color: rgba(255, 183, 77, 0.15);
-  color: #ffb74d;
+  background-color: var(--mantine-color-orange-light);
+  color: var(--mantine-color-orange-6);
 }
 
 .activity-row.activity-export .activity-badge {
-  background-color: rgba(100, 181, 246, 0.15);
-  color: #64b5f6;
+  background-color: var(--mantine-color-blue-light);
+  color: var(--mantine-color-blue-6);
 }
 
 .activity-row.activity-update .activity-badge {
-  background-color: rgba(186, 104, 200, 0.15);
-  color: #ba68c8;
+  background-color: var(--mantine-color-grape-light);
+  color: var(--mantine-color-grape-6);
 }
 
 .activity-footer {
@@ -143,11 +143,11 @@
   align-items: center;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #373a40;
+  border-top: 1px solid var(--border-color);
 }
 
 .activity-link {
-  color: #5a8fc7;
+  color: var(--accent-primary);
   text-decoration: none;
   font-size: 12px;
   font-weight: 500;
@@ -155,6 +155,6 @@
 }
 
 .activity-link:hover {
-  color: #7aa5d9;
+  color: var(--accent-hover);
   text-decoration: underline;
 }

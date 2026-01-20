@@ -40,7 +40,7 @@ const PreviewPanel = () => {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 0 24px 0', borderBottom: '1px solid #373a40', marginBottom: '16px' }}>
              <div style={{ 
                width: '64px', height: '64px', fontSize: '24px', marginBottom: '12px',
-               background: 'linear-gradient(135deg, #5a8fc7, #7aa5d9)', borderRadius: '3px',
+               background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', borderRadius: '3px',
                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'
              }}>
                {selectedItem.avatar || selectedItem.name?.substring(0,2).toUpperCase() || 'IT'}

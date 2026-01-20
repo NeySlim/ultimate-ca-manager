@@ -4,18 +4,18 @@
 .login-wrapper {
   --accent-gradient-start: #5a8fc7;
   --accent-gradient-end: #7aa5d9;
-  --bg-secondary: #1e1e1e;
-  --border-primary: #333;
+  --bg-secondary: var(--bg-panel);
+  --border-primary: var(--border-color);
   --border-secondary: #3a3a3a;
-  --text-tertiary: #888;
+  --text-tertiary: var(--text-secondary);
   --radius: 3px;
   
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #1a1a1a;
-  color: #e8e8e8;
+  background: var(--bg-app);
+  color: var(--text-primary);
   font-family: 'Inter', -apple-system, sans-serif;
 }
 
@@ -82,7 +82,7 @@
 
 .auth-status-text {
   font-size: 15px;
-  color: #e8e8e8;
+  color: var(--text-primary);
   margin-bottom: 4px;
 }
 
@@ -124,10 +124,10 @@
   width: 100%;
   height: 40px;
   padding: 0 12px 0 40px; /* Left padding for icon */
-  background: #2a2a2a;
+  background: var(--bg-element);
   border: 1px solid var(--border-secondary);
   border-radius: var(--radius);
-  color: #e8e8e8;
+  color: var(--text-primary);
   font-size: 14px;
   font-family: inherit;
   transition: all 0.2s;
@@ -182,8 +182,8 @@
   width: 100%;
   height: 40px;
   padding: 0 16px;
-  background: #333;
-  border: 1px solid #444;
+  background: var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius);
   color: #ccc;
   font-size: 14px;

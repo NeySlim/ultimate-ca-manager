@@ -7,17 +7,44 @@
   /* Accent Colors from phosphor-gradients.html */
   --accent-primary: #5a8fc7;
   --accent-secondary: #7aa5d9;
+  --accent-hover: #4a7ab5;
   --accent-gradient-start: #5a8fc7;
   --accent-gradient-end: #7aa5d9;
+
+  /* Default Theme Variables (Dark Mode Fallback) */
+  --bg-app: #1a1b1e;
+  --bg-panel: #25262b;
+  --bg-surface: #141517;
+  --bg-element: #2c2e33;
+  --bg-element-hover: #373a40;
+  --border-color: #373a40;
+  --text-primary: #c1c2c5;
+  --text-secondary: #909296;
+  --text-muted: #5c5f66;
+  
+  /* Default Density Variables (Fallback) */
+  --control-height: 28px;
+  --control-padding-x: 12px;
+  --control-radius: 3px;
+  --font-size-control: 13px;
+  --table-spacing: 8px;
+  --table-font-size: 13px;
+  --icon-size: 16px;
+
+  /* Mantine Overrides to prevent black text */
+  --mantine-color-text: var(--text-primary);
+  --mantine-color-body: var(--bg-app);
+  --mantine-color-black: var(--text-primary);
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #1a1a1a;
-  color: #e0e0e0;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
   margin: 0;
   padding: 0;
   overflow: hidden; /* App-like feel */
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Phosphor Icon Gradients */
@@ -45,4 +72,150 @@ body {
   border-color: var(--accent-primary);
   background: linear-gradient(135deg, rgba(90, 143, 199, 0.1), rgba(122, 165, 217, 0.1));
   color: var(--accent-primary);
+}
+
+/* --- Global Buttons & Controls (Reference Design) --- */
+/* Base Button - Dynamic Height based on Density */
+.btn {
+  height: var(--control-height);
+  padding: 0 var(--control-padding-x);
+  border-radius: var(--control-radius);
+  font-size: var(--font-size-control);
+  font-weight: 500;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-element);
+  color: var(--text-primary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.btn:hover:not(:disabled) {
+  background-color: var(--bg-element-hover);
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Primary Button */
+.btn-primary {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: #fff;
+}
+
+/* Tool Button (Icon only or Icon+Text, used in toolbars) */
+.btn-tool {
+  height: var(--control-height);
+  padding: 0 8px;
+  background-color: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  border-radius: var(--control-radius);
+}
+
+.btn-tool:hover {
+  background-color: var(--bg-element-hover);
+  color: var(--text-primary);
+}
+
+.btn-tool.active {
+  background-color: rgba(90, 143, 199, 0.15);
+  color: var(--accent-primary);
+}
+
+/* Input Fields (Global) */
+input[type="text"], 
+input[type="password"], 
+input[type="email"], 
+select, 
+textarea {
+  height: var(--control-height);
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-color);
+  border-radius: var(--control-radius);
+  color: var(--text-primary);
+  font-size: var(--font-size-control);
+  padding: 0 var(--control-padding-x);
+  font-family: var(--font-sans);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+/* Mantine Overrides to match Global Design */
+.mantine-Button-root {
+  height: var(--control-height) !important;
+  border-radius: var(--control-radius) !important;
+  font-size: var(--font-size-control) !important;
+}
+
+.mantine-Badge-root {
+  border-radius: var(--control-radius) !important;
+  text-transform: none !important;
+}
+
+.mantine-SegmentedControl-root {
+  background-color: var(--bg-element) !important;
+  border-radius: var(--control-radius) !important;
+  padding: 2px !important;
+}
+
+.mantine-SegmentedControl-control {
+  border-radius: var(--control-radius) !important;
+}
+
+.mantine-SegmentedControl-label {
+  font-size: var(--font-size-control) !important;
+  padding: 2px 8px !important;
+}
+
+.mantine-Modal-content {
+  background-color: var(--bg-panel) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important; /* Modals can be slightly rounder */
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+.mantine-Modal-header {
+  background-color: var(--bg-panel) !important;
+  padding: 12px 16px !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  min-height: auto !important;
+}
+
+.mantine-Modal-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+.mantine-Modal-close {
+  color: var(--text-secondary) !important;
+}
+.mantine-Modal-close:hover {
+  background-color: var(--bg-element-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Table Overrides for Density */
+.mantine-Table-td, .mantine-Table-th {
+  padding: var(--table-spacing) !important;
+  font-size: var(--table-font-size) !important;
 }

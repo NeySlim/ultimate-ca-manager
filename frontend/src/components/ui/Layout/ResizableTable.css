@@ -5,17 +5,17 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background: #1a1a1a;
-  border: 1px solid #333;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
   border-radius: 4px; /* Optional: standard layout borders */
 }
 
 /* Header */
 .rt-header {
   display: flex;
-  background: #242424;
-  border-bottom: 1px solid #333;
-  height: 40px; /* Standard height */
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+  height: calc(var(--control-height) + 12px); /* Scale header with density */
   flex-shrink: 0;
   overflow-x: hidden; /* Hide header scrollbar, syncs with body via width */
 }
@@ -24,11 +24,11 @@
   position: relative;
   display: flex;
   align-items: center;
-  padding: 0 12px;
+  padding: 0 var(--control-padding-x);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  color: #888;
+  color: var(--text-secondary);
   letter-spacing: 0.5px;
   user-select: none;
   border-right: 1px solid transparent; /* Placeholder for separators */
@@ -36,8 +36,8 @@
 }
 
 .rt-th:hover {
-  color: #e8e8e8;
-  background-color: #2a2a2a;
+  color: var(--text-primary);
+  background-color: var(--bg-element-hover);
 }
 
 .rt-th-content {
@@ -62,12 +62,12 @@
 
 .rt-resize-handle:hover,
 .rt-resize-handle.active {
-  background: #4a9eff; /* Accent color */
+  background: var(--accent-primary); /* Accent color */
 }
 
 /* Separator line visualization on hover */
 .rt-th:hover .rt-resize-handle {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-color);
 }
 
 /* Body */
@@ -75,29 +75,29 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: auto; /* Allow horizontal scroll if cols are wide */
-  background: #1a1a1a;
+  background: var(--bg-surface);
 }
 
 .rt-row {
   display: flex;
-  border-bottom: 1px solid #242424;
+  border-bottom: 1px solid var(--border-color);
   transition: background 0.15s ease;
   cursor: pointer;
   min-width: max-content; /* Ensure row takes full width of columns */
 }
 
 .rt-row:hover {
-  background: #242424;
+  background: var(--bg-element-hover);
 }
 
 .rt-row.selected {
-  background: rgba(74, 158, 255, 0.1); /* Accent faint */
+  background: rgba(90, 143, 199, 0.1); /* Accent faint - consider variable for rgb */
 }
 
 .rt-td {
-  padding: 8px 12px;
-  font-size: 13px;
-  color: #e8e8e8;
+  padding: var(--table-spacing) var(--control-padding-x);
+  font-size: var(--table-font-size);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   white-space: nowrap;
@@ -109,7 +109,7 @@
 .rt-empty {
   padding: 40px;
   text-align: center;
-  color: #666;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -120,24 +120,24 @@
 }
 
 .rt-body::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: var(--bg-surface);
 }
 
 .rt-body::-webkit-scrollbar-thumb {
-  background: #333;
+  background: var(--border-color);
   border-radius: 5px;
-  border: 2px solid #1a1a1a;
+  border: 2px solid var(--bg-surface);
 }
 
 .rt-body::-webkit-scrollbar-thumb:hover {
-  background: #444;
+  background: var(--text-muted);
 }
 
-/* Density Compact Override (if needed via class) */
+/* Density Compact Override (if needed via class, now redundant but kept safe) */
 .resizable-table-container.compact .rt-header {
-  height: 32px;
+  height: calc(var(--control-height) + 8px);
 }
 .resizable-table-container.compact .rt-td {
-  padding: 4px 12px;
-  font-size: 12px;
+  padding: var(--table-spacing) var(--control-padding-x);
+  font-size: var(--table-font-size);
 }

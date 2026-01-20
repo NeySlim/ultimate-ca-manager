@@ -164,7 +164,7 @@ const LoginPage = () => {
                     </div>
 
                     <div className="form-checkbox-group">
-                        <input type="checkbox" id="remember" style={{ accentColor: '#5a8fc7' }} />
+                        <input type="checkbox" id="remember" style={{ accentColor: 'var(--accent-primary)' }} />
                         <label htmlFor="remember" style={{ fontSize: '13px', color: '#ccc' }}>Remember me</label>
                     </div>
 

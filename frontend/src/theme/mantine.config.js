@@ -1,4 +1,5 @@
 import { colorPalettes } from './colors';
+import { rem } from '@mantine/core';
 
 export const createMantineTheme = (palette, density) => {
   const selectedPalette = colorPalettes[palette] || colorPalettes.teal;
@@ -50,6 +51,9 @@ export const createMantineTheme = (palette, density) => {
         styles: {
           root: {
             fontWeight: 500,
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-primary)',
+            backgroundColor: 'var(--bg-element)',
           },
         },
       },
@@ -57,16 +61,80 @@ export const createMantineTheme = (palette, density) => {
         styles: {
           root: {
             fontSize: fontSizes.sm,
+            color: 'var(--text-primary)',
+            backgroundColor: 'var(--bg-panel)',
           },
+          th: {
+            color: 'var(--text-secondary)',
+            backgroundColor: 'var(--bg-element)',
+            borderBottom: '1px solid var(--border-color)',
+          },
+          td: {
+            borderBottom: '1px solid var(--border-color)',
+          },
+          tr: {
+            '&:hover': {
+              backgroundColor: 'var(--bg-element-hover)',
+            }
+          }
         },
       },
       Card: {
         styles: {
           root: {
             borderRadius: radius.md,
+            backgroundColor: 'var(--bg-panel)',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-primary)',
           },
         },
       },
+      TextInput: {
+        styles: {
+          input: {
+            backgroundColor: 'var(--bg-app)',
+            borderColor: 'var(--border-color)',
+            color: 'var(--text-primary)',
+          }
+        }
+      },
+      Select: {
+        styles: {
+          input: {
+            backgroundColor: 'var(--bg-app)',
+            borderColor: 'var(--border-color)',
+            color: 'var(--text-primary)',
+          },
+          dropdown: {
+            backgroundColor: 'var(--bg-panel)',
+            borderColor: 'var(--border-color)',
+          },
+          option: {
+            color: 'var(--text-primary)',
+            '&:hover': {
+              backgroundColor: 'var(--bg-element-hover)',
+            }
+          }
+        }
+      },
+      Tabs: {
+        styles: {
+          tab: {
+            color: 'var(--text-secondary)',
+            '&[data-active]': {
+              color: 'var(--text-primary)',
+              borderColor: 'var(--accent-primary)',
+            },
+            '&:hover': {
+              backgroundColor: 'var(--bg-element-hover)',
+              color: 'var(--text-primary)',
+            }
+          },
+          list: {
+            borderColor: 'var(--border-color)',
+          }
+        }
+      }
     },
   };
 };

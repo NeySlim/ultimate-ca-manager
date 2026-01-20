@@ -51,14 +51,14 @@ const LogWidget = ({
   const getLevelColor = (level) => {
     switch (level) {
       case 'error':
-        return '#e57373';
+        return 'var(--mantine-color-red-6)';
       case 'warning':
-        return '#ffb74d';
+        return 'var(--mantine-color-orange-6)';
       case 'success':
-        return '#81c784';
+        return 'var(--mantine-color-green-6)';
       case 'info':
       default:
-        return '#64b5f6';
+        return 'var(--mantine-color-blue-6)';
     }
   };
 

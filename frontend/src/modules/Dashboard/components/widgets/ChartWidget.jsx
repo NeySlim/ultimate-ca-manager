@@ -35,7 +35,7 @@ const ChartWidget = ({
         <h3 className="chart-title">{title}</h3>
         <div className="chart-legend">
           <span className="legend-item">
-            <span className="legend-color" style={{ backgroundColor: '#5a8fc7' }}></span>
+            <span className="legend-color" style={{ backgroundColor: 'var(--accent-primary)' }}></span>
             Total
           </span>
         </div>

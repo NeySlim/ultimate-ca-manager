@@ -34,24 +34,24 @@ const StatusWidget = ({
   const getStatusIcon = (componentStatus) => {
     switch (componentStatus) {
       case 'error':
-        return { icon: '●', color: '#e57373', label: 'Error' };
+        return { icon: '●', statusClass: 'status-error', label: 'Error' };
       case 'warning':
-        return { icon: '●', color: '#ffb74d', label: 'Warning' };
+        return { icon: '●', statusClass: 'status-warning', label: 'Warning' };
       case 'healthy':
       default:
-        return { icon: '●', color: '#81c784', label: 'Healthy' };
+        return { icon: '●', statusClass: 'status-healthy', label: 'Healthy' };
     }
   };
 
   const getOverallStatus = () => {
     switch (statusData.overall) {
       case 'error':
-        return { icon: '✗', color: '#e57373', label: 'Critical', bg: '#2e1e1e' };
+        return { icon: '✗', statusClass: 'status-error', label: 'Critical' };
       case 'warning':
-        return { icon: '⚠', color: '#ffb74d', label: 'Warning', bg: '#2e2620' };
+        return { icon: '⚠', statusClass: 'status-warning', label: 'Warning' };
       case 'healthy':
       default:
-        return { icon: '✓', color: '#81c784', label: 'Healthy', bg: '#1e2e22' };
+        return { icon: '✓', statusClass: 'status-healthy', label: 'Healthy' };
     }
   };
 
@@ -64,16 +64,13 @@ const StatusWidget = ({
       </div>
 
       {/* Overall Status Card */}
-      <div 
-        className="status-overall"
-        style={{ backgroundColor: overall.bg, borderColor: overall.color }}
-      >
-        <div className="overall-icon" style={{ color: overall.color }}>
+      <div className={`status-overall ${overall.statusClass}`}>
+        <div className="overall-icon">
           <Pulse size={24} weight="bold" />
         </div>
         <div className="overall-content">
           <div className="overall-label">Overall Status</div>
-          <div className="overall-value" style={{ color: overall.color }}>
+          <div className="overall-value">
             {overall.label}
           </div>
         </div>
@@ -86,10 +83,7 @@ const StatusWidget = ({
           return (
             <div key={index} className="status-component">
               <div className="component-info">
-                <div 
-                  className="component-status-dot"
-                  style={{ color: compStatus.color }}
-                >
+                <div className={`component-status-dot ${compStatus.statusClass}`}>
                   {compStatus.icon}
                 </div>
                 <div className="component-details">
@@ -100,13 +94,7 @@ const StatusWidget = ({
                   </div>
                 </div>
               </div>
-              <div 
-                className="component-badge"
-                style={{ 
-                  backgroundColor: `${compStatus.color}20`,
-                  color: compStatus.color
-                }}
-              >
+              <div className={`component-badge ${compStatus.statusClass}`}>
                 {compStatus.label}
               </div>
             </div>

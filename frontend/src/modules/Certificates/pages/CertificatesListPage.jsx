@@ -88,20 +88,18 @@ const CertificatesListPage = () => {
       />
 
       {/* 2. Content (Standard Grid Layout) */}
-      <div className="certificates-content" style={{ flex: 1 }}>
-        <Grid>
-           {/* Full Width Widget for Table */}
-           <Widget className="widget-full" style={{ height: 'calc(100vh - 120px)' }}>
-              <CertificateTable
-                data={certificates}
-                onRowClick={handleRowClick}
-                onView={handleViewDetails}
-                onDownload={handleDownload}
-                onDelete={handleDelete}
-              />
-           </Widget>
-        </Grid>
-      </div>
+      <Grid style={{ flex: 1, padding: '16px' }}>
+         {/* Full Width Widget for Table */}
+         <Widget className="widget-full" style={{ height: '100%', padding: 0, overflow: 'hidden' }}>
+            <CertificateTable
+              data={certificates}
+              onRowClick={handleRowClick}
+              onView={handleViewDetails}
+              onDownload={handleDownload}
+              onDelete={handleDelete}
+            />
+         </Widget>
+      </Grid>
     </div>
   );
 };

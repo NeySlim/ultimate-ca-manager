@@ -22,69 +22,8 @@ import {
 } from '@phosphor-icons/react';
 import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
+import { caService } from '../services/ca.service';
 import './CATreePage.css';
-
-// Mock Data
-const MOCK_CAS = [
-  {
-    id: 1,
-    name: 'Root CA - UCM Global',
-    type: 'Root CA',
-    status: 'Active',
-    certs: 124,
-    expiry: '2035-01-01',
-    children: [
-      {
-        id: 2,
-        name: 'Intermediate CA - Web Server',
-        type: 'Intermediate',
-        status: 'Active',
-        certs: 45,
-        expiry: '2030-01-01',
-        children: []
-      },
-      {
-        id: 3,
-        name: 'Intermediate CA - VPN Access',
-        type: 'Intermediate',
-        status: 'Active',
-        certs: 78,
-        expiry: '2030-01-01',
-        children: []
-      }
-    ]
-  },
-  {
-    id: 4,
-    name: 'Root CA - Legacy 2020',
-    type: 'Root CA',
-    status: 'Expired',
-    certs: 12,
-    expiry: '2025-01-01',
-    children: []
-  }
-];
-
-const MOCK_ORPHANS = [
-  {
-    id: 101,
-    name: 'Imported Intermediate CA',
-    type: 'Intermediate',
-    status: 'Active',
-    certs: 5,
-    expiry: '2028-05-15',
-    issuer: 'External Root CA G2'
-  },
-  {
-    id: 102,
-    name: 'Old Dev Intermediate',
-    type: 'Intermediate',
-    status: 'Revoked',
-    certs: 0,
-    expiry: '2024-12-31',
-    issuer: 'Unknown'
-  }
-];
 
 // Flatten tree for table display
 const flattenTree = (nodes, expandedIds, level = 0) => {
@@ -101,12 +40,36 @@ const flattenTree = (nodes, expandedIds, level = 0) => {
 const CATreePage = () => {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState([1]); // Expand first root by default
-  const [data, setData] = useState([]);
+  const [treeData, setTreeData] = useState([]);
+  const [orphansData, setOrphansData] = useState([]);
+  const [flatData, setFlatData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('hierarchy');
 
+  // Fetch Data
   useEffect(() => {
-    setData(flattenTree(MOCK_CAS, expanded));
-  }, [expanded]);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [hierarchy, orphans] = await Promise.all([
+          caService.getHierarchy(),
+          caService.getOrphans()
+        ]);
+        setTreeData(hierarchy);
+        setOrphansData(orphans);
+      } catch (error) {
+        console.error("Failed to fetch CAs", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Recalculate flat data when tree or expansion changes
+  useEffect(() => {
+    setFlatData(flattenTree(treeData, expanded));
+  }, [expanded, treeData]);
 
   const toggleExpand = (id) => {
     setExpanded(prev => 
@@ -121,7 +84,7 @@ const CATreePage = () => {
       width: 300,
       minWidth: 200,
       render: (row) => (
-        <div style={{ display: 'flex', alignItems: 'center', paddingLeft: row.level * 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', paddingLeft: `calc(var(--control-height) * ${row.level})` }}>
           {/* Toggle Button */}
           {row.children && row.children.length > 0 ? (
             <ActionIcon 
@@ -133,12 +96,12 @@ const CATreePage = () => {
               {expanded.includes(row.id) ? <CaretDown /> : <CaretRight />}
             </ActionIcon>
           ) : (
-            <span style={{ width: 22 }} />
+            <span style={{ width: 'var(--control-height)', display: 'inline-block' }} />
           )}
 
           {/* Icon */}
           {row.type === 'Root CA' ? 
-            <ShieldCheck size={18} weight="fill" color="#e8b339" style={{ marginRight: 8 }} /> : 
+            <ShieldCheck size={18} weight="fill" color="var(--mantine-color-yellow-6)" style={{ marginRight: 8 }} /> : 
             <Certificate size={18} color="var(--accent-primary)" style={{ marginRight: 8 }} />
           }
           
@@ -267,7 +230,7 @@ const CATreePage = () => {
       <Grid style={{ flex: 1, padding: '16px' }}>
         <Widget className="col-12" style={{ padding: 0, overflow: 'hidden', height: '100%' }}>
             <Tabs value={activeTab} onChange={setActiveTab} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '0 16px', borderBottom: '1px solid #333' }}>
+                <div style={{ padding: '0 16px', borderBottom: '1px solid var(--border-color)' }}>
                     <Tabs.List style={{ borderBottom: 'none' }}>
                         <Tabs.Tab value="hierarchy" leftSection={<TreeView size={16} />}>
                             Hierarchy
@@ -282,14 +245,14 @@ const CATreePage = () => {
                     <Tabs.Panel value="hierarchy" style={{ height: '100%' }}>
                         <ResizableTable 
                             columns={columnsTree}
-                            data={data}
+                            data={flatData}
                             onRowClick={(row) => console.log('Clicked', row)}
                         />
                     </Tabs.Panel>
                     <Tabs.Panel value="orphans" style={{ height: '100%' }}>
                         <ResizableTable 
                             columns={columnsOrphans}
-                            data={MOCK_ORPHANS}
+                            data={orphansData}
                             onRowClick={(row) => console.log('Clicked orphan', row)}
                             emptyMessage="No orphan intermediate CAs found"
                         />

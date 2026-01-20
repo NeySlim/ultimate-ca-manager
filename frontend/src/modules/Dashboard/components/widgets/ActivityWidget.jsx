@@ -33,17 +33,17 @@ const ActivityWidget = ({
   const getActionColor = (type) => {
     switch (type) {
       case 'issue':
-        return '#81c784';
+        return 'var(--mantine-color-green-6)';
       case 'revoke':
-        return '#e57373';
+        return 'var(--mantine-color-red-6)';
       case 'renew':
-        return '#ffb74d';
+        return 'var(--mantine-color-orange-6)';
       case 'export':
-        return '#64b5f6';
+        return 'var(--mantine-color-blue-6)';
       case 'update':
-        return '#ba68c8';
+        return 'var(--mantine-color-grape-6)';
       default:
-        return '#909296';
+        return 'var(--mantine-color-gray-6)';
     }
   };
 

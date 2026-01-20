@@ -8,14 +8,14 @@
 .status-header {
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #373a40;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .status-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #e8e8e8;
+  color: var(--text-primary);
 }
 
 .status-overall {
@@ -28,12 +28,32 @@
   margin-bottom: 16px;
 }
 
+/* Status Classes */
+.status-overall.status-healthy {
+  background-color: var(--mantine-color-green-light);
+  border-color: var(--mantine-color-green-6);
+  color: var(--mantine-color-green-6);
+}
+
+.status-overall.status-warning {
+  background-color: var(--mantine-color-orange-light);
+  border-color: var(--mantine-color-orange-6);
+  color: var(--mantine-color-orange-6);
+}
+
+.status-overall.status-error {
+  background-color: var(--mantine-color-red-light);
+  border-color: var(--mantine-color-red-6);
+  color: var(--mantine-color-red-6);
+}
+
 .overall-icon {
   font-size: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: inherit;
 }
 
 .overall-content {
@@ -44,7 +64,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #909296;
+  color: var(--text-muted); /* Changed from text-secondary */
   margin-bottom: 2px;
   font-weight: 600;
 }
@@ -52,6 +72,7 @@
 .overall-value {
   font-size: 18px;
   font-weight: 700;
+  color: inherit;
 }
 
 .status-components {
@@ -66,16 +87,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px;
-  background-color: #1a1b1e;
-  border: 1px solid #373a40;
+  padding: var(--table-spacing);
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-color);
   border-radius: 3px;
   transition: all 0.2s ease;
 }
 
 .status-component:hover {
-  background-color: #25262b;
-  border-color: #4a5568;
+  background-color: var(--bg-panel);
+  border-color: var(--mantine-color-gray-5); /* Changed from hex */
 }
 
 .component-info {
@@ -92,6 +113,10 @@
   flex-shrink: 0;
 }
 
+.component-status-dot.status-healthy { color: var(--mantine-color-green-6); }
+.component-status-dot.status-warning { color: var(--mantine-color-orange-6); }
+.component-status-dot.status-error { color: var(--mantine-color-red-6); }
+
 .component-details {
   flex: 1;
   min-width: 0;
@@ -100,7 +125,7 @@
 .component-name {
   font-size: 12px;
   font-weight: 600;
-  color: #c1c2c5;
+  color: var(--text-primary);
   margin-bottom: 2px;
 }
 
@@ -108,7 +133,7 @@
   display: flex;
   gap: 12px;
   font-size: 10px;
-  color: #5c5f66;
+  color: var(--text-muted); /* Changed from hex */
 }
 
 .component-metrics span {
@@ -128,11 +153,26 @@
   flex-shrink: 0;
 }
 
+.component-badge.status-healthy {
+  background-color: var(--mantine-color-green-light);
+  color: var(--mantine-color-green-7);
+}
+
+.component-badge.status-warning {
+  background-color: var(--mantine-color-orange-light);
+  color: var(--mantine-color-orange-7);
+}
+
+.component-badge.status-error {
+  background-color: var(--mantine-color-red-light);
+  color: var(--mantine-color-red-7);
+}
+
 .status-footer {
   display: flex;
   justify-content: center;
   padding-top: 8px;
-  border-top: 1px solid #373a40;
+  border-top: 1px solid var(--border-color);
   font-size: 11px;
-  color: #5c5f66;
+  color: var(--text-muted); /* Changed from hex */
 }
