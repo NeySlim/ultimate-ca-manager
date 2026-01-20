@@ -18,17 +18,14 @@ const CertificateListView = ({ items, onSelect, selectedId }) => {
       />
 
       {/* 2. Content (Standard Grid Layout) */}
-      <div className="certificates-content" style={{ flex: 1 }}>
-        <Grid>
-           {/* Full Width Widget for Table */}
-           <Widget className="widget-full" style={{ height: 'calc(100vh - 120px)' }}>
+      <div className="certificates-content" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, background: 'var(--bg-panel)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               <CertificateTable 
                  data={items} 
                  onRowClick={onSelect}
                  selectedId={selectedId}
               />
-           </Widget>
-        </Grid>
+        </div>
       </div>
     </div>
   );

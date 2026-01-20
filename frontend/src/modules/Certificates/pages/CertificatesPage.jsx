@@ -32,7 +32,15 @@ const CertificatesPage = () => {
   }, []);
 
   const handleSelect = (item) => {
-    setSelectedItem(item);
+    // Enrich item for PreviewPanel
+    const enrichedItem = {
+        ...item,
+        type: 'Certificate',
+        title: item.commonName,
+        subtitle: item.issuer,
+        details: item // Full object for details
+    };
+    setSelectedItem(enrichedItem);
   };
 
   if (loading) {

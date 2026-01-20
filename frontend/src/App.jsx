@@ -10,7 +10,10 @@ import CATreePage from './modules/CAs/pages/CATreePage';
 import CACreatePage from './modules/CAs/pages/CACreatePage';
 import CADetailPage from './modules/CAs/pages/CADetailPage';
 import CSRListPage from './modules/CSRs/pages/CSRListPage';
+import CSRCreatePage from './modules/CSRs/pages/CSRCreatePage';
 import ACMEPage from './modules/ACME/pages/ACMEPage';
+import ACMESettings from './modules/ACME/pages/ACMESettings';
+import ACMEAccounts from './modules/ACME/pages/ACMEAccounts';
 import SCEPPage from './modules/SCEP/pages/SCEPPage';
 import ValidationPage from './modules/Validation/pages/ValidationPage';
 import UsersPage from './modules/Users/pages/UsersPage';
@@ -34,7 +37,10 @@ function App() {
         <Route path="cas/create" element={<CACreatePage />} />
         <Route path="cas/:id" element={<CADetailPage />} />
         <Route path="csrs" element={<CSRListPage />} />
+        <Route path="csrs/create" element={<CSRCreatePage />} />
         <Route path="acme" element={<ACMEPage />} />
+        <Route path="acme/settings" element={<ACMESettings />} />
+        <Route path="acme/accounts" element={<ACMEAccounts />} />
         <Route path="scep" element={<SCEPPage />} />
         <Route path="validation" element={<ValidationPage />} />
         <Route path="users" element={<UsersPage />} />

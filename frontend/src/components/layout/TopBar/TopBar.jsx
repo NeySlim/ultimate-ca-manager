@@ -15,6 +15,7 @@ import {
 } from '@phosphor-icons/react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import LogoIcon from '../../../assets/logo-chain-icon.svg';
+import './TopBar.css';
 
 const TopBar = ({ isSidebarOpen, toggleSidebar, isDetailsOpen, toggleDetails, openThemeSettings }) => {
   const { density, setDensity, colorScheme, setColorScheme } = useTheme();

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Button,
   Group,
@@ -16,43 +16,40 @@ import {
 import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
 import StatWidget from '../../Dashboard/components/widgets/StatWidget';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
+import { AcmeService } from '../services/acme.service';
 import './ACMEPage.css';
 
-// Mock Data
-const MOCK_ACME_STATS = {
-  activeAccounts: 124,
-  ordersToday: 45,
-  errors: 2
-};
-
-const MOCK_ORDERS = [
-  {
-    id: 1,
-    domain: 'api.service.io',
-    account: 'provider-k8s-cluster',
-    status: 'Valid',
-    expires: '2024-06-15',
-    method: 'DNS-01'
-  },
-  {
-    id: 2,
-    domain: 'auth.internal.net',
-    account: 'legacy-server',
-    status: 'Pending',
-    expires: '2024-06-14',
-    method: 'HTTP-01'
-  },
-  {
-    id: 3,
-    domain: 'test.dev.local',
-    account: 'dev-team',
-    status: 'Invalid',
-    expires: '2024-06-10',
-    method: 'DNS-01'
-  }
-];
-
 const ACMEPage = () => {
+  const [stats, setStats] = useState({
+    active_accounts: 0,
+    total_orders: 0,
+    pending_orders: 0,
+    valid_orders: 0,
+    invalid_orders: 0
+  });
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [statsData, ordersData] = await Promise.all([
+        AcmeService.getStats(),
+        AcmeService.getOrders()
+      ]);
+      setStats(statsData);
+      setOrders(ordersData);
+    } catch (error) {
+      console.error("Failed to load ACME data", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const columns = [
     {
       key: 'domain',
@@ -115,7 +112,7 @@ const ACMEPage = () => {
         <div className="widget-1-3">
           <StatWidget
             icon={<Globe size={32} weight="duotone" className="icon-gradient-glow" />}
-            value={MOCK_ACME_STATS.activeAccounts}
+            value={stats.active_accounts}
             label="Active Accounts"
             color="blue"
           />
@@ -123,18 +120,17 @@ const ACMEPage = () => {
         <div className="widget-1-3">
           <StatWidget
             icon={<CheckCircle size={32} weight="duotone" className="icon-gradient-glow" />}
-            value={MOCK_ACME_STATS.ordersToday}
-            label="Orders (24h)"
-            trend={{ value: 5, isPositive: true }}
+            value={stats.total_orders}
+            label="Total Orders"
+            subLabel={`${stats.pending_orders} pending`}
             color="green"
           />
         </div>
         <div className="widget-1-3">
           <StatWidget
             icon={<XCircle size={32} weight="duotone" className="icon-gradient-glow" />}
-            value={MOCK_ACME_STATS.errors}
+            value={stats.invalid_orders}
             label="Failed Challenges"
-            trend={{ value: 1, isPositive: false }}
             color="red"
           />
         </div>
@@ -148,8 +144,9 @@ const ACMEPage = () => {
         >
           <ResizableTable 
             columns={columns}
-            data={MOCK_ORDERS}
+            data={orders}
             onRowClick={(row) => console.log('Clicked order', row)}
+            emptyMessage="No ACME orders found"
           />
         </Widget>
       </Grid>

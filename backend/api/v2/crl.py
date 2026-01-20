@@ -4,7 +4,10 @@ CRL & OCSP Routes v2.0
 
 from flask import Blueprint, request, g
 from auth.unified import require_auth
-from utils.response import success_response
+from utils.response import success_response, error_response
+from models import db, CA, CRL, AuditLog
+from services.crl_service import CRLService
+import datetime
 
 bp = Blueprint('crl_v2', __name__)
 
@@ -13,30 +16,51 @@ bp = Blueprint('crl_v2', __name__)
 @require_auth(['read:crl'])
 def list_crls():
     """List CRLs"""
-    return success_response(data=[])
+    crls = CRL.query.order_by(CRL.updated_at.desc()).all()
+    return success_response(data=[crl.to_dict() for crl in crls])
 
 
 @bp.route('/api/crl/<int:ca_id>', methods=['GET'])
 @require_auth(['read:crl'])
 def get_crl(ca_id):
     """Get CRL for CA"""
-    return success_response(data={'ca_id': ca_id})
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+        
+    crl = CRL.query.filter_by(caref=ca.refid).first()
+    if not crl:
+        return error_response('CRL not found', 404)
+        
+    return success_response(data=crl.to_dict(include_crl=True))
 
 
 @bp.route('/api/crl/<int:ca_id>/regenerate', methods=['POST'])
 @require_auth(['write:crl'])
 def regenerate_crl(ca_id):
     """Force CRL regeneration"""
-    return success_response(
-        data={'ca_id': ca_id, 'regenerated': True},
-        message='CRL regenerated'
-    )
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+        
+    try:
+        CRLService.generate_crl(ca.id, username='current_user') # TODO: get from g.user
+        
+        crl = CRL.query.filter_by(caref=ca.refid).first()
+        
+        return success_response(
+            data=crl.to_dict(),
+            message='CRL regenerated successfully'
+        )
+    except Exception as e:
+        return error_response(f"Failed to regenerate CRL: {str(e)}", 500)
 
 
 @bp.route('/api/ocsp/status', methods=['GET'])
 @require_auth(['read:certificates'])
 def get_ocsp_status():
     """Get OCSP service status"""
+    # Check if OCSP is enabled in SystemConfig (placeholder)
     return success_response(data={
         'enabled': True,
         'running': True
@@ -47,6 +71,8 @@ def get_ocsp_status():
 @require_auth(['read:certificates'])
 def get_ocsp_stats():
     """Get OCSP statistics"""
+    # In a real implementation this would query logs or stats table
+    # For now we don't have OCSP stats tracking in DB
     return success_response(data={
         'total_requests': 0,
         'cache_hits': 0

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Button,
   Group,
@@ -16,43 +16,39 @@ import {
 import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
 import StatWidget from '../../Dashboard/components/widgets/StatWidget';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
+import { ScepService } from '../services/scep.service';
 import './SCEPPage.css';
 
-// Mock Data
-const MOCK_SCEP_STATS = {
-  activeDevices: 342,
-  requestsToday: 12,
-  failures: 0
-};
-
-const MOCK_REQUESTS = [
-  {
-    id: 1,
-    transactionId: '123e4567-e89b-12d3-a456-426614174000',
-    subject: 'iPad-Finance-001',
-    status: 'Success',
-    timestamp: '2024-03-20T10:30:00Z',
-    type: 'PKCSReq'
-  },
-  {
-    id: 2,
-    transactionId: '987fcdeb-51a2-43c1-z987-123456789012',
-    subject: 'MacBook-Dev-042',
-    status: 'Pending',
-    timestamp: '2024-03-20T10:15:00Z',
-    type: 'GetCACaps'
-  },
-  {
-    id: 3,
-    transactionId: '456a789b-cdef-0123-4567-890123456789',
-    subject: 'iPhone-Sales-105',
-    status: 'Failed',
-    timestamp: '2024-03-19T16:45:00Z',
-    type: 'PKCSReq'
-  }
-];
-
 const SCEPPage = () => {
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0
+  });
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [statsData, requestsData] = await Promise.all([
+        ScepService.getStats(),
+        ScepService.getRequests()
+      ]);
+      setStats(statsData);
+      setRequests(requestsData);
+    } catch (error) {
+      console.error("Failed to load SCEP data", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const columns = [
     {
       key: 'transactionId',
@@ -61,7 +57,7 @@ const SCEPPage = () => {
       render: (row) => (
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <DeviceMobile size={18} className="icon-gradient-subtle" style={{ marginRight: 8 }} />
-          <Text size="xs" className="mono-text" truncate>{row.transactionId}</Text>
+          <Text size="xs" className="mono-text" truncate>{row.transaction_id || row.transactionId}</Text>
         </div>
       )
     },
@@ -72,18 +68,12 @@ const SCEPPage = () => {
       render: (row) => <Text size="sm" fw={500}>{row.subject}</Text>
     },
     {
-      key: 'type',
-      label: 'Operation',
-      width: 120,
-      render: (row) => <Badge variant="outline" color="gray" size="xs">{row.type}</Badge>
-    },
-    {
       key: 'status',
       label: 'Status',
       width: 100,
       render: (row) => (
         <Badge 
-          color={row.status === 'Success' ? 'green' : row.status === 'Failed' ? 'red' : 'blue'} 
+          color={row.status === 'approved' || row.status === 'Success' ? 'green' : row.status === 'rejected' || row.status === 'Failed' ? 'red' : 'blue'} 
           variant="dot"
           size="sm"
         >
@@ -92,10 +82,10 @@ const SCEPPage = () => {
       )
     },
     {
-      key: 'timestamp',
+      key: 'created_at',
       label: 'Time',
       width: 150,
-      render: (row) => <Text size="sm" c="dimmed">{new Date(row.timestamp).toLocaleString()}</Text>
+      render: (row) => <Text size="sm" c="dimmed">{new Date(row.created_at || row.timestamp).toLocaleString()}</Text>
     }
   ];
 
@@ -115,7 +105,7 @@ const SCEPPage = () => {
         <div className="widget-1-3">
           <StatWidget
             icon={<DeviceMobile size={32} weight="duotone" className="icon-gradient-glow" />}
-            value={MOCK_SCEP_STATS.activeDevices}
+            value={stats.approved}
             label="Enrolled Devices"
             color="blue"
           />
@@ -123,18 +113,16 @@ const SCEPPage = () => {
         <div className="widget-1-3">
           <StatWidget
             icon={<CheckCircle size={32} weight="duotone" className="icon-gradient-glow" />}
-            value={MOCK_SCEP_STATS.requestsToday}
-            label="Requests (24h)"
-            trend={{ value: 10, isPositive: true }}
+            value={stats.pending}
+            label="Pending Requests"
             color="green"
           />
         </div>
         <div className="widget-1-3">
           <StatWidget
             icon={<XCircle size={32} weight="duotone" className="icon-gradient-glow" />}
-            value={MOCK_SCEP_STATS.failures}
-            label="Failures"
-            trend={{ value: 0, isPositive: true }}
+            value={stats.rejected}
+            label="Failures / Rejected"
             color="red"
           />
         </div>
@@ -148,8 +136,9 @@ const SCEPPage = () => {
         >
           <ResizableTable 
             columns={columns}
-            data={MOCK_REQUESTS}
+            data={requests}
             onRowClick={(row) => console.log('Clicked request', row)}
+            emptyMessage="No SCEP requests found"
           />
         </Widget>
       </Grid>

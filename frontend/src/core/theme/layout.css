@@ -204,9 +204,10 @@
   flex: 1;
   background-color: var(--bg-app);
   padding: 0;
-  overflow: auto;
+  overflow-y: auto; /* Allow scrolling for main content */
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 /* Status Bar */
@@ -254,3 +255,29 @@
 }
 .sidebar-item:hover { background-color: var(--bg-element); color: var(--text-primary); }
 .sidebar-item.active { background-color: rgba(90, 143, 199, 0.15); color: var(--accent-primary); }
+
+/* Preview Panel */
+.preview-panel {
+  background-color: var(--bg-panel);
+  border-left: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.preview-resize-handle {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 10;
+  transition: background 0.2s;
+}
+
+.preview-resize-handle:hover,
+.preview-resize-handle.active {
+  background: rgba(144, 146, 150, 0.2);
+}

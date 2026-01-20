@@ -1,90 +1,62 @@
-import React, { useState } from 'react';
-import {
-  Button,
-  Group,
-  Badge,
-  Text,
-  ActionIcon,
-  Tooltip,
-} from '@mantine/core';
-import {
-  Plus,
-  FileText,
-  PenNib,
-  Eye,
-  Trash,
-  CheckCircle,
-} from '@phosphor-icons/react';
-import { PageHeader, Grid, Widget } from '../../../components/ui/Layout';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button, Badge, Text, Group, ActionIcon, TextInput } from '@mantine/core';
+import { Plus, MagnifyingGlass, FileText, Trash, Key, User, CalendarBlank, PenNib } from '@phosphor-icons/react';
+import { PageHeader } from '../../../components/ui/Layout';
 import ResizableTable from '../../../components/ui/Layout/ResizableTable';
-import './CSRListPage.css';
-
-// Mock Data
-const MOCK_CSRS = [
-  {
-    id: 1,
-    commonName: 'web.internal.corp',
-    org: 'MyCorp Internal',
-    algo: 'RSA 2048',
-    status: 'Pending',
-    created: '2024-03-15T10:30:00Z',
-    requester: 'admin'
-  },
-  {
-    id: 2,
-    commonName: 'vpn.gateway.net',
-    org: 'NetOps Division',
-    algo: 'ECDSA P-256',
-    status: 'Pending',
-    created: '2024-03-14T15:45:00Z',
-    requester: 'operator'
-  },
-  {
-    id: 3,
-    commonName: 'legacy-app.local',
-    org: 'Legacy Systems',
-    algo: 'RSA 4096',
-    status: 'Signed',
-    created: '2024-03-10T09:00:00Z',
-    requester: 'admin'
-  }
-];
+import { CsrService } from '../services/csr.service';
+import { useSelection } from '../../../core/context/SelectionContext';
 
 const CSRListPage = () => {
-  const [data, setData] = useState(MOCK_CSRS);
+  const navigate = useNavigate();
+  const { setSelectedItem, selectedItem } = useSelection();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
+  // Fetch Data
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const data = await CsrService.getAll();
+      setItems(data);
+    } catch (error) {
+      console.error("Failed to fetch CSRs", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (row) => {
+    if (confirm(`Are you sure you want to delete CSR ${row.cn}?`)) {
+        await CsrService.delete(row.id);
+        loadData();
+        if (selectedItem?.id === row.id) setSelectedItem(null);
+    }
+  };
+
+  // Filter
+  const filteredData = useMemo(() => {
+    return items.filter(item => 
+      item.cn.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.requester.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [items, searchTerm]);
+
+  // Columns
   const columns = [
-    {
-      key: 'commonName',
-      label: 'Common Name',
-      width: 250,
-      minWidth: 150,
-      render: (row) => (
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <FileText size={18} className="icon-gradient-subtle" style={{ marginRight: 8 }} />
-          <Text size="sm" fw={500}>{row.commonName}</Text>
-        </div>
-      )
-    },
-    {
-      key: 'org',
-      label: 'Organization',
-      width: 180,
-      render: (row) => <Text size="sm">{row.org}</Text>
-    },
-    {
-      key: 'algo',
-      label: 'Algorithm',
-      width: 120,
-      render: (row) => <Badge variant="outline" color="gray" size="xs">{row.algo}</Badge>
-    },
     {
       key: 'status',
       label: 'Status',
       width: 100,
+      minWidth: 80,
       render: (row) => (
         <Badge 
-          color={row.status === 'Signed' ? 'green' : 'blue'} 
+          color={row.status === 'Approved' ? 'green' : row.status === 'Pending' ? 'orange' : 'gray'} 
           variant="dot" 
           size="sm"
         >
@@ -93,41 +65,58 @@ const CSRListPage = () => {
       )
     },
     {
-      key: 'requester',
-      label: 'Requester',
-      width: 120,
-      render: (row) => <Text size="sm" c="dimmed">{row.requester}</Text>
+      key: 'cn',
+      label: 'Common Name',
+      minWidth: 200,
+      flex: true, // This column will expand
+      render: (row) => (
+        <Group gap="xs" wrap="nowrap">
+            <FileText size={16} className="icon-gradient" />
+            <Text size="sm" fw={500} truncate>{row.cn}</Text>
+        </Group>
+      )
     },
     {
-      key: 'created',
+      key: 'key_type',
+      label: 'Key Type',
+      width: 140,
+      render: (row) => (
+        <Group gap="xs" wrap="nowrap" c="dimmed">
+            <Key size={14} />
+            <Text size="sm">{row.key_type}</Text>
+        </Group>
+      )
+    },
+    {
+      key: 'requester',
+      label: 'Requester',
+      width: 150,
+      render: (row) => (
+        <Group gap="xs" wrap="nowrap" c="dimmed">
+            <User size={14} />
+            <Text size="sm">{row.requester}</Text>
+        </Group>
+      )
+    },
+    {
+      key: 'created_at',
       label: 'Created',
       width: 150,
-      render: (row) => <Text size="sm" c="dimmed">{new Date(row.created).toLocaleDateString()}</Text>
+      render: (row) => (
+        <Group gap="xs" wrap="nowrap" c="dimmed">
+            <CalendarBlank size={14} />
+            <Text size="sm">{new Date(row.created_at).toLocaleDateString()}</Text>
+        </Group>
+      )
     },
     {
       key: 'actions',
-      label: 'Actions',
-      width: 140,
+      label: '',
+      width: 60,
       render: (row) => (
-        <Group gap={4}>
-          <Tooltip label="View Details">
-            <ActionIcon size="sm" variant="light">
-              <Eye size={16} />
-            </ActionIcon>
-          </Tooltip>
-          {row.status === 'Pending' && (
-            <Tooltip label="Sign Request">
-              <ActionIcon size="sm" variant="filled" color="blue">
-                <PenNib size={16} />
-              </ActionIcon>
-            </Tooltip>
-          )}
-          <Tooltip label="Delete">
-            <ActionIcon size="sm" variant="light" color="red">
-              <Trash size={16} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
+        <ActionIcon size="sm" variant="subtle" color="red" onClick={(e) => { e.stopPropagation(); handleDelete(row); }}>
+            <Trash size={16} />
+        </ActionIcon>
       )
     }
   ];
@@ -137,22 +126,39 @@ const CSRListPage = () => {
       <PageHeader 
         title="Certificate Signing Requests" 
         actions={
-          <Button leftSection={<Plus size={16} />} size="xs">
+          <Button leftSection={<Plus size={16} />} size="xs" onClick={() => navigate('/csrs/create')}>
             New CSR
           </Button>
         }
       />
 
-      <Grid style={{ flex: 1, padding: '16px' }}>
-        <Widget className="widget-full" style={{ height: '100%', padding: 0, overflow: 'hidden' }}>
-          <ResizableTable 
+      {/* Toolbar */}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)', display: 'flex' }}>
+        <TextInput
+            placeholder="Search CSRs..."
+            leftSection={<MagnifyingGlass size={16} className="icon-gradient-subtle" />}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.currentTarget.value)}
+            size="xs"
+            style={{ width: 300 }}
+        />
+      </div>
+
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+         <ResizableTable 
             columns={columns}
-            data={data}
-            onRowClick={(row) => console.log('Clicked CSR', row)}
-            emptyMessage="No Pending CSRs"
-          />
-        </Widget>
-      </Grid>
+            data={filteredData}
+            onRowClick={(row) => setSelectedItem({
+                ...row, 
+                type: 'CSR', 
+                title: row.cn, 
+                subtitle: `${row.key_type} • ${row.status}`,
+                details: row
+            })}
+            rowClassName={(row) => selectedItem?.id === row.id ? 'selected' : ''}
+            emptyMessage="No CSRs found"
+         />
+      </div>
     </div>
   );
 };

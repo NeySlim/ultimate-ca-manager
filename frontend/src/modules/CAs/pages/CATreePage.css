@@ -1,3 +1,49 @@
 .ca-tree-page {
   background: var(--bg-app);
 }
+
+/* Custom Tab Styles */
+.custom-tab-list {
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.custom-tab {
+  height: 44px !important;
+  min-width: 140px;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  border-bottom: none !important;
+  color: var(--text-muted) !important;
+  border-top-left-radius: 6px !important;
+  border-top-right-radius: 6px !important;
+  transition: all 0.2s ease;
+  margin-right: 2px;
+}
+
+.custom-tab:hover {
+  background-color: var(--bg-element-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.custom-tab[data-active] {
+  background-color: var(--bg-surface) !important;
+  border-color: var(--border-color) !important;
+  color: var(--accent-primary) !important;
+  position: relative;
+  box-shadow: 0 -2px 4px rgba(0,0,0,0.02);
+}
+
+.custom-tab[data-active]::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--accent-primary);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}

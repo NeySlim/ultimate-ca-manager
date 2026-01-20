@@ -25,6 +25,8 @@ import ResizableTable from '../../../components/ui/Layout/ResizableTable';
 import { caService } from '../services/ca.service';
 import './CATreePage.css';
 
+import { useSelection } from '../../../core/context/SelectionContext';
+
 // Flatten tree for table display
 const flattenTree = (nodes, expandedIds, level = 0) => {
   let flat = [];
@@ -41,6 +43,7 @@ const flattenTree = (nodes, expandedIds, level = 0) => {
 
 const CATreePage = () => {
   const navigate = useNavigate();
+  const { setSelectedItem } = useSelection();
   const [expanded, setExpanded] = useState([]); // Don't pre-expand by default with real data unless we know ID
   const [treeData, setTreeData] = useState([]);
   const [orphansData, setOrphansData] = useState([]);
@@ -104,7 +107,7 @@ const CATreePage = () => {
           {/* Icon */}
           {row.type === 'Root CA' ? 
             <ShieldCheck size={18} weight="fill" color="var(--mantine-color-yellow-6)" style={{ marginRight: 8 }} /> : 
-            <Certificate size={18} color="var(--accent-primary)" style={{ marginRight: 8 }} />
+            <Certificate size={18} className="icon-gradient" style={{ marginRight: 8 }} />
           }
           
           <Text size="sm" fw={500}>{row.name}</Text>
@@ -140,27 +143,9 @@ const CATreePage = () => {
     {
       key: 'expiry',
       label: 'Expires',
-      width: 120,
+      minWidth: 120,
+      flex: true,
       render: (row) => <Text size="sm" c="dimmed">{row.expiry}</Text>
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      width: 100,
-      render: (row) => (
-        <Group gap={4}>
-          <Tooltip label="View Details">
-            <ActionIcon size="sm" variant="light" onClick={(e) => { e.stopPropagation(); navigate(`/cas/${row.id}`); }}>
-              <Eye size={16} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Manage">
-            <ActionIcon size="sm" variant="light">
-              <Gear size={16} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-      )
     }
   ];
 
@@ -171,7 +156,7 @@ const CATreePage = () => {
         width: 250,
         render: (row) => (
             <div style={{ display: 'flex', alignItems: 'center' }}>
-                <Certificate size={18} color="var(--accent-secondary)" style={{ marginRight: 8 }} />
+                <Certificate size={18} className="icon-gradient-subtle" style={{ marginRight: 8 }} />
                 <Text size="sm" fw={500}>{row.name}</Text>
             </div>
         )
@@ -199,22 +184,9 @@ const CATreePage = () => {
     {
         key: 'expiry',
         label: 'Expires',
-        width: 120,
+        minWidth: 120,
+        flex: true,
         render: (row) => <Text size="sm" c="dimmed">{row.expiry}</Text>
-    },
-    {
-        key: 'actions',
-        label: 'Actions',
-        width: 120,
-        render: (row) => (
-            <Group gap={4}>
-            <Tooltip label="View Details">
-                <ActionIcon size="sm" variant="light">
-                <Eye size={16} />
-                </ActionIcon>
-            </Tooltip>
-            </Group>
-        )
     }
   ];
 
@@ -229,40 +201,56 @@ const CATreePage = () => {
         }
       />
 
-      <Grid style={{ flex: 1, padding: '16px' }}>
-        <Widget className="col-12" style={{ padding: 0, overflow: 'hidden', height: '100%' }}>
-            <Tabs value={activeTab} onChange={setActiveTab} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '0 16px', borderBottom: '1px solid var(--border-color)' }}>
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={setActiveTab} 
+              radius="xs"
+              style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+              classNames={{
+                tab: 'custom-tab',
+                list: 'custom-tab-list',
+                panel: 'custom-tab-panel' // Add class for panel
+              }}
+            >
+                <div style={{ padding: '0 16px', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-panel)' }}>
                     <Tabs.List style={{ borderBottom: 'none' }}>
-                        <Tabs.Tab value="hierarchy" leftSection={<TreeView size={16} />}>
+                        <Tabs.Tab 
+                          value="hierarchy" 
+                          leftSection={<TreeView size={16} />}
+                          style={{ fontSize: 'var(--font-size-control)', fontWeight: 500 }}
+                        >
                             Hierarchy
                         </Tabs.Tab>
-                        <Tabs.Tab value="orphans" leftSection={<ListDashes size={16} />}>
+                        <Tabs.Tab 
+                          value="orphans" 
+                          leftSection={<ListDashes size={16} />}
+                          style={{ fontSize: 'var(--font-size-control)', fontWeight: 500 }}
+                        >
                             Orphan Intermediates
                         </Tabs.Tab>
                     </Tabs.List>
                 </div>
 
-                <div style={{ flex: 1, position: 'relative' }}>
-                    <Tabs.Panel value="hierarchy" style={{ height: '100%' }}>
+                <div style={{ flex: 1, position: 'relative', background: 'var(--bg-app)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    <Tabs.Panel value="hierarchy" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                         <ResizableTable 
                             columns={columnsTree}
                             data={flatData}
-                            onRowClick={(row) => console.log('Clicked', row)}
+                            onRowClick={(row) => setSelectedItem({...row, type: 'CA', title: row.name, subtitle: row.status})}
                         />
                     </Tabs.Panel>
-                    <Tabs.Panel value="orphans" style={{ height: '100%' }}>
+                    <Tabs.Panel value="orphans" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                         <ResizableTable 
                             columns={columnsOrphans}
                             data={orphansData}
-                            onRowClick={(row) => console.log('Clicked orphan', row)}
+                            onRowClick={(row) => setSelectedItem({...row, type: 'CA', title: row.name, subtitle: row.issuer})}
                             emptyMessage="No orphan intermediate CAs found"
                         />
                     </Tabs.Panel>
                 </div>
             </Tabs>
-        </Widget>
-      </Grid>
+      </div>
     </div>
   );
 };
