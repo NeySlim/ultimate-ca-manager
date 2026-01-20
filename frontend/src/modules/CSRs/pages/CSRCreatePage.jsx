@@ -5,7 +5,7 @@ import {
 } from '@mantine/core';
 import { CreationWizard, WizardStep } from '../../../components/ui/Wizards/CreationWizard';
 import { CsrService } from '../services/csr.service';
-import { notifications } from '@mantine/notifications';
+import { notifications } from '../../../components/ui/notifications';
 
 const CSRCreatePage = () => {
   const navigate = useNavigate();

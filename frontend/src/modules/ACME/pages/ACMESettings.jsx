@@ -13,7 +13,7 @@ import {
 import { FloppyDisk, ArrowLeft } from '@phosphor-icons/react';
 import { PageHeader } from '../../../components/ui/Layout';
 import { AcmeService } from '../services/acme.service';
-import { notifications } from '@mantine/notifications';
+import { notifications } from '../../../components/ui/notifications';
 
 const ACMESettings = () => {
   const navigate = useNavigate();
