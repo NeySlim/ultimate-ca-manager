@@ -9,3 +9,5 @@ export { Stack, Group, Card, Divider } from './LayoutUtils';
 export { Menu, MenuItem, MenuDivider } from './Menu';
 export { Modal } from './Modal';
 export { Tabs, TabsList, TabsTab, TabsPanels, TabsPanel } from './Tabs';
+export { Select } from './Select';
+export { Pagination } from './Pagination';
