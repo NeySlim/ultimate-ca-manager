@@ -6,14 +6,14 @@
   border-radius: var(--radius);
   padding: var(--spacing-lg);
   transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(26, 26, 26, 0.2);
   display: flex;
   flex-direction: column;
 }
 
 .ui-widget:hover {
   border-color: var(--border-tertiary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.3);
 }
 
 .ui-widget-header {

@@ -102,7 +102,7 @@
 }
 
 .rt-row.selected {
-  background: rgba(90, 143, 199, 0.1); /* Subtle blue tint instead of full blue */
+  background: rgba(var(--accent-primary-rgb), 0.1); /* Subtle blue tint instead of full blue */
   border-color: var(--accent-primary);
 }
 

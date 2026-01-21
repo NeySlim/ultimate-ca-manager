@@ -19,13 +19,13 @@
 /* Edit mode - visual cue */
 .ui-grid.edit-mode > * {
   cursor: grab;
-  border: 2px dashed #5a8fc7;
+  border: 2px dashed var(--accent-primary);
   position: relative;
   z-index: 10;
 }
 
 .ui-grid.edit-mode > *:hover {
-  background-color: rgba(90, 143, 199, 0.05);
+  background-color: rgba(var(--accent-primary-rgb), 0.05);
 }
 
 /* --- Standard Column Spans --- */

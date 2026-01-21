@@ -70,7 +70,7 @@
 .toolbar-btn.active {
   background-color: var(--accent-primary);
   border-color: var(--accent-primary);
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .toolbar-btn.active:hover {

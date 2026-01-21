@@ -14,7 +14,7 @@ export const Avatar = ({ src, alt, size = 38, color, children, className = '', .
     fontSize: `${size / 2.5}px`,
     fontWeight: 600,
     backgroundColor: color || 'var(--accent-primary)',
-    color: '#fff',
+    color: 'var(--text-primary)',
     overflow: 'hidden',
   };
 
@@ -127,7 +127,7 @@ export const ThemeIcon = ({ children, color = 'primary', size = 38, radius = 'md
         height: size,
         borderRadius: radiusMap[radius],
         backgroundColor: colorMap[color] || color,
-        color: '#fff',
+        color: 'var(--text-primary)',
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -225,7 +225,7 @@ Stepper.Step = ({ label, description, isActive, isCompleted, ...props }) => {
           height: 32,
           borderRadius: '50%',
           backgroundColor: isCompleted ? 'var(--success)' : isActive ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-          color: '#fff',
+          color: 'var(--text-primary)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

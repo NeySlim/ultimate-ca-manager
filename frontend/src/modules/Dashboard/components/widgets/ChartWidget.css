@@ -105,7 +105,7 @@
 
 .bar:hover .bar-fill {
   opacity: 1.1;
-  box-shadow: 0 0 8px rgba(90, 143, 199, 0.3);
+  box-shadow: 0 0 8px rgba(var(--accent-primary-rgb), 0.3);
 }
 
 .bar-label {

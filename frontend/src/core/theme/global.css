@@ -7,6 +7,7 @@
   
   /* Accent Colors (changeable via theme) */
   --accent-primary: #5a8fc7;
+  --accent-primary-rgb: 90, 143, 199; /* For rgba() usage */
   --accent-secondary: #7aa5d9;
   --accent-hover: #4a7ab5;
   --accent-gradient-start: #5a8fc7;

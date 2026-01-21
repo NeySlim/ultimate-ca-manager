@@ -24,19 +24,19 @@
 }
 
 .dashboard-grid > *:hover {
-  border-color: #4a5568;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  border-color: var(--border-tertiary);
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.3);
 }
 
 /* Edit mode - visual cue for draggable widgets */
 .dashboard-grid.edit-mode > * {
   cursor: grab;
-  border: 2px dashed #5a8fc7;
+  border: 2px dashed var(--accent-primary);
 }
 
 .dashboard-grid.edit-mode > *:hover {
   border-style: solid;
-  background-color: rgba(90, 143, 199, 0.05);
+  background-color: rgba(var(--accent-primary-rgb), 0.05);
 }
 
 /* Default grid positions for common widget sizes */

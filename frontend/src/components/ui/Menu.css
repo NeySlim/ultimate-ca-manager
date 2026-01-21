@@ -15,7 +15,7 @@
   border: 1px solid var(--border-primary);
   border-radius: var(--radius);
   padding: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(26, 26, 26, 0.5);
   outline: none;
 }
 
