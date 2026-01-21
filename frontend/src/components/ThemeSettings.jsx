@@ -7,7 +7,7 @@ export const ThemeSettings = ({ opened, onClose }) => {
   const { palette, setPalette, colorScheme, setColorScheme, density, setDensity } = useTheme();
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Display Settings" size="lg">
+    <Modal open={opened} onClose={onClose} title="Display Settings" size="lg">
       <Stack gap="xl">
         {/* Mode light/dark */}
         <div>
