@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Button, Stack, Text, SegmentedControl } from './ui';
+import { Modal, Button, Stack, Text, SegmentedControl, SimpleGrid } from './ui';
 import { useTheme } from '../contexts/ThemeContext';
 import { colorPalettes } from '../theme/colors';
 
