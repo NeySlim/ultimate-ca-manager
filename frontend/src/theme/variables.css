@@ -1,0 +1,251 @@
+/**
+ * UCM Theme System - CSS Variables
+ * Source: prototype-dashboard.html (ABSOLUTE REFERENCE)
+ * 
+ * Theme Configurations:
+ * - 2 themes: dark, light
+ * - 6 accents: blue, green, purple, orange, red, cyan
+ * - Total: 12 configurations
+ * 
+ * bg-tertiary is TINTED per accent using HSL formula
+ */
+
+/* ============================================
+   DEFAULT THEME (Dark + Blue)
+   ============================================ */
+:root {
+  /* Accent Colors */
+  --accent-primary: #5a8fc7;
+  --accent-secondary: #7aa5d9;
+  --accent-gradient-start: #5a8fc7;
+  --accent-gradient-end: #7aa5d9;
+  
+  /* Base Colors */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: hsl(207, 15%, 16%); /* Tinted blue */
+  --bg-hover: #2a2a2a;
+  
+  /* Text Colors */
+  --text-primary: #e8e8e8;
+  --text-secondary: #ccc;
+  --text-tertiary: #888;
+  --text-muted: #555;
+  
+  /* Border Colors */
+  --border-primary: #333;
+  --border-secondary: #3a3a3a;
+  --border-tertiary: #444;
+  
+  /* Status Colors */
+  --status-success: #81c784;
+  --status-warning: #ffb74d;
+  --status-danger: #e57373;
+  --status-info: #64b5f6;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  
+  /* Border Radius */
+  --radius: 3px;
+  
+  /* Component Sizes */
+  --button-height: 26px;
+  --input-height: 30px;
+  --topbar-height: 48px;
+  --sidebar-width: 240px;
+}
+
+/* ============================================
+   DARK THEME ACCENTS
+   ============================================ */
+
+/* Dark + Blue (Default) */
+[data-theme="dark"][data-accent="blue"] {
+  --accent-primary: #5a8fc7;
+  --accent-secondary: #7aa5d9;
+  --accent-gradient-start: #5a8fc7;
+  --accent-gradient-end: #7aa5d9;
+  --bg-tertiary: hsl(207, 15%, 16%);
+}
+
+/* Dark + Green */
+[data-theme="dark"][data-accent="green"] {
+  --accent-primary: #81c784;
+  --accent-secondary: #a5d6a7;
+  --accent-gradient-start: #81c784;
+  --accent-gradient-end: #a5d6a7;
+  --bg-tertiary: hsl(122, 15%, 16%);
+}
+
+/* Dark + Purple */
+[data-theme="dark"][data-accent="purple"] {
+  --accent-primary: #ba68c8;
+  --accent-secondary: #ce93d8;
+  --accent-gradient-start: #ba68c8;
+  --accent-gradient-end: #ce93d8;
+  --bg-tertiary: hsl(263, 15%, 16%);
+}
+
+/* Dark + Orange */
+[data-theme="dark"][data-accent="orange"] {
+  --accent-primary: #ffb74d;
+  --accent-secondary: #ffcc80;
+  --accent-gradient-start: #ffb74d;
+  --accent-gradient-end: #ffcc80;
+  --bg-tertiary: hsl(36, 15%, 16%);
+}
+
+/* Dark + Red */
+[data-theme="dark"][data-accent="red"] {
+  --accent-primary: #e57373;
+  --accent-secondary: #ef9a9a;
+  --accent-gradient-start: #e57373;
+  --accent-gradient-end: #ef9a9a;
+  --bg-tertiary: hsl(0, 15%, 16%);
+}
+
+/* Dark + Cyan */
+[data-theme="dark"][data-accent="cyan"] {
+  --accent-primary: #4dd0e1;
+  --accent-secondary: #80deea;
+  --accent-gradient-start: #4dd0e1;
+  --accent-gradient-end: #80deea;
+  --bg-tertiary: hsl(187, 15%, 16%);
+}
+
+/* ============================================
+   LIGHT THEME BASE
+   ============================================ */
+[data-theme="light"] {
+  /* Base Colors */
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #ffffff;
+  --bg-hover: #e0e0e0;
+  
+  /* Text Colors */
+  --text-primary: #1a1a1a;
+  --text-secondary: #333;
+  --text-tertiary: #666;
+  --text-muted: #999;
+  
+  /* Border Colors */
+  --border-primary: #e0e0e0;
+  --border-secondary: #d0d0d0;
+  --border-tertiary: #c0c0c0;
+}
+
+/* ============================================
+   LIGHT THEME ACCENTS
+   ============================================ */
+
+/* Light + Blue */
+[data-theme="light"][data-accent="blue"] {
+  --accent-primary: #5a8fc7;
+  --accent-secondary: #7aa5d9;
+  --accent-gradient-start: #5a8fc7;
+  --accent-gradient-end: #7aa5d9;
+  --bg-tertiary: hsl(207, 25%, 96%);
+}
+
+/* Light + Green */
+[data-theme="light"][data-accent="green"] {
+  --accent-primary: #66bb6a;
+  --accent-secondary: #81c784;
+  --accent-gradient-start: #66bb6a;
+  --accent-gradient-end: #81c784;
+  --bg-tertiary: hsl(122, 25%, 96%);
+}
+
+/* Light + Purple */
+[data-theme="light"][data-accent="purple"] {
+  --accent-primary: #ab47bc;
+  --accent-secondary: #ba68c8;
+  --accent-gradient-start: #ab47bc;
+  --accent-gradient-end: #ba68c8;
+  --bg-tertiary: hsl(263, 25%, 96%);
+}
+
+/* Light + Orange */
+[data-theme="light"][data-accent="orange"] {
+  --accent-primary: #ffa726;
+  --accent-secondary: #ffb74d;
+  --accent-gradient-start: #ffa726;
+  --accent-gradient-end: #ffb74d;
+  --bg-tertiary: hsl(36, 25%, 96%);
+}
+
+/* Light + Red */
+[data-theme="light"][data-accent="red"] {
+  --accent-primary: #ef5350;
+  --accent-secondary: #e57373;
+  --accent-gradient-start: #ef5350;
+  --accent-gradient-end: #e57373;
+  --bg-tertiary: hsl(0, 25%, 96%);
+}
+
+/* Light + Cyan */
+[data-theme="light"][data-accent="cyan"] {
+  --accent-primary: #26c6da;
+  --accent-secondary: #4dd0e1;
+  --accent-gradient-start: #26c6da;
+  --accent-gradient-end: #4dd0e1;
+  --bg-tertiary: hsl(187, 25%, 96%);
+}
+
+/* ============================================
+   GLOBAL RESETS
+   ============================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100%;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Icon Gradient */
+.icon-gradient {
+  background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Text Utilities */
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-tertiary { color: var(--text-tertiary); }
+.text-muted { color: var(--text-muted); }
+
+/* Status Colors */
+.text-success { color: var(--status-success); }
+.text-warning { color: var(--status-warning); }
+.text-danger { color: var(--status-danger); }
+.text-info { color: var(--status-info); }
