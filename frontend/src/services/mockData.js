@@ -477,6 +477,13 @@ export function getACMEData() {
  * SCEP Configuration & Enrollments
  */
 export function getSCEPData() {
+  const enrollments = [
+    { id: 1, deviceId: 'iPhone-12345', commonName: 'user.iphone@acme.com', status: 'completed', requestedAt: '2026-01-20 10:30', approvedAt: '2026-01-20 10:45' },
+    { id: 2, deviceId: 'Android-67890', commonName: 'user.android@acme.com', status: 'pending', requestedAt: '2026-01-21 09:15', approvedAt: null },
+    { id: 3, deviceId: 'iPad-54321', commonName: 'manager.ipad@acme.com', status: 'completed', requestedAt: '2026-01-19 14:20', approvedAt: '2026-01-19 14:35' },
+    { id: 4, deviceId: 'MacBook-98765', commonName: 'admin.macbook@acme.com', status: 'rejected', requestedAt: '2026-01-18 11:50', approvedAt: null, reason: 'Invalid device identifier' },
+  ];
+
   return {
     config: {
       enabled: true,
@@ -487,12 +494,13 @@ export function getSCEPData() {
       allowRenewal: true,
       autoApprove: false,
     },
-    enrollments: [
-      { id: 1, deviceId: 'iPhone-12345', commonName: 'user.iphone@acme.com', status: 'completed', requestedAt: '2026-01-20 10:30', approvedAt: '2026-01-20 10:45' },
-      { id: 2, deviceId: 'Android-67890', commonName: 'user.android@acme.com', status: 'pending', requestedAt: '2026-01-21 09:15', approvedAt: null },
-      { id: 3, deviceId: 'iPad-54321', commonName: 'manager.ipad@acme.com', status: 'completed', requestedAt: '2026-01-19 14:20', approvedAt: '2026-01-19 14:35' },
-      { id: 4, deviceId: 'MacBook-98765', commonName: 'admin.macbook@acme.com', status: 'rejected', requestedAt: '2026-01-18 11:50', approvedAt: null, reason: 'Invalid device identifier' },
-    ],
+    stats: {
+      totalEnrollments: enrollments.length,
+      pendingApprovals: enrollments.filter(e => e.status === 'pending').length,
+      completedToday: enrollments.filter(e => e.status === 'completed' && e.requestedAt.startsWith('2026-01-21')).length,
+      rejectedToday: enrollments.filter(e => e.status === 'rejected' && e.requestedAt.startsWith('2026-01-21')).length,
+    },
+    enrollments,
   };
 }
 
