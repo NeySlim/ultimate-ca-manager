@@ -8,6 +8,8 @@ import CertificateListPage from './modules/Certificates/pages/CertificateListPag
 import CSRListPage from './modules/CSRs/pages/CSRListPage';
 import ACMEPage from './modules/ACME/pages/ACMEPage';
 import SCEPPage from './modules/SCEP/pages/SCEPPage';
+import UsersPage from './modules/Users/pages/UsersPage';
+import SettingsPage from './modules/Settings/pages/SettingsPage';
 import { RequireAuth } from './core/context/AuthContext';
 
 function App() {
@@ -26,10 +28,8 @@ function App() {
         <Route path="csrs" element={<CSRListPage />} />
         <Route path="acme" element={<ACMEPage />} />
         <Route path="scep" element={<SCEPPage />} />
-        
-        {/* Placeholder routes */}
-        <Route path="users" element={<div className="page-container"><h1>Users - Coming Soon</h1></div>} />
-        <Route path="settings" element={<div className="page-container"><h1>Settings - Coming Soon</h1></div>} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="settings" element={<SettingsPage />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
