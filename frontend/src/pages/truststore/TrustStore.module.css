@@ -1,18 +1,23 @@
-/* Trust Store Page Styles */
-
 .trustStore {
   display: flex;
   flex-direction: column;
+  gap: var(--spacing-xl);
 }
 
-.tabContent {
-  display: flex;
-  flex-direction: column;
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--spacing-lg);
 }
 
-.fingerprint {
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-  font-size: 11px;
-  color: var(--text-tertiary);
+@media (max-width: 1200px) {
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .statsRow {
+    grid-template-columns: 1fr;
+  }
 }
