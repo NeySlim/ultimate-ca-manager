@@ -1,4 +1,23 @@
-import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { 
+  House, 
+  TreeStructure, 
+  Certificate, 
+  FileText, 
+  Files, 
+  ListChecks, 
+  Globe, 
+  DeviceMobile, 
+  Upload, 
+  ShieldCheck, 
+  Users, 
+  ClockCounterClockwise, 
+  Gear, 
+  User,
+  CaretDown,
+  SignOut
+} from '@phosphor-icons/react';
 import { classNames } from '../../utils/classNames';
 import styles from './Sidebar.module.css';
 
@@ -15,49 +34,56 @@ import styles from './Sidebar.module.css';
  * Design reference: prototype-dashboard.html
  */
 export function Sidebar() {
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
   const navSections = [
     {
       title: 'Main',
       items: [
-        { path: '/', icon: 'ph-house', label: 'Dashboard' },
+        { path: '/', icon: House, label: 'Dashboard' },
       ],
     },
     {
       title: 'Certificate Management',
       items: [
-        { path: '/cas', icon: 'ph-tree-structure', label: 'Certificate Authorities' },
-        { path: '/certificates', icon: 'ph-certificate', label: 'Certificates' },
-        { path: '/csrs', icon: 'ph-file-text', label: 'Certificate Requests' },
-        { path: '/templates', icon: 'ph-files', label: 'Certificate Templates' },
-        { path: '/crl', icon: 'ph-list-checks', label: 'CRL & OCSP' },
+        { path: '/cas', icon: TreeStructure, label: 'Certificate Authorities' },
+        { path: '/certificates', icon: Certificate, label: 'Certificates' },
+        { path: '/csrs', icon: FileText, label: 'Certificate Requests' },
+        { path: '/templates', icon: Files, label: 'Certificate Templates' },
+        { path: '/crl', icon: ListChecks, label: 'CRL & OCSP' },
       ],
     },
     {
       title: 'Protocols',
       items: [
-        { path: '/acme', icon: 'ph-globe', label: 'ACME Service' },
-        { path: '/scep', icon: 'ph-device-mobile', label: 'SCEP Service' },
+        { path: '/acme', icon: Globe, label: 'ACME Service' },
+        { path: '/scep', icon: DeviceMobile, label: 'SCEP Service' },
       ],
     },
     {
       title: 'System',
       items: [
-        { path: '/import', icon: 'ph-upload', label: 'Import' },
-        { path: '/truststore', icon: 'ph-shield-check', label: 'Trust Store' },
-        { path: '/users', icon: 'ph-users', label: 'Users' },
-        { path: '/activity', icon: 'ph-clock-counter-clockwise', label: 'Activity Log' },
-        { path: '/settings', icon: 'ph-gear', label: 'Settings' },
-        { path: '/profile', icon: 'ph-user', label: 'Profile' },
+        { path: '/import', icon: Upload, label: 'Import' },
+        { path: '/truststore', icon: ShieldCheck, label: 'Trust Store' },
+        { path: '/users', icon: Users, label: 'Users' },
+        { path: '/activity', icon: ClockCounterClockwise, label: 'Activity Log' },
+        { path: '/settings', icon: Gear, label: 'Settings' },
       ],
     },
   ];
+
+  const handleLogout = () => {
+    // TODO: Implement logout
+    console.log('Logout');
+  };
 
   return (
     <div className={styles.sidebar}>
       {/* Logo Header */}
       <div className={styles.sidebarHeader}>
         <div className={styles.logo}>UCM</div>
-        <div className={styles.logoSubtitle}>Certificate Manager</div>
+        <div className={styles.logoSubtitle}>v2.1</div>
       </div>
 
       {/* Navigation */}
@@ -80,7 +106,11 @@ export function Sidebar() {
               >
                 {({ isActive }) => (
                   <>
-                    <i className={classNames('ph', item.icon, isActive && 'icon-gradient')} />
+                    <item.icon 
+                      size={18} 
+                      weight={isActive ? "fill" : "regular"}
+                      className={isActive ? 'icon-gradient' : ''} 
+                    />
                     <span>{item.label}</span>
                   </>
                 )}
@@ -90,15 +120,59 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* User Card Footer */}
+      {/* User Card Footer with Dropdown */}
       <div className={styles.sidebarFooter}>
-        <div className={styles.userCard}>
+        <div 
+          className={styles.userCard}
+          onClick={() => setUserMenuOpen(!userMenuOpen)}
+        >
           <div className={styles.userAvatar}>A</div>
           <div className={styles.userInfo}>
             <div className={styles.userName}>Admin</div>
             <div className={styles.userRole}>Administrator</div>
           </div>
+          <CaretDown size={12} style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />
         </div>
+
+        {/* User Dropdown Menu */}
+        {userMenuOpen && (
+          <div className={styles.userMenu}>
+            <button 
+              className={styles.userMenuItem}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/profile');
+                setUserMenuOpen(false);
+              }}
+            >
+              <User size={16} />
+              <span>Profile</span>
+            </button>
+            <button 
+              className={styles.userMenuItem}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/settings');
+                setUserMenuOpen(false);
+              }}
+            >
+              <Gear size={16} />
+              <span>Settings</span>
+            </button>
+            <div className={styles.userMenuDivider} />
+            <button 
+              className={styles.userMenuItem}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLogout();
+                setUserMenuOpen(false);
+              }}
+            >
+              <SignOut size={16} />
+              <span>Logout</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
