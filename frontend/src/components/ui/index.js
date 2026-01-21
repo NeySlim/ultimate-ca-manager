@@ -18,8 +18,14 @@ export { Tooltip } from './Tooltip';
 export { ActionIcon } from './ActionIcon';
 export { Container } from './Container';
 export { Textarea, NumberInput, Switch, Radio, Alert, Box } from './MoreComponents';
-export { CopyButton } from './Grid';
+export { CopyButton as GridCopyButton } from './Grid';
 export { Avatar, Title, Anchor, Loader, ScrollArea, ThemeIcon, Paper, Center, Code } from './MoreComponents2';
+
+// New intelligent components
+export { StatusBadge } from './StatusBadge';
+export { SearchToolbar } from './SearchToolbar';
+export { CodeBlock } from './CodeBlock';
+export { CopyButton } from './CopyButton';
 
 // Grid - Import, assign nested properties, then export
 import GridComponent, { GridCol } from './Grid';
