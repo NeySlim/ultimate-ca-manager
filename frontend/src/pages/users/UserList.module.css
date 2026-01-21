@@ -3,5 +3,143 @@
 .userList {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  height: 100%;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-secondary);
+}
+
+.topbarTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.topbarTitle i {
+  font-size: 20px;
+  color: var(--accent-primary);
+}
+
+.topbarActions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.filtersSection {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  padding: var(--spacing-lg);
+  margin: var(--spacing-xl);
+  margin-bottom: var(--spacing-lg);
+  display: flex;
+  gap: var(--spacing-xl);
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.filterGroup label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filterPills {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.filterPill {
+  padding: 4px var(--spacing-md);
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filterPill:hover {
+  border-color: var(--border-tertiary);
+  color: var(--text-primary);
+}
+
+.filterPill.active {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.filterPill .badge {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.tableContainer {
+  flex: 1;
+  overflow: hidden;
+  margin: 0 var(--spacing-xl) var(--spacing-xl);
+}
+
+.userInfoCell {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.userAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.userDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.userName {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.userEmail {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.actionsCell {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
 }
