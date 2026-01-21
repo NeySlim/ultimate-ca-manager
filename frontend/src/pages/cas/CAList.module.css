@@ -1,0 +1,40 @@
+/* CA List Page Styles */
+
+.caList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+}
+
+.viewToggle {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.caName {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .toolbar {
+    flex-direction: column;
+  }
+  
+  .viewToggle {
+    width: 100%;
+  }
+  
+  .viewToggle button {
+    flex: 1;
+  }
+}
