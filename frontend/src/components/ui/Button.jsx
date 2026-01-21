@@ -1,41 +1,51 @@
-import React from 'react';
-import './Button.css';
+import { classNames } from '../../utils/classNames';
+import styles from './Button.module.css';
 
 /**
- * Button component - Pure CSS, no Mantine
- * Uses design-system.html button classes
+ * Button Component
+ * 
+ * Variants:
+ * - primary: Main actions (create, save, apply)
+ * - success: Positive actions (approve, activate)
+ * - danger: Destructive actions (delete, revoke)
+ * - default: Neutral actions (cancel, close)
+ * 
+ * Design: Outline only, NO fill (strict dashboard reference)
+ * Height: 26px (strict)
+ * Font: 13px
  */
-export const Button = ({ 
-  children, 
-  variant = 'default', 
-  size = 'md',
-  className = '', 
+export function Button({
+  children,
+  variant = 'default',
+  size = 'default',
   disabled = false,
-  type = 'button',
+  loading = false,
+  icon,
   onClick,
-  ...props 
-}) => {
-  const baseClass = 'btn';
-  const variantClass = variant !== 'default' ? `btn-${variant}` : '';
-  const sizeClass = size !== 'md' ? `btn-${size}` : '';
-  
-  const classes = [
-    baseClass,
-    variantClass,
-    sizeClass,
-    disabled && 'btn-disabled',
-    className
-  ].filter(Boolean).join(' ');
-
+  type = 'button',
+  className,
+  ...props
+}) {
   return (
     <button
       type={type}
-      className={classes}
-      disabled={disabled}
+      className={classNames(
+        styles.btn,
+        styles[`btn-${variant}`],
+        styles[`btn-${size}`],
+        disabled && styles.disabled,
+        loading && styles.loading,
+        className
+      )}
+      disabled={disabled || loading}
       onClick={onClick}
       {...props}
     >
+      {loading && <i className="ph ph-circle-notch" />}
+      {!loading && icon && <i className={icon} />}
       {children}
     </button>
   );
-};
+}
+
+export default Button;

@@ -1,0 +1,132 @@
+/* Button Component Styles */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  height: var(--button-height);
+  padding: 0 var(--spacing-md);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  user-select: none;
+  border: 1px solid;
+  background: transparent; /* STRICT: Outline only, NO fill */
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.btn i {
+  font-size: 16px;
+}
+
+/* ==========================================
+   VARIANTS (Outline Only - Dashboard Reference)
+   ========================================== */
+
+/* Default (Neutral) */
+.btn-default {
+  color: var(--text-secondary);
+  border-color: var(--border-secondary);
+}
+
+.btn-default:hover:not(.disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-tertiary);
+}
+
+/* Primary */
+.btn-primary {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.btn-primary:hover:not(.disabled) {
+  background: var(--accent-primary);
+  color: var(--bg-primary);
+  border-color: var(--accent-primary);
+}
+
+/* Success */
+.btn-success {
+  color: var(--status-success);
+  border-color: var(--status-success);
+}
+
+.btn-success:hover:not(.disabled) {
+  background: var(--status-success);
+  color: var(--bg-primary);
+  border-color: var(--status-success);
+}
+
+/* Danger */
+.btn-danger {
+  color: var(--status-danger);
+  border-color: var(--status-danger);
+}
+
+.btn-danger:hover:not(.disabled) {
+  background: var(--status-danger);
+  color: #fff;
+  border-color: var(--status-danger);
+}
+
+/* ==========================================
+   SIZES
+   ========================================== */
+
+.btn-sm {
+  height: 22px;
+  padding: 0 var(--spacing-sm);
+  font-size: 12px;
+}
+
+.btn-sm i {
+  font-size: 14px;
+}
+
+.btn-lg {
+  height: 32px;
+  padding: 0 var(--spacing-lg);
+  font-size: 14px;
+}
+
+.btn-lg i {
+  font-size: 18px;
+}
+
+/* ==========================================
+   STATES
+   ========================================== */
+
+.btn.disabled,
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn.loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.btn.loading i {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

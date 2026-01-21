@@ -1,49 +1,40 @@
-import React from 'react';
+import { classNames } from '../../utils/classNames';
+import styles from './Badge.module.css';
 
 /**
- * Badge component - Replaces Mantine Badge
- * Uses design-system.html badge classes
+ * Badge Component
+ * 
+ * Variants (context-aware):
+ * - success: Valid, active, approved
+ * - warning: Expiring, pending, attention
+ * - danger: Expired, revoked, rejected, critical
+ * - info: Information, neutral status
+ * - secondary: Default, inactive
+ * 
+ * Usage:
+ *   <Badge variant="success">Valid</Badge>
+ *   <Badge variant={getBadgeVariant('cert-status', cert.status)}>{cert.status}</Badge>
  */
-export const Badge = ({ 
+export function Badge({
   children,
-  variant = 'filled',
-  color = 'default',
-  size = 'md',
-  className = '',
+  variant = 'secondary',
+  size = 'default',
+  className,
   ...props
-}) => {
-  const baseClass = 'badge';
-  
-  // Color mapping to design-system.html badge classes
-  const colorMap = {
-    default: '',
-    success: 'badge-success',
-    active: 'badge-active',
-    warning: 'badge-warning',
-    error: 'badge-error',
-    info: 'badge-info',
-    green: 'badge-success',
-    blue: 'badge-info',
-    red: 'badge-error',
-    yellow: 'badge-warning'
-  };
+}) {
+  return (
+    <span
+      className={classNames(
+        styles.badge,
+        styles[`badge-${variant}`],
+        styles[`badge-${size}`],
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+}
 
-  const sizeMap = {
-    xs: 'badge-xs',
-    sm: 'badge-sm',
-    md: '',
-    lg: 'badge-lg'
-  };
-
-  const variantClass = variant === 'outline' ? 'badge-outline' : '';
-
-  const classes = [
-    baseClass,
-    colorMap[color],
-    sizeMap[size],
-    variantClass,
-    className
-  ].filter(Boolean).join(' ');
-
-  return <span className={classes} {...props}>{children}</span>;
-};
+export default Badge;
