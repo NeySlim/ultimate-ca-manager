@@ -54,7 +54,8 @@ const LoginPage = () => {
       try {
         const res = await fetch('/api/stats/overview');
         if (res.ok) {
-          const data = await res.json();
+          const response = await res.json();
+          const data = response.data; // API wraps in {data: {...}}
           setStats({
             cas: data.total_cas || '—',
             certs: data.total_certs || '—',
