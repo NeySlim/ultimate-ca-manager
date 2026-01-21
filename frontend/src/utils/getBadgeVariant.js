@@ -7,6 +7,15 @@
  */
 
 const BADGE_MAPPING = {
+  // Certificate Type (following prototype colors)
+  'cert-type': {
+    'server': 'info',      // Blue (like prototype badge-info)
+    'acme': 'success',     // Green (like prototype badge-success)
+    'internal': 'info',    // Blue/cyan
+    'client': 'secondary', // Grey
+    'code signing': 'warning',
+  },
+  
   // Certificate Status
   'cert-status': {
     'valid': 'success',
@@ -48,7 +57,8 @@ const BADGE_MAPPING = {
   
   // User Role
   'user-role': {
-    'admin': 'danger', // Red = power/importance
+    'admin': 'danger',     // Red = power/importance
+    'administrator': 'danger',
     'user': 'secondary',
     'viewer': 'secondary',
   },
@@ -105,6 +115,14 @@ export function getBadgeVariant(context, value) {
   }
   
   return variant;
+}
+
+/**
+ * Get badge variant for certificate type
+ * Matches prototype-dashboard.html color scheme
+ */
+export function getCertTypeVariant(type) {
+  return getBadgeVariant('cert-type', type);
 }
 
 /**

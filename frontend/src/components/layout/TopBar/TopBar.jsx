@@ -1,25 +1,93 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
-  SidebarSimple, 
-  House, 
-  MagnifyingGlass, 
   Moon, 
   Sun,
-  Bell, 
-  Gear, 
-  CaretDown,
-  ListDashes,
-  Rows,
-  PencilSimple
+  GridFour,
+  PencilSimple,
+  DownloadSimple,
+  Plus,
+  CaretDown
 } from '@phosphor-icons/react';
 import { useTheme } from '../../../contexts/ThemeContext';
-import LogoIcon from '../../../assets/logo-chain-icon.svg';
 import './TopBar.css';
 
-const TopBar = ({ isSidebarOpen, toggleSidebar, isDetailsOpen, toggleDetails, openThemeSettings }) => {
-  const { density, setDensity, colorScheme, setColorScheme } = useTheme();
-  const navigate = useNavigate();
+const THEMES = [
+  { name: 'Blue Sky', primary: '#5a8fc7', secondary: '#7aa5d9' },
+  { name: 'Purple Dream', primary: '#9985c7', secondary: '#b5a3d9' },
+  { name: 'Mint Fresh', primary: '#5eb89b', secondary: '#7bc9af' },
+  { name: 'Amber Warm', primary: '#c99652', secondary: '#d9ac73' },
+  { name: 'Mokka', primary: '#b8926d', secondary: '#c9a687' },
+  { name: 'Pink Soft', primary: '#c77799', secondary: '#d994ad' },
+];
+
+const ThemeSelector = () => {
+  const { accentColor, setAccentColor } = useTheme();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleThemeSelect = (theme) => {
+    setAccentColor(theme.primary);
+    setIsOpen(false);
+  };
+
+  const currentTheme = THEMES.find(t => t.primary === accentColor) || THEMES[0];
+
+  return (
+    <div className="theme-selector">
+      <button className="theme-selector-btn" onClick={() => setIsOpen(!isOpen)}>
+        <div 
+          className="theme-color-preview" 
+          style={{ background: `linear-gradient(135deg, ${currentTheme.primary}, ${currentTheme.secondary})` }}
+        />
+        <span>Theme</span>
+        <CaretDown size={10} />
+      </button>
+      {isOpen && (
+        <div className="theme-dropdown">
+          {THEMES.map(theme => (
+            <div 
+              key={theme.name}
+              className={`theme-option ${theme.primary === accentColor ? 'selected' : ''}`}
+              onClick={() => handleThemeSelect(theme)}
+            >
+              <div 
+                className="theme-preview" 
+                style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})` }}
+              />
+              <div className="theme-info">
+                <div className="theme-name">{theme.name}</div>
+                <div className="theme-hex">{theme.primary}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const getPageTitle = (pathname) => {
+  const routes = {
+    '/': 'Dashboard',
+    '/cas': 'Certificate Authorities',
+    '/certificates': 'Certificates',
+    '/csrs': 'Certificate Requests',
+    '/templates': 'Templates',
+    '/acme': 'ACME Protocol',
+    '/scep': 'SCEP Server',
+    '/crl': 'CRL & OCSP',
+    '/import': 'Import',
+    '/truststore': 'Trust Store',
+    '/users': 'Users',
+    '/activity': 'Activity Log',
+    '/settings': 'Settings',
+  };
+  return routes[pathname] || 'Dashboard';
+};
+
+const TopBar = () => {
+  const { colorScheme, setColorScheme } = useTheme();
+  const location = useLocation();
 
   const toggleColorScheme = () => {
     setColorScheme(colorScheme === 'dark' ? 'light' : 'dark');
@@ -27,110 +95,38 @@ const TopBar = ({ isSidebarOpen, toggleSidebar, isDetailsOpen, toggleDetails, op
 
   return (
     <div className="topbar">
-      
-      {/* 1. LEFT: Logo + Nav */}
-      <div className="actions-group" style={{ marginRight: 'auto' }}>
-        {/* Logo */}
-        <div 
-          onClick={() => navigate('/')}
-          style={{ 
-            display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', 
-            fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)', 
-            paddingRight: 'var(--spacing-md)', borderRight: '1px solid var(--border-color)',
-            cursor: 'pointer'
-          }}
-        >
-          <img src={LogoIcon} alt="UCM Logo" style={{ width: 'var(--icon-size-xl)', height: 'var(--icon-size-xl)' }} />
-          UCM
-        </div>
-
-        {/* Sidebar Toggle */}
-        <button 
-          className="nav-btn"
-          onClick={toggleSidebar}
-          title="Toggle Sidebar"
-        >
-          <SidebarSimple weight={isSidebarOpen ? "fill" : "regular"} />
-        </button>
-
-        {/* Breadcrumbs */}
-        <div className="breadcrumb">
-           <div 
-             className="breadcrumb-item" 
-             onClick={() => navigate('/')}
-           >
-             <House size={14} /> Home
-           </div>
-           <span className="breadcrumb-sep">/</span>
-           <div className="breadcrumb-item active">Dashboard</div>
-        </div>
+      {/* LEFT: Page Title */}
+      <div className="topbar-left">
+        <div className="page-title">{getPageTitle(location.pathname)}</div>
       </div>
 
-      {/* 2. CENTER: Command Palette */}
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '0 var(--spacing-xl)' }}>
-         <div className="command-palette">
-            <MagnifyingGlass size={14} />
-            <input 
-              type="text" 
-              placeholder="Search resources..." 
-            />
-            <span className="command-shortcut">Ctrl+K</span>
-         </div>
-      </div>
-
-      {/* 3. RIGHT: Actions */}
-      <div className="actions-group" style={{ marginLeft: 'auto' }}>
-        
-        {/* View Toggles (Density) */}
-        <div className="view-toggle-group">
-           <button 
-             className={`view-toggle-btn ${density === 'normal' ? 'active' : ''}`}
-             onClick={() => setDensity('normal')}
-             title="Normal Density"
-           >
-             <Rows size={16} />
-           </button>
-           <button 
-             className={`view-toggle-btn ${density === 'compact' ? 'active' : ''}`}
-             onClick={() => setDensity('compact')}
-             title="Compact Density"
-           >
-             <ListDashes size={16} />
-           </button>
-        </div>
-
-        {/* Layout Edit */}
-        <button className="btn" style={{ height: 'var(--control-height)', fontSize: 'var(--font-size-control)' }}>
-            <PencilSimple size={14} /> Edit Layout
+      {/* RIGHT: Actions */}
+      <div className="topbar-right">
+        <button className="btn" title="Show/hide 12-column grid">
+          <GridFour size={16} />
+          Grid
         </button>
 
-        <div style={{ width: '1px', height: 'var(--spacing-xl)', backgroundColor: 'var(--border-color)' }}></div>
+        <ThemeSelector />
 
-        <button className="action-btn" onClick={toggleDetails} title="Toggle Details">
-           <SidebarSimple weight={isDetailsOpen ? "fill" : "regular"} style={{ transform: 'rotate(180deg)' }} />
-        </button>
-        
-        <button className="action-btn" onClick={toggleColorScheme} title="Toggle Theme">
-           {colorScheme === 'dark' ? <Moon weight="fill" /> : <Sun weight="fill" />}
+        <button className="btn" onClick={toggleColorScheme} title="Toggle dark/light mode">
+          {colorScheme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
         </button>
 
-        <button className="action-btn">
-           <Bell />
+        <button className="btn">
+          <PencilSimple size={16} />
+          Edit Layout
         </button>
 
-        <button className="action-btn" onClick={openThemeSettings}>
-           <Gear />
+        <button className="btn">
+          <DownloadSimple size={16} />
+          Export
         </button>
 
-        <div style={{ width: '1px', height: 'var(--spacing-xl)', backgroundColor: 'var(--border-color)' }}></div>
-
-        {/* User Profile */}
-        <div className="user-menu">
-           <div className="user-avatar">AD</div>
-           <div className="user-name">Admin</div>
-           <CaretDown size={12} color="var(--text-secondary)" />
-        </div>
-
+        <button className="btn btn-primary">
+          <Plus size={16} className="icon-gradient" />
+          Quick Issue
+        </button>
       </div>
     </div>
   );

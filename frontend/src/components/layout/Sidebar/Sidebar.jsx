@@ -1,19 +1,30 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  House, Users, Certificate, ShieldCheck, Sliders, FileText, Globe, Devices
+  House,
+  ShieldCheck,
+  Certificate,
+  FileText,
+  Notebook,
+  Planet,
+  DeviceMobile,
+  ListChecks,
+  Download,
+  Users,
+  ClockClockwise,
+  Gear
 } from '@phosphor-icons/react';
 
 const SidebarItem = ({ to, icon: Icon, label, end }) => (
   <NavLink 
     to={to} 
     end={end}
-    className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
+    className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
   >
     {({ isActive }) => (
       <>
-        <Icon size={18} className={`icon ${isActive ? 'icon-gradient' : ''}`} weight={isActive ? "fill" : "regular"} />
-        <span className="label">{label}</span>
+        <Icon size={18} className={isActive ? 'icon-gradient' : ''} weight={isActive ? "fill" : "regular"} />
+        <span>{label}</span>
       </>
     )}
   </NavLink>
@@ -22,32 +33,40 @@ const SidebarItem = ({ to, icon: Icon, label, end }) => (
 const Sidebar = () => {
   return (
     <div className="sidebar">
-      {/* SECTION 1: Overview */}
-      <div className="sidebar-section">
-        <SidebarItem to="/" label="Dashboard" icon={House} end />
-      </div>
+      <nav className="sidebar-nav">
+        {/* SECTION 1: Main */}
+        <div className="nav-section">
+          <div className="nav-section-title">Main</div>
+          <SidebarItem to="/" label="Dashboard" icon={House} end />
+        </div>
 
-      {/* SECTION 2: PKI Management */}
-      <div className="sidebar-section">
-        <div className="sidebar-title">PKI Management</div>
-        <SidebarItem to="/cas" label="Authorities" icon={ShieldCheck} />
-        <SidebarItem to="/certificates" label="Certificates" icon={Certificate} />
-        <SidebarItem to="/csrs" label="CSRs" icon={FileText} />
-      </div>
+        {/* SECTION 2: Certificate Management */}
+        <div className="nav-section">
+          <div className="nav-section-title">Certificate Management</div>
+          <SidebarItem to="/cas" label="Certificate Authorities" icon={ShieldCheck} />
+          <SidebarItem to="/certificates" label="Certificates" icon={Certificate} />
+          <SidebarItem to="/csrs" label="Certificate Requests" icon={FileText} />
+          <SidebarItem to="/templates" label="Templates" icon={Notebook} />
+        </div>
 
-      {/* SECTION 3: Services */}
-      <div className="sidebar-section">
-        <div className="sidebar-title">Services</div>
-        <SidebarItem to="/acme" label="ACME Protocol" icon={Globe} />
-        <SidebarItem to="/scep" label="SCEP Server" icon={Devices} />
-      </div>
-      
-      {/* SECTION 4: System */}
-      <div className="sidebar-section">
-        <div className="sidebar-title">System</div>
-        <SidebarItem to="/users" label="Users" icon={Users} />
-        <SidebarItem to="/settings" label="Settings" icon={Sliders} />
-      </div>
+        {/* SECTION 3: Protocols */}
+        <div className="nav-section">
+          <div className="nav-section-title">Protocols</div>
+          <SidebarItem to="/acme" label="ACME" icon={Planet} />
+          <SidebarItem to="/scep" label="SCEP" icon={DeviceMobile} />
+          <SidebarItem to="/crl" label="CRL & OCSP" icon={ListChecks} />
+        </div>
+        
+        {/* SECTION 4: System */}
+        <div className="nav-section">
+          <div className="nav-section-title">System</div>
+          <SidebarItem to="/import" label="Import" icon={Download} />
+          <SidebarItem to="/truststore" label="Trust Store" icon={ShieldCheck} />
+          <SidebarItem to="/users" label="Users" icon={Users} />
+          <SidebarItem to="/activity" label="Activity Log" icon={ClockClockwise} />
+          <SidebarItem to="/settings" label="Settings" icon={Gear} />
+        </div>
+      </nav>
     </div>
   );
 };
