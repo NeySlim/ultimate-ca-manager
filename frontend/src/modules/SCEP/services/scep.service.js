@@ -1,33 +1,27 @@
 import { api } from '../../../core/api/client';
 
-export const ScepService = {
-  getStats: async () => {
-    const response = await api.get('/scep/stats');
-    return response.data;
+export const scepService = {
+  async getStats() {
+    return await api.get('/scep/stats');
   },
 
-  getConfig: async () => {
-    const response = await api.get('/scep/config');
-    return response.data;
+  async getConfig() {
+    return await api.get('/scep/config');
   },
-  
-  updateConfig: async (data) => {
-    const response = await api.patch('/scep/config', data);
-    return response.data;
+
+  async updateConfig(data) {
+    return await api.patch('/scep/config', data);
   },
-  
-  getRequests: async (params = {}) => {
-    const response = await api.get('/scep/requests', { params });
-    return response.data;
+
+  async getRequests(params = {}) {
+    return await api.get('/scep/requests', { params });
   },
-  
-  approveRequest: async (id) => {
-    const response = await api.post(`/scep/${id}/approve`);
-    return response.data;
+
+  async approveRequest(id) {
+    return await api.post(`/scep/${id}/approve`);
   },
-  
-  rejectRequest: async (id, reason) => {
-    const response = await api.post(`/scep/${id}/reject`, { reason });
-    return response.data;
-  }
+
+  async rejectRequest(id, reason) {
+    return await api.post(`/scep/${id}/reject`, { reason });
+  },
 };

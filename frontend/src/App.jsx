@@ -1,23 +1,13 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout/MainLayout';
-import CertificatesRoutes from './modules/Certificates/routes';
-import DashboardPage from './modules/Dashboard/pages/DashboardPage';
-import UserDetailPage from './modules/Users/pages/UserDetailPage';
-import SettingsPage from './modules/Settings/pages/SettingsPage';
-import AuditPage from './modules/Settings/pages/AuditPage';
-import CATreePage from './modules/CAs/pages/CATreePage';
-import CACreatePage from './modules/CAs/pages/CACreatePage';
-import CADetailPage from './modules/CAs/pages/CADetailPage';
-import CSRListPage from './modules/Certificates/pages/CSRListPage';
-import CSRCreatePage from './modules/CSRs/pages/CSRCreatePage';
-import ACMEPage from './modules/ACME/pages/ACMEPage';
-import ACMESettings from './modules/ACME/pages/ACMESettings';
-import ACMEAccounts from './modules/ACME/pages/ACMEAccounts';
-import SCEPPage from './modules/SCEP/pages/SCEPPage';
-import ValidationPage from './modules/Validation/pages/ValidationPage';
-import UsersPage from './modules/Users/pages/UsersPage';
 import LoginPage from './modules/Auth/pages/LoginPage';
+import DashboardPage from './modules/Dashboard/pages/DashboardPage';
+import CAListPage from './modules/CAs/pages/CAListPage';
+import CertificateListPage from './modules/Certificates/pages/CertificateListPage';
+import CSRListPage from './modules/CSRs/pages/CSRListPage';
+import ACMEPage from './modules/ACME/pages/ACMEPage';
+import SCEPPage from './modules/SCEP/pages/SCEPPage';
 import { RequireAuth } from './core/context/AuthContext';
 
 function App() {
@@ -31,23 +21,16 @@ function App() {
         </RequireAuth>
       }>
         <Route index element={<DashboardPage />} />
-        <Route path="certificates/*" element={<CertificatesRoutes />} />
-        <Route path="cas" element={<Navigate to="/cas/tree" replace />} />
-        <Route path="cas/tree" element={<CATreePage />} />
-        <Route path="cas/create" element={<CACreatePage />} />
-        <Route path="cas/:id" element={<CADetailPage />} />
+        <Route path="cas" element={<CAListPage />} />
+        <Route path="certificates" element={<CertificateListPage />} />
         <Route path="csrs" element={<CSRListPage />} />
-        <Route path="csrs/create" element={<CSRCreatePage />} />
         <Route path="acme" element={<ACMEPage />} />
-        <Route path="acme/settings" element={<ACMESettings />} />
-        <Route path="acme/accounts" element={<ACMEAccounts />} />
         <Route path="scep" element={<SCEPPage />} />
-        <Route path="validation" element={<ValidationPage />} />
-        <Route path="users" element={<UsersPage />} />
-        <Route path="users/:id" element={<UserDetailPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="audit" element={<AuditPage />} />
-        <Route path="analytics" element={<div style={{padding: '20px'}}>Analytics</div>} />
+        
+        {/* Placeholder routes */}
+        <Route path="users" element={<div className="page-container"><h1>Users - Coming Soon</h1></div>} />
+        <Route path="settings" element={<div className="page-container"><h1>Settings - Coming Soon</h1></div>} />
+        
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
