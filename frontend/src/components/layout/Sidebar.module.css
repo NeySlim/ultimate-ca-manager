@@ -79,22 +79,17 @@
   border: 1px solid var(--border-secondary);
 }
 
+.navItem svg,
 .navItem i {
   font-size: 18px;
-}
-
-/* Gradient icon for active items - STRICT */
-.navItem.active i {
-  background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  flex-shrink: 0;
 }
 
 /* Footer */
 .sidebarFooter {
   padding: var(--spacing-lg);
   border-top: 1px solid var(--border-primary);
+  position: relative;
 }
 
 .userCard {
@@ -136,6 +131,47 @@
 .userRole {
   font-size: 11px;
   color: var(--text-tertiary);
+}
+
+/* User Dropdown Menu */
+.userMenu {
+  position: absolute;
+  bottom: 100%;
+  left: var(--spacing-lg);
+  right: var(--spacing-lg);
+  margin-bottom: var(--spacing-sm);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  z-index: 1000;
+}
+
+.userMenuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.userMenuItem:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.userMenuDivider {
+  height: 1px;
+  background: var(--border-primary);
+  margin: var(--spacing-xs) 0;
 }
 
 /* Scrollbar */

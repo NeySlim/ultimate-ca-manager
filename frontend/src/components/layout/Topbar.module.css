@@ -8,12 +8,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--spacing-xl);
+  gap: var(--spacing-xl);
 }
 
 .topbarLeft {
   display: flex;
   align-items: center;
   gap: var(--spacing-lg);
+  flex-shrink: 0;
 }
 
 .pageTitle {
@@ -26,10 +28,80 @@
   margin: 0;
 }
 
+/* Center: Command Palette */
+.topbarCenter {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.commandPalette {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  padding: 0 var(--spacing-md);
+  height: 32px;
+  transition: all 0.15s;
+}
+
+.commandPalette:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.1);
+}
+
+.commandInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.commandInput::placeholder {
+  color: var(--text-tertiary);
+}
+
+.commandShortcut {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+/* Right Actions */
 .topbarRight {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  flex-shrink: 0;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.actionButton:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .userButton {

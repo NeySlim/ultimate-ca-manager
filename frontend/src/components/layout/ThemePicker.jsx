@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Palette, Moon, Sun, X } from '@phosphor-icons/react';
 import { getTheme, getAccent, setTheme, setAccent, THEMES, ACCENTS } from '../../theme/theme';
 import styles from './ThemePicker.module.css';
 
@@ -44,7 +45,7 @@ export function ThemePicker() {
         onClick={() => setIsOpen(!isOpen)}
         title="Change theme"
       >
-        <i className="ph ph-palette" />
+        <Palette size={18} />
       </button>
 
       {isOpen && (
@@ -58,7 +59,7 @@ export function ThemePicker() {
                 className={styles.closeButton}
                 onClick={() => setIsOpen(false)}
               >
-                <i className="ph ph-x" />
+                <X size={16} />
               </button>
             </div>
 
@@ -71,14 +72,14 @@ export function ThemePicker() {
                     className={`${styles.themeButton} ${currentTheme === 'dark' ? styles.active : ''}`}
                     onClick={() => handleThemeChange('dark')}
                   >
-                    <i className="ph ph-moon" />
+                    <Moon size={16} />
                     <span>Dark</span>
                   </button>
                   <button
                     className={`${styles.themeButton} ${currentTheme === 'light' ? styles.active : ''}`}
                     onClick={() => handleThemeChange('light')}
                   >
-                    <i className="ph ph-sun" />
+                    <Sun size={16} />
                     <span>Light</span>
                   </button>
                 </div>
