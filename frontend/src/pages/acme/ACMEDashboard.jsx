@@ -152,17 +152,19 @@ export function ACMEDashboard() {
 
   return (
     <div className={styles.acmeDashboard}>
-      <Tabs>
-        <Tabs.List>
-          <Tabs.Tab>Internal ACME</Tabs.Tab>
-          <Tabs.Tab>Let's Encrypt</Tabs.Tab>
-        </Tabs.List>
+      <SectionTabs>
+        <Tab active={activeTab === 'internal'} onClick={() => setActiveTab('internal')}>
+          Internal ACME
+        </Tab>
+        <Tab active={activeTab === 'letsencrypt'} onClick={() => setActiveTab('letsencrypt')}>
+          Let's Encrypt
+        </Tab>
+      </SectionTabs>
 
-        <Tabs.Panels>
-          <Tabs.Panel>{renderTab(acmeData.internal, 'Internal ACME')}</Tabs.Panel>
-          <Tabs.Panel>{renderTab(acmeData.letsencrypt, 'Let\'s Encrypt')}</Tabs.Panel>
-        </Tabs.Panels>
-      </Tabs>
+      <div className={styles.tabContent}>
+        {activeTab === 'internal' && renderTab(acmeData.internal, 'Internal ACME')}
+        {activeTab === 'letsencrypt' && renderTab(acmeData.letsencrypt, 'Let\'s Encrypt')}
+      </div>
     </div>
   );
 }
