@@ -125,14 +125,16 @@
   padding: var(--spacing-lg);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: 4px;
 }
 
 .activityItem {
   display: flex;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
+  gap: var(--spacing-sm);
+  padding: 6px var(--spacing-sm);
+  background: var(--bg-tertiary);
   border-radius: var(--radius);
+  border: 1px solid var(--border-primary);
   transition: background 0.15s;
 }
 
@@ -141,39 +143,55 @@
 }
 
 .activityIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .iconSuccess {
-  background: color-mix(in srgb, var(--status-success) 15%, transparent);
+  background: var(--bg-secondary);
+}
+
+.iconSuccess i {
   color: var(--status-success);
 }
 
 .iconError {
-  background: color-mix(in srgb, var(--status-error) 15%, transparent);
+  background: var(--bg-secondary);
+}
+
+.iconError i {
   color: var(--status-error);
 }
 
 .iconWarning {
-  background: color-mix(in srgb, var(--status-warning) 15%, transparent);
+  background: var(--bg-secondary);
+}
+
+.iconWarning i {
   color: var(--status-warning);
 }
 
 .iconInfo {
-  background: color-mix(in srgb, var(--status-info) 15%, transparent);
+  background: var(--bg-secondary);
+}
+
+.iconInfo i {
   color: var(--status-info);
 }
 
 .iconGradient {
   background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
-  color: white;
+}
+
+.iconGradient i {
+  color: var(--bg-primary);
 }
 
 .activityContent {
