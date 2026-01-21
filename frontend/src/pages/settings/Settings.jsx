@@ -1,82 +1,278 @@
-import { Tabs } from '../../components/ui/Tabs';
-import { Card } from '../../components/ui/Card';
+import { useState } from 'react';
+import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { getSystemSettings } from '../../services/mockData';
 import styles from './Settings.module.css';
 
 /**
  * Settings Page
  * 
- * Four tabs:
- * - General (system settings)
- * - Email (SMTP configuration)
- * - Security (password policy, MFA)
- * - Backup (automated backup configuration)
+ * Reference: prototype-settings.html
+ * - TopBar with title badge + save button
+ * - 4 tabs: System, Database, Security, Backup
+ * - Form sections with labels, inputs, selects, checkboxes
  */
 export function Settings() {
-  const settings = getSystemSettings();
+  const [activeTab, setActiveTab] = useState('system');
 
   return (
     <div className={styles.settings}>
-      <Tabs>
-        <Tabs.List>
-          <Tabs.Tab>General</Tabs.Tab>
-          <Tabs.Tab>Email</Tabs.Tab>
-          <Tabs.Tab>Security</Tabs.Tab>
-          <Tabs.Tab>Backup</Tabs.Tab>
-        </Tabs.List>
+      <div className={styles.topbar}>
+        <div className={styles.topbarTitle}>
+          <i className="ph ph-gear"></i>
+          Settings
+          <Badge variant="warning">Requires Restart</Badge>
+        </div>
+        <div className={styles.topbarActions}>
+          <Button variant="default">Reset All</Button>
+          <Button variant="primary" icon="ph ph-floppy-disk">Save Changes</Button>
+        </div>
+      </div>
 
-        <Tabs.Panels>
-          {/* General Settings Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
-              <Card>
-                <Card.Header>
-                  <h3>General Settings</h3>
-                </Card.Header>
-                <Card.Body>
-                  <form className={styles.form}>
-                    <Input label="System Name" value={settings.general.systemName} />
-                    <Input label="Timezone" value={settings.general.timezone} />
-                    <Input label="Language" value={settings.general.language} />
-                    <Input label="Session Timeout (seconds)" value={settings.general.sessionTimeout} />
-                    
-                    <div className={styles.formActions}>
-                      <Button variant="primary" icon="ph ph-floppy-disk">Save Changes</Button>
-                      <Button variant="default">Reset</Button>
-                    </div>
-                  </form>
-                </Card.Body>
-              </Card>
-            </div>
-          </Tabs.Panel>
+      <div className={styles.tabs}>
+        <button
+          className={`${styles.tab} ${activeTab === 'system' ? styles.active : ''}`}
+          onClick={() => setActiveTab('system')}
+        >
+          System
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'database' ? styles.active : ''}`}
+          onClick={() => setActiveTab('database')}
+        >
+          Database
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'security' ? styles.active : ''}`}
+          onClick={() => setActiveTab('security')}
+        >
+          Security
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'backup' ? styles.active : ''}`}
+          onClick={() => setActiveTab('backup')}
+        >
+          Backup
+        </button>
+      </div>
 
-          {/* Email Settings Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
-              <Card>
-                <Card.Header>
-                  <h3>Email Configuration</h3>
-                </Card.Header>
-                <Card.Body>
-                  <form className={styles.form}>
-                    <Input label="SMTP Host" value={settings.email.smtpHost} />
-                    <Input label="SMTP Port" value={settings.email.smtpPort} />
-                    <Input label="SMTP Username" value={settings.email.smtpUsername} />
-                    <Input label="SMTP Security" value={settings.email.smtpSecurity} />
-                    <Input label="From Address" value={settings.email.fromAddress} />
-                    <Input label="From Name" value={settings.email.fromName} />
-                    
-                    <div className={styles.formActions}>
-                      <Button variant="primary" icon="ph ph-floppy-disk">Save Changes</Button>
-                      <Button variant="default" icon="ph ph-envelope">Send Test Email</Button>
-                    </div>
-                  </form>
-                </Card.Body>
-              </Card>
+      <div className={styles.tabContent}>
+        {activeTab === 'system' && (
+          <div className={styles.tabPanel}>
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>General</div>
+              <div className={styles.formGroup}>
+                <label>Application Name</label>
+                <input type="text" defaultValue="UCM - Certificate Manager" />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Application URL</label>
+                <input type="text" defaultValue="https://netsuit.lan.pew.pet:8443" />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Timezone</label>
+                <select>
+                  <option>UTC</option>
+                  <option>Europe/Paris</option>
+                  <option>America/New_York</option>
+                </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Language</label>
+                <select>
+                  <option>English</option>
+                  <option>Français</option>
+                </select>
+              </div>
             </div>
-          </Tabs.Panel>
+
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Session</div>
+              <div className={styles.formGroup}>
+                <label>Session Timeout</label>
+                <div className={styles.inputWithUnit}>
+                  <input type="number" defaultValue="30" />
+                  <span>minutes</span>
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Max Concurrent Sessions</label>
+                <input type="number" defaultValue="5" />
+              </div>
+            </div>
+
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Logging</div>
+              <div className={styles.formGroup}>
+                <label>Log Level</label>
+                <select>
+                  <option>Debug</option>
+                  <option>Info</option>
+                  <option>Warning</option>
+                  <option>Error</option>
+                </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Log Retention</label>
+                <div className={styles.inputWithUnit}>
+                  <input type="number" defaultValue="90" />
+                  <span>days</span>
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Enable Audit Log</label>
+                <input type="checkbox" defaultChecked />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'database' && (
+          <div className={styles.tabPanel}>
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Database Configuration</div>
+              <div className={styles.formGroup}>
+                <label>Database Type</label>
+                <input type="text" defaultValue="SQLite" readOnly />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Database Path</label>
+                <input type="text" defaultValue="/var/lib/ucm/ucm.db" readOnly />
+              </div>
+            </div>
+
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Database Maintenance</div>
+              <div className={styles.formGroup}>
+                <label>Database Size</label>
+                <input type="text" defaultValue="142.5 MB" readOnly />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Fragmentation</label>
+                <input type="text" defaultValue="3.2%" readOnly />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Last Optimization</label>
+                <input type="text" defaultValue="2024-03-15 02:00 UTC" readOnly />
+              </div>
+              <div className={styles.formGroup}>
+                <Button variant="primary" icon="ph ph-broom">Optimize Database</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'security' && (
+          <div className={styles.tabPanel}>
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Password Policy</div>
+              <div className={styles.formGroup}>
+                <label>Minimum Length</label>
+                <input type="number" defaultValue="12" />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Require Uppercase</label>
+                <input type="checkbox" defaultChecked />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Require Numbers</label>
+                <input type="checkbox" defaultChecked />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Password Expiration</label>
+                <div className={styles.inputWithUnit}>
+                  <input type="number" defaultValue="90" />
+                  <span>days</span>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Authentication</div>
+              <div className={styles.formGroup}>
+                <label>Max Failed Login Attempts</label>
+                <input type="number" defaultValue="5" />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Account Lockout Duration</label>
+                <div className={styles.inputWithUnit}>
+                  <input type="number" defaultValue="30" />
+                  <span>minutes</span>
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Two-Factor Authentication</label>
+                <input type="checkbox" />
+              </div>
+            </div>
+
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>HTTPS Certificate</div>
+              <div className={styles.formGroup}>
+                <label>Current Certificate</label>
+                <input type="text" defaultValue="CN=ucm.local" readOnly />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Valid Until</label>
+                <input type="text" defaultValue="2025-03-15" readOnly />
+              </div>
+              <div className={styles.formGroup}>
+                <Button variant="primary" icon="ph ph-arrows-clockwise">Regenerate Self-Signed</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'backup' && (
+          <div className={styles.tabPanel}>
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Automated Backup</div>
+              <div className={styles.formGroup}>
+                <label>Enable Automated Backup</label>
+                <input type="checkbox" defaultChecked />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Backup Schedule</label>
+                <select>
+                  <option>Daily at 03:00</option>
+                  <option>Weekly on Sunday</option>
+                  <option>Monthly on 1st</option>
+                </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Backup Retention</label>
+                <div className={styles.inputWithUnit}>
+                  <input type="number" defaultValue="30" />
+                  <span>days</span>
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Backup Location</label>
+                <input type="text" defaultValue="/var/backups/ucm/" />
+              </div>
+            </div>
+
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Manual Backup</div>
+              <div className={styles.formGroup}>
+                <label>Last Backup</label>
+                <input type="text" defaultValue="2024-03-15 03:00 UTC" readOnly />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Backup Size</label>
+                <input type="text" defaultValue="245.3 MB" readOnly />
+              </div>
+              <div className={styles.formGroup}>
+                <Button variant="primary" icon="ph ph-download-simple">Create Backup Now</Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default Settings;
 
           {/* Security Settings Tab */}
           <Tabs.Panel>
