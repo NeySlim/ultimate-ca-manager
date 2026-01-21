@@ -81,7 +81,7 @@ export function Dashboard() {
         <StatCard
           value="247"
           label="Active Certificates"
-          icon="ph ph-certificate"
+          icon="certificate"
           trend={{ direction: 'up', text: '+12 this week', positive: true }}
           gradient
         />
@@ -89,7 +89,7 @@ export function Dashboard() {
           value="12"
           label="Expiring Soon"
           sublabel="Within 30 days"
-          icon="ph ph-clock"
+          icon="clock"
           trend={{ direction: 'down', text: '5 critical (7 days)', positive: false }}
           variant="warning"
         />
@@ -97,14 +97,14 @@ export function Dashboard() {
           value="8"
           label="Pending Requests"
           sublabel="CSRs awaiting approval"
-          icon="ph ph-file-text"
+          icon="file-text"
           gradient
         />
         <StatCard
           value="156"
           label="ACME Renewals"
           sublabel="Last 30 days"
-          icon="ph ph-globe"
+          icon="globe"
           trend={{ direction: 'up', text: '100% success rate', positive: true }}
           gradient
         />
