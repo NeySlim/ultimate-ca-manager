@@ -18,6 +18,7 @@
     "@phosphor-icons/react": "^2.1.10",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "puppeteer": "^24.35.0",
     "react": "^19.2.3",
     "react-day-picker": "^9.13.0",
     "react-dom": "^19.2.3",
