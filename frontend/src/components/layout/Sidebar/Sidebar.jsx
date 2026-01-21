@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   House,
@@ -12,7 +12,8 @@ import {
   Download,
   Users,
   ClockClockwise,
-  Gear
+  Gear,
+  CaretDown
 } from '@phosphor-icons/react';
 
 const SidebarItem = ({ to, icon: Icon, label, end }) => (
@@ -31,8 +32,17 @@ const SidebarItem = ({ to, icon: Icon, label, end }) => (
 );
 
 const Sidebar = () => {
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
   return (
     <div className="sidebar">
+      {/* HEADER: Logo + Subtitle */}
+      <div className="sidebar-header">
+        <div className="logo">UCM v2.0</div>
+        <div className="logo-subtitle">Certificate Manager</div>
+      </div>
+
+      {/* NAVIGATION */}
       <nav className="sidebar-nav">
         {/* SECTION 1: Main */}
         <div className="nav-section">
@@ -67,6 +77,21 @@ const Sidebar = () => {
           <SidebarItem to="/settings" label="Settings" icon={Gear} />
         </div>
       </nav>
+
+      {/* FOOTER: User Card */}
+      <div className="sidebar-footer">
+        <div 
+          className="user-card" 
+          onClick={() => setShowUserMenu(!showUserMenu)}
+        >
+          <div className="user-avatar">A</div>
+          <div className="user-info">
+            <div className="user-name">admin</div>
+            <div className="user-role">Administrator</div>
+          </div>
+          <CaretDown size={12} style={{ color: 'var(--text-muted)' }} />
+        </div>
+      </div>
     </div>
   );
 };

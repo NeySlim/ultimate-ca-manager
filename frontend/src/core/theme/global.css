@@ -81,6 +81,38 @@
   --mantine-color-black: var(--text-primary);
 }
 
+/* LIGHT THEME - Softer colors (not too bright) */
+[data-theme="light"] {
+  /* Base Colors - Softer greys */
+  --bg-primary: #e8eaed;     /* Softer than #eef0f2 */
+  --bg-secondary: #f5f6f7;   /* Softer panels */
+  --bg-tertiary: #fafbfc;    /* Lightest surface */
+  --bg-hover: #e0e2e5;       /* Hover state */
+  
+  /* Text Colors - Better contrast */
+  --text-primary: #1a1a1a;
+  --text-secondary: #444;
+  --text-tertiary: #666;
+  --text-muted: #999;
+  
+  /* Border Colors */
+  --border-primary: #d0d2d5;
+  --border-secondary: #dadcdf;
+  --border-tertiary: #c0c2c5;
+  
+  /* Status colors remain the same for consistency */
+  /* Accent colors remain dynamic via --accent-* */
+  
+  /* Aliases */
+  --bg-app: var(--bg-primary);
+  --bg-panel: var(--bg-secondary);
+  --bg-surface: var(--bg-tertiary);
+  --bg-element: var(--bg-hover);
+  --bg-element-hover: #d8dadd;
+  --border-color: var(--border-primary);
+  --border-subtle: var(--border-secondary);
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -566,4 +598,76 @@ input:focus, select:focus, textarea:focus {
 .mantine-Table-td, .mantine-Table-th {
   padding: var(--table-spacing) !important; /* 8px */
   font-size: var(--table-font-size) !important; /* 13px */
+}
+
+/* ========================================
+   SIDEBAR LAYOUT (from prototype)
+   ======================================== */
+
+.sidebar-header {
+  padding: var(--spacing-xl);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--spacing-xs);
+}
+
+.logo-subtitle {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-footer {
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--border-primary);
+  margin-top: auto; /* Push to bottom */
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.user-card:hover {
+  background: var(--bg-hover);
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.user-info {
+  flex: 1;
+}
+
+.user-name {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.user-role {
+  font-size: 11px;
+  color: var(--text-tertiary);
 }
