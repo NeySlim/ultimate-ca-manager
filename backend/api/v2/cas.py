@@ -14,7 +14,7 @@ from models import Certificate
 bp = Blueprint('cas_v2', __name__)
 
 
-@bp.route('/api/cas', methods=['GET'])
+@bp.route('/api/v2/cas', methods=['GET'])
 @require_auth(['read:cas'])
 def list_cas():
     """
@@ -63,7 +63,7 @@ def list_cas():
     )
 
 
-@bp.route('/api/cas/tree', methods=['GET'])
+@bp.route('/api/v2/cas/tree', methods=['GET'])
 @require_auth(['read:cas'])
 def list_cas_tree():
     """
@@ -151,7 +151,7 @@ def list_cas_tree():
     return success_response(data=roots)
 
 
-@bp.route('/api/cas', methods=['POST'])
+@bp.route('/api/v2/cas', methods=['POST'])
 @require_auth(['write:cas'])
 def create_ca():
     """
@@ -194,7 +194,7 @@ def create_ca():
         return error_response(str(e), 500)
 
 
-@bp.route('/api/cas/<int:ca_id>', methods=['GET'])
+@bp.route('/api/v2/cas/<int:ca_id>', methods=['GET'])
 @require_auth(['read:cas'])
 def get_ca(ca_id):
     """Get CA details"""
@@ -226,7 +226,7 @@ def get_ca(ca_id):
     return success_response(data=ca_data)
 
 
-@bp.route('/api/cas/<int:ca_id>', methods=['PATCH'])
+@bp.route('/api/v2/cas/<int:ca_id>', methods=['PATCH'])
 @require_auth(['write:cas'])
 def update_ca(ca_id):
     """Update CA"""
@@ -234,14 +234,14 @@ def update_ca(ca_id):
     return success_response(data={'id': ca_id}, message='CA updated')
 
 
-@bp.route('/api/cas/<int:ca_id>', methods=['DELETE'])
+@bp.route('/api/v2/cas/<int:ca_id>', methods=['DELETE'])
 @require_auth(['delete:cas'])
 def delete_ca(ca_id):
     """Delete CA"""
     return no_content_response()
 
 
-@bp.route('/api/cas/<int:ca_id>/export', methods=['GET'])
+@bp.route('/api/v2/cas/<int:ca_id>/export', methods=['GET'])
 @require_auth(['read:cas'])
 def export_ca(ca_id):
     """Export CA certificate"""
@@ -284,7 +284,7 @@ def export_ca(ca_id):
         return error_response(str(e), 400)
 
 
-@bp.route('/api/cas/<int:ca_id>/certificates', methods=['GET'])
+@bp.route('/api/v2/cas/<int:ca_id>/certificates', methods=['GET'])
 @require_auth(['read:certificates'])
 def list_ca_certificates(ca_id):
     """List certificates for this CA"""

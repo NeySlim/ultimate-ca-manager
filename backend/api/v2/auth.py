@@ -16,7 +16,7 @@ import hashlib
 bp = Blueprint('auth_v2', __name__)
 
 
-@bp.route('/api/auth/login', methods=['POST'])
+@bp.route('/api/v2/auth/login', methods=['POST'])
 def login():
     """
     Login endpoint
@@ -91,7 +91,7 @@ def login():
         )
 
 
-@bp.route('/api/auth/logout', methods=['POST'])
+@bp.route('/api/v2/auth/logout', methods=['POST'])
 @require_auth()
 def logout():
     """
@@ -103,7 +103,7 @@ def logout():
     return success_response(message='Logout successful')
 
 
-@bp.route('/api/auth/verify', methods=['GET'])
+@bp.route('/api/v2/auth/verify', methods=['GET'])
 def verify():
     """
     Verify current authentication
@@ -147,7 +147,7 @@ def verify():
     )
 
 
-@bp.route('/api/auth/refresh', methods=['POST'])
+@bp.route('/api/v2/auth/refresh', methods=['POST'])
 @require_auth()
 def refresh_token():
     """

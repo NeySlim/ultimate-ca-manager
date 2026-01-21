@@ -12,7 +12,7 @@ import datetime
 bp = Blueprint('crl_v2', __name__)
 
 
-@bp.route('/api/crl', methods=['GET'])
+@bp.route('/api/v2/crl', methods=['GET'])
 @require_auth(['read:crl'])
 def list_crls():
     """List CRLs"""
@@ -20,7 +20,7 @@ def list_crls():
     return success_response(data=[crl.to_dict() for crl in crls])
 
 
-@bp.route('/api/crl/<int:ca_id>', methods=['GET'])
+@bp.route('/api/v2/crl/<int:ca_id>', methods=['GET'])
 @require_auth(['read:crl'])
 def get_crl(ca_id):
     """Get CRL for CA"""
@@ -35,7 +35,7 @@ def get_crl(ca_id):
     return success_response(data=crl.to_dict(include_crl=True))
 
 
-@bp.route('/api/crl/<int:ca_id>/regenerate', methods=['POST'])
+@bp.route('/api/v2/crl/<int:ca_id>/regenerate', methods=['POST'])
 @require_auth(['write:crl'])
 def regenerate_crl(ca_id):
     """Force CRL regeneration"""
@@ -56,7 +56,7 @@ def regenerate_crl(ca_id):
         return error_response(f"Failed to regenerate CRL: {str(e)}", 500)
 
 
-@bp.route('/api/ocsp/status', methods=['GET'])
+@bp.route('/api/v2/ocsp/status', methods=['GET'])
 @require_auth(['read:certificates'])
 def get_ocsp_status():
     """Get OCSP service status"""
@@ -67,7 +67,7 @@ def get_ocsp_status():
     })
 
 
-@bp.route('/api/ocsp/stats', methods=['GET'])
+@bp.route('/api/v2/ocsp/stats', methods=['GET'])
 @require_auth(['read:certificates'])
 def get_ocsp_stats():
     """Get OCSP statistics"""
