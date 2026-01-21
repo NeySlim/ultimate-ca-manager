@@ -1,0 +1,40 @@
+/* AppLayout Styles - Dashboard Reference */
+
+.appLayout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.mainContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pageContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-xl);
+  background: var(--bg-primary);
+}
+
+/* Scrollbar styling */
+.pageContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pageContent::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+.pageContent::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: var(--radius);
+}
+
+.pageContent::-webkit-scrollbar-thumb:hover {
+  background: var(--border-secondary);
+}
