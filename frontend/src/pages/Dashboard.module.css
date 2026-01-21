@@ -80,6 +80,7 @@
   align-items: center;
   gap: var(--spacing-sm);
   cursor: grab;
+  margin-bottom: 12px;
 }
 
 .alertsGrid {
