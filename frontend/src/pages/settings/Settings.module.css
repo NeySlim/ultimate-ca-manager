@@ -6,62 +6,13 @@
   height: 100%;
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-lg);
-  border-bottom: 1px solid var(--border-primary);
-  background: var(--bg-secondary);
-}
 
-.topbarTitle {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
 
-.topbarTitle i {
-  font-size: 20px;
-  color: var(--accent-primary);
-}
 
-.topbarActions {
-  display: flex;
-  gap: var(--spacing-sm);
-}
 
-.tabs {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--border-primary);
-  background: var(--bg-secondary);
-}
 
-.tab {
-  padding: var(--spacing-md) var(--spacing-xl);
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-  border-bottom: 2px solid transparent;
-}
 
-.tab:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-}
 
-.tab.active {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
-}
 
 .tabContent {
   flex: 1;

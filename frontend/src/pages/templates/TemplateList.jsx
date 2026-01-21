@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { PageTopBar } from '../../components/common';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
 import styles from './TemplateList.module.css';
 
 // Mock Templates Data
@@ -83,23 +86,17 @@ export function TemplateList() {
   return (
     <div className={styles.templateList}>
       {/* Page Header */}
-      <div className={styles.pageHeader}>
-        <div className={styles.pageTitle}>
-          <i className="ph ph-file-text"></i>
-          Certificate Templates
-          <span className={styles.badgeTopbar}>{MOCK_TEMPLATES.length} Templates</span>
-        </div>
-        <div className={styles.pageActions}>
-          <button className={styles.btn}>
-            <i className="ph ph-download-simple"></i>
-            Export
-          </button>
-          <button className={`${styles.btn} ${styles.btnPrimary}`}>
-            <i className="ph ph-plus"></i>
-            New Template
-          </button>
-        </div>
-      </div>
+      <PageTopBar
+        icon="ph ph-file-text"
+        title="Certificate Templates"
+        badge={<Badge variant="success">{MOCK_TEMPLATES.length} Templates</Badge>}
+        actions={
+          <>
+            <Button icon="ph ph-download-simple">Export</Button>
+            <Button variant="primary" icon="ph ph-plus">New Template</Button>
+          </>
+        }
+      />
 
       {/* Section Header */}
       <div className={styles.sectionHeader}>

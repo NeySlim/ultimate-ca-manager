@@ -1,8 +1,9 @@
-import { Tabs } from '../../components/ui/Tabs';
-import { StatCard } from '../../components/domain/StatCard';
+import { useState } from 'react';
+import { PageTopBar, SectionTabs, Tab, StatsGrid, StatCard } from '../../components/common';
 import { DataTable } from '../../components/domain/DataTable';
 import { SearchToolbar } from '../../components/domain/SearchToolbar';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { getBadgeVariant } from '../../utils/getBadgeVariant';
 import { getACMEData } from '../../services/mockData';
 import styles from './ACMEDashboard.module.css';
@@ -15,6 +16,7 @@ import styles from './ACMEDashboard.module.css';
  * - Let's Encrypt (external ACME provider)
  */
 export function ACMEDashboard() {
+  const [activeTab, setActiveTab] = useState('internal');
   const acmeData = getACMEData();
 
   const accountColumns = [
@@ -96,32 +98,28 @@ export function ACMEDashboard() {
   const renderTab = (data, title) => (
     <div className={styles.tabContent}>
       {/* Stats */}
-      <div className={styles.statsGrid}>
+      <StatsGrid columns={4}>
         <StatCard
           value={data.stats.accounts}
           label="Accounts"
-          icon="user"
-          gradient
+          icon="ph ph-user"
         />
         <StatCard
           value={data.stats.activeOrders}
           label="Active Orders"
-          icon="clock"
-          gradient
+          icon="ph ph-clock"
         />
         <StatCard
           value={data.stats.completedOrders}
           label="Completed Orders"
-          icon="check-circle"
-          gradient
+          icon="ph ph-check-circle"
         />
         <StatCard
           value={data.stats.domains}
           label="Domains"
-          icon="globe"
-          gradient
+          icon="ph ph-globe"
         />
-      </div>
+      </StatsGrid>
 
       {/* Accounts */}
       <div className={styles.section}>

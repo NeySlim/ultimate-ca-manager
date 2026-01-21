@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { PageTopBar, FiltersBar, FilterGroup, SectionTabs, Tab } from '../../components/common';
 import styles from './ActivityLog.module.css';
 
 /**
@@ -56,66 +57,51 @@ export function ActivityLog() {
 
   return (
     <div className={styles.activityLog}>
-      <div className={styles.topbar}>
-        <div className={styles.topbarTitle}>
-          <i className="ph ph-clock-clockwise"></i>
-          Activity
-          <Badge variant="info">Real-time</Badge>
-        </div>
-        <div className={styles.topbarActions}>
-          <Button variant="default" icon="ph ph-download-simple">Export Logs</Button>
-        </div>
-      </div>
+      <PageTopBar
+        icon="ph ph-clock-clockwise"
+        title="Activity"
+        badge={<Badge variant="info">Real-time</Badge>}
+        actions={<Button variant="default" icon="ph ph-download-simple">Export Logs</Button>}
+      />
 
-      <div className={styles.filtersBar}>
+      <FiltersBar>
         <div className={styles.filterGroupDate}>
-          <div>
-            <label>From</label>
+          <FilterGroup label="From">
             <input type="date" defaultValue="2024-01-01" />
-          </div>
-          <div>
-            <label>To</label>
+          </FilterGroup>
+          <FilterGroup label="To">
             <input type="date" defaultValue="2024-01-15" />
-          </div>
+          </FilterGroup>
         </div>
-        <div className={styles.filterGroup}>
-          <label>User</label>
+        <FilterGroup label="User">
           <select>
             <option>All Users</option>
             <option>john.doe</option>
             <option>admin</option>
             <option>jane.smith</option>
           </select>
-        </div>
-        <div className={styles.filterGroup}>
-          <label>Action Type</label>
+        </FilterGroup>
+        <FilterGroup label="Action Type">
           <select>
             <option>All Actions</option>
             <option>Login</option>
             <option>Configuration</option>
             <option>User Management</option>
           </select>
-        </div>
-        <div className={styles.filterGroup}>
-          <label>Search</label>
+        </FilterGroup>
+        <FilterGroup label="Search">
           <input type="text" placeholder="Search activities..." />
-        </div>
-      </div>
+        </FilterGroup>
+      </FiltersBar>
 
-      <div className={styles.tabs}>
-        <button
-          className={`${styles.tab} ${activeTab === 'app-logs' ? styles.active : ''}`}
-          onClick={() => setActiveTab('app-logs')}
-        >
+      <SectionTabs>
+        <Tab active={activeTab === 'app-logs'} onClick={() => setActiveTab('app-logs')}>
           Application Logs
-        </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'pki-ops' ? styles.active : ''}`}
-          onClick={() => setActiveTab('pki-ops')}
-        >
+        </Tab>
+        <Tab active={activeTab === 'pki-ops'} onClick={() => setActiveTab('pki-ops')}>
           PKI Operations
-        </button>
-      </div>
+        </Tab>
+      </SectionTabs>
 
       <div className={styles.activityList}>
         {currentLogs.map((log, idx) => (

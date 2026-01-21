@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { DataTable } from '../../components/domain/DataTable';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { PageTopBar, PillFilter, PillFilters } from '../../components/common';
 import styles from './UserList.module.css';
 
 /**
@@ -109,71 +110,50 @@ export function UserList() {
 
   return (
     <div className={styles.userList}>
-      <div className={styles.topbar}>
-        <div className={styles.topbarTitle}>
-          <i className="ph ph-users"></i>
-          Users
-          <Badge variant="info">{activeCount} Active</Badge>
-        </div>
-        <div className={styles.topbarActions}>
-          <Button variant="default" icon="ph ph-upload-simple">Import</Button>
-          <Button variant="default" icon="ph ph-download-simple">Export</Button>
-          <Button variant="primary" icon="ph ph-plus">Create User</Button>
-        </div>
-      </div>
+      <PageTopBar
+        icon="ph ph-users"
+        title="Users"
+        badge={<Badge variant="info">{activeCount} Active</Badge>}
+        actions={
+          <>
+            <Button variant="default" icon="ph ph-upload-simple">Import</Button>
+            <Button variant="default" icon="ph ph-download-simple">Export</Button>
+            <Button variant="primary" icon="ph ph-plus">Create User</Button>
+          </>
+        }
+      />
 
       <div className={styles.filtersSection}>
         <div className={styles.filterGroup}>
           <label>Role</label>
-          <div className={styles.filterPills}>
-            <button
-              className={`${styles.filterPill} ${roleFilter === 'All' ? styles.active : ''}`}
-              onClick={() => setRoleFilter('All')}
-            >
+          <PillFilters>
+            <PillFilter active={roleFilter === 'All'} onClick={() => setRoleFilter('All')}>
               All <span className={styles.badge}>({usersData.length})</span>
-            </button>
-            <button
-              className={`${styles.filterPill} ${roleFilter === 'Admin' ? styles.active : ''}`}
-              onClick={() => setRoleFilter('Admin')}
-            >
+            </PillFilter>
+            <PillFilter active={roleFilter === 'Admin'} onClick={() => setRoleFilter('Admin')}>
               Admin <span className={styles.badge}>({adminCount})</span>
-            </button>
-            <button
-              className={`${styles.filterPill} ${roleFilter === 'Operator' ? styles.active : ''}`}
-              onClick={() => setRoleFilter('Operator')}
-            >
+            </PillFilter>
+            <PillFilter active={roleFilter === 'Operator'} onClick={() => setRoleFilter('Operator')}>
               Operator <span className={styles.badge}>({operatorCount})</span>
-            </button>
-            <button
-              className={`${styles.filterPill} ${roleFilter === 'Viewer' ? styles.active : ''}`}
-              onClick={() => setRoleFilter('Viewer')}
-            >
+            </PillFilter>
+            <PillFilter active={roleFilter === 'Viewer'} onClick={() => setRoleFilter('Viewer')}>
               Viewer <span className={styles.badge}>({viewerCount})</span>
-            </button>
-          </div>
+            </PillFilter>
+          </PillFilters>
         </div>
         <div className={styles.filterGroup}>
           <label>Status</label>
-          <div className={styles.filterPills}>
-            <button
-              className={`${styles.filterPill} ${statusFilter === 'All' ? styles.active : ''}`}
-              onClick={() => setStatusFilter('All')}
-            >
+          <PillFilters>
+            <PillFilter active={statusFilter === 'All'} onClick={() => setStatusFilter('All')}>
               All <span className={styles.badge}>({usersData.length})</span>
-            </button>
-            <button
-              className={`${styles.filterPill} ${statusFilter === 'Active' ? styles.active : ''}`}
-              onClick={() => setStatusFilter('Active')}
-            >
+            </PillFilter>
+            <PillFilter active={statusFilter === 'Active'} onClick={() => setStatusFilter('Active')}>
               Active <span className={styles.badge}>({activeCount})</span>
-            </button>
-            <button
-              className={`${styles.filterPill} ${statusFilter === 'Disabled' ? styles.active : ''}`}
-              onClick={() => setStatusFilter('Disabled')}
-            >
+            </PillFilter>
+            <PillFilter active={statusFilter === 'Disabled'} onClick={() => setStatusFilter('Disabled')}>
               Disabled <span className={styles.badge}>({disabledCount})</span>
-            </button>
-          </div>
+            </PillFilter>
+          </PillFilters>
         </div>
       </div>
 
