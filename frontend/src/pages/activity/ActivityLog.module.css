@@ -1,0 +1,12 @@
+/* Activity Log Page Styles */
+
+.activityLog {
+  display: flex;
+  flex-direction: column;
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
