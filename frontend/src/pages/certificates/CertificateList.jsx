@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { PageTopBar, PillFilter, PillFilters, FiltersBar, FilterGroup } from '../../components/common';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
 import styles from './CertificateList.module.css';
 
 // Mock Certificates Data
@@ -141,100 +144,60 @@ export function CertificateList() {
   return (
     <div className={styles.certificateList}>
       {/* Page Header */}
-      <div className={styles.pageHeader}>
-        <div className={styles.pageTitle}>
-          <i className="ph ph-certificate"></i>
-          Certificates
-          <span className={styles.badgeTopbar}>247 Active</span>
-        </div>
-        <div className={styles.pageActions}>
-          <button className={styles.btn}>
-            <i className="ph ph-upload-simple"></i>
-            Import
-          </button>
-          <button className={styles.btn}>
-            <i className="ph ph-download-simple"></i>
-            Export
-          </button>
-          <button className={`${styles.btn} ${styles.btnPrimary}`}>
-            <i className="ph ph-file-plus"></i>
-            Issue Certificate
-          </button>
-        </div>
-      </div>
+      <PageTopBar
+        icon="ph ph-certificate"
+        title="Certificates"
+        badge={<Badge variant="success">247 Active</Badge>}
+        actions={
+          <>
+            <Button icon="ph ph-upload-simple">Import</Button>
+            <Button icon="ph ph-download-simple">Export</Button>
+            <Button variant="primary" icon="ph ph-file-plus">Issue Certificate</Button>
+          </>
+        }
+      />
 
       {/* Filters Section */}
-      <div className={styles.filtersSection}>
-        <div className={styles.filterGroup}>
-          <label>TYPE</label>
-          <div className={styles.filterPills}>
-            <span 
-              className={`${styles.filterPill} ${typeFilter === 'all' ? styles.active : ''}`}
-              onClick={() => setTypeFilter('all')}
-            >
-              All <span className={styles.badge}>(247)</span>
-            </span>
-            <span 
-              className={`${styles.filterPill} ${typeFilter === 'server' ? styles.active : ''}`}
-              onClick={() => setTypeFilter('server')}
-            >
-              Server <span className={styles.badge}>(89)</span>
-            </span>
-            <span 
-              className={`${styles.filterPill} ${typeFilter === 'client' ? styles.active : ''}`}
-              onClick={() => setTypeFilter('client')}
-            >
-              Client <span className={styles.badge}>(158)</span>
-            </span>
-            <span 
-              className={`${styles.filterPill} ${typeFilter === 'acme' ? styles.active : ''}`}
-              onClick={() => setTypeFilter('acme')}
-            >
-              ACME <span className={styles.badge}>(34)</span>
-            </span>
-          </div>
-        </div>
+      <FiltersBar>
+        <FilterGroup label="TYPE">
+          <PillFilters>
+            <PillFilter active={typeFilter === 'all'} onClick={() => setTypeFilter('all')}>
+              All <Badge variant="secondary">(247)</Badge>
+            </PillFilter>
+            <PillFilter active={typeFilter === 'server'} onClick={() => setTypeFilter('server')}>
+              Server <Badge variant="secondary">(89)</Badge>
+            </PillFilter>
+            <PillFilter active={typeFilter === 'client'} onClick={() => setTypeFilter('client')}>
+              Client <Badge variant="secondary">(158)</Badge>
+            </PillFilter>
+            <PillFilter active={typeFilter === 'acme'} onClick={() => setTypeFilter('acme')}>
+              ACME <Badge variant="secondary">(34)</Badge>
+            </PillFilter>
+          </PillFilters>
+        </FilterGroup>
 
-        <div className={styles.filterGroup}>
-          <label>STATUS</label>
-          <div className={styles.filterPills}>
-            <span 
-              className={`${styles.filterPill} ${statusFilter === 'all' ? styles.active : ''}`}
-              onClick={() => setStatusFilter('all')}
-            >
-              All <span className={styles.badge}>(247)</span>
-            </span>
-            <span 
-              className={`${styles.filterPill} ${statusFilter === 'active' ? styles.active : ''}`}
-              onClick={() => setStatusFilter('active')}
-            >
-              Active <span className={styles.badge}>(235)</span>
-            </span>
-            <span 
-              className={`${styles.filterPill} ${statusFilter === 'expiring' ? styles.active : ''}`}
-              onClick={() => setStatusFilter('expiring')}
-            >
-              Expiring <span className={styles.badge}>(12)</span>
-            </span>
-            <span 
-              className={`${styles.filterPill} ${statusFilter === 'expired' ? styles.active : ''}`}
-              onClick={() => setStatusFilter('expired')}
-            >
-              Expired <span className={styles.badge}>(0)</span>
-            </span>
-            <span 
-              className={`${styles.filterPill} ${statusFilter === 'revoked' ? styles.active : ''}`}
-              onClick={() => setStatusFilter('revoked')}
-            >
-              Revoked <span className={styles.badge}>(0)</span>
-            </span>
-          </div>
-        </div>
+        <FilterGroup label="STATUS">
+          <PillFilters>
+            <PillFilter active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>
+              All <Badge variant="secondary">(247)</Badge>
+            </PillFilter>
+            <PillFilter active={statusFilter === 'active'} onClick={() => setStatusFilter('active')}>
+              Active <Badge variant="secondary">(235)</Badge>
+            </PillFilter>
+            <PillFilter active={statusFilter === 'expiring'} onClick={() => setStatusFilter('expiring')}>
+              Expiring <Badge variant="secondary">(12)</Badge>
+            </PillFilter>
+            <PillFilter active={statusFilter === 'expired'} onClick={() => setStatusFilter('expired')}>
+              Expired <Badge variant="secondary">(0)</Badge>
+            </PillFilter>
+            <PillFilter active={statusFilter === 'revoked'} onClick={() => setStatusFilter('revoked')}>
+              Revoked <Badge variant="secondary">(0)</Badge>
+            </PillFilter>
+          </PillFilters>
+        </FilterGroup>
 
-        <div className={styles.filterGroup}>
-          <label htmlFor="sort-filter">SORT</label>
+        <FilterGroup label="SORT">
           <select 
-            id="sort-filter"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
           >
@@ -242,8 +205,8 @@ export function CertificateList() {
             <option value="issued">Issued</option>
             <option value="expires">Expires</option>
           </select>
-        </div>
-      </div>
+        </FilterGroup>
+      </FiltersBar>
 
       {/* Certificates Table */}
       <div className={styles.tableContainer}>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { PageTopBar, SectionTabs, Tab } from '../../components/common';
 import styles from './Settings.module.css';
 
 /**
@@ -16,44 +17,32 @@ export function Settings() {
 
   return (
     <div className={styles.settings}>
-      <div className={styles.topbar}>
-        <div className={styles.topbarTitle}>
-          <i className="ph ph-gear"></i>
-          Settings
-          <Badge variant="warning">Requires Restart</Badge>
-        </div>
-        <div className={styles.topbarActions}>
-          <Button variant="default">Reset All</Button>
-          <Button variant="primary" icon="ph ph-floppy-disk">Save Changes</Button>
-        </div>
-      </div>
+      <PageTopBar
+        icon="ph ph-gear"
+        title="Settings"
+        badge={<Badge variant="warning">Requires Restart</Badge>}
+        actions={
+          <>
+            <Button variant="default">Reset All</Button>
+            <Button variant="primary" icon="ph ph-floppy-disk">Save Changes</Button>
+          </>
+        }
+      />
 
-      <div className={styles.tabs}>
-        <button
-          className={`${styles.tab} ${activeTab === 'system' ? styles.active : ''}`}
-          onClick={() => setActiveTab('system')}
-        >
+      <SectionTabs>
+        <Tab active={activeTab === 'system'} onClick={() => setActiveTab('system')}>
           System
-        </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'database' ? styles.active : ''}`}
-          onClick={() => setActiveTab('database')}
-        >
+        </Tab>
+        <Tab active={activeTab === 'database'} onClick={() => setActiveTab('database')}>
           Database
-        </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'security' ? styles.active : ''}`}
-          onClick={() => setActiveTab('security')}
-        >
+        </Tab>
+        <Tab active={activeTab === 'security'} onClick={() => setActiveTab('security')}>
           Security
-        </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'backup' ? styles.active : ''}`}
-          onClick={() => setActiveTab('backup')}
-        >
+        </Tab>
+        <Tab active={activeTab === 'backup'} onClick={() => setActiveTab('backup')}>
           Backup
-        </button>
-      </div>
+        </Tab>
+      </SectionTabs>
 
       <div className={styles.tabContent}>
         {activeTab === 'system' && (

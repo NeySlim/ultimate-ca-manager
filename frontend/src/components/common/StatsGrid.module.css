@@ -1,0 +1,52 @@
+.statsGrid {
+  display: grid;
+  gap: var(--spacing-lg);
+  margin: var(--spacing-xl);
+  margin-top: var(--spacing-lg);
+}
+
+.statCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.statCard i {
+  font-size: 24px;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.statValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.statLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statCard.success .statValue {
+  color: var(--status-success);
+}
+
+.statCard.warning .statValue {
+  color: var(--status-warning);
+}
+
+.statCard.error .statValue {
+  color: var(--status-error);
+}
+
+.statCard.info .statValue {
+  color: var(--accent-primary);
+}

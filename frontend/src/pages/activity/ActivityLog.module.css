@@ -1,4 +1,4 @@
-/* Activity Log Page Styles */
+/* Activity Log Page - Only page-specific styles */
 
 .activityLog {
   display: flex;
@@ -6,117 +6,9 @@
   height: 100%;
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-lg);
-  border-bottom: 1px solid var(--border-primary);
-  background: var(--bg-secondary);
-}
-
-.topbarTitle {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.topbarTitle i {
-  font-size: 20px;
-  color: var(--accent-primary);
-}
-
-.topbarActions {
-  display: flex;
-  gap: var(--spacing-sm);
-}
-
-.filtersBar {
-  display: flex;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-lg);
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-primary);
-  flex-wrap: wrap;
-}
-
 .filterGroupDate {
   display: flex;
   gap: var(--spacing-md);
-}
-
-.filterGroupDate > div,
-.filterGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.filterGroupDate label,
-.filterGroup label {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.filterGroupDate input,
-.filterGroup select,
-.filterGroup input {
-  padding: 6px var(--spacing-md);
-  border: 1px solid var(--border-secondary);
-  border-radius: var(--radius);
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-size: 12px;
-  transition: all 0.15s;
-}
-
-.filterGroupDate input:hover,
-.filterGroup select:hover,
-.filterGroup input:hover {
-  border-color: var(--border-tertiary);
-}
-
-.filterGroupDate input:focus,
-.filterGroup select:focus,
-.filterGroup input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(90, 143, 199, 0.1);
-}
-
-.tabs {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--border-primary);
-  background: var(--bg-secondary);
-}
-
-.tab {
-  padding: var(--spacing-md) var(--spacing-xl);
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-  border-bottom: 2px solid transparent;
-}
-
-.tab:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-}
-
-.tab.active {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
 }
 
 .activityList {

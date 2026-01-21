@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Tabs } from '../../components/ui/Tabs';
+import { PageTopBar, SectionTabs, Tab } from '../../components/common';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -8,6 +8,7 @@ import { DataTable } from '../../components/domain/DataTable';
 import styles from './ImportPage.module.css';
 
 export function ImportPage() {
+  const [activeTab, setActiveTab] = useState('ca');
   const [caMethod, setCaMethod] = useState(0);
   const [certMethod, setCertMethod] = useState(0);
 
@@ -47,17 +48,32 @@ export function ImportPage() {
 
   return (
     <div className={styles.importPage}>
-      <Tabs>
-        <Tabs.List>
-          <Tabs.Tab>CA Import</Tabs.Tab>
-          <Tabs.Tab>Certificate Import</Tabs.Tab>
-          <Tabs.Tab>OPNsense Import</Tabs.Tab>
-        </Tabs.List>
+      <PageTopBar
+        icon="ph ph-upload"
+        title="Import"
+        badge={<Badge variant="info">Multiple Formats</Badge>}
+        actions={
+          <>
+            <Button icon="ph ph-question">Help</Button>
+            <Button variant="primary" icon="ph ph-upload-simple">Upload Files</Button>
+          </>
+        }
+      />
 
-        <Tabs.Panels>
-          {/* Tab 1: CA Import */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
+      <SectionTabs>
+        <Tab active={activeTab === 'ca'} onClick={() => setActiveTab('ca')}>
+          CA Import
+        </Tab>
+        <Tab active={activeTab === 'cert'} onClick={() => setActiveTab('cert')}>
+          Certificate Import
+        </Tab>
+        <Tab active={activeTab === 'opnsense'} onClick={() => setActiveTab('opnsense')}>
+          OPNsense Import
+        </Tab>
+      </SectionTabs>
+
+      {activeTab === 'ca' && (
+        <div className={styles.tabContent}>
               {renderSubMethods(
                 [
                   { icon: 'ph ph-clipboard-text', title: 'Paste PEM' },
@@ -148,11 +164,10 @@ export function ImportPage() {
                 </Card>
               )}
             </div>
-          </Tabs.Panel>
+      )}
 
-          {/* Tab 2: Certificate Import */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
+      {activeTab === 'cert' && (
+        <div className={styles.tabContent}>
               {renderSubMethods(
                 [
                   { icon: 'ph ph-clipboard-text', title: 'Paste PEM' },
@@ -227,11 +242,10 @@ export function ImportPage() {
                 </Card>
               )}
             </div>
-          </Tabs.Panel>
+      )}
 
-          {/* Tab 3: OPNsense Import */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
+      {activeTab === 'opnsense' && (
+        <div className={styles.tabContent}>
               <Card>
                 <Card.Header><h3>OPNsense Connection</h3></Card.Header>
                 <Card.Body>
@@ -264,9 +278,7 @@ export function ImportPage() {
                 </Card.Body>
               </Card>
             </div>
-          </Tabs.Panel>
-        </Tabs.Panels>
-      </Tabs>
+      )}
     </div>
   );
 }

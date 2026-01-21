@@ -1,4 +1,4 @@
-import { StatCard } from '../../components/domain/StatCard';
+import { PageTopBar, StatsGrid, StatCard } from '../../components/common';
 import { DataTable } from '../../components/domain/DataTable';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -120,21 +120,33 @@ export function TrustStore() {
 
   return (
     <div className={styles.trustStore}>
-      <div className={styles.statsRow}>
+      <PageTopBar
+        icon="ph ph-shield-check"
+        title="Trust Store"
+        badge={<Badge variant="success">12 Trusted CAs</Badge>}
+        actions={
+          <>
+            <Button icon="ph ph-arrows-clockwise">Sync Trust Store</Button>
+            <Button variant="primary" icon="ph ph-plus">Add CA</Button>
+          </>
+        }
+      />
+
+      <StatsGrid columns={4}>
         <StatCard
           value="12"
           label="Trusted CAs"
-          description="Active trust anchors"
+          icon="ph ph-certificate"
         />
         <StatCard
           value="45"
           label="System Trust Store"
-          description="OS trust store entries"
+          icon="ph ph-package"
         />
         <StatCard
           value="2 days ago"
           label="Last Updated"
-          description="Manual sync available"
+          icon="ph ph-clock"
         />
         <StatCard
           value={
@@ -144,9 +156,9 @@ export function TrustStore() {
             </Badge>
           }
           label="Auto-Sync Status"
-          description="Daily at 03:00"
+          icon="ph ph-arrows-clockwise"
         />
-      </div>
+      </StatsGrid>
 
       <Card>
         <Card.Header>

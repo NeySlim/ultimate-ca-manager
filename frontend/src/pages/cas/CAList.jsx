@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { getBadgeVariant } from '../../utils/getBadgeVariant';
+import { PageTopBar } from '../../components/common';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
 import styles from './CAList.module.css';
 
 // Mock CAs data matching prototype
@@ -116,27 +119,18 @@ export function CAList() {
   return (
     <div className={styles.caList}>
       {/* Page Header */}
-      <div className={styles.pageHeader}>
-        <div className={styles.pageTitle}>
-          <i className="ph ph-bank"></i>
-          Certificate Authorities
-          <span className={styles.badgeTopbar}>{activeCount} Active</span>
-        </div>
-        <div className={styles.pageActions}>
-          <button className={styles.btn}>
-            <i className="ph ph-upload-simple"></i>
-            Import
-          </button>
-          <button className={styles.btn}>
-            <i className="ph ph-download-simple"></i>
-            Export
-          </button>
-          <button className={`${styles.btn} ${styles.btnPrimary}`}>
-            <i className="ph ph-plus"></i>
-            Create CA
-          </button>
-        </div>
-      </div>
+      <PageTopBar
+        icon="ph ph-bank"
+        title="Certificate Authorities"
+        badge={<Badge variant="success">{activeCount} Active</Badge>}
+        actions={
+          <>
+            <Button icon="ph ph-upload-simple">Import</Button>
+            <Button icon="ph ph-download-simple">Export</Button>
+            <Button variant="primary" icon="ph ph-plus">Create CA</Button>
+          </>
+        }
+      />
 
       {/* Filters Section */}
       <div className={styles.filtersSection}>

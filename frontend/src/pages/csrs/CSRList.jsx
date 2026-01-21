@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { PageTopBar } from '../../components/common';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
 import styles from './CSRList.module.css';
 
 // Mock CSR Data
@@ -138,27 +141,18 @@ export function CSRList() {
   return (
     <div className={styles.csrList}>
       {/* Page Header */}
-      <div className={styles.pageHeader}>
-        <div className={styles.pageTitle}>
-          <i className="ph ph-file-text"></i>
-          Certificate Signing Requests
-          <span className={styles.badgeTopbar}>{MOCK_PENDING.length} Pending</span>
-        </div>
-        <div className={styles.pageActions}>
-          <button className={styles.btn}>
-            <i className="ph ph-upload-simple"></i>
-            Import CSR
-          </button>
-          <button className={styles.btn}>
-            <i className="ph ph-download-simple"></i>
-            Export
-          </button>
-          <button className={`${styles.btn} ${styles.btnPrimary}`}>
-            <i className="ph ph-file-plus"></i>
-            Create CSR
-          </button>
-        </div>
-      </div>
+      <PageTopBar
+        icon="ph ph-file-text"
+        title="Certificate Signing Requests"
+        badge={<Badge variant="warning">{MOCK_PENDING.length} Pending</Badge>}
+        actions={
+          <>
+            <Button icon="ph ph-upload-simple">Import CSR</Button>
+            <Button icon="ph ph-download-simple">Export</Button>
+            <Button variant="primary" icon="ph ph-file-plus">Create CSR</Button>
+          </>
+        }
+      />
 
       {/* Pending Approval Section */}
       <div className={styles.section}>

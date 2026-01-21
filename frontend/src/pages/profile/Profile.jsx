@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { PageTopBar, SectionTabs, Tab } from '../../components/common';
 import styles from './Profile.module.css';
 
 /**
@@ -16,43 +17,31 @@ export function Profile() {
 
   return (
     <div className={styles.profile}>
-      <div className={styles.topbar}>
-        <div className={styles.topbarTitle}>
-          <i className="ph ph-user-circle"></i>
-          My Profile
-        </div>
-        <div className={styles.topbarActions}>
-          <Button variant="default" icon="ph ph-arrow-counter-clockwise">Discard Changes</Button>
-          <Button variant="primary" icon="ph ph-floppy-disk">Save Changes</Button>
-        </div>
-      </div>
+      <PageTopBar
+        icon="ph ph-user-circle"
+        title="My Profile"
+        actions={
+          <>
+            <Button variant="default" icon="ph ph-arrow-counter-clockwise">Discard Changes</Button>
+            <Button variant="primary" icon="ph ph-floppy-disk">Save Changes</Button>
+          </>
+        }
+      />
 
-      <div className={styles.tabs}>
-        <button
-          className={`${styles.tab} ${activeTab === 'profile' ? styles.active : ''}`}
-          onClick={() => setActiveTab('profile')}
-        >
+      <SectionTabs>
+        <Tab active={activeTab === 'profile'} onClick={() => setActiveTab('profile')}>
           Profile
-        </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'security' ? styles.active : ''}`}
-          onClick={() => setActiveTab('security')}
-        >
+        </Tab>
+        <Tab active={activeTab === 'security'} onClick={() => setActiveTab('security')}>
           Security
-        </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'notifications' ? styles.active : ''}`}
-          onClick={() => setActiveTab('notifications')}
-        >
+        </Tab>
+        <Tab active={activeTab === 'notifications'} onClick={() => setActiveTab('notifications')}>
           Notifications
-        </button>
-        <button
-          className={`${styles.tab} ${activeTab === 'preferences' ? styles.active : ''}`}
-          onClick={() => setActiveTab('preferences')}
-        >
+        </Tab>
+        <Tab active={activeTab === 'preferences'} onClick={() => setActiveTab('preferences')}>
           Preferences
-        </button>
-      </div>
+        </Tab>
+      </SectionTabs>
 
       <div className={styles.tabContent}>
         {activeTab === 'profile' && (

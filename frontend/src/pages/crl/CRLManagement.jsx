@@ -1,4 +1,4 @@
-import { StatCard } from '../../components/domain/StatCard';
+import { PageTopBar, StatsGrid, StatCard } from '../../components/common';
 import { DataTable } from '../../components/domain/DataTable';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -150,32 +150,40 @@ export function CRLManagement() {
 
   return (
     <div className={styles.crlManagement}>
-      <div className={styles.statsRow}>
+      <PageTopBar
+        icon="ph ph-list-checks"
+        title="CRL Management"
+        badge={<Badge variant="success">5 Active CAs</Badge>}
+        actions={
+          <>
+            <Button icon="ph ph-arrows-clockwise">Regenerate All</Button>
+            <Button icon="ph ph-download-simple">Export CRLs</Button>
+          </>
+        }
+      />
+
+      <StatsGrid columns={4}>
         <StatCard
           value="23"
           label="CRLs Generated"
-          description="Last: 2 hours ago"
-          icon="file-text"
+          icon="ph ph-file-text"
         />
         <StatCard
           value="14,523"
           label="OCSP Requests (24h)"
-          description="+8% vs yesterday"
-          icon="chart-line"
+          icon="ph ph-chart-line"
         />
         <StatCard
           value="5"
           label="Active CAs"
-          description="With CRL enabled"
-          icon="certificate"
+          icon="ph ph-certificate"
         />
         <StatCard
           value="12ms"
           label="Avg Response Time"
-          description="OCSP queries"
-          icon="timer"
+          icon="ph ph-timer"
         />
-      </div>
+      </StatsGrid>
 
       <Card>
         <Card.Header>

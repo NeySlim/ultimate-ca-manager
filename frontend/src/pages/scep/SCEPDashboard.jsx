@@ -1,4 +1,5 @@
-import { Tabs } from '../../components/ui/Tabs';
+import { useState } from 'react';
+import { PageTopBar, SectionTabs, Tab, StatsGrid, StatCard } from '../../components/common';
 import { Card } from '../../components/ui/Card';
 import { DataTable } from '../../components/domain/DataTable';
 import { SearchToolbar } from '../../components/domain/SearchToolbar';
@@ -17,6 +18,7 @@ import styles from './SCEPDashboard.module.css';
  * - Enrollments (device enrollment requests)
  */
 export function SCEPDashboard() {
+  const [activeTab, setActiveTab] = useState('config');
   const scepData = getSCEPData();
 
   const enrollmentColumns = [
@@ -84,16 +86,52 @@ export function SCEPDashboard() {
 
   return (
     <div className={styles.scepDashboard}>
-      <Tabs>
-        <Tabs.List>
-          <Tabs.Tab>Configuration</Tabs.Tab>
-          <Tabs.Tab>Enrollments</Tabs.Tab>
-        </Tabs.List>
+      <PageTopBar
+        icon="ph ph-device-mobile"
+        title="SCEP"
+        badge={<Badge variant={scepData.config.enabled ? 'success' : 'secondary'}>{scepData.config.enabled ? 'Enabled' : 'Disabled'}</Badge>}
+        actions={
+          <>
+            <Button icon="ph ph-arrows-clockwise">Refresh</Button>
+            <Button variant="primary" icon="ph ph-gear">Configure</Button>
+          </>
+        }
+      />
 
-        <Tabs.Panels>
-          {/* Configuration Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
+      <StatsGrid columns={4}>
+        <StatCard
+          value={scepData.stats.totalEnrollments}
+          label="Total Enrollments"
+          icon="ph ph-certificate"
+        />
+        <StatCard
+          value={scepData.stats.pendingApprovals}
+          label="Pending Approvals"
+          icon="ph ph-clock"
+        />
+        <StatCard
+          value={scepData.stats.completedToday}
+          label="Completed Today"
+          icon="ph ph-check-circle"
+        />
+        <StatCard
+          value={scepData.stats.rejectedToday}
+          label="Rejected Today"
+          icon="ph ph-x-circle"
+        />
+      </StatsGrid>
+
+      <SectionTabs>
+        <Tab active={activeTab === 'config'} onClick={() => setActiveTab('config')}>
+          Configuration
+        </Tab>
+        <Tab active={activeTab === 'enrollments'} onClick={() => setActiveTab('enrollments')}>
+          Enrollments
+        </Tab>
+      </SectionTabs>
+
+      {activeTab === 'config' && (
+        <div className={styles.tabContent}>
               <Card>
                 <Card.Header>
                   <h3>SCEP Server Configuration</h3>
@@ -162,11 +200,10 @@ export function SCEPDashboard() {
                 </Card.Body>
               </Card>
             </div>
-          </Tabs.Panel>
+      )}
 
-          {/* Enrollments Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
+      {activeTab === 'enrollments' && (
+        <div className={styles.tabContent}>
               <SearchToolbar
                 placeholder="Search enrollments..."
                 filters={filters}
@@ -180,9 +217,7 @@ export function SCEPDashboard() {
                 onRowClick={(row) => console.log('Enrollment clicked:', row)}
               />
             </div>
-          </Tabs.Panel>
-        </Tabs.Panels>
-      </Tabs>
+      )}
     </div>
   );
 }
