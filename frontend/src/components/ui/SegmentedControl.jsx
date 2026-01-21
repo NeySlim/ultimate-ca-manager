@@ -20,3 +20,6 @@ export const SegmentedControl = ({ value, onChange, data = [] }) => {
     </div>
   );
 };
+
+// Default export for backward compatibility
+export default SegmentedControl;
