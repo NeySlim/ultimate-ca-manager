@@ -671,3 +671,19 @@ input:focus, select:focus, textarea:focus {
   font-size: 11px;
   color: var(--text-tertiary);
 }
+
+/* Fix NavLink blue color issue */
+.nav-item,
+.nav-item:link,
+.nav-item:visited {
+  color: var(--text-secondary) !important;
+  text-decoration: none;
+}
+
+.nav-item:hover {
+  color: var(--text-primary) !important;
+}
+
+.nav-item.active {
+  color: var(--text-primary) !important;
+}
