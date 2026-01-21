@@ -1,5 +1,3 @@
-/* Import Page Styles */
-
 .importPage {
   display: flex;
   flex-direction: column;
@@ -11,87 +9,133 @@
   gap: var(--spacing-lg);
 }
 
+.subMethods {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.subMethod {
+  flex: 1;
+  padding: var(--spacing-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.subMethod:hover {
+  border-color: var(--border-secondary);
+}
+
+.subMethod.active {
+  border-color: var(--accent-primary);
+  background: rgba(90, 143, 199, 0.1);
+}
+
+.subMethod i {
+  font-size: 24px;
+  color: var(--text-tertiary);
+  margin-bottom: var(--spacing-xs);
+  display: block;
+}
+
+.subMethod.active i {
+  color: var(--accent-primary);
+}
+
+.subMethodTitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.subMethod.active .subMethodTitle {
+  color: var(--accent-primary);
+}
+
 .form {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-  max-width: 600px;
 }
 
-.fileUpload {
+.formGroup {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
 }
 
-.label {
+.formLabel {
+  display: block;
   font-size: 11px;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--text-tertiary);
 }
 
-.uploadBox {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-xl);
+.formInput {
+  width: 100%;
+  max-width: 400px;
+  height: 30px;
+  padding: 0 var(--spacing-md);
   background: var(--bg-tertiary);
-  border: 2px dashed var(--border-primary);
+  border: 1px solid var(--border-primary);
   border-radius: var(--radius);
-  color: var(--text-secondary);
-  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
   transition: all 0.15s;
 }
 
-.uploadBox:hover {
-  border-color: var(--accent-primary);
-  background: var(--bg-hover);
+.formTextarea {
+  width: 100%;
+  max-width: 600px;
+  height: 120px;
+  padding: var(--spacing-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  resize: vertical;
+  transition: all 0.15s;
 }
 
-.uploadBox i {
-  font-size: 32px;
+.formInput:focus,
+.formTextarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.formHelp {
+  font-size: 11px;
   color: var(--text-tertiary);
 }
 
-.uploadBox input[type="file"] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
+.formCheckbox {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
   cursor: pointer;
 }
 
-.formActions {
-  display: flex;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-md);
+.formCheckbox input {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
 }
 
-.infoBox {
-  display: flex;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: var(--bg-tertiary);
-  border-radius: var(--radius);
-}
-
-.infoBox i {
-  font-size: 20px;
-  color: var(--accent-primary);
-}
-
-.infoTitle {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: var(--spacing-xs);
-}
-
-.infoText {
+.formCheckbox label {
   font-size: 13px;
   color: var(--text-secondary);
-  line-height: 1.5;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .subMethods {
+    flex-direction: column;
+  }
 }
