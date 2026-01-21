@@ -1,58 +1,58 @@
-import React, { Fragment } from 'react';
 import { Tab as HeadlessTab } from '@headlessui/react';
-import './Tabs.css';
+import { classNames } from '../../utils/classNames';
+import styles from './Tabs.module.css';
 
 /**
- * Tabs component - Headless UI Tab
- * Replaces Mantine Tabs
+ * Tabs Component
+ * Wrapper around Headless UI Tabs with UCM styling
  */
-export const Tabs = ({ children, defaultValue = 0, onChange }) => {
-  const [selectedIndex, setSelectedIndex] = React.useState(defaultValue);
-
-  const handleChange = (index) => {
-    setSelectedIndex(index);
-    if (onChange) onChange(index);
-  };
-
+export function Tabs({ children, className, ...props }) {
   return (
-    <HeadlessTab.Group selectedIndex={selectedIndex} onChange={handleChange}>
+    <HeadlessTab.Group as="div" className={classNames(styles.tabs, className)} {...props}>
       {children}
     </HeadlessTab.Group>
   );
-};
+}
 
-export const TabsList = ({ children }) => {
+Tabs.List = function TabList({ children, className, ...props }) {
   return (
-    <HeadlessTab.List className="tabs-list">
+    <HeadlessTab.List className={classNames(styles.tabList, className)} {...props}>
       {children}
     </HeadlessTab.List>
   );
 };
 
-export const TabsTab = ({ children, value }) => {
+Tabs.Tab = function Tab({ children, className, ...props }) {
   return (
-    <HeadlessTab as={Fragment}>
-      {({ selected }) => (
-        <button className={`tabs-tab ${selected ? 'tabs-tab-active' : ''}`}>
-          {children}
-        </button>
-      )}
+    <HeadlessTab
+      className={({ selected }) =>
+        classNames(
+          styles.tab,
+          selected && styles.selected,
+          className
+        )
+      }
+      {...props}
+    >
+      {children}
     </HeadlessTab>
   );
 };
 
-export const TabsPanels = ({ children }) => {
+Tabs.Panels = function TabPanels({ children, className, ...props }) {
   return (
-    <HeadlessTab.Panels className="tabs-panels">
+    <HeadlessTab.Panels className={classNames(styles.tabPanels, className)} {...props}>
       {children}
     </HeadlessTab.Panels>
   );
 };
 
-export const TabsPanel = ({ children }) => {
+Tabs.Panel = function TabPanel({ children, className, ...props }) {
   return (
-    <HeadlessTab.Panel className="tabs-panel">
+    <HeadlessTab.Panel className={classNames(styles.tabPanel, className)} {...props}>
       {children}
     </HeadlessTab.Panel>
   );
 };
+
+export default Tabs;
