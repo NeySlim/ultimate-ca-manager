@@ -1,128 +1,169 @@
-import React, { useState } from 'react';
-import { List, Pencil, ArrowClockwise, Folder, Calendar, X } from '@phosphor-icons/react';
-import DashboardGrid from '../components/DashboardGrid';
-import StatWidget from '../components/widgets/StatWidget';
-import ChartWidget from '../components/widgets/ChartWidget';
-import LogWidget from '../components/widgets/LogWidget';
-import ActivityWidget from '../components/widgets/ActivityWidget';
-import StatusWidget from '../components/widgets/StatusWidget';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { House, Certificate, ShieldCheck, Globe, Users, WarningCircle, CheckCircle, Clock } from '@phosphor-icons/react';
+import { Stack, Group, Card, Text, Button, Loader, Badge } from '../../../components/ui';
+import { dashboardService } from '../services/dashboard.service';
 import './DashboardPage.css';
 
-const DashboardPage = () => {
-  const [editMode, setEditMode] = useState(false);
-  const [loading, setLoading] = useState(false);
+const StatCard = ({ icon, label, value, trend, loading }) => (
+  <Card className="stat-card">
+    <div className="stat-icon">{icon}</div>
+    <div className="stat-content">
+      <Text className="stat-label">{label}</Text>
+      {loading ? (
+        <Loader size="sm" />
+      ) : (
+        <>
+          <Text className="stat-value">{value || '0'}</Text>
+          {trend && (
+            <Text className={`stat-trend ${trend.isPositive ? 'positive' : 'negative'}`}>
+              {trend.isPositive ? '+' : ''}{trend.value}
+            </Text>
+          )}
+        </>
+      )}
+    </div>
+  </Card>
+);
 
-  const handleRefresh = () => {
-    setLoading(true);
-    // Simulate refresh
-    setTimeout(() => {
+const DashboardPage = () => {
+  const [stats, setStats] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [activity, setActivity] = useState([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+      const [statsData, activityData] = await Promise.all([
+        dashboardService.getStats(),
+        dashboardService.getRecentActivity({ limit: 10 })
+      ]);
+      setStats(statsData || {});
+      setActivity(activityData?.activity || []);
+    } catch (error) {
+      console.error('Failed to load dashboard:', error);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
     <div className="dashboard-page">
-      {/* Toolbar */}
-      <div className="dashboard-toolbar">
-        <div className="toolbar-left">
-          <h2 className="page-title">Dashboard</h2>
-        </div>
-
-        <div className="toolbar-actions">
-          <button 
-            className={`toolbar-btn ${editMode ? 'active' : ''}`}
-            onClick={() => setEditMode(!editMode)}
-            title={editMode ? 'Exit edit mode' : 'Enter edit mode'}
-          >
-            <Pencil size={16} weight={editMode ? 'fill' : 'regular'} />
-            <span>{editMode ? 'Editing' : 'Edit'}</span>
-          </button>
-
-          <button 
-            className="toolbar-btn"
-            onClick={handleRefresh}
-            disabled={loading}
-            title="Refresh dashboard"
-          >
-            <ArrowClockwise size={16} weight="regular" style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-            <span>Refresh</span>
-          </button>
-        </div>
+      {/* Page Header */}
+      <div className="page-header">
+        <Group>
+          <House size={24} weight="duotone" className="icon-gradient" />
+          <div>
+            <h1 className="page-title">Dashboard</h1>
+            <Text className="page-subtitle">System Overview & Recent Activity</Text>
+          </div>
+        </Group>
+        <Button variant="primary" onClick={() => loadDashboard()}>
+          Refresh
+        </Button>
       </div>
 
-      {/* Dashboard Grid with Widgets */}
-      <DashboardGrid editMode={editMode}>
-        {/* Top Row - Stats */}
-        <div className="widget-1-3">
-          <StatWidget
-            icon={<Folder size={32} weight="duotone" className="icon-gradient-glow" />}
-            value="1,248"
-            label="Total Certificates"
-            trend={{ value: 12, isPositive: true }}
-            color="blue"
-          />
-        </div>
+      {/* Stats Grid */}
+      <div className="stats-grid">
+        <StatCard
+          icon={<ShieldCheck size={32} weight="duotone" className="icon-gradient" />}
+          label="Certificate Authorities"
+          value={stats.cas_count}
+          loading={loading}
+        />
+        <StatCard
+          icon={<Certificate size={32} weight="duotone" className="icon-gradient" />}
+          label="Total Certificates"
+          value={stats.certs_count}
+          loading={loading}
+        />
+        <StatCard
+          icon={<WarningCircle size={32} weight="duotone" style={{ color: 'var(--status-warning)' }} />}
+          label="Expiring Soon"
+          value={stats.expiring_count}
+          loading={loading}
+        />
+        <StatCard
+          icon={<Globe size={32} weight="duotone" className="icon-gradient" />}
+          label="ACME Orders"
+          value={stats.acme_orders_count}
+          loading={loading}
+        />
+      </div>
 
-        <div className="widget-1-3">
-          <StatWidget
-            icon={<Calendar size={32} weight="duotone" className="icon-gradient-glow" />}
-            value="5"
-            label="Expiring Soon"
-            trend={{ value: 2, isPositive: false }}
-            color="orange"
-          />
-        </div>
+      {/* Main Content Grid */}
+      <div className="dashboard-grid">
+        {/* Recent Activity */}
+        <Card className="dashboard-card">
+          <div className="card-header-custom">
+            <h3 className="card-title">Recent Activity</h3>
+            <Button size="sm" onClick={() => navigate('/audit')}>View All</Button>
+          </div>
+          <Stack className="activity-list">
+            {loading ? (
+              <div className="loading-center"><Loader /></div>
+            ) : activity.length === 0 ? (
+              <Text className="empty-state">No recent activity</Text>
+            ) : (
+              activity.map((item, idx) => (
+                <div key={idx} className="activity-item">
+                  <div className="activity-icon">
+                    {item.type === 'cert_issued' && <CheckCircle size={20} weight="fill" style={{ color: 'var(--status-success)' }} />}
+                    {item.type === 'cert_revoked' && <WarningCircle size={20} weight="fill" style={{ color: 'var(--status-error)' }} />}
+                    {item.type === 'ca_created' && <ShieldCheck size={20} weight="fill" style={{ color: 'var(--status-info)' }} />}
+                  </div>
+                  <div className="activity-content">
+                    <Text className="activity-title">{item.description}</Text>
+                    <Text className="activity-time">{item.timestamp}</Text>
+                  </div>
+                </div>
+              ))
+            )}
+          </Stack>
+        </Card>
 
-        <div className="widget-1-3">
-          <StatWidget
-            icon={<X size={32} weight="duotone" className="icon-gradient-glow" />}
-            value="2"
-            label="Revoked"
-            trend={{ value: 0, isPositive: true }}
-            color="red"
-          />
-        </div>
-
-        {/* Middle Row - Chart */}
-        <div className="widget-2-3">
-          <ChartWidget 
-            title="Certificates Issued (Last 6 Months)" 
-            size="widget-2-3"
-          />
-        </div>
-
-        {/* Status Widget */}
-        <div className="widget-1-3">
-          <StatusWidget 
-            title="System Status" 
-            size="widget-1-3"
-          />
-        </div>
-
-        {/* Activity Widget - Full Width */}
-        <div className="widget-full">
-          <ActivityWidget 
-            title="Recent Activity" 
-            size="widget-full"
-          />
-        </div>
-
-        {/* Logs Widget - Full Width */}
-        <div className="widget-full">
-          <LogWidget 
-            title="Recent Logs" 
-            maxHeight="250px"
-            size="widget-full"
-          />
-        </div>
-      </DashboardGrid>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+        {/* System Status */}
+        <Card className="dashboard-card">
+          <div className="card-header-custom">
+            <h3 className="card-title">System Status</h3>
+          </div>
+          <Stack>
+            <div className="status-item">
+              <Group>
+                <div className="status-dot online"></div>
+                <Text>UCM Core</Text>
+              </Group>
+              <Badge variant="active">Online</Badge>
+            </div>
+            <div className="status-item">
+              <Group>
+                <div className="status-dot online"></div>
+                <Text>Database</Text>
+              </Group>
+              <Badge variant="active">Operational</Badge>
+            </div>
+            <div className="status-item">
+              <Group>
+                <div className="status-dot online"></div>
+                <Text>ACME Service</Text>
+              </Group>
+              <Badge variant="active">Running</Badge>
+            </div>
+            <div className="status-item">
+              <Group>
+                <div className="status-dot online"></div>
+                <Text>SCEP Service</Text>
+              </Group>
+              <Badge variant="active">Running</Badge>
+            </div>
+          </Stack>
+        </Card>
+      </div>
     </div>
   );
 };

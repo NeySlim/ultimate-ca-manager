@@ -1,22 +1,19 @@
 import { api } from '../../../core/api/client';
 
-export const CsrService = {
-  getAll: async (params = {}) => {
-    const response = await api.get('/csrs', { params });
-    return response.data;
+export const csrService = {
+  async getAll(params = {}) {
+    return await api.get('/csrs', { params });
   },
 
-  getById: async (id) => {
-    const response = await api.get(`/csrs/${id}`);
-    return response.data;
+  async getById(id) {
+    return await api.get(`/csrs/${id}`);
   },
 
-  create: async (data) => {
-    const response = await api.post('/csrs', data);
-    return response.data;
+  async create(data) {
+    return await api.post('/csrs', data);
   },
 
-  delete: async (id) => {
-    await api.delete(`/csrs/${id}`);
-  }
+  async delete(id) {
+    return await api.delete(`/csrs/${id}`);
+  },
 };
