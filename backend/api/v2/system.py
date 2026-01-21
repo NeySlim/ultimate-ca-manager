@@ -15,7 +15,7 @@ from datetime import datetime
 
 bp = Blueprint('system_v2', __name__)
 
-@bp.route('/api/system/db/stats', methods=['GET'])
+@bp.route('/api/v2/system/db/stats', methods=['GET'])
 @require_auth(['read:settings'])
 def get_db_stats():
     """Get database statistics"""
@@ -47,7 +47,7 @@ def get_db_stats():
     except Exception as e:
         return error_response(f"Failed to get stats: {str(e)}")
 
-@bp.route('/api/system/db/optimize', methods=['POST'])
+@bp.route('/api/v2/system/db/optimize', methods=['POST'])
 @require_auth(['admin:system'])
 def optimize_db():
     """Run VACUUM and ANALYZE"""
@@ -58,7 +58,7 @@ def optimize_db():
     except Exception as e:
         return error_response(f"Optimization failed: {str(e)}")
 
-@bp.route('/api/system/db/integrity-check', methods=['POST'])
+@bp.route('/api/v2/system/db/integrity-check', methods=['POST'])
 @require_auth(['admin:system'])
 def check_integrity():
     """Run PRAGMA integrity_check"""
@@ -71,7 +71,7 @@ def check_integrity():
     except Exception as e:
         return error_response(f"Check failed: {str(e)}")
 
-@bp.route('/api/system/https/cert-info', methods=['GET'])
+@bp.route('/api/v2/system/https/cert-info', methods=['GET'])
 @require_auth(['read:settings'])
 def get_https_cert_info():
     """Get information about the current HTTPS certificate"""
@@ -85,7 +85,7 @@ def get_https_cert_info():
         'source': 'auto' # or 'managed'
     })
 
-@bp.route('/api/system/https/regenerate', methods=['POST'])
+@bp.route('/api/v2/system/https/regenerate', methods=['POST'])
 @require_auth(['admin:system'])
 def regenerate_https_cert():
     """Regenerate self-signed HTTPS certificate"""
@@ -93,7 +93,7 @@ def regenerate_https_cert():
     # Service restart required
     return success_response(message="Certificate regenerated. Service restart required.")
 
-@bp.route('/api/system/https/apply', methods=['POST'])
+@bp.route('/api/v2/system/https/apply', methods=['POST'])
 @require_auth(['admin:system'])
 def apply_https_cert():
     """Apply a managed certificate to HTTPS"""
@@ -111,21 +111,21 @@ def apply_https_cert():
     # and trigger restart
     return success_response(message="Certificate applied. Service restart required.")
 
-@bp.route('/api/system/db/export', methods=['GET'])
+@bp.route('/api/v2/system/db/export', methods=['GET'])
 @require_auth(['admin:system'])
 def export_db():
     """Export SQL dump"""
     # Placeholder: Return a dummy file
     return "SQL DUMP CONTENT", 200, {'Content-Type': 'application/sql', 'Content-Disposition': 'attachment; filename=dump.sql'}
 
-@bp.route('/api/system/db/reset', methods=['POST'])
+@bp.route('/api/v2/system/db/reset', methods=['POST'])
 @require_auth(['admin:system'])
 def reset_pki():
     """Reset PKI Database"""
     # Logic to drop tables or delete file
     return success_response(message="PKI Database reset successfully. System restarting...")
 
-@bp.route('/api/system/backup/create', methods=['POST'])
+@bp.route('/api/v2/system/backup/create', methods=['POST'])
 @require_auth(['admin:system'])
 def create_backup():
     """Create encrypted backup"""
@@ -160,7 +160,7 @@ def create_backup():
     except Exception as e:
         return error_response(f"Backup failed: {str(e)}")
 
-@bp.route('/api/system/backup/list', methods=['GET'])
+@bp.route('/api/v2/system/backup/list', methods=['GET'])
 @require_auth(['read:settings'])
 def list_backups():
     """List available backups"""
@@ -187,7 +187,7 @@ def list_backups():
     except Exception as e:
         return error_response(f"Failed to list backups: {str(e)}")
 
-@bp.route('/api/system/backup/<filename>/download', methods=['GET'])
+@bp.route('/api/v2/system/backup/<filename>/download', methods=['GET'])
 @require_auth(['read:settings'])
 def download_backup(filename):
     """Download backup file"""
@@ -200,7 +200,7 @@ def download_backup(filename):
         mimetype='application/octet-stream'
     )
 
-@bp.route('/api/system/backup/restore', methods=['POST'])
+@bp.route('/api/v2/system/backup/restore', methods=['POST'])
 @require_auth(['admin:system'])
 def restore_backup():
     """Restore from backup"""

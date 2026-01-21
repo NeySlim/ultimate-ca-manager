@@ -10,7 +10,7 @@ from utils.response import success_response, error_response, created_response, n
 bp = Blueprint('certificates_v2', __name__)
 
 
-@bp.route('/api/certificates', methods=['GET'])
+@bp.route('/api/v2/certificates', methods=['GET'])
 @require_auth(['read:certificates'])
 def list_certificates():
     """List certificates"""
@@ -24,7 +24,7 @@ def list_certificates():
     )
 
 
-@bp.route('/api/certificates', methods=['POST'])
+@bp.route('/api/v2/certificates', methods=['POST'])
 @require_auth(['write:certificates'])
 def create_certificate():
     """Create certificate"""
@@ -42,21 +42,21 @@ def create_certificate():
     )
 
 
-@bp.route('/api/certificates/<int:cert_id>', methods=['GET'])
+@bp.route('/api/v2/certificates/<int:cert_id>', methods=['GET'])
 @require_auth(['read:certificates'])
 def get_certificate(cert_id):
     """Get certificate details"""
     return success_response(data={'id': cert_id})
 
 
-@bp.route('/api/certificates/<int:cert_id>', methods=['DELETE'])
+@bp.route('/api/v2/certificates/<int:cert_id>', methods=['DELETE'])
 @require_auth(['delete:certificates'])
 def delete_certificate(cert_id):
     """Delete certificate"""
     return no_content_response()
 
 
-@bp.route('/api/certificates/<int:cert_id>/export', methods=['GET'])
+@bp.route('/api/v2/certificates/<int:cert_id>/export', methods=['GET'])
 @require_auth(['read:certificates'])
 def export_certificate(cert_id):
     """Export certificate (PEM/DER/PKCS12)"""
@@ -69,7 +69,7 @@ def export_certificate(cert_id):
     })
 
 
-@bp.route('/api/certificates/<int:cert_id>/revoke', methods=['POST'])
+@bp.route('/api/v2/certificates/<int:cert_id>/revoke', methods=['POST'])
 @require_auth(['write:certificates'])
 def revoke_certificate(cert_id):
     """Revoke certificate"""
@@ -82,7 +82,7 @@ def revoke_certificate(cert_id):
     )
 
 
-@bp.route('/api/certificates/<int:cert_id>/renew', methods=['POST'])
+@bp.route('/api/v2/certificates/<int:cert_id>/renew', methods=['POST'])
 @require_auth(['write:certificates'])
 def renew_certificate(cert_id):
     """Renew certificate"""
@@ -92,7 +92,7 @@ def renew_certificate(cert_id):
     )
 
 
-@bp.route('/api/certificates/import', methods=['POST'])
+@bp.route('/api/v2/certificates/import', methods=['POST'])
 @require_auth(['write:certificates'])
 def import_certificate():
     """

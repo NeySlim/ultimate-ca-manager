@@ -12,7 +12,7 @@ import datetime
 
 bp = Blueprint('csrs_v2', __name__)
 
-@bp.route('/api/csrs', methods=['GET'])
+@bp.route('/api/v2/csrs', methods=['GET'])
 @require_auth(['read:csrs'])
 def list_csrs():
     """List all pending CSRs (Certificates with no crt)"""
@@ -49,7 +49,7 @@ def list_csrs():
         }
     )
 
-@bp.route('/api/csrs/<int:csr_id>', methods=['GET'])
+@bp.route('/api/v2/csrs/<int:csr_id>', methods=['GET'])
 @require_auth(['read:csrs'])
 def get_csr(csr_id):
     """Get CSR details"""
@@ -62,7 +62,7 @@ def get_csr(csr_id):
     
     return success_response(data=data)
 
-@bp.route('/api/csrs', methods=['POST'])
+@bp.route('/api/v2/csrs', methods=['POST'])
 @require_auth(['write:csrs'])
 def create_csr():
     """Create a new CSR"""
@@ -105,7 +105,7 @@ def create_csr():
     except Exception as e:
         return error_response(f"Failed to create CSR: {str(e)}", 500)
 
-@bp.route('/api/csrs/<int:csr_id>', methods=['DELETE'])
+@bp.route('/api/v2/csrs/<int:csr_id>', methods=['DELETE'])
 @require_auth(['delete:csrs'])
 def delete_csr(csr_id):
     """Delete a CSR"""
