@@ -125,10 +125,26 @@
   line-height: 1;
 }
 
-/* Responsive */
+/* Responsive - more aggressive breakpoints */
+@media (max-width: 1600px) {
+  .statsGrid {
+    grid-template-columns: repeat(4, 1fr); /* Keep 4 columns */
+  }
+}
+
 @media (max-width: 1200px) {
   .statsGrid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr); /* Keep 4 columns even on smaller screens */
+  }
+  
+  .overviewGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr); /* Only 2 columns on tablets */
   }
   
   .overviewGrid {
@@ -138,7 +154,7 @@
 
 @media (max-width: 768px) {
   .statsGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr; /* 1 column on mobile */
   }
   
   .overviewGrid {
