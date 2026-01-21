@@ -1,0 +1,7 @@
+/* User List Page Styles */
+
+.userList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
