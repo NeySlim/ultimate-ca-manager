@@ -1,0 +1,80 @@
+/* StatCard Styles - Dashboard Reference */
+
+.widget {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  padding: var(--spacing-lg);
+  transition: all 0.15s;
+  grid-column: span 3;
+  min-height: 140px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.widget:hover {
+  border-color: var(--border-secondary);
+}
+
+.widgetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+.widgetTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.widgetIcon {
+  opacity: 0.3;
+  color: var(--text-tertiary);
+}
+
+.widgetValue {
+  font-size: 32px;
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+  color: var(--text-primary);
+}
+
+.widgetValue.gradient {
+  background: linear-gradient(135deg, var(--accent-gradient-start), var(--accent-gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.widgetLabel {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* Stat Trend */
+.statTrend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 11px;
+  margin-top: var(--spacing-xs);
+}
+
+.statTrend.positive {
+  color: var(--status-success);
+}
+
+.statTrend.negative {
+  color: var(--status-danger);
+}
+
+/* Widget size variants */
+.widget[data-cols="2"] { grid-column: span 2; }
+.widget[data-cols="3"] { grid-column: span 3; }
+.widget[data-cols="4"] { grid-column: span 4; }
+.widget[data-cols="6"] { grid-column: span 6; }
+.widget[data-cols="12"] { grid-column: span 12; }
