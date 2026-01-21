@@ -1,121 +1,169 @@
-import { Tabs } from '../../components/ui/Tabs';
+import { StatCard } from '../../components/domain/StatCard';
 import { DataTable } from '../../components/domain/DataTable';
-import { SearchToolbar } from '../../components/domain/SearchToolbar';
+import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { getTrustStoreCertificates } from '../../services/mockData';
+import { Badge } from '../../components/ui/Badge';
 import styles from './TrustStore.module.css';
 
-/**
- * Trust Store Page
- * 
- * Two tabs:
- * - System Trust Store (Mozilla CA bundle)
- * - Custom Trust Store (user-added CAs)
- */
 export function TrustStore() {
-  const trustCerts = getTrustStoreCertificates();
+  const trustedCAs = [
+    {
+      id: 1,
+      name: 'DigiCert Global Root CA',
+      subject: 'CN=DigiCert Global Root CA',
+      fingerprint: 'A8:98:5D:3A:65:E5:...',
+      validUntil: '2031-11-10',
+      usage: ['TLS Server', 'TLS Client'],
+      autoTrusted: true,
+    },
+    {
+      id: 2,
+      name: "Let's Encrypt Root CA X1",
+      subject: 'CN=ISRG Root X1',
+      fingerprint: '96:BC:EC:06:26:49:...',
+      validUntil: '2035-06-04',
+      usage: ['TLS Server'],
+      autoTrusted: true,
+    },
+    {
+      id: 3,
+      name: 'Corporate Root CA',
+      subject: 'CN=Corp Root CA, O=Example Corp',
+      fingerprint: '4F:3A:B2:C8:9D:E1:...',
+      validUntil: '2034-01-15',
+      usage: ['TLS Server', 'TLS Client', 'Email'],
+      autoTrusted: false,
+    },
+    {
+      id: 4,
+      name: 'Internal Development CA',
+      subject: 'CN=Dev CA, O=Example Corp',
+      fingerprint: '7B:2F:8A:D3:E6:4C:...',
+      validUntil: '2026-08-20',
+      usage: ['TLS Server', 'Code Signing'],
+      autoTrusted: false,
+    },
+    {
+      id: 5,
+      name: 'GlobalSign Root CA',
+      subject: 'CN=GlobalSign',
+      fingerprint: 'EB:D4:10:40:E4:BB:...',
+      validUntil: '2028-01-28',
+      usage: ['TLS Server', 'TLS Client'],
+      autoTrusted: true,
+    },
+  ];
 
   const columns = [
     {
       key: 'name',
-      label: 'Certificate Name',
-      sortable: true,
-    },
-    {
-      key: 'issuer',
-      label: 'Issuer',
-      sortable: true,
-    },
-    {
-      key: 'expires',
-      label: 'Expires',
-      sortable: true,
-    },
-    {
-      key: 'type',
-      label: 'Type',
-      sortable: true,
+      label: 'Name',
+      render: (row) => (
+        <div>
+          <div style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '2px' }}>
+            {row.name}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+            {row.subject}
+          </div>
+        </div>
+      ),
     },
     {
       key: 'fingerprint',
-      label: 'Fingerprint (SHA1)',
+      label: 'Fingerprint',
       render: (row) => (
-        <code className={styles.fingerprint}>{row.fingerprint}</code>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-tertiary)' }}>
+          {row.fingerprint}
+        </span>
       ),
     },
-  ];
-
-  const customColumns = [
-    ...columns,
+    {
+      key: 'validUntil',
+      label: 'Valid Until',
+    },
+    {
+      key: 'usage',
+      label: 'Usage',
+      render: (row) => (
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {row.usage.map((u, idx) => (
+            <Badge key={idx} variant="info">{u}</Badge>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: 'autoTrusted',
+      label: 'Auto-Trusted',
+      render: (row) =>
+        row.autoTrusted ? (
+          <Badge variant="success">
+            <i className="ph ph-check" style={{ marginRight: '4px' }} />
+            Yes
+          </Badge>
+        ) : (
+          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>No</span>
+        ),
+    },
     {
       key: 'actions',
       label: 'Actions',
       render: (row) => (
-        <Button variant="danger" icon="ph ph-trash" onClick={() => console.log('Delete:', row)}>
-          Remove
-        </Button>
+        <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+          <Button variant="default" size="sm" icon="ph ph-eye" onClick={() => console.log('View:', row)} />
+          <Button variant="default" size="sm" icon="ph ph-trash" onClick={() => console.log('Remove:', row)} />
+        </div>
       ),
     },
   ];
 
-  const filters = [
-    {
-      label: 'Type',
-      options: ['All Types', 'Root CA', 'Intermediate CA', 'Bundle'],
-    },
-  ];
-
-  const actions = [
-    { label: 'Add Certificate', icon: 'ph ph-plus', variant: 'primary' },
-    { label: 'Sync Mozilla Bundle', icon: 'ph ph-arrow-clockwise', variant: 'default' },
-  ];
-
   return (
     <div className={styles.trustStore}>
-      <Tabs>
-        <Tabs.List>
-          <Tabs.Tab>System Trust Store</Tabs.Tab>
-          <Tabs.Tab>Custom Trust Store</Tabs.Tab>
-        </Tabs.List>
+      <div className={styles.statsRow}>
+        <StatCard
+          value="12"
+          label="Trusted CAs"
+          description="Active trust anchors"
+        />
+        <StatCard
+          value="45"
+          label="System Trust Store"
+          description="OS trust store entries"
+        />
+        <StatCard
+          value="2 days ago"
+          label="Last Updated"
+          description="Manual sync available"
+        />
+        <StatCard
+          value={
+            <Badge variant="success">
+              <i className="ph ph-check-circle" style={{ marginRight: '4px' }} />
+              Enabled
+            </Badge>
+          }
+          label="Auto-Sync Status"
+          description="Daily at 03:00"
+        />
+      </div>
 
-        <Tabs.Panels>
-          {/* System Trust Store Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
-              <SearchToolbar
-                placeholder="Search system trust store..."
-                filters={filters}
-                actions={actions}
-                onSearch={(query) => console.log('Search:', query)}
-                onFilterChange={(filter, value) => console.log('Filter:', filter, value)}
-              />
-              <DataTable
-                columns={columns}
-                data={trustCerts.system}
-                onRowClick={(row) => console.log('Certificate clicked:', row)}
-              />
-            </div>
-          </Tabs.Panel>
-
-          {/* Custom Trust Store Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
-              <SearchToolbar
-                placeholder="Search custom trust store..."
-                filters={filters}
-                actions={actions}
-                onSearch={(query) => console.log('Search:', query)}
-                onFilterChange={(filter, value) => console.log('Filter:', filter, value)}
-              />
-              <DataTable
-                columns={customColumns}
-                data={trustCerts.custom}
-                onRowClick={(row) => console.log('Certificate clicked:', row)}
-              />
-            </div>
-          </Tabs.Panel>
-        </Tabs.Panels>
-      </Tabs>
+      <Card>
+        <Card.Header>
+          <h3>Trusted Certificate Authorities</h3>
+          <Button variant="default" icon="ph ph-funnel">
+            Filter
+          </Button>
+        </Card.Header>
+        <Card.Body>
+          <DataTable
+            columns={columns}
+            data={trustedCAs}
+            onRowClick={(row) => console.log('CA clicked:', row)}
+            pageSize={10}
+          />
+        </Card.Body>
+      </Card>
     </div>
   );
 }
