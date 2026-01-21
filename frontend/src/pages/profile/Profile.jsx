@@ -1,229 +1,253 @@
-import { Tabs } from '../../components/ui/Tabs';
-import { Card } from '../../components/ui/Card';
-import { DataTable } from '../../components/domain/DataTable';
-import { ActivityFeed } from '../../components/domain/ActivityFeed';
+import { useState } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { getBadgeVariant } from '../../utils/getBadgeVariant';
-import { getProfileData } from '../../services/mockData';
 import styles from './Profile.module.css';
 
 /**
  * Profile Page
  * 
- * Four tabs:
- * - Account (user information)
- * - Security (password, MFA, sessions)
- * - Activity (user activity log)
- * - Preferences (UI preferences)
+ * Reference: prototype-profile.html
+ * - TopBar with title + save/discard buttons
+ * - 4 tabs: Profile, Security, Notifications, Preferences
+ * - Form sections with avatar, personal info, password, client certs
  */
 export function Profile() {
-  const profile = getProfileData();
-
-  const sessionColumns = [
-    {
-      key: 'browser',
-      label: 'Browser',
-      sortable: true,
-    },
-    {
-      key: 'os',
-      label: 'Operating System',
-      sortable: true,
-    },
-    {
-      key: 'ip',
-      label: 'IP Address',
-      sortable: true,
-    },
-    {
-      key: 'loginAt',
-      label: 'Login At',
-      sortable: true,
-    },
-    {
-      key: 'current',
-      label: 'Status',
-      render: (row) => (
-        row.current ? (
-          <Badge variant="success">Current</Badge>
-        ) : (
-          <Button variant="danger" icon="ph ph-x" onClick={() => console.log('Revoke:', row)}>
-            Revoke
-          </Button>
-        )
-      ),
-    },
-  ];
+  const [activeTab, setActiveTab] = useState('profile');
 
   return (
     <div className={styles.profile}>
-      <Tabs>
-        <Tabs.List>
-          <Tabs.Tab>Account</Tabs.Tab>
-          <Tabs.Tab>Security</Tabs.Tab>
-          <Tabs.Tab>Activity</Tabs.Tab>
-          <Tabs.Tab>Preferences</Tabs.Tab>
-        </Tabs.List>
+      <div className={styles.topbar}>
+        <div className={styles.topbarTitle}>
+          <i className="ph ph-user-circle"></i>
+          My Profile
+        </div>
+        <div className={styles.topbarActions}>
+          <Button variant="default" icon="ph ph-arrow-counter-clockwise">Discard Changes</Button>
+          <Button variant="primary" icon="ph ph-floppy-disk">Save Changes</Button>
+        </div>
+      </div>
 
-        <Tabs.Panels>
-          {/* Account Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
-              <Card>
-                <Card.Header>
-                  <h3>Account Information</h3>
-                </Card.Header>
-                <Card.Body>
-                  <form className={styles.form}>
-                    <Input label="Username" value={profile.user.username} readOnly />
-                    <Input label="Email" value={profile.user.email} />
-                    <Input label="First Name" value={profile.user.firstName} />
-                    <Input label="Last Name" value={profile.user.lastName} />
-                    <Input label="Role" value={profile.user.role} readOnly />
-                    <Input label="Timezone" value={profile.user.timezone} />
-                    <Input label="Language" value={profile.user.language} />
-                    
-                    <div className={styles.metadata}>
-                      <div className={styles.metadataItem}>
-                        <span className={styles.metadataLabel}>Account Created</span>
-                        <span className={styles.metadataValue}>{profile.user.createdAt}</span>
-                      </div>
-                      <div className={styles.metadataItem}>
-                        <span className={styles.metadataLabel}>Last Login</span>
-                        <span className={styles.metadataValue}>{profile.user.lastLogin}</span>
-                      </div>
-                    </div>
-                    
-                    <div className={styles.formActions}>
-                      <Button variant="primary" icon="ph ph-floppy-disk">Save Changes</Button>
-                      <Button variant="default">Cancel</Button>
-                    </div>
-                  </form>
-                </Card.Body>
-              </Card>
+      <div className={styles.tabs}>
+        <button
+          className={`${styles.tab} ${activeTab === 'profile' ? styles.active : ''}`}
+          onClick={() => setActiveTab('profile')}
+        >
+          Profile
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'security' ? styles.active : ''}`}
+          onClick={() => setActiveTab('security')}
+        >
+          Security
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'notifications' ? styles.active : ''}`}
+          onClick={() => setActiveTab('notifications')}
+        >
+          Notifications
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'preferences' ? styles.active : ''}`}
+          onClick={() => setActiveTab('preferences')}
+        >
+          Preferences
+        </button>
+      </div>
+
+      <div className={styles.tabContent}>
+        {activeTab === 'profile' && (
+          <div className={styles.tabPanel}>
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Account Information</div>
+              
+              <div className={styles.avatarSection}>
+                <div className={styles.avatarLarge}>A</div>
+                <div className={styles.avatarActions}>
+                  <Button variant="default" icon="ph ph-upload">Upload Photo</Button>
+                  <Button variant="default" icon="ph ph-trash">Remove Photo</Button>
+                </div>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Username</label>
+                <input type="text" defaultValue="admin" readOnly />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Full Name</label>
+                <input type="text" defaultValue="Administrator" />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Email Address</label>
+                <input type="email" defaultValue="admin@ucm.local" />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Role</label>
+                <input type="text" defaultValue="Administrator" readOnly />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Department</label>
+                <input type="text" defaultValue="IT Operations" />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Phone Number</label>
+                <input type="tel" defaultValue="+1 555-0123" />
+              </div>
             </div>
-          </Tabs.Panel>
 
-          {/* Security Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
-              {/* Change Password */}
-              <Card>
-                <Card.Header>
-                  <h3>Change Password</h3>
-                </Card.Header>
-                <Card.Body>
-                  <form className={styles.form}>
-                    <Input label="Current Password" type="password" placeholder="Enter current password" />
-                    <Input label="New Password" type="password" placeholder="Enter new password" />
-                    <Input label="Confirm Password" type="password" placeholder="Confirm new password" />
-                    
-                    <div className={styles.metadata}>
-                      <div className={styles.metadataItem}>
-                        <span className={styles.metadataLabel}>Password Last Changed</span>
-                        <span className={styles.metadataValue}>{profile.security.passwordLastChanged}</span>
-                      </div>
-                    </div>
-                    
-                    <div className={styles.formActions}>
-                      <Button variant="primary" icon="ph ph-lock-key">Change Password</Button>
-                    </div>
-                  </form>
-                </Card.Body>
-              </Card>
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Bio</div>
+              <div className={styles.formGroup}>
+                <label>About Me</label>
+                <textarea placeholder="Tell us about yourself..." defaultValue="Senior system administrator managing certificate infrastructure." />
+              </div>
+            </div>
+          </div>
+        )}
 
-              {/* Two-Factor Authentication */}
-              <Card>
-                <Card.Header>
-                  <h3>Two-Factor Authentication</h3>
-                  <Badge variant={profile.security.mfaEnabled ? 'success' : 'secondary'}>
-                    {profile.security.mfaEnabled ? 'Enabled' : 'Disabled'}
-                  </Badge>
-                </Card.Header>
-                <Card.Body>
-                  <div className={styles.infoBox}>
-                    <div className={styles.infoIcon}>
-                      <i className="ph ph-shield-check" />
-                    </div>
-                    <div>
-                      <div className={styles.infoTitle}>Enhance Your Security</div>
-                      <div className={styles.infoText}>
-                        Two-factor authentication adds an extra layer of security to your account.
-                      </div>
-                    </div>
+        {activeTab === 'security' && (
+          <div className={styles.tabPanel}>
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Password</div>
+              <div className={styles.formGroup}>
+                <label>Current Password</label>
+                <input type="password" placeholder="Enter current password" />
+              </div>
+              <div className={styles.formGroup}>
+                <label>New Password</label>
+                <input type="password" placeholder="Enter new password" />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Confirm Password</label>
+                <input type="password" placeholder="Confirm new password" />
+              </div>
+              <div className={styles.formGroup}>
+                <Button variant="primary" icon="ph ph-lock">Change Password</Button>
+              </div>
+            </div>
+
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Two-Factor Authentication</div>
+              <div className={styles.formGroup}>
+                <label>Status</label>
+                <Badge variant="error">Disabled</Badge>
+              </div>
+              <div className={styles.formGroup}>
+                <Button variant="primary" icon="ph ph-shield-check">Enable 2FA</Button>
+              </div>
+            </div>
+
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Client Certificates</div>
+              <div className={styles.certList}>
+                <div className={styles.certItem}>
+                  <div className={styles.certInfo}>
+                    <div className={styles.certSubject}>CN=admin@ucm.local</div>
+                    <div className={styles.certMeta}>Valid until: 2025-12-31 • Serial: AB:CD:EF:12:34</div>
                   </div>
-                  <div className={styles.formActions}>
-                    {profile.security.mfaEnabled ? (
-                      <Button variant="danger" icon="ph ph-x">Disable 2FA</Button>
-                    ) : (
-                      <Button variant="success" icon="ph ph-shield-check">Enable 2FA</Button>
-                    )}
+                  <div className={styles.certActions}>
+                    <Button variant="default" size="sm" icon="ph ph-eye">View</Button>
+                    <Button variant="default" size="sm" icon="ph ph-download-simple">Download</Button>
+                    <Button variant="default" size="sm" icon="ph ph-trash">Revoke</Button>
                   </div>
-                </Card.Body>
-              </Card>
-
-              {/* Active Sessions */}
-              <Card>
-                <Card.Header>
-                  <h3>Active Sessions</h3>
-                </Card.Header>
-                <Card.Body>
-                  <DataTable
-                    columns={sessionColumns}
-                    data={profile.security.sessions}
-                  />
-                </Card.Body>
-              </Card>
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <Button variant="primary" icon="ph ph-plus">Generate New Certificate</Button>
+              </div>
             </div>
-          </Tabs.Panel>
+          </div>
+        )}
 
-          {/* Activity Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
-              <Card>
-                <Card.Header>
-                  <h3>Recent Activity</h3>
-                </Card.Header>
-                <Card.Body>
-                  <ActivityFeed items={profile.activity.map(item => ({
-                    icon: 'clock',
-                    text: `${item.action}: ${item.details}`,
-                    time: item.timestamp,
-                    variant: 'info',
-                  }))} />
-                </Card.Body>
-              </Card>
+        {activeTab === 'notifications' && (
+          <div className={styles.tabPanel}>
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Email Notifications</div>
+              <div className={styles.formGroup}>
+                <label className={styles.checkbox}>
+                  <input type="checkbox" defaultChecked />
+                  <span>Certificate Expiration Warnings</span>
+                </label>
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.checkbox}>
+                  <input type="checkbox" defaultChecked />
+                  <span>Security Alerts</span>
+                </label>
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.checkbox}>
+                  <input type="checkbox" />
+                  <span>System Maintenance Notifications</span>
+                </label>
+              </div>
             </div>
-          </Tabs.Panel>
 
-          {/* Preferences Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
-              <Card>
-                <Card.Header>
-                  <h3>UI Preferences</h3>
-                </Card.Header>
-                <Card.Body>
-                  <div className={styles.infoBox}>
-                    <div className={styles.infoIcon}>
-                      <i className="ph ph-palette" />
-                    </div>
-                    <div>
-                      <div className={styles.infoTitle}>Theme Settings</div>
-                      <div className={styles.infoText}>
-                        Use the theme picker in the top right to change your color scheme and accent color.
-                        Your preferences are saved automatically.
-                      </div>
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>In-App Notifications</div>
+              <div className={styles.formGroup}>
+                <label className={styles.checkbox}>
+                  <input type="checkbox" defaultChecked />
+                  <span>Show Desktop Notifications</span>
+                </label>
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.checkbox}>
+                  <input type="checkbox" defaultChecked />
+                  <span>Play Sound on Critical Alerts</span>
+                </label>
+              </div>
             </div>
-          </Tabs.Panel>
-        </Tabs.Panels>
-      </Tabs>
+          </div>
+        )}
+
+        {activeTab === 'preferences' && (
+          <div className={styles.tabPanel}>
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Display</div>
+              <div className={styles.formGroup}>
+                <label>Theme</label>
+                <select>
+                  <option>Dark</option>
+                  <option>Light</option>
+                  <option>Auto</option>
+                </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Timezone</label>
+                <select>
+                  <option>UTC</option>
+                  <option>Europe/Paris</option>
+                  <option>America/New_York</option>
+                </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Date Format</label>
+                <select>
+                  <option>YYYY-MM-DD</option>
+                  <option>DD/MM/YYYY</option>
+                  <option>MM/DD/YYYY</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Accessibility</div>
+              <div className={styles.formGroup}>
+                <label className={styles.checkbox}>
+                  <input type="checkbox" />
+                  <span>Reduce Animations</span>
+                </label>
+              </div>
+              <div className={styles.formGroup}>
+                <label className={styles.checkbox}>
+                  <input type="checkbox" />
+                  <span>High Contrast Mode</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
