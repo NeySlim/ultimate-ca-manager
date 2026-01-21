@@ -15,7 +15,7 @@
 .table th {
   background: var(--bg-tertiary);
   text-align: left;
-  padding: 8px 12px;
+  padding: var(--spacing-md);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -53,7 +53,7 @@
 }
 
 .table td {
-  padding: 8px 12px;
+  padding: var(--spacing-md);
   border-top: 1px solid var(--border-primary);
   color: var(--text-secondary);
   font-size: 13px;
@@ -121,4 +121,50 @@
 .loadingText {
   font-size: 14px;
   color: var(--text-tertiary);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md);
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.paginationInfo {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.paginationControls {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.paginationBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.paginationBtn:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.paginationBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

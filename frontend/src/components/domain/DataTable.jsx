@@ -31,9 +31,11 @@ export function DataTable({
   loading = false,
   emptyText = 'No data available',
   className,
+  itemsPerPage = 10,
 }) {
   const [sortColumn, setSortColumn] = useState(null);
   const [sortDirection, setSortDirection] = useState('asc');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const handleSort = (column) => {
     if (!column.sortable) return;
@@ -56,6 +58,20 @@ export function DataTable({
     if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
     return 0;
   });
+
+  // Pagination
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = sortedData.slice(startIndex, endIndex);
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
 
   if (loading) {
     return (
@@ -110,7 +126,7 @@ export function DataTable({
           </tr>
         </thead>
         <tbody>
-          {sortedData.map((row, rowIndex) => (
+          {paginatedData.map((row, rowIndex) => (
             <tr
               key={rowIndex}
               onClick={() => onRowClick && onRowClick(row)}
@@ -127,6 +143,31 @@ export function DataTable({
           ))}
         </tbody>
       </table>
+      
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className={styles.pagination}>
+          <div className={styles.paginationInfo}>
+            <span>Showing {startIndex + 1}-{Math.min(endIndex, sortedData.length)} of {sortedData.length}</span>
+          </div>
+          <div className={styles.paginationControls}>
+            <button 
+              className={styles.paginationBtn} 
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+            >
+              <Icon name="caret-left" size={14} />
+            </button>
+            <button 
+              className={styles.paginationBtn}
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+            >
+              <Icon name="caret-right" size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
