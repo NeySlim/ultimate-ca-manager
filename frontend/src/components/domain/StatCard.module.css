@@ -77,10 +77,3 @@
 .statTrend.negative {
   color: var(--status-warning);
 }
-
-/* Widget size variants */
-.widget[data-cols="2"] { grid-column: span 2; }
-.widget[data-cols="3"] { grid-column: span 3; }
-.widget[data-cols="4"] { grid-column: span 4; }
-.widget[data-cols="6"] { grid-column: span 6; }
-.widget[data-cols="12"] { grid-column: span 12; }

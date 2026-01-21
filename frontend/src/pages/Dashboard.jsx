@@ -76,8 +76,8 @@ export function Dashboard() {
 
   return (
     <div className={styles.dashboard}>
-      {/* 1. Stats Grid - 4 cards */}
-      <div className={styles.statsGrid}>
+      {/* 1. Stats - 4 widgets @ span 3 each (12-column grid) */}
+      <div className={styles.widgetSpan3}>
         <StatCard
           value="247"
           label="Active Certificates"
@@ -85,6 +85,8 @@ export function Dashboard() {
           trend={{ direction: 'up', text: '+12 this week', positive: true }}
           gradient
         />
+      </div>
+      <div className={styles.widgetSpan3}>
         <StatCard
           value="12"
           label="Expiring Soon"
@@ -93,6 +95,8 @@ export function Dashboard() {
           trend={{ direction: 'down', text: '5 critical (7 days)', positive: false }}
           variant="warning"
         />
+      </div>
+      <div className={styles.widgetSpan3}>
         <StatCard
           value="8"
           label="Pending Requests"
@@ -100,6 +104,8 @@ export function Dashboard() {
           icon="file-text"
           gradient
         />
+      </div>
+      <div className={styles.widgetSpan3}>
         <StatCard
           value="156"
           label="ACME Renewals"
@@ -110,8 +116,8 @@ export function Dashboard() {
         />
       </div>
 
-      {/* 2. System Overview */}
-      <div className={styles.systemOverview}>
+      {/* 2. System Overview - span 6 */}
+      <div className={`${styles.widget} ${styles.widgetSpan6}`}>
         <h2 className={styles.sectionTitle}>System Overview</h2>
         <div className={styles.overviewGrid}>
           {systemOverview.map(item => (
@@ -124,33 +130,35 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* 3. Alerts */}
-      <div className={styles.alertsSection}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Alerts</h2>
+      {/* 3. Alerts - span 6 */}
+      <div className={`${styles.widget} ${styles.widgetSpan6}`}>
+        <div className={styles.alertsHeader}>
+          <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Alerts</h2>
           <Badge variant="warning">3</Badge>
         </div>
         <div className={styles.alertsGrid}>
           <div className={styles.alertCard} data-variant="warning">
-            <Warning size={18} />
+            <Warning size={18} className={styles.alertIcon} style={{ color: 'var(--status-warning)' }} />
             <div className={styles.alertText}>5 certs<br />expire soon</div>
           </div>
           <div className={styles.alertCard} data-variant="info">
-            <Info size={18} />
+            <Info size={18} className={styles.alertIcon} style={{ color: 'var(--status-info)' }} />
             <div className={styles.alertText}>8 CSRs<br />pending</div>
           </div>
           <div className={styles.alertCard} data-variant="success">
-            <CheckCircle size={18} />
+            <CheckCircle size={18} className={styles.alertIcon} style={{ color: 'var(--status-success)' }} />
             <div className={styles.alertText}>Backup<br />OK</div>
           </div>
         </div>
       </div>
 
-      {/* 4. Expiring Certificates Table */}
-      <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Certificates Expiring Soon</h2>
-          <Button variant="secondary">View All (12)</Button>
+      {/* 4. Expiring Certificates Table - span 12 */}
+      <div className={`${styles.widget} ${styles.widgetSpan12}`} style={{ padding: 0 }}>
+        <div style={{ padding: 'var(--spacing-lg)', paddingBottom: 'var(--spacing-sm)' }}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Certificates Expiring Soon</h2>
+            <Button variant="secondary">View All (12)</Button>
+          </div>
         </div>
         <DataTable
           columns={certColumns}
@@ -159,8 +167,8 @@ export function Dashboard() {
         />
       </div>
 
-      {/* 5. Recent Activity */}
-      <div className={styles.section}>
+      {/* 5. Recent Activity - span 12 */}
+      <div className={`${styles.widget} ${styles.widgetSpan12}`}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Recent Activity</h2>
           <Button variant="secondary">View All</Button>
