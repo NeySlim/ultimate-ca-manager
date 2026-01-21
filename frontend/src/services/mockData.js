@@ -131,3 +131,241 @@ export function getPKIOperations() {
     { icon: 'list-checks', text: 'OCSP responder status updated', time: '3 days ago', user: 'system', gradient: true },
   ];
 }
+
+/**
+ * Certificate Authorities
+ */
+export function getCAs() {
+  return [
+    // Root CAs
+    { id: 1, name: 'ACME Root CA', type: 'root', status: 'active', validUntil: '2036-01-15', certificates: 3, parent: null },
+    { id: 2, name: 'ACME Root CA v2', type: 'root', status: 'active', validUntil: '2038-06-20', certificates: 2, parent: null },
+    { id: 3, name: 'Legacy Root CA', type: 'root', status: 'expired', validUntil: '2020-12-31', certificates: 0, parent: null },
+    
+    // Intermediate CAs (ACME Root CA children)
+    { id: 4, name: 'ACME Intermediate CA', type: 'intermediate', status: 'active', validUntil: '2031-01-15', certificates: 85, parent: 1 },
+    { id: 5, name: 'Production Intermediate CA', type: 'intermediate', status: 'active', validUntil: '2032-03-20', certificates: 124, parent: 1 },
+    { id: 6, name: 'Staging Intermediate CA', type: 'intermediate', status: 'active', validUntil: '2030-11-10', certificates: 38, parent: 1 },
+    
+    // Intermediate CAs (ACME Root CA v2 children)
+    { id: 7, name: 'Development CA', type: 'intermediate', status: 'active', validUntil: '2033-06-20', certificates: 45, parent: 2 },
+    { id: 8, name: 'Testing CA', type: 'intermediate', status: 'active', validUntil: '2033-06-20', certificates: 22, parent: 2 },
+    
+    // Sub-intermediate CAs
+    { id: 9, name: 'Web Server CA', type: 'intermediate', status: 'active', validUntil: '2029-01-15', certificates: 62, parent: 4 },
+    { id: 10, name: 'Email CA', type: 'intermediate', status: 'active', validUntil: '2029-01-15', certificates: 18, parent: 4 },
+    { id: 11, name: 'Code Signing CA', type: 'intermediate', status: 'active', validUntil: '2028-03-20', certificates: 5, parent: 5 },
+    { id: 12, name: 'VPN CA', type: 'intermediate', status: 'active', validUntil: '2028-11-10', certificates: 12, parent: 6 },
+  ];
+}
+
+/**
+ * Certificates
+ */
+export function getCertificates() {
+  const cas = ['ACME Intermediate CA', 'Production Intermediate CA', 'Web Server CA', 'Email CA', 'VPN CA'];
+  const statuses = ['valid', 'valid', 'valid', 'expiring', 'expired', 'revoked'];
+  const keySizes = ['2048', '4096'];
+  const algorithms = ['RSA', 'ECDSA'];
+  
+  const certs = [];
+  const domains = [
+    'api.acme.com', 'www.acme.com', 'mail.acme.com', 'vpn.acme.com', 'db.acme.com',
+    'staging.acme.com', 'dev.acme.com', 'test.acme.com', 'admin.acme.com', 'portal.acme.com',
+    'smtp.acme.com', 'imap.acme.com', 'ldap.acme.com', 'monitoring.acme.com', 'backup.acme.com',
+    '*.prod.acme.com', '*.staging.acme.com', '*.dev.acme.com', 'old.acme.com', 'legacy.acme.com',
+  ];
+  
+  for (let i = 0; i < 50; i++) {
+    const validFrom = new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1);
+    const validUntil = new Date(validFrom);
+    validUntil.setFullYear(validUntil.getFullYear() + 2);
+    
+    certs.push({
+      id: i + 1,
+      commonName: i < domains.length ? domains[i] : `server${i}.acme.com`,
+      ca: cas[Math.floor(Math.random() * cas.length)],
+      validFrom: validFrom.toISOString().split('T')[0],
+      validUntil: validUntil.toISOString().split('T')[0],
+      status: statuses[Math.floor(Math.random() * statuses.length)],
+      keySize: keySizes[Math.floor(Math.random() * keySizes.length)],
+      algorithm: algorithms[Math.floor(Math.random() * algorithms.length)],
+      serialNumber: Math.random().toString(16).substring(2, 18).toUpperCase(),
+    });
+  }
+  
+  return certs;
+}
+
+/**
+ * Certificate Signing Requests
+ */
+export function getCSRs() {
+  return {
+    pending: [
+      { id: 1, commonName: 'newapi.acme.com', requestedBy: 'operator', requestedAt: '2026-01-20 14:30', keySize: '4096', status: 'pending' },
+      { id: 2, commonName: 'app.acme.com', requestedBy: 'developer', requestedAt: '2026-01-20 10:15', keySize: '2048', status: 'pending' },
+      { id: 3, commonName: 'secure.acme.com', requestedBy: 'admin', requestedAt: '2026-01-19 16:45', keySize: '4096', status: 'pending' },
+      { id: 4, commonName: 'internal.acme.com', requestedBy: 'operator', requestedAt: '2026-01-19 09:20', keySize: '2048', status: 'pending' },
+      { id: 5, commonName: 'gateway.acme.com', requestedBy: 'netadmin', requestedAt: '2026-01-18 15:10', keySize: '4096', status: 'pending' },
+      { id: 6, commonName: 'proxy.acme.com', requestedBy: 'operator', requestedAt: '2026-01-18 11:30', keySize: '2048', status: 'pending' },
+      { id: 7, commonName: 'cdn.acme.com', requestedBy: 'developer', requestedAt: '2026-01-17 14:20', keySize: '2048', status: 'pending' },
+      { id: 8, commonName: 'cache.acme.com', requestedBy: 'operator', requestedAt: '2026-01-17 08:40', keySize: '4096', status: 'pending' },
+      { id: 9, commonName: 'queue.acme.com', requestedBy: 'developer', requestedAt: '2026-01-16 13:15', keySize: '2048', status: 'pending' },
+      { id: 10, commonName: 'worker.acme.com', requestedBy: 'operator', requestedAt: '2026-01-16 10:05', keySize: '4096', status: 'pending' },
+    ],
+    approved: [
+      { id: 11, commonName: 'api.acme.com', requestedBy: 'admin', requestedAt: '2026-01-15 12:00', keySize: '4096', status: 'approved', approvedBy: 'admin', approvedAt: '2026-01-15 12:30' },
+      { id: 12, commonName: 'mail.acme.com', requestedBy: 'operator', requestedAt: '2026-01-14 10:30', keySize: '2048', status: 'approved', approvedBy: 'admin', approvedAt: '2026-01-14 11:00' },
+      { id: 13, commonName: 'vpn.acme.com', requestedBy: 'netadmin', requestedAt: '2026-01-13 15:20', keySize: '4096', status: 'approved', approvedBy: 'admin', approvedAt: '2026-01-13 16:00' },
+      { id: 14, commonName: 'db.acme.com', requestedBy: 'dba', requestedAt: '2026-01-12 09:15', keySize: '4096', status: 'approved', approvedBy: 'security', approvedAt: '2026-01-12 10:00' },
+      { id: 15, commonName: 'smtp.acme.com', requestedBy: 'operator', requestedAt: '2026-01-11 14:45', keySize: '2048', status: 'approved', approvedBy: 'admin', approvedAt: '2026-01-11 15:00' },
+      { id: 16, commonName: 'ldap.acme.com', requestedBy: 'admin', requestedAt: '2026-01-10 11:20', keySize: '4096', status: 'approved', approvedBy: 'security', approvedAt: '2026-01-10 12:00' },
+      { id: 17, commonName: 'monitoring.acme.com', requestedBy: 'operator', requestedAt: '2026-01-09 16:30', keySize: '2048', status: 'approved', approvedBy: 'admin', approvedAt: '2026-01-09 17:00' },
+      { id: 18, commonName: 'backup.acme.com', requestedBy: 'admin', requestedAt: '2026-01-08 13:10', keySize: '4096', status: 'approved', approvedBy: 'admin', approvedAt: '2026-01-08 14:00' },
+      { id: 19, commonName: 'storage.acme.com', requestedBy: 'operator', requestedAt: '2026-01-07 10:40', keySize: '2048', status: 'approved', approvedBy: 'security', approvedAt: '2026-01-07 11:00' },
+      { id: 20, commonName: 'files.acme.com', requestedBy: 'developer', requestedAt: '2026-01-06 15:25', keySize: '2048', status: 'approved', approvedBy: 'admin', approvedAt: '2026-01-06 16:00' },
+      { id: 21, commonName: 'share.acme.com', requestedBy: 'operator', requestedAt: '2026-01-05 12:50', keySize: '4096', status: 'approved', approvedBy: 'admin', approvedAt: '2026-01-05 13:00' },
+      { id: 22, commonName: 'wiki.acme.com', requestedBy: 'developer', requestedAt: '2026-01-04 09:35', keySize: '2048', status: 'approved', approvedBy: 'security', approvedAt: '2026-01-04 10:00' },
+      { id: 23, commonName: 'docs.acme.com', requestedBy: 'operator', requestedAt: '2026-01-03 14:15', keySize: '2048', status: 'approved', approvedBy: 'admin', approvedAt: '2026-01-03 15:00' },
+      { id: 24, commonName: 'blog.acme.com', requestedBy: 'marketing', requestedAt: '2026-01-02 11:05', keySize: '2048', status: 'approved', approvedBy: 'admin', approvedAt: '2026-01-02 12:00' },
+      { id: 25, commonName: 'shop.acme.com', requestedBy: 'ecommerce', requestedAt: '2026-01-01 16:40', keySize: '4096', status: 'approved', approvedBy: 'security', approvedAt: '2026-01-01 17:00' },
+    ],
+    rejected: [
+      { id: 26, commonName: 'invalid-cn', requestedBy: 'test-user', requestedAt: '2025-12-30 10:20', keySize: '1024', status: 'rejected', rejectedBy: 'security', rejectedAt: '2025-12-30 11:00', reason: 'Invalid common name format' },
+      { id: 27, commonName: 'weak.acme.com', requestedBy: 'developer', requestedAt: '2025-12-28 14:30', keySize: '1024', status: 'rejected', rejectedBy: 'security', rejectedAt: '2025-12-28 15:00', reason: 'Key size too small (minimum 2048)' },
+      { id: 28, commonName: 'external.example.com', requestedBy: 'operator', requestedAt: '2025-12-25 09:15', keySize: '2048', status: 'rejected', rejectedBy: 'admin', rejectedAt: '2025-12-25 10:00', reason: 'Domain not authorized' },
+      { id: 29, commonName: 'duplicate.acme.com', requestedBy: 'developer', requestedAt: '2025-12-20 13:45', keySize: '2048', status: 'rejected', rejectedBy: 'admin', rejectedAt: '2025-12-20 14:00', reason: 'Certificate already exists' },
+      { id: 30, commonName: 'test123.acme.com', requestedBy: 'test-user', requestedAt: '2025-12-15 11:30', keySize: '2048', status: 'rejected', rejectedBy: 'security', rejectedAt: '2025-12-15 12:00', reason: 'Insufficient permissions' },
+    ],
+  };
+}
+
+/**
+ * Certificate Templates
+ */
+export function getTemplates() {
+  return [
+    {
+      id: 1,
+      name: 'Web Server',
+      icon: 'globe',
+      type: 'webserver',
+      description: 'TLS certificates for web servers (HTTPS)',
+      keyUsage: ['Digital Signature', 'Key Encipherment'],
+      extKeyUsage: ['Server Authentication'],
+      certificatesIssued: 124,
+      defaultValidity: 825, // days
+    },
+    {
+      id: 2,
+      name: 'Email Protection',
+      icon: 'envelope',
+      type: 'email',
+      description: 'S/MIME certificates for email encryption and signing',
+      keyUsage: ['Digital Signature', 'Key Encipherment'],
+      extKeyUsage: ['Email Protection'],
+      certificatesIssued: 32,
+      defaultValidity: 730,
+    },
+    {
+      id: 3,
+      name: 'Code Signing',
+      icon: 'code',
+      type: 'codesigning',
+      description: 'Certificates for signing software and scripts',
+      keyUsage: ['Digital Signature'],
+      extKeyUsage: ['Code Signing'],
+      certificatesIssued: 8,
+      defaultValidity: 1095,
+    },
+    {
+      id: 4,
+      name: 'VPN Client',
+      icon: 'shield-check',
+      type: 'vpn',
+      description: 'Client certificates for VPN authentication',
+      keyUsage: ['Digital Signature', 'Key Agreement'],
+      extKeyUsage: ['Client Authentication'],
+      certificatesIssued: 45,
+      defaultValidity: 365,
+    },
+    {
+      id: 5,
+      name: 'User Authentication',
+      icon: 'user-circle',
+      type: 'user',
+      description: 'Personal certificates for user authentication',
+      keyUsage: ['Digital Signature'],
+      extKeyUsage: ['Client Authentication'],
+      certificatesIssued: 28,
+      defaultValidity: 365,
+    },
+    {
+      id: 6,
+      name: 'OCSP Signing',
+      icon: 'seal-check',
+      type: 'ocsp',
+      description: 'Certificates for OCSP responder signing',
+      keyUsage: ['Digital Signature'],
+      extKeyUsage: ['OCSP Signing'],
+      certificatesIssued: 3,
+      defaultValidity: 365,
+    },
+    {
+      id: 7,
+      name: 'Document Signing',
+      icon: 'file-text',
+      type: 'document',
+      description: 'Certificates for PDF and document signing',
+      keyUsage: ['Digital Signature', 'Non Repudiation'],
+      extKeyUsage: ['Document Signing'],
+      certificatesIssued: 12,
+      defaultValidity: 730,
+    },
+    {
+      id: 8,
+      name: 'Time Stamping',
+      icon: 'clock',
+      type: 'timestamp',
+      description: 'Certificates for trusted timestamping services',
+      keyUsage: ['Digital Signature'],
+      extKeyUsage: ['Time Stamping'],
+      certificatesIssued: 2,
+      defaultValidity: 1095,
+    },
+  ];
+}
+
+/**
+ * CRL Statistics
+ */
+export function getCRLStats() {
+  return {
+    totalCRLs: 12,
+    totalRevocations: 47,
+    lastGenerated: '2026-01-21 06:00:00',
+    cas: [
+      { id: 1, name: 'ACME Root CA', crlSize: '2.3 KB', revocations: 0, lastGenerated: '2026-01-21 06:00', nextUpdate: '2026-02-21 06:00' },
+      { id: 4, name: 'ACME Intermediate CA', crlSize: '8.7 KB', revocations: 12, lastGenerated: '2026-01-21 06:00', nextUpdate: '2026-02-21 06:00' },
+      { id: 5, name: 'Production Intermediate CA', crlSize: '15.2 KB', revocations: 23, lastGenerated: '2026-01-21 06:00', nextUpdate: '2026-02-21 06:00' },
+      { id: 9, name: 'Web Server CA', crlSize: '6.1 KB', revocations: 8, lastGenerated: '2026-01-21 06:00', nextUpdate: '2026-02-21 06:00' },
+      { id: 11, name: 'Code Signing CA', crlSize: '1.2 KB', revocations: 1, lastGenerated: '2026-01-21 06:00', nextUpdate: '2026-02-21 06:00' },
+    ],
+  };
+}
+
+/**
+ * OCSP Statistics
+ */
+export function getOCSPStats() {
+  return {
+    requests24h: 1847,
+    requestsTotal: 45629,
+    avgResponseTime: '12ms',
+    cacheHitRate: '87%',
+    responderStatus: 'active',
+    responderUrl: 'http://ocsp.acme.com',
+    lastRestart: '2026-01-15 10:30:00',
+  };
+}
