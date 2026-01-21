@@ -36,6 +36,18 @@ export function getDashboardStats() {
 }
 
 /**
+ * System Overview (Dashboard)
+ */
+export function getSystemOverview() {
+  return [
+    { label: 'CAs', value: '8', subtext: '5 Root • 3 Int.' },
+    { label: 'Users', value: '23', subtext: '3 Admin • 20 Std' },
+    { label: 'ACME', value: '34', subtext: '18 domains' },
+    { label: 'SCEP', value: '67', subtext: '90 days' },
+  ];
+}
+
+/**
  * Recent Activity (Dashboard)
  */
 export function getRecentActivity() {
@@ -68,11 +80,42 @@ export function getRecentActivity() {
  */
 export function getExpiringCertificates() {
   return [
-    { id: 1, name: 'old.acme.com', ca: 'ACME Root CA', expires: '2026-02-15', status: 'expiring', daysLeft: 25 },
-    { id: 2, name: 'legacy-api.acme.com', ca: 'ACME Intermediate CA', expires: '2026-02-20', status: 'expiring', daysLeft: 30 },
-    { id: 3, name: 'test.acme.com', ca: 'ACME Root CA', expires: '2026-02-10', status: 'expiring', daysLeft: 20 },
-    { id: 4, name: 'staging.acme.com', ca: 'ACME Intermediate CA', expires: '2026-02-25', status: 'expiring', daysLeft: 35 },
-    { id: 5, name: 'dev-vpn.acme.com', ca: 'ACME Root CA', expires: '2026-02-12', status: 'expiring', daysLeft: 22 },
+    { 
+      id: 1, 
+      name: 'mail.example.com', 
+      fingerprint: '4F:3A:B2:C8:9D:...',
+      type: 'Server',
+      issuer: 'Server CA', 
+      expiresIn: '7 days',
+      daysLeft: 7 
+    },
+    { 
+      id: 2, 
+      name: 'vpn.internal.net', 
+      fingerprint: '8A:2D:E1:F4:7B:...',
+      type: 'Server',
+      issuer: 'Server CA', 
+      expiresIn: '12 days',
+      daysLeft: 12 
+    },
+    { 
+      id: 3, 
+      name: 'ldap.corp.local', 
+      fingerprint: 'D2:8F:4C:1A:5E:...',
+      type: 'Server',
+      issuer: 'Internal CA', 
+      expiresIn: '15 days',
+      daysLeft: 15 
+    },
+    { 
+      id: 4, 
+      name: 'api.service.com', 
+      fingerprint: 'C3:9F:1A:6E:2D:...',
+      type: 'ACME',
+      issuer: 'ACME CA', 
+      expiresIn: '28 days',
+      daysLeft: 28 
+    },
   ];
 }
 

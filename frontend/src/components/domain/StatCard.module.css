@@ -19,9 +19,9 @@
 
 .widgetHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: var(--spacing-md);
+  width: 100%;
 }
 
 .widgetTitle {
@@ -29,6 +29,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-muted);
+  margin-bottom: 8px;
 }
 
 .widgetIcon {
@@ -39,7 +40,7 @@
 .widgetValue {
   font-size: 32px;
   font-weight: 600;
-  margin-bottom: var(--spacing-xs);
+  margin-bottom: 4px;
   color: var(--text-primary);
 }
 
@@ -50,18 +51,23 @@
   background-clip: text;
 }
 
-.widgetLabel {
-  font-size: 13px;
-  color: var(--text-tertiary);
+.widgetValue.warning {
+  color: var(--status-warning);
+}
+
+.widgetSublabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
 }
 
 /* Stat Trend */
 .statTrend {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: 4px;
   font-size: 11px;
-  margin-top: var(--spacing-xs);
+  margin-top: 4px;
 }
 
 .statTrend.positive {
@@ -69,7 +75,7 @@
 }
 
 .statTrend.negative {
-  color: var(--status-danger);
+  color: var(--status-warning);
 }
 
 /* Widget size variants */

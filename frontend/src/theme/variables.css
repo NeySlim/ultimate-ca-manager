@@ -122,21 +122,22 @@
    LIGHT THEME BASE
    ============================================ */
 [data-theme="light"] {
-  /* Base Colors */
-  --bg-primary: #f5f5f5;
-  --bg-secondary: #ffffff;
-  --bg-hover: #e0e0e0;
+  /* Base Colors - SOFTER (not too bright) */
+  --bg-primary: #e8eaed;       /* Soft grey instead of #f5f5f5 */
+  --bg-secondary: #f5f6f7;     /* Light grey instead of pure white */
+  --bg-tertiary: #fafbfc;      /* Almost white but not pure */
+  --bg-hover: #dfe2e5;
   
   /* Text Colors */
-  --text-primary: #1a1a1a;
-  --text-secondary: #333;
-  --text-tertiary: #666;
-  --text-muted: #999;
+  --text-primary: #1a1d23;     /* Soft black instead of pure black */
+  --text-secondary: #4a5568;   /* Softer grey */
+  --text-tertiary: #718096;    /* Medium grey */
+  --text-muted: #a0aec0;       /* Light grey */
   
   /* Border Colors */
-  --border-primary: #e0e0e0;
-  --border-secondary: #d0d0d0;
-  --border-tertiary: #c0c0c0;
+  --border-primary: #e2e4e8;
+  --border-secondary: #d4d7dc;
+  --border-tertiary: #c5c9cf;
 }
 
 /* ============================================

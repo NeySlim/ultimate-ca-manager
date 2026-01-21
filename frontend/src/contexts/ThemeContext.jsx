@@ -41,15 +41,16 @@ export const ThemeProvider = ({ children }) => {
       root.style.setProperty('--text-secondary', '#cccccc'); // design-system.html
       root.style.setProperty('--text-muted', '#888888'); // design-system.html --text-tertiary
     } else {
-      root.style.setProperty('--bg-app', '#eef0f2'); /* Darker grey for contrast */
-      root.style.setProperty('--bg-panel', '#ffffff'); /* Pure white panels */
-      root.style.setProperty('--bg-surface', '#ffffff'); /* White content backgrounds */
-      root.style.setProperty('--bg-element', '#f8f9fa'); /* Light grey elements */
-      root.style.setProperty('--bg-element-hover', '#e9ecef');
-      root.style.setProperty('--border-color', '#dee2e6');
-      root.style.setProperty('--text-primary', '#1f2937');
-      root.style.setProperty('--text-secondary', '#4b5563');
-      root.style.setProperty('--text-muted', '#9ca3af');
+      // SOFT LIGHT THEME (less bright)
+      root.style.setProperty('--bg-app', '#e8eaed');     /* Soft grey */
+      root.style.setProperty('--bg-panel', '#f5f6f7');   /* Light grey */
+      root.style.setProperty('--bg-surface', '#fafbfc'); /* Almost white */
+      root.style.setProperty('--bg-element', '#f0f1f3'); /* Light element */
+      root.style.setProperty('--bg-element-hover', '#e2e4e8');
+      root.style.setProperty('--border-color', '#e2e4e8');
+      root.style.setProperty('--text-primary', '#1a1d23');   /* Soft black */
+      root.style.setProperty('--text-secondary', '#4a5568'); /* Softer grey */
+      root.style.setProperty('--text-muted', '#718096');     /* Medium grey */
     }
     
     // Apply Density Variables
@@ -144,6 +145,22 @@ export const ThemeProvider = ({ children }) => {
     });
   };
 
+  // Alias for accent color (used by TopBar theme selector)
+  const setAccentColor = (color) => {
+    const root = document.documentElement;
+    root.style.setProperty('--accent-primary', color);
+    root.style.setProperty('--accent-gradient-start', color);
+    // Save to palette if it matches
+    const matchingPalette = Object.entries(colorPalettes).find(
+      ([_, p]) => p.primary === color
+    )?.[0];
+    if (matchingPalette) {
+      setPalette(matchingPalette);
+    }
+  };
+
+  const accentColor = colorPalettes[palette]?.primary || '#5a8fc7';
+
   return (
     <ThemeContext.Provider value={{
       palette,
@@ -152,6 +169,8 @@ export const ThemeProvider = ({ children }) => {
       setColorScheme,
       density,
       setDensity,
+      accentColor,
+      setAccentColor,
     }}>
       {children}
     </ThemeContext.Provider>
