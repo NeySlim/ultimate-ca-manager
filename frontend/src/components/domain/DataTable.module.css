@@ -1,0 +1,124 @@
+/* DataTable Styles - Dashboard Reference */
+
+.tableWrapper {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-primary);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-secondary);
+}
+
+.table th {
+  background: var(--bg-tertiary);
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.table th.sortable:hover {
+  color: var(--text-secondary);
+}
+
+.table th.sorted {
+  color: var(--accent-primary);
+}
+
+.headerContent {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.sortIcon {
+  color: var(--text-muted);
+}
+
+.table th.sorted .sortIcon {
+  color: var(--accent-primary);
+}
+
+.table td {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.table tbody tr {
+  transition: background 0.15s;
+}
+
+.table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+.table tbody tr.clickable {
+  cursor: pointer;
+}
+
+/* Empty State */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  gap: var(--spacing-md);
+  min-height: 200px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+}
+
+.emptyText {
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
+
+/* Loading State */
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  gap: var(--spacing-md);
+  min-height: 200px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: var(--accent-primary);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loadingText {
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
