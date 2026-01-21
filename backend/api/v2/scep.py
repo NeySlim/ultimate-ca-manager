@@ -12,7 +12,7 @@ from datetime import datetime
 bp = Blueprint('scep_v2', __name__)
 
 
-@bp.route('/api/scep/config', methods=['GET'])
+@bp.route('/api/v2/scep/config', methods=['GET'])
 @require_auth(['read:scep'])
 def get_scep_config():
     """Get SCEP configuration"""
@@ -24,7 +24,7 @@ def get_scep_config():
     })
 
 
-@bp.route('/api/scep/config', methods=['PATCH'])
+@bp.route('/api/v2/scep/config', methods=['PATCH'])
 @require_auth(['write:scep'])
 def update_scep_config():
     """Update SCEP configuration"""
@@ -36,7 +36,7 @@ def update_scep_config():
     )
 
 
-@bp.route('/api/scep/requests', methods=['GET'])
+@bp.route('/api/v2/scep/requests', methods=['GET'])
 @require_auth(['read:scep'])
 def list_scep_requests():
     """List SCEP certificate requests"""
@@ -52,7 +52,7 @@ def list_scep_requests():
     return success_response(data=data)
 
 
-@bp.route('/api/scep/<int:request_id>/approve', methods=['POST'])
+@bp.route('/api/v2/scep/<int:request_id>/approve', methods=['POST'])
 @require_auth(['write:scep'])
 def approve_scep_request(request_id):
     """Approve SCEP request"""
@@ -78,7 +78,7 @@ def approve_scep_request(request_id):
     )
 
 
-@bp.route('/api/scep/<int:request_id>/reject', methods=['POST'])
+@bp.route('/api/v2/scep/<int:request_id>/reject', methods=['POST'])
 @require_auth(['write:scep'])
 def reject_scep_request(request_id):
     """Reject SCEP request"""
@@ -105,7 +105,7 @@ def reject_scep_request(request_id):
     )
 
 
-@bp.route('/api/scep/stats', methods=['GET'])
+@bp.route('/api/v2/scep/stats', methods=['GET'])
 @require_auth(['read:scep'])
 def get_scep_stats():
     """Get SCEP statistics"""

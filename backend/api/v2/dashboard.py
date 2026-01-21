@@ -11,7 +11,7 @@ from utils.response import success_response
 bp = Blueprint('dashboard_v2', __name__)
 
 
-@bp.route('/api/stats/overview', methods=['GET'])
+@bp.route('/api/v2/stats/overview', methods=['GET'])
 def get_public_stats():
     """Get public overview statistics (no auth required - for login page)"""
     try:
@@ -50,7 +50,7 @@ def get_public_stats():
         })
 
 
-@bp.route('/api/dashboard/stats', methods=['GET'])
+@bp.route('/api/v2/dashboard/stats', methods=['GET'])
 @require_auth()
 def get_dashboard_stats():
     """Get dashboard statistics"""
@@ -62,7 +62,7 @@ def get_dashboard_stats():
     })
 
 
-@bp.route('/api/dashboard/recent-cas', methods=['GET'])
+@bp.route('/api/v2/dashboard/recent-cas', methods=['GET'])
 @require_auth(['read:cas'])
 def get_recent_cas():
     """Get recently created CAs"""
@@ -70,7 +70,7 @@ def get_recent_cas():
     return success_response(data=[])
 
 
-@bp.route('/api/dashboard/expiring-certs', methods=['GET'])
+@bp.route('/api/v2/dashboard/expiring-certs', methods=['GET'])
 @require_auth(['read:certificates'])
 def get_expiring_certificates():
     """Get certificates expiring soon"""
@@ -78,7 +78,7 @@ def get_expiring_certificates():
     return success_response(data=[])
 
 
-@bp.route('/api/dashboard/activity', methods=['GET'])
+@bp.route('/api/v2/dashboard/activity', methods=['GET'])
 @require_auth()
 def get_activity_log():
     """Get recent activity"""

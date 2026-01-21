@@ -52,7 +52,7 @@ const LoginPage = () => {
     // Fetch stats for sidebar
     const fetchStats = async () => {
       try {
-        const res = await fetch('/api/stats/overview');
+        const res = await fetch('/api/v2/stats/overview');
         if (res.ok) {
           const response = await res.json();
           const data = response.data; // API wraps in {data: {...}}

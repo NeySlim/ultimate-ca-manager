@@ -1,4 +1,4 @@
-const API_BASE = '/api';
+const API_BASE = '/api/v2';
 
 class ApiClient {
   async request(endpoint, options = {}) {

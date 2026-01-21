@@ -15,7 +15,7 @@ from datetime import datetime
 bp = Blueprint('account_v2', __name__)
 
 
-@bp.route('/api/account/profile', methods=['GET'])
+@bp.route('/api/v2/account/profile', methods=['GET'])
 @require_auth()
 def get_profile():
     """Get current user profile"""
@@ -31,7 +31,7 @@ def get_profile():
     )
 
 
-@bp.route('/api/account/profile', methods=['PATCH'])
+@bp.route('/api/v2/account/profile', methods=['PATCH'])
 @require_auth()
 def update_profile():
     """
@@ -77,7 +77,7 @@ def update_profile():
     )
 
 
-@bp.route('/api/account/password', methods=['POST'])
+@bp.route('/api/v2/account/password', methods=['POST'])
 @require_auth()
 def change_password():
     """
@@ -126,7 +126,7 @@ def change_password():
     )
 
 
-@bp.route('/api/account/apikeys', methods=['GET'])
+@bp.route('/api/v2/account/apikeys', methods=['GET'])
 @require_auth()
 def list_api_keys():
     """
@@ -144,7 +144,7 @@ def list_api_keys():
     )
 
 
-@bp.route('/api/account/apikeys', methods=['POST'])
+@bp.route('/api/v2/account/apikeys', methods=['POST'])
 @require_auth()
 def create_api_key():
     """
@@ -224,7 +224,7 @@ def create_api_key():
         return error_response('Failed to create API key', 500)
 
 
-@bp.route('/api/account/apikeys/<int:key_id>', methods=['GET'])
+@bp.route('/api/v2/account/apikeys/<int:key_id>', methods=['GET'])
 @require_auth()
 def get_api_key(key_id):
     """
@@ -242,7 +242,7 @@ def get_api_key(key_id):
     return success_response(data=api_key.to_dict())
 
 
-@bp.route('/api/account/apikeys/<int:key_id>', methods=['PATCH'])
+@bp.route('/api/v2/account/apikeys/<int:key_id>', methods=['PATCH'])
 @require_auth()
 def update_api_key(key_id):
     """
@@ -272,7 +272,7 @@ def update_api_key(key_id):
     )
 
 
-@bp.route('/api/account/apikeys/<int:key_id>', methods=['DELETE'])
+@bp.route('/api/v2/account/apikeys/<int:key_id>', methods=['DELETE'])
 @require_auth()
 def delete_api_key(key_id):
     """
@@ -295,7 +295,7 @@ def delete_api_key(key_id):
     return success_response(message='API key revoked')
 
 
-@bp.route('/api/account/apikeys/<int:key_id>/regenerate', methods=['POST'])
+@bp.route('/api/v2/account/apikeys/<int:key_id>/regenerate', methods=['POST'])
 @require_auth()
 def regenerate_api_key(key_id):
     """
@@ -343,7 +343,7 @@ def regenerate_api_key(key_id):
 # 2FA Management
 # ============================================================================
 
-@bp.route('/api/account/2fa/enable', methods=['POST'])
+@bp.route('/api/v2/account/2fa/enable', methods=['POST'])
 @require_auth()
 def enable_2fa():
     """
@@ -391,7 +391,7 @@ def enable_2fa():
     )
 
 
-@bp.route('/api/account/2fa/confirm', methods=['POST'])
+@bp.route('/api/v2/account/2fa/confirm', methods=['POST'])
 @require_auth()
 def confirm_2fa():
     """
@@ -423,7 +423,7 @@ def confirm_2fa():
     )
 
 
-@bp.route('/api/account/2fa/disable', methods=['POST'])
+@bp.route('/api/v2/account/2fa/disable', methods=['POST'])
 @require_auth()
 def disable_2fa():
     """
@@ -451,7 +451,7 @@ def disable_2fa():
     return success_response(message='2FA disabled successfully')
 
 
-@bp.route('/api/account/2fa/recovery-codes', methods=['GET'])
+@bp.route('/api/v2/account/2fa/recovery-codes', methods=['GET'])
 @require_auth()
 def get_recovery_codes():
     """
@@ -472,7 +472,7 @@ def get_recovery_codes():
     )
 
 
-@bp.route('/api/account/2fa/recovery-codes/regenerate', methods=['POST'])
+@bp.route('/api/v2/account/2fa/recovery-codes/regenerate', methods=['POST'])
 @require_auth()
 def regenerate_recovery_codes():
     """
@@ -508,7 +508,7 @@ def regenerate_recovery_codes():
 # Session Management
 # ============================================================================
 
-@bp.route('/api/account/sessions', methods=['GET'])
+@bp.route('/api/v2/account/sessions', methods=['GET'])
 @require_auth()
 def list_sessions():
     """
@@ -539,7 +539,7 @@ def list_sessions():
     )
 
 
-@bp.route('/api/account/sessions/<int:session_id>', methods=['DELETE'])
+@bp.route('/api/v2/account/sessions/<int:session_id>', methods=['DELETE'])
 @require_auth()
 def revoke_session(session_id):
     """
@@ -557,7 +557,7 @@ def revoke_session(session_id):
     return success_response(message='Session revoked successfully')
 
 
-@bp.route('/api/account/sessions/revoke-all', methods=['POST'])
+@bp.route('/api/v2/account/sessions/revoke-all', methods=['POST'])
 @require_auth()
 def revoke_all_sessions():
     """
@@ -581,7 +581,7 @@ def revoke_all_sessions():
 # Activity Log
 # ============================================================================
 
-@bp.route('/api/account/activity', methods=['GET'])
+@bp.route('/api/v2/account/activity', methods=['GET'])
 @require_auth()
 def get_activity_log():
     """

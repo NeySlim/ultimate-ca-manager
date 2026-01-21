@@ -11,7 +11,7 @@ from models import db, AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge
 bp = Blueprint('acme_v2', __name__)
 
 
-@bp.route('/api/acme/settings', methods=['GET'])
+@bp.route('/api/v2/acme/settings', methods=['GET'])
 @require_auth(['read:acme'])
 def get_acme_settings():
     """Get ACME configuration"""
@@ -23,7 +23,7 @@ def get_acme_settings():
     })
 
 
-@bp.route('/api/acme/settings', methods=['PATCH'])
+@bp.route('/api/v2/acme/settings', methods=['PATCH'])
 @require_auth(['write:acme'])
 def update_acme_settings():
     """Update ACME configuration"""
@@ -35,7 +35,7 @@ def update_acme_settings():
     )
 
 
-@bp.route('/api/acme/stats', methods=['GET'])
+@bp.route('/api/v2/acme/stats', methods=['GET'])
 @require_auth(['read:acme'])
 def get_acme_stats():
     """Get ACME statistics"""
@@ -54,7 +54,7 @@ def get_acme_stats():
     })
 
 
-@bp.route('/api/acme/accounts', methods=['GET'])
+@bp.route('/api/v2/acme/accounts', methods=['GET'])
 @require_auth(['read:acme'])
 def list_acme_accounts():
     """List ACME accounts"""
@@ -73,7 +73,7 @@ def list_acme_accounts():
     return success_response(data=data)
 
 
-@bp.route('/api/acme/orders', methods=['GET'])
+@bp.route('/api/v2/acme/orders', methods=['GET'])
 @require_auth(['read:acme'])
 def list_acme_orders():
     """List ACME orders"""
@@ -114,7 +114,7 @@ def list_acme_orders():
     return success_response(data=data)
 
 
-@bp.route('/api/acme/proxy/register', methods=['POST'])
+@bp.route('/api/v2/acme/proxy/register', methods=['POST'])
 @require_auth(['write:acme'])
 def register_proxy_account():
     """Register ACME proxy account"""

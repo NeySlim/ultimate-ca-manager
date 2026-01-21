@@ -10,7 +10,7 @@ from utils.response import success_response, error_response
 bp = Blueprint('settings_v2', __name__)
 
 
-@bp.route('/api/settings/general', methods=['GET'])
+@bp.route('/api/v2/settings/general', methods=['GET'])
 @require_auth(['read:settings'])
 def get_general_settings():
     """Get general settings"""
@@ -20,7 +20,7 @@ def get_general_settings():
     })
 
 
-@bp.route('/api/settings/general', methods=['PATCH'])
+@bp.route('/api/v2/settings/general', methods=['PATCH'])
 @require_auth(['write:settings'])
 def update_general_settings():
     """Update general settings"""
@@ -28,14 +28,14 @@ def update_general_settings():
     return success_response(data=data, message='Settings updated')
 
 
-@bp.route('/api/settings/users', methods=['GET'])
+@bp.route('/api/v2/settings/users', methods=['GET'])
 @require_auth(['admin:users'])
 def list_users():
     """List users (admin only)"""
     return success_response(data=[])
 
 
-@bp.route('/api/settings/users', methods=['POST'])
+@bp.route('/api/v2/settings/users', methods=['POST'])
 @require_auth(['admin:users'])
 def create_user():
     """Create user (admin only)"""
@@ -51,7 +51,7 @@ def create_user():
     )
 
 
-@bp.route('/api/settings/users/<int:user_id>', methods=['PATCH'])
+@bp.route('/api/v2/settings/users/<int:user_id>', methods=['PATCH'])
 @require_auth(['admin:users'])
 def update_user(user_id):
     """Update user (admin only)"""
@@ -72,7 +72,7 @@ def update_user(user_id):
     )
 
 
-@bp.route('/api/settings/users/<int:user_id>', methods=['DELETE'])
+@bp.route('/api/v2/settings/users/<int:user_id>', methods=['DELETE'])
 @require_auth(['admin:users'])
 def delete_user(user_id):
     """Delete user (admin only)"""
@@ -89,7 +89,7 @@ def delete_user(user_id):
     return no_content_response()
 
 
-@bp.route('/api/settings/backup', methods=['GET'])
+@bp.route('/api/v2/settings/backup', methods=['GET'])
 @require_auth(['read:settings'])
 def get_backup_settings():
     """Get backup configuration"""
@@ -99,7 +99,7 @@ def get_backup_settings():
     })
 
 
-@bp.route('/api/settings/backup/create', methods=['POST'])
+@bp.route('/api/v2/settings/backup/create', methods=['POST'])
 @require_auth(['admin:system'])
 def create_backup():
     """Create backup now"""
@@ -109,7 +109,7 @@ def create_backup():
     )
 
 
-@bp.route('/api/settings/backup/restore', methods=['POST'])
+@bp.route('/api/v2/settings/backup/restore', methods=['POST'])
 @require_auth(['admin:system'])
 def restore_backup():
     """
@@ -147,7 +147,7 @@ def restore_backup():
     )
 
 
-@bp.route('/api/settings/backup/<int:backup_id>/download', methods=['GET'])
+@bp.route('/api/v2/settings/backup/<int:backup_id>/download', methods=['GET'])
 @require_auth(['read:settings'])
 def download_backup(backup_id):
     """Download backup file"""
@@ -172,7 +172,7 @@ def download_backup(backup_id):
     )
 
 
-@bp.route('/api/settings/backup/<int:backup_id>', methods=['DELETE'])
+@bp.route('/api/v2/settings/backup/<int:backup_id>', methods=['DELETE'])
 @require_auth(['admin:system'])
 def delete_backup(backup_id):
     """Delete backup"""
@@ -187,7 +187,7 @@ def delete_backup(backup_id):
     return no_content_response()
 
 
-@bp.route('/api/settings/email', methods=['GET'])
+@bp.route('/api/v2/settings/email', methods=['GET'])
 @require_auth(['read:settings'])
 def get_email_settings():
     """Get email settings"""
@@ -197,7 +197,7 @@ def get_email_settings():
     })
 
 
-@bp.route('/api/settings/email', methods=['PATCH'])
+@bp.route('/api/v2/settings/email', methods=['PATCH'])
 @require_auth(['write:settings'])
 def update_email_settings():
     """Update email settings"""
@@ -217,7 +217,7 @@ def update_email_settings():
     )
 
 
-@bp.route('/api/settings/email/test', methods=['POST'])
+@bp.route('/api/v2/settings/email/test', methods=['POST'])
 @require_auth(['write:settings'])
 def test_email():
     """Send test email"""
@@ -234,7 +234,7 @@ def test_email():
 # Audit Logs
 # ============================================================================
 
-@bp.route('/api/settings/audit-logs', methods=['GET'])
+@bp.route('/api/v2/settings/audit-logs', methods=['GET'])
 @require_auth(['admin:system'])
 def get_audit_logs():
     """
@@ -277,7 +277,7 @@ def get_audit_logs():
 # LDAP Integration
 # ============================================================================
 
-@bp.route('/api/settings/ldap', methods=['GET'])
+@bp.route('/api/v2/settings/ldap', methods=['GET'])
 @require_auth(['read:settings'])
 def get_ldap_settings():
     """Get LDAP configuration"""
@@ -295,7 +295,7 @@ def get_ldap_settings():
     )
 
 
-@bp.route('/api/settings/ldap', methods=['PATCH'])
+@bp.route('/api/v2/settings/ldap', methods=['PATCH'])
 @require_auth(['write:settings'])
 def update_ldap_settings():
     """Update LDAP configuration"""
@@ -314,7 +314,7 @@ def update_ldap_settings():
     )
 
 
-@bp.route('/api/settings/ldap/test', methods=['POST'])
+@bp.route('/api/v2/settings/ldap/test', methods=['POST'])
 @require_auth(['write:settings'])
 def test_ldap_connection():
     """Test LDAP connection and authentication"""
@@ -342,7 +342,7 @@ def test_ldap_connection():
 # Webhooks
 # ============================================================================
 
-@bp.route('/api/settings/webhooks', methods=['GET'])
+@bp.route('/api/v2/settings/webhooks', methods=['GET'])
 @require_auth(['read:settings'])
 def list_webhooks():
     """List configured webhooks"""
@@ -361,7 +361,7 @@ def list_webhooks():
     )
 
 
-@bp.route('/api/settings/webhooks', methods=['POST'])
+@bp.route('/api/v2/settings/webhooks', methods=['POST'])
 @require_auth(['write:settings'])
 def create_webhook():
     """Create webhook"""
@@ -387,7 +387,7 @@ def create_webhook():
     )
 
 
-@bp.route('/api/settings/webhooks/<int:webhook_id>', methods=['DELETE'])
+@bp.route('/api/v2/settings/webhooks/<int:webhook_id>', methods=['DELETE'])
 @require_auth(['write:settings'])
 def delete_webhook(webhook_id):
     """Delete webhook"""
@@ -397,7 +397,7 @@ def delete_webhook(webhook_id):
     return no_content_response()
 
 
-@bp.route('/api/settings/webhooks/<int:webhook_id>/test', methods=['POST'])
+@bp.route('/api/v2/settings/webhooks/<int:webhook_id>/test', methods=['POST'])
 @require_auth(['write:settings'])
 def test_webhook(webhook_id):
     """Test webhook by sending a test event"""
@@ -413,7 +413,7 @@ def test_webhook(webhook_id):
 # Scheduled Backups
 # ============================================================================
 
-@bp.route('/api/settings/backup/schedule', methods=['GET'])
+@bp.route('/api/v2/settings/backup/schedule', methods=['GET'])
 @require_auth(['read:settings'])
 def get_backup_schedule():
     """Get backup schedule configuration"""
@@ -433,7 +433,7 @@ def get_backup_schedule():
     )
 
 
-@bp.route('/api/settings/backup/schedule', methods=['PATCH'])
+@bp.route('/api/v2/settings/backup/schedule', methods=['PATCH'])
 @require_auth(['admin:system'])
 def update_backup_schedule():
     """Update backup schedule"""
@@ -453,7 +453,7 @@ def update_backup_schedule():
     )
 
 
-@bp.route('/api/settings/backup/history', methods=['GET'])
+@bp.route('/api/v2/settings/backup/history', methods=['GET'])
 @require_auth(['read:settings'])
 def get_backup_history():
     """Get backup history"""
