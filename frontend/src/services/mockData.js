@@ -369,3 +369,175 @@ export function getOCSPStats() {
     lastRestart: '2026-01-15 10:30:00',
   };
 }
+
+/**
+ * Trust Store Certificates
+ */
+export function getTrustStoreCertificates() {
+  return {
+    system: [
+      { id: 1, name: 'DigiCert Global Root CA', issuer: 'DigiCert', expires: '2031-11-10', type: 'Root CA', fingerprint: 'A8:98:5D:3A:65:E5:E5:C4:B2:D7:D6:6D:40:C6:DD:2F:B1:9C:54:36' },
+      { id: 2, name: 'Let\'s Encrypt ISRG Root X1', issuer: 'ISRG', expires: '2035-06-04', type: 'Root CA', fingerprint: '96:BC:EC:06:26:49:76:F3:74:60:77:9A:CF:28:C5:A7:CF:E8:A3:C0' },
+      { id: 3, name: 'GlobalSign Root CA', issuer: 'GlobalSign', expires: '2028-01-28', type: 'Root CA', fingerprint: 'DA:DA:FE:BB:FE:DC:D5:9D:5D:5C:A4:8D:C0:06:2F:90:D7:CD:0E:F2' },
+      { id: 4, name: 'Mozilla CA Certificate Store', issuer: 'Mozilla', expires: '2030-12-31', type: 'Bundle', fingerprint: 'N/A' },
+    ],
+    custom: [
+      { id: 5, name: 'Company Root CA', issuer: 'Internal', expires: '2040-01-01', type: 'Root CA', fingerprint: '12:34:56:78:9A:BC:DE:F0:12:34:56:78:9A:BC:DE:F0:12:34:56:78' },
+      { id: 6, name: 'Partner CA Certificate', issuer: 'Partner Corp', expires: '2028-06-15', type: 'Root CA', fingerprint: 'AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01' },
+    ],
+  };
+}
+
+/**
+ * ACME Accounts & Orders
+ */
+export function getACMEData() {
+  return {
+    internal: {
+      stats: {
+        accounts: 5,
+        activeOrders: 12,
+        completedOrders: 247,
+        domains: 38,
+      },
+      accounts: [
+        { id: 1, email: 'admin@acme.com', status: 'valid', createdAt: '2025-06-15', orders: 124 },
+        { id: 2, email: 'ops@acme.com', status: 'valid', createdAt: '2025-08-20', orders: 89 },
+        { id: 3, email: 'dev@acme.com', status: 'valid', createdAt: '2025-10-12', orders: 34 },
+      ],
+      orders: [
+        { id: 1, domain: '*.prod.acme.com', account: 'admin@acme.com', status: 'valid', createdAt: '2026-01-20', expiresAt: '2026-04-20' },
+        { id: 2, domain: 'api.acme.com', account: 'ops@acme.com', status: 'pending', createdAt: '2026-01-21', expiresAt: '2026-04-21' },
+        { id: 3, domain: '*.staging.acme.com', account: 'dev@acme.com', status: 'valid', createdAt: '2026-01-18', expiresAt: '2026-04-18' },
+      ],
+    },
+    letsencrypt: {
+      stats: {
+        accounts: 2,
+        activeOrders: 8,
+        completedOrders: 156,
+        domains: 24,
+      },
+      accounts: [
+        { id: 1, email: 'webmaster@acme.com', status: 'valid', createdAt: '2024-03-10', orders: 98 },
+        { id: 2, email: 'devops@acme.com', status: 'valid', createdAt: '2024-07-22', orders: 58 },
+      ],
+      orders: [
+        { id: 1, domain: 'www.acme.com', account: 'webmaster@acme.com', status: 'valid', createdAt: '2026-01-15', expiresAt: '2026-04-15' },
+        { id: 2, domain: 'blog.acme.com', account: 'webmaster@acme.com', status: 'valid', createdAt: '2026-01-10', expiresAt: '2026-04-10' },
+      ],
+    },
+  };
+}
+
+/**
+ * SCEP Configuration & Enrollments
+ */
+export function getSCEPData() {
+  return {
+    config: {
+      enabled: true,
+      url: 'https://ucm.acme.com/scep',
+      caIdentifier: 'ACME-SCEP-CA',
+      challengePassword: '********',
+      certificateValidity: 365,
+      allowRenewal: true,
+      autoApprove: false,
+    },
+    enrollments: [
+      { id: 1, deviceId: 'iPhone-12345', commonName: 'user.iphone@acme.com', status: 'completed', requestedAt: '2026-01-20 10:30', approvedAt: '2026-01-20 10:45' },
+      { id: 2, deviceId: 'Android-67890', commonName: 'user.android@acme.com', status: 'pending', requestedAt: '2026-01-21 09:15', approvedAt: null },
+      { id: 3, deviceId: 'iPad-54321', commonName: 'manager.ipad@acme.com', status: 'completed', requestedAt: '2026-01-19 14:20', approvedAt: '2026-01-19 14:35' },
+      { id: 4, deviceId: 'MacBook-98765', commonName: 'admin.macbook@acme.com', status: 'rejected', requestedAt: '2026-01-18 11:50', approvedAt: null, reason: 'Invalid device identifier' },
+    ],
+  };
+}
+
+/**
+ * Users
+ */
+export function getUsers() {
+  return [
+    { id: 1, username: 'admin', email: 'admin@acme.com', role: 'admin', status: 'active', lastLogin: '2026-01-21 10:30', createdAt: '2024-01-15' },
+    { id: 2, username: 'operator', email: 'operator@acme.com', role: 'operator', status: 'active', lastLogin: '2026-01-21 08:15', createdAt: '2024-03-20' },
+    { id: 3, username: 'john.doe', email: 'john.doe@acme.com', role: 'user', status: 'active', lastLogin: '2026-01-20 16:45', createdAt: '2024-06-10' },
+    { id: 4, username: 'jane.smith', email: 'jane.smith@acme.com', role: 'user', status: 'active', lastLogin: '2026-01-20 14:20', createdAt: '2024-08-05' },
+    { id: 5, username: 'security', email: 'security@acme.com', role: 'security', status: 'active', lastLogin: '2026-01-19 12:00', createdAt: '2024-02-28' },
+    { id: 6, username: 'developer', email: 'dev@acme.com', role: 'user', status: 'active', lastLogin: '2026-01-18 09:30', createdAt: '2024-09-15' },
+    { id: 7, username: 'old.account', email: 'old@acme.com', role: 'user', status: 'inactive', lastLogin: '2025-06-10 10:00', createdAt: '2023-01-20' },
+    { id: 8, username: 'test.user', email: 'test@acme.com', role: 'user', status: 'locked', lastLogin: '2025-12-30 15:20', createdAt: '2024-11-01', lockReason: 'Suspicious activity detected' },
+  ];
+}
+
+/**
+ * System Settings
+ */
+export function getSystemSettings() {
+  return {
+    general: {
+      systemName: 'UCM - Unified Certificate Manager',
+      timezone: 'UTC',
+      language: 'en',
+      sessionTimeout: 3600,
+    },
+    email: {
+      smtpHost: 'smtp.acme.com',
+      smtpPort: 587,
+      smtpUsername: 'ucm@acme.com',
+      smtpSecurity: 'STARTTLS',
+      fromAddress: 'noreply@acme.com',
+      fromName: 'UCM System',
+    },
+    security: {
+      passwordMinLength: 12,
+      passwordRequireUppercase: true,
+      passwordRequireLowercase: true,
+      passwordRequireNumbers: true,
+      passwordRequireSpecial: true,
+      mfa: 'optional',
+      sessionExpiration: 86400,
+      maxLoginAttempts: 5,
+    },
+    backup: {
+      enabled: true,
+      schedule: 'daily',
+      time: '02:00',
+      retention: 30,
+      lastBackup: '2026-01-21 02:00:15',
+      backupSize: '487 MB',
+    },
+  };
+}
+
+/**
+ * Profile Data
+ */
+export function getProfileData() {
+  return {
+    user: {
+      id: 1,
+      username: 'admin',
+      email: 'admin@acme.com',
+      firstName: 'System',
+      lastName: 'Administrator',
+      role: 'admin',
+      timezone: 'UTC',
+      language: 'en',
+      createdAt: '2024-01-15 10:00:00',
+      lastLogin: '2026-01-21 10:30:00',
+    },
+    security: {
+      mfaEnabled: true,
+      passwordLastChanged: '2025-10-15',
+      sessions: [
+        { id: 1, browser: 'Chrome 122', os: 'macOS 14', ip: '192.168.1.100', loginAt: '2026-01-21 10:30', current: true },
+        { id: 2, browser: 'Firefox 123', os: 'Windows 11', ip: '192.168.1.50', loginAt: '2026-01-20 08:15', current: false },
+      ],
+    },
+    activity: [
+      { action: 'Certificate issued', details: 'api.acme.com', timestamp: '2026-01-21 09:45' },
+      { action: 'User created', details: 'jane.smith', timestamp: '2026-01-20 14:30' },
+      { action: 'CA created', details: 'Production Intermediate CA', timestamp: '2026-01-19 11:20' },
+    ],
+  };
+}

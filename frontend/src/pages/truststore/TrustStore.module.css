@@ -1,0 +1,18 @@
+/* Trust Store Page Styles */
+
+.trustStore {
+  display: flex;
+  flex-direction: column;
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.fingerprint {
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
