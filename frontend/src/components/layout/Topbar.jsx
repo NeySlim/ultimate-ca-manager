@@ -1,4 +1,5 @@
 import { useLocation } from 'react-router-dom';
+import { Bell, MagnifyingGlass, Moon, Sun, UserCircle } from '@phosphor-icons/react';
 import { ThemePicker } from './ThemePicker';
 import { classNames } from '../../utils/classNames';
 import styles from './Topbar.module.css';
@@ -7,9 +8,9 @@ import styles from './Topbar.module.css';
  * Topbar Component
  * 
  * Layout:
- * - Left: Breadcrumb
- * - Center: (empty for now, could add global search)
- * - Right: ThemePicker + User menu
+ * - Left: Breadcrumb/Page title
+ * - Center: Command palette (search)
+ * - Right: Theme toggle, Notifications, User menu
  * 
  * Height: 60px (dashboard reference)
  */
@@ -42,11 +43,28 @@ export function Topbar() {
         <h1 className={styles.pageTitle}>{pageTitle}</h1>
       </div>
 
+      {/* Center: Command Palette */}
+      <div className={styles.topbarCenter}>
+        <div className={styles.commandPalette}>
+          <MagnifyingGlass size={14} />
+          <input 
+            type="text" 
+            placeholder="Search resources..." 
+            className={styles.commandInput}
+          />
+          <span className={styles.commandShortcut}>Ctrl+K</span>
+        </div>
+      </div>
+
       <div className={styles.topbarRight}>
         <ThemePicker />
         
-        <button className={styles.userButton}>
-          <i className="ph ph-user-circle" />
+        <button className={styles.actionButton} title="Notifications">
+          <Bell size={18} />
+        </button>
+        
+        <button className={styles.actionButton} title="User Menu">
+          <UserCircle size={18} />
         </button>
       </div>
     </div>
