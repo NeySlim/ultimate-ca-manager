@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CA Tree - File Manager Style</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+      background: #1a1a1a;
+      color: #e8e8e8;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    /* Topbar */
+    .topbar {
+      background: linear-gradient(180deg, #2a2a2a 0%, #242424 100%);
+      height: 44px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      border-bottom: 1px solid #3a3a3a;
+      gap: 8px;
+    }
+    .nav-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 5px;
+      background: #333;
+      border: 1px solid #444;
+      color: #aaa;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      transition: all 0.2s ease;
+    }
+    .nav-btn:hover { background: #3a3a3a; color: #fff; }
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      flex: 1;
+      padding: 4px 10px;
+      background: #2a2a2a;
+      border-radius: 5px;
+      border: 1px solid #3a3a3a;
+      height: 28px;
+    }
+    .breadcrumb-item { color: #999; padding: 2px 6px; border-radius: 3px; cursor: pointer; }
+    .breadcrumb-item:hover { color: #fff; background: #333; }
+    .breadcrumb-item.active { color: #4a9eff; }
+    
+    /* Density Toggle */
+    .density-toggle {
+      display: flex;
+      background: #2a2a2a;
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .density-btn {
+      padding: 6px 12px;
+      border: none;
+      background: transparent;
+      color: #888;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .density-btn:hover { color: #fff; }
+    .density-btn.active {
+      background: #4a9eff;
+      color: white;
+    }
+    
+    /* Toolbar */
+    .toolbar {
+      background: #242424;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      border-bottom: 1px solid #333;
+      gap: 10px;
+    }
+    .search-box {
+      flex: 1;
+      max-width: 350px;
+      position: relative;
+    }
+    .search-box input {
+      width: 100%;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      color: #e8e8e8;
+      padding: 6px 10px 6px 32px;
+      border-radius: 6px;
+      font-size: 12px;
+      height: 28px;
+    }
+    .search-box .icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #666;
+      font-size: 13px;
+    }
+    
+    /* Main */
+    .main-layout {
+      display: flex;
+      height: calc(100vh - 82px);
+      overflow: hidden;
+    }
+    
+    /* Sidebar */
+    .sidebar {
+      width: 220px;
+      min-width: 180px;
+      max-width: 400px;
+      flex-shrink: 0;
+      background: #1e1e1e;
+      overflow-y: auto;
+      padding: 12px 8px;
+      position: relative;
+    }
+    .sidebar-item {
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-radius: 6px;
+      margin-bottom: 2px;
+      transition: all 0.15s ease;
+    }
+    .sidebar-item:hover { background: #2a2a2a; }
+    .sidebar-item.active {
+      background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
+    }
+    
+    /* Content */
+    .content-area {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background: #1a1a1a;
+      overflow: hidden;
+    }
+    
+    /* Tree Header with Resizable Columns */
+    .tree-header {
+      display: flex;
+      padding: 0 16px;
+      background: #242424;
+      border-bottom: 1px solid #333;
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      font-weight: 600;
+      overflow: hidden;
+      min-width: 0;
+      letter-spacing: 0.5px;
+      user-select: none;
+    }
+    .tree-header.compact { height: 32px; }
+    .tree-header.normal { height: 40px; }
+    
+    .header-col {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      position: relative;
+      cursor: pointer;
+    }
+    .header-col:hover { color: #fff; }
+    .resize-handle {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      cursor: col-resize;
+      background: transparent;
+      z-index: 10;
+    }
+    .resize-handle:hover { background: rgba(74, 158, 255, 0.3); }
+    .resize-handle.resizing { background: #4a9eff; }
+    
+    /* Tree List */
+    .tree-list {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: auto;
+      padding: 8px;
+      min-width: 0;
+    }
+    .tree-list::-webkit-scrollbar { width: 10px; height: 10px; }
+    .tree-list::-webkit-scrollbar-track { background: transparent; }
+    .tree-list::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; }
+    
+    /* Tree Item */
+    .tree-item {
+      display: flex;
+      background: #1e1e1e;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 2px solid transparent;
+      min-width: max-content;
+      align-items: center;
+    }
+    .tree-item.compact { padding: 6px 16px; margin-bottom: 2px; }
+    .tree-item.normal { padding: 10px 16px; margin-bottom: 4px; }
+    
+    .tree-item:hover {
+      background: #242424;
+      transform: translateX(2px);
+    }
+    .tree-item.selected {
+      background: linear-gradient(135deg, rgba(74, 158, 255, 0.15) 0%, rgba(53, 122, 189, 0.15) 100%);
+      border-color: #4a9eff;
+      box-shadow: 0 4px 12px rgba(74, 158, 255, 0.2);
+    }
+    
+    .tree-col {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+    }
+    
+    .tree-indent {
+      display: inline-block;
+    }
+    .tree-toggle {
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      background: #2a2a2a;
+      color: #888;
+      font-size: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .tree-toggle:hover {
+      background: #4a9eff;
+      color: white;
+    }
+    .tree-toggle.expanded::before { content: '▼'; }
+    .tree-toggle.collapsed::before { content: '▶'; }
+    .tree-toggle.leaf { opacity: 0; pointer-events: none; }
+    
+    .tree-icon {
+      font-size: 18px;
+      margin-right: 10px;
+    }
+    .tree-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .tree-name.compact { font-size: 13px; }
+    
+    .tree-meta {
+      font-size: 12px;
+      color: #888;
+    }
+    .tree-meta.compact { font-size: 11px; }
+    
+    .tree-type {
+      font-size: 11px;
+      color: #666;
+      font-family: 'SF Mono', monospace;
+    }
+    .tree-type.compact { font-size: 10px; }
+    
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .status-badge.compact {
+      padding: 3px 8px;
+      font-size: 10px;
+    }
+    .status-badge.active { background: rgba(76, 175, 80, 0.2); color: #81c784; }
+    .status-badge.expired { background: rgba(244, 67, 54, 0.2); color: #e57373; }
+    
+    /* Panel Resize Handles */
+    .panel-resize-handle {
+      width: 8px;
+      background: #333;
+      cursor: col-resize;
+      position: relative;
+      flex-shrink: 0;
+      transition: background 0.2s ease;
+    }
+    .panel-resize-handle:hover {
+      background: #4a9eff;
+    }
+    .panel-resize-handle.resizing {
+      background: #4a9eff;
+    }
+    .panel-resize-handle::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 2px;
+      height: 40px;
+      background: #555;
+      border-radius: 1px;
+    }
+    .panel-resize-handle:hover::after {
+      background: #fff;
+    }
+    
+    /* Context Menu */
+    .context-menu {
+      position: fixed;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      padding: 4px;
+      min-width: 200px;
+      z-index: 1000;
+      display: none;
+    }
+    .context-menu.show { display: block; }
+    .context-menu-item {
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #e8e8e8;
+      transition: all 0.15s ease;
+    }
+    .context-menu-item:hover {
+      background: #4a9eff;
+      color: white;
+    }
+    .context-menu-item.danger { color: #e57373; }
+    .context-menu-item.danger:hover {
+      background: rgba(244, 67, 54, 0.2);
+      color: #ef5350;
+    }
+    .context-menu-separator {
+      height: 1px;
+      background: #444;
+      margin: 4px 0;
+    }
+    
+    /* Preview Panel */
+    .preview-panel {
+      width: 320px;
+      min-width: 280px;
+      max-width: 500px;
+      flex-shrink: 0;
+      background: #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .preview-header {
+      padding: 20px;
+      border-bottom: 1px solid #333;
+      text-align: center;
+    }
+    .preview-icon { font-size: 48px; margin-bottom: 12px; }
+    .preview-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .preview-subtitle { font-size: 12px; color: #888; }
+    
+    .preview-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    .preview-content::-webkit-scrollbar { width: 6px; }
+    .preview-content::-webkit-scrollbar-track { background: transparent; }
+    .preview-content::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+    
+    .preview-section {
+      margin-bottom: 20px;
+    }
+    .preview-section .label {
+      font-size: 10px;
+      color: #666;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .preview-section .value {
+      font-size: 13px;
+      color: #ccc;
+      line-height: 1.6;
+    }
+    .preview-section code {
+      background: #242424;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: 'SF Mono', monospace;
+      font-size: 11px;
+      color: #4a9eff;
+    }
+    
+    .preview-actions {
+      padding: 20px;
+      border-top: 1px solid #333;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+    .preview-actions button {
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 8px;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .preview-actions button.primary {
+      background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(74, 158, 255, 0.3);
+    }
+    .preview-actions button.primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(74, 158, 255, 0.4);
+    }
+    .preview-actions button.secondary {
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #3a3a3a;
+    }
+    .preview-actions button.secondary:hover {
+      background: #333;
+      color: #fff;
+    }
+    .preview-actions button.danger {
+      background: rgba(244, 67, 54, 0.1);
+      color: #e57373;
+      border: 1px solid rgba(244, 67, 54, 0.2);
+    }
+    .preview-actions button.danger:hover {
+      background: rgba(244, 67, 54, 0.2);
+      color: #ef5350;
+    }
+    
+    .back-btn {
+      position: fixed;
+      top: 8px;
+      right: 12px;
+      background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      height: 28px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+  </style>
+</head>
+<body>
+  <button class="back-btn" onclick="location.href='index.html'">← Back</button>
+  
+  <div class="topbar">
+    <button class="nav-btn">◀</button>
+    <button class="nav-btn">▶</button>
+    <button class="nav-btn">⌂</button>
+    <div class="breadcrumb">
+      <span class="breadcrumb-item">📁 Certificate Authorities</span>
+      <span style="color: #555">›</span>
+      <span class="breadcrumb-item active">All CAs</span>
+    </div>
+    <div class="density-toggle">
+      <button class="density-btn" onclick="setDensity('compact')">Compact</button>
+      <button class="density-btn active" onclick="setDensity('normal')">Normal</button>
+    </div>
+    <div style="color: #888; font-size: 13px;">👤 admin</div>
+  </div>
+  
+  <div class="toolbar">
+    <div class="search-box">
+      <span class="icon">🔍</span>
+      <input type="text" placeholder="Search CAs..." />
+    </div>
+  </div>
+  
+  <div class="main-layout">
+    <div class="sidebar">
+      <div class="sidebar-item active">
+        <span>📁</span>
+        <span>All CAs</span>
+        <span style="margin-left: auto; color: #666; font-size: 11px;">3</span>
+      </div>
+      <div class="sidebar-item">
+        <span>🔐</span>
+        <span>Root CAs</span>
+        <span style="margin-left: auto; color: #666; font-size: 11px;">1</span>
+      </div>
+      <div class="sidebar-item">
+        <span>��</span>
+        <span>Intermediate</span>
+        <span style="margin-left: auto; color: #666; font-size: 11px;">2</span>
+      </div>
+      <div class="sidebar-item">
+        <span>📜</span>
+        <span>Issued Certs</span>
+        <span style="margin-left: auto; color: #666; font-size: 11px;">24</span>
+      </div>
+    </div>
+    
+    <!-- Resize Handle between Sidebar and Content -->
+    <div class="panel-resize-handle" id="sidebarResizer"></div>
+    
+    <div class="content-area">
+      <div class="tree-header normal" id="treeHeader">
+        <div class="header-col" style="width: 400px;">
+          Name
+          <div class="resize-handle" data-col="0"></div>
+        </div>
+        <div class="header-col" style="width: 140px;">
+          Type
+          <div class="resize-handle" data-col="1"></div>
+        </div>
+        <div class="header-col" style="width: 160px;">
+          Valid Until
+          <div class="resize-handle" data-col="2"></div>
+        </div>
+        <div class="header-col" style="width: 120px;">
+          Issued Certs
+          <div class="resize-handle" data-col="3"></div>
+        </div>
+        <div class="header-col" style="flex: 1;">
+          Status
+        </div>
+      </div>
+      
+      <div class="tree-list" id="treeList">
+        <!-- Root CA -->
+        <div class="tree-item normal" data-level="0" data-id="root-ca" oncontextmenu="showContextMenu(event, 'root-ca')">
+          <div class="tree-col" style="width: 400px;">
+            <span class="tree-toggle expanded" onclick="toggleNode(event, 'root-ca')"></span>
+            <span class="tree-icon">🔐</span>
+            <span class="tree-name">Acme Root CA</span>
+          </div>
+          <div class="tree-col" style="width: 140px;">
+            <span class="tree-type">Root CA</span>
+          </div>
+          <div class="tree-col" style="width: 160px;">
+            <span class="tree-meta">Dec 31, 2035</span>
+          </div>
+          <div class="tree-col" style="width: 120px;">
+            <span class="tree-meta">2 CAs</span>
+          </div>
+          <div class="tree-col" style="flex: 1;">
+            <span class="status-badge active">Active</span>
+          </div>
+        </div>
+        
+        <!-- Intermediate CA 1 (child of Root) -->
+        <div class="tree-item normal" data-level="1" data-id="inter-ca-1" data-parent="root-ca" oncontextmenu="showContextMenu(event, 'inter-ca-1')">
+          <div class="tree-col" style="width: 400px;">
+            <span class="tree-indent" style="width: 24px;"></span>
+            <span class="tree-toggle expanded" onclick="toggleNode(event, 'inter-ca-1')"></span>
+            <span class="tree-icon">🔓</span>
+            <span class="tree-name">Engineering Intermediate CA</span>
+          </div>
+          <div class="tree-col" style="width: 140px;">
+            <span class="tree-type">Intermediate</span>
+          </div>
+          <div class="tree-col" style="width: 160px;">
+            <span class="tree-meta">Jun 30, 2026</span>
+          </div>
+          <div class="tree-col" style="width: 120px;">
+            <span class="tree-meta">18 certs</span>
+          </div>
+          <div class="tree-col" style="flex: 1;">
+            <span class="status-badge active">Active</span>
+          </div>
+        </div>
+        
+        <!-- End-entity certs (children of Intermediate 1) -->
+        <div class="tree-item normal selected" data-level="2" data-id="cert-1" data-parent="inter-ca-1" oncontextmenu="showContextMenu(event, 'cert-1')">
+          <div class="tree-col" style="width: 400px;">
+            <span class="tree-indent" style="width: 48px;"></span>
+            <span class="tree-toggle leaf"></span>
+            <span class="tree-icon">📜</span>
+            <span class="tree-name">api.example.com</span>
+          </div>
+          <div class="tree-col" style="width: 140px;">
+            <span class="tree-type">RSA 2048</span>
+          </div>
+          <div class="tree-col" style="width: 160px;">
+            <span class="tree-meta">Dec 31, 2025</span>
+          </div>
+          <div class="tree-col" style="width: 120px;">
+            <span class="tree-meta">—</span>
+          </div>
+          <div class="tree-col" style="flex: 1;">
+            <span class="status-badge active">Valid</span>
+          </div>
+        </div>
+        
+        <div class="tree-item normal" data-level="2" data-id="cert-2" data-parent="inter-ca-1" oncontextmenu="showContextMenu(event, 'cert-2')">
+          <div class="tree-col" style="width: 400px;">
+            <span class="tree-indent" style="width: 48px;"></span>
+            <span class="tree-toggle leaf"></span>
+            <span class="tree-icon">📜</span>
+            <span class="tree-name">web.app.com</span>
+          </div>
+          <div class="tree-col" style="width: 140px;">
+            <span class="tree-type">RSA 2048</span>
+          </div>
+          <div class="tree-col" style="width: 160px;">
+            <span class="tree-meta">Mar 15, 2025</span>
+          </div>
+          <div class="tree-col" style="width: 120px;">
+            <span class="tree-meta">—</span>
+          </div>
+          <div class="tree-col" style="flex: 1;">
+            <span class="status-badge active">Valid</span>
+          </div>
+        </div>
+        
+        <!-- Intermediate CA 2 (child of Root) -->
+        <div class="tree-item normal" data-level="1" data-id="inter-ca-2" data-parent="root-ca" oncontextmenu="showContextMenu(event, 'inter-ca-2')">
+          <div class="tree-col" style="width: 400px;">
+            <span class="tree-indent" style="width: 24px;"></span>
+            <span class="tree-toggle collapsed" onclick="toggleNode(event, 'inter-ca-2')"></span>
+            <span class="tree-icon">🔓</span>
+            <span class="tree-name">Operations Intermediate CA</span>
+          </div>
+          <div class="tree-col" style="width: 140px;">
+            <span class="tree-type">Intermediate</span>
+          </div>
+          <div class="tree-col" style="width: 160px;">
+            <span class="tree-meta">Jun 30, 2026</span>
+          </div>
+          <div class="tree-col" style="width: 120px;">
+            <span class="tree-meta">6 certs</span>
+          </div>
+          <div class="tree-col" style="flex: 1;">
+            <span class="status-badge active">Active</span>
+          </div>
+        </div>
+        
+        <!-- Children of Intermediate 2 (collapsed by default) -->
+        <div class="tree-item normal" data-level="2" data-id="cert-3" data-parent="inter-ca-2" style="display: none;" oncontextmenu="showContextMenu(event, 'cert-3')">
+          <div class="tree-col" style="width: 400px;">
+            <span class="tree-indent" style="width: 48px;"></span>
+            <span class="tree-toggle leaf"></span>
+            <span class="tree-icon">📜</span>
+            <span class="tree-name">vpn.gateway.lan</span>
+          </div>
+          <div class="tree-col" style="width: 140px;">
+            <span class="tree-type">EC P-256</span>
+          </div>
+          <div class="tree-col" style="width: 160px;">
+            <span class="tree-meta">Jan 10, 2025</span>
+          </div>
+          <div class="tree-col" style="width: 120px;">
+            <span class="tree-meta">—</span>
+          </div>
+          <div class="tree-col" style="flex: 1;">
+            <span class="status-badge expired">Expired</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Resize Handle between Content and Preview -->
+    <div class="panel-resize-handle" id="previewResizer"></div>
+    
+    <div class="preview-panel">
+      <div class="preview-header">
+        <div class="preview-icon">📜</div>
+        <div class="preview-title">api.example.com</div>
+        <div class="preview-subtitle">End-Entity Certificate</div>
+      </div>
+      
+      <div class="preview-content">
+        <div class="preview-section">
+          <div class="label">Common Name</div>
+          <div class="value">api.example.com</div>
+        </div>
+        
+        <div class="preview-section">
+          <div class="label">Issuer (Parent CA)</div>
+          <div class="value">Engineering Intermediate CA</div>
+        </div>
+        
+        <div class="preview-section">
+          <div class="label">Issuer Chain</div>
+          <div class="value" style="font-size: 11px; color: #888;">
+            📜 api.example.com<br>
+            &nbsp;&nbsp;↳ 🔓 Engineering Intermediate CA<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;↳ 🔐 Acme Root CA
+          </div>
+        </div>
+        
+        <div class="preview-section">
+          <div class="label">Serial Number</div>
+          <div class="value"><code>A3:4F:2B:8E:91:CC</code></div>
+        </div>
+        
+        <div class="preview-section">
+          <div class="label">Valid Period</div>
+          <div class="value">
+            Jan 15, 2024 → Dec 31, 2025<br>
+            <span style="color: #4a9eff; font-size: 11px;">245 days remaining</span>
+          </div>
+        </div>
+        
+        <div class="preview-section">
+          <div class="label">Key Algorithm</div>
+          <div class="value">RSA 2048 bits</div>
+        </div>
+      </div>
+      
+      <div class="preview-actions">
+        <button class="primary" title="Export">📤</button>
+        <button class="secondary" title="Renew">🔄</button>
+        <button class="secondary" title="Copy">📋</button>
+        <button class="danger" title="Delete">🗑️</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Context Menu -->
+  <div class="context-menu" id="contextMenu">
+    <div class="context-menu-item" onclick="alert('View Details')">
+      <span>👁️</span> View Details
+    </div>
+    <div class="context-menu-item" onclick="alert('View Issued Certificates')">
+      <span>📜</span> View Issued Certificates
+    </div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" onclick="alert('Export Certificate')">
+      <span>📤</span> Export Certificate
+    </div>
+    <div class="context-menu-item" onclick="alert('Renew')">
+      <span>🔄</span> Renew
+    </div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" onclick="alert('Copy Path')">
+      <span>📋</span> Copy Certificate Path
+    </div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item danger" onclick="alert('Delete')">
+      <span>🗑️</span> Revoke & Delete
+    </div>
+  </div>
+  
+  <script>
+    // Density Toggle
+    let currentDensity = 'normal';
+    function setDensity(density) {
+      currentDensity = density;
+      document.querySelectorAll('.density-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      
+      document.getElementById('treeHeader').className = `tree-header ${density}`;
+      document.querySelectorAll('.tree-item').forEach(item => {
+        item.className = item.className.replace(/compact|normal/, density);
+      });
+      document.querySelectorAll('.tree-name, .tree-meta, .tree-type, .status-badge').forEach(el => {
+        if (density === 'compact') {
+          el.classList.add('compact');
+        } else {
+          el.classList.remove('compact');
+        }
+      });
+    }
+    
+    // Tree Toggle
+    function toggleNode(event, nodeId) {
+      event.stopPropagation();
+      const toggle = event.target;
+      const isExpanded = toggle.classList.contains('expanded');
+      
+      if (isExpanded) {
+        toggle.classList.remove('expanded');
+        toggle.classList.add('collapsed');
+        // Hide children recursively
+        hideChildren(nodeId);
+      } else {
+        toggle.classList.remove('collapsed');
+        toggle.classList.add('expanded');
+        // Show direct children only
+        document.querySelectorAll(`[data-parent="${nodeId}"]`).forEach(child => {
+          const childLevel = parseInt(child.dataset.level);
+          const parentLevel = parseInt(document.querySelector(`[data-id="${nodeId}"]`).dataset.level);
+          if (childLevel === parentLevel + 1) {
+            child.style.display = 'flex';
+          }
+        });
+      }
+    }
+    
+    function hideChildren(nodeId) {
+      document.querySelectorAll(`[data-parent="${nodeId}"]`).forEach(child => {
+        child.style.display = 'none';
+        const childToggle = child.querySelector('.tree-toggle');
+        if (childToggle && !childToggle.classList.contains('leaf')) {
+          childToggle.classList.remove('expanded');
+          childToggle.classList.add('collapsed');
+          // Recursively hide grandchildren
+          hideChildren(child.dataset.id);
+        }
+      });
+    }
+    
+    // Context Menu
+    let contextMenuTarget = null;
+    function showContextMenu(event, itemId) {
+      event.preventDefault();
+      contextMenuTarget = itemId;
+      
+      const menu = document.getElementById('contextMenu');
+      menu.style.left = event.pageX + 'px';
+      menu.style.top = event.pageY + 'px';
+      menu.classList.add('show');
+      
+      // Select the item
+      document.querySelectorAll('.tree-item').forEach(item => item.classList.remove('selected'));
+      document.querySelector(`[data-id="${itemId}"]`).classList.add('selected');
+    }
+    
+    // Hide context menu on click elsewhere
+    document.addEventListener('click', () => {
+      document.getElementById('contextMenu').classList.remove('show');
+    });
+    
+    // ===== PANEL RESIZE (Sidebar, Content, Preview) =====
+    let isPanelResizing = false;
+    let panelStartX = 0;
+    let panelStartWidth = 0;
+    let currentPanel = null;
+    
+    const sidebarResizer = document.getElementById('sidebarResizer');
+    const sidebar = document.querySelector('.sidebar');
+    const previewResizer = document.getElementById('previewResizer');
+    const previewPanel = document.querySelector('.preview-panel');
+    
+    sidebarResizer.addEventListener('mousedown', (e) => {
+      isPanelResizing = true;
+      currentPanel = sidebar;
+      panelStartX = e.pageX;
+      panelStartWidth = sidebar.offsetWidth;
+      sidebarResizer.classList.add('resizing');
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    
+    previewResizer.addEventListener('mousedown', (e) => {
+      isPanelResizing = true;
+      currentPanel = previewPanel;
+      panelStartX = e.pageX;
+      panelStartWidth = previewPanel.offsetWidth;
+      previewResizer.classList.add('resizing');
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    
+    // ===== COLUMN RESIZE (Table Headers) =====
+    let isColResizing = false;
+    let currentCol = null;
+    let colStartX = 0;
+    let colStartWidth = 0;
+    let colIndex = -1;
+    let colMinWidth = 80;
+    
+    // Calculate min-width for each column based on content
+    function getColumnMinWidth(colIdx) {
+      let maxWidth = 80; // default min
+      
+      // Check header
+      const header = document.querySelectorAll('.header-col')[colIdx];
+      if (header) {
+        const headerText = header.textContent.trim();
+        maxWidth = Math.max(maxWidth, headerText.length * 8 + 40);
+      }
+      
+      // Check all rows
+      document.querySelectorAll('.tree-item').forEach(row => {
+        if (row.children[colIdx]) {
+          const cell = row.children[colIdx];
+          const textElements = cell.querySelectorAll('.tree-name, .tree-type, .tree-meta, .status-badge');
+          textElements.forEach(el => {
+            const text = el.textContent.trim();
+            const charWidth = el.classList.contains('tree-name') ? 9 : 7;
+            const estimated = text.length * charWidth + 40;
+            maxWidth = Math.max(maxWidth, estimated);
+          });
+        }
+      });
+      
+      return Math.min(maxWidth, 300); // cap at 300px
+    }
+    
+    document.querySelectorAll('.resize-handle').forEach(handle => {
+      handle.addEventListener('mousedown', (e) => {
+        isColResizing = true;
+        currentCol = e.target.parentElement;
+        colStartX = e.pageX;
+        colStartWidth = currentCol.offsetWidth;
+        colIndex = Array.from(currentCol.parentElement.children).indexOf(currentCol);
+        colMinWidth = getColumnMinWidth(colIndex);
+        handle.classList.add('resizing');
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    });
+    
+    // ===== GLOBAL MOUSE MOVE =====
+    document.addEventListener('mousemove', (e) => {
+      // Panel resize
+      if (isPanelResizing && currentPanel) {
+        if (currentPanel === sidebar) {
+          const diff = e.pageX - panelStartX;
+          const newWidth = Math.max(180, Math.min(400, panelStartWidth + diff));
+          sidebar.style.width = newWidth + 'px';
+        } else if (currentPanel === previewPanel) {
+          const diff = panelStartX - e.pageX;
+          const newWidth = Math.max(280, Math.min(500, panelStartWidth + diff));
+          previewPanel.style.width = newWidth + 'px';
+        }
+      }
+      
+      // Column resize with dynamic min-width
+      if (isColResizing && currentCol) {
+        const diff = e.pageX - colStartX;
+        const newWidth = Math.max(colMinWidth, colStartWidth + diff);
+        currentCol.style.width = newWidth + 'px';
+        
+        // Update all rows
+        document.querySelectorAll('.tree-item').forEach(row => {
+          if (row.children[colIndex]) {
+            row.children[colIndex].style.width = newWidth + 'px';
+          }
+        });
+      }
+    });
+    
+    // ===== GLOBAL MOUSE UP =====
+    document.addEventListener('mouseup', () => {
+      if (isPanelResizing) {
+        isPanelResizing = false;
+        currentPanel = null;
+        document.querySelectorAll('.panel-resize-handle').forEach(h => h.classList.remove('resizing'));
+      }
+      if (isColResizing) {
+        isColResizing = false;
+        currentCol = null;
+        colIndex = -1;
+        document.querySelectorAll('.resize-handle').forEach(h => h.classList.remove('resizing'));
+      }
+    });
+  </script>
+</body>
+</html>
