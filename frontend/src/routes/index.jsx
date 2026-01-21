@@ -1,56 +1,123 @@
-import { Routes, Route } from 'react-router-dom';
-import AppLayout from '../components/layout/AppLayout';
+import { lazy, Suspense } from 'react';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router';
+import { AppLayout } from '../components/layout/AppLayout';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
-// Pages
-import Dashboard from '../pages/Dashboard';
-import CAList from '../pages/cas/CAList';
-import CertificateList from '../pages/certificates/CertificateList';
-import CSRList from '../pages/csrs/CSRList';
-import TemplateList from '../pages/templates/TemplateList';
-import CRLManagement from '../pages/crl/CRLManagement';
-import ACMEDashboard from '../pages/acme/ACMEDashboard';
-import SCEPDashboard from '../pages/scep/SCEPDashboard';
-import ImportPage from '../pages/import/ImportPage';
-import TrustStore from '../pages/truststore/TrustStore';
-import UserList from '../pages/users/UserList';
-import ActivityLog from '../pages/activity/ActivityLog';
-import Settings from '../pages/settings/Settings';
-import Profile from '../pages/profile/Profile';
+// Lazy load pages for code splitting
+const Dashboard = lazy(() => import('../pages/Dashboard'));
+const ActivityLog = lazy(() => import('../pages/activity/ActivityLog'));
+const CAList = lazy(() => import('../pages/cas/CAList'));
+const CertificateList = lazy(() => import('../pages/certificates/CertificateList'));
+const CSRList = lazy(() => import('../pages/csrs/CSRList'));
+const TemplateList = lazy(() => import('../pages/templates/TemplateList'));
+const CRLManagement = lazy(() => import('../pages/crl/CRLManagement'));
+const ACMEDashboard = lazy(() => import('../pages/acme/ACMEDashboard'));
+const SCEPDashboard = lazy(() => import('../pages/scep/SCEPDashboard'));
+const ImportPage = lazy(() => import('../pages/import/ImportPage'));
+const TrustStore = lazy(() => import('../pages/truststore/TrustStore'));
+const UserList = lazy(() => import('../pages/users/UserList'));
+const Settings = lazy(() => import('../pages/settings/Settings'));
+const Profile = lazy(() => import('../pages/profile/Profile'));
 
-/**
- * Application Routes
- * 
- * All routes wrapped in AppLayout (Sidebar + Topbar)
- * 14 main pages from prototype suite
- */
-export function AppRoutes() {
+// Loading fallback component
+function PageLoader() {
   return (
-    <Routes>
-      <Route path="/" element={<AppLayout />}>
-        {/* Main */}
-        <Route index element={<Dashboard />} />
-        
-        {/* Certificate Management */}
-        <Route path="cas" element={<CAList />} />
-        <Route path="certificates" element={<CertificateList />} />
-        <Route path="csrs" element={<CSRList />} />
-        <Route path="templates" element={<TemplateList />} />
-        <Route path="crl" element={<CRLManagement />} />
-        
-        {/* Protocols */}
-        <Route path="acme" element={<ACMEDashboard />} />
-        <Route path="scep" element={<SCEPDashboard />} />
-        
-        {/* System */}
-        <Route path="import" element={<ImportPage />} />
-        <Route path="truststore" element={<TrustStore />} />
-        <Route path="users" element={<UserList />} />
-        <Route path="activity" element={<ActivityLog />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="profile" element={<Profile />} />
-      </Route>
-    </Routes>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '400px',
+      color: 'var(--text-tertiary)',
+    }}>
+      <div style={{ textAlign: 'center' }}>
+        <i className="ph ph-spinner" style={{ fontSize: '32px', marginBottom: '8px' }} />
+        <div>Loading...</div>
+      </div>
+    </div>
   );
+}
+
+// Wrapper for lazy-loaded pages
+function LazyPage({ children }) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      {children}
+    </Suspense>
+  );
+}
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <AppLayout />,
+    errorElement: <ErrorBoundary />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/dashboard" replace />,
+      },
+      {
+        path: 'dashboard',
+        element: <LazyPage><Dashboard /></LazyPage>,
+      },
+      {
+        path: 'activity',
+        element: <LazyPage><ActivityLog /></LazyPage>,
+      },
+      {
+        path: 'cas',
+        element: <LazyPage><CAList /></LazyPage>,
+      },
+      {
+        path: 'certificates',
+        element: <LazyPage><CertificateList /></LazyPage>,
+      },
+      {
+        path: 'csrs',
+        element: <LazyPage><CSRList /></LazyPage>,
+      },
+      {
+        path: 'templates',
+        element: <LazyPage><TemplateList /></LazyPage>,
+      },
+      {
+        path: 'crl',
+        element: <LazyPage><CRLManagement /></LazyPage>,
+      },
+      {
+        path: 'acme',
+        element: <LazyPage><ACMEDashboard /></LazyPage>,
+      },
+      {
+        path: 'scep',
+        element: <LazyPage><SCEPDashboard /></LazyPage>,
+      },
+      {
+        path: 'import',
+        element: <LazyPage><ImportPage /></LazyPage>,
+      },
+      {
+        path: 'truststore',
+        element: <LazyPage><TrustStore /></LazyPage>,
+      },
+      {
+        path: 'users',
+        element: <LazyPage><UserList /></LazyPage>,
+      },
+      {
+        path: 'settings',
+        element: <LazyPage><Settings /></LazyPage>,
+      },
+      {
+        path: 'profile',
+        element: <LazyPage><Profile /></LazyPage>,
+      },
+    ],
+  },
+]);
+
+export function AppRoutes() {
+  return <RouterProvider router={router} />;
 }
 
 export default AppRoutes;
