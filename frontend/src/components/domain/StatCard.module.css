@@ -6,7 +6,6 @@
   border-radius: var(--radius);
   padding: var(--spacing-lg);
   transition: all 0.15s;
-  grid-column: span 3;
   min-height: 140px;
   position: relative;
   display: flex;
@@ -35,6 +34,7 @@
 .widgetIcon {
   opacity: 0.3;
   color: var(--text-tertiary);
+  font-size: 48px !important;
 }
 
 .widgetValue {
