@@ -1,43 +1,87 @@
-import { Tabs } from '../../components/ui/Tabs';
 import { StatCard } from '../../components/domain/StatCard';
 import { DataTable } from '../../components/domain/DataTable';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { getCRLStats, getOCSPStats } from '../../services/mockData';
+import { Badge } from '../../components/ui/Badge';
 import styles from './CRLManagement.module.css';
 
-/**
- * CRL/OCSP Management Page
- * 
- * Two tabs:
- * - CRL Management (generation, stats)
- * - OCSP Configuration (responder config, stats)
- */
 export function CRLManagement() {
-  const crlStats = getCRLStats();
-  const ocspStats = getOCSPStats();
+  const cas = [
+    {
+      id: 1,
+      name: 'Internal Root CA',
+      crlStatus: 'active',
+      lastGenerated: '2 hours ago',
+      nextUpdate: 'In 22 hours',
+      ocspStatus: 'enabled',
+      revokedCerts: 3,
+    },
+    {
+      id: 2,
+      name: 'Production Intermediate CA',
+      crlStatus: 'active',
+      lastGenerated: '3 hours ago',
+      nextUpdate: 'In 21 hours',
+      ocspStatus: 'enabled',
+      revokedCerts: 12,
+    },
+    {
+      id: 3,
+      name: 'Development Intermediate CA',
+      crlStatus: 'active',
+      lastGenerated: '1 hour ago',
+      nextUpdate: 'In 23 hours',
+      ocspStatus: 'enabled',
+      revokedCerts: 8,
+    },
+    {
+      id: 4,
+      name: 'ECDSA Root CA',
+      crlStatus: 'stale',
+      lastGenerated: '3 days ago',
+      nextUpdate: 'Overdue',
+      ocspStatus: 'enabled',
+      revokedCerts: 1,
+    },
+    {
+      id: 5,
+      name: 'Testing Root CA',
+      crlStatus: 'disabled',
+      lastGenerated: '-',
+      nextUpdate: '-',
+      ocspStatus: 'disabled',
+      revokedCerts: 0,
+    },
+  ];
 
-  const crlColumns = [
+  const columns = [
     {
       key: 'name',
       label: 'CA Name',
       sortable: true,
-    },
-    {
-      key: 'crlSize',
-      label: 'CRL Size',
-      sortable: true,
-    },
-    {
-      key: 'revocations',
-      label: 'Revocations',
-      sortable: true,
       render: (row) => (
-        <span style={{ color: 'var(--text-tertiary)' }}>
-          {row.revocations}
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+          {row.name}
         </span>
       ),
+    },
+    {
+      key: 'crlStatus',
+      label: 'CRL Status',
+      sortable: true,
+      render: (row) => {
+        const statusMap = {
+          active: 'success',
+          stale: 'warning',
+          disabled: 'info',
+        };
+        const labelMap = {
+          active: 'Active',
+          stale: 'Stale',
+          disabled: 'Disabled',
+        };
+        return <Badge variant={statusMap[row.crlStatus]}>{labelMap[row.crlStatus]}</Badge>;
+      },
     },
     {
       key: 'lastGenerated',
@@ -50,16 +94,55 @@ export function CRLManagement() {
       sortable: true,
     },
     {
+      key: 'ocspStatus',
+      label: 'OCSP',
+      sortable: true,
+      render: (row) => {
+        const statusMap = {
+          enabled: 'success',
+          disabled: 'info',
+        };
+        const labelMap = {
+          enabled: 'Enabled',
+          disabled: 'Disabled',
+        };
+        return <Badge variant={statusMap[row.ocspStatus]}>{labelMap[row.ocspStatus]}</Badge>;
+      },
+    },
+    {
+      key: 'revokedCerts',
+      label: 'Revoked Certs',
+      sortable: true,
+    },
+    {
       key: 'actions',
       label: 'Actions',
       render: (row) => (
-        <div className={styles.actions}>
-          <Button variant="primary" icon="ph ph-arrow-clockwise" onClick={() => console.log('Regenerate:', row)}>
-            Regenerate
-          </Button>
-          <Button variant="default" icon="ph ph-download-simple" onClick={() => console.log('Download:', row)}>
-            Download
-          </Button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {row.crlStatus !== 'disabled' && (
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                icon="ph ph-arrows-clockwise"
+                onClick={() => console.log('Regenerate CRL:', row)}
+              />
+              <Button
+                variant="default"
+                size="sm"
+                icon="ph ph-download-simple"
+                onClick={() => console.log('Download CRL:', row)}
+              />
+            </>
+          )}
+          {row.crlStatus === 'disabled' && (
+            <Button
+              variant="default"
+              size="sm"
+              icon="ph ph-gear"
+              onClick={() => console.log('Configure:', row)}
+            />
+          )}
         </div>
       ),
     },
@@ -67,157 +150,49 @@ export function CRLManagement() {
 
   return (
     <div className={styles.crlManagement}>
-      <Tabs>
-        <Tabs.List>
-          <Tabs.Tab>CRL Management</Tabs.Tab>
-          <Tabs.Tab>OCSP Configuration</Tabs.Tab>
-        </Tabs.List>
+      <div className={styles.statsRow}>
+        <StatCard
+          value="23"
+          label="CRLs Generated"
+          description="Last: 2 hours ago"
+          icon="file-text"
+        />
+        <StatCard
+          value="14,523"
+          label="OCSP Requests (24h)"
+          description="+8% vs yesterday"
+          icon="chart-line"
+        />
+        <StatCard
+          value="5"
+          label="Active CAs"
+          description="With CRL enabled"
+          icon="certificate"
+        />
+        <StatCard
+          value="12ms"
+          label="Avg Response Time"
+          description="OCSP queries"
+          icon="timer"
+        />
+      </div>
 
-        <Tabs.Panels>
-          {/* CRL Management Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
-              {/* Stats */}
-              <div className={styles.statsGrid}>
-                <StatCard
-                  value={crlStats.totalCRLs}
-                  label="Total CRLs"
-                  icon="list-checks"
-                  gradient
-                />
-                <StatCard
-                  value={crlStats.totalRevocations}
-                  label="Total Revocations"
-                  icon="x-circle"
-                  gradient
-                />
-              </div>
-
-              {/* CRL Table */}
-              <Card>
-                <Card.Header>
-                  <h3>CRL Status by CA</h3>
-                  <Button variant="primary" icon="ph ph-arrow-clockwise">
-                    Regenerate All
-                  </Button>
-                </Card.Header>
-                <Card.Body>
-                  <DataTable
-                    columns={crlColumns}
-                    data={crlStats.cas}
-                    onRowClick={(row) => console.log('CA clicked:', row)}
-                  />
-                </Card.Body>
-              </Card>
-
-              {/* Info Box */}
-              <Card className={styles.infoBox}>
-                <Card.Body>
-                  <div className={styles.infoContent}>
-                    <div className={styles.infoIcon}>
-                      <i className="ph ph-info" />
-                    </div>
-                    <div>
-                      <div className={styles.infoTitle}>Automatic CRL Generation</div>
-                      <div className={styles.infoText}>
-                        CRLs are automatically regenerated every 24 hours. You can manually regenerate a CRL at any time.
-                        Last automatic generation: {crlStats.lastGenerated}
-                      </div>
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            </div>
-          </Tabs.Panel>
-
-          {/* OCSP Configuration Tab */}
-          <Tabs.Panel>
-            <div className={styles.tabContent}>
-              {/* Stats */}
-              <div className={styles.statsGrid}>
-                <StatCard
-                  value={ocspStats.requests24h}
-                  label="Requests (24h)"
-                  icon="activity"
-                  gradient
-                />
-                <StatCard
-                  value={ocspStats.avgResponseTime}
-                  label="Avg Response Time"
-                  icon="clock"
-                  gradient
-                />
-                <StatCard
-                  value={ocspStats.cacheHitRate}
-                  label="Cache Hit Rate"
-                  icon="database"
-                  gradient
-                />
-              </div>
-
-              {/* OCSP Configuration */}
-              <Card>
-                <Card.Header>
-                  <h3>OCSP Responder Configuration</h3>
-                  <div className={styles.statusBadge}>
-                    <span className={styles.statusDot} data-status={ocspStats.responderStatus} />
-                    <span>{ocspStats.responderStatus}</span>
-                  </div>
-                </Card.Header>
-                <Card.Body>
-                  <form className={styles.form}>
-                    <Input
-                      label="OCSP Responder URL"
-                      value={ocspStats.responderUrl}
-                      readOnly
-                    />
-                    <Input
-                      label="Total Requests"
-                      value={ocspStats.requestsTotal.toLocaleString()}
-                      readOnly
-                    />
-                    <Input
-                      label="Last Restart"
-                      value={ocspStats.lastRestart}
-                      readOnly
-                    />
-                    
-                    <div className={styles.formActions}>
-                      <Button variant="primary" icon="ph ph-play">
-                        Restart Responder
-                      </Button>
-                      <Button variant="default" icon="ph ph-check-circle">
-                        Test OCSP
-                      </Button>
-                      <Button variant="default" icon="ph ph-gear">
-                        Configure
-                      </Button>
-                    </div>
-                  </form>
-                </Card.Body>
-              </Card>
-
-              {/* Info Box */}
-              <Card className={styles.infoBox}>
-                <Card.Body>
-                  <div className={styles.infoContent}>
-                    <div className={styles.infoIcon}>
-                      <i className="ph ph-info" />
-                    </div>
-                    <div>
-                      <div className={styles.infoTitle}>About OCSP</div>
-                      <div className={styles.infoText}>
-                        The OCSP responder provides real-time certificate status information to clients.
-                        It uses a cache to improve performance and reduce database load.
-                      </div>
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            </div>
-          </Tabs.Panel>
-        </Tabs.Panels>
-      </Tabs>
+      <Card>
+        <Card.Header>
+          <h3>Certificate Authorities</h3>
+          <Button variant="default" icon="ph ph-funnel">
+            Filter
+          </Button>
+        </Card.Header>
+        <Card.Body>
+          <DataTable
+            columns={columns}
+            data={cas}
+            onRowClick={(row) => console.log('CA clicked:', row)}
+            pageSize={10}
+          />
+        </Card.Body>
+      </Card>
     </div>
   );
 }
