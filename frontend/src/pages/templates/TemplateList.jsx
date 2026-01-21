@@ -1,129 +1,177 @@
-import { SearchToolbar } from '../../components/domain/SearchToolbar';
-import { Card } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
-import { Icon } from '../../components/ui/Icon';
-import { getBadgeVariant } from '../../utils/getBadgeVariant';
-import { getTemplates } from '../../services/mockData';
+import { useState } from 'react';
 import styles from './TemplateList.module.css';
 
-/**
- * Templates Page
- * 
- * Certificate templates management with:
- * - Cards grid layout
- * - Template metadata display
- * - Create/Edit/Delete actions
- */
+// Mock Templates Data
+const MOCK_TEMPLATES = [
+  {
+    id: 1,
+    name: 'Server Certificate',
+    keyUsage: 'Digital Signature, Key Encipherment',
+    validity: '1 year',
+    subjectPattern: 'CN={hostname}, O=Company',
+    usedBy: '142 certs',
+    status: 'ACTIVE',
+  },
+  {
+    id: 2,
+    name: 'Client Authentication',
+    keyUsage: 'Digital Signature, Non Repudiation',
+    validity: '2 years',
+    subjectPattern: 'CN={username}, OU=Users',
+    usedBy: '87 certs',
+    status: 'ACTIVE',
+  },
+  {
+    id: 3,
+    name: 'Code Signing',
+    keyUsage: 'Digital Signature',
+    validity: '3 years',
+    subjectPattern: 'CN={developer}, O=Company',
+    usedBy: '12 certs',
+    status: 'ACTIVE',
+  },
+  {
+    id: 4,
+    name: 'Email Protection',
+    keyUsage: 'Digital Signature, Key Encipherment',
+    validity: '1 year',
+    subjectPattern: 'CN={email}, OU=Email',
+    usedBy: '234 certs',
+    status: 'ACTIVE',
+  },
+  {
+    id: 5,
+    name: 'Wildcard SSL',
+    keyUsage: 'Digital Signature, Key Encipherment',
+    validity: '90 days',
+    subjectPattern: 'CN=*.{domain}',
+    usedBy: '45 certs',
+    status: 'ACTIVE',
+  },
+  {
+    id: 6,
+    name: 'VPN Gateway',
+    keyUsage: 'Digital Signature, Key Encipherment, TLS Server',
+    validity: '2 years',
+    subjectPattern: 'CN={gateway}, OU=VPN',
+    usedBy: '8 certs',
+    status: 'ACTIVE',
+  },
+  {
+    id: 7,
+    name: 'IoT Device',
+    keyUsage: 'Digital Signature',
+    validity: '5 years',
+    subjectPattern: 'CN={device_id}, OU=IoT',
+    usedBy: '567 certs',
+    status: 'ACTIVE',
+  },
+  {
+    id: 8,
+    name: 'Intermediate CA',
+    keyUsage: 'Certificate Sign, CRL Sign',
+    validity: '10 years',
+    subjectPattern: 'CN={ca_name}, O=Company',
+    usedBy: '3 certs',
+    status: 'SYSTEM',
+  },
+];
+
 export function TemplateList() {
-  const templates = getTemplates();
-
-  const filters = [
-    {
-      label: 'Type',
-      options: ['All Types', 'Web Server', 'Email', 'Code Signing', 'VPN', 'User', 'OCSP'],
-    },
-  ];
-
-  const actions = [
-    { label: 'Create Template', icon: 'ph ph-plus', variant: 'primary' },
-    { label: 'Import Template', icon: 'ph ph-upload', variant: 'default' },
-  ];
+  const [filterOpen, setFilterOpen] = useState(false);
 
   return (
     <div className={styles.templateList}>
-      <SearchToolbar
-        placeholder="Search templates..."
-        filters={filters}
-        actions={actions}
-        onSearch={(query) => console.log('Search:', query)}
-        onFilterChange={(filter, value) => console.log('Filter:', filter, value)}
-      />
+      {/* Page Header */}
+      <div className={styles.pageHeader}>
+        <div className={styles.pageTitle}>
+          <i className="ph ph-file-text"></i>
+          Certificate Templates
+          <span className={styles.badgeTopbar}>{MOCK_TEMPLATES.length} Templates</span>
+        </div>
+        <div className={styles.pageActions}>
+          <button className={styles.btn}>
+            <i className="ph ph-download-simple"></i>
+            Export
+          </button>
+          <button className={`${styles.btn} ${styles.btnPrimary}`}>
+            <i className="ph ph-plus"></i>
+            New Template
+          </button>
+        </div>
+      </div>
 
-      <div className={styles.grid}>
-        {templates.map((template) => (
-          <Card key={template.id} className={styles.templateCard}>
-            <div className={styles.cardHeader}>
-              <div className={styles.iconWrapper}>
-                <Icon name={template.icon} size={32} gradient />
-              </div>
-              <div className={styles.cardActions}>
-                <button
-                  className={styles.iconButton}
-                  onClick={() => console.log('Edit:', template)}
-                  title="Edit template"
-                >
-                  <Icon name="pencil-simple" size={16} />
-                </button>
-                <button
-                  className={styles.iconButton}
-                  onClick={() => console.log('Delete:', template)}
-                  title="Delete template"
-                >
-                  <Icon name="trash" size={16} />
-                </button>
-              </div>
-            </div>
+      {/* Section Header */}
+      <div className={styles.sectionHeader}>
+        <span className={styles.sectionTitle}>Available Templates</span>
+        <button 
+          className={styles.filterBtn}
+          onClick={() => setFilterOpen(!filterOpen)}
+        >
+          <i className="ph ph-funnel"></i>
+          Filter
+        </button>
+      </div>
 
-            <div className={styles.cardContent}>
-              <h3 className={styles.templateName}>{template.name}</h3>
-              <p className={styles.description}>{template.description}</p>
-
-              <div className={styles.metadata}>
-                <div className={styles.metadataItem}>
-                  <span className={styles.metadataLabel}>Type</span>
-                  <Badge variant={getBadgeVariant('template-type', template.type)}>
-                    {template.type}
-                  </Badge>
-                </div>
-
-                <div className={styles.metadataItem}>
-                  <span className={styles.metadataLabel}>Certificates Issued</span>
-                  <span className={styles.metadataValue}>{template.certificatesIssued}</span>
-                </div>
-
-                <div className={styles.metadataItem}>
-                  <span className={styles.metadataLabel}>Default Validity</span>
-                  <span className={styles.metadataValue}>{template.defaultValidity} days</span>
-                </div>
-              </div>
-
-              <div className={styles.usage}>
-                <div className={styles.usageLabel}>Key Usage:</div>
-                <div className={styles.usageTags}>
-                  {template.keyUsage.map((usage) => (
-                    <span key={usage} className={styles.usageTag}>
-                      {usage}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {template.extKeyUsage.length > 0 && (
-                <div className={styles.usage}>
-                  <div className={styles.usageLabel}>Extended Key Usage:</div>
-                  <div className={styles.usageTags}>
-                    {template.extKeyUsage.map((usage) => (
-                      <span key={usage} className={styles.usageTag}>
-                        {usage}
-                      </span>
-                    ))}
+      {/* Templates Table */}
+      <div className={styles.tableContainer}>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '15%' }}>TEMPLATE NAME</th>
+              <th style={{ width: '25%' }}>KEY USAGE</th>
+              <th style={{ width: '10%' }}>VALIDITY</th>
+              <th style={{ width: '20%' }}>SUBJECT PATTERN</th>
+              <th style={{ width: '12%' }}>USED BY</th>
+              <th style={{ width: '10%' }}>STATUS</th>
+              <th style={{ width: '8%' }}>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {MOCK_TEMPLATES.map((template) => (
+              <tr key={template.id}>
+                <td>
+                  <span className={styles.templateName}>{template.name}</span>
+                </td>
+                <td>
+                  <span className={styles.keyUsage}>{template.keyUsage}</span>
+                </td>
+                <td>{template.validity}</td>
+                <td>
+                  <code className={styles.subjectPattern}>{template.subjectPattern}</code>
+                </td>
+                <td>{template.usedBy}</td>
+                <td>
+                  <span 
+                    className={`${styles.statusBadge} ${
+                      template.status === 'ACTIVE' ? styles.badgeActive : styles.badgeSystem
+                    }`}
+                  >
+                    {template.status}
+                  </span>
+                </td>
+                <td>
+                  <div className={styles.actionsCell}>
+                    {template.status === 'ACTIVE' ? (
+                      <>
+                        <button className={styles.actionBtn} title="Edit">
+                          <i className="ph ph-pencil"></i>
+                        </button>
+                        <button className={styles.actionBtn} title="Duplicate">
+                          <i className="ph ph-copy"></i>
+                        </button>
+                      </>
+                    ) : (
+                      <button className={styles.actionBtn} title="View">
+                        <i className="ph ph-eye"></i>
+                      </button>
+                    )}
                   </div>
-                </div>
-              )}
-            </div>
-
-            <div className={styles.cardFooter}>
-              <Button
-                variant="primary"
-                icon="ph ph-certificate"
-                onClick={() => console.log('Use template:', template)}
-              >
-                Use Template
-              </Button>
-            </div>
-          </Card>
-        ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
