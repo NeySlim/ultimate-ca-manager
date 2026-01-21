@@ -9,7 +9,7 @@
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(26, 26, 26, 0.8);
   backdrop-filter: blur(2px);
 }
 
@@ -27,7 +27,7 @@
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px rgba(26, 26, 26, 0.6);
   width: 100%;
   max-height: calc(100vh - 2rem);
   display: flex;

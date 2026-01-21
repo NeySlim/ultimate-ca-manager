@@ -125,7 +125,7 @@
 
 .log-autoscroll input {
   cursor: pointer;
-  accent-color: #5a8fc7;
+  accent-color: var(--accent-primary);
 }
 
 .log-autoscroll:hover {

@@ -17,7 +17,7 @@
   width: calc(var(--control-height) * 2.5); /* Scale box */
   height: calc(var(--control-height) * 2.5);
   border-radius: 8px;
-  background-color: rgba(90, 143, 199, 0.1);
+  background-color: rgba(var(--accent-primary-rgb), 0.1);
 }
 
 .stat-widget.green .stat-icon {

@@ -39,7 +39,7 @@ export const CreationWizard = ({
           border: '1px solid var(--border-color)',
           background: 'var(--bg-panel)',
           overflow: 'hidden',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+          boxShadow: '0 4px 12px rgba(26, 26, 26, 0.3)'
         }}
       >
         {/* Header */}
