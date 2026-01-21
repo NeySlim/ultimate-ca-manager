@@ -4,6 +4,7 @@ import { AppLayout } from '../components/layout/AppLayout';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Lazy load pages for code splitting
+const Login = lazy(() => import('../pages/Login'));
 const Dashboard = lazy(() => import('../pages/Dashboard'));
 const ActivityLog = lazy(() => import('../pages/activity/ActivityLog'));
 const CAList = lazy(() => import('../pages/cas/CAList'));
@@ -47,6 +48,11 @@ function LazyPage({ children }) {
 }
 
 const router = createBrowserRouter([
+  {
+    path: '/login',
+    element: <LazyPage><Login /></LazyPage>,
+    errorElement: <ErrorBoundary />,
+  },
   {
     path: '/',
     element: <AppLayout />,
