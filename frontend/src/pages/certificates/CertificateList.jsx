@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useCertificates, useRevokeCertificate } from '../../hooks/useCertificates';
 import { IssueCertificateModal } from '../../components/modals/IssueCertificateModal';
+import { ImportCertificateModal } from '../../components/modals/ImportCertificateModal';
 import { exportTableData } from '../../utils/export';
 import styles from './CertificateList.module.css';
 
@@ -13,6 +14,7 @@ export function CertificateList() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [showIssueModal, setShowIssueModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const { data: certsResponse, isLoading, error } = useCertificates();
   const { mutate: revokeCertificate } = useRevokeCertificate();
@@ -104,7 +106,7 @@ export function CertificateList() {
         badge={<Badge variant="success">{activeCount} Active</Badge>}
         actions={
           <>
-            <Button icon="ph ph-upload-simple">Import</Button>
+            <Button icon="ph ph-upload-simple" onClick={() => setShowImportModal(true)}>Import</Button>
             <Button icon="ph ph-download-simple" onClick={handleExport}>Export</Button>
             <Button 
               variant="primary" 
@@ -242,6 +244,12 @@ export function CertificateList() {
       <IssueCertificateModal 
         isOpen={showIssueModal}
         onClose={() => setShowIssueModal(false)}
+      />
+      
+      {/* Import Certificate Modal */}
+      <ImportCertificateModal 
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
       />
     </div>
   );

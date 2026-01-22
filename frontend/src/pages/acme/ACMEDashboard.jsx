@@ -6,6 +6,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { getBadgeVariant } from '../../utils/getBadgeVariant';
 import { useACMESettings, useACMEStats, useACMEAccounts, useACMEOrders, useUpdateACMESettings } from '../../hooks/useACME';
+import { CreateACMEAccountModal } from '../../components/modals/CreateACMEAccountModal';
+import { CreateACMEOrderModal } from '../../components/modals/CreateACMEOrderModal';
 import toast from 'react-hot-toast';
 import styles from './ACMEDashboard.module.css';
 
@@ -18,6 +20,8 @@ import styles from './ACMEDashboard.module.css';
  */
 export function ACMEDashboard() {
   const [activeTab, setActiveTab] = useState('internal');
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showOrderModal, setShowOrderModal] = useState(false);
   
   const { data: settings, isLoading: loadingSettings, error: errorSettings } = useACMESettings();
   const { data: stats, isLoading: loadingStats, error: errorStats } = useACMEStats();
@@ -100,8 +104,8 @@ export function ACMEDashboard() {
   ];
 
   const actions = [
-    { label: 'New Account', icon: 'ph ph-plus', variant: 'primary' },
-    { label: 'New Order', icon: 'ph ph-certificate', variant: 'default' },
+    { label: 'New Account', icon: 'ph ph-plus', variant: 'primary', onClick: () => setShowAccountModal(true) },
+    { label: 'New Order', icon: 'ph ph-certificate', variant: 'default', onClick: () => setShowOrderModal(true) },
   ];
 
   if (isLoading) {
@@ -226,6 +230,16 @@ export function ACMEDashboard() {
       <div className={styles.tabContent}>
         {renderTab()}
       </div>
+      
+      <CreateACMEAccountModal 
+        isOpen={showAccountModal} 
+        onClose={() => setShowAccountModal(false)} 
+      />
+      
+      <CreateACMEOrderModal 
+        isOpen={showOrderModal} 
+        onClose={() => setShowOrderModal(false)} 
+      />
     </div>
   );
 }

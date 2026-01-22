@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { CreateTemplateModal } from '../../components/modals/CreateTemplateModal';
 import styles from './TemplateList.module.css';
 
 // Mock Templates Data
@@ -82,6 +83,7 @@ const MOCK_TEMPLATES = [
 
 export function TemplateList() {
   const [filterOpen, setFilterOpen] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   return (
     <div className={styles.templateList}>
@@ -93,7 +95,7 @@ export function TemplateList() {
         actions={
           <>
             <Button icon="ph ph-download-simple">Export</Button>
-            <Button variant="primary" icon="ph ph-plus">New Template</Button>
+            <Button variant="primary" icon="ph ph-plus" onClick={() => setShowCreateModal(true)}>New Template</Button>
           </>
         }
       />
@@ -170,6 +172,11 @@ export function TemplateList() {
           </tbody>
         </table>
       </div>
+      
+      <CreateTemplateModal 
+        isOpen={showCreateModal} 
+        onClose={() => setShowCreateModal(false)} 
+      />
     </div>
   );
 }

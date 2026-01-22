@@ -4,11 +4,15 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useCSRs } from '../../hooks/useCSRs';
 import { exportTableData } from '../../utils/export';
+import { CreateCSRModal } from '../../components/modals/CreateCSRModal';
+import { ImportCSRModal } from '../../components/modals/ImportCSRModal';
 import toast from 'react-hot-toast';
 import styles from './CSRList.module.css';
 
 export function CSRList() {
   const { data: csrsResponse, isLoading, error } = useCSRs();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const handleExport = () => {
     const csrs = csrsResponse?.data || [];
@@ -71,9 +75,9 @@ export function CSRList() {
         badge={<Badge variant="warning">{MOCK_PENDING.length} Pending</Badge>}
         actions={
           <>
-            <Button icon="ph ph-upload-simple">Import CSR</Button>
+            <Button icon="ph ph-upload-simple" onClick={() => setShowImportModal(true)}>Import CSR</Button>
             <Button icon="ph ph-download-simple" onClick={handleExport}>Export</Button>
-            <Button variant="primary" icon="ph ph-file-plus">Create CSR</Button>
+            <Button variant="primary" icon="ph ph-file-plus" onClick={() => setShowCreateModal(true)}>Create CSR</Button>
           </>
         }
       />
@@ -252,6 +256,16 @@ export function CSRList() {
           </div>
         </div>
       )}
+      
+      <CreateCSRModal 
+        isOpen={showCreateModal} 
+        onClose={() => setShowCreateModal(false)} 
+      />
+      
+      <ImportCSRModal 
+        isOpen={showImportModal} 
+        onClose={() => setShowImportModal(false)} 
+      />
     </div>
   );
 }

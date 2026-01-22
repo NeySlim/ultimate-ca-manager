@@ -4,6 +4,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { PageTopBar, PillFilter, PillFilters } from '../../components/common';
 import { exportTableData } from '../../utils/export';
+import { CreateUserModal } from '../../components/modals/CreateUserModal';
 import toast from 'react-hot-toast';
 import styles from './UserList.module.css';
 
@@ -19,6 +20,7 @@ import styles from './UserList.module.css';
 export function UserList() {
   const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const handleExport = () => {
     if (filteredUsers.length === 0) {
@@ -132,7 +134,7 @@ export function UserList() {
           <>
             <Button variant="default" icon="ph ph-upload-simple">Import</Button>
             <Button variant="default" icon="ph ph-download-simple" onClick={handleExport}>Export</Button>
-            <Button variant="primary" icon="ph ph-plus">Create User</Button>
+            <Button variant="primary" icon="ph ph-plus" onClick={() => setShowCreateModal(true)}>Create User</Button>
           </>
         }
       />
@@ -179,6 +181,11 @@ export function UserList() {
           pageSize={10}
         />
       </div>
+      
+      <CreateUserModal 
+        isOpen={showCreateModal} 
+        onClose={() => setShowCreateModal(false)} 
+      />
     </div>
   );
 }
