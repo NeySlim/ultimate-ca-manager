@@ -189,7 +189,7 @@ export function Dashboard() {
         <div style={{ padding: 'var(--spacing-lg)', paddingBottom: 'var(--spacing-sm)' }}>
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>Certificates Expiring Soon</h2>
-            <Button variant="secondary">View All (12)</Button>
+            <Button variant="secondary">View All ({statsData.expiringSoon})</Button>
           </div>
         </div>
         <DataTable
