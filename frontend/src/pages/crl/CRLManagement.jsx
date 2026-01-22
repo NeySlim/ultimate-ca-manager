@@ -1,20 +1,33 @@
+import { useState } from 'react';
 import { PageTopBar, StatsGrid, StatCard } from '../../components/common';
 import { DataTable } from '../../components/domain/DataTable';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import toast from 'react-hot-toast';
+import api from '../../services/api/api';
 import styles from './CRLManagement.module.css';
 
 export function CRLManagement() {
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
   const handleDownloadCRL = (caId) => {
     window.open(`/api/v2/crl/download/${caId}`, '_blank');
     toast.success('CRL download started');
   };
 
-  const handleRegenerateCRL = (ca) => {
-    toast.success(`Regenerating CRL for ${ca.name}...`);
-    // TODO: Connect to backend mutation when available
+  const handleRegenerateCRL = async (ca) => {
+    if (!confirm(`Regenerate CRL for ${ca.name}? This may take a moment.`)) return;
+    
+    setIsRegenerating(true);
+    try {
+      await api.post(`/api/v2/crl/regenerate/${ca.id}`);
+      toast.success('CRL regenerated successfully');
+    } catch (error) {
+      toast.error('Failed to regenerate CRL');
+    } finally {
+      setIsRegenerating(false);
+    }
   };
 
   const cas = [
@@ -137,6 +150,7 @@ export function CRLManagement() {
                 size="sm"
                 icon="ph ph-arrows-clockwise"
                 onClick={() => handleRegenerateCRL(row)}
+                disabled={isRegenerating}
               />
               <Button
                 variant="default"

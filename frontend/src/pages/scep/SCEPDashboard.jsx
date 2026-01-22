@@ -7,7 +7,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { getBadgeVariant } from '../../utils/getBadgeVariant';
-import { useSCEPSettings, useSCEPStats } from '../../hooks/useSCEP';
+import { useSCEPSettings, useSCEPStats, useApproveSCEPRequest, useRejectSCEPRequest } from '../../hooks/useSCEP';
+import toast from 'react-hot-toast';
 import styles from './SCEPDashboard.module.css';
 
 /**
@@ -21,6 +22,8 @@ export function SCEPDashboard() {
   const [activeTab, setActiveTab] = useState('config');
   const { data: settings, isLoading: settingsLoading } = useSCEPSettings();
   const { data: stats, isLoading: statsLoading } = useSCEPStats();
+  const approveSCEP = useApproveSCEPRequest();
+  const rejectSCEP = useRejectSCEPRequest();
   
   const isLoading = settingsLoading || statsLoading;
   
@@ -68,10 +71,32 @@ export function SCEPDashboard() {
         if (row.status === 'pending') {
           return (
             <div className={styles.actions}>
-              <Button variant="success" icon="ph ph-check" onClick={() => console.log('Approve:', row)}>
+              <Button 
+                variant="success" 
+                icon="ph ph-check" 
+                onClick={() => {
+                  if (confirm(`Approve enrollment for ${row.deviceId}?`)) {
+                    approveSCEP.mutate(row.id, {
+                      onSuccess: () => toast.success('Enrollment approved'),
+                      onError: () => toast.error('Failed to approve')
+                    });
+                  }
+                }}
+              >
                 Approve
               </Button>
-              <Button variant="danger" icon="ph ph-x" onClick={() => console.log('Reject:', row)}>
+              <Button 
+                variant="danger" 
+                icon="ph ph-x" 
+                onClick={() => {
+                  if (confirm(`Reject enrollment for ${row.deviceId}?`)) {
+                    rejectSCEP.mutate(row.id, {
+                      onSuccess: () => toast.success('Enrollment rejected'),
+                      onError: () => toast.error('Failed to reject')
+                    });
+                  }
+                }}
+              >
                 Reject
               </Button>
             </div>
