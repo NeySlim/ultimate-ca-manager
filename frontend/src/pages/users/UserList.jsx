@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { DataTable } from '../../components/domain/DataTable';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -23,10 +23,13 @@ export function UserList() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Build API params from filters
-  const params = {};
-  if (roleFilter !== 'All') params.role = roleFilter.toLowerCase();
-  if (statusFilter !== 'All') params.active = statusFilter === 'Active';
+  // Build API params from filters - memoized to prevent infinite re-renders
+  const params = useMemo(() => {
+    const p = {};
+    if (roleFilter !== 'All') p.role = roleFilter.toLowerCase();
+    if (statusFilter !== 'All') p.active = statusFilter === 'Active';
+    return p;
+  }, [roleFilter, statusFilter]);
 
   // Fetch users from backend
   const { data, isLoading, error } = useUsers(params);
@@ -56,12 +59,16 @@ export function UserList() {
     return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   };
 
-  const usersData = (data?.data || []).map(user => ({
+  // Transform backend data to frontend format
+  // Handle both {data: [...]} and [...] formats
+  const rawUsers = Array.isArray(data) ? data : (data?.data || []);
+  
+  const usersData = rawUsers.map(user => ({
     id: user.id,
     name: user.username,
     initials: getInitials(user.username),
     email: user.email,
-    role: user.role.charAt(0).toUpperCase() + user.role.slice(1), // admin -> Admin
+    role: user.role ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : 'Unknown',
     status: user.active ? 'Active' : 'Disabled',
     lastLogin: formatDate(user.last_login),
     created: formatDate(user.created_at),
