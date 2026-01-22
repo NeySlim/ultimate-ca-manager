@@ -103,11 +103,6 @@ export function ACMEDashboard() {
     },
   ];
 
-  const actions = [
-    { label: 'New Account', icon: 'ph ph-plus', variant: 'primary', onClick: () => setShowAccountModal(true) },
-    { label: 'New Order', icon: 'ph ph-certificate', variant: 'default', onClick: () => setShowOrderModal(true) },
-  ];
-
   if (isLoading) {
     return (
       <div className={styles.acmeDashboard}>
@@ -142,27 +137,27 @@ export function ACMEDashboard() {
     orders: ordersResponse?.data || [],
   };
 
-  const renderTab = (data, title) => (
+  const renderTab = () => (
     <div className={styles.tabContent}>
       {/* Stats */}
       <StatsGrid columns={4}>
         <StatCard
-          value={data.stats.accounts}
+          value={acmeData.stats.accounts}
           label="Accounts"
           icon="ph ph-user"
         />
         <StatCard
-          value={data.stats.activeOrders}
+          value={acmeData.stats.activeOrders}
           label="Active Orders"
           icon="ph ph-clock"
         />
         <StatCard
-          value={data.stats.completedOrders}
+          value={acmeData.stats.completedOrders}
           label="Completed Orders"
           icon="ph ph-check-circle"
         />
         <StatCard
-          value={data.stats.domains}
+          value={acmeData.stats.domains}
           label="Domains"
           icon="ph ph-globe"
         />
@@ -174,13 +169,12 @@ export function ACMEDashboard() {
         <SearchToolbar
           placeholder="Search accounts..."
           filters={filters}
-          actions={actions}
           onSearch={(query) => console.log('Search:', query)}
           onFilterChange={(filter, value) => console.log('Filter:', filter, value)}
         />
         <DataTable
           columns={accountColumns}
-          data={data.accounts}
+          data={acmeData.accounts}
           onRowClick={(row) => console.log('Account clicked:', row)}
         />
       </div>
@@ -190,7 +184,7 @@ export function ACMEDashboard() {
         <h3 className={styles.sectionTitle}>Recent Orders</h3>
         <DataTable
           columns={orderColumns}
-          data={data.orders}
+          data={acmeData.orders}
           onRowClick={(row) => console.log('Order clicked:', row)}
         />
       </div>
@@ -204,17 +198,25 @@ export function ACMEDashboard() {
         title="ACME"
         badge={<Badge variant={settings?.enabled ? 'success' : 'secondary'}>{settings?.enabled ? 'Enabled' : 'Disabled'}</Badge>}
         actions={
-          <Button 
-            variant={settings?.enabled ? 'secondary' : 'primary'}
-            onClick={() => {
-              updateACME.mutate({ enabled: !settings?.enabled }, {
-                onSuccess: () => toast.success(settings?.enabled ? 'ACME disabled' : 'ACME enabled'),
-                onError: () => toast.error('Failed to update ACME')
-              });
-            }}
-          >
-            {settings?.enabled ? 'Disable' : 'Enable'} ACME
-          </Button>
+          <>
+            <Button onClick={() => setShowAccountModal(true)} icon="ph ph-plus">
+              New Account
+            </Button>
+            <Button onClick={() => setShowOrderModal(true)} icon="ph ph-certificate">
+              New Order
+            </Button>
+            <Button 
+              variant={settings?.enabled ? 'secondary' : 'primary'}
+              onClick={() => {
+                updateACME.mutate({ enabled: !settings?.enabled }, {
+                  onSuccess: () => toast.success(settings?.enabled ? 'ACME disabled' : 'ACME enabled'),
+                  onError: () => toast.error('Failed to update ACME')
+                });
+              }}
+            >
+              {settings?.enabled ? 'Disable' : 'Enable'} ACME
+            </Button>
+          </>
         }
       />
       
