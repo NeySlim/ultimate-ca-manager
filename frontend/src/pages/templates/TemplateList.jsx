@@ -20,16 +20,36 @@ export function TemplateList() {
   // Handle both {data: [...]} and [...] formats
   const rawTemplates = Array.isArray(data) ? data : (data?.data || []);
   
-  const templates = rawTemplates.map(template => ({
-    id: template.id,
-    name: template.name,
-    keyUsage: template.extensions_template?.key_usage?.join(', ') || 'N/A',
-    validity: `${template.validity_days} days`,
-    subjectPattern: template.dn_template || 'N/A',
-    usedBy: '0 certs', // Backend doesn't track this yet
-    status: 'ACTIVE',
-    isSystem: template.is_system,
-  }));
+  const templates = rawTemplates.map(template => {
+    try {
+      // Format dn_template object as string
+      const dnTemplate = template.dn_template;
+      let subjectPattern = 'N/A';
+      if (typeof dnTemplate === 'string') {
+        subjectPattern = dnTemplate;
+      } else if (dnTemplate && typeof dnTemplate === 'object') {
+        // Convert {CN: "...", O: "...", ...} to "CN=..., O=..."
+        const parts = Object.entries(dnTemplate)
+          .filter(([k, v]) => v && v.trim())
+          .map(([k, v]) => `${k}=${v}`);
+        subjectPattern = parts.length > 0 ? parts.join(', ') : 'N/A';
+      }
+      
+      return {
+        id: template.id,
+        name: template.name || 'Unnamed',
+        keyUsage: template.extensions_template?.key_usage?.join(', ') || 'N/A',
+        validity: template.validity_days ? `${template.validity_days} days` : 'N/A',
+        subjectPattern: subjectPattern,
+        usedBy: '0 certs', // Backend doesn't track this yet
+        status: 'ACTIVE',
+        isSystem: template.is_system || false,
+      };
+    } catch (err) {
+      console.error('Error mapping template:', template, err);
+      return null;
+    }
+  }).filter(Boolean);
 
   const handleExport = () => {
     if (templates.length === 0) {
