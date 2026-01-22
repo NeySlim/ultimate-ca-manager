@@ -203,7 +203,12 @@ export function Dashboard() {
       <div className={`${styles.widget} ${styles.widgetSpan12}`}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Recent Activity</h2>
-          <Button variant="secondary">View All</Button>
+          <Button 
+            variant="secondary"
+            onClick={() => window.location.href = '/activity'}
+          >
+            View All
+          </Button>
         </div>
         <ActivityFeed items={activityData} />
       </div>
