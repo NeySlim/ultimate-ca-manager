@@ -3,6 +3,8 @@ import { DataTable } from '../../components/domain/DataTable';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { PageTopBar, PillFilter, PillFilters } from '../../components/common';
+import { exportTableData } from '../../utils/export';
+import toast from 'react-hot-toast';
 import styles from './UserList.module.css';
 
 /**
@@ -17,6 +19,18 @@ import styles from './UserList.module.css';
 export function UserList() {
   const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+
+  const handleExport = () => {
+    if (filteredUsers.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+    exportTableData(filteredUsers, 'users-export', {
+      format: 'csv',
+      columns: ['id', 'name', 'email', 'role', 'status', 'lastLogin', 'created']
+    });
+    toast.success('Users exported successfully');
+  };
 
   const usersData = [
     { id: 1, name: 'John Admin', initials: 'JA', email: 'admin@acme.com', role: 'Admin', status: 'Active', lastLogin: '2 min ago', created: 'Jan 2020' },
@@ -117,7 +131,7 @@ export function UserList() {
         actions={
           <>
             <Button variant="default" icon="ph ph-upload-simple">Import</Button>
-            <Button variant="default" icon="ph ph-download-simple">Export</Button>
+            <Button variant="default" icon="ph ph-download-simple" onClick={handleExport}>Export</Button>
             <Button variant="primary" icon="ph ph-plus">Create User</Button>
           </>
         }

@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useCertificates, useRevokeCertificate } from '../../hooks/useCertificates';
 import { IssueCertificateModal } from '../../components/modals/IssueCertificateModal';
+import { exportTableData } from '../../utils/export';
 import styles from './CertificateList.module.css';
 
 export function CertificateList() {
@@ -26,6 +27,23 @@ export function CertificateList() {
         }
       );
     }
+  };
+
+  const handleExport = () => {
+    const certs = certsResponse?.data || [];
+    if (certs.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+    exportTableData(certs, 'certificates-export', {
+      format: 'csv',
+      columns: ['id', 'name', 'type', 'status', 'issuedBy', 'daysLeft', 'issued', 'expires']
+    });
+    toast.success('Certificates exported successfully');
+  };
+
+  const handleDownload = (cert) => {
+    window.open(`/api/v2/certificates/${cert.id}/download`, '_blank');
   };
 
   const getDaysLeftBadgeClass = (days) => {
@@ -87,7 +105,7 @@ export function CertificateList() {
         actions={
           <>
             <Button icon="ph ph-upload-simple">Import</Button>
-            <Button icon="ph ph-download-simple">Export</Button>
+            <Button icon="ph ph-download-simple" onClick={handleExport}>Export</Button>
             <Button 
               variant="primary" 
               icon="ph ph-file-plus"
@@ -195,7 +213,11 @@ export function CertificateList() {
                 </td>
                 <td>
                   <div className={styles.actionsCell}>
-                    <button className={styles.actionBtn} title="Download">
+                    <button 
+                      className={styles.actionBtn} 
+                      title="Download"
+                      onClick={() => handleDownload(cert)}
+                    >
                       <i className="ph ph-download-simple"></i>
                     </button>
                     <button 

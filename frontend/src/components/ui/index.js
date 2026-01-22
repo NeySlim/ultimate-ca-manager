@@ -26,6 +26,7 @@ export { StatusBadge } from './StatusBadge';
 export { SearchToolbar } from './SearchToolbar';
 export { CodeBlock } from './CodeBlock';
 export { CopyButton } from './CopyButton';
+export { FileUpload } from './FileUpload';
 
 // Grid - Import, assign nested properties, then export
 import GridComponent, { GridCol } from './Grid';
