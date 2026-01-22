@@ -144,8 +144,8 @@ export function Dashboard() {
       <GridLayout
         className={styles.dashboard}
         layout={layout}
-        cols={12}
-        rowHeight={60}
+        cols={24}
+        rowHeight={30}
         width={1200}
         isDraggable={isEditMode}
         isResizable={isEditMode}
