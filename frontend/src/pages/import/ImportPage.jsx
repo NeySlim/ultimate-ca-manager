@@ -5,20 +5,83 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable } from '../../components/domain/DataTable';
+import { Modal } from '../../components/ui/Modal';
+import { useTestOPNsenseConnection, useImportFromOPNsense } from '../../hooks/useOPNsenseImport';
+import { Check, Warning } from '@phosphor-icons/react';
 import styles from './ImportPage.module.css';
 
 export function ImportPage() {
   const [activeTab, setActiveTab] = useState('ca');
   const [caMethod, setCaMethod] = useState(0);
   const [certMethod, setCertMethod] = useState(0);
+  
+  // OPNsense state
+  const [opnsenseConfig, setOpnsenseConfig] = useState({
+    host: '',
+    port: '443',
+    api_key: '',
+    api_secret: '',
+    verify_ssl: false
+  });
+  const [opnsenseItems, setOpnsenseItems] = useState([]);
+  const [connectedHost, setConnectedHost] = useState(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedItems, setSelectedItems] = useState([]);
+  
+  // Mutations
+  const testConnection = useTestOPNsenseConnection();
+  const importItems = useImportFromOPNsense();
 
-  const opnsenseItems = [
-    { id: 1, type: 'CA', name: 'Root CA', subject: 'CN=Root CA', validUntil: '2034-02-15' },
-    { id: 2, type: 'Certificate', name: 'Web GUI', subject: 'CN=opnsense.local', validUntil: '2025-03-01' },
-    { id: 3, type: 'Certificate', name: 'VPN Server', subject: 'CN=vpn.acme.com', validUntil: '2025-06-12' },
-  ];
+  const handleTestConnection = async () => {
+    try {
+      const result = await testConnection.mutateAsync(opnsenseConfig);
+      if (result.success) {
+        setOpnsenseItems(result.items);
+        setConnectedHost(`${opnsenseConfig.host}:${opnsenseConfig.port}`);
+        // Select all items by default
+        setSelectedItems(result.items.map(item => item.id));
+      }
+    } catch (error) {
+      console.error('Connection test failed:', error);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const result = await importItems.mutateAsync({
+        ...opnsenseConfig,
+        items: selectedItems
+      });
+      if (result.success) {
+        setShowImportModal(false);
+        // Clear selection and items
+        setSelectedItems([]);
+        setOpnsenseItems([]);
+        setConnectedHost(null);
+      }
+    } catch (error) {
+      console.error('Import failed:', error);
+    }
+  };
+
+  const toggleItemSelection = (id) => {
+    setSelectedItems(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
 
   const opnsenseColumns = [
+    {
+      key: 'selected',
+      label: '',
+      render: (row) => (
+        <input
+          type="checkbox"
+          checked={selectedItems.includes(row.id)}
+          onChange={() => toggleItemSelection(row.id)}
+        />
+      ),
+    },
     {
       key: 'type',
       label: 'Type',
@@ -246,39 +309,140 @@ export function ImportPage() {
 
       {activeTab === 'opnsense' && (
         <div className={styles.tabContent}>
-              <Card>
-                <Card.Header><h3>OPNsense Connection</h3></Card.Header>
-                <Card.Body>
-                  <form className={styles.form}>
-                    <Input label="Host" placeholder="opnsense.local" defaultValue="192.168.1.1" />
-                    <Input label="Port" type="number" placeholder="443" defaultValue="443" />
-                    <Input label="API Key" placeholder="Enter API key" />
-                    <Input label="API Secret" type="password" placeholder="Enter API secret" />
-                    <div className={styles.formCheckbox}>
-                      <input type="checkbox" id="verify-ssl" defaultChecked />
-                      <label htmlFor="verify-ssl">Verify SSL Certificate</label>
-                    </div>
-                    <Button variant="primary" icon="ph ph-plug">Connect</Button>
-                  </form>
-                </Card.Body>
-              </Card>
-
-              <Card>
-                <Card.Header>
-                  <h3>Available Items</h3>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Connected to 192.168.1.1</div>
-                </Card.Header>
-                <Card.Body>
-                  <DataTable
-                    columns={opnsenseColumns}
-                    data={opnsenseItems}
-                    onRowClick={(row) => console.log('Item:', row)}
-                    pageSize={10}
+          <Card>
+            <Card.Header><h3>OPNsense Connection</h3></Card.Header>
+            <Card.Body>
+              <form className={styles.form} onSubmit={(e) => { e.preventDefault(); handleTestConnection(); }}>
+                <Input
+                  label="Host"
+                  placeholder="192.168.1.1"
+                  value={opnsenseConfig.host}
+                  onChange={(e) => setOpnsenseConfig({ ...opnsenseConfig, host: e.target.value })}
+                />
+                <Input
+                  label="Port"
+                  type="number"
+                  placeholder="443"
+                  value={opnsenseConfig.port}
+                  onChange={(e) => setOpnsenseConfig({ ...opnsenseConfig, port: e.target.value })}
+                />
+                <Input
+                  label="API Key"
+                  placeholder="Enter API key"
+                  value={opnsenseConfig.api_key}
+                  onChange={(e) => setOpnsenseConfig({ ...opnsenseConfig, api_key: e.target.value })}
+                />
+                <Input
+                  label="API Secret"
+                  type="password"
+                  placeholder="Enter API secret"
+                  value={opnsenseConfig.api_secret}
+                  onChange={(e) => setOpnsenseConfig({ ...opnsenseConfig, api_secret: e.target.value })}
+                />
+                <div className={styles.formCheckbox}>
+                  <input
+                    type="checkbox"
+                    id="verify-ssl"
+                    checked={opnsenseConfig.verify_ssl}
+                    onChange={(e) => setOpnsenseConfig({ ...opnsenseConfig, verify_ssl: e.target.checked })}
                   />
-                </Card.Body>
-              </Card>
-            </div>
+                  <label htmlFor="verify-ssl">Verify SSL Certificate</label>
+                </div>
+                
+                <Button
+                  type="submit"
+                  variant="primary"
+                  icon="ph ph-plug"
+                  disabled={testConnection.isPending}
+                >
+                  {testConnection.isPending ? 'Testing...' : 'Test Connection'}
+                </Button>
+                
+                {testConnection.isError && (
+                  <div style={{ color: 'var(--status-danger)', fontSize: '13px', marginTop: '8px' }}>
+                    <Warning size={16} /> {testConnection.error?.response?.data?.error || 'Connection failed'}
+                  </div>
+                )}
+                
+                {testConnection.isSuccess && testConnection.data?.success && (
+                  <div style={{ color: 'var(--status-success)', fontSize: '13px', marginTop: '8px' }}>
+                    <Check size={16} /> Connected! Found {testConnection.data.stats.cas} CAs and {testConnection.data.stats.certificates} certificates
+                  </div>
+                )}
+              </form>
+            </Card.Body>
+          </Card>
+
+          {opnsenseItems.length > 0 && (
+            <Card>
+              <Card.Header>
+                <h3>Available Items</h3>
+                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                  Connected to {connectedHost} • {selectedItems.length} of {opnsenseItems.length} selected
+                </div>
+              </Card.Header>
+              <Card.Body>
+                <DataTable
+                  columns={opnsenseColumns}
+                  data={opnsenseItems}
+                  pageSize={10}
+                />
+                <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                  <Button
+                    variant="primary"
+                    icon="ph ph-download-simple"
+                    disabled={selectedItems.length === 0}
+                    onClick={() => setShowImportModal(true)}
+                  >
+                    Import Selected ({selectedItems.length})
+                  </Button>
+                  <Button
+                    onClick={() => setSelectedItems(opnsenseItems.map(i => i.id))}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    onClick={() => setSelectedItems([])}
+                  >
+                    Deselect All
+                  </Button>
+                </div>
+              </Card.Body>
+            </Card>
+          )}
+        </div>
       )}
+
+      {/* Import Confirmation Modal */}
+      <Modal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Confirm Import"
+        footer={
+          <>
+            <Button onClick={() => setShowImportModal(false)}>Cancel</Button>
+            <Button
+              variant="primary"
+              onClick={handleImport}
+              disabled={importItems.isPending}
+            >
+              {importItems.isPending ? 'Importing...' : `Import ${selectedItems.length} Items`}
+            </Button>
+          </>
+        }
+      >
+        <p>You are about to import {selectedItems.length} items from OPNsense ({connectedHost}):</p>
+        <ul style={{ marginTop: '12px', paddingLeft: '20px' }}>
+          {opnsenseItems.filter(item => selectedItems.includes(item.id)).map(item => (
+            <li key={item.id} style={{ marginBottom: '4px' }}>
+              <Badge variant={item.type === 'CA' ? 'info' : 'success'}>{item.type}</Badge> {item.name}
+            </li>
+          ))}
+        </ul>
+        <p style={{ marginTop: '12px', color: 'var(--text-tertiary)', fontSize: '12px' }}>
+          This action will add these items to your UCM trust store.
+        </p>
+      </Modal>
     </div>
   );
 }
