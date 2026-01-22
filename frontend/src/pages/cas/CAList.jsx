@@ -5,6 +5,8 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useCAs, useDeleteCA } from '../../hooks/useCAs';
 import { CreateCAModal } from '../../components/modals/CreateCAModal';
+import { ImportCAModal } from '../../components/modals/ImportCAModal';
+import { exportTableData } from '../../utils/export';
 import toast from 'react-hot-toast';
 import styles from './CAList.module.css';
 
@@ -15,6 +17,7 @@ export function CAList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCAs, setExpandedCAs] = useState(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const { data: casResponse, isLoading, error } = useCAs();
   const deleteCA = useDeleteCA();
@@ -36,6 +39,23 @@ export function CAList() {
       newExpanded.add(caId);
     }
     setExpandedCAs(newExpanded);
+  };
+
+  const handleExport = () => {
+    const cas = casResponse?.data || [];
+    if (cas.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+    exportTableData(cas, 'cas-export', {
+      format: 'csv',
+      columns: ['id', 'name', 'type', 'status', 'issued', 'expires', 'certs']
+    });
+    toast.success('CAs exported successfully');
+  };
+
+  const handleImportSuccess = () => {
+    toast.success('CA imported successfully');
   };
 
   if (isLoading) {
@@ -80,8 +100,8 @@ export function CAList() {
         badge={<Badge variant="success">{activeCount} Active</Badge>}
         actions={
           <>
-            <Button icon="ph ph-upload-simple">Import</Button>
-            <Button icon="ph ph-download-simple">Export</Button>
+            <Button icon="ph ph-upload-simple" onClick={() => setShowImportModal(true)}>Import</Button>
+            <Button icon="ph ph-download-simple" onClick={handleExport}>Export</Button>
             <Button 
               variant="primary" 
               icon="ph ph-plus"
@@ -314,6 +334,13 @@ export function CAList() {
       <CreateCAModal 
         isOpen={showCreateModal} 
         onClose={() => setShowCreateModal(false)} 
+      />
+
+      {/* Import CA Modal */}
+      <ImportCAModal 
+        isOpen={showImportModal} 
+        onClose={() => setShowImportModal(false)}
+        onSuccess={handleImportSuccess}
       />
     </div>
   );

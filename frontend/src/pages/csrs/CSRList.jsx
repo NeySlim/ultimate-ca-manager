@@ -3,10 +3,25 @@ import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useCSRs } from '../../hooks/useCSRs';
+import { exportTableData } from '../../utils/export';
+import toast from 'react-hot-toast';
 import styles from './CSRList.module.css';
 
 export function CSRList() {
   const { data: csrsResponse, isLoading, error } = useCSRs();
+
+  const handleExport = () => {
+    const csrs = csrsResponse?.data || [];
+    if (csrs.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+    exportTableData(csrs, 'csrs-export', {
+      format: 'csv',
+      columns: ['id', 'commonName', 'requestedBy', 'status', 'priority', 'createdAt']
+    });
+    toast.success('CSRs exported successfully');
+  };
 
   const getPriorityClass = (priority) => {
     if (priority === 'HIGH') return styles.badgeHigh;
@@ -57,7 +72,7 @@ export function CSRList() {
         actions={
           <>
             <Button icon="ph ph-upload-simple">Import CSR</Button>
-            <Button icon="ph ph-download-simple">Export</Button>
+            <Button icon="ph ph-download-simple" onClick={handleExport}>Export</Button>
             <Button variant="primary" icon="ph ph-file-plus">Create CSR</Button>
           </>
         }
