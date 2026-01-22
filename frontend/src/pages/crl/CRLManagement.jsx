@@ -3,9 +3,20 @@ import { DataTable } from '../../components/domain/DataTable';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import toast from 'react-hot-toast';
 import styles from './CRLManagement.module.css';
 
 export function CRLManagement() {
+  const handleDownloadCRL = (caId) => {
+    window.open(`/api/v2/crl/download/${caId}`, '_blank');
+    toast.success('CRL download started');
+  };
+
+  const handleRegenerateCRL = (ca) => {
+    toast.success(`Regenerating CRL for ${ca.name}...`);
+    // TODO: Connect to backend mutation when available
+  };
+
   const cas = [
     {
       id: 1,
@@ -125,13 +136,13 @@ export function CRLManagement() {
                 variant="default"
                 size="sm"
                 icon="ph ph-arrows-clockwise"
-                onClick={() => console.log('Regenerate CRL:', row)}
+                onClick={() => handleRegenerateCRL(row)}
               />
               <Button
                 variant="default"
                 size="sm"
                 icon="ph ph-download-simple"
-                onClick={() => console.log('Download CRL:', row)}
+                onClick={() => handleDownloadCRL(row.id)}
               />
             </>
           )}

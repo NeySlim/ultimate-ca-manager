@@ -103,4 +103,12 @@ export const accountApi = {
     const response = await api.delete(`/api/v2/account/sessions/${sessionId}`);
     return response.data;
   },
+
+  /**
+   * Revoke all sessions
+   */
+  revokeAllSessions: async () => {
+    const response = await api.delete('/api/v2/account/sessions');
+    return response.data;
+  },
 };

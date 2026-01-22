@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { PageTopBar, PillFilter, PillFilters, FiltersBar, FilterGroup } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { useCertificates } from '../../hooks/useCertificates';
+import { useCertificates, useRevokeCertificate } from '../../hooks/useCertificates';
 import styles from './CertificateList.module.css';
 
 export function CertificateList() {
@@ -11,6 +12,19 @@ export function CertificateList() {
   const [sortBy, setSortBy] = useState('name');
 
   const { data: certsResponse, isLoading, error } = useCertificates();
+  const { mutate: revokeCertificate } = useRevokeCertificate();
+
+  const handleRevokeCertificate = (cert) => {
+    if (window.confirm(`Revoke certificate ${cert.name}?`)) {
+      revokeCertificate(
+        { id: cert.id, reason: 'Revoked by administrator' },
+        {
+          onSuccess: () => toast.success(`Certificate ${cert.name} revoked successfully`),
+          onError: (err) => toast.error(`Failed to revoke certificate: ${err.message}`),
+        }
+      );
+    }
+  };
 
   const getDaysLeftBadgeClass = (days) => {
     if (days <= 7) return styles.badgeError;
@@ -176,8 +190,12 @@ export function CertificateList() {
                     <button className={styles.actionBtn} title="Download">
                       <i className="ph ph-download-simple"></i>
                     </button>
-                    <button className={styles.actionBtn} title="Renew">
-                      <i className="ph ph-arrow-clockwise"></i>
+                    <button 
+                      className={styles.actionBtn} 
+                      title="Revoke"
+                      onClick={() => handleRevokeCertificate(cert)}
+                    >
+                      <i className="ph ph-x-circle"></i>
                     </button>
                     <button className={styles.actionBtn} title="More">
                       <i className="ph ph-dots-three-outline-vertical"></i>

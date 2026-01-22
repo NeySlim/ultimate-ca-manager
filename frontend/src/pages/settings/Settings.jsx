@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { PageTopBar, SectionTabs, Tab } from '../../components/common';
-import { useGeneralSettings } from '../../hooks/useSettings';
+import { useGeneralSettings, useUpdateGeneralSettings } from '../../hooks/useSettings';
 import styles from './Settings.module.css';
 
 /**
@@ -15,9 +16,26 @@ import styles from './Settings.module.css';
  */
 export function Settings() {
   const [activeTab, setActiveTab] = useState('system');
+  const [formData, setFormData] = useState({});
+  
   const { data: settings, isLoading } = useGeneralSettings();
+  const { mutate: updateSettings } = useUpdateGeneralSettings();
   
   const generalSettings = settings || {};
+  
+  const handleSave = () => {
+    updateSettings(formData, {
+      onSuccess: () => toast.success('Settings saved successfully'),
+      onError: (err) => toast.error(`Failed to save settings: ${err.message}`),
+    });
+  };
+
+  const handleReset = () => {
+    if (window.confirm('Are you sure you want to reset all settings to default?')) {
+      setFormData({});
+      toast.success('Settings reset to default');
+    }
+  };
   
   if (isLoading) {
     return (
@@ -42,8 +60,8 @@ export function Settings() {
         badge={<Badge variant="warning">Requires Restart</Badge>}
         actions={
           <>
-            <Button variant="default">Reset All</Button>
-            <Button variant="primary" icon="ph ph-floppy-disk">Save Changes</Button>
+            <Button variant="default" onClick={handleReset}>Reset All</Button>
+            <Button variant="primary" icon="ph ph-floppy-disk" onClick={handleSave}>Save Changes</Button>
           </>
         }
       />
