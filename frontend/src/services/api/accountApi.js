@@ -6,10 +6,15 @@ import api from './api';
 export const accountApi = {
   /**
    * Get user profile
+   * Backend returns: { data: { id, username, email, created_at } }
+   * Note: Backend might not provide all fields, frontend will use defaults
    */
   getProfile: async () => {
     const response = await api.get('/api/v2/account/profile');
-    return response.data;
+    const profile = response.data || {};
+    
+    // Return as-is, page will handle defaults
+    return profile;
   },
 
   /**
@@ -33,10 +38,54 @@ export const accountApi = {
 
   /**
    * Get user activity
+   * Backend returns: { data: [...] }
+   * Transform to frontend format
    */
   getActivity: async (params = {}) => {
     const response = await api.get('/api/v2/account/activity', { params });
-    return response.data || [];
+    
+    // Transform backend data to frontend format
+    const transformedData = (response.data || []).map(activity => {
+      // Determine category and type based on action or existing fields
+      const action = activity.action || activity.event || '';
+      const category = activity.category || (
+        action.includes('certificate') || action.includes('ca') || action.includes('csr') 
+          ? 'pki' 
+          : 'app'
+      );
+      
+      const type = activity.type || activity.severity || (
+        action.includes('error') || action.includes('failed') 
+          ? 'error' 
+          : action.includes('warn') 
+            ? 'warning' 
+            : 'info'
+      );
+      
+      const icon = activity.icon || (
+        type === 'error' ? 'ph-x-circle' 
+          : type === 'warning' ? 'ph-warning' 
+            : type === 'success' ? 'ph-check-circle' 
+              : 'ph-info'
+      );
+      
+      return {
+        id: activity.id,
+        category: category,
+        type: type,
+        icon: icon,
+        text: activity.message || activity.description || action,
+        time: activity.timestamp || activity.created_at || 'N/A',
+        user: activity.user || activity.username || 'System',
+        // Keep original data
+        _raw: activity,
+      };
+    });
+    
+    return {
+      data: transformedData,
+      meta: response.meta || { page: 1, per_page: 50, total: transformedData.length },
+    };
   },
 
   /**
