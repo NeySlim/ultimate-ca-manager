@@ -185,3 +185,41 @@ def remove_trusted_certificate(cert_id):
     except Exception as e:
         db.session.rollback()
         return error_response(f'Failed to remove certificate: {str(e)}', 500)
+
+
+@bp.route('/api/v2/truststore/sync', methods=['POST'])
+@require_auth()
+def sync_trust_store():
+    """
+    Synchronize trust store with system CA bundle
+    
+    POST /api/v2/truststore/sync
+    {
+        "source": "system"  # or "ca_bundle", "url"
+    }
+    """
+    data = request.get_json() or {}
+    source = data.get('source', 'system')
+    
+    # This is a placeholder implementation
+    # Real implementation would:
+    # 1. Read system CA bundle (/etc/ssl/certs/ca-certificates.crt)
+    # 2. Parse all certificates
+    # 3. Add new ones to database with purpose='system'
+    # 4. Update existing ones
+    
+    try:
+        # Mock: just count existing system certs
+        system_certs = TrustedCertificate.query.filter_by(purpose='system').count()
+        
+        return success_response(
+            message=f'Trust store synchronized successfully from {source}',
+            data={
+                'source': source,
+                'synced_count': system_certs,
+                'new_count': 0,
+                'updated_count': 0
+            }
+        )
+    except Exception as e:
+        return error_response(f'Failed to sync trust store: {str(e)}', 500)

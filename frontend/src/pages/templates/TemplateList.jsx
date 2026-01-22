@@ -3,6 +3,7 @@ import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { CreateTemplateModal } from '../../components/modals/CreateTemplateModal';
+import { EditTemplateModal } from '../../components/modals/EditTemplateModal';
 import { useTemplates, useDeleteTemplate } from '../../hooks/useTemplates';
 import { exportTableData } from '../../utils/export';
 import toast from 'react-hot-toast';
@@ -10,6 +11,8 @@ import styles from './TemplateList.module.css';
 
 export function TemplateList() {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState(null);
   const [filterOpen, setFilterOpen] = useState(false);
 
   // Fetch templates from backend
@@ -71,6 +74,15 @@ export function TemplateList() {
     if (confirm(`Delete template "${template.name}"?`)) {
       deleteTemplate.mutate(template.id);
     }
+  };
+
+  const handleEdit = (template) => {
+    if (template.isSystem) {
+      toast.error('Cannot edit system template');
+      return;
+    }
+    setEditingTemplateId(template.id);
+    setShowEditModal(true);
   };
 
   if (error) {
@@ -166,7 +178,7 @@ export function TemplateList() {
                     <div className={styles.actionsCell}>
                       {!template.isSystem && (
                         <>
-                          <button className={styles.actionBtn} title="Edit">
+                          <button className={styles.actionBtn} title="Edit" onClick={() => handleEdit(template)}>
                             <i className="ph ph-pencil"></i>
                           </button>
                           <button className={styles.actionBtn} title="Delete" onClick={() => handleDelete(template)}>
@@ -186,6 +198,11 @@ export function TemplateList() {
       <CreateTemplateModal 
         isOpen={showCreateModal} 
         onClose={() => setShowCreateModal(false)} 
+      />
+      <EditTemplateModal 
+        isOpen={showEditModal} 
+        onClose={() => setShowEditModal(false)} 
+        templateId={editingTemplateId}
       />
     </div>
   );

@@ -35,6 +35,30 @@ export const settingsApi = {
   },
 
   /**
+   * Get database statistics
+   */
+  getDatabaseStats: async () => {
+    const response = await api.get('/api/v2/system/db/stats');
+    return response.data;
+  },
+
+  /**
+   * Optimize database (VACUUM + ANALYZE)
+   */
+  optimizeDatabase: async () => {
+    const response = await api.post('/api/v2/system/db/optimize');
+    return response.data;
+  },
+
+  /**
+   * Regenerate self-signed HTTPS certificate
+   */
+  regenerateHttpsCert: async () => {
+    const response = await api.post('/api/v2/system/https/regenerate');
+    return response.data;
+  },
+
+  /**
    * Get users list (admin only)
    */
   getUsers: async () => {

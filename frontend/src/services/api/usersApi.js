@@ -32,6 +32,24 @@ export const usersApi = {
   },
 
   /**
+   * Reset user password
+   * Backend: POST /api/v2/users/:id/reset-password
+   */
+  resetPassword: async (id, newPassword) => {
+    const response = await api.post(`/api/v2/users/${id}/reset-password`, { new_password: newPassword });
+    return response.data;
+  },
+
+  /**
+   * Toggle user active status
+   * Backend: PATCH /api/v2/users/:id/toggle
+   */
+  toggleStatus: async (id) => {
+    const response = await api.patch(`/api/v2/users/${id}/toggle`);
+    return response.data;
+  },
+
+  /**
    * Delete user (soft delete)
    * Backend: DELETE /api/v2/users/:id
    */
