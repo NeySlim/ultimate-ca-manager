@@ -224,8 +224,7 @@ export function ACMEDashboard() {
       </SectionTabs>
 
       <div className={styles.tabContent}>
-        {activeTab === 'internal' && renderTab(acmeData.internal, 'Internal ACME')}
-        {activeTab === 'letsencrypt' && renderTab(acmeData.letsencrypt, 'Let\'s Encrypt')}
+        {renderTab()}
       </div>
     </div>
   );
