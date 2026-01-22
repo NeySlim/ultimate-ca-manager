@@ -124,22 +124,22 @@ export function SCEPDashboard() {
 
       <StatsGrid columns={4}>
         <StatCard
-          value={scepData.stats.totalEnrollments}
+          value={scepData.stats.total_enrollments || 0}
           label="Total Enrollments"
           icon="ph ph-certificate"
         />
         <StatCard
-          value={scepData.stats.pendingApprovals}
+          value={scepData.stats.pending || 0}
           label="Pending Approvals"
           icon="ph ph-clock"
         />
         <StatCard
-          value={scepData.stats.completedToday}
+          value={scepData.stats.approved || 0}
           label="Completed Today"
           icon="ph ph-check-circle"
         />
         <StatCard
-          value={scepData.stats.rejectedToday}
+          value={scepData.stats.rejected || 0}
           label="Rejected Today"
           icon="ph ph-x-circle"
         />
