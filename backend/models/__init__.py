@@ -223,16 +223,34 @@ class CA(db.Model):
     
     def to_dict(self, include_private=False):
         """Convert to dictionary"""
+        # Determine CA type
+        ca_type = "Root CA" if self.is_root else "Intermediate"
+        
+        # Determine status based on expiry
+        status = "Active"
+        if self.valid_to:
+            if self.valid_to < datetime.utcnow():
+                status = "Expired"
+        
+        # Format dates for frontend
+        issued = self.valid_from.strftime("%Y-%m-%d") if self.valid_from else ""
+        expires = self.valid_to.strftime("%Y-%m-%d") if self.valid_to else ""
+        expiry = self.valid_to.strftime("%Y-%m-%d") if self.valid_to else ""
+        
         data = {
             "id": self.id,
             "refid": self.refid,
             "descr": self.descr,
+            "name": self.descr,  # Alias for frontend
             "serial": self.serial,
             "caref": self.caref,
             "subject": self.subject,
             "issuer": self.issuer,
             "valid_from": self.valid_from.isoformat() if self.valid_from else None,
             "valid_to": self.valid_to.isoformat() if self.valid_to else None,
+            "issued": issued,  # Frontend-friendly date
+            "expires": expires,  # Frontend-friendly date
+            "expiry": expiry,  # Frontend-friendly date
             "imported_from": self.imported_from,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "created_by": self.created_by,
@@ -245,6 +263,9 @@ class CA(db.Model):
             "state": self.state,
             "locality": self.locality,
             "is_root": self.is_root,
+            "type": ca_type,  # "Root CA" or "Intermediate"
+            "status": status,  # "Active" or "Expired"
+            "certs": self.certificates.count() if self.certificates else 0,  # Count of issued certificates
             "key_type": self.key_type,
             "hash_algorithm": self.hash_algorithm,
             # CRL/CDP configuration

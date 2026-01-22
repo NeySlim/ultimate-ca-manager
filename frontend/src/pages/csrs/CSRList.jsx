@@ -62,9 +62,9 @@ export function CSRList() {
   }
 
   const allCSRs = csrsResponse?.data || [];
-  const MOCK_PENDING = allCSRs.filter(csr => csr.status === 'PENDING');
-  const MOCK_APPROVED = allCSRs.filter(csr => csr.status === 'APPROVED');
-  const MOCK_REJECTED = allCSRs.filter(csr => csr.status === 'REJECTED');
+  const pendingCSRs = allCSRs.filter(csr => csr.status === 'PENDING');
+  const approvedCSRs = allCSRs.filter(csr => csr.status === 'APPROVED');
+  const rejectedCSRs = allCSRs.filter(csr => csr.status === 'REJECTED');
 
   return (
     <div className={styles.csrList}>
@@ -72,7 +72,7 @@ export function CSRList() {
       <PageTopBar
         icon="ph ph-file-text"
         title="Certificate Signing Requests"
-        badge={<Badge variant="warning">{MOCK_PENDING.length} Pending</Badge>}
+        badge={<Badge variant="warning">{pendingCSRs.length} Pending</Badge>}
         actions={
           <>
             <Button icon="ph ph-upload-simple" onClick={() => setShowImportModal(true)}>Import CSR</Button>
@@ -103,7 +103,7 @@ export function CSRList() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_PENDING.map((csr) => (
+              {pendingCSRs.map((csr) => (
                 <tr key={csr.id}>
                   <td>
                     <div className={styles.subjectCell}>
@@ -164,7 +164,7 @@ export function CSRList() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_APPROVED.map((csr) => (
+              {approvedCSRs.map((csr) => (
                 <tr key={csr.id}>
                   <td>
                     <div className={styles.subjectCell}>
@@ -203,7 +203,7 @@ export function CSRList() {
       </div>
 
       {/* Rejected Section */}
-      {MOCK_REJECTED.length > 0 && (
+      {rejectedCSRs.length > 0 && (
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
             <div className={styles.sectionIconError}>
@@ -224,7 +224,7 @@ export function CSRList() {
                 </tr>
               </thead>
               <tbody>
-                {MOCK_REJECTED.map((csr) => (
+                {rejectedCSRs.map((csr) => (
                   <tr key={csr.id}>
                     <td>
                       <div className={styles.subjectCell}>

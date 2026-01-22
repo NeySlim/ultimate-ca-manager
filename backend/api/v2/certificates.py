@@ -14,13 +14,42 @@ bp = Blueprint('certificates_v2', __name__)
 @require_auth(['read:certificates'])
 def list_certificates():
     """List certificates"""
+    from models import Certificate
+    
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     status = request.args.get('status')  # valid, revoked, expired
     
+    query = Certificate.query
+    
+    # Apply status filter
+    if status == 'revoked':
+        query = query.filter_by(revoked=True)
+    elif status == 'valid':
+        query = query.filter_by(revoked=False)
+    
+    # Paginate
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    certs = [{
+        'id': cert.id,
+        'refid': cert.refid,
+        'descr': cert.descr,
+        'caref': cert.caref,
+        'cert_type': cert.cert_type,
+        'subject': cert.subject,
+        'issuer': cert.issuer,
+        'serial_number': cert.serial_number,
+        'valid_from': cert.valid_from.isoformat() if cert.valid_from else None,
+        'valid_to': cert.valid_to.isoformat() if cert.valid_to else None,
+        'revoked': cert.revoked,
+        'imported_from': cert.imported_from,
+        'created_at': cert.created_at.isoformat() if cert.created_at else None
+    } for cert in pagination.items]
+    
     return success_response(
-        data=[],
-        meta={'total': 0, 'page': page, 'per_page': per_page}
+        data=certs,
+        meta={'total': pagination.total, 'page': page, 'per_page': per_page}
     )
 
 
