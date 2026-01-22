@@ -37,11 +37,8 @@
   border: 1px solid var(--border-primary);
   border-radius: var(--radius);
   transition: all 0.15s;
-  overflow: hidden;
+  overflow: auto;
   position: relative;
-  height: 100%; /* Fill grid cell */
-  display: flex;
-  flex-direction: column;
 }
 
 .widgetCard {
