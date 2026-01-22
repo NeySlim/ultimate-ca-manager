@@ -1,7 +1,7 @@
 /**
  * Account/Profile React Query Hooks
  */
-import { useQuery, useMutation, useQueryClient } from '@tantml:invoke>
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { accountApi } from '../services/api/accountApi';
 
 export const accountKeys = {
