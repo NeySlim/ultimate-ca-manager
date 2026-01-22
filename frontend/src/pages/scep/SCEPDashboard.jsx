@@ -7,7 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { getBadgeVariant } from '../../utils/getBadgeVariant';
-import { getSCEPData } from '../../services/mockData';
+import { useSCEPSettings, useSCEPStats } from '../../hooks/useSCEP';
 import styles from './SCEPDashboard.module.css';
 
 /**
@@ -19,7 +19,16 @@ import styles from './SCEPDashboard.module.css';
  */
 export function SCEPDashboard() {
   const [activeTab, setActiveTab] = useState('config');
-  const scepData = getSCEPData();
+  const { data: settings, isLoading: settingsLoading } = useSCEPSettings();
+  const { data: stats, isLoading: statsLoading } = useSCEPStats();
+  
+  const isLoading = settingsLoading || statsLoading;
+  
+  const scepData = {
+    config: settings || {},
+    stats: stats || {},
+    enrollments: [] // TODO: Add enrollments hook when available
+  };
 
   const enrollmentColumns = [
     {
@@ -84,6 +93,21 @@ export function SCEPDashboard() {
     { label: 'Export List', icon: 'ph ph-download-simple', variant: 'default' },
   ];
 
+  if (isLoading) {
+    return (
+      <div className={styles.scepDashboard}>
+        <PageTopBar
+          icon="ph ph-device-mobile"
+          title="SCEP"
+          badge={<Badge variant="secondary">Loading...</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+          Loading SCEP data...
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className={styles.scepDashboard}>
       <PageTopBar

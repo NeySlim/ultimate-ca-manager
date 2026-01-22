@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { PageTopBar, SectionTabs, Tab } from '../../components/common';
+import { useGeneralSettings } from '../../hooks/useSettings';
 import styles from './Settings.module.css';
 
 /**
@@ -14,6 +15,24 @@ import styles from './Settings.module.css';
  */
 export function Settings() {
   const [activeTab, setActiveTab] = useState('system');
+  const { data: settings, isLoading } = useGeneralSettings();
+  
+  const generalSettings = settings || {};
+  
+  if (isLoading) {
+    return (
+      <div className={styles.settings}>
+        <PageTopBar
+          icon="ph ph-gear"
+          title="Settings"
+          badge={<Badge variant="secondary">Loading...</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+          Loading settings...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.settings}>
