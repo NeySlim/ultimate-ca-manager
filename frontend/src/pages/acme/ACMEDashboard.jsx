@@ -5,7 +5,7 @@ import { SearchToolbar } from '../../components/domain/SearchToolbar';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { getBadgeVariant } from '../../utils/getBadgeVariant';
-import { getACMEData } from '../../services/mockData';
+import { useACMESettings, useACMEStats, useACMEAccounts, useACMEOrders } from '../../hooks/useACME';
 import styles from './ACMEDashboard.module.css';
 
 /**
@@ -17,7 +17,14 @@ import styles from './ACMEDashboard.module.css';
  */
 export function ACMEDashboard() {
   const [activeTab, setActiveTab] = useState('internal');
-  const acmeData = getACMEData();
+  
+  const { data: settings, isLoading: loadingSettings, error: errorSettings } = useACMESettings();
+  const { data: stats, isLoading: loadingStats, error: errorStats } = useACMEStats();
+  const { data: accountsResponse, isLoading: loadingAccounts, error: errorAccounts } = useACMEAccounts();
+  const { data: ordersResponse, isLoading: loadingOrders, error: errorOrders } = useACMEOrders();
+
+  const isLoading = loadingSettings || loadingStats || loadingAccounts || loadingOrders;
+  const error = errorSettings || errorStats || errorAccounts || errorOrders;
 
   const accountColumns = [
     {
@@ -94,6 +101,40 @@ export function ACMEDashboard() {
     { label: 'New Account', icon: 'ph ph-plus', variant: 'primary' },
     { label: 'New Order', icon: 'ph ph-certificate', variant: 'default' },
   ];
+
+  if (isLoading) {
+    return (
+      <div className={styles.acmeDashboard}>
+        <PageTopBar
+          icon="ph ph-globe"
+          title="ACME"
+          badge={<Badge variant="neutral">Loading...</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center' }}>Loading ACME data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.acmeDashboard}>
+        <PageTopBar
+          icon="ph ph-globe"
+          title="ACME"
+          badge={<Badge variant="danger">Error</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
+          Error loading ACME data: {error.message}
+        </div>
+      </div>
+    );
+  }
+
+  const acmeData = {
+    stats: stats || { accounts: 0, activeOrders: 0, completedOrders: 0, domains: 0 },
+    accounts: accountsResponse?.data || [],
+    orders: ordersResponse?.data || [],
+  };
 
   const renderTab = (data, title) => (
     <div className={styles.tabContent}>

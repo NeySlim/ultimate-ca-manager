@@ -3,106 +3,17 @@ import { getBadgeVariant } from '../../utils/getBadgeVariant';
 import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { useCAs } from '../../hooks/useCAs';
 import styles from './CAList.module.css';
-
-// Mock CAs data matching prototype
-const MOCK_CAS = [
-  {
-    id: 'root-1',
-    name: 'Enterprise Root CA',
-    type: 'Root',
-    status: 'ACTIVE',
-    issued: '2020-01-15',
-    expires: '2040-01-15',
-    certs: 2,
-    children: [
-      {
-        id: 'int-1',
-        name: 'Server CA',
-        type: 'Intermediate',
-        status: 'ACTIVE',
-        issued: '2022-03-10',
-        expires: '2032-03-10',
-        certs: 145,
-      },
-      {
-        id: 'int-2',
-        name: 'Client CA',
-        type: 'Intermediate',
-        status: 'ACTIVE',
-        issued: '2022-06-20',
-        expires: '2032-06-20',
-        certs: 312,
-      },
-    ],
-  },
-  {
-    id: 'root-2',
-    name: 'Dev Root CA',
-    type: 'Root',
-    status: 'ACTIVE',
-    issued: '2021-05-01',
-    expires: '2041-05-01',
-    certs: 1,
-    children: [
-      {
-        id: 'int-3',
-        name: 'ACME CA',
-        type: 'Intermediate',
-        status: 'ACTIVE',
-        issued: '2023-02-14',
-        expires: '2033-02-14',
-        certs: 89,
-      },
-    ],
-  },
-  {
-    id: 'root-3',
-    name: 'VPN Root CA',
-    type: 'Root',
-    status: 'ACTIVE',
-    issued: '2019-07-20',
-    expires: '2039-07-20',
-    certs: 0,
-  },
-  {
-    id: 'root-4',
-    name: 'Mobile Device CA',
-    type: 'Root',
-    status: 'ACTIVE',
-    issued: '2021-11-10',
-    expires: '2041-11-10',
-    certs: 0,
-  },
-  {
-    id: 'root-5',
-    name: 'Legacy Root CA',
-    type: 'Root',
-    status: 'EXPIRED',
-    issued: '2015-03-01',
-    expires: '2023-03-01',
-    certs: 0,
-  },
-];
-
-const ORPHANED_CAS = [
-  {
-    id: 'orphan-1',
-    name: 'Orphaned Test CA',
-    type: 'Intermediate',
-    status: 'ACTIVE',
-    issued: '2023-08-12',
-    expires: '2033-08-12',
-    certs: 23,
-  },
-];
 
 export function CAList() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedCAs, setExpandedCAs] = useState(new Set(['root-1', 'root-2']));
+  const [expandedCAs, setExpandedCAs] = useState(new Set());
+
+  const { data: casResponse, isLoading, error } = useCAs();
 
   const toggleCA = (caId) => {
     const newExpanded = new Set(expandedCAs);
@@ -113,6 +24,37 @@ export function CAList() {
     }
     setExpandedCAs(newExpanded);
   };
+
+  if (isLoading) {
+    return (
+      <div className={styles.caList}>
+        <PageTopBar
+          icon="ph ph-bank"
+          title="Certificate Authorities"
+          badge={<Badge variant="neutral">Loading...</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center' }}>Loading CAs...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.caList}>
+        <PageTopBar
+          icon="ph ph-bank"
+          title="Certificate Authorities"
+          badge={<Badge variant="danger">Error</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
+          Error loading CAs: {error.message}
+        </div>
+      </div>
+    );
+  }
+
+  const MOCK_CAS = casResponse?.data || [];
+  const ORPHANED_CAS = [];
 
   const activeCount = MOCK_CAS.filter(ca => ca.status === 'ACTIVE').length;
 

@@ -2,141 +2,50 @@ import { useState } from 'react';
 import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { useCSRs } from '../../hooks/useCSRs';
 import styles from './CSRList.module.css';
 
-// Mock CSR Data
-const MOCK_PENDING = [
-  {
-    id: 1,
-    cn: 'CN=api.newservice.com',
-    email: 'admin@acme.com',
-    key: 'RSA 2048',
-    requested: 'Mar 15',
-    requestedAgo: '2 hours ago',
-    priority: 'HIGH',
-  },
-  {
-    id: 2,
-    cn: 'CN=mail.internal.net',
-    email: 'jane.smith@acme.com',
-    key: 'RSA 4096',
-    requested: 'Mar 15',
-    requestedAgo: '5 hours ago',
-    priority: 'HIGH',
-  },
-  {
-    id: 3,
-    cn: 'CN=vpn.acme.com',
-    email: 'robert.wilson@acme.com',
-    key: 'RSA 2048',
-    requested: 'Mar 14',
-    requestedAgo: '1 day ago',
-    priority: 'NORMAL',
-  },
-  {
-    id: 4,
-    cn: 'CN=ldap.corp.local',
-    email: 'alice.brown@acme.com',
-    key: 'RSA 4096',
-    requested: 'Mar 13',
-    requestedAgo: '2 days ago',
-    priority: 'NORMAL',
-  },
-  {
-    id: 5,
-    cn: 'CN=monitoring.local',
-    email: 'bob.jones@acme.com',
-    key: 'RSA 2048',
-    requested: 'Mar 12',
-    requestedAgo: '3 days ago',
-    priority: 'NORMAL',
-  },
-  {
-    id: 6,
-    cn: 'CN=backup.internal',
-    email: 'emma.davis@acme.com',
-    key: 'ECDSA P-256',
-    requested: 'Mar 11',
-    requestedAgo: '4 days ago',
-    priority: 'NORMAL',
-  },
-  {
-    id: 7,
-    cn: 'CN=test.dev.local',
-    email: 'michael.lee@acme.com',
-    key: 'RSA 2048',
-    requested: 'Mar 10',
-    requestedAgo: '5 days ago',
-    priority: 'LOW',
-  },
-  {
-    id: 8,
-    cn: 'CN=admin.acme.com',
-    email: 'sarah.white@acme.com',
-    key: 'RSA 4096',
-    requested: 'Mar 8',
-    requestedAgo: '1 week ago',
-    priority: 'LOW',
-  },
-];
-
-const MOCK_APPROVED = [
-  {
-    id: 1,
-    cn: 'CN=netsuit.lan.pew.pet',
-    email: 'admin@acme.com',
-    key: 'RSA 4096',
-    approved: 'Mar 14',
-    approvedBy: 'admin',
-    certificateId: '#2847',
-  },
-  {
-    id: 2,
-    cn: 'CN=git.internal.net',
-    email: 'dev.team@acme.com',
-    key: 'RSA 2048',
-    approved: 'Mar 14',
-    approvedBy: 'admin',
-    certificateId: '#2846',
-  },
-  {
-    id: 3,
-    cn: 'CN=jenkins.local',
-    email: 'ci.cd@acme.com',
-    key: 'RSA 2048',
-    approved: 'Mar 13',
-    approvedBy: 'admin',
-    certificateId: '#2845',
-  },
-  {
-    id: 4,
-    cn: 'CN=db.internal',
-    email: 'dba.team@acme.com',
-    key: 'RSA 4096',
-    approved: 'Mar 13',
-    approvedBy: 'security.team',
-    certificateId: '#2844',
-  },
-];
-
-const MOCK_REJECTED = [
-  {
-    id: 1,
-    cn: 'CN=suspicious.domain.com',
-    email: 'unknown@example.com',
-    key: 'RSA 2048',
-    rejected: 'Mar 10',
-    rejectedBy: 'security.team',
-    reason: 'Unauthorized domain',
-  },
-];
-
 export function CSRList() {
+  const { data: csrsResponse, isLoading, error } = useCSRs();
+
   const getPriorityClass = (priority) => {
     if (priority === 'HIGH') return styles.badgeHigh;
     if (priority === 'NORMAL') return styles.badgeNormal;
     return styles.badgeLow;
   };
+
+  if (isLoading) {
+    return (
+      <div className={styles.csrList}>
+        <PageTopBar
+          icon="ph ph-file-text"
+          title="Certificate Signing Requests"
+          badge={<Badge variant="neutral">Loading...</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center' }}>Loading CSRs...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.csrList}>
+        <PageTopBar
+          icon="ph ph-file-text"
+          title="Certificate Signing Requests"
+          badge={<Badge variant="danger">Error</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
+          Error loading CSRs: {error.message}
+        </div>
+      </div>
+    );
+  }
+
+  const allCSRs = csrsResponse?.data || [];
+  const MOCK_PENDING = allCSRs.filter(csr => csr.status === 'PENDING');
+  const MOCK_APPROVED = allCSRs.filter(csr => csr.status === 'APPROVED');
+  const MOCK_REJECTED = allCSRs.filter(csr => csr.status === 'REJECTED');
 
   return (
     <div className={styles.csrList}>

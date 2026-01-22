@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { PageTopBar, SectionTabs, Tab } from '../../components/common';
+import { useProfile, useSessions } from '../../hooks/useAccount';
 import styles from './Profile.module.css';
 
 /**
@@ -14,6 +15,41 @@ import styles from './Profile.module.css';
  */
 export function Profile() {
   const [activeTab, setActiveTab] = useState('profile');
+  
+  const { data: profile, isLoading: loadingProfile, error: errorProfile } = useProfile();
+  const { data: sessions, isLoading: loadingSessions, error: errorSessions } = useSessions();
+
+  const isLoading = loadingProfile || loadingSessions;
+  const error = errorProfile || errorSessions;
+
+  if (isLoading) {
+    return (
+      <div className={styles.profile}>
+        <PageTopBar
+          icon="ph ph-user-circle"
+          title="My Profile"
+        />
+        <div style={{ padding: '2rem', textAlign: 'center' }}>Loading profile...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.profile}>
+        <PageTopBar
+          icon="ph ph-user-circle"
+          title="My Profile"
+        />
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
+          Error loading profile: {error.message}
+        </div>
+      </div>
+    );
+  }
+
+  const profileData = profile || {};
+  const sessionsData = sessions?.data || [];
 
   return (
     <div className={styles.profile}>
@@ -59,23 +95,23 @@ export function Profile() {
 
               <div className={styles.formGroup}>
                 <label>Username</label>
-                <input type="text" defaultValue="admin" readOnly />
+                <input type="text" defaultValue={profileData.username || 'admin'} readOnly />
               </div>
               <div className={styles.formGroup}>
                 <label>Full Name</label>
-                <input type="text" defaultValue="Administrator" />
+                <input type="text" defaultValue={profileData.full_name || 'Administrator'} />
               </div>
               <div className={styles.formGroup}>
                 <label>Email Address</label>
-                <input type="email" defaultValue="admin@ucm.local" />
+                <input type="email" defaultValue={profileData.email || 'admin@ucm.local'} />
               </div>
               <div className={styles.formGroup}>
                 <label>Role</label>
-                <input type="text" defaultValue="Administrator" readOnly />
+                <input type="text" defaultValue={profileData.role || 'Administrator'} readOnly />
               </div>
               <div className={styles.formGroup}>
                 <label>Department</label>
-                <input type="text" defaultValue="IT Operations" />
+                <input type="text" defaultValue={profileData.department || 'IT Operations'} />
               </div>
               <div className={styles.formGroup}>
                 <label>Phone Number</label>

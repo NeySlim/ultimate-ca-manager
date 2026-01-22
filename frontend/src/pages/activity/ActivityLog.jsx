@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { PageTopBar, FiltersBar, FilterGroup, SectionTabs, Tab } from '../../components/common';
+import { useAccountActivity } from '../../hooks/useAccount';
 import styles from './ActivityLog.module.css';
 
 /**
@@ -16,31 +17,39 @@ import styles from './ActivityLog.module.css';
 export function ActivityLog() {
   const [activeTab, setActiveTab] = useState('app-logs');
 
-  const appLogs = [
-    { type: 'success', icon: 'ph-sign-in', text: 'User <strong>john.doe</strong> logged in successfully', time: '2 minutes ago' },
-    { type: 'info', icon: 'ph-gear', text: '<strong>admin</strong> regenerated HTTPS certificate for web interface', time: '15 minutes ago' },
-    { type: 'success', icon: 'ph-user-plus', text: 'New user <strong>jane.smith</strong> created by <strong>admin</strong>', time: '32 minutes ago' },
-    { type: 'warning', icon: 'ph-warning', text: 'Failed login attempt for user <strong>admin</strong> from IP 192.168.1.45', time: '1 hour ago' },
-    { type: 'info', icon: 'ph-shield-check', text: '<strong>admin</strong> enabled mTLS authentication for API endpoints', time: '1 hour ago' },
-    { type: 'success', icon: 'ph-sign-in', text: 'User <strong>admin</strong> logged in successfully', time: '2 hours ago' },
-    { type: 'info', icon: 'ph-key', text: '<strong>john.doe</strong> rotated API key for integration service', time: '3 hours ago' },
-    { type: 'info', icon: 'ph-user-gear', text: 'Role changed for user <strong>jane.smith</strong> from Operator to Admin', time: '3 hours ago' },
-    { type: 'success', icon: 'ph-database', text: 'Database optimization completed successfully', time: '4 hours ago' },
-    { type: 'info', icon: 'ph-lock', text: '<strong>admin</strong> updated password policy settings', time: '5 hours ago' },
-  ];
+  const { data: activityResponse, isLoading, error } = useAccountActivity();
 
-  const pkiOps = [
-    { type: 'gradient', icon: 'ph-certificate', text: 'Server certificate <strong>web-server-01.acme.com</strong> issued by Production CA', time: '5 minutes ago' },
-    { type: 'gradient', icon: 'ph-certificate', text: 'Client certificate <strong>user-john.doe@acme.com</strong> issued by User CA', time: '12 minutes ago' },
-    { type: 'gradient', icon: 'ph-tree-structure', text: 'Intermediate CA <strong>Production Issuing CA 2024</strong> created under Root CA', time: '25 minutes ago' },
-    { type: 'error', icon: 'ph-prohibition', text: 'Certificate <strong>old-api.acme.com</strong> revoked (reason: superseded)', time: '45 minutes ago' },
-    { type: 'gradient', icon: 'ph-file-text', text: 'CSR <strong>api-gateway.acme.com</strong> approved and certificate issued', time: '1 hour ago' },
-    { type: 'gradient', icon: 'ph-list-checks', text: 'CRL generated for <strong>Production CA</strong> (3 revoked certificates)', time: '2 hours ago' },
-    { type: 'gradient', icon: 'ph-certificate', text: 'ACME certificate <strong>*.acme.com</strong> auto-renewed successfully', time: '2 hours ago' },
-    { type: 'gradient', icon: 'ph-broadcast', text: 'OCSP responder updated with latest certificate status', time: '3 hours ago' },
-    { type: 'gradient', icon: 'ph-files', text: 'Template <strong>Web Server - 2 Year</strong> applied to new certificate', time: '3 hours ago' },
-    { type: 'gradient', icon: 'ph-certificate', text: 'Certificate <strong>vpn-gateway.acme.com</strong> issued via SCEP enrollment', time: '4 hours ago' },
-  ];
+  if (isLoading) {
+    return (
+      <div className={styles.activityLog}>
+        <PageTopBar
+          icon="ph ph-clock-clockwise"
+          title="Activity"
+          badge={<Badge variant="neutral">Loading...</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center' }}>Loading activity...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.activityLog}>
+        <PageTopBar
+          icon="ph ph-clock-clockwise"
+          title="Activity"
+          badge={<Badge variant="danger">Error</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
+          Error loading activity: {error.message}
+        </div>
+      </div>
+    );
+  }
+
+  const allActivity = activityResponse?.data || [];
+  const appLogs = allActivity.filter(log => log.category === 'app' || !log.category);
+  const pkiOps = allActivity.filter(log => log.category === 'pki');
 
   const currentLogs = activeTab === 'app-logs' ? appLogs : pkiOps;
 
