@@ -8,97 +8,58 @@ import { exportTableData } from '../../utils/export';
 import toast from 'react-hot-toast';
 import styles from './TemplateList.module.css';
 
-// Mock Templates Data
-const MOCK_TEMPLATES = [
-  {
-    id: 1,
-    name: 'Server Certificate',
-    keyUsage: 'Digital Signature, Key Encipherment',
-    validity: '1 year',
-    subjectPattern: 'CN={hostname}, O=Company',
-    usedBy: '142 certs',
-    status: 'ACTIVE',
-  },
-  {
-    id: 2,
-    name: 'Client Authentication',
-    keyUsage: 'Digital Signature, Non Repudiation',
-    validity: '2 years',
-    subjectPattern: 'CN={username}, OU=Users',
-    usedBy: '87 certs',
-    status: 'ACTIVE',
-  },
-  {
-    id: 3,
-    name: 'Code Signing',
-    keyUsage: 'Digital Signature',
-    validity: '3 years',
-    subjectPattern: 'CN={developer}, O=Company',
-    usedBy: '12 certs',
-    status: 'ACTIVE',
-  },
-  {
-    id: 4,
-    name: 'Email Protection',
-    keyUsage: 'Digital Signature, Key Encipherment',
-    validity: '1 year',
-    subjectPattern: 'CN={email}, OU=Email',
-    usedBy: '234 certs',
-    status: 'ACTIVE',
-  },
-  {
-    id: 5,
-    name: 'Wildcard SSL',
-    keyUsage: 'Digital Signature, Key Encipherment',
-    validity: '90 days',
-    subjectPattern: 'CN=*.{domain}',
-    usedBy: '45 certs',
-    status: 'ACTIVE',
-  },
-  {
-    id: 6,
-    name: 'VPN Gateway',
-    keyUsage: 'Digital Signature, Key Encipherment, TLS Server',
-    validity: '2 years',
-    subjectPattern: 'CN={gateway}, OU=VPN',
-    usedBy: '8 certs',
-    status: 'ACTIVE',
-  },
-  {
-    id: 7,
-    name: 'IoT Device',
-    keyUsage: 'Digital Signature',
-    validity: '5 years',
-    subjectPattern: 'CN={device_id}, OU=IoT',
-    usedBy: '567 certs',
-    status: 'ACTIVE',
-  },
-  {
-    id: 8,
-    name: 'Intermediate CA',
-    keyUsage: 'Certificate Sign, CRL Sign',
-    validity: '10 years',
-    subjectPattern: 'CN={ca_name}, O=Company',
-    usedBy: '3 certs',
-    status: 'SYSTEM',
-  },
-];
-
 export function TemplateList() {
-  const [filterOpen, setFilterOpen] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  // Fetch templates from backend
+  const { data, isLoading, error } = useTemplates();
+  const deleteTemplate = useDeleteTemplate();
+
+  // Transform backend data to frontend format
+  const templates = (data?.data || []).map(template => ({
+    id: template.id,
+    name: template.name,
+    keyUsage: template.extensions_template?.key_usage?.join(', ') || 'N/A',
+    validity: `${template.validity_days} days`,
+    subjectPattern: template.dn_template || 'N/A',
+    usedBy: '0 certs', // Backend doesn't track this yet
+    status: 'ACTIVE',
+    isSystem: template.is_system,
+  }));
 
   const handleExport = () => {
-    if (MOCK_TEMPLATES.length === 0) {
+    if (templates.length === 0) {
       toast.error('No templates to export');
       return;
     }
-    exportTableData(MOCK_TEMPLATES, 'templates-export', {
+    exportTableData(templates, 'templates-export', {
       format: 'csv',
       columns: ['id', 'name', 'keyUsage', 'validity', 'subjectPattern', 'usedBy', 'status']
     });
     toast.success('Templates exported successfully');
   };
+
+  const handleDelete = (template) => {
+    if (template.isSystem) {
+      toast.error('Cannot delete system template');
+      return;
+    }
+    if (confirm(`Delete template "${template.name}"?`)) {
+      deleteTemplate.mutate(template.id);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className={styles.templateList}>
+        <PageTopBar icon="ph ph-file-text" title="Certificate Templates" badge={<Badge variant="danger">Error</Badge>} />
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
+          Error loading templates: {error.message}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.templateList}>
