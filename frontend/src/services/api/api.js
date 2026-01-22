@@ -36,8 +36,12 @@ api.interceptors.response.use(
   (error) => {
     // Handle authentication errors
     if (error.response?.status === 401) {
-      // Redirect to login if not already there
-      if (!window.location.pathname.includes('/login')) {
+      // Only redirect to login if not already there AND not on a public endpoint
+      const isPublicEndpoint = error.config?.url?.includes('/stats/overview') || 
+                               error.config?.url?.includes('/auth/');
+      
+      if (!window.location.pathname.includes('/login') && !isPublicEndpoint) {
+        // Redirect to login
         window.location.href = '/login';
       }
     }
