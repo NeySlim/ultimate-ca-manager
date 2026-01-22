@@ -131,6 +131,7 @@ export function ACMEDashboard() {
     );
   }
 
+  // stats is already transformed by acmeApi.getStats()
   const acmeData = {
     stats: stats || { accounts: 0, activeOrders: 0, completedOrders: 0, domains: 0 },
     accounts: accountsResponse?.data || [],

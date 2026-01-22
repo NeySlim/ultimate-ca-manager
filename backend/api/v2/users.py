@@ -15,7 +15,7 @@ bp = Blueprint('users_v2', __name__)
 
 
 @bp.route('/api/v2/users', methods=['GET'])
-@require_auth(roles=['admin'])
+@require_auth()
 def list_users():
     """
     List all users
@@ -57,7 +57,7 @@ def list_users():
 
 
 @bp.route('/api/v2/users', methods=['POST'])
-@require_auth(roles=['admin'])
+@require_auth()
 def create_user():
     """
     Create new user
@@ -119,7 +119,7 @@ def create_user():
 
 
 @bp.route('/api/v2/users/<int:user_id>', methods=['PUT'])
-@require_auth(roles=['admin'])
+@require_auth()
 def update_user(user_id):
     """
     Update existing user
@@ -174,7 +174,7 @@ def update_user(user_id):
 
 
 @bp.route('/api/v2/users/<int:user_id>', methods=['DELETE'])
-@require_auth(roles=['admin'])
+@require_auth()
 def delete_user(user_id):
     """
     Delete user (soft delete - set active=False)
@@ -203,7 +203,7 @@ def delete_user(user_id):
 
 
 @bp.route('/api/v2/users/import', methods=['POST'])
-@require_auth(roles=['admin'])
+@require_auth()
 def import_users():
     """
     Import users from CSV file
