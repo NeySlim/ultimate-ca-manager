@@ -1,0 +1,153 @@
+/* Modal.module.css - Headless UI Dialog avec CSS Modules */
+
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+}
+
+.dialogContainer {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  width: 100%;
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sizes */
+.sm { max-width: 400px; }
+.md { max-width: 600px; }
+.lg { max-width: 800px; }
+.xl { max-width: 1000px; }
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.closeBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius);
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.closeBtn:active {
+  transform: scale(0.95);
+}
+
+/* Body */
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
+}
+
+/* Overlay Transitions */
+.overlayEnter {
+  transition: opacity 200ms ease-out;
+}
+
+.overlayEnterFrom {
+  opacity: 0;
+}
+
+.overlayEnterTo {
+  opacity: 1;
+}
+
+.overlayLeave {
+  transition: opacity 150ms ease-in;
+}
+
+.overlayLeaveFrom {
+  opacity: 1;
+}
+
+.overlayLeaveTo {
+  opacity: 0;
+}
+
+/* Panel Transitions */
+.panelEnter {
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.panelEnterFrom {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.panelEnterTo {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.panelLeave {
+  transition: opacity 150ms ease-in, transform 150ms ease-in;
+}
+
+.panelLeaveFrom {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.panelLeaveTo {
+  opacity: 0;
+  transform: scale(0.95);
+}

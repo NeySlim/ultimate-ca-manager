@@ -4,6 +4,7 @@ import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useCAs, useDeleteCA } from '../../hooks/useCAs';
+import { CreateCAModal } from '../../components/modals/CreateCAModal';
 import toast from 'react-hot-toast';
 import styles from './CAList.module.css';
 
@@ -13,6 +14,7 @@ export function CAList() {
   const [sortBy, setSortBy] = useState('name');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCAs, setExpandedCAs] = useState(new Set());
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const { data: casResponse, isLoading, error } = useCAs();
   const deleteCA = useDeleteCA();
@@ -80,7 +82,13 @@ export function CAList() {
           <>
             <Button icon="ph ph-upload-simple">Import</Button>
             <Button icon="ph ph-download-simple">Export</Button>
-            <Button variant="primary" icon="ph ph-plus">Create CA</Button>
+            <Button 
+              variant="primary" 
+              icon="ph ph-plus"
+              onClick={() => setShowCreateModal(true)}
+            >
+              Create CA
+            </Button>
           </>
         }
       />
@@ -301,6 +309,12 @@ export function CAList() {
           </div>
         </div>
       )}
+
+      {/* Create CA Modal */}
+      <CreateCAModal 
+        isOpen={showCreateModal} 
+        onClose={() => setShowCreateModal(false)} 
+      />
     </div>
   );
 }

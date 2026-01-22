@@ -1,70 +1,61 @@
-import React, { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
+import { Fragment } from 'react';
 import { X } from '@phosphor-icons/react';
 import { Button } from './Button';
-import './Modal.css';
+import styles from './Modal.module.css';
 
-/**
- * Modal component - Headless UI Dialog
- * Replaces Mantine Modal
- */
-export const Modal = ({ 
-  open, 
+export function Modal({ 
+  isOpen, 
   onClose, 
   title, 
   children,
-  size = 'md',
-  footer
-}) => {
-  const sizeMap = {
-    xs: 'modal-xs',
-    sm: 'modal-sm',
-    md: 'modal-md',
-    lg: 'modal-lg',
-    xl: 'modal-xl'
-  };
-
+  footer,
+  size = 'md' // sm, md, lg, xl
+}) {
   return (
-    <Transition appear show={open} as={Fragment}>
-      <Dialog as="div" className="modal-overlay" onClose={onClose}>
+    <Transition appear show={isOpen} as={Fragment}>
+      <Dialog as="div" className={styles.dialogOverlay} onClose={onClose}>
         <Transition.Child
           as={Fragment}
-          enter="modal-backdrop-enter"
-          enterFrom="modal-backdrop-enter-from"
-          enterTo="modal-backdrop-enter-to"
-          leave="modal-backdrop-leave"
-          leaveFrom="modal-backdrop-leave-from"
-          leaveTo="modal-backdrop-leave-to"
+          enter={styles.overlayEnter}
+          enterFrom={styles.overlayEnterFrom}
+          enterTo={styles.overlayEnterTo}
+          leave={styles.overlayLeave}
+          leaveFrom={styles.overlayLeaveFrom}
+          leaveTo={styles.overlayLeaveTo}
         >
-          <div className="modal-backdrop" aria-hidden="true" />
+          <div className={styles.overlay} />
         </Transition.Child>
 
-        <div className="modal-container">
+        <div className={styles.dialogContainer}>
           <Transition.Child
             as={Fragment}
-            enter="modal-content-enter"
-            enterFrom="modal-content-enter-from"
-            enterTo="modal-content-enter-to"
-            leave="modal-content-leave"
-            leaveFrom="modal-content-leave-from"
-            leaveTo="modal-content-leave-to"
+            enter={styles.panelEnter}
+            enterFrom={styles.panelEnterFrom}
+            enterTo={styles.panelEnterTo}
+            leave={styles.panelLeave}
+            leaveFrom={styles.panelLeaveFrom}
+            leaveTo={styles.panelLeaveTo}
           >
-            <Dialog.Panel className={`modal-panel ${sizeMap[size]}`}>
-              {title && (
-                <div className="modal-header">
-                  <Dialog.Title className="modal-title">{title}</Dialog.Title>
-                  <button className="modal-close" onClick={onClose}>
-                    <X size={20} />
-                  </button>
-                </div>
-              )}
+            <Dialog.Panel className={`${styles.panel} ${styles[size]}`}>
+              {/* Header */}
+              <div className={styles.header}>
+                <Dialog.Title className={styles.title}>
+                  {title}
+                </Dialog.Title>
+                <button onClick={onClose} className={styles.closeBtn}>
+                  <X size={18} />
+                </button>
+              </div>
 
-              <div className="modal-body">
+              {/* Body */}
+              <div className={styles.body}>
                 {children}
               </div>
 
+              {/* Footer */}
               {footer && (
-                <div className="modal-footer">
+                <div className={styles.footer}>
                   {footer}
                 </div>
               )}
@@ -74,4 +65,4 @@ export const Modal = ({
       </Dialog>
     </Transition>
   );
-};
+}
