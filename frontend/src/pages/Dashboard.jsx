@@ -5,7 +5,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Warning, Info, CheckCircle, Clock } from '@phosphor-icons/react';
 import { getBadgeVariant } from '../utils/getBadgeVariant';
-import { getDashboardStats, getRecentActivity, getExpiringCertificates, getSystemOverview } from '../services/mockData';
+import { useDashboardStats, useDashboardOverview, useDashboardActivity, useDashboardExpiringCerts } from '../hooks/useDashboard';
 import styles from './Dashboard.module.css';
 
 /**
@@ -21,10 +21,11 @@ import styles from './Dashboard.module.css';
  * - Recent Activity Feed
  */
 export function Dashboard() {
-  const stats = getDashboardStats();
-  const activity = getRecentActivity();
-  const expiringCerts = getExpiringCertificates();
-  const systemOverview = getSystemOverview();
+  // Fetch data with React Query
+  const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats();
+  const { data: overview, isLoading: overviewLoading, error: overviewError } = useDashboardOverview();
+  const { data: activity, isLoading: activityLoading } = useDashboardActivity(20);
+  const { data: expiringCerts, isLoading: expiringLoading } = useDashboardExpiringCerts(10);
 
   const certColumns = [
     {
@@ -74,12 +75,43 @@ export function Dashboard() {
     },
   ];
 
+  // Loading state
+  if (statsLoading || overviewLoading) {
+    return (
+      <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center' }}>
+        <div style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>Loading dashboard...</div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (statsError || overviewError) {
+    return (
+      <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center' }}>
+        <div style={{ fontSize: '14px', color: 'var(--status-danger)' }}>
+          Error loading dashboard: {statsError?.message || overviewError?.message}
+        </div>
+      </div>
+    );
+  }
+
+  // Use API data with fallbacks
+  const statsData = stats || {
+    activeCertificates: '0',
+    expiringSoon: '0',
+    pendingRequests: '0',
+    acmeRenewals: '0',
+  };
+  const overviewData = overview || [];
+  const activityData = activity || [];
+  const expiringCertsData = expiringCerts || [];
+
   return (
     <div className={styles.dashboard}>
       {/* 1. Stats - 4 widgets @ span 3 each (12-column grid) */}
       <div className={styles.widgetSpan3}>
         <StatCard
-          value="247"
+          value={statsData.activeCertificates}
           label="Active Certificates"
           icon="certificate"
           trend={{ direction: 'up', text: '+12 this week', positive: true }}
@@ -88,7 +120,7 @@ export function Dashboard() {
       </div>
       <div className={styles.widgetSpan3}>
         <StatCard
-          value="12"
+          value={statsData.expiringSoon}
           label="Expiring Soon"
           sublabel="Within 30 days"
           icon="clock"
@@ -98,7 +130,7 @@ export function Dashboard() {
       </div>
       <div className={styles.widgetSpan3}>
         <StatCard
-          value="8"
+          value={statsData.pendingRequests}
           label="Pending Requests"
           sublabel="CSRs awaiting approval"
           icon="file-text"
@@ -107,7 +139,7 @@ export function Dashboard() {
       </div>
       <div className={styles.widgetSpan3}>
         <StatCard
-          value="156"
+          value={statsData.acmeRenewals}
           label="ACME Renewals"
           sublabel="Last 30 days"
           icon="globe"
@@ -120,7 +152,7 @@ export function Dashboard() {
       <div className={`${styles.widget} ${styles.widgetSpan6}`}>
         <h2 className={styles.sectionTitle}>System Overview</h2>
         <div className={styles.overviewGrid}>
-          {systemOverview.map(item => (
+          {overviewData.map(item => (
             <div key={item.label} className={styles.overviewCard}>
               <div className={styles.overviewLabel}>{item.label}</div>
               <div className={styles.overviewValue}>{item.value}</div>
@@ -162,7 +194,7 @@ export function Dashboard() {
         </div>
         <DataTable
           columns={certColumns}
-          data={expiringCerts}
+          data={expiringCertsData}
           onRowClick={(row) => console.log('Certificate clicked:', row)}
         />
       </div>
@@ -173,7 +205,7 @@ export function Dashboard() {
           <h2 className={styles.sectionTitle}>Recent Activity</h2>
           <Button variant="secondary">View All</Button>
         </div>
-        <ActivityFeed items={activity} />
+        <ActivityFeed items={activityData} />
       </div>
     </div>
   );
