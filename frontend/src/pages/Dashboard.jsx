@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import GridLayout from 'react-grid-layout';
-import { WidthProvider } from 'react-grid-layout';
+import RGL from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 
-const ResponsiveGridLayout = WidthProvider(GridLayout);
+const GridLayout = RGL;
+const ResponsiveGridLayout = RGL.WidthProvider(GridLayout);
 import { StatCard } from '../components/domain/StatCard';
 import { ActivityFeed } from '../components/domain/ActivityFeed';
 import { DataTable } from '../components/domain/DataTable';
