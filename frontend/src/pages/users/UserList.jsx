@@ -5,7 +5,8 @@ import { Button } from '../../components/ui/Button';
 import { PageTopBar, PillFilter, PillFilters } from '../../components/common';
 import { exportTableData } from '../../utils/export';
 import { CreateUserModal } from '../../components/modals/CreateUserModal';
-import { useUsers, useDeleteUser, useImportUsers } from '../../hooks/useUsers';
+import { EditUserModal } from '../../components/modals/EditUserModal';
+import { useUsers, useDeleteUser, useImportUsers, useResetUserPassword, useToggleUserStatus } from '../../hooks/useUsers';
 import toast from 'react-hot-toast';
 import styles from './UserList.module.css';
 
@@ -22,6 +23,8 @@ export function UserList() {
   const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // Build API params from filters - memoized to prevent infinite re-renders
   const params = useMemo(() => {
@@ -35,6 +38,8 @@ export function UserList() {
   const { data, isLoading, error } = useUsers(params);
   const deleteUser = useDeleteUser();
   const importUsers = useImportUsers();
+  const resetPassword = useResetUserPassword();
+  const toggleStatus = useToggleUserStatus();
 
   // Transform backend data to frontend format
   const getInitials = (name) => {
@@ -108,6 +113,27 @@ export function UserList() {
     }
   };
 
+  const handleEdit = (user) => {
+    setEditingUser(user);
+    setShowEditModal(true);
+  };
+
+  const handleResetPassword = (user) => {
+    const newPassword = prompt(`Enter new password for ${user.name}:`);
+    if (newPassword && newPassword.length >= 8) {
+      resetPassword.mutate({ userId: user.id, newPassword });
+    } else if (newPassword) {
+      toast.error('Password must be at least 8 characters');
+    }
+  };
+
+  const handleToggleStatus = (user) => {
+    const action = user.status === 'Active' ? 'deactivate' : 'activate';
+    if (confirm(`Are you sure you want to ${action} user "${user.name}"?`)) {
+      toggleStatus.mutate(user.id);
+    }
+  };
+
   if (error) {
     return (
       <div className={styles.userList}>
@@ -163,9 +189,96 @@ export function UserList() {
       label: 'Actions',
       render: (row) => (
         <div className={styles.actionsCell}>
-          <Button variant="default" size="sm" icon="ph ph-pencil-simple" onClick={(e) => { e.stopPropagation(); console.log('Edit:', row); }} />
-          <Button variant="default" size="sm" icon="ph ph-trash" onClick={(e) => { e.stopPropagation(); handleDelete(row); }} />
-          <Button variant="default" size="sm" icon="ph ph-dots-three-outline-vertical" onClick={(e) => { e.stopPropagation(); console.log('More:', row); }} />
+          <Button 
+            variant="default" 
+            size="sm" 
+            icon="ph ph-pencil-simple" 
+            onClick={(e) => { e.stopPropagation(); handleEdit(row); }} 
+          />
+          <Button 
+            variant="default" 
+            size="sm" 
+            icon="ph ph-trash" 
+            onClick={(e) => { e.stopPropagation(); handleDelete(row); }} 
+          />
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <Button 
+              variant="default" 
+              size="sm" 
+              icon="ph ph-dots-three-outline-vertical" 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                const menu = e.currentTarget.nextSibling;
+                menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+              }} 
+            />
+            <div 
+              style={{
+                display: 'none',
+                position: 'absolute',
+                right: 0,
+                top: '100%',
+                marginTop: '4px',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-primary)',
+                borderRadius: 'var(--radius)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                zIndex: 1000,
+                minWidth: '160px',
+              }}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleResetPassword(row);
+                  e.currentTarget.parentElement.style.display = 'none';
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  fontSize: '13px',
+                  color: 'var(--text-primary)',
+                  background: 'transparent',
+                  border: 'none',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+              >
+                <i className="ph ph-key" />
+                Reset Password
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleStatus(row);
+                  e.currentTarget.parentElement.style.display = 'none';
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  fontSize: '13px',
+                  color: 'var(--text-primary)',
+                  background: 'transparent',
+                  border: 'none',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+              >
+                <i className={row.status === 'Active' ? 'ph ph-prohibit' : 'ph ph-check-circle'} />
+                {row.status === 'Active' ? 'Deactivate' : 'Activate'}
+              </button>
+            </div>
+          </div>
         </div>
       ),
     },
@@ -234,6 +347,11 @@ export function UserList() {
       <CreateUserModal 
         isOpen={showCreateModal} 
         onClose={() => setShowCreateModal(false)} 
+      />
+      <EditUserModal 
+        isOpen={showEditModal} 
+        onClose={() => setShowEditModal(false)} 
+        user={editingUser}
       />
     </div>
   );

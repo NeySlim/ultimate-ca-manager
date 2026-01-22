@@ -1,16 +1,24 @@
+import { useState } from 'react';
 import { PageTopBar, StatsGrid, StatCard } from '../../components/common';
 import { DataTable } from '../../components/domain/DataTable';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { useTrustStore, useRemoveTrustedCert } from '../../hooks/useTrustStore';
+import { useTrustStore, useRemoveTrustedCert, useSyncTrustStore } from '../../hooks/useTrustStore';
+import { ViewCertificateModal } from '../../components/modals/ViewCertificateModal';
+import { AddCAToTrustStoreModal } from '../../components/modals/AddCAToTrustStoreModal';
 import toast from 'react-hot-toast';
 import styles from './TrustStore.module.css';
 
 export function TrustStore() {
+  const [selectedCert, setSelectedCert] = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+
   // Fetch trusted certificates from backend
   const { data, isLoading, error } = useTrustStore();
   const removeCert = useRemoveTrustedCert();
+  const syncTrustStore = useSyncTrustStore();
 
   // Transform backend data to frontend format
   const formatDate = (dateStr) => {
@@ -35,6 +43,17 @@ export function TrustStore() {
   const handleRemove = (cert) => {
     if (confirm(`Remove "${cert.name}" from trust store?`)) {
       removeCert.mutate(cert.id);
+    }
+  };
+
+  const handleView = (cert) => {
+    setSelectedCert(cert);
+    setShowViewModal(true);
+  };
+
+  const handleSync = () => {
+    if (confirm('Synchronize trust store with system CA bundle?')) {
+      syncTrustStore.mutate();
     }
   };
 
@@ -106,7 +125,7 @@ export function TrustStore() {
       label: 'Actions',
       render: (row) => (
         <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-          <Button variant="default" size="sm" icon="ph ph-eye" onClick={() => console.log('View:', row)} />
+          <Button variant="default" size="sm" icon="ph ph-eye" onClick={(e) => { e.stopPropagation(); handleView(row); }} />
           <Button variant="default" size="sm" icon="ph ph-trash" onClick={(e) => { e.stopPropagation(); handleRemove(row); }} />
         </div>
       ),
@@ -121,8 +140,12 @@ export function TrustStore() {
         badge={<Badge variant="success">{trustedCAs.length} Trusted CAs</Badge>}
         actions={
           <>
-            <Button icon="ph ph-arrows-clockwise">Sync Trust Store</Button>
-            <Button variant="primary" icon="ph ph-plus">Add CA</Button>
+            <Button icon="ph ph-arrows-clockwise" onClick={handleSync} disabled={syncTrustStore.isPending}>
+              {syncTrustStore.isPending ? 'Syncing...' : 'Sync Trust Store'}
+            </Button>
+            <Button variant="primary" icon="ph ph-plus" onClick={() => setShowAddModal(true)}>
+              Add CA
+            </Button>
           </>
         }
       />
@@ -172,6 +195,17 @@ export function TrustStore() {
           />
         </Card.Body>
       </Card>
+
+      {/* Modals */}
+      <ViewCertificateModal 
+        isOpen={showViewModal} 
+        onClose={() => setShowViewModal(false)} 
+        certificate={selectedCert}
+      />
+      <AddCAToTrustStoreModal 
+        isOpen={showAddModal} 
+        onClose={() => setShowAddModal(false)}
+      />
     </div>
   );
 }

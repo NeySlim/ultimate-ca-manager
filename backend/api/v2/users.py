@@ -202,6 +202,70 @@ def delete_user(user_id):
         return error_response(f'Failed to delete user: {str(e)}', 500)
 
 
+@bp.route('/api/v2/users/<int:user_id>/reset-password', methods=['POST'])
+@require_auth()
+def reset_user_password(user_id):
+    """
+    Reset user password (admin action)
+    
+    POST /api/v2/users/{user_id}/reset-password
+    {
+        "new_password": "newsecurepass123"
+    }
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return error_response('User not found', 404)
+    
+    data = request.get_json()
+    
+    if not data.get('new_password'):
+        return error_response('New password is required', 400)
+    
+    # Update password
+    user.set_password(data['new_password'])
+    
+    try:
+        db.session.commit()
+        return success_response(
+            message=f'Password reset successfully for user {user.username}'
+        )
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'Failed to reset password: {str(e)}', 500)
+
+
+@bp.route('/api/v2/users/<int:user_id>/toggle', methods=['PATCH'])
+@require_auth()
+def toggle_user_status(user_id):
+    """
+    Toggle user active/inactive status
+    
+    PATCH /api/v2/users/{user_id}/toggle
+    """
+    # Prevent toggling yourself
+    if g.current_user.id == user_id:
+        return error_response('Cannot toggle your own account status', 403)
+    
+    user = User.query.get(user_id)
+    if not user:
+        return error_response('User not found', 404)
+    
+    # Toggle status
+    user.active = not user.active
+    status = 'activated' if user.active else 'deactivated'
+    
+    try:
+        db.session.commit()
+        return success_response(
+            data=user.to_dict(),
+            message=f'User {user.username} {status} successfully'
+        )
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'Failed to toggle user status: {str(e)}', 500)
+
+
 @bp.route('/api/v2/users/import', methods=['POST'])
 @require_auth()
 def import_users():

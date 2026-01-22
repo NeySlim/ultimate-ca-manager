@@ -75,3 +75,14 @@ export const useDeleteTemplate = () => {
     },
   });
 };
+
+/**
+ * Get single template details
+ */
+export const useTemplateDetails = (templateId) => {
+  return useQuery({
+    queryKey: [...templatesKeys.all, 'detail', templateId],
+    queryFn: () => templatesApi.getTemplateDetails(templateId),
+    enabled: !!templateId,
+  });
+};

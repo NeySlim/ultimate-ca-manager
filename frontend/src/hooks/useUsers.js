@@ -94,3 +94,39 @@ export const useImportUsers = () => {
     },
   });
 };
+
+/**
+ * Reset user password mutation
+ */
+export const useResetUserPassword = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: ({ userId, newPassword }) => usersApi.resetPassword(userId, newPassword),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: usersKeys.all });
+      toast.success('Password reset successfully');
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to reset password');
+    },
+  });
+};
+
+/**
+ * Toggle user status mutation
+ */
+export const useToggleUserStatus = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: usersApi.toggleStatus,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: usersKeys.all });
+      toast.success('User status updated successfully');
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to toggle user status');
+    },
+  });
+};

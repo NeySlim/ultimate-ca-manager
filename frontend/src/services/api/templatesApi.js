@@ -14,6 +14,15 @@ export const templatesApi = {
   },
 
   /**
+   * Get single template details
+   * Backend: GET /api/v2/templates/:id
+   */
+  getTemplateDetails: async (id) => {
+    const response = await api.get(`/api/v2/templates/${id}`);
+    return response.data;
+  },
+
+  /**
    * Create template
    * Backend: POST /api/v2/templates
    */

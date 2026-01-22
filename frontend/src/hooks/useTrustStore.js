@@ -57,3 +57,33 @@ export const useRemoveTrustedCert = () => {
     },
   });
 };
+
+/**
+ * Sync trust store mutation
+ */
+export const useSyncTrustStore = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: truststoreApi.syncTrustStore,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: truststoreKeys.all });
+      const synced = data?.data?.synced_count || 0;
+      toast.success(`Trust store synchronized successfully (${synced} certificates)`);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to sync trust store');
+    },
+  });
+};
+
+/**
+ * Get single trusted certificate details
+ */
+export const useTrustedCertDetails = (certId) => {
+  return useQuery({
+    queryKey: [...truststoreKeys.all, 'detail', certId],
+    queryFn: () => truststoreApi.getTrustedCertDetails(certId),
+    enabled: !!certId,
+  });
+};

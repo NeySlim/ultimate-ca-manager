@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { PageTopBar, SectionTabs, Tab } from '../../components/common';
-import { useGeneralSettings, useUpdateGeneralSettings } from '../../hooks/useSettings';
+import { useGeneralSettings, useUpdateGeneralSettings, useOptimizeDatabase, useRegenerateHttpsCert } from '../../hooks/useSettings';
 import styles from './Settings.module.css';
 
 /**
@@ -21,6 +21,8 @@ export function Settings() {
   
   const { data: settings, isLoading } = useGeneralSettings();
   const { mutate: updateSettings } = useUpdateGeneralSettings();
+  const optimizeDb = useOptimizeDatabase();
+  const regenerateCert = useRegenerateHttpsCert();
   
   const generalSettings = settings || {};
   
@@ -66,6 +68,18 @@ export function Settings() {
     if (window.confirm('Are you sure you want to reset all settings to default?')) {
       setFormData({});
       toast.success('Settings reset to default');
+    }
+  };
+
+  const handleOptimizeDatabase = () => {
+    if (window.confirm('Optimize database? This may take a few moments.')) {
+      optimizeDb.mutate();
+    }
+  };
+
+  const handleRegenerateCert = () => {
+    if (window.confirm('Regenerate self-signed HTTPS certificate? The service will need to be restarted.')) {
+      regenerateCert.mutate();
     }
   };
   
@@ -213,7 +227,14 @@ export function Settings() {
                 <input type="text" defaultValue="2024-03-15 02:00 UTC" readOnly />
               </div>
               <div className={styles.formGroup}>
-                <Button variant="primary" icon="ph ph-broom">Optimize Database</Button>
+                <Button 
+                  variant="primary" 
+                  icon="ph ph-broom" 
+                  onClick={handleOptimizeDatabase}
+                  disabled={optimizeDb.isPending}
+                >
+                  {optimizeDb.isPending ? 'Optimizing...' : 'Optimize Database'}
+                </Button>
               </div>
             </div>
           </div>
@@ -274,7 +295,14 @@ export function Settings() {
                 <input type="text" defaultValue="2025-03-15" readOnly />
               </div>
               <div className={styles.formGroup}>
-                <Button variant="primary" icon="ph ph-arrows-clockwise">Regenerate Self-Signed</Button>
+                <Button 
+                  variant="primary" 
+                  icon="ph ph-arrows-clockwise" 
+                  onClick={handleRegenerateCert}
+                  disabled={regenerateCert.isPending}
+                >
+                  {regenerateCert.isPending ? 'Regenerating...' : 'Regenerate Self-Signed'}
+                </Button>
               </div>
             </div>
           </div>
