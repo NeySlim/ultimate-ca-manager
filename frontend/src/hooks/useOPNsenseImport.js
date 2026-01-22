@@ -1,9 +1,8 @@
 /**
  * Custom hooks for OPNsense Import
  */
-import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { api } from '../services/api';
+import api from '../services/api/api';
 
 /**
  * Hook for testing OPNsense connection
@@ -12,7 +11,7 @@ export function useTestOPNsenseConnection() {
   return useMutation({
     mutationFn: async (credentials) => {
       const response = await api.post('/api/v2/import/opnsense/test', credentials);
-      return response.data;
+      return response;
     }
   });
 }
@@ -24,7 +23,7 @@ export function useImportFromOPNsense() {
   return useMutation({
     mutationFn: async (importData) => {
       const response = await api.post('/api/v2/import/opnsense/import', importData);
-      return response.data;
+      return response;
     }
   });
 }
