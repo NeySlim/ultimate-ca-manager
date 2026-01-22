@@ -5,7 +5,8 @@ import { SearchToolbar } from '../../components/domain/SearchToolbar';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { getBadgeVariant } from '../../utils/getBadgeVariant';
-import { useACMESettings, useACMEStats, useACMEAccounts, useACMEOrders } from '../../hooks/useACME';
+import { useACMESettings, useACMEStats, useACMEAccounts, useACMEOrders, useUpdateACMESettings } from '../../hooks/useACME';
+import toast from 'react-hot-toast';
 import styles from './ACMEDashboard.module.css';
 
 /**
@@ -22,6 +23,7 @@ export function ACMEDashboard() {
   const { data: stats, isLoading: loadingStats, error: errorStats } = useACMEStats();
   const { data: accountsResponse, isLoading: loadingAccounts, error: errorAccounts } = useACMEAccounts();
   const { data: ordersResponse, isLoading: loadingOrders, error: errorOrders } = useACMEOrders();
+  const updateACME = useUpdateACMESettings();
 
   const isLoading = loadingSettings || loadingStats || loadingAccounts || loadingOrders;
   const error = errorSettings || errorStats || errorAccounts || errorOrders;
@@ -193,6 +195,25 @@ export function ACMEDashboard() {
 
   return (
     <div className={styles.acmeDashboard}>
+      <PageTopBar
+        icon="ph ph-globe"
+        title="ACME"
+        badge={<Badge variant={settings?.enabled ? 'success' : 'secondary'}>{settings?.enabled ? 'Enabled' : 'Disabled'}</Badge>}
+        actions={
+          <Button 
+            variant={settings?.enabled ? 'secondary' : 'primary'}
+            onClick={() => {
+              updateACME.mutate({ enabled: !settings?.enabled }, {
+                onSuccess: () => toast.success(settings?.enabled ? 'ACME disabled' : 'ACME enabled'),
+                onError: () => toast.error('Failed to update ACME')
+              });
+            }}
+          >
+            {settings?.enabled ? 'Disable' : 'Enable'} ACME
+          </Button>
+        }
+      />
+      
       <SectionTabs>
         <Tab active={activeTab === 'internal'} onClick={() => setActiveTab('internal')}>
           Internal ACME

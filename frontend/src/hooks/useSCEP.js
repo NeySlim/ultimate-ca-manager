@@ -41,3 +41,23 @@ export const useUpdateSCEPSettings = () => {
     },
   });
 };
+
+export const useApproveSCEPRequest = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: scepApi.approveRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: scepKeys.all });
+    },
+  });
+};
+
+export const useRejectSCEPRequest = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: scepApi.rejectRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: scepKeys.all });
+    },
+  });
+};

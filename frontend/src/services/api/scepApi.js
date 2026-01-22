@@ -48,4 +48,20 @@ export const scepApi = {
     const response = await api.get('/api/v2/scep/requests', { params });
     return response.data || [];
   },
+
+  /**
+   * Approve SCEP enrollment request
+   */
+  approveRequest: async (requestId) => {
+    const response = await api.post(`/api/v2/scep/${requestId}/approve`);
+    return response.data;
+  },
+
+  /**
+   * Reject SCEP enrollment request
+   */
+  rejectRequest: async (requestId) => {
+    const response = await api.post(`/api/v2/scep/${requestId}/reject`);
+    return response.data;
+  },
 };

@@ -3,7 +3,8 @@ import { getBadgeVariant } from '../../utils/getBadgeVariant';
 import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { useCAs } from '../../hooks/useCAs';
+import { useCAs, useDeleteCA } from '../../hooks/useCAs';
+import toast from 'react-hot-toast';
 import styles from './CAList.module.css';
 
 export function CAList() {
@@ -14,6 +15,16 @@ export function CAList() {
   const [expandedCAs, setExpandedCAs] = useState(new Set());
 
   const { data: casResponse, isLoading, error } = useCAs();
+  const deleteCA = useDeleteCA();
+
+  const handleDelete = (ca) => {
+    if (confirm(`Delete CA "${ca.name}"? This cannot be undone.`)) {
+      deleteCA.mutate(ca.id, {
+        onSuccess: () => toast.success('CA deleted'),
+        onError: () => toast.error('Failed to delete CA')
+      });
+    }
+  };
 
   const toggleCA = (caId) => {
     const newExpanded = new Set(expandedCAs);
@@ -171,6 +182,16 @@ export function CAList() {
                       <button className={styles.actionBtn} title="View">
                         <i className="ph ph-eye"></i>
                       </button>
+                      <button 
+                        className={styles.actionBtn} 
+                        title="Delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(ca);
+                        }}
+                      >
+                        <i className="ph ph-trash"></i>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -197,6 +218,16 @@ export function CAList() {
                       <div className={styles.actionsCell}>
                         <button className={styles.actionBtn} title="View">
                           <i className="ph ph-eye"></i>
+                        </button>
+                        <button 
+                          className={styles.actionBtn} 
+                          title="Delete"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(child);
+                          }}
+                        >
+                          <i className="ph ph-trash"></i>
                         </button>
                       </div>
                     </td>
@@ -250,6 +281,16 @@ export function CAList() {
                       <div className={styles.actionsCell}>
                         <button className={styles.actionBtn} title="View">
                           <i className="ph ph-eye"></i>
+                        </button>
+                        <button 
+                          className={styles.actionBtn} 
+                          title="Delete"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(ca);
+                          }}
+                        >
+                          <i className="ph ph-trash"></i>
                         </button>
                       </div>
                     </td>
