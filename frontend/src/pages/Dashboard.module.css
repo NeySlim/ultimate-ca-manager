@@ -39,6 +39,9 @@
   transition: all 0.15s;
   overflow: hidden;
   position: relative;
+  height: 100%; /* Fill grid cell */
+  display: flex;
+  flex-direction: column;
 }
 
 .widgetCard {
