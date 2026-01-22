@@ -626,6 +626,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .sidebar-footer {
+  position: relative;
   padding: var(--spacing-lg);
   border-top: 1px solid var(--border-primary);
   margin-top: auto; /* Push to bottom */
