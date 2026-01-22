@@ -10,6 +10,7 @@ db = SQLAlchemy()
 
 # Import sub-models
 from models.certificate_template import CertificateTemplate
+from models.truststore import TrustedCertificate
 
 
 class User(db.Model):
