@@ -55,7 +55,7 @@ def list_templates():
 
 
 @bp.route('/api/v2/templates', methods=['POST'])
-@require_auth(roles=['admin', 'operator'])
+@require_auth()
 def create_template():
     """
     Create new certificate template
@@ -161,7 +161,7 @@ def get_template(template_id):
 
 
 @bp.route('/api/v2/templates/<int:template_id>', methods=['PUT'])
-@require_auth(roles=['admin', 'operator'])
+@require_auth()
 def update_template(template_id):
     """
     Update existing template
@@ -236,7 +236,7 @@ def update_template(template_id):
 
 
 @bp.route('/api/v2/templates/<int:template_id>', methods=['DELETE'])
-@require_auth(roles=['admin'])
+@require_auth()
 def delete_template(template_id):
     """
     Delete certificate template
