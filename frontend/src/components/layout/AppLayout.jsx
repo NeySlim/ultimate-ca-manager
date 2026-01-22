@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar/Sidebar';
 import Topbar from './TopBar/TopBar';
+import { DashboardLayoutProvider } from '../../contexts/DashboardLayoutContext';
 import styles from './AppLayout.module.css';
 
 /**
@@ -16,17 +17,19 @@ import styles from './AppLayout.module.css';
  */
 export function AppLayout() {
   return (
-    <div className={styles.appLayout}>
-      <Sidebar />
-      
-      <div className={styles.mainContent}>
-        <Topbar />
+    <DashboardLayoutProvider>
+      <div className={styles.appLayout}>
+        <Sidebar />
         
-        <div className={styles.pageContent}>
-          <Outlet />
+        <div className={styles.mainContent}>
+          <Topbar />
+          
+          <div className={styles.pageContent}>
+            <Outlet />
+          </div>
         </div>
       </div>
-    </div>
+    </DashboardLayoutProvider>
   );
 }
 
