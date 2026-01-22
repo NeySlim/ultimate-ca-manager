@@ -17,6 +17,7 @@ import styles from './Settings.module.css';
 export function Settings() {
   const [activeTab, setActiveTab] = useState('system');
   const [formData, setFormData] = useState({});
+  const [isBackingUp, setIsBackingUp] = useState(false);
   
   const { data: settings, isLoading } = useGeneralSettings();
   const { mutate: updateSettings } = useUpdateGeneralSettings();
@@ -28,6 +29,37 @@ export function Settings() {
       onSuccess: () => toast.success('Settings saved successfully'),
       onError: (err) => toast.error(`Failed to save settings: ${err.message}`),
     });
+  };
+
+  const handleBackup = async () => {
+    setIsBackingUp(true);
+    try {
+      const response = await fetch('/api/v2/system/backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error('Backup failed');
+      }
+
+      // Download backup file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ucm-backup-${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Backup created successfully');
+    } catch (error) {
+      toast.error('Failed to create backup');
+    } finally {
+      setIsBackingUp(false);
+    }
   };
 
   const handleReset = () => {
@@ -288,7 +320,14 @@ export function Settings() {
                 <input type="text" defaultValue="245.3 MB" readOnly />
               </div>
               <div className={styles.formGroup}>
-                <Button variant="primary" icon="ph ph-download-simple">Create Backup Now</Button>
+                <Button 
+                  variant="primary" 
+                  icon="ph ph-download-simple"
+                  onClick={handleBackup}
+                  disabled={isBackingUp}
+                >
+                  {isBackingUp ? 'Creating Backup...' : 'Create Backup Now'}
+                </Button>
               </div>
             </div>
           </div>

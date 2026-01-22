@@ -4,6 +4,7 @@ import { DataTable } from '../../components/domain/DataTable';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { exportTableData } from '../../utils/export';
 import toast from 'react-hot-toast';
 import api from '../../services/api/api';
 import styles from './CRLManagement.module.css';
@@ -28,6 +29,18 @@ export function CRLManagement() {
     } finally {
       setIsRegenerating(false);
     }
+  };
+
+  const handleExportCRLs = () => {
+    if (cas.length === 0) {
+      toast.error('No CRL data to export');
+      return;
+    }
+    exportTableData(cas, 'crls-export', {
+      format: 'csv',
+      columns: ['id', 'name', 'crlStatus', 'lastGenerated', 'nextUpdate', 'ocspStatus']
+    });
+    toast.success('CRLs exported successfully');
   };
 
   const cas = [
@@ -165,7 +178,11 @@ export function CRLManagement() {
               variant="default"
               size="sm"
               icon="ph ph-gear"
-              onClick={() => console.log('Configure:', row)}
+              onClick={() => {
+                // Redirect to Settings CRL section
+                window.location.href = '/settings#crl';
+                toast.info('Redirecting to CRL configuration...');
+              }}
             />
           )}
         </div>
@@ -182,7 +199,7 @@ export function CRLManagement() {
         actions={
           <>
             <Button icon="ph ph-arrows-clockwise">Regenerate All</Button>
-            <Button icon="ph ph-download-simple">Export CRLs</Button>
+            <Button icon="ph ph-download-simple" onClick={handleExportCRLs}>Export CRLs</Button>
           </>
         }
       />

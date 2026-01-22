@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { getBadgeVariant } from '../../utils/getBadgeVariant';
 import { useSCEPSettings, useSCEPStats, useApproveSCEPRequest, useRejectSCEPRequest } from '../../hooks/useSCEP';
+import { useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import styles from './SCEPDashboard.module.css';
 
@@ -24,6 +25,7 @@ export function SCEPDashboard() {
   const { data: stats, isLoading: statsLoading } = useSCEPStats();
   const approveSCEP = useApproveSCEPRequest();
   const rejectSCEP = useRejectSCEPRequest();
+  const queryClient = useQueryClient();
   
   const isLoading = settingsLoading || statsLoading;
   
@@ -141,7 +143,15 @@ export function SCEPDashboard() {
         badge={<Badge variant={scepData.config.enabled ? 'success' : 'secondary'}>{scepData.config.enabled ? 'Enabled' : 'Disabled'}</Badge>}
         actions={
           <>
-            <Button icon="ph ph-arrows-clockwise">Refresh</Button>
+            <Button 
+              icon="ph ph-arrows-clockwise"
+              onClick={() => {
+                queryClient.invalidateQueries(['scep']);
+                toast.success('SCEP data refreshed');
+              }}
+            >
+              Refresh
+            </Button>
             <Button variant="primary" icon="ph ph-gear">Configure</Button>
           </>
         }

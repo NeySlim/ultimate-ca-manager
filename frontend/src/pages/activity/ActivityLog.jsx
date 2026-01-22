@@ -3,6 +3,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { PageTopBar, FiltersBar, FilterGroup, SectionTabs, Tab } from '../../components/common';
 import { useAccountActivity } from '../../hooks/useAccount';
+import { exportTableData } from '../../utils/export';
+import toast from 'react-hot-toast';
 import styles from './ActivityLog.module.css';
 
 /**
@@ -18,6 +20,19 @@ export function ActivityLog() {
   const [activeTab, setActiveTab] = useState('app-logs');
 
   const { data: activityResponse, isLoading, error } = useAccountActivity();
+
+  const handleExport = () => {
+    const allActivity = activityResponse?.data || [];
+    if (allActivity.length === 0) {
+      toast.error('No activity data to export');
+      return;
+    }
+    exportTableData(allActivity, 'activity-logs-export', {
+      format: 'csv',
+      columns: ['timestamp', 'user', 'action', 'details', 'status', 'ip']
+    });
+    toast.success('Activity logs exported successfully');
+  };
 
   if (isLoading) {
     return (
@@ -70,7 +85,7 @@ export function ActivityLog() {
         icon="ph ph-clock-clockwise"
         title="Activity"
         badge={<Badge variant="info">Real-time</Badge>}
-        actions={<Button variant="default" icon="ph ph-download-simple">Export Logs</Button>}
+        actions={<Button variant="default" icon="ph ph-download-simple" onClick={handleExport}>Export Logs</Button>}
       />
 
       <FiltersBar>
