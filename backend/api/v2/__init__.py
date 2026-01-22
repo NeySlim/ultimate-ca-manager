@@ -20,6 +20,7 @@ from api.v2.csrs import bp as csrs_bp
 from api.v2.users import bp as users_bp
 from api.v2.templates import bp as templates_bp
 from api.v2.truststore import bp as truststore_bp
+from api.v2.import_opnsense import bp as import_opnsense_bp
 
 # List of all blueprints to register
 API_V2_BLUEPRINTS = [
@@ -36,7 +37,8 @@ API_V2_BLUEPRINTS = [
     crl_bp,
     users_bp,
     templates_bp,
-    truststore_bp
+    truststore_bp,
+    import_opnsense_bp
 ]
 
 
