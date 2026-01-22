@@ -58,3 +58,13 @@ export const useRevokeSession = () => {
     },
   });
 };
+
+export const useRevokeAllSessions = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: accountApi.revokeAllSessions,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: accountKeys.sessions() });
+    },
+  });
+};

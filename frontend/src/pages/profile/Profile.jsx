@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { PageTopBar, SectionTabs, Tab } from '../../components/common';
-import { useProfile, useSessions } from '../../hooks/useAccount';
+import { useProfile, useSessions, useRevokeSession, useRevokeAllSessions } from '../../hooks/useAccount';
 import styles from './Profile.module.css';
 
 /**
@@ -18,9 +19,28 @@ export function Profile() {
   
   const { data: profile, isLoading: loadingProfile, error: errorProfile } = useProfile();
   const { data: sessions, isLoading: loadingSessions, error: errorSessions } = useSessions();
+  
+  const { mutate: revokeSession } = useRevokeSession();
+  const { mutate: revokeAllSessions } = useRevokeAllSessions();
 
   const isLoading = loadingProfile || loadingSessions;
   const error = errorProfile || errorSessions;
+
+  const handleRevokeSession = (sessionId) => {
+    revokeSession(sessionId, {
+      onSuccess: () => toast.success('Session revoked successfully'),
+      onError: (err) => toast.error(`Failed to revoke session: ${err.message}`),
+    });
+  };
+
+  const handleRevokeAllSessions = () => {
+    if (window.confirm('Are you sure you want to revoke all sessions? You will be logged out.')) {
+      revokeAllSessions(undefined, {
+        onSuccess: () => toast.success('All sessions revoked successfully'),
+        onError: (err) => toast.error(`Failed to revoke sessions: ${err.message}`),
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -158,6 +178,47 @@ export function Profile() {
               </div>
               <div className={styles.formGroup}>
                 <Button variant="primary" icon="ph ph-shield-check">Enable 2FA</Button>
+              </div>
+            </div>
+
+            <div className={styles.settingsSection}>
+              <div className={styles.sectionTitle}>Active Sessions</div>
+              <div className={styles.certList}>
+                {sessionsData.map((session) => (
+                  <div key={session.id} className={styles.certItem}>
+                    <div className={styles.certInfo}>
+                      <div className={styles.certSubject}>
+                        {session.current ? 'Current Session (This Device)' : session.device || 'Unknown Device'}
+                      </div>
+                      <div className={styles.certMeta}>
+                        {session.user_agent || 'Unknown browser'} • IP: {session.ip_address || 'N/A'} • Started {session.created_at || 'N/A'}
+                      </div>
+                    </div>
+                    <div className={styles.certActions}>
+                      {session.current ? (
+                        <Badge variant="success">Active</Badge>
+                      ) : (
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          icon="ph ph-x"
+                          onClick={() => handleRevokeSession(session.id)}
+                        >
+                          Revoke
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className={styles.formGroup}>
+                <Button 
+                  variant="danger" 
+                  icon="ph ph-x-circle"
+                  onClick={handleRevokeAllSessions}
+                >
+                  Revoke All Sessions
+                </Button>
               </div>
             </div>
 
