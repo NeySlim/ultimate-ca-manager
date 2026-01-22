@@ -755,6 +755,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .sidebar-footer {
+  position: relative;
   padding: var(--spacing-lg);
   border-top: 1px solid var(--border-primary);
   margin-top: auto;
@@ -798,4 +799,50 @@ input:focus, select:focus, textarea:focus {
 .user-role {
   font-size: 11px;
   color: var(--text-tertiary);
+}
+
+/* User Dropdown Menu */
+.user-menu {
+  position: absolute;
+  bottom: 100%;
+  left: var(--spacing-lg);
+  right: var(--spacing-lg);
+  margin-bottom: var(--spacing-sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  padding: var(--spacing-xs);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: all 0.15s;
+}
+
+.user-menu-item:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.user-menu-item svg {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.user-menu-item:hover svg {
+  color: var(--accent-primary);
 }
