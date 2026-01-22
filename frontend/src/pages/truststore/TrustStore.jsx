@@ -3,56 +3,48 @@ import { DataTable } from '../../components/domain/DataTable';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { useTrustStore, useRemoveTrustedCert } from '../../hooks/useTrustStore';
+import toast from 'react-hot-toast';
 import styles from './TrustStore.module.css';
 
 export function TrustStore() {
-  const trustedCAs = [
-    {
-      id: 1,
-      name: 'DigiCert Global Root CA',
-      subject: 'CN=DigiCert Global Root CA',
-      fingerprint: 'A8:98:5D:3A:65:E5:...',
-      validUntil: '2031-11-10',
-      usage: ['TLS Server', 'TLS Client'],
-      autoTrusted: true,
-    },
-    {
-      id: 2,
-      name: "Let's Encrypt Root CA X1",
-      subject: 'CN=ISRG Root X1',
-      fingerprint: '96:BC:EC:06:26:49:...',
-      validUntil: '2035-06-04',
-      usage: ['TLS Server'],
-      autoTrusted: true,
-    },
-    {
-      id: 3,
-      name: 'Corporate Root CA',
-      subject: 'CN=Corp Root CA, O=Example Corp',
-      fingerprint: '4F:3A:B2:C8:9D:E1:...',
-      validUntil: '2034-01-15',
-      usage: ['TLS Server', 'TLS Client', 'Email'],
-      autoTrusted: false,
-    },
-    {
-      id: 4,
-      name: 'Internal Development CA',
-      subject: 'CN=Dev CA, O=Example Corp',
-      fingerprint: '7B:2F:8A:D3:E6:4C:...',
-      validUntil: '2026-08-20',
-      usage: ['TLS Server', 'Code Signing'],
-      autoTrusted: false,
-    },
-    {
-      id: 5,
-      name: 'GlobalSign Root CA',
-      subject: 'CN=GlobalSign',
-      fingerprint: 'EB:D4:10:40:E4:BB:...',
-      validUntil: '2028-01-28',
-      usage: ['TLS Server', 'TLS Client'],
-      autoTrusted: true,
-    },
-  ];
+  // Fetch trusted certificates from backend
+  const { data, isLoading, error } = useTrustStore();
+  const removeCert = useRemoveTrustedCert();
+
+  // Transform backend data to frontend format
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    return date.toISOString().split('T')[0];
+  };
+
+  const trustedCAs = (data?.data || []).map(cert => ({
+    id: cert.id,
+    name: cert.subject?.split(',')[0]?.replace('CN=', '') || 'Unknown',
+    subject: cert.subject || 'N/A',
+    fingerprint: cert.fingerprint_sha256?.substring(0, 20) + '...' || 'N/A',
+    validUntil: formatDate(cert.valid_until),
+    usage: [cert.purpose || 'General'],
+    autoTrusted: false, // Backend doesn't track this yet
+  }));
+
+  const handleRemove = (cert) => {
+    if (confirm(`Remove "${cert.name}" from trust store?`)) {
+      removeCert.mutate(cert.id);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className={styles.trustStore}>
+        <PageTopBar icon="ph ph-shield-check" title="Trust Store" badge={<Badge variant="danger">Error</Badge>} />
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
+          Error loading trust store: {error.message}
+        </div>
+      </div>
+    );
+  }
 
   const columns = [
     {
@@ -112,7 +104,7 @@ export function TrustStore() {
       render: (row) => (
         <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
           <Button variant="default" size="sm" icon="ph ph-eye" onClick={() => console.log('View:', row)} />
-          <Button variant="default" size="sm" icon="ph ph-trash" onClick={() => console.log('Remove:', row)} />
+          <Button variant="default" size="sm" icon="ph ph-trash" onClick={(e) => { e.stopPropagation(); handleRemove(row); }} />
         </div>
       ),
     },
@@ -123,7 +115,7 @@ export function TrustStore() {
       <PageTopBar
         icon="ph ph-shield-check"
         title="Trust Store"
-        badge={<Badge variant="success">12 Trusted CAs</Badge>}
+        badge={<Badge variant="success">{trustedCAs.length} Trusted CAs</Badge>}
         actions={
           <>
             <Button icon="ph ph-arrows-clockwise">Sync Trust Store</Button>
@@ -171,6 +163,7 @@ export function TrustStore() {
           <DataTable
             columns={columns}
             data={trustedCAs}
+            loading={isLoading}
             onRowClick={(row) => console.log('CA clicked:', row)}
             pageSize={10}
           />

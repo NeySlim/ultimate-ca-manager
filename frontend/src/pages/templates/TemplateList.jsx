@@ -3,6 +3,7 @@ import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { CreateTemplateModal } from '../../components/modals/CreateTemplateModal';
+import { useTemplates, useDeleteTemplate } from '../../hooks/useTemplates';
 import { exportTableData } from '../../utils/export';
 import toast from 'react-hot-toast';
 import styles from './TemplateList.module.css';
@@ -105,7 +106,7 @@ export function TemplateList() {
       <PageTopBar
         icon="ph ph-file-text"
         title="Certificate Templates"
-        badge={<Badge variant="success">{MOCK_TEMPLATES.length} Templates</Badge>}
+        badge={<Badge variant="success">{templates.length} Templates</Badge>}
         actions={
           <>
             <Button icon="ph ph-download-simple" onClick={handleExport}>Export</Button>
@@ -141,48 +142,59 @@ export function TemplateList() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_TEMPLATES.map((template) => (
-              <tr key={template.id}>
-                <td>
-                  <span className={styles.templateName}>{template.name}</span>
-                </td>
-                <td>
-                  <span className={styles.keyUsage}>{template.keyUsage}</span>
-                </td>
-                <td>{template.validity}</td>
-                <td>
-                  <code className={styles.subjectPattern}>{template.subjectPattern}</code>
-                </td>
-                <td>{template.usedBy}</td>
-                <td>
-                  <span 
-                    className={`${styles.statusBadge} ${
-                      template.status === 'ACTIVE' ? styles.badgeActive : styles.badgeSystem
-                    }`}
-                  >
-                    {template.status}
-                  </span>
-                </td>
-                <td>
-                  <div className={styles.actionsCell}>
-                    {template.status === 'ACTIVE' ? (
-                      <>
-                        <button className={styles.actionBtn} title="Edit">
-                          <i className="ph ph-pencil"></i>
-                        </button>
-                        <button className={styles.actionBtn} title="Duplicate">
-                          <i className="ph ph-copy"></i>
-                        </button>
-                      </>
-                    ) : (
-                      <button className={styles.actionBtn} title="View">
-                        <i className="ph ph-eye"></i>
-                      </button>
-                    )}
-                  </div>
+            {isLoading ? (
+              <tr>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>
+                  Loading templates...
                 </td>
               </tr>
-            ))}
+            ) : templates.length === 0 ? (
+              <tr>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>
+                  No templates found
+                </td>
+              </tr>
+            ) : (
+              templates.map((template) => (
+                <tr key={template.id}>
+                  <td>
+                    <span className={styles.templateName}>{template.name}</span>
+                    {template.isSystem && <Badge variant="info" style={{ marginLeft: '0.5rem' }}>System</Badge>}
+                  </td>
+                  <td>
+                    <span className={styles.keyUsage}>{template.keyUsage}</span>
+                  </td>
+                  <td>{template.validity}</td>
+                  <td>
+                    <code className={styles.subjectPattern}>{template.subjectPattern}</code>
+                  </td>
+                  <td>{template.usedBy}</td>
+                  <td>
+                    <span 
+                      className={`${styles.statusBadge} ${
+                        template.status === 'ACTIVE' ? styles.badgeActive : styles.badgeSystem
+                      }`}
+                    >
+                      {template.status}
+                    </span>
+                  </td>
+                  <td>
+                    <div className={styles.actionsCell}>
+                      {!template.isSystem && (
+                        <>
+                          <button className={styles.actionBtn} title="Edit">
+                            <i className="ph ph-pencil"></i>
+                          </button>
+                          <button className={styles.actionBtn} title="Delete" onClick={() => handleDelete(template)}>
+                            <i className="ph ph-trash"></i>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
