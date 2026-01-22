@@ -17,7 +17,10 @@ export function TemplateList() {
   const deleteTemplate = useDeleteTemplate();
 
   // Transform backend data to frontend format
-  const templates = (data?.data || []).map(template => ({
+  // Handle both {data: [...]} and [...] formats
+  const rawTemplates = Array.isArray(data) ? data : (data?.data || []);
+  
+  const templates = rawTemplates.map(template => ({
     id: template.id,
     name: template.name,
     keyUsage: template.extensions_template?.key_usage?.join(', ') || 'N/A',

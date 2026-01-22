@@ -19,7 +19,10 @@ export function TrustStore() {
     return date.toISOString().split('T')[0];
   };
 
-  const trustedCAs = (data?.data || []).map(cert => ({
+  // Handle both {data: [...]} and [...] formats
+  const rawCerts = Array.isArray(data) ? data : (data?.data || []);
+
+  const trustedCAs = rawCerts.map(cert => ({
     id: cert.id,
     name: cert.subject?.split(',')[0]?.replace('CN=', '') || 'Unknown',
     subject: cert.subject || 'N/A',
