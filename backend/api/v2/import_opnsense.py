@@ -213,14 +213,214 @@ def import_items():
             "error": "No items selected for import"
         }), 400
     
-    # TODO: Implement actual import logic
-    # For now, return mock success
-    return jsonify({
-        "success": True,
-        "imported": {
-            "cas": 2,
-            "certificates": 3
-        },
-        "skipped": 0,
+    # Import logic
+    from models import db, CA, Certificate
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+    import base64
+    import json
+    
+    # Fetch data from OPNsense
+    session = requests.Session()
+    session.verify = verify_ssl
+    base_url = f"https://{host}:{port}"
+    
+    stats = {
+        "cas_imported": 0,
+        "cas_skipped": 0,
+        "certs_imported": 0,
+        "certs_skipped": 0,
         "errors": []
-    })
+    }
+    
+    try:
+        # Fetch CAs
+        ca_response = session.get(
+            f"{base_url}/api/trust/ca/search",
+            auth=(api_key, api_secret),
+            timeout=10
+        )
+        
+        # Fetch certificates
+        cert_response = session.get(
+            f"{base_url}/api/trust/cert/search",
+            auth=(api_key, api_secret),
+            timeout=10
+        )
+        
+        # Build lookup by UUID
+        all_cas = {}
+        all_certs = {}
+        
+        if ca_response.status_code == 200:
+            ca_data = ca_response.json()
+            if 'rows' in ca_data:
+                for row in ca_data['rows']:
+                    all_cas[row.get('uuid')] = row
+        
+        if cert_response.status_code == 200:
+            cert_data = cert_response.json()
+            if 'rows' in cert_data:
+                for row in cert_data['rows']:
+                    all_certs[row.get('uuid')] = row
+        
+        # Import selected items
+        for item_id in items:
+            if item_id in all_cas:
+                # Import CA
+                ca_data = all_cas[item_id]
+                
+                # Check if already exists by refid
+                existing = CA.query.filter_by(refid=item_id).first()
+                if existing:
+                    stats['cas_skipped'] += 1
+                    continue
+                
+                # Check for duplicate by description (same CA, different refid from OPNsense)
+                duplicate_by_name = CA.query.filter_by(
+                    descr=ca_data.get('descr'),
+                    imported_from='opnsense'
+                ).first()
+                
+                if duplicate_by_name:
+                    # Skip duplicate - same CA already imported with different refid
+                    stats['cas_skipped'] += 1
+                    stats['errors'].append(f"CA '{ca_data.get('descr')}' already exists with refid {duplicate_by_name.refid}")
+                    continue
+                
+                # Parse certificate
+                try:
+                    crt_pem = base64.b64decode(ca_data.get('crt', ''))
+                    x509_cert = x509.load_pem_x509_certificate(crt_pem, default_backend())
+                    
+                    subject = x509_cert.subject.rfc4514_string()
+                    issuer = x509_cert.issuer.rfc4514_string()
+                    valid_from = x509_cert.not_valid_before
+                    valid_to = x509_cert.not_valid_after
+                except:
+                    subject = ''
+                    issuer = ''
+                    valid_from = None
+                    valid_to = None
+                
+                # Create CA
+                ca = CA(
+                    refid=item_id,
+                    descr=ca_data.get('descr', 'Imported from OPNsense'),
+                    crt=ca_data.get('crt', ''),
+                    prv=ca_data.get('prv'),
+                    serial=0,
+                    subject=subject,
+                    issuer=issuer,
+                    valid_from=valid_from,
+                    valid_to=valid_to,
+                    imported_from='opnsense',
+                    created_by='import'
+                )
+                
+                db.session.add(ca)
+                stats['cas_imported'] += 1
+            
+            elif item_id in all_certs:
+                # Import Certificate
+                cert_data = all_certs[item_id]
+                
+                # Check if already exists by refid
+                existing = Certificate.query.filter_by(refid=item_id).first()
+                if existing:
+                    stats['certs_skipped'] += 1
+                    continue
+                
+                # Check for duplicate by description
+                duplicate_by_name = Certificate.query.filter_by(
+                    descr=cert_data.get('descr'),
+                    imported_from='opnsense'
+                ).first()
+                
+                if duplicate_by_name:
+                    # Skip duplicate
+                    stats['certs_skipped'] += 1
+                    stats['errors'].append(f"Certificate '{cert_data.get('descr')}' already exists with refid {duplicate_by_name.refid}")
+                    continue
+                
+                # Parse certificate
+                san_dns_list = []
+                san_ip_list = []
+                san_email_list = []
+                san_uri_list = []
+                subject = ''
+                issuer = ''
+                serial_number = ''
+                valid_from = None
+                valid_to = None
+                
+                try:
+                    crt_pem = base64.b64decode(cert_data.get('crt', ''))
+                    x509_cert = x509.load_pem_x509_certificate(crt_pem, default_backend())
+                    
+                    subject = x509_cert.subject.rfc4514_string()
+                    issuer = x509_cert.issuer.rfc4514_string()
+                    serial_number = str(x509_cert.serial_number)
+                    valid_from = x509_cert.not_valid_before
+                    valid_to = x509_cert.not_valid_after
+                    
+                    # Extract SANs
+                    try:
+                        ext = x509_cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+                        for name in ext.value:
+                            if isinstance(name, x509.DNSName):
+                                san_dns_list.append(name.value)
+                            elif isinstance(name, x509.IPAddress):
+                                san_ip_list.append(str(name.value))
+                            elif isinstance(name, x509.RFC822Name):
+                                san_email_list.append(name.value)
+                            elif isinstance(name, x509.UniformResourceIdentifier):
+                                san_uri_list.append(name.value)
+                    except x509.ExtensionNotFound:
+                        pass
+                except:
+                    pass
+                
+                # Create certificate
+                cert = Certificate(
+                    refid=item_id,
+                    descr=cert_data.get('descr', 'Imported from OPNsense'),
+                    caref=cert_data.get('caref'),
+                    crt=cert_data.get('crt', ''),
+                    prv=cert_data.get('prv'),
+                    cert_type='server_cert',
+                    subject=subject,
+                    issuer=issuer,
+                    serial_number=serial_number,
+                    valid_from=valid_from,
+                    valid_to=valid_to,
+                    san_dns=json.dumps(san_dns_list) if san_dns_list else None,
+                    san_ip=json.dumps(san_ip_list) if san_ip_list else None,
+                    san_email=json.dumps(san_email_list) if san_email_list else None,
+                    san_uri=json.dumps(san_uri_list) if san_uri_list else None,
+                    imported_from='opnsense',
+                    created_by='import'
+                )
+                
+                db.session.add(cert)
+                stats['certs_imported'] += 1
+        
+        # Commit all changes
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "imported": {
+                "cas": stats['cas_imported'],
+                "certificates": stats['certs_imported']
+            },
+            "skipped": stats['cas_skipped'] + stats['certs_skipped'],
+            "errors": stats['errors']
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500

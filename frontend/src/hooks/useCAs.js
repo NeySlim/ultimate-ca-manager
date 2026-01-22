@@ -8,6 +8,7 @@ export const casKeys = {
   all: ['cas'],
   lists: () => [...casKeys.all, 'list'],
   list: (params) => [...casKeys.lists(), params],
+  tree: () => [...casKeys.all, 'tree'],
   details: () => [...casKeys.all, 'detail'],
   detail: (id) => [...casKeys.details(), id],
 };
@@ -16,6 +17,13 @@ export const useCAs = (params = {}) => {
   return useQuery({
     queryKey: casKeys.list(params),
     queryFn: () => casApi.getAll(params),
+  });
+};
+
+export const useCAsTree = () => {
+  return useQuery({
+    queryKey: casKeys.tree(),
+    queryFn: () => casApi.getTree(),
   });
 };
 
@@ -33,6 +41,7 @@ export const useCreateCA = () => {
     mutationFn: casApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: casKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: casKeys.tree() });
     },
   });
 };
@@ -53,6 +62,7 @@ export const useDeleteCA = () => {
     mutationFn: casApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: casKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: casKeys.tree() });
     },
   });
 };

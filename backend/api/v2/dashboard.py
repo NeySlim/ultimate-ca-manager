@@ -54,11 +54,30 @@ def get_public_stats():
 @require_auth()
 def get_dashboard_stats():
     """Get dashboard statistics"""
+    from models import CA, Certificate
+    from datetime import datetime, timedelta
+    
+    # Count CAs
+    total_cas = CA.query.count()
+    
+    # Count certificates
+    total_certs = Certificate.query.count()
+    
+    # Count expiring soon (next 30 days)
+    expiry_threshold = datetime.utcnow() + timedelta(days=30)
+    expiring_soon = Certificate.query.filter(
+        Certificate.valid_to <= expiry_threshold,
+        Certificate.revoked == False
+    ).count()
+    
+    # Count revoked
+    revoked = Certificate.query.filter_by(revoked=True).count()
+    
     return success_response(data={
-        'total_cas': 0,
-        'total_certificates': 0,
-        'expiring_soon': 0,
-        'revoked': 0
+        'total_cas': total_cas,
+        'total_certificates': total_certs,
+        'expiring_soon': expiring_soon,
+        'revoked': revoked
     })
 
 
@@ -66,16 +85,46 @@ def get_dashboard_stats():
 @require_auth(['read:cas'])
 def get_recent_cas():
     """Get recently created CAs"""
+    from models import CA
+    
     limit = request.args.get('limit', 5, type=int)
-    return success_response(data=[])
+    
+    recent = CA.query.order_by(CA.created_at.desc()).limit(limit).all()
+    
+    return success_response(data=[{
+        'id': ca.id,
+        'refid': ca.refid,
+        'descr': ca.descr,
+        'common_name': ca.common_name,
+        'is_root': ca.is_root,
+        'created_at': ca.created_at.isoformat() if ca.created_at else None,
+        'valid_to': ca.valid_to.isoformat() if ca.valid_to else None
+    } for ca in recent])
 
 
 @bp.route('/api/v2/dashboard/expiring-certs', methods=['GET'])
 @require_auth(['read:certificates'])
 def get_expiring_certificates():
     """Get certificates expiring soon"""
+    from models import Certificate
+    from datetime import datetime, timedelta
+    
     days = request.args.get('days', 30, type=int)
-    return success_response(data=[])
+    
+    expiry_threshold = datetime.utcnow() + timedelta(days=days)
+    
+    expiring = Certificate.query.filter(
+        Certificate.valid_to <= expiry_threshold,
+        Certificate.revoked == False
+    ).order_by(Certificate.valid_to.asc()).limit(10).all()
+    
+    return success_response(data=[{
+        'id': cert.id,
+        'refid': cert.refid,
+        'descr': cert.descr,
+        'subject': cert.subject,
+        'valid_to': cert.valid_to.isoformat() if cert.valid_to else None
+    } for cert in expiring])
 
 
 @bp.route('/api/v2/dashboard/activity', methods=['GET'])

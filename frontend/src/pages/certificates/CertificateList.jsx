@@ -94,8 +94,8 @@ export function CertificateList() {
     );
   }
 
-  const MOCK_CERTIFICATES = certsResponse?.data || [];
-  const activeCount = MOCK_CERTIFICATES.filter(cert => cert.status === 'ACTIVE').length;
+  const certificates = certsResponse?.data || [];
+  const activeCount = certificates.filter(cert => cert.status === 'ACTIVE').length;
 
   return (
     <div className={styles.certificateList}>
@@ -185,7 +185,7 @@ export function CertificateList() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_CERTIFICATES.map((cert) => (
+            {certificates.map((cert) => (
               <tr key={cert.id}>
                 <td>
                   <div className={styles.certNameCell}>

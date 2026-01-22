@@ -114,6 +114,7 @@
   cursor: pointer;
   transition: transform 0.15s;
   padding: 0;
+  flex-shrink: 0;
 }
 
 .caExpandBtn:hover {
@@ -124,9 +125,11 @@
   transform: rotate(-90deg);
 }
 
-.caExpandBtn.noChildren {
-  opacity: 0;
-  cursor: default;
+.caExpandSpacer {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 .caTreeIndent {
