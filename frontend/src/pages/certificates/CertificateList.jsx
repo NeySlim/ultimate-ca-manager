@@ -2,126 +2,15 @@ import { useState } from 'react';
 import { PageTopBar, PillFilter, PillFilters, FiltersBar, FilterGroup } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { useCertificates } from '../../hooks/useCertificates';
 import styles from './CertificateList.module.css';
-
-// Mock Certificates Data
-const MOCK_CERTIFICATES = [
-  {
-    id: 1,
-    name: 'mail.example.com',
-    serial: '3d2f5a1e8b4c...',
-    type: 'Server',
-    issuer: 'Server CA',
-    status: 'CRITICAL',
-    issued: '2023-10-15',
-    expires: '2024-10-15',
-    daysLeft: 7,
-  },
-  {
-    id: 2,
-    name: 'vpn.internal.net',
-    serial: '7c9e1a4b2f6d...',
-    type: 'Server',
-    issuer: 'Server CA',
-    status: 'EXPIRING SOON',
-    issued: '2023-09-20',
-    expires: '2024-09-20',
-    daysLeft: 12,
-  },
-  {
-    id: 3,
-    name: 'api.service.com',
-    serial: '4a8d1f5c3b9e...',
-    type: 'ACME',
-    issuer: 'ACME CA',
-    status: 'ACTIVE',
-    issued: '2024-01-10',
-    expires: '2025-01-10',
-    daysLeft: 234,
-  },
-  {
-    id: 4,
-    name: 'john.doe@acme.com',
-    serial: '9b2a7d5e1c4f...',
-    type: 'Client',
-    issuer: 'Client CA',
-    status: 'ACTIVE',
-    issued: '2023-12-05',
-    expires: '2026-12-05',
-    daysLeft: 710,
-  },
-  {
-    id: 5,
-    name: 'ldap.corp.local',
-    serial: '5f3b8a1d7c2e...',
-    type: 'Server',
-    issuer: 'Server CA',
-    status: 'EXPIRING SOON',
-    issued: '2023-09-05',
-    expires: '2024-09-05',
-    daysLeft: 15,
-  },
-  {
-    id: 6,
-    name: '*.dev.local',
-    serial: '1e4a6f9b3c5d...',
-    type: 'Server',
-    issuer: 'Dev CA',
-    status: 'ACTIVE',
-    issued: '2024-02-01',
-    expires: '2025-02-01',
-    daysLeft: 210,
-  },
-  {
-    id: 7,
-    name: 'admin@acme.com',
-    serial: '8d2c7f4a1b6e...',
-    type: 'Client',
-    issuer: 'Client CA',
-    status: 'ACTIVE',
-    issued: '2023-11-20',
-    expires: '2026-11-20',
-    daysLeft: 725,
-  },
-  {
-    id: 8,
-    name: 'netsuit.lan.pew.pet',
-    serial: '1c0f1c7e8b2d...',
-    type: 'Server',
-    issuer: 'Enterprise Root CA',
-    status: 'ACTIVE',
-    issued: '2020-03-15',
-    expires: '2030-03-15',
-    daysLeft: 2034,
-  },
-  {
-    id: 9,
-    name: 'api.internal.net',
-    serial: '2b5e0a3d1f7c...',
-    type: 'Server',
-    issuer: 'Server CA',
-    status: 'ACTIVE',
-    issued: '2024-01-25',
-    expires: '2025-01-25',
-    daysLeft: 219,
-  },
-  {
-    id: 10,
-    name: 'mobile-device-001',
-    serial: '6c1e4e8b3f8d...',
-    type: 'Client',
-    issuer: 'Mobile Device CA',
-    status: 'ACTIVE',
-    issued: '2024-03-10',
-    expires: '2027-03-10',
-    daysLeft: 1095,
-  },
-];
 
 export function CertificateList() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
+
+  const { data: certsResponse, isLoading, error } = useCertificates();
 
   const getDaysLeftBadgeClass = (days) => {
     if (days <= 7) return styles.badgeError;
@@ -141,13 +30,44 @@ export function CertificateList() {
     return styles.badgeNeutral;
   };
 
+  if (isLoading) {
+    return (
+      <div className={styles.certificateList}>
+        <PageTopBar
+          icon="ph ph-certificate"
+          title="Certificates"
+          badge={<Badge variant="neutral">Loading...</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center' }}>Loading certificates...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.certificateList}>
+        <PageTopBar
+          icon="ph ph-certificate"
+          title="Certificates"
+          badge={<Badge variant="danger">Error</Badge>}
+        />
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
+          Error loading certificates: {error.message}
+        </div>
+      </div>
+    );
+  }
+
+  const MOCK_CERTIFICATES = certsResponse?.data || [];
+  const activeCount = MOCK_CERTIFICATES.filter(cert => cert.status === 'ACTIVE').length;
+
   return (
     <div className={styles.certificateList}>
       {/* Page Header */}
       <PageTopBar
         icon="ph ph-certificate"
         title="Certificates"
-        badge={<Badge variant="success">247 Active</Badge>}
+        badge={<Badge variant="success">{activeCount} Active</Badge>}
         actions={
           <>
             <Button icon="ph ph-upload-simple">Import</Button>
