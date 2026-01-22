@@ -4,12 +4,14 @@ import { PageTopBar, PillFilter, PillFilters, FiltersBar, FilterGroup } from '..
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useCertificates, useRevokeCertificate } from '../../hooks/useCertificates';
+import { IssueCertificateModal } from '../../components/modals/IssueCertificateModal';
 import styles from './CertificateList.module.css';
 
 export function CertificateList() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name');
+  const [showIssueModal, setShowIssueModal] = useState(false);
 
   const { data: certsResponse, isLoading, error } = useCertificates();
   const { mutate: revokeCertificate } = useRevokeCertificate();
@@ -86,7 +88,13 @@ export function CertificateList() {
           <>
             <Button icon="ph ph-upload-simple">Import</Button>
             <Button icon="ph ph-download-simple">Export</Button>
-            <Button variant="primary" icon="ph ph-file-plus">Issue Certificate</Button>
+            <Button 
+              variant="primary" 
+              icon="ph ph-file-plus"
+              onClick={() => setShowIssueModal(true)}
+            >
+              Issue Certificate
+            </Button>
           </>
         }
       />
@@ -207,6 +215,12 @@ export function CertificateList() {
           </tbody>
         </table>
       </div>
+
+      {/* Issue Certificate Modal */}
+      <IssueCertificateModal 
+        isOpen={showIssueModal}
+        onClose={() => setShowIssueModal(false)}
+      />
     </div>
   );
 }

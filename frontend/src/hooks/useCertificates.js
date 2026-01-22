@@ -46,3 +46,13 @@ export const useRenewCertificate = () => {
     },
   });
 };
+
+export const useIssueCertificate = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: certificatesApi.issue,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: certificatesKeys.all });
+    },
+  });
+};
