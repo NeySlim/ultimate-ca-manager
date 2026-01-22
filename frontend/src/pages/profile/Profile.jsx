@@ -232,7 +232,18 @@ export function Profile() {
                   </div>
                   <div className={styles.certActions}>
                     <Button variant="default" size="sm" icon="ph ph-eye">View</Button>
-                    <Button variant="default" size="sm" icon="ph ph-download-simple">Download</Button>
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      icon="ph ph-download-simple"
+                      onClick={() => {
+                        // Download session certificate
+                        window.open('/api/v2/account/certificates/admin', '_blank');
+                        toast.success('Certificate download started');
+                      }}
+                    >
+                      Download
+                    </Button>
                     <Button variant="default" size="sm" icon="ph ph-trash">Revoke</Button>
                   </div>
                 </div>

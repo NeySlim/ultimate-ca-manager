@@ -3,6 +3,8 @@ import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { CreateTemplateModal } from '../../components/modals/CreateTemplateModal';
+import { exportTableData } from '../../utils/export';
+import toast from 'react-hot-toast';
 import styles from './TemplateList.module.css';
 
 // Mock Templates Data
@@ -85,6 +87,18 @@ export function TemplateList() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  const handleExport = () => {
+    if (MOCK_TEMPLATES.length === 0) {
+      toast.error('No templates to export');
+      return;
+    }
+    exportTableData(MOCK_TEMPLATES, 'templates-export', {
+      format: 'csv',
+      columns: ['id', 'name', 'keyUsage', 'validity', 'subjectPattern', 'usedBy', 'status']
+    });
+    toast.success('Templates exported successfully');
+  };
+
   return (
     <div className={styles.templateList}>
       {/* Page Header */}
@@ -94,7 +108,7 @@ export function TemplateList() {
         badge={<Badge variant="success">{MOCK_TEMPLATES.length} Templates</Badge>}
         actions={
           <>
-            <Button icon="ph ph-download-simple">Export</Button>
+            <Button icon="ph ph-download-simple" onClick={handleExport}>Export</Button>
             <Button variant="primary" icon="ph ph-plus" onClick={() => setShowCreateModal(true)}>New Template</Button>
           </>
         }
