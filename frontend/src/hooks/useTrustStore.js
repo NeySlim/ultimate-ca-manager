@@ -1,7 +1,7 @@
 /**
  * TrustStore React Query Hooks
  */
-import { useQuery, useMutation, useQueryClient } from '@tantml:parameter>:react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { truststoreApi } from '../services/api/truststoreApi';
 import toast from 'react-hot-toast';
 
