@@ -94,4 +94,12 @@ export const certificatesApi = {
     });
     return response;
   },
+
+  /**
+   * Issue certificate
+   */
+  issue: async (data) => {
+    const response = await api.post('/api/v2/certificates', data);
+    return response.data;
+  },
 };
