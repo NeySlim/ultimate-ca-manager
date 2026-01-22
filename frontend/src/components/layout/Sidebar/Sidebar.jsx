@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   House,
   ShieldCheck,
@@ -13,7 +13,9 @@ import {
   Users,
   ClockClockwise,
   Gear,
-  CaretDown
+  CaretDown,
+  User,
+  SignOut
 } from '@phosphor-icons/react';
 
 const SidebarItem = ({ to, icon: Icon, label, end }) => (
@@ -33,6 +35,17 @@ const SidebarItem = ({ to, icon: Icon, label, end }) => (
 
 const Sidebar = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // Clear session and redirect to login
+    fetch('/api/v2/auth/logout', { 
+      method: 'POST',
+      credentials: 'include' 
+    }).then(() => {
+      window.location.href = '/login';
+    });
+  };
 
   return (
     <div className="sidebar">
@@ -89,8 +102,42 @@ const Sidebar = () => {
             <div className="user-name">admin</div>
             <div className="user-role">Administrator</div>
           </div>
-          <CaretDown size={12} style={{ color: 'var(--text-muted)' }} />
+          <CaretDown 
+            size={12} 
+            style={{ 
+              color: 'var(--text-muted)',
+              transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s'
+            }} 
+          />
         </div>
+
+        {/* User Dropdown Menu */}
+        {showUserMenu && (
+          <div className="user-menu">
+            <button 
+              className="user-menu-item"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/profile');
+                setShowUserMenu(false);
+              }}
+            >
+              <User size={16} />
+              <span>Profile</span>
+            </button>
+            <button 
+              className="user-menu-item"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLogout();
+              }}
+            >
+              <SignOut size={16} />
+              <span>Logout</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
