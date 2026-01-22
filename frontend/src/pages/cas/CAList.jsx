@@ -3,7 +3,7 @@ import { getBadgeVariant } from '../../utils/getBadgeVariant';
 import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { useCAs, useDeleteCA } from '../../hooks/useCAs';
+import { useCAsTree, useDeleteCA } from '../../hooks/useCAs';
 import { CreateCAModal } from '../../components/modals/CreateCAModal';
 import { ImportCAModal } from '../../components/modals/ImportCAModal';
 import { exportTableData } from '../../utils/export';
@@ -19,7 +19,7 @@ export function CAList() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
 
-  const { data: casResponse, isLoading, error } = useCAs();
+  const { data: treeData, isLoading, error } = useCAsTree();
   const deleteCA = useDeleteCA();
 
   const handleDelete = (ca) => {
@@ -42,12 +42,12 @@ export function CAList() {
   };
 
   const handleExport = () => {
-    const cas = casResponse?.data || [];
-    if (cas.length === 0) {
+    const allCAs = [...rootCAs, ...orphanedCAs];
+    if (allCAs.length === 0) {
       toast.error('No data to export');
       return;
     }
-    exportTableData(cas, 'cas-export', {
+    exportTableData(allCAs, 'cas-export', {
       format: 'csv',
       columns: ['id', 'name', 'type', 'status', 'issued', 'expires', 'certs']
     });
@@ -86,10 +86,10 @@ export function CAList() {
     );
   }
 
-  const MOCK_CAS = casResponse?.data || [];
-  const ORPHANED_CAS = [];
+  const rootCAs = treeData?.roots || [];
+  const orphanedCAs = treeData?.orphans || [];
 
-  const activeCount = MOCK_CAS.filter(ca => ca.status === 'ACTIVE').length;
+  const activeCount = [...rootCAs, ...orphanedCAs].filter(ca => ca.status === 'Active').length;
 
   return (
     <div className={styles.caList}>
@@ -178,20 +178,22 @@ export function CAList() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_CAS.map((ca) => (
+            {rootCAs.map((ca) => (
               <>
                 {/* Root CA Row */}
                 <tr key={ca.id}>
                   <td>
                     <div className={styles.caNameCell}>
-                      <button
-                        className={`${styles.caExpandBtn} ${
-                          ca.children ? '' : styles.noChildren
-                        } ${expandedCAs.has(ca.id) ? '' : styles.collapsed}`}
-                        onClick={() => ca.children && toggleCA(ca.id)}
-                      >
-                        <i className="ph ph-caret-down"></i>
-                      </button>
+                      {ca.children && ca.children.length > 0 ? (
+                        <button
+                          className={`${styles.caExpandBtn} ${expandedCAs.has(ca.id) ? '' : styles.collapsed}`}
+                          onClick={() => toggleCA(ca.id)}
+                        >
+                          <i className="ph ph-caret-down"></i>
+                        </button>
+                      ) : (
+                        <span className={styles.caExpandSpacer}></span>
+                      )}
                       <i className={`ph ph-bank ${styles.caIcon} ${styles.root}`}></i>
                       <span>{ca.name}</span>
                     </div>
@@ -268,7 +270,7 @@ export function CAList() {
       </div>
 
       {/* Orphaned Section */}
-      {ORPHANED_CAS.length > 0 && (
+      {orphanedCAs.length > 0 && (
         <div className={styles.orphanedSection}>
           <div className={styles.orphanedHeader}>
             <i className="ph ph-warning"></i>
@@ -288,7 +290,7 @@ export function CAList() {
                 </tr>
               </thead>
               <tbody>
-                {ORPHANED_CAS.map((ca) => (
+                {orphanedCAs.map((ca) => (
                   <tr key={ca.id}>
                     <td>
                       <div className={styles.caNameCell}>

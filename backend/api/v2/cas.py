@@ -67,7 +67,11 @@ def list_cas():
 @require_auth(['read:cas'])
 def list_cas_tree():
     """
-    Get CA hierarchy
+    Get CA hierarchy with orphans separated
+    Returns: {
+        "roots": [...],
+        "orphans": [...]
+    }
     """
     all_cas = CAService.list_cas()
     
@@ -85,6 +89,7 @@ def list_cas_tree():
         ca['expiry'] = ca['valid_to'].split('T')[0] if ca['valid_to'] else 'N/A'
 
     roots = []
+    orphans = []
     
     # First pass: Link by explicit parent reference (caref)
     processed_ids = set()
@@ -108,6 +113,7 @@ def list_cas_tree():
         # If it's explicitly marked as root, add to roots
         if ca.is_root:
             roots.append(ca_dict)
+            processed_ids.add(ca.refid)
             continue
             
         # Try to find parent by matching Issuer DN with Subject DN of other CAs
@@ -118,37 +124,43 @@ def list_cas_tree():
                     continue
                     
                 # Loose matching on Subject string
-                # TODO: Parse DN properly for robust matching
                 if potential_parent.subject == ca.issuer:
                     ca_map[potential_parent.refid]['children'].append(ca_dict)
                     parent_found = True
+                    processed_ids.add(ca.refid)
                     # Update type if it was mislabeled
                     if ca_dict['type'] == 'Root CA':
                          ca_dict['type'] = 'Intermediate'
                          
                     # AUTO-FIX: Persist the relationship if missing
-                    # We do this asynchronously/implicitly by updating the DB model
-                    # But since we are inside a read-only view function, we should ideally trigger a task
-                    # For now, we will attempt a direct update if safe (GET requests shouldn't write, but this is a repair)
                     try:
                         ca_obj = CAService.get_ca_by_refid(ca.refid)
                         if ca_obj and not ca_obj.caref:
                             ca_obj.caref = potential_parent.refid
-                            # If it was marked as root but has a parent, unmark root
                             if ca_obj.is_root:
                                 ca_obj.is_root = False
                             from models import db
                             db.session.commit()
-                    except Exception as e:
-                        # Log error but don't fail the request
+                    except Exception:
                         pass
                         
                     break
         
         if not parent_found:
-            roots.append(ca_dict)
+            # This is an orphan: intermediate CA without parent in database
+            if ca.subject == ca.issuer:
+                # Self-signed but not marked as root
+                roots.append(ca_dict)
+                ca_dict['type'] = 'Root CA'
+            else:
+                # Intermediate without parent = orphan
+                orphans.append(ca_dict)
+                ca_dict['type'] = 'Intermediate (Orphaned)'
             
-    return success_response(data=roots)
+    return success_response(data={
+        'roots': roots,
+        'orphans': orphans
+    })
 
 
 @bp.route('/api/v2/cas', methods=['POST'])

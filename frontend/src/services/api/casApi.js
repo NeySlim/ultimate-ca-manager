@@ -40,6 +40,15 @@ export const casApi = {
   },
 
   /**
+   * Get CA hierarchy tree
+   * Backend returns: { data: { roots: [...], orphans: [...] } }
+   */
+  getTree: async () => {
+    const response = await api.get('/api/v2/cas/tree');
+    return response.data; // Returns { roots, orphans }
+  },
+
+  /**
    * Get single CA by ID
    */
   getById: async (id) => {
