@@ -1,141 +1,31 @@
-/* Dashboard Page Styles - Grid Layout System */
-
-.dashboardContainer {
-  position: relative;
-}
-
-.editMode {
-  padding-top: 48px; /* Space for edit banner */
-}
-
-.editModeBanner {
-  position: fixed;
-  top: 60px; /* Below topbar */
-  left: 240px; /* After sidebar */
-  right: 0;
-  height: 48px;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--spacing-lg);
-  z-index: 1000;
-  font-size: 13px;
-  font-weight: 500;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
+/* Dashboard Page Styles - 12-column grid layout like prototype */
 
 .dashboard {
-  min-height: 100vh;
-  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--spacing-sm);
 }
 
-/* Widget base styles */
+/* Widget spans - match prototype data-cols attribute */
 .widget {
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius);
-  transition: all 0.15s;
-  overflow: auto;
-  position: relative;
-}
-
-.widgetCard {
-  padding: 0; /* StatCard has its own padding */
-}
-
-.widgetPanel {
   padding: var(--spacing-lg);
+  transition: all 0.15s;
   min-height: 140px;
 }
 
-.widgetTable {
-  padding: 0;
+.widgetSpan3 {
+  grid-column: span 3;
 }
 
-/* Drag handle for edit mode */
-.drag-handle {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 24px;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--accent-primary) 0,
-    var(--accent-primary) 10px,
-    var(--accent-secondary) 10px,
-    var(--accent-secondary) 20px
-  );
-  cursor: grab;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 11px;
-  font-weight: 600;
-  z-index: 10;
-  opacity: 0;
-  transition: opacity 0.2s;
+.widgetSpan6 {
+  grid-column: span 6;
 }
 
-.editMode .drag-handle {
-  opacity: 1;
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-/* Edit mode widget borders */
-.editMode .widget {
-  border: 2px dashed var(--accent-primary);
-  box-shadow: 0 0 0 4px rgba(var(--accent-primary-rgb), 0.1);
-}
-
-.editMode .widget:hover {
-  border-color: var(--accent-secondary);
-  box-shadow: 0 0 0 4px rgba(var(--accent-secondary-rgb), 0.2);
-}
-
-/* React Grid Layout overrides */
-.react-grid-item {
-  transition: all 200ms ease;
-  transition-property: left, top, width, height;
-}
-
-.react-grid-item.resizing {
-  z-index: 100;
-  transition: none;
-}
-
-.react-grid-item.react-draggable-dragging {
-  transition: none;
-  z-index: 100;
-  opacity: 0.8;
-}
-
-.react-grid-item > .react-resizable-handle {
-  display: none; /* Hide default resize handles */
-}
-
-.editMode .react-grid-item > .react-resizable-handle {
-  display: block;
-  background: var(--accent-primary);
-  opacity: 0.6;
-}
-
-.editMode .react-grid-item > .react-resizable-handle:hover {
-  opacity: 1;
-}
-
-.react-grid-placeholder {
-  background: var(--accent-primary);
-  opacity: 0.2;
-  transition-duration: 100ms;
-  z-index: 2;
-  border-radius: var(--radius);
+.widgetSpan12 {
+  grid-column: span 12;
 }
 
 /* System Overview Section */
