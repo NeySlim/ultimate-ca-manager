@@ -17,6 +17,9 @@ from api.v2.system import bp as system_bp
 from api.v2.dashboard import bp as dashboard_bp
 from api.v2.crl import bp as crl_bp
 from api.v2.csrs import bp as csrs_bp
+from api.v2.users import bp as users_bp
+from api.v2.templates import bp as templates_bp
+from api.v2.truststore import bp as truststore_bp
 
 # List of all blueprints to register
 API_V2_BLUEPRINTS = [
@@ -30,7 +33,10 @@ API_V2_BLUEPRINTS = [
     settings_bp,
     system_bp,
     dashboard_bp,
-    crl_bp
+    crl_bp,
+    users_bp,
+    templates_bp,
+    truststore_bp
 ]
 
 
