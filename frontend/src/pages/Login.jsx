@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Input, PasswordInput } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { authApi } from '../services/api/authApi';
+import toast from 'react-hot-toast';
 import styles from './Login.module.css';
 
 /**
@@ -13,17 +15,23 @@ export function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     
-    // Simulate login (TODO: Replace with real API call)
-    setTimeout(() => {
-      setLoading(false);
-      // For now, just redirect to dashboard
+    try {
+      await authApi.login(username, password);
+      toast.success('Login successful');
       navigate('/dashboard');
-    }, 500);
+    } catch (err) {
+      setError(err.message || 'Invalid credentials');
+      toast.error(err.message || 'Invalid credentials');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,6 +72,12 @@ export function Login() {
             autoComplete="current-password"
             required
           />
+
+          {error && (
+            <div className={styles.errorMessage}>
+              {error}
+            </div>
+          )}
 
           <div className={styles.loginOptions}>
             <label className={styles.checkbox}>
