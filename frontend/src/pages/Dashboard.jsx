@@ -40,10 +40,13 @@ export function Dashboard() {
   const { data: activity, isLoading: activityLoading } = useDashboardActivity(20);
   const { data: expiringCerts, isLoading: expiringLoading } = useDashboardExpiringCerts(10);
 
-  // Save layout when it changes
-  const handleLayoutChange = (newLayout) => {
-    setLayout(newLayout);
-    saveLayout(newLayout);
+  // Save layout when it changes (only for 'lg' breakpoint)
+  const handleLayoutChange = (currentLayout, allLayouts) => {
+    // Save the lg layout to localStorage
+    if (allLayouts.lg) {
+      setLayout(allLayouts.lg);
+      saveLayout(allLayouts.lg);
+    }
   };
 
   // Reset to default layout
