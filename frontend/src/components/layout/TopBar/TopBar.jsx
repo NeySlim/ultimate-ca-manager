@@ -9,7 +9,6 @@ import {
   CaretDown
 } from '@phosphor-icons/react';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { useDashboardLayout } from '../../../contexts/DashboardLayoutContext';
 import './TopBar.css';
 
 const THEMES = [
@@ -88,15 +87,11 @@ const getPageTitle = (pathname) => {
 
 const TopBar = () => {
   const { colorScheme, setColorScheme } = useTheme();
-  const { isEditMode, toggleEditMode } = useDashboardLayout();
   const location = useLocation();
 
   const toggleColorScheme = () => {
     setColorScheme(colorScheme === 'dark' ? 'light' : 'dark');
   };
-
-  // Only show Edit Layout button on Dashboard
-  const isDashboard = location.pathname === '/' || location.pathname === '/dashboard';
 
   return (
     <div className="topbar">
@@ -112,17 +107,6 @@ const TopBar = () => {
         <button className="btn" onClick={toggleColorScheme} title="Toggle dark/light mode">
           {colorScheme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
         </button>
-
-        {isDashboard && (
-          <button 
-            className={`btn ${isEditMode ? 'btn-active' : ''}`} 
-            onClick={toggleEditMode} 
-            title="Edit dashboard layout"
-          >
-            <PencilSimple size={16} />
-            {isEditMode ? 'Done Editing' : 'Edit Layout'}
-          </button>
-        )}
 
         <button className="btn">
           <DownloadSimple size={16} />
