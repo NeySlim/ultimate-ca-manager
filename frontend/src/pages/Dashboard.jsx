@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Responsive, WidthProvider } from 'react-grid-layout';
+import GridLayout from 'react-grid-layout';
+import { WidthProvider } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 
-const ResponsiveGridLayout = WidthProvider(Responsive);
+const ResponsiveGridLayout = WidthProvider(GridLayout);
 import { StatCard } from '../components/domain/StatCard';
 import { ActivityFeed } from '../components/domain/ActivityFeed';
 import { DataTable } from '../components/domain/DataTable';
@@ -40,13 +41,10 @@ export function Dashboard() {
   const { data: activity, isLoading: activityLoading } = useDashboardActivity(20);
   const { data: expiringCerts, isLoading: expiringLoading } = useDashboardExpiringCerts(10);
 
-  // Save layout when it changes (only for 'lg' breakpoint)
-  const handleLayoutChange = (currentLayout, allLayouts) => {
-    // Save the lg layout to localStorage
-    if (allLayouts.lg) {
-      setLayout(allLayouts.lg);
-      saveLayout(allLayouts.lg);
-    }
+  // Save layout when it changes
+  const handleLayoutChange = (newLayout) => {
+    setLayout(newLayout);
+    saveLayout(newLayout);
   };
 
   // Reset to default layout
@@ -148,9 +146,8 @@ export function Dashboard() {
       
       <ResponsiveGridLayout
         className={styles.dashboard}
-        layouts={{ lg: layout }}
-        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-        cols={{ lg: 24, md: 24, sm: 12, xs: 8, xxs: 4 }}
+        layout={layout}
+        cols={24}
         rowHeight={30}
         isDraggable={isEditMode}
         isResizable={isEditMode}
@@ -159,7 +156,6 @@ export function Dashboard() {
         onLayoutChange={handleLayoutChange}
         draggableHandle=".drag-handle"
         margin={[8, 8]}
-        containerPadding={[0, 0]}
       >
         {/* 1. Stats - 4 widgets */}
         <div key="stat-active" className={`${styles.widget} ${styles.widgetCard}`}>
