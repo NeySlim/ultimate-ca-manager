@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import GridLayout from 'react-grid-layout';
+import { Responsive, WidthProvider } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
 import { StatCard } from '../components/domain/StatCard';
 import { ActivityFeed } from '../components/domain/ActivityFeed';
 import { DataTable } from '../components/domain/DataTable';
@@ -141,12 +143,12 @@ export function Dashboard() {
         </div>
       )}
       
-      <GridLayout
+      <ResponsiveGridLayout
         className={styles.dashboard}
-        layout={layout}
-        cols={24}
+        layouts={{ lg: layout }}
+        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+        cols={{ lg: 24, md: 24, sm: 12, xs: 8, xxs: 4 }}
         rowHeight={30}
-        width={1200}
         isDraggable={isEditMode}
         isResizable={isEditMode}
         compactType="vertical"
@@ -154,6 +156,7 @@ export function Dashboard() {
         onLayoutChange={handleLayoutChange}
         draggableHandle=".drag-handle"
         margin={[8, 8]}
+        containerPadding={[0, 0]}
       >
         {/* 1. Stats - 4 widgets */}
         <div key="stat-active" className={`${styles.widget} ${styles.widgetCard}`}>
@@ -275,7 +278,7 @@ export function Dashboard() {
           </div>
           <ActivityFeed items={activityData} />
         </div>
-      </GridLayout>
+      </ResponsiveGridLayout>
     </div>
   );
 }
