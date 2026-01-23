@@ -1,5 +1,6 @@
 import { classNames } from '../../utils/classNames';
 import { Icon } from '../ui/Icon';
+import { AnimatedCounter } from '../ui/AnimatedCounter';
 import styles from './StatCard.module.css';
 
 /**
@@ -45,7 +46,10 @@ export function StatCard({
             gradient && !variant && styles.gradient,
             variant && styles[variant]
           )}>
-            {value}
+            <AnimatedCounter 
+              value={parseInt(value) || 0} 
+              duration={1200}
+            />
           </div>
           {sublabel && (
             <div className={styles.widgetSublabel}>{sublabel}</div>
