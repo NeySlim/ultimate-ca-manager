@@ -53,6 +53,18 @@
   margin-top: -0.75rem;
 }
 
+.caSelectedInfo {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+}
+
 .directoryUrlsCard {
   background: var(--surface-secondary);
   border: 1px solid var(--border-primary);
