@@ -70,10 +70,47 @@ export const dashboardApi = {
 
   /**
    * Get expiring certificates (requires auth)
-   * Backend returns: { data: [] }
+   * Backend returns: { data: [{ id, subject, valid_to, descr, refid }] }
+   * Frontend needs: [{ name, type, issuer, expiresIn, daysLeft, fingerprint }]
    */
   getExpiringCerts: async (limit = 10) => {
     const response = await api.get(`/api/v2/dashboard/expiring-certs?limit=${limit}`);
-    return response.data || [];
+    const certs = response.data || [];
+    
+    // Transform backend format to frontend format
+    return certs.map(cert => {
+      const validTo = new Date(cert.valid_to);
+      const now = new Date();
+      const daysLeft = Math.ceil((validTo - now) / (1000 * 60 * 60 * 24));
+      
+      // Extract CN from subject
+      const cnMatch = cert.subject.match(/CN=([^,]+)/);
+      const name = cnMatch ? cnMatch[1] : cert.descr || 'Unknown';
+      
+      // Determine type based on subject or description
+      let type = 'Server';
+      if (cert.descr && cert.descr.toLowerCase().includes('acme')) {
+        type = 'ACME';
+      } else if (cert.subject.includes('CN=Users')) {
+        type = 'User';
+      } else if (cert.descr && cert.descr.toLowerCase().includes('ca')) {
+        type = 'CA';
+      }
+      
+      // Extract issuer (simplified)
+      const issuerMatch = cert.subject.match(/O=([^,]+)/);
+      const issuer = issuerMatch ? issuerMatch[1] : 'Self-signed';
+      
+      return {
+        id: cert.id,
+        name: name,
+        type: type,
+        issuer: issuer,
+        expiresIn: daysLeft > 0 ? `${daysLeft} days` : 'Expired',
+        daysLeft: daysLeft,
+        fingerprint: cert.refid || '',
+        validTo: cert.valid_to,
+      };
+    });
   },
 };

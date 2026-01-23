@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router';
+import { Routes, Route, Navigate } from 'react-router';
 import { AppLayout } from '../components/layout/AppLayout';
-import { ProtectedRoute } from '../components/ProtectedRoute';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Lazy load pages for code splitting
@@ -20,6 +19,8 @@ const TrustStore = lazy(() => import('../pages/truststore/TrustStore'));
 const UserList = lazy(() => import('../pages/users/UserList'));
 const Settings = lazy(() => import('../pages/settings/Settings'));
 const Profile = lazy(() => import('../pages/profile/Profile'));
+
+
 
 // Loading fallback component
 function PageLoader() {
@@ -48,83 +49,29 @@ function LazyPage({ children }) {
   );
 }
 
-const router = createBrowserRouter([
-  {
-    path: '/login',
-    element: <LazyPage><Login /></LazyPage>,
-    errorElement: <ErrorBoundary />,
-  },
-  {
-    path: '/',
-    element: <ProtectedRoute><AppLayout /></ProtectedRoute>,
-    errorElement: <ErrorBoundary />,
-    children: [
-      {
-        index: true,
-        element: <Navigate to="/dashboard" replace />,
-      },
-      {
-        path: 'dashboard',
-        element: <LazyPage><Dashboard /></LazyPage>,
-      },
-      {
-        path: 'activity',
-        element: <LazyPage><ActivityLog /></LazyPage>,
-      },
-      {
-        path: 'cas',
-        element: <LazyPage><CAList /></LazyPage>,
-      },
-      {
-        path: 'certificates',
-        element: <LazyPage><CertificateList /></LazyPage>,
-      },
-      {
-        path: 'csrs',
-        element: <LazyPage><CSRList /></LazyPage>,
-      },
-      {
-        path: 'templates',
-        element: <LazyPage><TemplateList /></LazyPage>,
-      },
-      {
-        path: 'crl',
-        element: <LazyPage><CRLManagement /></LazyPage>,
-      },
-      {
-        path: 'acme',
-        element: <LazyPage><ACMEDashboard /></LazyPage>,
-      },
-      {
-        path: 'scep',
-        element: <LazyPage><SCEPDashboard /></LazyPage>,
-      },
-      {
-        path: 'import',
-        element: <LazyPage><ImportPage /></LazyPage>,
-      },
-      {
-        path: 'truststore',
-        element: <LazyPage><TrustStore /></LazyPage>,
-      },
-      {
-        path: 'users',
-        element: <LazyPage><UserList /></LazyPage>,
-      },
-      {
-        path: 'settings',
-        element: <LazyPage><Settings /></LazyPage>,
-      },
-      {
-        path: 'profile',
-        element: <LazyPage><Profile /></LazyPage>,
-      },
-    ],
-  },
-]);
-
 export function AppRoutes() {
-  return <RouterProvider router={router} />;
+  return (
+    <Routes>
+      <Route path="/login" element={<LazyPage><Login /></LazyPage>} />
+      <Route path="/" element={<AppLayout />}>
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<LazyPage><Dashboard /></LazyPage>} />
+        <Route path="activity" element={<LazyPage><ActivityLog /></LazyPage>} />
+        <Route path="cas" element={<LazyPage><CAList /></LazyPage>} />
+        <Route path="certificates" element={<LazyPage><CertificateList /></LazyPage>} />
+        <Route path="csrs" element={<LazyPage><CSRList /></LazyPage>} />
+        <Route path="templates" element={<LazyPage><TemplateList /></LazyPage>} />
+        <Route path="crl" element={<LazyPage><CRLManagement /></LazyPage>} />
+        <Route path="acme" element={<LazyPage><ACMEDashboard /></LazyPage>} />
+        <Route path="scep" element={<LazyPage><SCEPDashboard /></LazyPage>} />
+        <Route path="import" element={<LazyPage><ImportPage /></LazyPage>} />
+        <Route path="truststore" element={<LazyPage><TrustStore /></LazyPage>} />
+        <Route path="users" element={<LazyPage><UserList /></LazyPage>} />
+        <Route path="settings" element={<LazyPage><Settings /></LazyPage>} />
+        <Route path="profile" element={<LazyPage><Profile /></LazyPage>} />
+      </Route>
+    </Routes>
+  );
 }
 
 export default AppRoutes;

@@ -1,17 +1,19 @@
 import React from 'react';
+import { BrowserRouter } from 'react-router';
 import { AppRoutes } from './routes';
+import { AuthProvider } from './contexts/AuthContext';
 
 /**
- * Main App Component
- * 
- * Phase 2: Layout & Navigation complete
- * - AppLayout with Sidebar + Topbar
- * - 14 placeholder pages
- * - React Router configured
- * - Theme system active (12 configurations)
+ * Main App Component with Auth Protection
  */
 function App() {
-  return <AppRoutes />;
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
 
 export default App;

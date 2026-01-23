@@ -12,6 +12,7 @@ import styles from './AppLayout.module.css';
  *   - Topbar (60px height)
  *   - Page content (scrollable)
  * 
+ * Auth is handled by router loader (no flash)
  * Design reference: prototype-dashboard.html
  */
 export function AppLayout() {
