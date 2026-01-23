@@ -51,3 +51,6 @@ export { default as Widget } from './Layout/Widget';
 // State components
 export { default as LoadingState } from './LoadingState';
 export { default as ErrorState } from './ErrorState';
+
+// Skeleton loaders
+export { Skeleton, SkeletonCard, SkeletonTable, SkeletonDashboard } from './Skeleton';
