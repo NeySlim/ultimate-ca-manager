@@ -26,12 +26,6 @@
   border-color: var(--status-success);
 }
 
-.badge-success:hover {
-  background: var(--status-success);
-  color: #1a1a1a;
-  box-shadow: 0 2px 6px rgba(129, 199, 132, 0.25);
-  transform: translateY(-1px);
-}
 
 /* Warning - Expiring, Pending, Attention */
 .badge-warning {
@@ -40,12 +34,6 @@
   border-color: var(--status-warning);
 }
 
-.badge-warning:hover {
-  background: var(--status-warning);
-  color: #1a1a1a;
-  box-shadow: 0 2px 6px rgba(255, 183, 77, 0.25);
-  transform: translateY(-1px);
-}
 
 /* Danger - Expired, Revoked, Rejected */
 .badge-danger {
@@ -54,12 +42,6 @@
   border-color: var(--status-danger);
 }
 
-.badge-danger:hover {
-  background: var(--status-danger);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(229, 115, 115, 0.25);
-  transform: translateY(-1px);
-}
 
 /* Info - Information, Neutral */
 .badge-info {
@@ -68,12 +50,6 @@
   border-color: var(--status-info);
 }
 
-.badge-info:hover {
-  background: var(--status-info);
-  color: #1a1a1a;
-  box-shadow: 0 2px 6px rgba(100, 181, 246, 0.25);
-  transform: translateY(-1px);
-}
 
 /* Secondary - Default, Inactive */
 .badge-secondary {
@@ -82,11 +58,6 @@
   border-color: var(--border-secondary);
 }
 
-.badge-secondary:hover {
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-  box-shadow: 0 0 6px rgba(90, 143, 199, 0.15);
-}
 
 /* Neutral - alternative name */
 .badge-neutral {
@@ -95,11 +66,6 @@
   border-color: var(--border-secondary);
 }
 
-.badge-neutral:hover {
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-  box-shadow: 0 0 6px rgba(90, 143, 199, 0.15);
-}
 
 /* ==========================================
    SIZES
