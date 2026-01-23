@@ -846,3 +846,25 @@ input:focus, select:focus, textarea:focus {
 .user-menu-item:hover svg {
   color: var(--accent-primary);
 }
+
+  /* ==========================================
+     ELEVATION SYSTEM (Material Design inspired)
+     ========================================== */
+  
+  --elevation-0: none;
+  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+  --elevation-2: 0 3px 6px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.10);
+  --elevation-3: 0 6px 12px rgba(0, 0, 0, 0.18), 0 4px 8px rgba(0, 0, 0, 0.12);
+  --elevation-4: 0 12px 24px rgba(0, 0, 0, 0.22), 0 8px 16px rgba(0, 0, 0, 0.15);
+  
+  /* Colored shadows for status */
+  --shadow-success: 0 4px 12px rgba(129, 199, 132, 0.25);
+  --shadow-warning: 0 4px 12px rgba(255, 183, 77, 0.25);
+  --shadow-danger: 0 4px 12px rgba(229, 115, 115, 0.25);
+  --shadow-info: 0 4px 12px rgba(100, 181, 246, 0.25);
+  --shadow-primary: 0 4px 12px rgba(90, 143, 199, 0.25);
+  
+  /* Glassmorphism */
+  --glass-bg: rgba(30, 30, 30, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-blur: blur(10px);
