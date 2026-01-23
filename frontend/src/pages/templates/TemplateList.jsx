@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import ErrorState from '../../components/ui/ErrorState';
 import { CreateTemplateModal } from '../../components/modals/CreateTemplateModal';
 import { EditTemplateModal } from '../../components/modals/EditTemplateModal';
 import { useTemplates, useDeleteTemplate } from '../../hooks/useTemplates';
@@ -85,13 +88,26 @@ export function TemplateList() {
     setShowEditModal(true);
   };
 
+  if (isLoading) {
+    return (
+      <div className={styles.templateList}>
+        <PageTopBar
+          icon="ph ph-file-text"
+          title="Certificate Templates"
+          badge={<Badge variant="neutral">Loading...</Badge>}
+        />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} width="100%" height={70} style={{ marginBottom: '10px' }} />
+        ))}
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className={styles.templateList}>
         <PageTopBar icon="ph ph-file-text" title="Certificate Templates" badge={<Badge variant="danger">Error</Badge>} />
-        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
-          Error loading templates: {error.message}
-        </div>
+        <ErrorState error={error} shake />
       </div>
     );
   }
@@ -125,29 +141,34 @@ export function TemplateList() {
 
       {/* Templates Table */}
       <div className={styles.tableContainer}>
-        <table>
-          <thead>
-            <tr>
-              <th style={{ width: '15%' }}>TEMPLATE NAME</th>
-              <th style={{ width: '25%' }}>KEY USAGE</th>
-              <th style={{ width: '10%' }}>VALIDITY</th>
-              <th style={{ width: '20%' }}>SUBJECT PATTERN</th>
-              <th style={{ width: '12%' }}>USED BY</th>
-              <th style={{ width: '10%' }}>STATUS</th>
-              <th style={{ width: '8%' }}>ACTIONS</th>
-            </tr>
-          </thead>
-          <tbody>
+        {templates.length === 0 ? (
+          <EmptyState
+            icon="ph ph-file-text"
+            title="No Certificate Templates"
+            message="Create reusable templates to standardize certificate issuance"
+            action={{
+              label: "New Template",
+              onClick: () => setShowCreateModal(true)
+            }}
+          />
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: '15%' }}>TEMPLATE NAME</th>
+                <th style={{ width: '25%' }}>KEY USAGE</th>
+                <th style={{ width: '10%' }}>VALIDITY</th>
+                <th style={{ width: '20%' }}>SUBJECT PATTERN</th>
+                <th style={{ width: '12%' }}>USED BY</th>
+                <th style={{ width: '10%' }}>STATUS</th>
+                <th style={{ width: '8%' }}>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
             {isLoading ? (
               <tr>
                 <td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>
                   Loading templates...
-                </td>
-              </tr>
-            ) : templates.length === 0 ? (
-              <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>
-                  No templates found
                 </td>
               </tr>
             ) : (
@@ -193,6 +214,7 @@ export function TemplateList() {
             )}
           </tbody>
         </table>
+        )}
       </div>
       
       <CreateTemplateModal 

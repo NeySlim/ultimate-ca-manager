@@ -2,6 +2,9 @@ import { useState, useMemo } from 'react';
 import { DataTable } from '../../components/domain/DataTable';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import ErrorState from '../../components/ui/ErrorState';
 import { PageTopBar, PillFilter, PillFilters } from '../../components/common';
 import { exportTableData } from '../../utils/export';
 import { CreateUserModal } from '../../components/modals/CreateUserModal';
@@ -134,10 +137,26 @@ export function UserList() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className={styles.userList}>
+        <PageTopBar
+          icon="ph ph-users"
+          title="Users"
+          badge={<Badge variant="neutral">Loading...</Badge>}
+        />
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} width="100%" height={60} style={{ marginBottom: '8px' }} />
+        ))}
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className={styles.userList}>
         <PageTopBar icon="ph ph-users" title="Users" badge={<Badge variant="danger">Error</Badge>} />
+        <ErrorState error={error} shake />
         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
           Error loading users: {error.message}
         </div>
@@ -335,13 +354,27 @@ export function UserList() {
       </div>
 
       <div className={styles.tableContainer}>
-        <DataTable
-          columns={columns}
-          data={filteredUsers}
-          loading={isLoading}
-          onRowClick={(row) => console.log('User clicked:', row)}
-          pageSize={10}
-        />
+        {filteredUsers.length === 0 ? (
+          <EmptyState
+            icon="ph ph-users"
+            title="No users found"
+            message={roleFilter !== 'All' || statusFilter !== 'All' 
+              ? "Try adjusting your filters to see more results" 
+              : "Get started by creating your first user account"}
+            action={roleFilter === 'All' && statusFilter === 'All' ? {
+              label: "Create User",
+              onClick: () => setShowCreateModal(true)
+            } : undefined}
+          />
+        ) : (
+          <DataTable
+            columns={columns}
+            data={filteredUsers}
+            loading={isLoading}
+            onRowClick={(row) => console.log('User clicked:', row)}
+            pageSize={10}
+          />
+        )}
       </div>
       
       <CreateUserModal 

@@ -3,6 +3,9 @@ import { getBadgeVariant } from '../../utils/getBadgeVariant';
 import { PageTopBar } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import ErrorState from '../../components/ui/ErrorState';
 import { useCAsTree, useDeleteCA } from '../../hooks/useCAs';
 import { CreateCAModal } from '../../components/modals/CreateCAModal';
 import { ImportCAModal } from '../../components/modals/ImportCAModal';
@@ -66,7 +69,9 @@ export function CAList() {
           title="Certificate Authorities"
           badge={<Badge variant="neutral">Loading...</Badge>}
         />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>Loading CAs...</div>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} width="100%" height={80} style={{ marginBottom: '12px' }} />
+        ))}
       </div>
     );
   }
@@ -79,9 +84,7 @@ export function CAList() {
           title="Certificate Authorities"
           badge={<Badge variant="danger">Error</Badge>}
         />
-        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
-          Error loading CAs: {error.message}
-        </div>
+        <ErrorState error={error} shake />
       </div>
     );
   }
@@ -165,19 +168,30 @@ export function CAList() {
 
       {/* Main Table */}
       <div className={styles.tableContainer}>
-        <table>
-          <thead>
-            <tr>
-              <th style={{ width: '35%' }}>NAME</th>
-              <th style={{ width: '15%' }}>TYPE</th>
-              <th style={{ width: '12%' }}>STATUS</th>
-              <th style={{ width: '12%' }}>ISSUED</th>
-              <th style={{ width: '12%' }}>EXPIRES</th>
-              <th style={{ width: '8%' }}>CERTS</th>
-              <th style={{ width: '6%' }}>ACTIONS</th>
-            </tr>
-          </thead>
-          <tbody>
+        {rootCAs.length === 0 && orphanedCAs.length === 0 ? (
+          <EmptyState
+            icon="ph ph-bank"
+            title="No Certificate Authorities"
+            message="Create your first Root CA to start issuing certificates"
+            action={{
+              label: "Create CA",
+              onClick: () => setShowCreateModal(true)
+            }}
+          />
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: '35%' }}>NAME</th>
+                <th style={{ width: '15%' }}>TYPE</th>
+                <th style={{ width: '12%' }}>STATUS</th>
+                <th style={{ width: '12%' }}>ISSUED</th>
+                <th style={{ width: '12%' }}>EXPIRES</th>
+                <th style={{ width: '8%' }}>CERTS</th>
+                <th style={{ width: '6%' }}>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody>
             {rootCAs.map((ca) => (
               <>
                 {/* Root CA Row */}
@@ -267,10 +281,11 @@ export function CAList() {
             ))}
           </tbody>
         </table>
+        )}
       </div>
 
       {/* Orphaned Section */}
-      {orphanedCAs.length > 0 && (
+      {orphanedCAs.length > 0 && rootCAs.length > 0 && (
         <div className={styles.orphanedSection}>
           <div className={styles.orphanedHeader}>
             <i className="ph ph-warning"></i>
