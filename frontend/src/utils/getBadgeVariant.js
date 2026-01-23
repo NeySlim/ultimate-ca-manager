@@ -13,6 +13,8 @@ const BADGE_MAPPING = {
     'acme': 'success',     // Green (like prototype badge-success)
     'internal': 'info',    // Blue/cyan
     'client': 'secondary', // Grey
+    'user': 'secondary',   // Grey - User certificates
+    'ca': 'warning',       // Orange - CA certificates
     'code signing': 'warning',
   },
   
