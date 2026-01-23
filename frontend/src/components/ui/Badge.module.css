@@ -1,4 +1,4 @@
-/* Badge Component Styles */
+/* Badge Component Styles - Enhanced with optional gradient fills */
 
 .badge {
   display: inline-flex;
@@ -12,6 +12,7 @@
   letter-spacing: 0.3px;
   white-space: nowrap;
   border: 1px solid;
+  transition: all 200ms ease;
 }
 
 /* ==========================================
@@ -25,11 +26,25 @@
   border-color: var(--status-success);
 }
 
+.badge-success:hover {
+  background: var(--status-success);
+  color: #1a1a1a;
+  box-shadow: 0 2px 6px rgba(129, 199, 132, 0.25);
+  transform: translateY(-1px);
+}
+
 /* Warning - Expiring, Pending, Attention */
 .badge-warning {
   color: var(--status-warning);
   background: transparent;
   border-color: var(--status-warning);
+}
+
+.badge-warning:hover {
+  background: var(--status-warning);
+  color: #1a1a1a;
+  box-shadow: 0 2px 6px rgba(255, 183, 77, 0.25);
+  transform: translateY(-1px);
 }
 
 /* Danger - Expired, Revoked, Rejected */
@@ -39,6 +54,13 @@
   border-color: var(--status-danger);
 }
 
+.badge-danger:hover {
+  background: var(--status-danger);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(229, 115, 115, 0.25);
+  transform: translateY(-1px);
+}
+
 /* Info - Information, Neutral */
 .badge-info {
   color: var(--status-info);
@@ -46,11 +68,37 @@
   border-color: var(--status-info);
 }
 
+.badge-info:hover {
+  background: var(--status-info);
+  color: #1a1a1a;
+  box-shadow: 0 2px 6px rgba(100, 181, 246, 0.25);
+  transform: translateY(-1px);
+}
+
 /* Secondary - Default, Inactive */
 .badge-secondary {
   color: var(--text-secondary);
   background: transparent;
   border-color: var(--border-secondary);
+}
+
+.badge-secondary:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: 0 0 6px rgba(90, 143, 199, 0.15);
+}
+
+/* Neutral - alternative name */
+.badge-neutral {
+  color: var(--text-secondary);
+  background: transparent;
+  border-color: var(--border-secondary);
+}
+
+.badge-neutral:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: 0 0 6px rgba(90, 143, 199, 0.15);
 }
 
 /* ==========================================
