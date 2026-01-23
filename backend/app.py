@@ -11,6 +11,7 @@ from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 from flask_caching import Cache
 from flask_session import Session
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -37,6 +38,16 @@ def create_app(config_name=None):
     # Load configuration
     config = get_config(config_name)
     app.config.from_object(config)
+    
+    # Reverse proxy support (handles X-Forwarded-* headers)
+    # Safe to enable even without proxy - only activates if headers present
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=1,      # X-Forwarded-For (client IP)
+        x_proto=1,    # X-Forwarded-Proto (http/https)
+        x_host=1,     # X-Forwarded-Host (original host)
+        x_prefix=1    # X-Forwarded-Prefix (URL prefix)
+    )
     
     # Validate secrets at runtime (not during package installation)
     try:
