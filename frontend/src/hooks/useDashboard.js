@@ -52,3 +52,14 @@ export const useDashboardExpiringCerts = (limit = 10) => {
     queryFn: () => dashboardApi.getExpiringCerts(limit),
   });
 };
+
+/**
+ * Hook to get system status (no auth required)
+ */
+export const useDashboardSystemStatus = () => {
+  return useQuery({
+    queryKey: [...dashboardKeys.all, 'system-status'],
+    queryFn: dashboardApi.getSystemStatus,
+    refetchInterval: 30000, // Refresh every 30s
+  });
+};
