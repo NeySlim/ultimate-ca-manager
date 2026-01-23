@@ -11,6 +11,48 @@
   gap: var(--spacing-lg);
 }
 
+.settingsCard {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.settingsTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1.5rem 0;
+  display: flex;
+  align-items: center;
+}
+
+.settingsContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.settingRow {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.settingLabel {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.settingHint {
+  font-size: 0.875rem;
+  color: var(--text-tertiary);
+  padding-left: 140px;
+  margin-top: -0.75rem;
+}
+
 .directoryUrlsCard {
   background: var(--surface-secondary);
   border: 1px solid var(--border-primary);

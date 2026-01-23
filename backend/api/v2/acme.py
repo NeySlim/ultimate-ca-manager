@@ -6,7 +6,7 @@ ACME Configuration Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from models import db, AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge
+from models import db, AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, SystemConfig, CA
 
 bp = Blueprint('acme_v2', __name__)
 
@@ -15,9 +15,24 @@ bp = Blueprint('acme_v2', __name__)
 @require_auth(['read:acme'])
 def get_acme_settings():
     """Get ACME configuration"""
-    # For now returning static config, could be moved to SystemConfig
+    # Get settings from SystemConfig
+    enabled_cfg = SystemConfig.query.filter_by(key='acme.enabled').first()
+    ca_id_cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
+    
+    enabled = enabled_cfg.value == 'true' if enabled_cfg else True
+    ca_id = ca_id_cfg.value if ca_id_cfg else None
+    
+    # Get CA name if CA ID is set
+    ca_name = None
+    if ca_id:
+        ca = CA.query.filter_by(refid=ca_id).first()
+        if ca:
+            ca_name = ca.common_name
+    
     return success_response(data={
-        'enabled': True,
+        'enabled': enabled,
+        'issuing_ca_id': ca_id,
+        'issuing_ca_name': ca_name,
         'provider': 'Built-in ACME Server',
         'contact_email': 'admin@ucm.local'
     })
@@ -28,7 +43,25 @@ def get_acme_settings():
 def update_acme_settings():
     """Update ACME configuration"""
     data = request.json
-    # Implement logic to save to SystemConfig
+    
+    # Update enabled status
+    if 'enabled' in data:
+        enabled_cfg = SystemConfig.query.filter_by(key='acme.enabled').first()
+        if not enabled_cfg:
+            enabled_cfg = SystemConfig(key='acme.enabled', description='ACME server enabled')
+            db.session.add(enabled_cfg)
+        enabled_cfg.value = 'true' if data['enabled'] else 'false'
+    
+    # Update issuing CA
+    if 'issuing_ca_id' in data:
+        ca_id_cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
+        if not ca_id_cfg:
+            ca_id_cfg = SystemConfig(key='acme.issuing_ca_id', description='ACME issuing CA refid')
+            db.session.add(ca_id_cfg)
+        ca_id_cfg.value = data['issuing_ca_id'] if data['issuing_ca_id'] else ''
+    
+    db.session.commit()
+    
     return success_response(
         data=data,
         message='ACME settings updated'
