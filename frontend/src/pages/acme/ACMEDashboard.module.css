@@ -11,6 +11,53 @@
   gap: var(--spacing-lg);
 }
 
+.directoryUrlsCard {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.directoryTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+  display: flex;
+  align-items: center;
+}
+
+.urlsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.urlItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.urlLabel {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.urlCode {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 0.875rem;
+  color: var(--color-info);
+  overflow-x: auto;
+  white-space: nowrap;
+  user-select: all;
+}
+
 .section {
   display: flex;
   flex-direction: column;

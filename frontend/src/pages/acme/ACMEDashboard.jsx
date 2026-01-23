@@ -140,6 +140,24 @@ export function ACMEDashboard() {
 
   const renderTab = () => (
     <div className={styles.tabContent}>
+      {/* ACME Directory URLs */}
+      <div className={styles.directoryUrlsCard}>
+        <h3 className={styles.directoryTitle}>
+          <i className="ph ph-link" style={{ marginRight: '0.5rem' }}></i>
+          ACME Directory URLs
+        </h3>
+        <div className={styles.urlsList}>
+          <div className={styles.urlItem}>
+            <label className={styles.urlLabel}>Local ACME Server:</label>
+            <code className={styles.urlCode}>{window.location.origin}/acme/directory</code>
+          </div>
+          <div className={styles.urlItem}>
+            <label className={styles.urlLabel}>Let's Encrypt Proxy:</label>
+            <code className={styles.urlCode}>{window.location.origin}/acme/proxy/directory</code>
+          </div>
+        </div>
+      </div>
+
       {/* Stats */}
       <StatsGrid columns={4}>
         <StatCard
