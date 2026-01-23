@@ -1,9 +1,14 @@
-/* DataTable Styles - Dashboard Reference */
+/* DataTable Styles - Dashboard Reference - Enhanced */
 
 .tableWrapper {
   overflow-x: auto;
   border-radius: var(--radius);
   border: 1px solid var(--border-primary);
+  transition: box-shadow 300ms ease;
+}
+
+.tableWrapper:hover {
+  box-shadow: var(--elevation-1);
 }
 
 .table {
@@ -22,20 +27,52 @@
   color: var(--text-muted);
   font-weight: 500;
   border-bottom: 1px solid var(--border-primary);
+  position: relative;
 }
 
 .table th.sortable {
   cursor: pointer;
   user-select: none;
-  transition: color 0.15s;
+  transition: all 200ms ease;
 }
 
 .table th.sortable:hover {
   color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+/* Animated sort indicator */
+.table th.sortable::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.table th.sortable:hover::after {
+  content: '⇅';
+  opacity: 0.4;
+  font-size: 10px;
 }
 
 .table th.sorted {
   color: var(--accent-primary);
+}
+
+.table th.sorted::after {
+  opacity: 1 !important;
+  color: var(--accent-primary);
+}
+
+.table th.sorted[data-direction="asc"]::after {
+  content: '↑';
+}
+
+.table th.sorted[data-direction="desc"]::after {
+  content: '↓';
 }
 
 .headerContent {
@@ -46,10 +83,12 @@
 
 .sortIcon {
   color: var(--text-muted);
+  transition: all 200ms ease;
 }
 
 .table th.sorted .sortIcon {
   color: var(--accent-primary);
+  transform: scale(1.1);
 }
 
 .table td {
@@ -57,18 +96,36 @@
   border-top: 1px solid var(--border-primary);
   color: var(--text-secondary);
   font-size: 13px;
+  transition: all 200ms ease;
 }
 
+/* Premium row hover */
 .table tbody tr {
-  transition: background 0.15s;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+/* Subtle stripes */
+.table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.01);
 }
 
 .table tbody tr:hover {
   background: var(--bg-hover);
+  box-shadow: inset 3px 0 0 var(--accent-primary);
+  transform: translateX(2px);
+}
+
+.table tbody tr:hover td {
+  color: var(--text-primary);
 }
 
 .table tbody tr.clickable {
   cursor: pointer;
+}
+
+.table tbody tr.clickable:active {
+  transform: translateX(1px);
 }
 
 /* Empty State */
