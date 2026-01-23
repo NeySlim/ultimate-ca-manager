@@ -4,8 +4,10 @@ import { DataTable } from '../../components/domain/DataTable';
 import { SearchToolbar } from '../../components/domain/SearchToolbar';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { Select } from '../../components/ui/Select';
 import { getBadgeVariant } from '../../utils/getBadgeVariant';
 import { useACMESettings, useACMEStats, useACMEAccounts, useACMEOrders, useUpdateACMESettings } from '../../hooks/useACME';
+import { useCAs } from '../../hooks/useCAs';
 import { CreateACMEAccountModal } from '../../components/modals/CreateACMEAccountModal';
 import { CreateACMEOrderModal } from '../../components/modals/CreateACMEOrderModal';
 import toast from 'react-hot-toast';
@@ -27,6 +29,7 @@ export function ACMEDashboard() {
   const { data: stats, isLoading: loadingStats, error: errorStats } = useACMEStats();
   const { data: accountsResponse, isLoading: loadingAccounts, error: errorAccounts } = useACMEAccounts();
   const { data: ordersResponse, isLoading: loadingOrders, error: errorOrders } = useACMEOrders();
+  const { data: casResponse, isLoading: loadingCAs } = useCAs();
   const updateACME = useUpdateACMESettings();
 
   const isLoading = loadingSettings || loadingStats || loadingAccounts || loadingOrders;
@@ -138,23 +141,52 @@ export function ACMEDashboard() {
     orders: ordersResponse?.data || [],
   };
 
-  const renderTab = () => (
+  // Prepare CAs options for select
+  const casOptions = [
+    { value: '', label: 'Select issuing CA...' },
+    ...(casResponse?.data || []).map(ca => ({
+      value: ca.refid,
+      label: ca.common_name || ca.refid
+    }))
+  ];
+
+  const handleUpdateIssuingCA = (caId) => {
+    updateACME.mutate(
+      { issuing_ca_id: caId },
+      {
+        onSuccess: () => toast.success('Issuing CA updated'),
+        onError: () => toast.error('Failed to update issuing CA')
+      }
+    );
+  };
+
+  const renderInternalTab = () => (
     <div className={styles.tabContent}>
-      {/* ACME Directory URLs */}
-      <div className={styles.directoryUrlsCard}>
-        <h3 className={styles.directoryTitle}>
-          <i className="ph ph-link" style={{ marginRight: '0.5rem' }}></i>
-          ACME Directory URLs
+      {/* Internal ACME Settings */}
+      <div className={styles.settingsCard}>
+        <h3 className={styles.settingsTitle}>
+          <i className="ph ph-gear" style={{ marginRight: '0.5rem' }}></i>
+          Internal ACME Server Configuration
         </h3>
-        <div className={styles.urlsList}>
-          <div className={styles.urlItem}>
-            <label className={styles.urlLabel}>Local ACME Server:</label>
+        <div className={styles.settingsContent}>
+          <div className={styles.settingRow}>
+            <label className={styles.settingLabel}>Directory URL:</label>
             <code className={styles.urlCode}>{window.location.origin}/acme/directory</code>
           </div>
-          <div className={styles.urlItem}>
-            <label className={styles.urlLabel}>Let's Encrypt Proxy:</label>
-            <code className={styles.urlCode}>{window.location.origin}/acme/proxy/directory</code>
+          <div className={styles.settingRow}>
+            <label className={styles.settingLabel}>Issuing CA:</label>
+            <Select
+              value={settings?.issuing_ca_id || ''}
+              onChange={(e) => handleUpdateIssuingCA(e.target.value)}
+              options={casOptions}
+              disabled={loadingCAs}
+            />
           </div>
+          {settings?.issuing_ca_name && (
+            <div className={styles.settingHint}>
+              Selected: <strong>{settings.issuing_ca_name}</strong>
+            </div>
+          )}
         </div>
       </div>
 
@@ -249,7 +281,7 @@ export function ACMEDashboard() {
       </SectionTabs>
 
       <div className={styles.tabContent}>
-        {renderTab()}
+        {activeTab === 'internal' ? renderInternalTab() : renderLetsEncryptTab()}
       </div>
       
       <CreateACMEAccountModal 
