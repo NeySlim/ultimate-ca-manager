@@ -160,6 +160,14 @@
   background: var(--status-success);
 }
 
+.status-dot.offline {
+  background: var(--status-error);
+}
+
+.status-dot.idle {
+  background: var(--text-muted);
+}
+
 .loading-center {
   display: flex;
   justify-content: center;

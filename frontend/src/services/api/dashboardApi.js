@@ -41,7 +41,7 @@ export const dashboardApi = {
 
   /**
    * Get dashboard statistics (requires auth)
-   * Backend returns: { data: { total_cas, total_certificates, expiring_soon, revoked } }
+   * Backend returns: { data: { total_cas, total_certificates, expiring_soon, revoked, pending_csrs, acme_renewals } }
    * Frontend needs: { activeCertificates, expiringSoon, pendingRequests, acmeRenewals }
    */
   getStats: async () => {
@@ -52,8 +52,8 @@ export const dashboardApi = {
     return {
       activeCertificates: String(data.total_certificates || 0),
       expiringSoon: String(data.expiring_soon || 0),
-      pendingRequests: '0', // Not provided by backend yet
-      acmeRenewals: '0', // Not provided by backend yet
+      pendingRequests: String(data.pending_csrs || 0),
+      acmeRenewals: String(data.acme_renewals || 0),
       totalCAs: String(data.total_cas || 0),
       revoked: String(data.revoked || 0),
     };
@@ -61,11 +61,20 @@ export const dashboardApi = {
 
   /**
    * Get recent activity (requires auth)
-   * Backend returns: { data: [] }
+   * Backend returns: { data: { activity: [] } }
    */
   getActivity: async (limit = 20) => {
     const response = await api.get(`/api/v2/dashboard/activity?limit=${limit}`);
-    return response.data || [];
+    return response.data.activity || [];
+  },
+
+  /**
+   * Get system status (no auth required)
+   * Backend returns: { data: { database, acme, scep, core } }
+   */
+  getSystemStatus: async () => {
+    const response = await api.get('/api/v2/dashboard/system-status');
+    return response.data;
   },
 
   /**

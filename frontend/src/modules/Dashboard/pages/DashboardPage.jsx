@@ -30,6 +30,7 @@ const DashboardPage = () => {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [activity, setActivity] = useState([]);
+  const [systemStatus, setSystemStatus] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -39,12 +40,14 @@ const DashboardPage = () => {
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      const [statsData, activityData] = await Promise.all([
+      const [statsData, activityData, statusData] = await Promise.all([
         dashboardService.getStats(),
-        dashboardService.getRecentActivity({ limit: 10 })
+        dashboardService.getRecentActivity({ limit: 10 }),
+        fetch('/api/v2/dashboard/system-status').then(r => r.json()).catch(() => null)
       ]);
       setStats(statsData || {});
       setActivity(activityData?.activity || []);
+      setSystemStatus(statusData?.data || null);
     } catch (error) {
       console.error('Failed to load dashboard:', error);
     } finally {
@@ -135,31 +138,39 @@ const DashboardPage = () => {
           <Stack>
             <div className="status-item">
               <Group>
-                <div className="status-dot online"></div>
+                <div className={`status-dot ${systemStatus?.core?.status === 'online' ? 'online' : 'offline'}`}></div>
                 <Text>UCM Core</Text>
               </Group>
-              <Badge variant="active">Online</Badge>
+              <Badge variant={systemStatus?.core?.status === 'online' ? 'active' : 'error'}>
+                {systemStatus?.core?.message || 'Unknown'}
+              </Badge>
             </div>
             <div className="status-item">
               <Group>
-                <div className="status-dot online"></div>
+                <div className={`status-dot ${systemStatus?.database?.status === 'online' ? 'online' : 'offline'}`}></div>
                 <Text>Database</Text>
               </Group>
-              <Badge variant="active">Operational</Badge>
+              <Badge variant={systemStatus?.database?.status === 'online' ? 'active' : 'error'}>
+                {systemStatus?.database?.message || 'Unknown'}
+              </Badge>
             </div>
             <div className="status-item">
               <Group>
-                <div className="status-dot online"></div>
+                <div className={`status-dot ${systemStatus?.acme?.status === 'online' ? 'online' : systemStatus?.acme?.status === 'disabled' ? 'idle' : 'offline'}`}></div>
                 <Text>ACME Service</Text>
               </Group>
-              <Badge variant="active">Running</Badge>
+              <Badge variant={systemStatus?.acme?.status === 'online' ? 'active' : systemStatus?.acme?.status === 'disabled' ? 'neutral' : 'error'}>
+                {systemStatus?.acme?.message || 'Unknown'}
+              </Badge>
             </div>
             <div className="status-item">
               <Group>
-                <div className="status-dot online"></div>
+                <div className={`status-dot ${systemStatus?.scep?.status === 'online' ? 'online' : 'offline'}`}></div>
                 <Text>SCEP Service</Text>
               </Group>
-              <Badge variant="active">Running</Badge>
+              <Badge variant={systemStatus?.scep?.status === 'online' ? 'active' : 'error'}>
+                {systemStatus?.scep?.message || 'Unknown'}
+              </Badge>
             </div>
           </Stack>
         </Card>
