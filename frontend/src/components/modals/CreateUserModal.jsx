@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import toast from 'react-hot-toast';
-import styles from './CreateCAModal.module.css';
+import styles from './SharedModalForm.module.css';
 
 export function CreateUserModal({ isOpen, onClose }) {
   const [formData, setFormData] = useState({
