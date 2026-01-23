@@ -3,6 +3,9 @@ import toast from 'react-hot-toast';
 import { PageTopBar, PillFilter, PillFilters, FiltersBar, FilterGroup } from '../../components/common';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { EmptyState } from '../../components/ui/EmptyState';
+import ErrorState from '../../components/ui/ErrorState';
 import { useCertificates, useRevokeCertificate } from '../../hooks/useCertificates';
 import { IssueCertificateModal } from '../../components/modals/IssueCertificateModal';
 import { ImportCertificateModal } from '../../components/modals/ImportCertificateModal';
@@ -74,7 +77,22 @@ export function CertificateList() {
           title="Certificates"
           badge={<Badge variant="neutral">Loading...</Badge>}
         />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>Loading certificates...</div>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} width="100%" height={60} style={{ marginBottom: '8px' }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.certificateList}>
+        <PageTopBar
+          icon="ph ph-certificate"
+          title="Certificates"
+          badge={<Badge variant="danger">Error</Badge>}
+        />
+        <ErrorState error={error} shake />
       </div>
     );
   }

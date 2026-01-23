@@ -3,6 +3,9 @@ import { ActivityFeed } from '../components/domain/ActivityFeed';
 import { DataTable } from '../components/domain/DataTable';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { Skeleton, SkeletonDashboard } from '../components/ui/Skeleton';
+import { AnimatedCounter } from '../components/ui/AnimatedCounter';
+import ErrorState from '../components/ui/ErrorState';
 import { Warning, Info, CheckCircle, Clock } from '@phosphor-icons/react';
 import { getBadgeVariant } from '../utils/getBadgeVariant';
 import { useDashboardStats, useDashboardOverview, useDashboardActivity, useDashboardExpiringCerts } from '../hooks/useDashboard';
@@ -75,22 +78,20 @@ export function Dashboard() {
     },
   ];
 
-  // Loading state
+  // Loading state with Skeleton
   if (statsLoading || overviewLoading) {
-    return (
-      <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center' }}>
-        <div style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>Loading dashboard...</div>
-      </div>
-    );
+    return <SkeletonDashboard />;
   }
 
   // Error state
   if (statsError || overviewError) {
     return (
-      <div style={{ padding: 'var(--spacing-xl)', textAlign: 'center' }}>
-        <div style={{ fontSize: '14px', color: 'var(--status-danger)' }}>
-          Error loading dashboard: {statsError?.message || overviewError?.message}
-        </div>
+      <div style={{ padding: 'var(--spacing-xl)' }}>
+        <ErrorState 
+          error={statsError || overviewError}
+          message="Error loading dashboard"
+          shake
+        />
       </div>
     );
   }
