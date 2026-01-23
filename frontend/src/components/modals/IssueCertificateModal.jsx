@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { SuccessAnimation } from '../ui/SuccessAnimation';
 import { useIssueCertificate } from '../../hooks/useCertificates';
 import { useCAs } from '../../hooks/useCAs';
 import toast from 'react-hot-toast';
 import styles from './IssueCertificateModal.module.css';
 
 export function IssueCertificateModal({ isOpen, onClose }) {
+  const [showSuccess, setShowSuccess] = useState(false);
   const [formData, setFormData] = useState({
     ca_id: '',
     common_name: '',
@@ -62,9 +64,13 @@ export function IssueCertificateModal({ isOpen, onClose }) {
 
     issueCertificate.mutate(payload, {
       onSuccess: () => {
+        setShowSuccess(true);
         toast.success('Certificate issued successfully');
-        onClose();
-        resetForm();
+        setTimeout(() => {
+          onClose();
+          setShowSuccess(false);
+          resetForm();
+        }, 2000);
       },
       onError: (error) => {
         toast.error(`Failed to issue certificate: ${error.message}`);
@@ -303,6 +309,13 @@ export function IssueCertificateModal({ isOpen, onClose }) {
           </div>
         </div>
       </form>
+
+      {showSuccess && (
+        <SuccessAnimation
+          message="Certificate Issued!"
+          onComplete={() => setShowSuccess(false)}
+        />
+      )}
     </Modal>
   );
 }

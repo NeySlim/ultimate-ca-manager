@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { SuccessAnimation } from '../ui/SuccessAnimation';
 import toast from 'react-hot-toast';
 import styles from './SharedModalForm.module.css';
 
 export function CreateUserModal({ isOpen, onClose }) {
+  const [showSuccess, setShowSuccess] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -64,27 +66,29 @@ export function CreateUserModal({ isOpen, onClose }) {
         throw new Error(error.message || 'Failed to create user');
       }
 
+      setShowSuccess(true);
       toast.success('User created successfully');
-      onClose();
-      
-      setFormData({
-        username: '',
-        password: '',
-        confirmPassword: '',
-        email: '',
-        fullName: '',
-        role: 'operator',
-        permissions: {
-          manageCAs: false,
-          issueCertificates: true,
-          revokeCertificates: false,
-          manageUsers: false,
-          viewLogs: true,
-          manageSettings: false,
-        },
-      });
-
-      window.location.reload();
+      setTimeout(() => {
+        onClose();
+        setShowSuccess(false);
+        setFormData({
+          username: '',
+          password: '',
+          confirmPassword: '',
+          email: '',
+          fullName: '',
+          role: 'operator',
+          permissions: {
+            manageCAs: false,
+            issueCertificates: true,
+            revokeCertificates: false,
+            manageUsers: false,
+            viewLogs: true,
+            manageSettings: false,
+          },
+        });
+        window.location.reload();
+      }, 2000);
     } catch (error) {
       toast.error(error.message || 'Failed to create user');
     } finally {
@@ -310,6 +314,13 @@ export function CreateUserModal({ isOpen, onClose }) {
           </div>
         </div>
       </form>
+
+      {showSuccess && (
+        <SuccessAnimation
+          message="User Created!"
+          onComplete={() => setShowSuccess(false)}
+        />
+      )}
     </Modal>
   );
 }
