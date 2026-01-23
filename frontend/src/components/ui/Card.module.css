@@ -1,10 +1,36 @@
-/* Card Component Styles */
+/* Card Component Styles - Enhanced with premium hover effects */
 
 .card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius);
   overflow: hidden;
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+/* Gradient border glow on hover */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 
+    0 8px 16px rgba(0, 0, 0, 0.15),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+  border-color: transparent;
+}
+
+.card:hover::before {
+  opacity: 1;
 }
 
 .cardHeader {
