@@ -17,6 +17,11 @@ const LoginPage = () => {
     acme: '—',
     users: '—'
   });
+  const [systemStatus, setSystemStatus] = useState({
+    core: { status: 'online', message: 'Operational' },
+    database: { status: 'online', message: 'Healthy' },
+    acme: { status: 'online', message: 'Active' }
+  });
   
   // Initial authentication check
   useEffect(() => {
@@ -68,8 +73,22 @@ const LoginPage = () => {
       }
     };
 
+    // Fetch system status
+    const fetchSystemStatus = async () => {
+      try {
+        const res = await fetch('/api/v2/dashboard/system-status');
+        if (res.ok) {
+          const response = await res.json();
+          setSystemStatus(response.data);
+        }
+      } catch (e) {
+        console.error('System status fetch failed', e);
+      }
+    };
+
     checkStatus();
     fetchStats();
+    fetchSystemStatus();
 
     return () => { mounted = false; };
   }, []);
@@ -156,15 +175,21 @@ const LoginPage = () => {
           <div className="status-list">
             <div className="status-item">
               <Text size="xs" color="tertiary">Platform</Text>
-              <Text size="xs" color="primary">Operational</Text>
+              <Text size="xs" color={systemStatus.core?.status === 'online' ? 'primary' : 'error'}>
+                {systemStatus.core?.message || 'Unknown'}
+              </Text>
             </div>
             <div className="status-item">
               <Text size="xs" color="tertiary">Database</Text>
-              <Text size="xs" color="primary">Healthy</Text>
+              <Text size="xs" color={systemStatus.database?.status === 'online' ? 'primary' : 'error'}>
+                {systemStatus.database?.message || 'Unknown'}
+              </Text>
             </div>
             <div className="status-item">
               <Text size="xs" color="tertiary">ACME Service</Text>
-              <Text size="xs" color="primary">Active</Text>
+              <Text size="xs" color={systemStatus.acme?.status === 'online' ? 'primary' : systemStatus.acme?.status === 'disabled' ? 'tertiary' : 'primary'}>
+                {systemStatus.acme?.message || 'Unknown'}
+              </Text>
             </div>
           </div>
         </div>

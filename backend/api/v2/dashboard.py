@@ -15,7 +15,7 @@ bp = Blueprint('dashboard_v2', __name__)
 def get_public_stats():
     """Get public overview statistics (no auth required - for login page)"""
     try:
-        from database import db
+        from models import db
         from sqlalchemy import text
         
         # Query counts directly with SQL to avoid import issues
@@ -56,6 +56,8 @@ def get_dashboard_stats():
     """Get dashboard statistics"""
     from models import CA, Certificate
     from datetime import datetime, timedelta
+    from models import db
+    from sqlalchemy import text
     
     # Count CAs
     total_cas = CA.query.count()
@@ -73,11 +75,33 @@ def get_dashboard_stats():
     # Count revoked
     revoked = Certificate.query.filter_by(revoked=True).count()
     
+    # Count pending CSRs (if CSR table exists)
+    pending_csrs = 0
+    try:
+        pending_csrs = db.session.execute(
+            text("SELECT COUNT(*) FROM certificate_requests WHERE status = 'pending'")
+        ).scalar() or 0
+    except:
+        pass
+    
+    # Count ACME renewals (last 30 days)
+    acme_renewals = 0
+    try:
+        thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
+        acme_renewals = db.session.execute(
+            text("SELECT COUNT(*) FROM acme_orders WHERE created_at >= :date"),
+            {'date': thirty_days_ago}
+        ).scalar() or 0
+    except:
+        pass
+    
     return success_response(data={
         'total_cas': total_cas,
         'total_certificates': total_certs,
         'expiring_soon': expiring_soon,
-        'revoked': revoked
+        'revoked': revoked,
+        'pending_csrs': pending_csrs,
+        'acme_renewals': acme_renewals
     })
 
 
@@ -131,5 +155,74 @@ def get_expiring_certificates():
 @require_auth()
 def get_activity_log():
     """Get recent activity"""
+    from models import db
+    from sqlalchemy import text
+    from datetime import datetime
+    
     limit = request.args.get('limit', 20, type=int)
-    return success_response(data=[])
+    
+    try:
+        # Try to get audit logs if table exists
+        results = db.session.execute(
+            text("""
+                SELECT action, entity_type, entity_id, user_id, created_at, details
+                FROM audit_logs 
+                ORDER BY created_at DESC 
+                LIMIT :limit
+            """),
+            {'limit': limit}
+        ).fetchall()
+        
+        activity = []
+        for row in results:
+            activity.append({
+                'type': row.entity_type or 'system',
+                'description': row.action or 'Unknown action',
+                'timestamp': row.created_at.isoformat() if row.created_at else None,
+                'user': f'User {row.user_id}' if row.user_id else 'System'
+            })
+        
+        return success_response(data={'activity': activity})
+    except:
+        # If audit_logs table doesn't exist, return empty
+        return success_response(data={'activity': []})
+
+
+@bp.route('/api/v2/dashboard/system-status', methods=['GET'])
+def get_system_status():
+    """Get system services status (no auth required - for login page)"""
+    from models import db
+    from sqlalchemy import text
+    import os
+    
+    status = {
+        'database': {'status': 'online', 'message': 'Connected'},
+        'acme': {'status': 'online', 'message': 'Running'},
+        'scep': {'status': 'online', 'message': 'Running'},
+        'core': {'status': 'online', 'message': 'Operational'}
+    }
+    
+    # Check database
+    try:
+        db.session.execute(text('SELECT 1'))
+        status['database'] = {'status': 'online', 'message': 'Connected'}
+    except:
+        status['database'] = {'status': 'offline', 'message': 'Connection failed'}
+    
+    # Check ACME service (check if enabled in config or has active orders)
+    try:
+        acme_count = db.session.execute(text("SELECT COUNT(*) FROM acme_accounts")).scalar()
+        if acme_count > 0:
+            status['acme'] = {'status': 'online', 'message': f'{acme_count} accounts'}
+        else:
+            status['acme'] = {'status': 'idle', 'message': 'No accounts'}
+    except:
+        status['acme'] = {'status': 'disabled', 'message': 'Not configured'}
+    
+    # SCEP is always available if UCM is running
+    status['scep'] = {'status': 'online', 'message': 'Endpoint available'}
+    
+    # Core is online if we can respond
+    status['core'] = {'status': 'online', 'message': 'Operational'}
+    
+    return success_response(data=status)
