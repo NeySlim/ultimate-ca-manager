@@ -12,6 +12,7 @@ from flask_migrate import Migrate
 from flask_caching import Cache
 from flask_session import Session
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flasgger import Swagger
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -95,6 +96,64 @@ def create_app(config_name=None):
             "supports_credentials": True
         }
     })
+    
+    # Swagger/OpenAPI Documentation
+    swagger_config = {
+        "headers": [],
+        "specs": [
+            {
+                "endpoint": 'apispec',
+                "route": '/api/docs/apispec.json',
+                "rule_filter": lambda rule: True,
+                "model_filter": lambda tag: True,
+            }
+        ],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/api/docs"
+    }
+    
+    swagger_template = {
+        "swagger": "2.0",
+        "info": {
+            "title": "UCM API v2.0",
+            "description": "Ultimate Certificate Manager - REST API Documentation",
+            "version": "2.0.0",
+            "contact": {
+                "name": "UCM Support",
+                "url": "https://github.com/your-org/ucm"
+            }
+        },
+        "basePath": "/api/v2",
+        "schemes": ["https"],
+        "securityDefinitions": {
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "JWT Authorization header using the Bearer scheme. Example: 'Bearer {token}'"
+            }
+        },
+        "security": [{"Bearer": []}],
+        "tags": [
+            {"name": "auth", "description": "Authentication endpoints"},
+            {"name": "cas", "description": "Certificate Authorities"},
+            {"name": "certificates", "description": "Certificates management"},
+            {"name": "csrs", "description": "Certificate Signing Requests"},
+            {"name": "crl", "description": "Certificate Revocation Lists"},
+            {"name": "acme", "description": "ACME protocol"},
+            {"name": "scep", "description": "SCEP protocol"},
+            {"name": "dashboard", "description": "Dashboard statistics"},
+            {"name": "users", "description": "User management"},
+            {"name": "settings", "description": "System settings"},
+            {"name": "templates", "description": "Certificate templates"},
+            {"name": "truststore", "description": "Trust store"},
+            {"name": "account", "description": "Account management"},
+            {"name": "system", "description": "System operations"}
+        ]
+    }
+    
+    Swagger(app, config=swagger_config, template=swagger_template)
     
     # Initialize auth middleware
     init_auth_middleware(jwt)
