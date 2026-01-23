@@ -175,18 +175,22 @@ export function ACMEDashboard() {
           </div>
           <div className={styles.settingRow}>
             <label className={styles.settingLabel}>Issuing CA:</label>
-            <Select
-              value={settings?.issuing_ca_id || ''}
-              onChange={handleUpdateIssuingCA}
-              options={casOptions}
-              disabled={loadingCAs}
-            />
-          </div>
-          {settings?.issuing_ca_name && (
-            <div className={styles.settingHint}>
-              Selected: <strong>{settings.issuing_ca_name}</strong>
+            <div style={{ flex: 1 }}>
+              <Select
+                value={settings?.issuing_ca_id || ''}
+                onChange={handleUpdateIssuingCA}
+                options={casOptions}
+                disabled={loadingCAs}
+                placeholder="Select issuing CA..."
+              />
+              {settings?.issuing_ca_name && (
+                <div className={styles.caSelectedInfo}>
+                  <i className="ph ph-check-circle" style={{ color: 'var(--color-success)', marginRight: '0.5rem' }}></i>
+                  Currently using: <strong>{settings.issuing_ca_name}</strong>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
