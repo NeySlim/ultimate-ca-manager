@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { SuccessAnimation } from '../ui/SuccessAnimation';
 import { useCreateCA } from '../../hooks/useCAs';
 import toast from 'react-hot-toast';
 import styles from './CreateCAModal.module.css';
 
 export function CreateCAModal({ isOpen, onClose }) {
+  const [showSuccess, setShowSuccess] = useState(false);
   const [formData, setFormData] = useState({
     commonName: '',
     organization: '',
@@ -41,19 +43,23 @@ export function CreateCAModal({ isOpen, onClose }) {
       is_root: formData.isRoot,
     }, {
       onSuccess: () => {
+        setShowSuccess(true);
         toast.success('CA created successfully');
-        onClose();
-        setFormData({
-          commonName: '',
-          organization: '',
-          organizationalUnit: '',
-          country: '',
-          state: '',
-          locality: '',
-          validityDays: '3650',
-          keySize: '2048',
-          isRoot: true,
-        });
+        setTimeout(() => {
+          onClose();
+          setShowSuccess(false);
+          setFormData({
+            commonName: '',
+            organization: '',
+            organizationalUnit: '',
+            country: '',
+            state: '',
+            locality: '',
+            validityDays: '3650',
+            keySize: '2048',
+            isRoot: true,
+          });
+        }, 2000); // Close after success animation
       },
       onError: (error) => {
         toast.error(`Failed to create CA: ${error.message}`);
@@ -201,6 +207,13 @@ export function CreateCAModal({ isOpen, onClose }) {
           </div>
         </div>
       </form>
+
+      {showSuccess && (
+        <SuccessAnimation
+          message="CA Created!"
+          onComplete={() => setShowSuccess(false)}
+        />
+      )}
     </Modal>
   );
 }

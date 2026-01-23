@@ -2,6 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { FormInput } from '../../components/ui/FormInput';
 import { PageTopBar, SectionTabs, Tab } from '../../components/common';
 import { useGeneralSettings, useUpdateGeneralSettings, useOptimizeDatabase, useRegenerateHttpsCert } from '../../hooks/useSettings';
 import styles from './Settings.module.css';
@@ -134,11 +135,11 @@ export function Settings() {
               <div className={styles.sectionTitle}>General</div>
               <div className={styles.formGroup}>
                 <label>Application Name</label>
-                <input type="text" defaultValue="UCM - Certificate Manager" />
+                <FormInput type="text" defaultValue="UCM - Certificate Manager" />
               </div>
               <div className={styles.formGroup}>
                 <label>Application URL</label>
-                <input type="text" defaultValue="https://netsuit.lan.pew.pet:8443" />
+                <FormInput type="text" defaultValue="https://netsuit.lan.pew.pet:8443" />
               </div>
               <div className={styles.formGroup}>
                 <label>Timezone</label>
@@ -162,13 +163,13 @@ export function Settings() {
               <div className={styles.formGroup}>
                 <label>Session Timeout</label>
                 <div className={styles.inputWithUnit}>
-                  <input type="number" defaultValue="30" />
+                  <FormInput type="number" defaultValue="30" />
                   <span>minutes</span>
                 </div>
               </div>
               <div className={styles.formGroup}>
                 <label>Max Concurrent Sessions</label>
-                <input type="number" defaultValue="5" />
+                <FormInput type="number" defaultValue="5" />
               </div>
             </div>
 
@@ -186,13 +187,13 @@ export function Settings() {
               <div className={styles.formGroup}>
                 <label>Log Retention</label>
                 <div className={styles.inputWithUnit}>
-                  <input type="number" defaultValue="90" />
+                  <FormInput type="number" defaultValue="90" />
                   <span>days</span>
                 </div>
               </div>
               <div className={styles.formGroup}>
                 <label>Enable Audit Log</label>
-                <input type="checkbox" defaultChecked />
+                <FormInput type="checkbox" defaultChecked />
               </div>
             </div>
           </div>
@@ -204,11 +205,11 @@ export function Settings() {
               <div className={styles.sectionTitle}>Database Configuration</div>
               <div className={styles.formGroup}>
                 <label>Database Type</label>
-                <input type="text" defaultValue="SQLite" readOnly />
+                <FormInput type="text" defaultValue="SQLite" readOnly />
               </div>
               <div className={styles.formGroup}>
                 <label>Database Path</label>
-                <input type="text" defaultValue="/var/lib/ucm/ucm.db" readOnly />
+                <FormInput type="text" defaultValue="/var/lib/ucm/ucm.db" readOnly />
               </div>
             </div>
 
@@ -216,15 +217,15 @@ export function Settings() {
               <div className={styles.sectionTitle}>Database Maintenance</div>
               <div className={styles.formGroup}>
                 <label>Database Size</label>
-                <input type="text" defaultValue="142.5 MB" readOnly />
+                <FormInput type="text" defaultValue="142.5 MB" readOnly />
               </div>
               <div className={styles.formGroup}>
                 <label>Fragmentation</label>
-                <input type="text" defaultValue="3.2%" readOnly />
+                <FormInput type="text" defaultValue="3.2%" readOnly />
               </div>
               <div className={styles.formGroup}>
                 <label>Last Optimization</label>
-                <input type="text" defaultValue="2024-03-15 02:00 UTC" readOnly />
+                <FormInput type="text" defaultValue="2024-03-15 02:00 UTC" readOnly />
               </div>
               <div className={styles.formGroup}>
                 <Button 
@@ -246,20 +247,20 @@ export function Settings() {
               <div className={styles.sectionTitle}>Password Policy</div>
               <div className={styles.formGroup}>
                 <label>Minimum Length</label>
-                <input type="number" defaultValue="12" />
+                <FormInput type="number" defaultValue="12" />
               </div>
               <div className={styles.formGroup}>
                 <label>Require Uppercase</label>
-                <input type="checkbox" defaultChecked />
+                <FormInput type="checkbox" defaultChecked />
               </div>
               <div className={styles.formGroup}>
                 <label>Require Numbers</label>
-                <input type="checkbox" defaultChecked />
+                <FormInput type="checkbox" defaultChecked />
               </div>
               <div className={styles.formGroup}>
                 <label>Password Expiration</label>
                 <div className={styles.inputWithUnit}>
-                  <input type="number" defaultValue="90" />
+                  <FormInput type="number" defaultValue="90" />
                   <span>days</span>
                 </div>
               </div>
@@ -269,18 +270,18 @@ export function Settings() {
               <div className={styles.sectionTitle}>Authentication</div>
               <div className={styles.formGroup}>
                 <label>Max Failed Login Attempts</label>
-                <input type="number" defaultValue="5" />
+                <FormInput type="number" defaultValue="5" />
               </div>
               <div className={styles.formGroup}>
                 <label>Account Lockout Duration</label>
                 <div className={styles.inputWithUnit}>
-                  <input type="number" defaultValue="30" />
+                  <FormInput type="number" defaultValue="30" />
                   <span>minutes</span>
                 </div>
               </div>
               <div className={styles.formGroup}>
                 <label>Two-Factor Authentication</label>
-                <input type="checkbox" />
+                <FormInput type="checkbox" />
               </div>
             </div>
 
@@ -288,11 +289,11 @@ export function Settings() {
               <div className={styles.sectionTitle}>HTTPS Certificate</div>
               <div className={styles.formGroup}>
                 <label>Current Certificate</label>
-                <input type="text" defaultValue="CN=ucm.local" readOnly />
+                <FormInput type="text" defaultValue="CN=ucm.local" readOnly />
               </div>
               <div className={styles.formGroup}>
                 <label>Valid Until</label>
-                <input type="text" defaultValue="2025-03-15" readOnly />
+                <FormInput type="text" defaultValue="2025-03-15" readOnly />
               </div>
               <div className={styles.formGroup}>
                 <Button 
@@ -314,7 +315,7 @@ export function Settings() {
               <div className={styles.sectionTitle}>Automated Backup</div>
               <div className={styles.formGroup}>
                 <label>Enable Automated Backup</label>
-                <input type="checkbox" defaultChecked />
+                <FormInput type="checkbox" defaultChecked />
               </div>
               <div className={styles.formGroup}>
                 <label>Backup Schedule</label>
@@ -327,13 +328,13 @@ export function Settings() {
               <div className={styles.formGroup}>
                 <label>Backup Retention</label>
                 <div className={styles.inputWithUnit}>
-                  <input type="number" defaultValue="30" />
+                  <FormInput type="number" defaultValue="30" />
                   <span>days</span>
                 </div>
               </div>
               <div className={styles.formGroup}>
                 <label>Backup Location</label>
-                <input type="text" defaultValue="/var/backups/ucm/" />
+                <FormInput type="text" defaultValue="/var/backups/ucm/" />
               </div>
             </div>
 
@@ -341,11 +342,11 @@ export function Settings() {
               <div className={styles.sectionTitle}>Manual Backup</div>
               <div className={styles.formGroup}>
                 <label>Last Backup</label>
-                <input type="text" defaultValue="2024-03-15 03:00 UTC" readOnly />
+                <FormInput type="text" defaultValue="2024-03-15 03:00 UTC" readOnly />
               </div>
               <div className={styles.formGroup}>
                 <label>Backup Size</label>
-                <input type="text" defaultValue="245.3 MB" readOnly />
+                <FormInput type="text" defaultValue="245.3 MB" readOnly />
               </div>
               <div className={styles.formGroup}>
                 <Button 

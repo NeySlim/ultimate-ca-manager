@@ -52,3 +52,4 @@ const FormInput = ({
 };
 
 export default FormInput;
+export { FormInput };
