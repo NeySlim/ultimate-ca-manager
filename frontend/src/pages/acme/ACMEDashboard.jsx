@@ -242,6 +242,77 @@ export function ACMEDashboard() {
     </div>
   );
 
+  const renderLetsEncryptTab = () => (
+    <div className={styles.tabContent}>
+      {/* Let's Encrypt Proxy Settings */}
+      <div className={styles.settingsCard}>
+        <h3 className={styles.settingsTitle}>
+          <i className="ph ph-link" style={{ marginRight: '0.5rem' }}></i>
+          Let's Encrypt Proxy Configuration
+        </h3>
+        <div className={styles.settingsContent}>
+          <div className={styles.settingRow}>
+            <label className={styles.settingLabel}>Proxy Directory URL:</label>
+            <code className={styles.urlCode}>{window.location.origin}/acme/proxy/directory</code>
+          </div>
+          <div className={styles.settingHint}>
+            This proxy allows you to use Let's Encrypt through UCM while maintaining audit trails and control.
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <StatsGrid columns={4}>
+        <StatCard
+          value={acmeData.stats.accounts}
+          label="Accounts"
+          icon="ph ph-user"
+        />
+        <StatCard
+          value={acmeData.stats.activeOrders}
+          label="Active Orders"
+          icon="ph ph-clock"
+        />
+        <StatCard
+          value={acmeData.stats.completedOrders}
+          label="Completed Orders"
+          icon="ph ph-check-circle"
+        />
+        <StatCard
+          value={acmeData.stats.domains}
+          label="Domains"
+          icon="ph ph-globe"
+        />
+      </StatsGrid>
+
+      {/* Accounts */}
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>Accounts</h3>
+        <SearchToolbar
+          placeholder="Search accounts..."
+          filters={filters}
+          onSearch={(query) => console.log('Search:', query)}
+          onFilterChange={(filter, value) => console.log('Filter:', filter, value)}
+        />
+        <DataTable
+          columns={accountColumns}
+          data={acmeData.accounts}
+          onRowClick={(row) => console.log('Account clicked:', row)}
+        />
+      </div>
+
+      {/* Recent Orders */}
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>Recent Orders</h3>
+        <DataTable
+          columns={orderColumns}
+          data={acmeData.orders}
+          onRowClick={(row) => console.log('Order clicked:', row)}
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className={styles.acmeDashboard}>
       <PageTopBar
