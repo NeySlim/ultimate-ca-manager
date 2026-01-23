@@ -43,7 +43,11 @@ export function Modal({
                 <Dialog.Title className={styles.title}>
                   {title}
                 </Dialog.Title>
-                <button onClick={onClose} className={styles.closeBtn}>
+                <button 
+                  onClick={onClose} 
+                  className={styles.closeBtn}
+                  aria-label="Close modal"
+                >
                   <X size={18} />
                 </button>
               </div>
