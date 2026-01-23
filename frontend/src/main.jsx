@@ -7,6 +7,8 @@ import { queryClient } from './lib/queryClient';
 import { initTheme } from './theme/theme';
 import App from './App.jsx';
 
+// Import animations
+import './core/theme/animations.css';
 // Import Theme System (12 configurations: 2 themes × 6 accents)
 // Note: variables.css is deprecated, using core/theme/global.css instead
 // import './theme/variables.css';
