@@ -177,7 +177,7 @@ export function ACMEDashboard() {
             <label className={styles.settingLabel}>Issuing CA:</label>
             <Select
               value={settings?.issuing_ca_id || ''}
-              onChange={(e) => handleUpdateIssuingCA(e.target.value)}
+              onChange={handleUpdateIssuingCA}
               options={casOptions}
               disabled={loadingCAs}
             />
