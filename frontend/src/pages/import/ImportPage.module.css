@@ -110,6 +110,24 @@
   border-color: var(--accent-primary);
 }
 
+/* Fix browser autofill background */
+.formInput:-webkit-autofill,
+.formInput:-webkit-autofill:hover,
+.formInput:-webkit-autofill:focus,
+.formTextarea:-webkit-autofill,
+.formTextarea:-webkit-autofill:hover,
+.formTextarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-tertiary) inset;
+  transition: background-color 5000s ease-in-out 0s;
+  border-color: var(--border-primary);
+}
+
+.formInput:-webkit-autofill:focus,
+.formTextarea:-webkit-autofill:focus {
+  border-color: var(--accent-primary);
+}
+
 .formHelp {
   font-size: 11px;
   color: var(--text-tertiary);
