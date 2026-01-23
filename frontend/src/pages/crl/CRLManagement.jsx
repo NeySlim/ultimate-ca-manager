@@ -4,6 +4,7 @@ import { DataTable } from '../../components/domain/DataTable';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { ViewCADetailsModal } from '../../components/modals/ViewCADetailsModal';
 import { exportTableData } from '../../utils/export';
 import toast from 'react-hot-toast';
 import api from '../../services/api/api';
@@ -11,6 +12,8 @@ import styles from './CRLManagement.module.css';
 
 export function CRLManagement() {
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [selectedCA, setSelectedCA] = useState(null);
+  const [showCAModal, setShowCAModal] = useState(false);
 
   const handleDownloadCRL = (caId) => {
     window.open(`/api/v2/crl/download/${caId}`, '_blank');
@@ -29,6 +32,11 @@ export function CRLManagement() {
     } finally {
       setIsRegenerating(false);
     }
+  };
+
+  const handleViewCA = (ca) => {
+    setSelectedCA(ca);
+    setShowCAModal(true);
   };
 
   const handleExportCRLs = () => {
@@ -238,11 +246,17 @@ export function CRLManagement() {
           <DataTable
             columns={columns}
             data={cas}
-            onRowClick={(row) => console.log('CA clicked:', row)}
+            onRowClick={handleViewCA}
             pageSize={10}
           />
         </Card.Body>
       </Card>
+
+      <ViewCADetailsModal
+        isOpen={showCAModal}
+        onClose={() => setShowCAModal(false)}
+        ca={selectedCA}
+      />
     </div>
   );
 }
