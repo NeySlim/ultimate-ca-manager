@@ -58,3 +58,7 @@ export { Skeleton, SkeletonCard, SkeletonTable, SkeletonDashboard } from './Skel
 // Data visualization
 export { ProgressCircle } from './ProgressCircle';
 export { AnimatedCounter } from './AnimatedCounter';
+
+// Feedback & states
+export { EmptyState } from './EmptyState';
+export { SuccessAnimation, ConfettiEffect } from './SuccessAnimation';

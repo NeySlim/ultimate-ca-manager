@@ -5,12 +5,13 @@ import styles from './ErrorState.module.css';
 const ErrorState = ({ 
   message = 'An error occurred', 
   error, 
-  onRetry 
+  onRetry,
+  shake = false 
 }) => {
   const errorMessage = error?.message || message;
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${shake ? styles.shake : ''}`}>
       <div className={styles.icon}>
         <i className="ph ph-warning-circle"></i>
       </div>
