@@ -8,7 +8,8 @@ import { initTheme } from './theme/theme';
 import App from './App.jsx';
 
 // Import Theme System (12 configurations: 2 themes × 6 accents)
-import './theme/variables.css';
+// Note: variables.css is deprecated, using core/theme/global.css instead
+// import './theme/variables.css';
 import './core/theme/global.css';
 
 // Initialize theme system on app load

@@ -47,3 +47,7 @@ export { TableComponent as Table, StepperComponent as Stepper };
 // Layout components (for backward compatibility)
 export { default as PageHeader } from './Layout/PageHeader';
 export { default as Widget } from './Layout/Widget';
+
+// State components
+export { default as LoadingState } from './LoadingState';
+export { default as ErrorState } from './ErrorState';

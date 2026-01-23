@@ -75,7 +75,7 @@
 
 .btn-danger:hover:not(.disabled) {
   background: var(--status-danger);
-  color: #fff;
+  color: var(--bg-primary);
   border-color: var(--status-danger);
 }
 
@@ -84,7 +84,7 @@
    ========================================== */
 
 .btn-sm {
-  height: 22px;
+  height: var(--control-height-sm, 22px);
   padding: 0 var(--spacing-sm);
   font-size: 12px;
 }
@@ -94,7 +94,7 @@
 }
 
 .btn-lg {
-  height: 32px;
+  height: var(--control-height-lg, 32px);
   padding: 0 var(--spacing-lg);
   font-size: 14px;
 }

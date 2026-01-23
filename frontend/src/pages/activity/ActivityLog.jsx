@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import LoadingState from '../../components/ui/LoadingState';
+import ErrorState from '../../components/ui/ErrorState';
 import { PageTopBar, FiltersBar, FilterGroup, SectionTabs, Tab } from '../../components/common';
 import { useAccountActivity } from '../../hooks/useAccount';
 import { exportTableData } from '../../utils/export';
@@ -42,7 +44,7 @@ export function ActivityLog() {
           title="Activity"
           badge={<Badge variant="neutral">Loading...</Badge>}
         />
-        <div style={{ padding: '2rem', textAlign: 'center' }}>Loading activity...</div>
+        <LoadingState message="Loading activity..." />
       </div>
     );
   }
@@ -55,9 +57,7 @@ export function ActivityLog() {
           title="Activity"
           badge={<Badge variant="danger">Error</Badge>}
         />
-        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-danger)' }}>
-          Error loading activity: {error.message}
-        </div>
+        <ErrorState error={error} message="Error loading activity" />
       </div>
     );
   }
