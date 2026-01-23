@@ -1,0 +1,16 @@
+.counter {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  animation: fadeIn 400ms ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -54,3 +54,7 @@ export { default as ErrorState } from './ErrorState';
 
 // Skeleton loaders
 export { Skeleton, SkeletonCard, SkeletonTable, SkeletonDashboard } from './Skeleton';
+
+// Data visualization
+export { ProgressCircle } from './ProgressCircle';
+export { AnimatedCounter } from './AnimatedCounter';
