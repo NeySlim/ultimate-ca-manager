@@ -145,8 +145,8 @@ export function ACMEDashboard() {
   const casOptions = [
     { value: '', label: 'Select issuing CA...' },
     ...(casResponse?.data || []).map(ca => ({
-      value: ca.refid,
-      label: ca.common_name || ca.refid
+      value: ca._raw?.refid || ca.id,
+      label: ca.name || ca._raw?.common_name || 'Unnamed CA'
     }))
   ];
 
