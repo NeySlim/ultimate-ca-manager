@@ -7,3 +7,6 @@ export { Switch } from './Switch';
 export { Select } from './Select';
 export { TextArea } from './TextArea';
 export { Card } from './Card';
+export { GlassCard } from './GlassCard';
+export { GradientBadge } from './GradientBadge';
+export { AnimatedCheckbox } from './AnimatedCheckbox';

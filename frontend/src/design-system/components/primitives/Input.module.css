@@ -7,8 +7,19 @@
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border-default);
   border-radius: 6px;
-  transition: all var(--duration-fast);
+  transition: all var(--duration-normal) var(--easing-smooth);
+  position: relative;
 }
-.input:focus { outline: none; border-color: var(--color-blue-500); box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1); }
+
+.input:focus { 
+  outline: none; 
+  border-color: var(--color-blue-500); 
+  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.15);
+  transform: translateY(-1px);
+}
+
 .input::placeholder { color: var(--color-text-tertiary); }
-.input.error { border-color: var(--color-red-500); }
+.input.error { 
+  border-color: var(--color-red-500);
+  box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.1);
+}
