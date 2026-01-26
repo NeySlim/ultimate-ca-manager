@@ -6,3 +6,4 @@ export { Radio } from './Radio';
 export { Switch } from './Switch';
 export { Select } from './Select';
 export { TextArea } from './TextArea';
+export { Card } from './Card';

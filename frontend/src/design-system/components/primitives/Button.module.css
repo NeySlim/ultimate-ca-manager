@@ -10,11 +10,35 @@
   cursor: pointer;
   transition: all var(--duration-fast) var(--easing-smooth);
   white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+}
+
+.button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 70%);
+  opacity: 0;
+  transform: scale(0);
+  transition: all 0.4s;
+}
+
+.button:active::before {
+  opacity: 1;
+  transform: scale(2);
+  transition: all 0s;
 }
 
 .button:disabled { opacity: 0.5; cursor: not-allowed; }
-.button:hover:not(:disabled) { transform: translateY(-1px); }
-.button:active:not(:disabled) { transform: translateY(0); }
+.button:hover:not(:disabled) { 
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+.button:active:not(:disabled) { 
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
 
 .primary { background: var(--color-blue-500); color: white; }
 .primary:hover:not(:disabled) { background: var(--color-blue-600); }
