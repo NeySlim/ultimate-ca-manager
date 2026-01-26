@@ -16,18 +16,18 @@ import {
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 
 // Design System V3 Components
-import { Card } from '../design-system/components/primitives/Card';
-import { GlassCard } from '../design-system/components/primitives/GlassCard';
-import { Badge } from '../design-system/components/primitives/Badge';
-import { GradientBadge } from '../design-system/components/primitives/GradientBadge';
-import { Button } from '../design-system/components/primitives/Button';
-import { Grid } from '../design-system/components/layout/Grid';
-import { Stack } from '../design-system/components/layout/Stack';
-import { Inline } from '../design-system/components/layout/Inline';
-import { Divider } from '../design-system/components/layout/Divider';
-import { Alert } from '../design-system/components/feedback/Alert';
-import { EmptyState } from '../design-system/components/feedback/EmptyState';
-import { Skeleton } from '../design-system/components/feedback/Skeleton';
+import { Card } from '../../design-system/components/primitives/Card';
+import { GlassCard } from '../../design-system/components/primitives/GlassCard';
+import { Badge } from '../../design-system/components/primitives/Badge';
+import { GradientBadge } from '../../design-system/components/primitives/GradientBadge';
+import { Button } from '../../design-system/components/primitives/Button';
+import { Grid } from '../../design-system/components/layout/Grid';
+import { Stack } from '../../design-system/components/layout/Stack';
+import { Inline } from '../../design-system/components/layout/Inline';
+import { Divider } from '../../design-system/components/layout/Divider';
+import { Alert } from '../../design-system/components/feedback/Alert';
+import { EmptyState } from '../../design-system/components/feedback/EmptyState';
+import { Skeleton } from '../../design-system/components/feedback/Skeleton';
 import { useDashboardStats, useDashboardOverview, useDashboardActivity, useDashboardExpiringCerts } from '../../hooks/useDashboard';
 import styles from './DashboardV3.module.css';
 
