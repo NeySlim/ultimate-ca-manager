@@ -103,6 +103,7 @@
 .tabs {
   display: flex;
   gap: 4px;
+  position: relative;
 }
 
 .tab {
@@ -129,6 +130,58 @@
 .tab.active {
   color: var(--text-primary);
   border-bottom-color: var(--accent-primary);
+}
+
+/* Dropdown Menus */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  margin-top: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  min-width: 200px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.more-menu {
+  left: 0;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: 10px var(--space-md);
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.dropdown-item:hover {
+  background: var(--bg-tertiary);
+  color: var(--accent-primary);
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.new-btn-container {
+  position: relative;
+}
+
+.new-menu {
+  right: 0;
 }
 
 .new-btn {

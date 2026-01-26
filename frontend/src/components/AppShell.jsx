@@ -5,6 +5,8 @@ import './AppShell.css'
 
 export default function AppShell({ children }) {
   const [searchOpen, setSearchOpen] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [showNewMenu, setShowNewMenu] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   
@@ -30,10 +32,10 @@ export default function AppShell({ children }) {
         </div>
         
         <div className="header-right">
-          <button className="icon-btn" title="Account">
+          <button className="icon-btn" title="Account" onClick={() => navigate('/account')}>
             <User size={20} />
           </button>
-          <button className="icon-btn" title="Settings">
+          <button className="icon-btn" title="Settings" onClick={() => navigate('/settings')}>
             <Gear size={20} />
           </button>
           <button className="icon-btn" title="Help">
@@ -47,7 +49,7 @@ export default function AppShell({ children }) {
         <div className="nav-left">
           <button 
             className="search-btn"
-            onClick={() => setSearchOpen(!searchOpen)}
+            onClick={() => alert('⌘K Command Palette coming in Phase 4!')}
           >
             <MagnifyingGlass size={16} />
             <span>Search...</span>
@@ -58,22 +60,68 @@ export default function AppShell({ children }) {
             {tabs.map(tab => (
               <button
                 key={tab.id}
-                className={`tab ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => tab.path && navigate(tab.path)}
+                className={`tab ${activeTab === tab.id ? 'active' : ''} ${tab.dropdown ? 'dropdown-trigger' : ''}`}
+                onClick={() => {
+                  if (tab.dropdown) {
+                    setShowMoreMenu(!showMoreMenu)
+                  } else if (tab.path) {
+                    navigate(tab.path)
+                  }
+                }}
               >
                 {tab.label}
                 {tab.dropdown && <CaretDown size={14} />}
               </button>
             ))}
+            
+            {/* More Dropdown Menu */}
+            {showMoreMenu && (
+              <div className="dropdown-menu more-menu">
+                <button className="dropdown-item" onClick={() => { navigate('/settings'); setShowMoreMenu(false); }}>
+                  <Gear size={16} />
+                  <span>Settings</span>
+                </button>
+                <button className="dropdown-item" onClick={() => { navigate('/users'); setShowMoreMenu(false); }}>
+                  <User size={16} />
+                  <span>Users</span>
+                </button>
+                <div className="dropdown-divider"></div>
+                <button className="dropdown-item" onClick={() => { navigate('/account'); setShowMoreMenu(false); }}>
+                  <User size={16} />
+                  <span>Account</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
         
         <div className="nav-right">
-          <button className="new-btn">
-            <Plus size={16} weight="bold" />
-            <span>New</span>
-            <CaretDown size={14} />
-          </button>
+          <div className="new-btn-container">
+            <button className="new-btn" onClick={() => setShowNewMenu(!showNewMenu)}>
+              <Plus size={16} weight="bold" />
+              <span>New</span>
+              <CaretDown size={14} />
+            </button>
+            
+            {/* New Dropdown Menu */}
+            {showNewMenu && (
+              <div className="dropdown-menu new-menu">
+                <button className="dropdown-item" onClick={() => { navigate('/cas'); setShowNewMenu(false); }}>
+                  <span>Create CA</span>
+                </button>
+                <button className="dropdown-item" onClick={() => { navigate('/certificates'); setShowNewMenu(false); }}>
+                  <span>Issue Certificate</span>
+                </button>
+                <button className="dropdown-item" onClick={() => { navigate('/csrs'); setShowNewMenu(false); }}>
+                  <span>Upload CSR</span>
+                </button>
+                <div className="dropdown-divider"></div>
+                <button className="dropdown-item" onClick={() => { navigate('/users'); setShowNewMenu(false); }}>
+                  <span>Create User</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </nav>
       
