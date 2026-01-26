@@ -2,4 +2,7 @@ export { Button } from './Button';
 export { Input } from './Input';
 export { Badge } from './Badge';
 export { Checkbox } from './Checkbox';
+export { Radio } from './Radio';
+export { Switch } from './Switch';
 export { Select } from './Select';
+export { TextArea } from './TextArea';

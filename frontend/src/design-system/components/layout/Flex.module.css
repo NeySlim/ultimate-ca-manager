@@ -1,0 +1,16 @@
+.flex { display: flex; }
+.row { flex-direction: row; }
+.column { flex-direction: column; }
+.gapxs { gap: var(--spacing-xs); }
+.gapsm { gap: var(--spacing-sm); }
+.gapmd { gap: var(--spacing-md); }
+.gaplg { gap: var(--spacing-lg); }
+.gapxl { gap: var(--spacing-xl); }
+.alignstretch { align-items: stretch; }
+.alignstart { align-items: flex-start; }
+.aligncenter { align-items: center; }
+.alignend { align-items: flex-end; }
+.justifyflex-start { justify-content: flex-start; }
+.justifycenter { justify-content: center; }
+.justifyflex-end { justify-content: flex-end; }
+.justifyspace-between { justify-content: space-between; }
