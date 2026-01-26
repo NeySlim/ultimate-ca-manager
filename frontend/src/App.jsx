@@ -4,6 +4,8 @@ import Dashboard from './pages/Dashboard'
 import CAs from './pages/CAs'
 import Certificates from './pages/Certificates'
 import CSRs from './pages/CSRs'
+import Settings from './pages/Settings'
+import Users from './pages/Users'
 import Login from './pages/Login'
 
 export default function App() {
@@ -16,6 +18,8 @@ export default function App() {
         <Route path="/cas" element={<AppShell><CAs /></AppShell>} />
         <Route path="/certificates" element={<AppShell><Certificates /></AppShell>} />
         <Route path="/csrs" element={<AppShell><CSRs /></AppShell>} />
+        <Route path="/settings" element={<AppShell><Settings /></AppShell>} />
+        <Route path="/users" element={<AppShell><Users /></AppShell>} />
       </Routes>
     </BrowserRouter>
   )
