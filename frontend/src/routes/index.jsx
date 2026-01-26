@@ -21,6 +21,7 @@ const Settings = lazy(() => import('../pages/settings/Settings'));
 const Profile = lazy(() => import('../pages/profile/Profile'));
 const Showcase = lazy(() => import('../pages/Showcase'));
 const ShowcaseAnimations = lazy(() => import('../pages/ShowcaseAnimations'));
+const ShowcaseAll = lazy(() => import('../pages/ShowcaseAll'));
 
 // Loading fallback component
 function PageLoader() {
@@ -71,6 +72,7 @@ export function AppRoutes() {
         <Route path="profile" element={<LazyPage><Profile /></LazyPage>} />
         <Route path="showcase" element={<LazyPage><Showcase /></LazyPage>} />
         <Route path="showcase/animations" element={<LazyPage><ShowcaseAnimations /></LazyPage>} />
+        <Route path="showcase/all" element={<LazyPage><ShowcaseAll /></LazyPage>} />
       </Route>
     </Routes>
   );
