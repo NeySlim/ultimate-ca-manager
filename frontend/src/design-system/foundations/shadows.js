@@ -10,7 +10,6 @@ export const shadows = {
     lg: '0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
     xl: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
     '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
-    none: 'none',
     
     // Glow effects
     'glow-blue': '0 0 20px rgba(0, 168, 252, 0.4)',
@@ -24,7 +23,6 @@ export const shadows = {
     lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
     xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
     '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-    none: 'none',
     
     // Glow effects
     'glow-blue': '0 0 20px rgba(33, 150, 243, 0.3)',

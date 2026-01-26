@@ -1,0 +1,18 @@
+.tabs {
+  display: flex;
+  gap: var(--spacing-2);
+  border-bottom: 1px solid var(--color-border-default);
+}
+.tab {
+  padding: var(--spacing-3) var(--spacing-4);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.tab:hover { color: var(--color-text-primary); }
+.tab.active { color: var(--color-blue-500); border-bottom-color: var(--color-blue-500); }

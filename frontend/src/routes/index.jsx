@@ -19,8 +19,7 @@ const TrustStore = lazy(() => import('../pages/truststore/TrustStore'));
 const UserList = lazy(() => import('../pages/users/UserList'));
 const Settings = lazy(() => import('../pages/settings/Settings'));
 const Profile = lazy(() => import('../pages/profile/Profile'));
-
-
+const Showcase = lazy(() => import('../pages/Showcase'));
 
 // Loading fallback component
 function PageLoader() {
@@ -69,6 +68,7 @@ export function AppRoutes() {
         <Route path="users" element={<LazyPage><UserList /></LazyPage>} />
         <Route path="settings" element={<LazyPage><Settings /></LazyPage>} />
         <Route path="profile" element={<LazyPage><Profile /></LazyPage>} />
+        <Route path="showcase" element={<LazyPage><Showcase /></LazyPage>} />
       </Route>
     </Routes>
   );
