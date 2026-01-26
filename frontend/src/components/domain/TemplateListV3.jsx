@@ -10,7 +10,6 @@ import {
   Download,
   FileText,
   Star,
-  StarFill,
   Check
 } from '@phosphor-icons/react';
 
@@ -59,7 +58,7 @@ function TemplateCard({ template, onSelect, onDuplicate, onEdit, onDelete, onTog
             }}
           >
             {template.is_favorite ? (
-              <StarFill size={20} weight="fill" color="var(--color-warning-500)" />
+              <Star size={20} weight="fill" color="var(--color-warning-500)" />
             ) : (
               <Star size={20} />
             )}
