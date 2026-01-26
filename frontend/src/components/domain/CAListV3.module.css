@@ -1,0 +1,262 @@
+.container {
+  padding: var(--spacing-2xl);
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+}
+
+.title {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Filters Bar */
+.filtersBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.filtersLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.filtersRight {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.viewToggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+}
+
+/* Tree View */
+.treeView {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.treeNode {
+  --indent: calc(var(--level) * 32px);
+  margin-left: var(--indent);
+}
+
+.treeChildren {
+  margin-top: var(--spacing-sm);
+  position: relative;
+}
+
+.treeChildren::before {
+  content: '';
+  position: absolute;
+  left: -16px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border-secondary);
+}
+
+/* CA Card */
+.caCard {
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--easing-smooth);
+}
+
+.caCardContent {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.expandButton {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.expandButton:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.expandButton:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.caIcon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  color: var(--color-primary-500);
+  flex-shrink: 0;
+}
+
+.caInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.caName {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  flex-wrap: wrap;
+}
+
+.caActions {
+  flex-shrink: 0;
+}
+
+/* Grid View */
+.gridCard {
+  height: 100%;
+  transition: all var(--duration-fast) var(--easing-smooth);
+}
+
+.gridCard:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+}
+
+.gridCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gridCardIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.gridCardTitle {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gridCardSubtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gridCardFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border-secondary);
+}
+
+.gridCardStat {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.gridCardStat svg {
+  color: var(--color-text-tertiary);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .container {
+    padding: var(--spacing-lg);
+  }
+
+  .filtersBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filtersLeft,
+  .filtersRight {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .filtersLeft > * {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: var(--spacing-md);
+  }
+
+  .header {
+    flex-direction: column;
+  }
+
+  .title {
+    font-size: var(--text-2xl);
+  }
+}
