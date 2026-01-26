@@ -1,0 +1,20 @@
+.settings-page { max-width: 1400px; }
+.settings-container { display: grid; grid-template-columns: 250px 1fr; gap: var(--space-xl); }
+.settings-tabs { display: flex; flex-direction: column; gap: 4px; }
+.settings-tab { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-md); background: transparent; border: none; border-radius: var(--radius-md); color: var(--text-secondary); font-size: 14px; cursor: pointer; transition: all 0.2s; }
+.settings-tab:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.settings-tab.active { background: var(--accent-primary); color: white; }
+.settings-content { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-xl); }
+.settings-tab-content h2 { font-size: 20px; margin-bottom: var(--space-lg); }
+.tab-description { margin-bottom: var(--space-lg); color: var(--text-secondary); }
+.form-actions { display: flex; gap: var(--space-md); margin-top: var(--space-xl); }
+.backup-section { margin-bottom: var(--space-xl); padding: var(--space-lg); background: var(--bg-tertiary); border-radius: var(--radius-md); }
+.backup-section h3 { font-size: 16px; margin-bottom: var(--space-sm); }
+.backup-section p { margin-bottom: var(--space-md); color: var(--text-secondary); font-size: 14px; }
+.backup-section.warning { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); }
+.btn-danger { background: var(--accent-danger); color: white; padding: 8px var(--space-md); border: none; border-radius: var(--radius-md); cursor: pointer; }
+.webhooks-list { display: flex; flex-direction: column; gap: var(--space-md); margin-bottom: var(--space-lg); }
+.webhook-item { display: flex; justify-content: space-between; align-items: center; padding: var(--space-md); background: var(--bg-tertiary); border-radius: var(--radius-md); }
+.webhook-info strong { display: block; margin-bottom: 4px; }
+.small { font-size: 12px; }
+@media (max-width: 768px) { .settings-container { grid-template-columns: 1fr; } .settings-tabs { flex-direction: row; overflow-x: auto; } }
