@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import styles from './SettingsV3.module.css';
-import Card from '../../design-system/components/primitives/Card';
-import Button from '../../design-system/components/primitives/Button';
-import Input from '../../design-system/components/primitives/Input';
-import Select from '../../design-system/components/primitives/Select';
-import Switch from '../../design-system/components/primitives/Switch';
-import Tabs from '../../design-system/components/navigation/Tabs';
-import Alert from '../../design-system/components/feedback/Alert';
-import Badge from '../../design-system/components/primitives/Badge';
-import Stack from '../../design-system/components/layout/Stack';
-import Grid from '../../design-system/components/layout/Grid';
+import { Card } from '../../design-system/components/primitives/Card';
+import { Button } from '../../design-system/components/primitives/Button';
+import { Input } from '../../design-system/components/primitives/Input';
+import { Select } from '../../design-system/components/primitives/Select';
+import { Switch } from '../../design-system/components/primitives/Switch';
+import { Tabs } from '../../design-system/components/navigation/Tabs';
+import { Alert } from '../../design-system/components/feedback/Alert';
+import { Badge } from '../../design-system/components/primitives/Badge';
+import { Stack } from '../../design-system/components/layout/Stack';
+import { Grid } from '../../design-system/components/layout/Grid';
 import { 
   Certificate, 
   Key, 
