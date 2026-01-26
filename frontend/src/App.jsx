@@ -1,26 +1,24 @@
-import React from 'react';
-import { BrowserRouter } from 'react-router';
-import { AppRoutes } from './routes';
-import { AuthProvider } from './contexts/AuthContext';
-import { ThemeProvider } from './design-system/themes';
-import { CommandPalette, useCommandPalette } from './design-system/components/features/CommandPalette';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import AppShell from './components/AppShell'
+import Dashboard from './pages/Dashboard'
+import Login from './pages/Login'
 
-/**
- * Main App Component with Auth Protection
- */
-function App() {
-  const { isOpen, close } = useCommandPalette();
-
+export default function App() {
   return (
-    <ThemeProvider>
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-          <CommandPalette isOpen={isOpen} onClose={close} />
-        </AuthProvider>
-      </BrowserRouter>
-    </ThemeProvider>
-  );
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={
+          <AppShell>
+            <Dashboard />
+          </AppShell>
+        } />
+        <Route path="/dashboard" element={
+          <AppShell>
+            <Dashboard />
+          </AppShell>
+        } />
+      </Routes>
+    </BrowserRouter>
+  )
 }
-
-export default App;

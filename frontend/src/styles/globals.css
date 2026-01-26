@@ -1,0 +1,36 @@
+:root {
+  --bg-primary: #0A0E14;
+  --bg-secondary: #161B22;
+  --bg-tertiary: #1F2428;
+  --text-primary: #E6EDF3;
+  --text-secondary: #8B949E;
+  --accent-primary: #3B82F6;
+  --accent-success: #22C55E;
+  --accent-warning: #F59E0B;
+  --accent-danger: #EF4444;
+  --border: #30363D;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+#root {
+  min-height: 100vh;
+}

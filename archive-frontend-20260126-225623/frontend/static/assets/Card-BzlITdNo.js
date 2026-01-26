@@ -1,0 +1,1 @@
+import{j as n}from"./index-BF_YdiPX.js";const c="_card_eqz39_1",d="_hover_eqz39_9",_="_gradient_eqz39_15",r={card:c,hover:d,gradient:_};function v({children:e,hover:t=!0,gradient:a,className:o,...s}){return n.jsx("div",{className:`${r.card} ${t?r.hover:""} ${a?r.gradient:""} ${o||""}`,...s,children:e})}export{v as C};
