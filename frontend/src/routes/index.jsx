@@ -6,6 +6,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 // Lazy load pages for code splitting
 const Login = lazy(() => import('../pages/Login'));
 const Dashboard = lazy(() => import('../pages/Dashboard'));
+const DashboardV3 = lazy(() => import('../components/domain/DashboardV3'));
 const ActivityLog = lazy(() => import('../pages/activity/ActivityLog'));
 const CAList = lazy(() => import('../pages/cas/CAList'));
 const CertificateList = lazy(() => import('../pages/certificates/CertificateList'));
@@ -56,7 +57,8 @@ export function AppRoutes() {
       <Route path="/login" element={<LazyPage><Login /></LazyPage>} />
       <Route path="/" element={<AppLayout />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<LazyPage><Dashboard /></LazyPage>} />
+        <Route path="dashboard" element={<LazyPage><DashboardV3 /></LazyPage>} />
+        <Route path="dashboard/old" element={<LazyPage><Dashboard /></LazyPage>} />
         <Route path="activity" element={<LazyPage><ActivityLog /></LazyPage>} />
         <Route path="cas" element={<LazyPage><CAList /></LazyPage>} />
         <Route path="certificates" element={<LazyPage><CertificateList /></LazyPage>} />
