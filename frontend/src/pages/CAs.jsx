@@ -312,3 +312,106 @@ function CADetailsModal({ ca, onClose }) {
     </div>
   )
 }
+
+function ImportCAModal({ onClose, onImport }) {
+  const [certData, setCertData] = useState('')
+  const [keyData, setKeyData] = useState('')
+  const [file, setFile] = useState(null)
+  const [uploadMethod, setUploadMethod] = useState('paste')
+  
+  async function handleSubmit(e) {
+    e.preventDefault()
+    try {
+      if (uploadMethod === 'paste') {
+        await api.importCA({ certificate: certData, private_key: keyData })
+      } else {
+        const formData = new FormData()
+        formData.append('ca_file', file)
+        await api.importCA(formData)
+      }
+      onImport()
+      onClose()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
+  }
+  
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-large" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Import Certificate Authority</h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-group">
+              <label>Import Method</label>
+              <div className="radio-group" style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <input 
+                    type="radio"
+                    checked={uploadMethod === 'paste'}
+                    onChange={() => setUploadMethod('paste')}
+                  />
+                  Paste PEM
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <input 
+                    type="radio"
+                    checked={uploadMethod === 'file'}
+                    onChange={() => setUploadMethod('file')}
+                  />
+                  Upload File
+                </label>
+              </div>
+            </div>
+            
+            {uploadMethod === 'paste' ? (
+              <>
+                <div className="form-group">
+                  <label>CA Certificate (PEM format) *</label>
+                  <textarea 
+                    required
+                    value={certData}
+                    onChange={e => setCertData(e.target.value)}
+                    placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                    rows={8}
+                    style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Private Key (PEM format, optional)</label>
+                  <textarea 
+                    value={keyData}
+                    onChange={e => setKeyData(e.target.value)}
+                    placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+                    rows={8}
+                    style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                  />
+                  <small>Only needed if you want to issue certificates with this CA</small>
+                </div>
+              </>
+            ) : (
+              <div className="form-group">
+                <label>CA Bundle File (PEM/P12) *</label>
+                <input 
+                  type="file"
+                  required
+                  accept=".pem,.p12,.pfx"
+                  onChange={e => setFile(e.target.files[0])}
+                />
+                <small>Accepted formats: PEM, P12, PFX</small>
+              </div>
+            )}
+          </div>
+          
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary">Import CA</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

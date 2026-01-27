@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { User, Plus } from '@phosphor-icons/react'
+import { User, Plus, Pencil, Trash } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
@@ -10,6 +10,7 @@ export default function Users() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editUser, setEditUser] = useState(null)
   
   useEffect(() => {
     fetchUsers()
@@ -67,7 +68,21 @@ export default function Users() {
                 <td><span className={`role-badge ${user.role || 'viewer'}`}>{user.role || 'viewer'}</span></td>
                 <td><span className="status-badge success">{user.status || 'active'}</span></td>
                 <td className="user-actions">
-                  <button className="icon-btn">Edit</button>
+                  <button className="icon-btn" onClick={() => setEditUser(user)}>
+                    <Pencil size={16} />
+                  </button>
+                  <button className="icon-btn" onClick={() => {
+                    if (confirm(`Delete user ${user.username}? This action cannot be undone.`)) {
+                      api.deleteUser(user.id)
+                        .then(() => {
+                          alert('User deleted successfully')
+                          fetchUsers()
+                        })
+                        .catch(err => alert('Delete failed: ' + err.message))
+                    }
+                  }}>
+                    <Trash size={16} />
+                  </button>
                 </td>
               </tr>
             ))}
@@ -76,6 +91,7 @@ export default function Users() {
       </div>
       
       {showCreateModal && <CreateUserModal onClose={() => setShowCreateModal(false)} onCreate={fetchUsers} />}
+      {editUser && <EditUserModal user={editUser} onClose={() => setEditUser(null)} onUpdate={fetchUsers} />}
     </div>
   )
 }
@@ -127,6 +143,62 @@ function CreateUserModal({ onClose, onCreate }) {
           <div className="modal-footer">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn-primary">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function EditUserModal({ user, onClose, onUpdate }) {
+  const [formData, setFormData] = useState({
+    email: user.email || '',
+    role: user.role || 'user',
+    status: user.status || 'active'
+  })
+  
+  async function handleSubmit(e) {
+    e.preventDefault()
+    try {
+      await api.updateUser(user.id, formData)
+      onUpdate()
+      onClose()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
+  }
+  
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Edit User: {user.username}</h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-group">
+              <label>Email</label>
+              <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+            </div>
+            <div className="form-group">
+              <label>Role</label>
+              <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Status</label>
+              <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary">Update</button>
           </div>
         </form>
       </div>
