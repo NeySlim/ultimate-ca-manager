@@ -1,0 +1,395 @@
+/**
+ * ACME Page
+ */
+import { useState, useEffect } from 'react'
+import { Key, Plus, Trash, CheckCircle, XCircle } from '@phosphor-icons/react'
+import {
+  ExplorerPanel, DetailsPanel, Table, Button, Badge,
+  Input, Modal, Tabs,
+  LoadingSpinner, EmptyState, StatusIndicator
+} from '../components'
+import { acmeService } from '../services'
+import { useNotification } from '../contexts'
+
+export default function ACMEPage() {
+  const { showSuccess, showError } = useNotification()
+  
+  const [accounts, setAccounts] = useState([])
+  const [selectedAccount, setSelectedAccount] = useState(null)
+  const [orders, setOrders] = useState([])
+  const [challenges, setChallenges] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+
+  useEffect(() => {
+    loadAccounts()
+  }, [])
+
+  const loadAccounts = async () => {
+    setLoading(true)
+    try {
+      const data = await acmeService.getAccounts()
+      setAccounts(data.accounts || [])
+      if (data.accounts?.length > 0 && !selectedAccount) {
+        selectAccount(data.accounts[0])
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to load ACME accounts')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const selectAccount = async (account) => {
+    try {
+      const [accountData, ordersData, challengesData] = await Promise.all([
+        acmeService.getAccountById(account.id),
+        acmeService.getOrders(account.id),
+        acmeService.getChallenges(account.id),
+      ])
+      
+      setSelectedAccount(accountData)
+      setOrders(ordersData.orders || [])
+      setChallenges(challengesData.challenges || [])
+    } catch (error) {
+      showError(error.message || 'Failed to load account details')
+    }
+  }
+
+  const handleCreate = async (accountData) => {
+    try {
+      const created = await acmeService.createAccount(accountData)
+      showSuccess('ACME account created successfully')
+      setShowCreateModal(false)
+      loadAccounts()
+      selectAccount(created)
+    } catch (error) {
+      showError(error.message || 'Failed to create ACME account')
+    }
+  }
+
+  const handleDeactivate = async (id) => {
+    if (!confirm('Are you sure you want to deactivate this ACME account?')) return
+    
+    try {
+      await acmeService.deactivateAccount(id)
+      showSuccess('ACME account deactivated')
+      loadAccounts()
+    } catch (error) {
+      showError(error.message || 'Failed to deactivate account')
+    }
+  }
+
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this ACME account?')) return
+    
+    try {
+      await acmeService.deleteAccount(id)
+      showSuccess('ACME account deleted')
+      setSelectedAccount(null)
+      loadAccounts()
+    } catch (error) {
+      showError(error.message || 'Failed to delete account')
+    }
+  }
+
+  const accountColumns = [
+    { 
+      key: 'email', 
+      label: 'Email',
+      render: (val) => <span className="font-medium">{val}</span>
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (val) => (
+        <div className="flex items-center gap-2">
+          <StatusIndicator status={val === 'valid' ? 'active' : 'inactive'} />
+          <Badge variant={val === 'valid' ? 'success' : 'secondary'}>{val}</Badge>
+        </div>
+      )
+    },
+    {
+      key: 'orders_count',
+      label: 'Orders',
+      render: (val) => val || 0
+    },
+    {
+      key: 'created_at',
+      label: 'Created',
+      render: (val) => new Date(val).toLocaleDateString()
+    },
+  ]
+
+  const orderColumns = [
+    { key: 'domain', label: 'Domain' },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (val) => <Badge variant={val === 'valid' ? 'success' : 'warning'}>{val}</Badge>
+    },
+    { key: 'created_at', label: 'Created', render: (val) => new Date(val).toLocaleString() },
+  ]
+
+  const challengeColumns = [
+    { key: 'type', label: 'Type', render: (val) => <Badge variant="secondary">{val}</Badge> },
+    { key: 'domain', label: 'Domain' },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (val) => (
+        <Badge variant={
+          val === 'valid' ? 'success' :
+          val === 'pending' ? 'warning' :
+          'danger'
+        }>
+          {val}
+        </Badge>
+      )
+    },
+    { key: 'validated_at', label: 'Validated', render: (val) => val ? new Date(val).toLocaleString() : '-' },
+  ]
+
+  const detailTabs = selectedAccount ? [
+    {
+      id: 'info',
+      label: 'Account Info',
+      icon: <Key size={16} />,
+      content: (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-text-secondary uppercase mb-1">Email</p>
+              <p className="text-sm text-text-primary">{selectedAccount.email}</p>
+            </div>
+            <div>
+              <p className="text-xs text-text-secondary uppercase mb-1">Status</p>
+              <div className="flex items-center gap-2">
+                <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'} />
+                <span className="text-sm">{selectedAccount.status}</span>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs text-text-secondary uppercase mb-1">Key Type</p>
+              <p className="text-sm text-text-primary">{selectedAccount.key_type || 'RSA-2048'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-text-secondary uppercase mb-1">Created</p>
+              <p className="text-sm text-text-primary">
+                {new Date(selectedAccount.created_at).toLocaleString()}
+              </p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs text-text-secondary uppercase mb-1">Account ID</p>
+              <p className="text-xs font-mono text-text-primary break-all">
+                {selectedAccount.account_id}
+              </p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs text-text-secondary uppercase mb-1">Terms of Service</p>
+              <div className="flex items-center gap-2">
+                {selectedAccount.tos_agreed ? (
+                  <>
+                    <CheckCircle size={16} className="text-green-500" />
+                    <span className="text-sm text-green-500">Agreed</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle size={16} className="text-red-500" />
+                    <span className="text-sm text-red-500">Not Agreed</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'orders',
+      label: 'Active Orders',
+      content: (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-text-secondary">
+              {orders.length} active orders
+            </p>
+          </div>
+          
+          {orders.length === 0 ? (
+            <EmptyState
+              title="No active orders"
+              description="No pending certificate orders for this account"
+            />
+          ) : (
+            <Table
+              columns={orderColumns}
+              data={orders}
+            />
+          )}
+        </div>
+      )
+    },
+    {
+      id: 'challenges',
+      label: 'Challenges',
+      content: (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-text-secondary">
+              {challenges.length} challenges
+            </p>
+          </div>
+          
+          {challenges.length === 0 ? (
+            <EmptyState
+              title="No challenges"
+              description="No active ACME challenges"
+            />
+          ) : (
+            <Table
+              columns={challengeColumns}
+              data={challenges}
+            />
+          )}
+        </div>
+      )
+    },
+  ] : []
+
+  return (
+    <>
+      <ExplorerPanel
+        title="ACME Accounts"
+        footer={
+          <div className="text-xs text-text-secondary">
+            {accounts.length} accounts
+          </div>
+        }
+      >
+        <div className="p-4">
+          <Button onClick={() => setShowCreateModal(true)} className="w-full">
+            <Plus size={18} />
+            Create Account
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <LoadingSpinner />
+            </div>
+          ) : accounts.length === 0 ? (
+            <EmptyState
+              icon={Key}
+              title="No ACME accounts"
+              description="Create an ACME account to use automatic certificate issuance"
+              action={{
+                label: 'Create Account',
+                onClick: () => setShowCreateModal(true)
+              }}
+            />
+          ) : (
+            <Table
+              columns={accountColumns}
+              data={accounts}
+              onRowClick={selectAccount}
+            />
+          )}
+        </div>
+      </ExplorerPanel>
+
+      <DetailsPanel
+        breadcrumb={[
+          { label: 'ACME' },
+          { label: selectedAccount?.email || '...' }
+        ]}
+        title={selectedAccount?.email || 'Select an account'}
+        actions={selectedAccount && (
+          <>
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              onClick={() => handleDeactivate(selectedAccount.id)}
+              disabled={selectedAccount.status !== 'valid'}
+            >
+              Deactivate
+            </Button>
+            <Button variant="danger" size="sm" onClick={() => handleDelete(selectedAccount.id)}>
+              <Trash size={16} />
+              Delete
+            </Button>
+          </>
+        )}
+      >
+        {!selectedAccount ? (
+          <EmptyState
+            title="No account selected"
+            description="Select an ACME account to view details"
+          />
+        ) : (
+          <Tabs tabs={detailTabs} defaultTab="info" />
+        )}
+      </DetailsPanel>
+
+      {/* Create Account Modal */}
+      <Modal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Create ACME Account"
+      >
+        <CreateACMEAccountForm
+          onSubmit={handleCreate}
+          onCancel={() => setShowCreateModal(false)}
+        />
+      </Modal>
+    </>
+  )
+}
+
+function CreateACMEAccountForm({ onSubmit, onCancel }) {
+  const [formData, setFormData] = useState({
+    email: '',
+    key_type: 'RSA-2048',
+    agree_tos: false,
+  })
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!formData.agree_tos) {
+      alert('You must agree to the Terms of Service')
+      return
+    }
+    onSubmit(formData)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Input
+        label="Email Address"
+        type="email"
+        value={formData.email}
+        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+        required
+        helperText="Contact email for certificate expiry notifications"
+      />
+      
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={formData.agree_tos}
+          onChange={(e) => setFormData(prev => ({ ...prev, agree_tos: e.target.checked }))}
+          className="rounded border-border bg-bg-tertiary mt-1"
+        />
+        <span className="text-sm text-text-primary">
+          I agree to the ACME Terms of Service
+        </span>
+      </label>
+      
+      <div className="flex gap-3 pt-4">
+        <Button type="submit">Create Account</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
+  )
+}

@@ -207,7 +207,7 @@ class Config:
     SESSION_COOKIE_SECURE = True  # HTTPS only
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
-    PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)  # 30 minutes session timeout
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=24)  # 24 hours session
     SESSION_REFRESH_EACH_REQUEST = True  # Reset timeout on each request
     
     # Initial Admin User (only used on first run)

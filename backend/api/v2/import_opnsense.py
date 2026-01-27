@@ -5,11 +5,15 @@ Handles testing connection and importing CAs/Certs from OPNsense
 from flask import Blueprint, request, jsonify, g
 from functools import wraps
 import requests
+import logging
 from urllib3 import disable_warnings
 from urllib3.exceptions import InsecureRequestWarning
 
 # Disable SSL warnings for self-signed certs
 disable_warnings(InsecureRequestWarning)
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('import_opnsense', __name__)
 
@@ -67,7 +71,10 @@ def test_connection():
     api_secret = data.get('api_secret')
     verify_ssl = data.get('verify_ssl', False)
     
+    logger.info(f"OpnSense test connection: host={host}, port={port}, verify_ssl={verify_ssl}")
+    
     if not all([host, api_key, api_secret]):
+        logger.warning(f"OpnSense test failed: missing required fields")
         return jsonify({
             "success": False,
             "error": "Missing required fields: host, api_key, api_secret"
@@ -137,6 +144,7 @@ def test_connection():
                     })
                     certs_count += 1
         
+        logger.info(f"OpnSense test successful: {cas_count} CAs, {certs_count} certificates")
         return jsonify({
             "success": True,
             "items": items,
@@ -147,18 +155,21 @@ def test_connection():
         })
     
     except requests.exceptions.Timeout:
+        logger.error(f"OpnSense connection timeout: {host}:{port}")
         return jsonify({
             "success": False,
             "error": "Connection timeout. Check host and port."
         }), 408
     
     except requests.exceptions.ConnectionError:
+        logger.error(f"OpnSense connection failed: {host}:{port}")
         return jsonify({
             "success": False,
             "error": "Connection failed. Check host and port."
         }), 503
     
     except Exception as e:
+        logger.exception(f"OpnSense test error: {str(e)}")
         return jsonify({
             "success": False,
             "error": f"Error: {str(e)}"
@@ -201,13 +212,18 @@ def import_items():
     verify_ssl = data.get('verify_ssl', False)
     items = data.get('items', [])
     
+    logger.info(f"OpnSense import: host={host}, port={port}, items_count={len(items)}")
+    
     if not all([host, api_key, api_secret]):
+        logger.warning("OpnSense import failed: missing required fields")
         return jsonify({
             "success": False,
             "error": "Missing required fields"
         }), 400
     
-    if not items:
+    # Allow empty items array to import all
+    if items is None:
+        logger.warning("OpnSense import failed: no items specified")
         return jsonify({
             "success": False,
             "error": "No items selected for import"
@@ -408,6 +424,8 @@ def import_items():
         # Commit all changes
         db.session.commit()
         
+        logger.info(f"OpnSense import complete: {stats['cas_imported']} CAs, {stats['certs_imported']} certificates imported, {stats['cas_skipped'] + stats['certs_skipped']} skipped")
+        
         return jsonify({
             "success": True,
             "imported": {
@@ -420,6 +438,7 @@ def import_items():
     
     except Exception as e:
         db.session.rollback()
+        logger.exception(f"OpnSense import failed: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)

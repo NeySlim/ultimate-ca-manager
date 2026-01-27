@@ -310,4 +310,10 @@ def list_ca_certificates(ca_id):
     # Filter by CA refid
     query = Certificate.query.filter_by(caref=ca.refid).order_by(Certificate.created_at.desc())
     
-    return paginate(query, page, per_page)
+    result = paginate(query, page, per_page)
+    
+    # Convert items to dict
+    return success_response(
+        data=[cert.to_dict() for cert in result['items']],
+        meta=result['meta']
+    )
