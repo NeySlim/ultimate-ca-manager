@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Certificate, Plus, MagnifyingGlass, Download, X } from '@phosphor-icons/react'
+import { Certificate, Plus, MagnifyingGlass, Download, X, FileText } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
@@ -12,6 +12,8 @@ export default function Certificates() {
   const [filters, setFilters] = useState({ status: '', ca_id: '', search: '' })
   const [selectedCert, setSelectedCert] = useState(null)
   const [showIssueModal, setShowIssueModal] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportCert, setExportCert] = useState(null)
   
   useEffect(() => {
     fetchCertificates()
@@ -132,6 +134,10 @@ export default function Certificates() {
       
       {showIssueModal && <IssueCertModal onClose={() => setShowIssueModal(false)} onIssue={fetchCertificates} />}
       {selectedCert && <CertDetailsModal cert={selectedCert} onClose={() => setSelectedCert(null)} />}
+      {showExportModal && exportCert && <ExportCertificateModal cert={exportCert} onClose={() => {
+        setShowExportModal(false)
+        setExportCert(null)
+      }} />}
     </div>
   )
 }
@@ -197,6 +203,84 @@ function IssueCertModal({ onClose, onIssue }) {
   )
 }
 
+function ExportCertificateModal({ cert, onClose }) {
+  const [format, setFormat] = useState('pem')
+  const [includeChain, setIncludeChain] = useState(false)
+  const [loading, setLoading] = useState(false)
+  
+  async function handleExport() {
+    setLoading(true)
+    try {
+      const options = {
+        format,
+        include_chain: includeChain
+      }
+      const result = await api.exportCertificate(cert.id, options)
+      
+      // Create download
+      const blob = format === 'pem' 
+        ? new Blob([result.content], { type: 'application/x-pem-file' })
+        : new Blob([atob(result.content)], { type: 'application/octet-stream' })
+      
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = result.filename || `certificate_${cert.id}.${format}`
+      a.click()
+      URL.revokeObjectURL(url)
+      
+      onClose()
+    } catch (err) {
+      alert('Export failed: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2><FileText size={20} /> Export Certificate: {cert.common_name}</h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Export Format</label>
+            <select value={format} onChange={e => setFormat(e.target.value)}>
+              <option value="pem">PEM (.crt)</option>
+              <option value="der">DER (.der)</option>
+              <option value="pkcs12">PKCS#12 (.p12)</option>
+            </select>
+          </div>
+          
+          <div className="form-group">
+            <label className="checkbox-label">
+              <input 
+                type="checkbox" 
+                checked={includeChain}
+                onChange={e => setIncludeChain(e.target.checked)}
+              />
+              Include certificate chain
+            </label>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button 
+            className="btn-primary" 
+            onClick={handleExport}
+            disabled={loading}
+          >
+            <Download size={16} />
+            {loading ? 'Exporting...' : 'Export'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CertDetailsModal({ cert, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -227,7 +311,11 @@ function CertDetailsModal({ cert, onClose }) {
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Close</button>
-          <button className="btn-primary"><Download size={16} /> Export</button>
+          <button className="btn-primary" onClick={() => {
+            onClose()
+            setExportCert(cert)
+            setShowExportModal(true)
+          }}><Download size={16} /> Export</button>
         </div>
       </div>
     </div>

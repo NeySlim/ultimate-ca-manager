@@ -107,7 +107,14 @@ export const api = {
     method: 'DELETE'
   }),
   
-  exportCA: (id) => request(`/cas/${id}/export`),
+  exportCA: (id, options = {}) => {
+    const params = new URLSearchParams()
+    if (options.format) params.append('format', options.format)
+    if (options.include_chain) params.append('chain', 'true')
+    if (options.include_key) params.append('key', 'true')
+    if (options.password) params.append('password', options.password)
+    return request(`/cas/${id}/export?${params.toString()}`)
+  },
   
   // ========== CERTIFICATES ==========
   
@@ -142,7 +149,12 @@ export const api = {
     method: 'DELETE'
   }),
   
-  exportCertificate: (id) => request(`/certificates/${id}/export`),
+  exportCertificate: (id, options = {}) => {
+    const params = new URLSearchParams()
+    if (options.format) params.append('format', options.format)
+    if (options.include_chain) params.append('include_chain', 'true')
+    return request(`/certificates/${id}/export?${params.toString()}`)
+  },
   
   // ========== CSRs ==========
   
@@ -275,6 +287,18 @@ export const api = {
   getOCSPStatus: () => request('/ocsp/status'),
   
   getOCSPStats: () => request('/ocsp/stats'),
+  
+  // ========== OPNSENSE IMPORT ==========
+  
+  testOPNsenseConnection: (data) => request('/import/opnsense/test', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  
+  importFromOPNsense: (data) => request('/import/opnsense/import', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
   
   // ========== SCEP ==========
   

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Folder, TreeStructure, SquaresFour, Plus, Eye, Trash, Download } from '@phosphor-icons/react'
+import { Folder, TreeStructure, SquaresFour, Plus, Eye, Trash, Download, FileText } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
@@ -11,7 +11,10 @@ export default function CAs() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
   const [selectedCA, setSelectedCA] = useState(null)
+  const [exportCA, setExportCA] = useState(null)
   
   useEffect(() => {
     fetchCAs()
@@ -86,7 +89,16 @@ export default function CAs() {
       )}
       
       {showCreateModal && <CreateCAModal onClose={() => setShowCreateModal(false)} onCreate={fetchCAs} />}
-      {selectedCA && <CADetailsModal ca={selectedCA} onClose={() => setSelectedCA(null)} />}
+      {showImportModal && <ImportCAModal onClose={() => setShowImportModal(false)} onImport={fetchCAs} />}
+      {selectedCA && <CADetailsModal ca={selectedCA} onClose={() => setSelectedCA(null)} onExport={(ca) => {
+        setExportCA(ca)
+        setShowExportModal(true)
+        setSelectedCA(null)
+      }} />}
+      {showExportModal && exportCA && <ExportCAModal ca={exportCA} onClose={() => {
+        setShowExportModal(false)
+        setExportCA(null)
+      }} />}
     </div>
   )
 }
@@ -259,7 +271,7 @@ function CreateCAModal({ onClose, onCreate }) {
   )
 }
 
-function CADetailsModal({ ca, onClose }) {
+function CADetailsModal({ ca, onClose, onExport }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-large" onClick={e => e.stopPropagation()}>
@@ -303,7 +315,7 @@ function CADetailsModal({ ca, onClose }) {
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Close</button>
-          <button className="btn-primary">
+          <button className="btn-primary" onClick={() => onExport(ca)}>
             <Download size={16} />
             Export CA
           </button>
@@ -411,6 +423,113 @@ function ImportCAModal({ onClose, onImport }) {
             <button type="submit" className="btn-primary">Import CA</button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+function ExportCAModal({ ca, onClose }) {
+  const [format, setFormat] = useState('pem')
+  const [includeChain, setIncludeChain] = useState(false)
+  const [includeKey, setIncludeKey] = useState(false)
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  
+  async function handleExport() {
+    setLoading(true)
+    try {
+      const options = {
+        format,
+        include_chain: includeChain,
+        include_key: includeKey,
+        password: password || undefined
+      }
+      const result = await api.exportCA(ca.id, options)
+      
+      // Create download
+      const blob = format === 'pem' 
+        ? new Blob([result.content], { type: 'application/x-pem-file' })
+        : new Blob([atob(result.content)], { type: 'application/octet-stream' })
+      
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = result.filename || `ca_${ca.id}.${format}`
+      a.click()
+      URL.revokeObjectURL(url)
+      
+      onClose()
+    } catch (err) {
+      alert('Export failed: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2><FileText size={20} /> Export CA: {ca.descr}</h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group">
+            <label>Export Format</label>
+            <select value={format} onChange={e => setFormat(e.target.value)}>
+              <option value="pem">PEM (.crt)</option>
+              <option value="der">DER (.der)</option>
+              <option value="pkcs12">PKCS#12 (.p12)</option>
+            </select>
+          </div>
+          
+          <div className="form-group">
+            <label className="checkbox-label">
+              <input 
+                type="checkbox" 
+                checked={includeChain}
+                onChange={e => setIncludeChain(e.target.checked)}
+              />
+              Include certificate chain
+            </label>
+          </div>
+          
+          <div className="form-group">
+            <label className="checkbox-label">
+              <input 
+                type="checkbox" 
+                checked={includeKey}
+                onChange={e => setIncludeKey(e.target.checked)}
+                disabled={!ca.has_private_key}
+              />
+              Include private key {!ca.has_private_key && '(not available)'}
+            </label>
+          </div>
+          
+          {(includeKey || format === 'pkcs12') && (
+            <div className="form-group">
+              <label>Password {format === 'pkcs12' && '*'}</label>
+              <input 
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder={format === 'pkcs12' ? 'Required for PKCS#12' : 'Optional'}
+                required={format === 'pkcs12'}
+              />
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button 
+            className="btn-primary" 
+            onClick={handleExport}
+            disabled={loading || (format === 'pkcs12' && !password)}
+          >
+            <Download size={16} />
+            {loading ? 'Exporting...' : 'Export'}
+          </button>
+        </div>
       </div>
     </div>
   )
