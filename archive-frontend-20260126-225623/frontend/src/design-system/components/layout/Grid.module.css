@@ -1,8 +1,0 @@
-.grid { display: grid; }
-.cols1 { grid-template-columns: repeat(1, 1fr); }
-.cols2 { grid-template-columns: repeat(2, 1fr); }
-.cols3 { grid-template-columns: repeat(3, 1fr); }
-.cols4 { grid-template-columns: repeat(4, 1fr); }
-.gapsm { gap: var(--spacing-sm); }
-.gapmd { gap: var(--spacing-md); }
-.gaplg { gap: var(--spacing-lg); }

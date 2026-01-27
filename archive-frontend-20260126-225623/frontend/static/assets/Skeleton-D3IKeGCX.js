@@ -1,1 +1,0 @@
-import{j as o}from"./index-qRzKqHpr.js";const n="_skeleton_1acqh_1",l={skeleton:n};function a({width:e,height:s=20,className:t}){return o.jsx("div",{className:`${l.skeleton} ${t||""}`,style:{width:e,height:s}})}export{a as S};

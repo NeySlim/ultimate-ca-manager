@@ -1,8 +1,0 @@
-/* Button.css - Ensures button styles are loaded */
-/* Main styles are in global.css, this file ensures proper loading order */
-
-.btn-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}

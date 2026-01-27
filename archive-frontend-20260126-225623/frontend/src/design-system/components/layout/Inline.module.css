@@ -1,8 +1,0 @@
-.inline { display: flex; flex-wrap: wrap; }
-.xs { gap: var(--spacing-xs); }
-.sm { gap: var(--spacing-sm); }
-.md { gap: var(--spacing-md); }
-.lg { gap: var(--spacing-lg); }
-.start { align-items: flex-start; }
-.center { align-items: center; }
-.end { align-items: flex-end; }

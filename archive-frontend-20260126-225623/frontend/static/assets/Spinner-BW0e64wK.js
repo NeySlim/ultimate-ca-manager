@@ -1,1 +1,0 @@
-import{j as _}from"./index-BF_YdiPX.js";const t="_spinner_1jf29_1",o="_spin_1jf29_1",i="_xs_1jf29_8",m="_sm_1jf29_9",p="_md_1jf29_10",r="_lg_1jf29_11",c="_xl_1jf29_12",s={spinner:t,spin:o,xs:i,sm:m,md:p,lg:r,xl:c};function j({size:n="md"}){return _.jsx("div",{className:`${s.spinner} ${s[n]}`})}export{j as S};
