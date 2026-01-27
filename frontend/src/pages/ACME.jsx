@@ -3,7 +3,6 @@ import { ShieldCheck, Plus, Trash, Key } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
-import './ACME.css'
 
 export default function ACME() {
   const [accounts, setAccounts] = useState([])

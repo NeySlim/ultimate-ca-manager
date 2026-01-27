@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { User, Lock, Bell } from '@phosphor-icons/react'
 import { api } from '../lib/api'
-import './Account.css'
 
 export default function Account() {
   const [user, setUser] = useState(null)

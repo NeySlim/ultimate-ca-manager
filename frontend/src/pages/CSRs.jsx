@@ -3,7 +3,6 @@ import { FileText, UploadSimple, Check } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
-import './CSRs.css'
 
 export default function CSRs() {
   const [csrs, setCSRs] = useState([])

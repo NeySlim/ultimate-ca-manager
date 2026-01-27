@@ -3,7 +3,6 @@ import { FileText, Plus, Copy, Trash, Pencil } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
-import './Templates.css'
 
 export default function Templates() {
   const [templates, setTemplates] = useState([])

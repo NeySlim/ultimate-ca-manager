@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Gear, EnvelopeSimple, IdentificationCard, Broadcast, Database, DownloadSimple } from '@phosphor-icons/react'
 import { api } from '../lib/api'
-import './Settings.css'
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('general')

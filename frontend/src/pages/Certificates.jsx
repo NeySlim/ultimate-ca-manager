@@ -3,7 +3,6 @@ import { Certificate, Plus, MagnifyingGlass, Download, X, FileText } from '@phos
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
-import './Certificates.css'
 
 export default function Certificates() {
   const [certificates, setCertificates] = useState([])

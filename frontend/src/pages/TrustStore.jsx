@@ -3,7 +3,6 @@ import { ShieldStar, Upload, Trash } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
-import './TrustStore.css'
 
 export default function TrustStore() {
   const [trusted, setTrusted] = useState([])
