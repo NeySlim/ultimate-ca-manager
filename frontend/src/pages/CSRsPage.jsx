@@ -2,6 +2,7 @@
  * CSRs (Certificate Signing Requests) Page
  */
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { FileText, Upload, SignIn, Trash, Download } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge,
@@ -10,9 +11,11 @@ import {
 } from '../components'
 import { csrsService, casService } from '../services'
 import { useNotification } from '../contexts'
+import { extractData } from '../lib/utils'
 
 export default function CSRsPage() {
   const { showSuccess, showError } = useNotification()
+  const [searchParams, setSearchParams] = useSearchParams()
   
   const [csrs, setCSRs] = useState([])
   const [selectedCSR, setSelectedCSR] = useState(null)
@@ -26,6 +29,12 @@ export default function CSRsPage() {
   useEffect(() => {
     loadCSRs()
     loadCAs()
+    // Check if we should auto-open upload modal
+    if (searchParams.get('action') === 'upload') {
+      setShowUploadModal(true)
+      searchParams.delete('action')
+      setSearchParams(searchParams)
+    }
   }, [])
 
   const loadCSRs = async () => {
@@ -55,9 +64,12 @@ export default function CSRsPage() {
 
   const loadCSRDetails = async (id) => {
     try {
-      const data = await csrsService.getById(id)
-      setSelectedCSR(data)
+      const response = await csrsService.getById(id)
+      const data = extractData(response)
+      console.log('CSR loaded:', data)
+      setSelectedCSR({ ...data })
     } catch (error) {
+      console.error('Failed to load CSR:', error)
       showError(error.message || 'Failed to load CSR details')
     }
   }

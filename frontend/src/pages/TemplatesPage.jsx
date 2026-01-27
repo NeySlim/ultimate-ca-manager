@@ -10,6 +10,7 @@ import {
 } from '../components'
 import { templatesService } from '../services'
 import { useNotification } from '../contexts'
+import { extractData } from '../lib/utils'
 
 export default function TemplatesPage() {
   const { showSuccess, showError } = useNotification()
@@ -42,11 +43,14 @@ export default function TemplatesPage() {
 
   const selectTemplate = async (template) => {
     try {
-      const data = await templatesService.getById(template.id)
-      setSelectedTemplate(data)
-      setFormData(data)
+      const response = await templatesService.getById(template.id)
+      const data = extractData(response)
+      console.log('Template loaded:', data)
+      setSelectedTemplate({ ...data })
+      setFormData({ ...data })
       setEditing(false)
     } catch (error) {
+      console.error('Failed to load template:', error)
       showError(error.message || 'Failed to load template details')
     }
   }
