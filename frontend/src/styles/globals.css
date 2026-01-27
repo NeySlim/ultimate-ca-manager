@@ -302,6 +302,9 @@ button {
 }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
   padding: 10px var(--space-lg);
   border-radius: var(--radius-md);
   font-size: 14px;
@@ -309,34 +312,70 @@ button {
   cursor: pointer;
   transition: all 0.2s;
   border: none;
+  text-decoration: none;
 }
 
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-lg);
   background: var(--accent-primary);
   color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
 }
 
 .btn-primary:hover {
   background: #2563EB;
+  text-decoration: none;
 }
 
 .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-lg);
   background: var(--bg-tertiary);
   color: var(--text-primary);
   border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
 }
 
 .btn-secondary:hover {
   background: var(--bg-primary);
+  text-decoration: none;
 }
 
 .btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-lg);
   background: var(--accent-danger);
   color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
 }
 
 .btn-danger:hover {
   background: #DC2626;
+  text-decoration: none;
 }
 
 /* Forms */
@@ -727,4 +766,73 @@ tr:hover {
 .info-row .value {
   color: var(--text-primary);
   font-weight: 500;
+}
+
+/* ============================================
+   PAGE CONTAINERS - Universal Padding
+   ============================================ */
+
+.csrs-page,
+.users-page,
+.certificates-page,
+.acme-page,
+.templates-page,
+.truststore-page {
+  padding: var(--space-xl);
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.csrs-page .page-header,
+.users-page .page-header,
+.certificates-page .page-header,
+.acme-page .page-header,
+.templates-page .page-header,
+.truststore-page .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-xl);
+}
+
+.csrs-page .page-header h1,
+.users-page .page-header h1,
+.certificates-page .page-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+}
+
+/* ============================================
+   TABLES - Ellipsis for long content
+   ============================================ */
+
+/* Certificates table specific fixes */
+.certificates-table td {
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.certificates-table td:first-child {
+  max-width: 350px; /* Common Name column wider */
+}
+
+.certificates-table td:nth-child(2) {
+  max-width: 300px; /* Issuer column */
+}
+
+/* General table cell ellipsis */
+table td {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* But allow expanding for badge/button columns */
+.badge,
+button {
+  white-space: normal;
 }
