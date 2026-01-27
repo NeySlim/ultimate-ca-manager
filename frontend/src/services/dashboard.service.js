@@ -9,13 +9,13 @@ export const dashboardService = {
   },
 
   async getRecentCAs(limit = 5) {
-    // TODO: Backend endpoint not implemented yet
-    return { data: [] }
+    // Use the CAs endpoint with pagination
+    return apiClient.get(`/cas?page=1&per_page=${limit}`)
   },
 
   async getExpiringCerts(days = 30) {
-    // TODO: Backend endpoint not implemented yet  
-    return { data: [] }
+    // Use the certificates endpoint with expiring filter
+    return apiClient.get(`/certificates?status=expiring&per_page=10`)
   },
 
   async getActivityLog(limit = 20, offset = 0) {

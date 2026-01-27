@@ -2,6 +2,7 @@
  * Certificates Page
  */
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Certificate, Download, X, ArrowsClockwise, Trash } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge, 
@@ -14,6 +15,7 @@ import { extractCN, extractData, formatDate } from '../lib/utils'
 
 export default function CertificatesPage() {
   const { showSuccess, showError } = useNotification()
+  const [searchParams, setSearchParams] = useSearchParams()
   
   const [certificates, setCertificates] = useState([])
   const [selectedCert, setSelectedCert] = useState(null)
@@ -26,6 +28,12 @@ export default function CertificatesPage() {
 
   useEffect(() => {
     loadCertificates()
+    // Check if we should auto-open create modal
+    if (searchParams.get('action') === 'create') {
+      setShowCreateModal(true)
+      searchParams.delete('action')
+      setSearchParams(searchParams)
+    }
   }, [page, statusFilter, searchQuery])
 
   const loadCertificates = async () => {
@@ -485,9 +493,91 @@ export default function CertificatesPage() {
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         title="Issue New Certificate"
+        size="lg"
       >
-        <p className="text-text-secondary mb-4">Certificate creation form will be implemented here</p>
-        <Button onClick={() => setShowCreateModal(false)}>Close</Button>
+        <form onSubmit={async (e) => {
+          e.preventDefault()
+          const formData = new FormData(e.target)
+          const data = {
+            cn: formData.get('cn'),
+            ca_id: parseInt(formData.get('ca_id')),
+            validity_days: parseInt(formData.get('validity_days')),
+            key_type: formData.get('key_type'),
+            san_dns: formData.get('san_dns') ? formData.get('san_dns').split(',').map(s => s.trim()) : []
+          }
+          
+          try {
+            await certificatesService.create(data)
+            showSuccess('Certificate issued successfully')
+            setShowCreateModal(false)
+            loadCertificates()
+          } catch (error) {
+            showError(error.message || 'Failed to issue certificate')
+          }
+        }} className="space-y-4">
+          
+          <Input
+            name="cn"
+            label="Common Name (CN)"
+            placeholder="example.com"
+            required
+          />
+          
+          <Select
+            name="ca_id"
+            label="Issuing CA"
+            options={[
+              { value: '1', label: 'Root CA' },
+              { value: '2', label: 'Intermediate CA' }
+            ]}
+            required
+          />
+          
+          <Input
+            name="san_dns"
+            label="Subject Alternative Names (SANs)"
+            placeholder="www.example.com, api.example.com"
+            helperText="Comma-separated DNS names"
+          />
+          
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              name="validity_days"
+              label="Validity Period"
+              options={[
+                { value: '90', label: '90 days' },
+                { value: '180', label: '180 days' },
+                { value: '365', label: '1 year' },
+                { value: '730', label: '2 years' }
+              ]}
+              defaultValue="365"
+            />
+            
+            <Select
+              name="key_type"
+              label="Key Type"
+              options={[
+                { value: 'RSA-2048', label: 'RSA 2048' },
+                { value: 'RSA-4096', label: 'RSA 4096' },
+                { value: 'ECDSA-P256', label: 'ECDSA P-256' }
+              ]}
+              defaultValue="RSA-2048"
+            />
+          </div>
+
+          <div className="flex gap-3 justify-end pt-4 border-t border-border">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowCreateModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit">
+              Issue Certificate
+            </Button>
+          </div>
+        </form>
       </Modal>
     </>
   )
