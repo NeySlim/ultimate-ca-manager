@@ -1,4 +1,4 @@
-const API_BASE = 'https://localhost:8443/api/v2'
+const API_BASE = '/api/v2'  // Relative URL to avoid CORS issues
 
 // ============================================
 // LOW-LEVEL HTTP CLIENT (Session-based auth)
