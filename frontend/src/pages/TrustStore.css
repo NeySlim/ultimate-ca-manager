@@ -1,0 +1,43 @@
+.truststore-page {
+  padding: 24px;
+}
+
+.trusted-table {
+  margin-top: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.trusted-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.trusted-table th {
+  text-align: left;
+  padding: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+
+.trusted-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.trusted-table tbody tr:hover {
+  background: var(--background);
+}
+
+.fingerprint {
+  font-family: monospace;
+  font-size: 12px;
+  background: var(--background);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
