@@ -84,7 +84,10 @@ export const api = {
   
   // ========== CERTIFICATE AUTHORITIES ==========
   
-  getCAs: () => request('/cas'),
+  getCAs: async () => {
+    const data = await request('/cas')
+    return Array.isArray(data) ? data : []
+  },
   
   getCAsTree: () => request('/cas/tree'),
   
@@ -108,14 +111,15 @@ export const api = {
   
   // ========== CERTIFICATES ==========
   
-  getCertificates: (filters = {}) => {
+  getCertificates: async (filters = {}) => {
     const params = new URLSearchParams()
     if (filters.status) params.append('status', filters.status)
     if (filters.ca_id) params.append('ca_id', filters.ca_id)
     if (filters.search) params.append('search', filters.search)
     
     const query = params.toString()
-    return request(`/certificates${query ? '?' + query : ''}`)
+    const data = await request(`/certificates${query ? '?' + query : ''}`)
+    return Array.isArray(data) ? data : []
   },
   
   getCertificate: (id) => request(`/certificates/${id}`),
@@ -142,7 +146,10 @@ export const api = {
   
   // ========== CSRs ==========
   
-  getCSRs: () => request('/csrs'),
+  getCSRs: async () => {
+    const data = await request('/csrs')
+    return Array.isArray(data) ? data : []
+  },
   
   getCSR: (id) => request(`/csrs/${id}`),
   
@@ -162,7 +169,10 @@ export const api = {
   
   // ========== USERS ==========
   
-  getUsers: () => request('/users'),
+  getUsers: async () => {
+    const data = await request('/users')
+    return Array.isArray(data) ? data : []
+  },
   
   getUser: (id) => request(`/users/${id}`),
   
@@ -221,9 +231,15 @@ export const api = {
   
   // ========== ACME ==========
   
-  getACMEAccounts: () => request('/acme/accounts'),
+  getACMEAccounts: async () => {
+    const data = await request('/acme/accounts')
+    return Array.isArray(data) ? data : []
+  },
   
-  getACMEOrders: () => request('/acme/orders'),
+  getACMEOrders: async () => {
+    const data = await request('/acme/orders')
+    return Array.isArray(data) ? data : []
+  },
   
   getACMESettings: () => request('/acme/settings'),
   
@@ -276,7 +292,10 @@ export const api = {
   
   // ========== TEMPLATES ==========
   
-  getTemplates: () => request('/templates'),
+  getTemplates: async () => {
+    const data = await request('/templates')
+    return Array.isArray(data) ? data : []
+  },
   
   getTemplate: (id) => request(`/templates/${id}`),
   
