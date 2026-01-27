@@ -1,14 +1,36 @@
-import { useState } from 'react'
-import { User, Plus, Eye, Trash } from '@phosphor-icons/react'
+import { useState, useEffect } from 'react'
+import { User, Plus } from '@phosphor-icons/react'
+import { api } from '../lib/api'
+import LoadingSpinner from '../components/LoadingSpinner'
+import ErrorMessage from '../components/ErrorMessage'
 import './Users.css'
 
 export default function Users() {
-  const [users, setUsers] = useState([
-    { id: 1, username: 'admin', email: 'admin@ucm.local', role: 'admin', status: 'active', lastLogin: '2024-01-26 10:30' },
-    { id: 2, username: 'operator1', email: 'operator@ucm.local', role: 'operator', status: 'active', lastLogin: '2024-01-25 14:22' },
-    { id: 3, username: 'viewer1', email: 'viewer@ucm.local', role: 'viewer', status: 'active', lastLogin: '2024-01-24 09:15' }
-  ])
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+  
+  async function fetchUsers() {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await api.getUsers()
+      setUsers(data || [])
+    } catch (err) {
+      console.error('Users fetch error:', err)
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  if (loading) return <LoadingSpinner message="Loading users..." />
+  if (error) return <ErrorMessage message={error} onRetry={fetchUsers} />
   
   return (
     <div className="users-page">
@@ -31,7 +53,6 @@ export default function Users() {
               <th>Email</th>
               <th>Role</th>
               <th>Status</th>
-              <th>Last Login</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -42,13 +63,11 @@ export default function Users() {
                   <User size={16} />
                   <span>{user.username}</span>
                 </td>
-                <td>{user.email}</td>
-                <td><span className={`role-badge ${user.role}`}>{user.role}</span></td>
-                <td><span className="status-badge success">{user.status}</span></td>
-                <td className="text-secondary">{user.lastLogin}</td>
+                <td>{user.email || 'N/A'}</td>
+                <td><span className={`role-badge ${user.role || 'viewer'}`}>{user.role || 'viewer'}</span></td>
+                <td><span className="status-badge success">{user.status || 'active'}</span></td>
                 <td className="user-actions">
-                  <button className="icon-btn"><Eye size={16} /></button>
-                  <button className="icon-btn danger"><Trash size={16} /></button>
+                  <button className="icon-btn">Edit</button>
                 </td>
               </tr>
             ))}
@@ -56,14 +75,25 @@ export default function Users() {
         </table>
       </div>
       
-      {showCreateModal && (
-        <CreateUserModal onClose={() => setShowCreateModal(false)} onCreate={() => setShowCreateModal(false)} />
-      )}
+      {showCreateModal && <CreateUserModal onClose={() => setShowCreateModal(false)} onCreate={fetchUsers} />}
     </div>
   )
 }
 
 function CreateUserModal({ onClose, onCreate }) {
+  const [formData, setFormData] = useState({ username: '', email: '', password: '', role: 'viewer' })
+  
+  async function handleSubmit(e) {
+    e.preventDefault()
+    try {
+      await api.createUser(formData)
+      onCreate()
+      onClose()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
+  }
+  
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
@@ -71,32 +101,34 @@ function CreateUserModal({ onClose, onCreate }) {
           <h2>Create User</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
-        <div className="modal-body">
-          <div className="form-group">
-            <label>Username</label>
-            <input type="text" placeholder="john.doe" />
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-group">
+              <label>Username</label>
+              <input type="text" required value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} />
+            </div>
+            <div className="form-group">
+              <label>Email</label>
+              <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+            </div>
+            <div className="form-group">
+              <label>Role</label>
+              <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
+                <option value="admin">Admin</option>
+                <option value="operator">Operator</option>
+                <option value="viewer">Viewer</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Password</label>
+              <input type="password" required value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
+            </div>
           </div>
-          <div className="form-group">
-            <label>Email</label>
-            <input type="email" placeholder="john.doe@example.com" />
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary">Create</button>
           </div>
-          <div className="form-group">
-            <label>Role</label>
-            <select>
-              <option value="admin">Admin (Full access)</option>
-              <option value="operator">Operator (Manage certificates)</option>
-              <option value="viewer">Viewer (Read only)</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Password</label>
-            <input type="password" placeholder="Min 8 characters" />
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button className="btn-primary" onClick={onCreate}>Create User</button>
-        </div>
+        </form>
       </div>
     </div>
   )
