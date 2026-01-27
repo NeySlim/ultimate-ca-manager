@@ -278,9 +278,16 @@ export const api = {
   
   // ========== SCEP ==========
   
-  getSCEPConfigs: () => request('/scep/config'),
+  getSCEPConfigs: async () => {
+    const data = await request('/scep/config')
+    // Backend returns single config object, not array
+    return data && typeof data === 'object' && !Array.isArray(data) ? [data] : (Array.isArray(data) ? data : [])
+  },
   
-  getSCEPEnrollments: () => request('/scep/requests'),
+  getSCEPEnrollments: async () => {
+    const data = await request('/scep/requests')
+    return Array.isArray(data) ? data : []
+  },
   
   approveSCEP: (id) => request(`/scep/${id}/approve`, {
     method: 'POST'
