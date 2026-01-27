@@ -2,6 +2,7 @@
  * Dashboard Page
  */
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { 
   ShieldCheck, Certificate, Warning, ClockCounterClockwise, 
   Plus, FileArrowUp, Clock
@@ -15,6 +16,7 @@ import { useNotification } from '../contexts'
 
 export default function DashboardPage() {
   const { showError } = useNotification()
+  const navigate = useNavigate()
   
   const [stats, setStats] = useState(null)
   const [expiringCerts, setExpiringCerts] = useState([])
@@ -190,19 +192,19 @@ export default function DashboardPage() {
           <Card>
             <h3 className="text-sm font-semibold text-text-primary mb-4">Quick Actions</h3>
             <div className="flex flex-wrap gap-3">
-              <Button>
+              <Button onClick={() => navigate('/certificates?action=create')}>
                 <Certificate size={18} />
                 Issue Certificate
               </Button>
-              <Button variant="secondary">
+              <Button variant="secondary" onClick={() => navigate('/cas?action=create')}>
                 <ShieldCheck size={18} />
                 Create CA
               </Button>
-              <Button variant="secondary">
+              <Button variant="secondary" onClick={() => navigate('/csrs?action=upload')}>
                 <FileArrowUp size={18} />
                 Upload CSR
               </Button>
-              <Button variant="ghost">
+              <Button variant="ghost" onClick={() => navigate('/settings')}>
                 <ClockCounterClockwise size={18} />
                 View Activity
               </Button>
@@ -223,7 +225,7 @@ export default function DashboardPage() {
               <Table
                 columns={certColumns}
                 data={expiringCerts}
-                onRowClick={(row) => console.log('Navigate to cert:', row.id)}
+                onRowClick={(row) => navigate(`/certificates?id=${row.id}`)}
               />
             )}
           </Card>
@@ -237,7 +239,7 @@ export default function DashboardPage() {
                 description="Create your first Certificate Authority to get started"
                 action={{
                   label: 'Create CA',
-                  onClick: () => console.log('Create CA')
+                  onClick: () => navigate('/cas')
                 }}
               />
             ) : (
@@ -246,6 +248,7 @@ export default function DashboardPage() {
                   <div
                     key={ca.id}
                     className="flex items-center gap-4 p-4 bg-bg-tertiary rounded-xl hover:bg-bg-tertiary/80 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/cas?id=${ca.id}`)}
                   >
                     <ShieldCheck size={32} weight="duotone" className="text-accent-primary" />
                     <div className="flex-1">

@@ -2,6 +2,7 @@
  * CAs (Certificate Authorities) Page
  */
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { 
   ShieldCheck, Crown, Key, Download, Trash, PencilSimple,
   Tree, SquaresFour, Certificate
@@ -17,6 +18,7 @@ import { extractCN, extractData, formatDate, formatDateTime } from '../lib/utils
 
 export default function CAsPage() {
   const { showSuccess, showError } = useNotification()
+  const [searchParams, setSearchParams] = useSearchParams()
   
   const [cas, setCAs] = useState([])
   const [treeData, setTreeData] = useState([])
@@ -26,9 +28,17 @@ export default function CAsPage() {
   const [viewMode, setViewMode] = useState('tree') // 'tree' or 'grid'
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [createFormType, setCreateFormType] = useState('root')
 
   useEffect(() => {
     loadCAs()
+    // Check if we should auto-open create modal
+    if (searchParams.get('action') === 'create') {
+      setShowCreateModal(true)
+      // Remove the param after opening
+      searchParams.delete('action')
+      setSearchParams(searchParams)
+    }
   }, [])
 
   const loadCAs = async () => {
@@ -627,8 +637,159 @@ export default function CAsPage() {
         title="Create Certificate Authority"
         size="lg"
       >
-        <p className="text-text-secondary mb-4">CA creation form will be implemented here</p>
-        <Button onClick={() => setShowCreateModal(false)}>Close</Button>
+        <form onSubmit={async (e) => {
+          e.preventDefault()
+          const formData = new FormData(e.target)
+          const data = {
+            commonName: formData.get('commonName'),
+            organization: formData.get('organization'),
+            country: formData.get('country'),
+            state: formData.get('state'),
+            locality: formData.get('locality'),
+            keyAlgo: formData.get('keyAlgo'),
+            keySize: parseInt(formData.get('keySize')),
+            validityYears: parseInt(formData.get('validityYears')),
+            type: formData.get('type'),
+            parentCAId: formData.get('type') === 'intermediate' ? formData.get('parentCAId') : null
+          }
+          
+          try {
+            await casService.create(data)
+            showSuccess('CA created successfully')
+            setShowCreateModal(false)
+            loadCAs()
+          } catch (error) {
+            showError(error.message || 'Failed to create CA')
+          }
+        }} className="space-y-6">
+          
+          {/* Subject Information */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-text-primary">Subject Information</h3>
+            
+            <Input
+              name="commonName"
+              label="Common Name (CN)"
+              placeholder="My Certificate Authority"
+              required
+            />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                name="organization"
+                label="Organization (O)"
+                placeholder="My Company"
+              />
+              <Input
+                name="country"
+                label="Country (C)"
+                placeholder="US"
+                maxLength={2}
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                name="state"
+                label="State/Province (ST)"
+                placeholder="California"
+              />
+              <Input
+                name="locality"
+                label="City/Locality (L)"
+                placeholder="San Francisco"
+              />
+            </div>
+          </div>
+
+          {/* Key Configuration */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-text-primary">Key Configuration</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                name="keyAlgo"
+                label="Key Algorithm"
+                options={[
+                  { value: 'RSA', label: 'RSA' },
+                  { value: 'ECDSA', label: 'ECDSA' }
+                ]}
+                defaultValue="RSA"
+              />
+              
+              <Select
+                name="keySize"
+                label="Key Size"
+                options={[
+                  { value: '2048', label: '2048 bits' },
+                  { value: '3072', label: '3072 bits' },
+                  { value: '4096', label: '4096 bits' }
+                ]}
+                defaultValue="2048"
+              />
+            </div>
+          </div>
+
+          {/* Validity */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-text-primary">Validity</h3>
+            
+            <Select
+              name="validityYears"
+              label="Validity Period"
+              options={[
+                { value: '5', label: '5 years' },
+                { value: '10', label: '10 years' },
+                { value: '15', label: '15 years' },
+                { value: '20', label: '20 years' }
+              ]}
+              defaultValue="10"
+            />
+          </div>
+
+          {/* Type */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-text-primary">CA Type</h3>
+            
+            <Select
+              name="type"
+              label="Type"
+              options={[
+                { value: 'root', label: 'Root CA (Self-signed)' },
+                { value: 'intermediate', label: 'Intermediate CA (Signed by parent)' }
+              ]}
+              value={createFormType}
+              onChange={(value) => setCreateFormType(value)}
+            />
+            
+            {/* Parent CA selector - only show if intermediate */}
+            {createFormType === 'intermediate' && (
+              <Select
+                name="parentCAId"
+                label="Parent CA"
+                options={cas.map(ca => ({
+                  value: ca.id.toString(),
+                  label: ca.name || ca.descr
+                }))}
+                required
+              />
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 justify-end pt-4 border-t border-border">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowCreateModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit">
+              Create CA
+            </Button>
+          </div>
+        </form>
       </Modal>
     </>
   )

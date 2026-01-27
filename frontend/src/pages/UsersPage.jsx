@@ -10,6 +10,7 @@ import {
 } from '../components'
 import { usersService } from '../services'
 import { useNotification } from '../contexts'
+import { extractData } from '../lib/utils'
 
 export default function UsersPage() {
   const { showSuccess, showError } = useNotification()
@@ -46,11 +47,14 @@ export default function UsersPage() {
 
   const selectUser = async (user) => {
     try {
-      const data = await usersService.getById(user.id)
-      setSelectedUser(data)
-      setFormData(data)
+      const response = await usersService.getById(user.id)
+      const data = extractData(response)
+      console.log('User loaded:', data)
+      setSelectedUser({ ...data })
+      setFormData({ ...data })
       setEditing(false)
     } catch (error) {
+      console.error('Failed to load user:', error)
       showError(error.message || 'Failed to load user details')
     }
   }
