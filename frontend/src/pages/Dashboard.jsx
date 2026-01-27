@@ -3,7 +3,6 @@ import { Certificate, Shield, Clock, FileText } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
-import './Dashboard.css'
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null)

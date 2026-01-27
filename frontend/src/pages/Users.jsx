@@ -3,7 +3,6 @@ import { User, Plus, Pencil, Trash } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
-import './Users.css'
 
 export default function Users() {
   const [users, setUsers] = useState([])

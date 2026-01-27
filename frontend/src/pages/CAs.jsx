@@ -3,7 +3,6 @@ import { Folder, TreeStructure, SquaresFour, Plus, Eye, Trash, Download, FileTex
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
-import './CAs.css'
 
 export default function CAs() {
   const [cas, setCAs] = useState([])

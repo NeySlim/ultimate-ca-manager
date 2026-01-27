@@ -3,7 +3,6 @@ import { DeviceMobile, QrCode, Key } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
-import './SCEP.css'
 
 export default function SCEP() {
   const [configs, setConfigs] = useState([])

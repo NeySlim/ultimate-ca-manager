@@ -3,7 +3,6 @@ import { ListChecks, Download, ArrowsClockwise } from '@phosphor-icons/react'
 import { api } from '../lib/api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorMessage from '../components/ErrorMessage'
-import './CRL.css'
 
 export default function CRL() {
   const [crls, setCrls] = useState([])
