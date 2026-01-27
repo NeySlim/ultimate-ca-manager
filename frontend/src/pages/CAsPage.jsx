@@ -141,6 +141,7 @@ export default function CAsPage() {
       icon: <ShieldCheck size={16} />,
       content: (
         <div className="space-y-6">
+          {/* Type & Status */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-text-secondary uppercase mb-1">Type</p>
@@ -152,39 +153,132 @@ export default function CAsPage() {
               </div>
             </div>
             <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Serial Number</p>
-              <p className="text-sm font-mono text-text-primary">{selectedCA.serial_number}</p>
+              <p className="text-xs text-text-secondary uppercase mb-1">Status</p>
+              <Badge variant={selectedCA.status === 'Active' ? 'success' : 'danger'}>
+                {selectedCA.status}
+              </Badge>
             </div>
-            <div className="col-span-2">
-              <p className="text-xs text-text-secondary uppercase mb-1">Subject DN</p>
-              <p className="text-sm text-text-primary">{selectedCA.subject}</p>
+          </div>
+
+          {/* Subject Information */}
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary mb-3">Subject Information</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <p className="text-xs text-text-secondary uppercase mb-1">Common Name (CN)</p>
+                <p className="text-sm text-text-primary font-medium">{selectedCA.common_name || 'N/A'}</p>
+              </div>
+              {selectedCA.organization && (
+                <div className="col-span-2">
+                  <p className="text-xs text-text-secondary uppercase mb-1">Organization (O)</p>
+                  <p className="text-sm text-text-primary">{selectedCA.organization}</p>
+                </div>
+              )}
+              {selectedCA.organizational_unit && (
+                <div className="col-span-2">
+                  <p className="text-xs text-text-secondary uppercase mb-1">Organizational Unit (OU)</p>
+                  <p className="text-sm text-text-primary">{selectedCA.organizational_unit}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Country (C)</p>
+                <p className="text-sm text-text-primary">{selectedCA.country || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">State (ST)</p>
+                <p className="text-sm text-text-primary">{selectedCA.state || 'N/A'}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-xs text-text-secondary uppercase mb-1">Locality (L)</p>
+                <p className="text-sm text-text-primary">{selectedCA.locality || 'N/A'}</p>
+              </div>
             </div>
+          </div>
+
+          {/* Certificate Details */}
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary mb-3">Certificate Details</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Serial Number</p>
+                <p className="text-sm font-mono text-text-primary">{selectedCA.serial || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Issued Certificates</p>
+                <p className="text-sm text-text-primary">{selectedCA.certs || 0} certificates</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Valid From</p>
+                <p className="text-sm text-text-primary">{formatDate(selectedCA.valid_from)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Valid Until</p>
+                <p className="text-sm text-text-primary">{formatDate(selectedCA.valid_to)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Key Algorithm</p>
+                <p className="text-sm text-text-primary">{selectedCA.key_algorithm || selectedCA.key_type || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Signature Algorithm</p>
+                <p className="text-sm text-text-primary">{selectedCA.signature_algorithm || selectedCA.hash_algorithm || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Private Key</p>
+                <Badge variant={selectedCA.has_private_key ? 'success' : 'warning'}>
+                  {selectedCA.has_private_key ? 'Available' : 'Not Available'}
+                </Badge>
+              </div>
+              {selectedCA.caref && (
+                <div>
+                  <p className="text-xs text-text-secondary uppercase mb-1">Parent CA</p>
+                  <p className="text-sm text-text-primary">{selectedCA.caref}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* CRL & OCSP Configuration */}
+          {(selectedCA.cdp_enabled || selectedCA.ocsp_enabled) && (
             <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Key Algorithm</p>
-              <p className="text-sm text-text-primary">{selectedCA.key_algorithm}</p>
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Revocation Services</h3>
+              <div className="space-y-3">
+                {selectedCA.cdp_enabled && (
+                  <div className="p-3 bg-bg-tertiary border border-border rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="success">CRL Enabled</Badge>
+                    </div>
+                    <p className="text-xs text-text-secondary uppercase mb-1">CRL Distribution Point</p>
+                    <p className="text-xs font-mono text-text-primary break-all">
+                      {selectedCA.cdp_url || 'Not configured'}
+                    </p>
+                  </div>
+                )}
+                {selectedCA.ocsp_enabled && (
+                  <div className="p-3 bg-bg-tertiary border border-border rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="success">OCSP Enabled</Badge>
+                    </div>
+                    <p className="text-xs text-text-secondary uppercase mb-1">OCSP Responder URL</p>
+                    <p className="text-xs font-mono text-text-primary break-all">
+                      {selectedCA.ocsp_url || 'Not configured'}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Key Size</p>
-              <p className="text-sm text-text-primary">{selectedCA.key_size} bits</p>
-            </div>
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Valid From</p>
-              <p className="text-sm text-text-primary">{formatDate(selectedCA.valid_from)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Valid Until</p>
-              <p className="text-sm text-text-primary">{formatDate(selectedCA.valid_to)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Path Length</p>
-              <p className="text-sm text-text-primary">
-                {selectedCA.path_length !== null ? selectedCA.path_length : 'Unlimited'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Signature Algorithm</p>
-              <p className="text-sm text-text-primary">{selectedCA.signature_algorithm}</p>
-            </div>
+          )}
+
+          {/* Full Subject/Issuer DN */}
+          <div className="p-4 bg-bg-tertiary border border-border rounded-lg">
+            <p className="text-xs text-text-secondary uppercase mb-2">Full Subject DN</p>
+            <p className="text-xs font-mono text-text-primary break-all mb-4">
+              {selectedCA.subject}
+            </p>
+            <p className="text-xs text-text-secondary uppercase mb-2">Issuer DN</p>
+            <p className="text-xs font-mono text-text-primary break-all">
+              {selectedCA.issuer}
+            </p>
           </div>
         </div>
       )

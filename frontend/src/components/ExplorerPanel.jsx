@@ -7,6 +7,7 @@ import { cn } from '../lib/utils'
 export function ExplorerPanel({ 
   title, 
   children, 
+  actions,
   searchable = false,
   searchValue,
   onSearch,
@@ -17,10 +18,17 @@ export function ExplorerPanel({
   return (
     <div className={cn("w-80 border-r border-border bg-bg-secondary flex flex-col", className)}>
       {/* Header */}
-      <div className="px-3 py-2 border-b border-border">
-        <h1 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
-          {title}
-        </h1>
+      <div className="px-4 py-3 border-b border-border">
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
+            {title}
+          </h1>
+        </div>
+        {actions && (
+          <div className="flex items-center gap-2 mt-2">
+            {actions}
+          </div>
+        )}
       </div>
 
       {/* Search */}
