@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { MagnifyingGlass, Gear, CaretDown, Bell, SignOut, Plus, Certificate, ShieldCheck, FileText, Users as UsersIcon, UserCircle, Palette } from '@phosphor-icons/react'
-import CommandPalette from './CommandPalette'
-import ThemeSwitcher from './ThemeSwitcher'
+import { MagnifyingGlass, Gear, CaretDown, Bell, SignOut, Plus, Certificate, ShieldCheck, FileText, Key, Users as UsersIcon, UserCircle } from '@phosphor-icons/react'
 import './AppShell.css'
 
 export default function AppShell() {
@@ -10,24 +8,6 @@ export default function AppShell() {
   const location = useLocation()
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [showNewMenu, setShowNewMenu] = useState(false)
-  const [showCommandPalette, setShowCommandPalette] = useState(false)
-  const [showThemeSwitcher, setShowThemeSwitcher] = useState(false)
-  
-  useEffect(() => {
-    function handleKeyDown(e) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        setShowCommandPalette(true)
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
-        e.preventDefault()
-        setShowThemeSwitcher(true)
-      }
-    }
-    
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
   
   function isActive(path) {
     return location.pathname === path
@@ -51,7 +31,7 @@ export default function AppShell() {
             <span>UCM</span>
           </div>
           
-          <button className="search-button" onClick={() => setShowCommandPalette(true)}>
+          <button className="search-button">
             <MagnifyingGlass size={18} />
             <span>Search...</span>
             <kbd>⌘K</kbd>
@@ -67,29 +47,25 @@ export default function AppShell() {
           
           {showNewMenu && (
             <div className="dropdown-menu new-menu">
-              <button className="dropdown-item" onClick={() => { navigate('/cas'); setShowNewMenu(false) }}>
+              <button className="dropdown-item" onClick={() => navigate('/cas')}>
                 <ShieldCheck size={18} />
                 <span>Create CA</span>
               </button>
-              <button className="dropdown-item" onClick={() => { navigate('/certificates'); setShowNewMenu(false) }}>
+              <button className="dropdown-item" onClick={() => navigate('/certificates')}>
                 <Certificate size={18} />
                 <span>Issue Certificate</span>
               </button>
-              <button className="dropdown-item" onClick={() => { navigate('/csrs'); setShowNewMenu(false) }}>
+              <button className="dropdown-item" onClick={() => navigate('/csrs')}>
                 <FileText size={18} />
                 <span>Upload CSR</span>
               </button>
               <div className="dropdown-divider"></div>
-              <button className="dropdown-item" onClick={() => { navigate('/templates'); setShowNewMenu(false) }}>
+              <button className="dropdown-item" onClick={() => navigate('/templates')}>
                 <FileText size={18} />
                 <span>New Template</span>
               </button>
             </div>
           )}
-          
-          <button className="btn-icon" onClick={() => setShowThemeSwitcher(true)} title="Change theme (⌘T)">
-            <Palette size={20} />
-          </button>
           
           <button className="btn-icon">
             <Bell size={20} />
@@ -103,15 +79,15 @@ export default function AppShell() {
           
           {showMoreMenu && (
             <div className="dropdown-menu more-menu">
-              <button className="dropdown-item" onClick={() => { navigate('/settings'); setShowMoreMenu(false) }}>
+              <button className="dropdown-item" onClick={() => navigate('/settings')}>
                 <Gear size={18} />
                 <span>Settings</span>
               </button>
-              <button className="dropdown-item" onClick={() => { navigate('/users'); setShowMoreMenu(false) }}>
+              <button className="dropdown-item" onClick={() => navigate('/users')}>
                 <UsersIcon size={18} />
                 <span>Users</span>
               </button>
-              <button className="dropdown-item" onClick={() => { navigate('/account'); setShowMoreMenu(false) }}>
+              <button className="dropdown-item" onClick={() => navigate('/account')}>
                 <UserCircle size={18} />
                 <span>Account</span>
               </button>
@@ -140,9 +116,6 @@ export default function AppShell() {
       <main className="app-content">
         <Outlet />
       </main>
-      
-      <CommandPalette isOpen={showCommandPalette} onClose={() => setShowCommandPalette(false)} />
-      <ThemeSwitcher isOpen={showThemeSwitcher} onClose={() => setShowThemeSwitcher(false)} />
     </div>
   )
 }
