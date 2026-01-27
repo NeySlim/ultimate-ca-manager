@@ -106,6 +106,20 @@ export default function Certificates() {
                   <td>
                     <div className="cert-actions">
                       <button className="icon-btn" onClick={() => setSelectedCert(cert)}>View</button>
+                      <button className="icon-btn" onClick={() => {
+                        if (cert.status === 'revoked') {
+                          alert('Certificate already revoked')
+                          return
+                        }
+                        if (confirm(`Revoke certificate for ${cert.common_name || cert.subject}?`)) {
+                          api.revokeCertificate(cert.id || cert.serial)
+                            .then(() => {
+                              alert('Certificate revoked successfully')
+                              fetchCertificates()
+                            })
+                            .catch(err => alert('Revoke failed: ' + err.message))
+                        }
+                      }}>Revoke</button>
                       <button className="icon-btn"><Download size={14} /></button>
                     </div>
                   </td>
