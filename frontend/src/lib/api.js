@@ -37,8 +37,13 @@ async function request(endpoint, options = {}) {
       throw new Error(data?.message || data?.error || `HTTP ${res.status}`)
     }
     
-    // UCM API returns { success, data, message } or { data, message }
-    return data?.data !== undefined ? data.data : data
+    // UCM API returns { data, message } format
+    // Extract the 'data' field if it exists
+    if (data && typeof data === 'object' && 'data' in data) {
+      return data.data
+    }
+    
+    return data
     
   } catch (error) {
     // Network errors
@@ -69,7 +74,11 @@ export const api = {
   
   getDashboardStats: () => request('/dashboard/stats'),
   
-  getActivityLog: (limit = 10) => request('/dashboard/activity'),
+  getActivityLog: async (limit = 10) => {
+    const result = await request('/dashboard/activity')
+    // Backend returns { activity: [] } - extract the array
+    return result?.activity || []
+  },
   
   getSystemStatus: () => request('/dashboard/system-status'),
   
