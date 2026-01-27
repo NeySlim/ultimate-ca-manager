@@ -1,6 +1,0 @@
-.stack { display: flex; flex-direction: column; }
-.xs { gap: var(--spacing-xs); }
-.sm { gap: var(--spacing-sm); }
-.md { gap: var(--spacing-md); }
-.lg { gap: var(--spacing-lg); }
-.xl { gap: var(--spacing-xl); }

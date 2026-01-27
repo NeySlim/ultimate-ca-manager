@@ -1,9 +1,0 @@
-.divider {
-  background: var(--color-border-default);
-  height: 1px;
-  width: 100%;
-}
-.divider.vertical {
-  width: 1px;
-  height: 100%;
-}
