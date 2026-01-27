@@ -484,16 +484,16 @@ tr:hover {
 .stat-card {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-md) var(--space-lg);
+  gap: var(--space-sm);
+  padding: var(--space-md);
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
 }
 
 .stat-icon {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -502,13 +502,13 @@ tr:hover {
 }
 
 .stat-content h3 {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .stat-content p {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -519,22 +519,22 @@ tr:hover {
 .cas-page {
   max-width: 1600px;
   margin: 0 auto;
-  padding: var(--space-xl);
+  padding: var(--space-lg);
 }
 
 .page-header {
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-lg);
 }
 
 .page-header h1 {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 600;
-  margin-bottom: var(--space-sm);
+  margin-bottom: 4px;
 }
 
 .subtitle {
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .header-actions {
@@ -781,7 +781,7 @@ tr:hover {
 .acme-page,
 .templates-page,
 .truststore-page {
-  padding: var(--space-xl);
+  padding: var(--space-lg);
   max-width: 1600px;
   margin: 0 auto;
 }
@@ -795,15 +795,15 @@ tr:hover {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-lg);
 }
 
 .csrs-page .page-header h1,
 .users-page .page-header h1,
 .certificates-page .page-header h1 {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 600;
-  margin-bottom: var(--space-sm);
+  margin-bottom: 4px;
 }
 
 /* ============================================
