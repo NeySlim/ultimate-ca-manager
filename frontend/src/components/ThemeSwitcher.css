@@ -16,9 +16,9 @@
 .theme-switcher {
   width: 500px;
   max-width: 90vw;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  background: #161B22;
+  border: 1px solid #30363D;
+  border-radius: 12px;
   padding: 24px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.2s ease;
@@ -29,16 +29,18 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 20px;
+  color: #E6EDF3;
 }
 
 .theme-header svg {
-  color: var(--primary);
+  color: #3B82F6;
 }
 
 .theme-header h3 {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
+  color: #E6EDF3;
 }
 
 .theme-grid {
@@ -53,26 +55,26 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: var(--background);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-md);
+  background: #0A0E14;
+  border: 2px solid #30363D;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .theme-option:hover {
-  border-color: var(--primary);
+  border-color: #3B82F6;
   transform: scale(1.02);
 }
 
 .theme-option.active {
-  border-color: var(--primary);
-  background: var(--primary-alpha);
+  border-color: #3B82F6;
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .theme-preview {
   height: 60px;
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
   border: 1px solid;
   display: flex;
   align-items: center;
@@ -98,13 +100,14 @@
   font-size: 14px;
   font-weight: 500;
   text-align: center;
+  color: #E6EDF3;
 }
 
 .theme-option .check {
   position: absolute;
   top: 8px;
   right: 8px;
-  color: var(--primary);
+  color: #3B82F6;
 }
 
 @keyframes slideUp {
