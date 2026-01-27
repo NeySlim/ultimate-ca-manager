@@ -13,6 +13,7 @@ import {
 } from '../components'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
+import { extractCN, extractData, formatDate, formatDateTime } from '../lib/utils'
 
 export default function CAsPage() {
   const { showSuccess, showError } = useNotification()
@@ -86,8 +87,8 @@ export default function CAsPage() {
         casService.getCertificates(id, { page: 1, per_page: 10 }),
       ])
       
-      setSelectedCA(caData)
-      setIssuedCerts(certsData.certificates || [])
+      setSelectedCA(extractData(caData))
+      setIssuedCerts(extractData(certsData) || [])
     } catch (error) {
       showError(error.message || 'Failed to load CA details')
     }
@@ -168,15 +169,11 @@ export default function CAsPage() {
             </div>
             <div>
               <p className="text-xs text-text-secondary uppercase mb-1">Valid From</p>
-              <p className="text-sm text-text-primary">
-                {selectedCA.valid_from ? new Date(selectedCA.valid_from).toLocaleDateString() : 'N/A'}
-              </p>
+              <p className="text-sm text-text-primary">{formatDate(selectedCA.valid_from)}</p>
             </div>
             <div>
               <p className="text-xs text-text-secondary uppercase mb-1">Valid Until</p>
-              <p className="text-sm text-text-primary">
-                {selectedCA.valid_to ? new Date(selectedCA.valid_to).toLocaleDateString() : 'N/A'}
-              </p>
+              <p className="text-sm text-text-primary">{formatDate(selectedCA.valid_to)}</p>
             </div>
             <div>
               <p className="text-xs text-text-secondary uppercase mb-1">Path Length</p>
