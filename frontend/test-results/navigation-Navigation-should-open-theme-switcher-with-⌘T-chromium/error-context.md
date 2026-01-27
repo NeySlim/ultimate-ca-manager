@@ -1,0 +1,70 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e7]
+        - generic [ref=e10]: UCM
+      - button "Search...⌘K" [ref=e11]:
+        - img [ref=e12]
+        - text: Search...⌘K
+    - generic [ref=e14]:
+      - button "New" [ref=e15]:
+        - img [ref=e16]
+        - text: New
+        - img [ref=e18]
+      - button "Change theme (⌘T)" [ref=e20]:
+        - img [ref=e21]
+      - button [ref=e23]:
+        - img [ref=e24]
+      - button "More" [ref=e26]:
+        - img [ref=e27]
+        - text: More
+        - img [ref=e29]
+  - navigation [ref=e31]:
+    - button "Dashboard" [ref=e32]
+    - button "CAs" [ref=e33]
+    - button "Certificates" [ref=e34]
+    - button "CSRs" [ref=e35]
+    - button "ACME" [ref=e36]
+    - button "CRL/OCSP" [ref=e37]
+    - button "SCEP" [ref=e38]
+    - button "Templates" [ref=e39]
+    - button "TrustStore" [ref=e40]
+  - main [ref=e41]:
+    - generic [ref=e42]:
+      - heading "Dashboard" [level=1] [ref=e43]
+      - paragraph [ref=e44]: Overview of your PKI infrastructure
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - img [ref=e48]
+          - generic [ref=e51]:
+            - generic [ref=e52]: "54"
+            - generic [ref=e53]: Total Certificates
+        - generic [ref=e54]:
+          - img [ref=e56]
+          - generic [ref=e59]:
+            - generic [ref=e60]: "0"
+            - generic [ref=e61]: Active CAs
+        - generic [ref=e62]:
+          - img [ref=e64]
+          - generic [ref=e67]:
+            - generic [ref=e68]: "16"
+            - generic [ref=e69]: Expiring Soon
+        - generic [ref=e70]:
+          - img [ref=e72]
+          - generic [ref=e75]:
+            - generic [ref=e76]: "0"
+            - generic [ref=e77]: Revoked
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - heading "Recent Activity" [level=2] [ref=e80]
+          - paragraph [ref=e81]: No recent activity
+        - generic [ref=e82]:
+          - heading "System Status" [level=2] [ref=e83]
+          - generic [ref=e84]: API ServerOnline
+          - generic [ref=e85]: DatabaseHealthy
+          - generic [ref=e86]: OCSPDisabled
+```
