@@ -10,6 +10,7 @@ import {
 } from '../components'
 import { certificatesService } from '../services'
 import { useNotification } from '../contexts'
+import { extractCN, extractData, formatDate } from '../lib/utils'
 
 export default function CertificatesPage() {
   const { showSuccess, showError } = useNotification()
@@ -52,8 +53,8 @@ export default function CertificatesPage() {
 
   const loadCertificateDetails = async (id) => {
     try {
-      const data = await certificatesService.getById(id)
-      setSelectedCert(data)
+      const response = await certificatesService.getById(id)
+      setSelectedCert(extractData(response))
     } catch (error) {
       showError(error.message || 'Failed to load certificate details')
     }
@@ -97,9 +98,9 @@ export default function CertificatesPage() {
 
   const certColumns = [
     { 
-      key: 'common_name', 
+      key: 'subject', 
       label: 'Common Name',
-      render: (val) => <span className="font-medium">{val}</span>
+      render: (val) => <span className="font-medium">{extractCN(val)}</span>
     },
     {
       key: 'status',
@@ -120,9 +121,13 @@ export default function CertificatesPage() {
     { 
       key: 'valid_to', 
       label: 'Expires',
-      render: (val) => val ? new Date(val).toLocaleDateString() : 'N/A'
+      render: (val) => formatDate(val)
     },
-    { key: 'issuer', label: 'Issuer' },
+    { 
+      key: 'issuer', 
+      label: 'Issuer',
+      render: (val) => extractCN(val)
+    },
   ]
 
   const detailTabs = selectedCert ? [
@@ -232,6 +237,39 @@ export default function CertificatesPage() {
 
   return (
     <>
+      <DetailsPanel
+        breadcrumb={[
+          { label: 'Certificates' },
+          { label: selectedCert ? extractCN(selectedCert.subject) : '...' }
+        ]}
+        title={selectedCert ? extractCN(selectedCert.subject) : 'Select a certificate'}
+        actions={selectedCert && (
+          <>
+            <ExportDropdown 
+              onExport={(format) => handleExport(selectedCert.id, format)} 
+              formats={['pem', 'der', 'pkcs12']}
+            />
+            <Button variant="secondary" size="sm" onClick={() => handleRenew(selectedCert.id)}>
+              <ArrowsClockwise size={16} />
+              Renew
+            </Button>
+            <Button variant="danger" size="sm" onClick={() => handleRevoke(selectedCert.id)}>
+              <X size={16} />
+              Revoke
+            </Button>
+          </>
+        )}
+      >
+        {!selectedCert ? (
+          <EmptyState
+            title="No certificate selected"
+            description="Select a certificate from the list to view details"
+          />
+        ) : (
+          <Tabs tabs={detailTabs} defaultTab="overview" />
+        )}
+      </DetailsPanel>
+
       <ExplorerPanel
         title="Certificates"
         searchable
@@ -289,39 +327,6 @@ export default function CertificatesPage() {
           )}
         </div>
       </ExplorerPanel>
-
-      <DetailsPanel
-        breadcrumb={[
-          { label: 'Certificates' },
-          { label: selectedCert?.common_name || '...' }
-        ]}
-        title={selectedCert?.common_name || 'Select a certificate'}
-        actions={selectedCert && (
-          <>
-            <ExportDropdown 
-              onExport={(format) => handleExport(selectedCert.id, format)} 
-              formats={['pem', 'der', 'pkcs12']}
-            />
-            <Button variant="secondary" size="sm" onClick={() => handleRenew(selectedCert.id)}>
-              <ArrowsClockwise size={16} />
-              Renew
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => handleRevoke(selectedCert.id)}>
-              <X size={16} />
-              Revoke
-            </Button>
-          </>
-        )}
-      >
-        {!selectedCert ? (
-          <EmptyState
-            title="No certificate selected"
-            description="Select a certificate from the list to view details"
-          />
-        ) : (
-          <Tabs tabs={detailTabs} defaultTab="overview" />
-        )}
-      </DetailsPanel>
 
       {/* Create Certificate Modal */}
       <Modal
