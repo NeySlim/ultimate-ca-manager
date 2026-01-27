@@ -423,16 +423,17 @@ thead {
 }
 
 th {
-  padding: var(--space-md);
+  padding: 12px var(--space-md);
   text-align: left;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 td {
-  padding: var(--space-md);
+  padding: 12px var(--space-md);
   border-bottom: 1px solid var(--border);
   font-size: 14px;
 }
@@ -484,19 +485,20 @@ tr:hover {
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  padding: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
 }
 
 .stat-icon {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
+  flex-shrink: 0;
 }
 
 .stat-content h3 {
@@ -635,8 +637,8 @@ tr:hover {
 .ca-node {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-lg);
+  gap: var(--space-sm);
+  padding: 12px var(--space-md);
   transition: background 0.2s;
 }
 
@@ -665,11 +667,12 @@ tr:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   background: rgba(59, 130, 246, 0.1);
   border-radius: var(--radius-md);
   color: var(--accent-primary);
+  flex-shrink: 0;
 }
 
 .ca-info {
@@ -677,14 +680,14 @@ tr:hover {
 }
 
 .ca-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .ca-details {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -716,15 +719,15 @@ tr:hover {
 /* Grid View */
 .ca-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: var(--space-lg);
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-md);
 }
 
 .ca-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--space-lg);
+  padding: var(--space-md);
   transition: all 0.2s;
   cursor: pointer;
 }
