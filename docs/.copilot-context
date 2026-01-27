@@ -1,0 +1,32 @@
+# Copilot Context for UCM Documentation
+
+This directory contains critical API specifications and audit documents.
+
+## Key Files
+
+- **UCM-API-SPECIFICATION.md**: Complete API contract specification, endpoint analysis, and implementation plan
+- **API-WIRING-AUDIT.md**: Frontend/backend wiring audit with bug reports and fixes
+- **README.md**: Overview and contribution guidelines
+
+## Current Status
+
+🔴 CRITICAL: 9/9 endpoints have frontend/backend mismatches
+- Backend: Returns `{data: ..., meta: ...}` consistently
+- Frontend: Expects various structures (data.certificates, data.users, etc.)
+- Impact: Empty pages despite data in database
+
+## When Working on UCM
+
+1. Always reference UCM-API-SPECIFICATION.md for correct API structures
+2. Follow the standard response format: `{data: [...], meta: {...}}`
+3. Update documentation when making API changes
+4. Run /tmp/analyze_api_contract.py to verify contracts
+
+## Implementation Priority
+
+1. Fix CSRsPage, TemplatesPage, UsersPage, DashboardPage (empty pages)
+2. Fix SettingsPage tabs (ACME, SCEP, Database, HTTPS)
+3. Fix date field mapping (valid_from/valid_to vs not_before/not_after)
+4. Comprehensive testing
+
+Total estimated time: 90 minutes

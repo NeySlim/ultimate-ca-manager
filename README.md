@@ -374,3 +374,16 @@ BSD 3-Clause License - See [LICENSE](LICENSE) file for details.
 ---
 
 **Made with ❤️ by the UCM Team**
+
+---
+
+## 📚 Documentation
+
+Comprehensive technical documentation is available in the [`/docs`](/docs) directory:
+
+- **[UCM API Specification](/docs/UCM-API-SPECIFICATION.md)** - Complete API v2 contract, endpoint analysis, implementation plan
+- **[API Wiring Audit](/docs/API-WIRING-AUDIT.md)** - Frontend/backend integration audit and bug reports
+- **[Documentation Overview](/docs/README.md)** - Architecture, conventions, and contribution guidelines
+
+**Current Status:** 🔴 Critical frontend/backend mismatches detected - see docs for details and fix plan.
+
