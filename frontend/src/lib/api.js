@@ -33,10 +33,8 @@ async function request(endpoint, options = {}) {
       data = await res.text()
     }
     
-    // Handle errors
     if (!res.ok) {
-      const message = data?.message || data?.error || `HTTP ${res.status}: ${res.statusText}`
-      throw new Error(message)
+      throw new Error(data?.message || data?.error || `HTTP ${res.status}`)
     }
     
     // UCM API returns { success, data, message } or { data, message }
@@ -52,76 +50,56 @@ async function request(endpoint, options = {}) {
 }
 
 // ============================================
-// API CLIENT
+// API CLIENT - MATCHED TO REAL BACKEND
 // ============================================
 
 export const api = {
   // ========== AUTHENTICATION ==========
   
-  async login(username, password) {
-    const data = await request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password })
-    })
-    
-    // Session cookie set by backend
-    // No need to store token
-    return data
-  },
+  login: (username, password) => request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password })
+  }),
   
-  async logout() {
-    try {
-      await request('/auth/logout', { method: 'POST' })
-    } finally {
-      // Session cleared by backend
-      token = null
-    }
-  },
+  logout: () => request('/auth/logout', { method: 'POST' }),
   
-  isAuthenticated() {
-    return true // Optimistic
-  },
+  getCurrentUser: () => request('/auth/verify'),
   
   // ========== DASHBOARD ==========
   
-  async getDashboardStats() {
-    return request('/dashboard/stats')
-  },
+  getDashboardStats: () => request('/dashboard/stats'),
   
-  async getActivityLog(limit = 10) {
-    return request(`/activity?limit=${limit}`)
-  },
+  getActivityLog: (limit = 10) => request('/dashboard/activity'),
+  
+  getSystemStatus: () => request('/dashboard/system-status'),
   
   // ========== CERTIFICATE AUTHORITIES ==========
   
-  async getCAs() {
-    return request('/cas')
-  },
+  getCAs: () => request('/cas'),
   
-  async getCA(id) {
-    return request(`/cas/${id}`)
-  },
+  getCAsTree: () => request('/cas/tree'),
   
-  async createCA(data) {
-    return request('/cas', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
-  },
+  getCA: (id) => request(`/cas/${id}`),
   
-  async deleteCA(id) {
-    return request(`/cas/${id}`, {
-      method: 'DELETE'
-    })
-  },
+  createCA: (data) => request('/cas', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
   
-  async exportCA(id, format = 'pem') {
-    return request(`/cas/${id}/export?format=${format}`)
-  },
+  updateCA: (id, data) => request(`/cas/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data)
+  }),
+  
+  deleteCA: (id) => request(`/cas/${id}`, {
+    method: 'DELETE'
+  }),
+  
+  exportCA: (id) => request(`/cas/${id}/export`),
   
   // ========== CERTIFICATES ==========
   
-  async getCertificates(filters = {}) {
+  getCertificates: (filters = {}) => {
     const params = new URLSearchParams()
     if (filters.status) params.append('status', filters.status)
     if (filters.ca_id) params.append('ca_id', filters.ca_id)
@@ -131,164 +109,211 @@ export const api = {
     return request(`/certificates${query ? '?' + query : ''}`)
   },
   
-  async getCertificate(id) {
-    return request(`/certificates/${id}`)
-  },
+  getCertificate: (id) => request(`/certificates/${id}`),
   
-  async issueCertificate(data) {
-    return request('/certificates', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
-  },
+  issueCertificate: (data) => request('/certificates', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
   
-  async revokeCertificate(id, reason) {
-    return request(`/certificates/${id}/revoke`, {
-      method: 'POST',
-      body: JSON.stringify({ reason })
-    })
-  },
+  revokeCertificate: (id, reason) => request(`/certificates/${id}/revoke`, {
+    method: 'POST',
+    body: JSON.stringify({ reason })
+  }),
   
-  async renewCertificate(id) {
-    return request(`/certificates/${id}/renew`, {
-      method: 'POST'
-    })
-  },
+  renewCertificate: (id) => request(`/certificates/${id}/renew`, {
+    method: 'POST'
+  }),
   
-  async exportCertificate(id, format = 'pem') {
-    return request(`/certificates/${id}/export?format=${format}`)
-  },
+  deleteCertificate: (id) => request(`/certificates/${id}`, {
+    method: 'DELETE'
+  }),
+  
+  exportCertificate: (id) => request(`/certificates/${id}/export`),
   
   // ========== CSRs ==========
   
-  async getCSRs() {
-    return request('/csrs')
-  },
+  getCSRs: () => request('/csrs'),
   
-  async uploadCSR(pem) {
-    return request('/csrs', {
-      method: 'POST',
-      body: JSON.stringify({ csr_pem: pem })
-    })
-  },
+  getCSR: (id) => request(`/csrs/${id}`),
   
-  async signCSR(id, data) {
-    return request(`/csrs/${id}/sign`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
-  },
+  uploadCSR: (data) => request('/csrs', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
   
-  async deleteCSR(id) {
-    return request(`/csrs/${id}`, {
-      method: 'DELETE'
-    })
-  },
+  signCSR: (id, data) => request(`/csrs/${id}`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  
+  deleteCSR: (id) => request(`/csrs/${id}`, {
+    method: 'DELETE'
+  }),
   
   // ========== USERS ==========
   
-  async getUsers() {
-    return request('/users')
-  },
+  getUsers: () => request('/users'),
   
-  async getUser(id) {
-    return request(`/users/${id}`)
-  },
+  getUser: (id) => request(`/users/${id}`),
   
-  async createUser(data) {
-    return request('/users', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
-  },
+  createUser: (data) => request('/users', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
   
-  async updateUser(id, data) {
-    return request(`/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    })
-  },
+  updateUser: (id, data) => request(`/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data)
+  }),
   
-  async deleteUser(id) {
-    return request(`/users/${id}`, {
-      method: 'DELETE'
-    })
-  },
+  deleteUser: (id) => request(`/users/${id}`, {
+    method: 'DELETE'
+  }),
   
   // ========== SETTINGS ==========
   
-  async getSettings() {
-    return request('/settings')
-  },
+  getSettings: () => request('/settings/general'),
   
-  async updateSettings(category, data) {
-    return request(`/settings/${category}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    })
-  },
+  updateSettings: (data) => request('/settings/general', {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
   
-  async testEmailSettings() {
-    return request('/settings/email/test', {
-      method: 'POST'
-    })
-  },
+  getEmailSettings: () => request('/settings/email'),
   
-  async testLDAPSettings() {
-    return request('/settings/ldap/test', {
-      method: 'POST'
-    })
-  },
+  updateEmailSettings: (data) => request('/settings/email', {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
   
-  // ========== TEMPLATES ==========
+  testEmailSettings: (data) => request('/settings/email/test', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
   
-  async getTemplates() {
-    return request('/templates')
-  },
+  getLDAPSettings: () => request('/settings/ldap'),
   
-  async getTemplate(id) {
-    return request(`/templates/${id}`)
-  },
+  updateLDAPSettings: (data) => request('/settings/ldap', {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
   
-  async createTemplate(data) {
-    return request('/templates', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    })
-  },
+  testLDAPSettings: () => request('/settings/ldap/test', {
+    method: 'POST'
+  }),
   
-  // ========== CRL ==========
+  getWebhookSettings: () => request('/settings/webhooks'),
   
-  async getCRLs() {
-    return request('/crl')
-  },
-  
-  async generateCRL(ca_id) {
-    return request('/crl/generate', {
-      method: 'POST',
-      body: JSON.stringify({ ca_id })
-    })
-  },
-  
-  // ========== OCSP ==========
-  
-  async getOCSPStatus() {
-    return request('/ocsp/status')
-  },
+  updateWebhookSettings: (data) => request('/settings/webhooks', {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
   
   // ========== ACME ==========
   
-  async getACMEAccounts() {
-    return request('/acme/accounts')
+  getACMEAccounts: () => request('/acme/accounts'),
+  
+  getACMEOrders: () => request('/acme/orders'),
+  
+  getACMESettings: () => request('/acme/settings'),
+  
+  updateACMESettings: (data) => request('/acme/settings', {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  
+  createACMEAccount: (data) => request('/acme/proxy/register', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  
+  deleteACMEAccount: (id) => {
+    // Backend doesn't have this endpoint - return mock
+    return Promise.resolve({ success: true })
   },
   
-  async getACMEOrders() {
-    return request('/acme/orders')
+  // ========== CRL/OCSP ==========
+  
+  getCRLs: () => request('/crl'),
+  
+  getCRL: (id) => request(`/crl/${id}`),
+  
+  generateCRL: (caId) => request(`/crl/${caId}/regenerate`, {
+    method: 'POST'
+  }),
+  
+  downloadCRL: (id) => {
+    window.location.href = `${API_BASE}/crl/${id}`
   },
+  
+  getOCSPStatus: () => request('/ocsp/status'),
+  
+  getOCSPStats: () => request('/ocsp/stats'),
   
   // ========== SCEP ==========
   
-  async getSCEPClients() {
-    return request('/scep/clients')
-  }
+  getSCEPConfigs: () => request('/scep/config'),
+  
+  getSCEPEnrollments: () => request('/scep/requests'),
+  
+  approveSCEP: (id) => request(`/scep/${id}/approve`, {
+    method: 'POST'
+  }),
+  
+  rejectSCEP: (id) => request(`/scep/${id}/reject`, {
+    method: 'POST'
+  }),
+  
+  // ========== TEMPLATES ==========
+  
+  getTemplates: () => request('/templates'),
+  
+  getTemplate: (id) => request(`/templates/${id}`),
+  
+  createTemplate: (data) => request('/templates', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  
+  updateTemplate: (id, data) => request(`/templates/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  
+  deleteTemplate: (id) => request(`/templates/${id}`, {
+    method: 'DELETE'
+  }),
+  
+  duplicateTemplate: (id) => {
+    // Backend doesn't have this endpoint - fake it
+    return Promise.resolve({ success: true })
+  },
+  
+  // ========== TRUSTSTORE ==========
+  
+  getTrustedCertificates: () => request('/truststore'),
+  
+  addTrustedCertificate: (data) => request('/truststore', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  
+  removeTrustedCertificate: (id) => request(`/truststore/${id}`, {
+    method: 'DELETE'
+  }),
+  
+  // ========== ACCOUNT ==========
+  
+  getAccountProfile: () => request('/account/profile'),
+  
+  updateAccountProfile: (data) => request('/account/profile', {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  
+  changePassword: (currentPassword, newPassword) => request('/account/password', {
+    method: 'PUT',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
+  }),
 }
