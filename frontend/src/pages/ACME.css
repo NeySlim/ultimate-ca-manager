@@ -1,0 +1,133 @@
+.acme-page {
+  padding: 24px;
+}
+
+.acme-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.accounts-section, .orders-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.accounts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.account-card {
+  position: relative;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.account-header svg {
+  color: var(--primary);
+}
+
+.account-info h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.provider-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--primary-alpha);
+  color: var(--primary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.account-stats {
+  display: flex;
+  gap: 24px;
+  margin-top: 12px;
+}
+
+.account-stats .stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-stats .label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.account-stats .value {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.btn-icon-danger {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.btn-icon-danger:hover {
+  background: var(--danger-alpha);
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-info strong {
+  font-size: 14px;
+}
+
+.order-time {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .acme-grid {
+    grid-template-columns: 1fr;
+  }
+}
