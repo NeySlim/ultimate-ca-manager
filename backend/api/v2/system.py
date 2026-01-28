@@ -125,6 +125,7 @@ def reset_pki():
     # Logic to drop tables or delete file
     return success_response(message="PKI Database reset successfully. System restarting...")
 
+@bp.route('/api/v2/system/backup', methods=['POST'])
 @bp.route('/api/v2/system/backup/create', methods=['POST'])
 @require_auth(['admin:system'])
 def create_backup():
