@@ -418,8 +418,7 @@ def renew_certificate(cert_id):
             issuer=cert.issuer,
             valid_from=not_before,
             valid_to=not_after,
-            key_type=cert.key_type,
-            key_size=cert.key_size,
+            cert_type=cert.cert_type,
             revoked=False
         )
         
