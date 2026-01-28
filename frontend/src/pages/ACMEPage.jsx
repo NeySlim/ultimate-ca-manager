@@ -2,13 +2,13 @@
  * ACME Page
  */
 import { useState, useEffect } from 'react'
-import { Key, Plus, Trash, CheckCircle, XCircle } from '@phosphor-icons/react'
+import { Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge,
-  Input, Modal, Tabs,
+  Input, Modal, Tabs, Select,
   LoadingSpinner, EmptyState, StatusIndicator
 } from '../components'
-import { acmeService } from '../services'
+import { acmeService, casService } from '../services'
 import { useNotification } from '../contexts'
 
 export default function ACMEPage() {
@@ -20,10 +20,64 @@ export default function ACMEPage() {
   const [challenges, setChallenges] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [acmeSettings, setAcmeSettings] = useState({})
+  const [cas, setCas] = useState([])
+  const [proxyEmail, setProxyEmail] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     loadAccounts()
+    loadAcmeSettings()
+    loadCAs()
   }, [])
+
+  const loadCAs = async () => {
+    try {
+      const data = await casService.getAll()
+      setCas(data.cas || [])
+    } catch (error) {
+      // Silent fail
+    }
+  }
+
+  const loadAcmeSettings = async () => {
+    try {
+      const data = await acmeService.getConfig()
+      setAcmeSettings(data || {})
+    } catch (error) {
+      // Silent fail
+    }
+  }
+
+  const handleSaveConfig = async () => {
+    setSaving(true)
+    try {
+      await acmeService.updateConfig(acmeSettings)
+      showSuccess('ACME settings saved successfully')
+    } catch (error) {
+      showError(error.message || 'Failed to save ACME settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRegisterProxy = async () => {
+    if (!proxyEmail) {
+      showError('Email is required')
+      return
+    }
+    try {
+      await acmeService.registerProxy(proxyEmail)
+      showSuccess('Proxy account registered successfully')
+      setProxyEmail('')
+    } catch (error) {
+      showError(error.message || 'Failed to register proxy account')
+    }
+  }
+
+  const updateAcmeSetting = (key, value) => {
+    setAcmeSettings(prev => ({ ...prev, [key]: value }))
+  }
 
   const loadAccounts = async () => {
     setLoading(true)
@@ -257,6 +311,93 @@ export default function ACMEPage() {
     },
   ] : []
 
+  const configTabs = [
+    {
+      id: 'config',
+      label: 'Server Configuration',
+      content: (
+        <div className="space-y-6 max-w-2xl p-4">
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary mb-4">ACME Server Configuration</h3>
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acmeSettings.enabled || false}
+                  onChange={(e) => updateAcmeSetting('enabled', e.target.checked)}
+                  className="rounded border-border bg-bg-tertiary"
+                />
+                <div>
+                  <p className="text-sm text-text-primary font-medium">Enable ACME Server</p>
+                  <p className="text-xs text-text-secondary">Allow automated certificate issuance via ACME protocol</p>
+                </div>
+              </label>
+
+              <Select
+                label="Default CA for ACME"
+                value={acmeSettings.issuing_ca_id || undefined}
+                onChange={(val) => updateAcmeSetting('issuing_ca_id', val)}
+                disabled={!acmeSettings.enabled}
+                placeholder="Select a CA..."
+                options={cas.map(ca => ({ value: ca.refid, label: ca.common_name || ca.descr }))}
+              />
+
+              <Input
+                label="ACME Directory URL"
+                value={`${window.location.origin}/acme/directory`}
+                readOnly
+                helperText="Use this URL with ACME clients like certbot or acme.sh"
+                className="bg-bg-tertiary"
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-6">
+            <h3 className="text-sm font-semibold text-text-primary mb-4">Let's Encrypt Proxy</h3>
+            <div className="space-y-4">
+              <p className="text-sm text-text-secondary">
+                Register a proxy account to use UCM as a Let's Encrypt proxy for external certificate issuance.
+              </p>
+
+              <Input
+                label="Proxy Endpoint URL"
+                value={`${window.location.origin}/api/v2/acme/proxy`}
+                readOnly
+                helperText="External ACME clients can use this URL to proxy requests to Let's Encrypt"
+                className="bg-bg-tertiary"
+              />
+              
+              <Input
+                label="Email Address"
+                type="email"
+                value={proxyEmail}
+                onChange={(e) => setProxyEmail(e.target.value)}
+                placeholder="admin@example.com"
+                helperText="Email for Let's Encrypt account registration"
+              />
+
+              <Button 
+                variant="secondary" 
+                onClick={handleRegisterProxy}
+                disabled={!proxyEmail}
+              >
+                <Key size={16} />
+                Register Proxy Account
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t border-border">
+            <Button onClick={handleSaveConfig} disabled={saving}>
+              <FloppyDisk size={16} />
+              Save Configuration
+            </Button>
+          </div>
+        </div>
+      )
+    }
+  ]
+
   return (
     <>
       <ExplorerPanel
@@ -302,9 +443,9 @@ export default function ACMEPage() {
       <DetailsPanel
         breadcrumb={[
           { label: 'ACME' },
-          { label: selectedAccount?.email || '...' }
+          { label: selectedAccount?.email || 'Configuration' }
         ]}
-        title={selectedAccount?.email || 'Select an account'}
+        title={selectedAccount?.email || 'ACME Configuration'}
         actions={selectedAccount && (
           <>
             <Button 
@@ -323,10 +464,7 @@ export default function ACMEPage() {
         )}
       >
         {!selectedAccount ? (
-          <EmptyState
-            title="No account selected"
-            description="Select an ACME account to view details"
-          />
+          <Tabs tabs={configTabs} defaultTab="config" />
         ) : (
           <Tabs tabs={detailTabs} defaultTab="info" />
         )}
