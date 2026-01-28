@@ -9,6 +9,7 @@ import {
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
+import { formatDate } from '../lib/utils'
 
 export default function SettingsPage() {
   const { showSuccess, showError } = useNotification()
@@ -754,11 +755,11 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Valid From:</span>
-                  <span className="text-text-primary font-medium">{httpsInfo?.valid_from || '-'}</span>
+                  <span className="text-text-primary font-medium">{formatDate(httpsInfo?.valid_from) || '-'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Valid Until:</span>
-                  <span className="text-text-primary font-medium">{httpsInfo?.valid_until || '-'}</span>
+                  <span className="text-text-primary font-medium">{formatDate(httpsInfo?.valid_to) || '-'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Fingerprint (SHA256):</span>
@@ -781,7 +782,7 @@ export default function SettingsPage() {
                     placeholder="Choose a certificate..."
                     options={certificates.map(cert => ({
                       value: cert.id,
-                      label: `${cert.common_name} (expires ${new Date(cert.valid_until).toLocaleDateString()})`
+                      label: `${cert.common_name || 'Certificate'} (expires ${formatDate(cert.valid_to)})`
                     }))}
                   />
                   {certificates.length === 0 && (
