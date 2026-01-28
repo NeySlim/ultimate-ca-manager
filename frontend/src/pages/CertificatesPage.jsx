@@ -2,7 +2,7 @@
  * Certificates Page
  */
 import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Certificate, Download, X, ArrowsClockwise, Trash, UploadSimple } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge, 
@@ -18,6 +18,7 @@ export default function CertificatesPage() {
   const { showSuccess, showError } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   
   const [certificates, setCertificates] = useState([])
   const [selectedCert, setSelectedCert] = useState(null)
@@ -46,6 +47,24 @@ export default function CertificatesPage() {
       setSearchParams(searchParams)
     }
   }, [page, statusFilter, searchQuery])
+
+  // Handle selected param from navigation (e.g., after import redirect)
+  useEffect(() => {
+    const selectedId = searchParams.get('selected')
+    if (selectedId && certificates.length > 0) {
+      const cert = certificates.find(c => c.id === parseInt(selectedId))
+      if (cert) {
+        setSelectedCert(cert)
+        searchParams.delete('selected')
+        setSearchParams(searchParams)
+      } else {
+        // Load the specific certificate if not in current page
+        loadCertificateDetails(parseInt(selectedId))
+        searchParams.delete('selected')
+        setSearchParams(searchParams)
+      }
+    }
+  }, [certificates, searchParams])
 
   const loadCAs = async () => {
     try {
@@ -132,11 +151,13 @@ export default function CertificatesPage() {
       setImportName('')
       setImportPassword('')
       setImportCaId('auto')
-      await loadCertificates()
       
-      // Auto-select the imported certificate to show details
-      // Note: If it was a CA cert, it went to CAs table - message will indicate this
-      if (result.data && !result.message?.includes('CA')) {
+      // If CA was detected, navigate to CAs page with the new CA selected
+      if (result.data && result.message?.includes('CA')) {
+        navigate(`/cas?selected=${result.data.id}`)
+      } else if (result.data) {
+        // Regular certificate - select it here
+        await loadCertificates()
         setSelectedCert(result.data)
       }
     } catch (error) {

@@ -154,11 +154,23 @@ export default function CAsPage() {
     // Check if we should auto-open create modal
     if (searchParams.get('action') === 'create') {
       setShowCreateModal(true)
-      // Remove the param after opening
       searchParams.delete('action')
       setSearchParams(searchParams)
     }
   }, [])
+
+  // Handle selected param from navigation (e.g., after import redirect)
+  useEffect(() => {
+    const selectedId = searchParams.get('selected')
+    if (selectedId && cas.length > 0) {
+      const ca = cas.find(c => c.id === parseInt(selectedId))
+      if (ca) {
+        setSelectedCA(ca)
+        searchParams.delete('selected')
+        setSearchParams(searchParams)
+      }
+    }
+  }, [cas, searchParams])
 
   const loadCAs = async () => {
     setLoading(true)
