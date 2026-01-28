@@ -1,6 +1,6 @@
 # Ultimate CA Manager
 
-![Version](https://img.shields.io/badge/version-1.8.3-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-success.svg)
@@ -31,10 +31,10 @@
 - **HTTPS Only** - All traffic encrypted by default
 
 ### 🎨 Modern Interface
-- **8 Beautiful Themes** - Sentinel, Amber, Nebula, Blossom (Light/Dark variants)
-- **Responsive Design** - Works on desktop, tablet, mobile
-- **Real-time Updates** - HTMX-powered dynamic interface
-- **Intuitive UI** - Clean, professional design
+- **6 Beautiful Themes** - Dark Gray, Blue Ocean, Purple Night, Green Forest, Orange Sunset, Cyber Pink
+- **React 18 + Radix UI** - Modern, accessible component library
+- **Split-View Layout** - Sidebar, explorer panel, details panel
+- **Real-time Updates** - Instant feedback on all operations
 - **[View Screenshots](docs/SCREENSHOTS.md)** - See all features in action
 
 ### 🚀 Deployment Options
@@ -226,8 +226,8 @@ sudo systemctl enable --now ucm
 
 ## 🛠️ Technology Stack
 
+- **Frontend:** React 18, Vite, Radix UI, Tailwind CSS
 - **Backend:** Python 3.11, Flask, SQLAlchemy
-- **Frontend:** HTMX, Alpine.js, Tailwind CSS
 - **Database:** SQLite
 - **Server:** Gunicorn (production), Werkzeug (dev)
 - **Cryptography:** pyOpenSSL, cryptography
@@ -385,5 +385,5 @@ Comprehensive technical documentation is available in the [`/docs`](/docs) direc
 - **[API Wiring Audit](/docs/API-WIRING-AUDIT.md)** - Frontend/backend integration audit and bug reports
 - **[Documentation Overview](/docs/README.md)** - Architecture, conventions, and contribution guidelines
 
-**Current Status:** 🔴 Critical frontend/backend mismatches detected - see docs for details and fix plan.
+**Current Status:** ✅ Production Ready - v2.0.0 with React frontend
 

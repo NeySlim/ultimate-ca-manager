@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-01-28
+
+### 🎨 Complete React Frontend Rewrite (UCM V4)
+
+#### Added
+- **React 18 + Vite** - Modern frontend stack replacing HTMX/Alpine.js
+- **Radix UI Components** - Accessible, professional UI primitives
+- **6 Gradient Themes** - Dark Gray, Blue Ocean, Purple Night, Green Forest, Orange Sunset, Cyber Pink
+- **Split-View Layout** - 56px sidebar | 320px explorer | flex details panel
+- **TreeView for CAs** - Hierarchical display with Root CAs / Orphans sections
+
+#### Import/Export System
+- **Unified Import** - Auto-detect PEM, DER, PKCS12, PKCS7 formats
+- **Paste PEM/JSON** - Direct paste in import modals (no file needed)
+- **Copy PEM** - One-click copy from detail views
+- **Auto-Routing** - CA certificates (CA:TRUE) auto-routed to CAs table
+- **Duplicate Detection** - Auto-update existing entries
+- **Smart Navigation** - Redirects to correct page after import with selection
+
+#### Authentication
+- **WebAuthn/FIDO2** - Hardware security key support (YubiKey, etc.)
+- **2FA TOTP** - Google Authenticator compatible with QR setup
+- **mTLS** - Mutual TLS certificate authentication
+- **Cascade Auth** - Automatic method detection and fallback
+
+#### Audit Logging
+- **Complete Audit Trail** - All actions logged with user, IP, details
+- **Filter & Search** - By action type, user, date range
+- **Export CSV** - Download audit logs for compliance
+- **Statistics Dashboard** - Action counts and trends
+
+#### API Enhancements
+- **155+ Endpoints** - Complete REST API v2
+- **Standardized Responses** - `{data, meta}` structure throughout
+- **OCSP Responder** - RFC 6960 compliant certificate status
+
+#### Bug Fixes
+- Delete CA/Certificate actually deletes (was stub)
+- Export uses correct attribute (`descr` not `name`)
+- Modal props fixed for Radix (`open` not `isOpen`)
+- Select defaults fixed for Radix (`'auto'` not `''`)
+
+---
+
 ## [1.8.3] - 2026-01-10
 
 ### 🚀 Installation & CI/CD Improvements
