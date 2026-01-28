@@ -49,6 +49,13 @@ class APIClient {
         error.status = response.status
         error.data = data
         console.error(`❌ API error ${response.status}:`, error.message)
+        
+        // Redirect to login on 401 (unless already on login page)
+        if (response.status === 401 && !window.location.pathname.includes('/login')) {
+          console.warn('🚪 401 Unauthorized - redirecting to login')
+          window.location.href = '/login'
+        }
+        
         throw error
       }
 
