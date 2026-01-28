@@ -171,51 +171,6 @@ export default function TemplatesPage() {
   return (
     <>
       <ExplorerPanel
-        title="Templates"
-        footer={
-          <div className="text-xs text-text-secondary">
-            {templates.length} templates
-          </div>
-        }
-      >
-        <div className="p-4">
-          <Button onClick={handleCreate} className="w-full mb-3">
-            <Plus size={18} />
-            Create Template
-          </Button>
-        </div>
-
-        <div className="flex-1 overflow-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <LoadingSpinner />
-            </div>
-          ) : templates.length === 0 ? (
-            <EmptyState
-              icon={List}
-              title="No templates"
-              description="Create your first certificate template"
-              action={{
-                label: 'Create Template',
-                onClick: handleCreate
-              }}
-            />
-          ) : (
-            <Table
-              columns={templateColumns}
-              data={templates}
-              onRowClick={selectTemplate}
-              selectedId={selectedTemplate?.id}
-            />
-          )}
-        </div>
-      </ExplorerPanel>
-
-      <DetailsPanel
-        breadcrumb={[
-          { label: 'Templates' },
-          { label: selectedTemplate?.name || '...' }
-        ]}
         title={selectedTemplate?.name || 'Select a template'}
         actions={selectedTemplate && (
           <>
@@ -246,7 +201,7 @@ export default function TemplatesPage() {
             description="Select a template from the list to edit"
           />
         ) : (
-          <div className="space-y-6">
+          <div className="p-4 space-y-6">
             {/* Basic Info */}
             <div>
               <h3 className="text-sm font-semibold text-text-primary mb-4">Basic Information</h3>
@@ -280,7 +235,7 @@ export default function TemplatesPage() {
             {/* Validity */}
             <div>
               <h3 className="text-sm font-semibold text-text-primary mb-4">Validity Period</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
                 <Input
                   label="Default Validity (days)"
                   type="number"
@@ -301,7 +256,7 @@ export default function TemplatesPage() {
             {/* Subject */}
             <div>
               <h3 className="text-sm font-semibold text-text-primary mb-4">Subject Template</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
                 <Input
                   label="Country (C)"
                   value={formData.subject?.C || ''}
@@ -317,25 +272,11 @@ export default function TemplatesPage() {
                   placeholder="California"
                 />
                 <Input
-                  label="Locality (L)"
-                  value={formData.subject?.L || ''}
-                  onChange={(e) => updateSubject('L', e.target.value)}
-                  disabled={!editing}
-                  placeholder="San Francisco"
-                />
-                <Input
                   label="Organization (O)"
                   value={formData.subject?.O || ''}
                   onChange={(e) => updateSubject('O', e.target.value)}
                   disabled={!editing}
                   placeholder="Example Corp"
-                />
-                <Input
-                  label="Organizational Unit (OU)"
-                  value={formData.subject?.OU || ''}
-                  onChange={(e) => updateSubject('OU', e.target.value)}
-                  disabled={!editing}
-                  placeholder="IT Department"
                 />
                 <Input
                   label="Common Name (CN)"
@@ -347,55 +288,74 @@ export default function TemplatesPage() {
               </div>
             </div>
 
-            {/* Key Usage */}
+            {/* Key Usage Summary */}
             <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Key Usage</h3>
+              <h3 className="text-sm font-semibold text-text-primary mb-4">Usage Summary</h3>
               <div className="space-y-2">
-                {keyUsageOptions.map(usage => (
-                  <label key={usage} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.key_usage?.includes(usage) || false}
-                      onChange={(e) => {
-                        const newUsage = e.target.checked
-                          ? [...(formData.key_usage || []), usage]
-                          : (formData.key_usage || []).filter(u => u !== usage)
-                        updateFormData('key_usage', newUsage)
-                      }}
-                      disabled={!editing}
-                      className="rounded border-border bg-bg-tertiary"
-                    />
-                    <span className="text-sm text-text-primary">{usage}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Extended Key Usage */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Extended Key Usage</h3>
-              <div className="space-y-2">
-                {extendedKeyUsageOptions.map(usage => (
-                  <label key={usage} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.extended_key_usage?.includes(usage) || false}
-                      onChange={(e) => {
-                        const newUsage = e.target.checked
-                          ? [...(formData.extended_key_usage || []), usage]
-                          : (formData.extended_key_usage || []).filter(u => u !== usage)
-                        updateFormData('extended_key_usage', newUsage)
-                      }}
-                      disabled={!editing}
-                      className="rounded border-border bg-bg-tertiary"
-                    />
-                    <span className="text-sm text-text-primary">{usage}</span>
-                  </label>
-                ))}
+                <div>
+                  <p className="text-xs text-text-secondary uppercase mb-1">Key Usage</p>
+                  <p className="text-sm text-text-primary">
+                    {formData.key_usage?.length > 0 ? formData.key_usage.join(', ') : 'None'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-text-secondary uppercase mb-1">Extended Key Usage</p>
+                  <p className="text-sm text-text-primary">
+                    {formData.extended_key_usage?.length > 0 ? formData.extended_key_usage.join(', ') : 'None'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         )}
+      </ExplorerPanel>
+
+      <DetailsPanel
+        breadcrumb={[
+          { label: 'Templates' },
+          { label: `${templates.length} templates` }
+        ]}
+        title="Certificate Templates"
+      >
+        <div className="p-4 space-y-3">
+          <Button onClick={handleCreate}>
+            <Plus size={18} />
+            Create Template
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <LoadingSpinner />
+            </div>
+          ) : templates.length === 0 ? (
+            <EmptyState
+              icon={List}
+              title="No templates"
+              description="Create your first certificate template"
+              action={{
+                label: 'Create Template',
+                onClick: handleCreate
+              }}
+            />
+          ) : (
+            <div className="p-4">
+              <Table
+                columns={templateColumns}
+                data={templates}
+                onRowClick={selectTemplate}
+                selectedId={selectedTemplate?.id}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="px-4 py-3 border-t border-border bg-bg-secondary">
+          <div className="text-xs text-text-secondary">
+            {templates.length} templates total
+          </div>
+        </div>
       </DetailsPanel>
     </>
   )
