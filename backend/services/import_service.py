@@ -122,6 +122,9 @@ def extract_cert_info(cert):
         except:
             return ''
     
+    # Get serial number as hex string for comparison
+    serial_hex = format(cert.serial_number, 'x').upper()
+    
     return {
         'cn': get_name_attr(subject, NameOID.COMMON_NAME),
         'org': get_name_attr(subject, NameOID.ORGANIZATION_NAME),
@@ -132,7 +135,31 @@ def extract_cert_info(cert):
         'valid_from': cert.not_valid_before_utc,
         'valid_to': cert.not_valid_after_utc,
         'serial_number': cert.serial_number,
+        'serial_hex': serial_hex,
     }
+
+
+def find_existing_ca(cert_info):
+    """
+    Find existing CA by subject match.
+    Returns: CA object or None
+    """
+    from models import CA
+    # Match by subject (unique identifier for a CA)
+    return CA.query.filter_by(subject=cert_info['subject']).first()
+
+
+def find_existing_certificate(cert_info):
+    """
+    Find existing certificate by subject + issuer match.
+    Returns: Certificate object or None
+    """
+    from models import Certificate
+    # Match by subject AND issuer (together they identify a cert)
+    return Certificate.query.filter_by(
+        subject=cert_info['subject'],
+        issuer=cert_info['issuer']
+    ).first()
 
 
 def serialize_cert_to_pem(cert):
