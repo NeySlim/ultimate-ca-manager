@@ -25,8 +25,17 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False, default="viewer")  # admin, operator, viewer
     active = db.Column(db.Boolean, default=True)
     mfa_enabled = db.Column(db.Boolean, default=False)  # MFA enabled for this user
+    
+    # 2FA/TOTP fields
+    totp_secret = db.Column(db.String(32))  # Base32-encoded TOTP secret
+    totp_confirmed = db.Column(db.Boolean, default=False)  # TOTP setup confirmed
+    backup_codes = db.Column(db.Text)  # JSON array of backup codes (hashed)
+    
+    # Login tracking
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
+    login_count = db.Column(db.Integer, default=0)  # Total successful logins
+    failed_logins = db.Column(db.Integer, default=0)  # Failed login attempts
     
     def set_password(self, password: str):
         """Hash and set password"""
@@ -46,8 +55,12 @@ class User(db.Model):
             "role": self.role,
             "active": self.active,
             "mfa_enabled": self.mfa_enabled,
+            "totp_enabled": self.totp_confirmed,  # Legacy compatibility
+            "two_factor_enabled": self.totp_confirmed,  # For frontend
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "last_login": self.last_login.isoformat() if self.last_login else None,
+            "login_count": self.login_count or 0,
+            "failed_logins": self.failed_logins or 0,
         }
 
 
@@ -274,11 +287,23 @@ class CA(db.Model):
             # OCSP configuration
             "ocsp_enabled": self.ocsp_enabled,
             "ocsp_url": self.ocsp_url,
+            # PEM for display/copy
+            "pem": self._decode_pem(self.crt),
         }
         if include_private:
             data["crt"] = self.crt
             data["prv"] = self.prv
         return data
+    
+    def _decode_pem(self, encoded):
+        """Decode base64 encoded PEM"""
+        if not encoded:
+            return None
+        try:
+            import base64
+            return base64.b64decode(encoded).decode('utf-8')
+        except:
+            return None
 
 
 class Certificate(db.Model):
@@ -471,6 +496,19 @@ class Certificate(db.Model):
     
     def to_dict(self, include_private=False):
         """Convert to dictionary"""
+        from datetime import datetime, timedelta
+        
+        # Calculate status
+        status = "valid"
+        if self.revoked:
+            status = "revoked"
+        elif self.valid_to:
+            now = datetime.utcnow()
+            if self.valid_to < now:
+                status = "expired"
+            elif self.valid_to < now + timedelta(days=30):
+                status = "expiring"
+        
         data = {
             "id": self.id,
             "refid": self.refid,
@@ -503,12 +541,25 @@ class Certificate(db.Model):
             "issuer_name": self.issuer_name,
             "not_valid_before": self.not_valid_before,
             "not_valid_after": self.not_valid_after,
+            "status": status,
+            # PEM for display/copy
+            "pem": self._decode_pem(self.crt),
         }
         if include_private:
             data["crt"] = self.crt
             data["csr"] = self.csr
             data["prv"] = self.prv
         return data
+    
+    def _decode_pem(self, encoded):
+        """Decode base64 encoded PEM"""
+        if not encoded:
+            return None
+        try:
+            import base64
+            return base64.b64decode(encoded).decode('utf-8')
+        except:
+            return None
 
 
 class CRL(db.Model):
