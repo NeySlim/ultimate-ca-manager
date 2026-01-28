@@ -26,9 +26,24 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('all')
   const [rolesData, setRolesData] = useState(null) // NEW: Roles & permissions data
 
+  // Load roles data on mount
+  useEffect(() => {
+    loadRolesData()
+  }, [])
+
   useEffect(() => {
     loadUsers()
   }, [roleFilter])
+
+  const loadRolesData = async () => {
+    try {
+      const response = await rolesService.getAll()
+      setRolesData(response.data)
+    } catch (error) {
+      console.error('Failed to load roles:', error)
+      showError('Failed to load role permissions')
+    }
+  }
 
   const loadUsers = async () => {
     setLoading(true)
