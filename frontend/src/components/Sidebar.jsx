@@ -10,6 +10,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
+import { Logo } from './Logo'
 
 export function Sidebar({ activePage }) {
   const navigate = useNavigate()
@@ -36,8 +37,8 @@ export function Sidebar({ activePage }) {
   return (
     <div className="w-14 border-r border-border bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-0.5">
       {/* Logo */}
-      <Link to="/" className="w-10 h-10 bg-gradient-to-br from-accent-primary to-blue-600 rounded-sm flex items-center justify-center mb-3 shadow-lg shadow-accent-primary/30">
-        <ShieldCheck size={20} weight="bold" className="text-white" />
+      <Link to="/" className="w-10 h-10 flex items-center justify-center mb-3" title="UCM Dashboard">
+        <Logo variant="icon" size="md" withText={false} />
       </Link>
 
       {/* Page Icons */}
