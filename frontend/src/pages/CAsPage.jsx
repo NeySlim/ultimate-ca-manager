@@ -622,7 +622,7 @@ export default function CAsPage() {
                 <ShieldCheck size={18} />
                 Create
               </Button>
-              <Button variant="secondary" onClick={() => setShowImportModal(true)}>
+              <Button variant="secondary" onClick={() => { setShowImportModal(true); }}>
                 <UploadSimple size={18} />
                 Import
               </Button>
@@ -905,7 +905,7 @@ export default function CAsPage() {
 
       {/* Import CA Modal */}
       <Modal
-        isOpen={showImportModal}
+        open={showImportModal}
         onClose={() => setShowImportModal(false)}
         title="Import CA"
         size="md"
