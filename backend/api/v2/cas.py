@@ -212,16 +212,18 @@ def import_ca():
     """
     Import CA certificate from file
     Supports: PEM, DER, PKCS12, PKCS7
+    Auto-updates existing CA if duplicate found (same subject)
     
     Form data:
         file: Certificate file
         password: Password for PKCS12
         name: Optional display name
         import_key: Whether to import private key (default: true)
+        update_existing: Whether to update if duplicate found (default: true)
     """
     from models import CA, db
     from services.import_service import (
-        parse_certificate_file, extract_cert_info,
+        parse_certificate_file, extract_cert_info, find_existing_ca,
         serialize_cert_to_pem, serialize_key_to_pem
     )
     import base64
@@ -237,6 +239,7 @@ def import_ca():
     password = request.form.get('password')
     name = request.form.get('name', '')
     import_key = request.form.get('import_key', 'true').lower() == 'true'
+    update_existing = request.form.get('update_existing', 'true').lower() == 'true'
     
     try:
         file_data = file.read()
@@ -253,7 +256,42 @@ def import_ca():
         cert_pem = serialize_cert_to_pem(cert)
         key_pem = serialize_key_to_pem(private_key) if import_key else None
         
-        # Create CA record
+        # Check for existing CA with same subject
+        existing_ca = find_existing_ca(cert_info)
+        
+        if existing_ca:
+            if not update_existing:
+                return error_response(
+                    f'CA with subject "{cert_info["cn"]}" already exists (ID: {existing_ca.id})',
+                    409
+                )
+            
+            # Update existing CA
+            existing_ca.descr = name or cert_info['cn'] or existing_ca.descr
+            existing_ca.crt = base64.b64encode(cert_pem).decode('utf-8')
+            if key_pem:
+                existing_ca.prv = base64.b64encode(key_pem).decode('utf-8')
+            existing_ca.issuer = cert_info['issuer']
+            existing_ca.valid_from = cert_info['valid_from']
+            existing_ca.valid_to = cert_info['valid_to']
+            
+            db.session.commit()
+            
+            from services.audit_service import AuditService
+            AuditService.log_action(
+                action='ca_updated',
+                resource_type='ca',
+                resource_id=existing_ca.id,
+                details=f'Updated CA via import: {existing_ca.descr}',
+                success=True
+            )
+            
+            return success_response(
+                data=existing_ca.to_dict(),
+                message=f'CA "{existing_ca.descr}" updated (already existed)'
+            )
+        
+        # Create new CA record
         refid = str(uuid.uuid4())
         ca = CA(
             refid=refid,
@@ -271,7 +309,6 @@ def import_ca():
         db.session.add(ca)
         db.session.commit()
         
-        # Audit log
         from services.audit_service import AuditService
         AuditService.log_action(
             action='ca_imported',
