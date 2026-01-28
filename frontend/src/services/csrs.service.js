@@ -25,6 +25,16 @@ export const csrsService = {
     return apiClient.post('/csrs/upload', { pem: pemData })
   },
 
+  async import(formData) {
+    return apiClient.upload('/csrs/import', formData)
+  },
+
+  async export(id) {
+    return apiClient.get(`/csrs/${id}/export`, {
+      responseType: 'blob'
+    })
+  },
+
   async sign(id, ca_id, validity_days) {
     return apiClient.post(`/csrs/${id}/sign`, { ca_id, validity_days })
   },

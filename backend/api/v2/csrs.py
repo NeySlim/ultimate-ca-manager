@@ -9,6 +9,8 @@ from utils.response import success_response, error_response, created_response, n
 from models import db, Certificate
 from services.cert_service import CertificateService
 import datetime
+import base64
+import uuid
 
 bp = Blueprint('csrs_v2', __name__)
 
@@ -58,7 +60,12 @@ def get_csr(csr_id):
         return error_response('CSR not found', 404)
     
     data = cert.to_dict(include_private=False)
-    data['csr_pem'] = cert.csr  # Allow downloading the PEM
+    # Decode CSR PEM for display
+    if cert.csr:
+        try:
+            data['csr_pem'] = base64.b64decode(cert.csr).decode('utf-8')
+        except:
+            data['csr_pem'] = cert.csr
     
     return success_response(data=data)
 
@@ -104,6 +111,132 @@ def create_csr():
         )
     except Exception as e:
         return error_response(f"Failed to create CSR: {str(e)}", 500)
+
+@bp.route('/api/v2/csrs/import', methods=['POST'])
+@require_auth(['write:csrs'])
+def import_csr():
+    """
+    Import CSR from file OR pasted PEM content
+    
+    Form data:
+        file: CSR file (optional if pem_content provided)
+        pem_content: Pasted PEM content (optional if file provided)
+        name: Optional display name
+    """
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+    
+    # Get CSR data from file or pasted content
+    csr_pem = None
+    
+    if 'file' in request.files and request.files['file'].filename:
+        file = request.files['file']
+        csr_pem = file.read()
+    elif request.form.get('pem_content'):
+        csr_pem = request.form.get('pem_content').encode('utf-8')
+    else:
+        return error_response('No file or PEM content provided', 400)
+    
+    name = request.form.get('name', '')
+    
+    try:
+        # Parse CSR
+        csr = x509.load_pem_x509_csr(csr_pem, default_backend())
+        
+        # Extract subject info
+        subject = csr.subject
+        cn = None
+        org = None
+        ou = None
+        
+        for attr in subject:
+            if attr.oid == x509.oid.NameOID.COMMON_NAME:
+                cn = attr.value
+            elif attr.oid == x509.oid.NameOID.ORGANIZATION_NAME:
+                org = attr.value
+            elif attr.oid == x509.oid.NameOID.ORGANIZATIONAL_UNIT_NAME:
+                ou = attr.value
+        
+        # Build subject string
+        subject_parts = []
+        for attr in subject:
+            subject_parts.append(f"{attr.oid._name}={attr.value}")
+        subject_str = ', '.join(subject_parts)
+        
+        # Extract SANs if present
+        san_dns = []
+        san_ip = []
+        san_email = []
+        try:
+            san_ext = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            for name_entry in san_ext.value:
+                if isinstance(name_entry, x509.DNSName):
+                    san_dns.append(name_entry.value)
+                elif isinstance(name_entry, x509.IPAddress):
+                    san_ip.append(str(name_entry.value))
+                elif isinstance(name_entry, x509.RFC822Name):
+                    san_email.append(name_entry.value)
+        except x509.ExtensionNotFound:
+            pass
+        
+        # Create Certificate record with CSR
+        refid = str(uuid.uuid4())
+        cert = Certificate(
+            refid=refid,
+            descr=name or cn or 'Imported CSR',
+            csr=base64.b64encode(csr_pem).decode('utf-8'),
+            crt=None,  # Not signed yet
+            subject=subject_str,
+            san_dns=str(san_dns) if san_dns else None,
+            san_ip=str(san_ip) if san_ip else None,
+            san_email=str(san_email) if san_email else None,
+            created_by='import',
+            created_at=datetime.datetime.utcnow()
+        )
+        
+        db.session.add(cert)
+        db.session.commit()
+        
+        # Audit log
+        from services.audit_service import AuditService
+        AuditService.log_action(
+            action='csr_imported',
+            resource_type='csr',
+            resource_id=cert.id,
+            details=f'Imported CSR: {cert.descr}',
+            success=True
+        )
+        
+        return created_response(
+            data=cert.to_dict(),
+            message=f'CSR "{cert.descr}" imported successfully'
+        )
+        
+    except Exception as e:
+        import traceback
+        print(f"CSR Import Error: {str(e)}")
+        print(traceback.format_exc())
+        return error_response(f'Import failed: {str(e)}', 500)
+
+@bp.route('/api/v2/csrs/<int:csr_id>/export', methods=['GET'])
+@require_auth(['read:csrs'])
+def export_csr(csr_id):
+    """Export CSR as PEM file"""
+    from flask import Response
+    
+    cert = Certificate.query.get(csr_id)
+    if not cert or not cert.csr:
+        return error_response('CSR not found', 404)
+    
+    try:
+        csr_pem = base64.b64decode(cert.csr)
+        return Response(
+            csr_pem,
+            mimetype='application/x-pem-file',
+            headers={'Content-Disposition': f'attachment; filename="{cert.descr or cert.refid}.csr"'}
+        )
+    except Exception as e:
+        return error_response(f'Export failed: {str(e)}', 500)
 
 @bp.route('/api/v2/csrs/<int:csr_id>', methods=['DELETE'])
 @require_auth(['delete:csrs'])

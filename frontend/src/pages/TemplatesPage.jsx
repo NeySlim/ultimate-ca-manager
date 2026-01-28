@@ -1,11 +1,11 @@
 /**
  * Templates Page
  */
-import { useState, useEffect } from 'react'
-import { List, Plus, Copy, Trash, FloppyDisk } from '@phosphor-icons/react'
+import { useState, useEffect, useRef } from 'react'
+import { List, Plus, Copy, Trash, FloppyDisk, Download, FileArrowUp } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge,
-  Input, Select, Textarea,
+  Input, Select, Textarea, Modal,
   LoadingSpinner, EmptyState
 } from '../components'
 import { templatesService } from '../services'
@@ -16,12 +16,19 @@ import { extractData } from '../lib/utils'
 export default function TemplatesPage() {
   const { showSuccess, showError } = useNotification()
   const { canWrite, canDelete } = usePermission()
+  const fileRef = useRef(null)
   
   const [templates, setTemplates] = useState([])
   const [selectedTemplate, setSelectedTemplate] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [formData, setFormData] = useState({})
+  
+  // Import state
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importFile, setImportFile] = useState(null)
+  const [importJson, setImportJson] = useState('')
+  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     loadTemplates()
@@ -117,6 +124,50 @@ export default function TemplatesPage() {
       loadTemplates()
     } catch (error) {
       showError(error.message || 'Failed to delete template')
+    }
+  }
+
+  const handleExportTemplate = async (id) => {
+    try {
+      const blob = await templatesService.export(id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${selectedTemplate?.name || 'template'}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      showSuccess('Template exported')
+    } catch (error) {
+      showError(error.message || 'Failed to export template')
+    }
+  }
+
+  const handleImportTemplate = async () => {
+    if (!importFile && !importJson.trim()) {
+      showError('Please select a file or paste JSON content')
+      return
+    }
+    setImporting(true)
+    try {
+      const formData = new FormData()
+      if (importFile) {
+        formData.append('file', importFile)
+      } else {
+        formData.append('json_content', importJson)
+      }
+      formData.append('update_existing', 'false')
+      
+      const result = await templatesService.import(formData)
+      showSuccess(result.message || 'Template imported successfully')
+      setShowImportModal(false)
+      setImportFile(null)
+      setImportJson('')
+      if (fileRef.current) fileRef.current.value = ''
+      loadTemplates()
+    } catch (error) {
+      showError(error.message || 'Failed to import template')
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -317,13 +368,25 @@ export default function TemplatesPage() {
           { label: `${templates.length} templates` }
         ]}
         title="Certificate Templates"
+        actions={selectedTemplate && (
+          <Button variant="secondary" size="sm" onClick={() => handleExportTemplate(selectedTemplate.id)}>
+            <Download size={16} />
+            Export
+          </Button>
+        )}
       >
         <div className="p-4 space-y-3">
           {canWrite('templates') && (
-            <Button onClick={handleCreate} className="w-full">
-              <Plus size={18} />
-              Create Template
-            </Button>
+            <>
+              <Button onClick={handleCreate} className="w-full">
+                <Plus size={18} />
+                Create Template
+              </Button>
+              <Button variant="secondary" onClick={() => setShowImportModal(true)} className="w-full">
+                <FileArrowUp size={18} />
+                Import Template
+              </Button>
+            </>
           )}
         </div>
 
@@ -348,6 +411,55 @@ export default function TemplatesPage() {
           )}
         </div>
       </DetailsPanel>
+
+      {/* Import Template Modal */}
+      <Modal
+        open={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Import Template"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            Import a certificate template from a JSON file or paste JSON content
+          </p>
+          
+          <div>
+            <label className="block text-xs font-medium text-text-primary mb-1">Template File (JSON)</label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json"
+              onChange={(e) => { setImportFile(e.target.files[0]); setImportJson('') }}
+              className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
+            />
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex-1 border-t border-border"></div>
+            <span className="text-xs text-text-secondary">OR paste JSON content</span>
+            <div className="flex-1 border-t border-border"></div>
+          </div>
+          
+          <div>
+            <label className="block text-xs font-medium text-text-primary mb-1">Paste JSON Content</label>
+            <textarea
+              value={importJson}
+              onChange={(e) => { setImportJson(e.target.value); setImportFile(null); if (fileRef.current) fileRef.current.value = '' }}
+              placeholder='{"name": "My Template", "validity_days": 365, ...}'
+              rows={6}
+              className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-sm text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
+            />
+          </div>
+          
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setShowImportModal(false)}>Cancel</Button>
+            <Button onClick={handleImportTemplate} disabled={importing || (!importFile && !importJson.trim())}>
+              {importing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
+              Import Template
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }

@@ -1,9 +1,9 @@
 /**
  * CSRs (Certificate Signing Requests) Page
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { FileText, Upload, SignIn, Trash, Download } from '@phosphor-icons/react'
+import { FileText, Upload, SignIn, Trash, Download, FileArrowUp } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge,
   Modal, Input, Select, Textarea,
@@ -18,15 +18,23 @@ export default function CSRsPage() {
   const { showSuccess, showError } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
+  const fileRef = useRef(null)
   
   const [csrs, setCSRs] = useState([])
   const [selectedCSR, setSelectedCSR] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [showSignModal, setShowSignModal] = useState(false)
   const [cas, setCAs] = useState([])
   const [signCA, setSignCA] = useState('')
   const [validityDays, setValidityDays] = useState(365)
+  
+  // Import form state
+  const [importFile, setImportFile] = useState(null)
+  const [importPem, setImportPem] = useState('')
+  const [importName, setImportName] = useState('')
+  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     loadCSRs()
@@ -117,6 +125,41 @@ export default function CSRsPage() {
     }
   }
 
+  const handleImportCSR = async () => {
+    if (!importFile && !importPem.trim()) {
+      showError('Please select a file or paste PEM content')
+      return
+    }
+    setImporting(true)
+    try {
+      const formData = new FormData()
+      if (importFile) {
+        formData.append('file', importFile)
+      } else {
+        formData.append('pem_content', importPem)
+      }
+      if (importName) formData.append('name', importName)
+      
+      const result = await csrsService.import(formData)
+      showSuccess(result.message || 'CSR imported successfully')
+      setShowImportModal(false)
+      setImportFile(null)
+      setImportPem('')
+      setImportName('')
+      if (fileRef.current) fileRef.current.value = ''
+      loadCSRs()
+      
+      // Auto-select imported CSR
+      if (result.data?.id) {
+        loadCSRDetails(result.data.id)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to import CSR')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const handleDownload = async (id) => {
     try {
       const blob = await csrsService.download(id)
@@ -167,10 +210,16 @@ export default function CSRsPage() {
       >
         <div className="p-4 space-y-3">
           {canWrite('csrs') && (
-            <Button onClick={() => setShowUploadModal(true)} className="w-full">
-              <Upload size={18} />
-              Upload CSR
-            </Button>
+            <>
+              <Button onClick={() => setShowUploadModal(true)} className="w-full">
+                <Upload size={18} />
+                Create CSR
+              </Button>
+              <Button variant="secondary" onClick={() => setShowImportModal(true)} className="w-full">
+                <FileArrowUp size={18} />
+                Import CSR
+              </Button>
+            </>
           )}
         </div>
 
@@ -183,10 +232,10 @@ export default function CSRsPage() {
             <EmptyState
               icon={FileText}
               title="No CSRs"
-              description="Upload a Certificate Signing Request"
+              description="Create or import a Certificate Signing Request"
               action={{
-                label: 'Upload CSR',
-                onClick: () => setShowUploadModal(true)
+                label: 'Import CSR',
+                onClick: () => setShowImportModal(true)
               }}
             />
           ) : (
@@ -291,24 +340,93 @@ export default function CSRsPage() {
 
             {/* Raw CSR */}
             <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Raw CSR (PEM)</h3>
-              <pre className="bg-bg-tertiary border border-border rounded-lg p-4 text-xs overflow-x-auto">
-                {selectedCSR.pem}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-text-primary">Raw CSR (PEM)</h3>
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedCSR.csr_pem || selectedCSR.pem || '')
+                    showSuccess('CSR PEM copied to clipboard')
+                  }}
+                  disabled={!selectedCSR.csr_pem && !selectedCSR.pem}
+                >
+                  Copy PEM
+                </Button>
+              </div>
+              <pre className="bg-bg-tertiary border border-border rounded-lg p-4 text-xs overflow-x-auto max-h-64">
+                {selectedCSR.csr_pem || selectedCSR.pem || 'PEM data not available'}
               </pre>
             </div>
           </div>
         )}
       </DetailsPanel>
 
-      {/* Upload CSR Modal */}
+      {/* Import CSR Modal */}
       <Modal
-        open={showUploadModal}
-        onClose={() => setShowUploadModal(false)}
-        title="Upload CSR"
+        open={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Import CSR"
       >
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
-            Upload a Certificate Signing Request in PEM format
+            Import a Certificate Signing Request from a file or paste PEM content
+          </p>
+          
+          <div>
+            <label className="block text-xs font-medium text-text-primary mb-1">CSR File</label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pem,.csr,.req"
+              onChange={(e) => { setImportFile(e.target.files[0]); setImportPem('') }}
+              className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
+            />
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex-1 border-t border-border"></div>
+            <span className="text-xs text-text-secondary">OR paste PEM content</span>
+            <div className="flex-1 border-t border-border"></div>
+          </div>
+          
+          <div>
+            <label className="block text-xs font-medium text-text-primary mb-1">Paste PEM Content</label>
+            <textarea
+              value={importPem}
+              onChange={(e) => { setImportPem(e.target.value); setImportFile(null); if (fileRef.current) fileRef.current.value = '' }}
+              placeholder="-----BEGIN CERTIFICATE REQUEST-----&#10;...&#10;-----END CERTIFICATE REQUEST-----"
+              rows={6}
+              className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-sm text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
+            />
+          </div>
+          
+          <Input 
+            label="Display Name (optional)" 
+            value={importName}
+            onChange={(e) => setImportName(e.target.value)}
+            placeholder="My CSR"
+          />
+          
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setShowImportModal(false)}>Cancel</Button>
+            <Button onClick={handleImportCSR} disabled={importing || (!importFile && !importPem.trim())}>
+              {importing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
+              Import CSR
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Create CSR Modal */}
+      <Modal
+        open={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        title="Create CSR"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            Create a new Certificate Signing Request
           </p>
           <FileUpload
             accept=".pem,.csr"
