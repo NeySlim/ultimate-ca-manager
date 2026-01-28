@@ -23,7 +23,6 @@ export const dashboardService = {
   },
 
   async getSystemStatus() {
-    // TODO: Backend endpoint not implemented yet
-    return { data: {} }
+    return apiClient.get('/dashboard/system-status')
   }
 }
