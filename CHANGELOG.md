@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **6 Gradient Themes** - Dark Gray, Blue Ocean, Purple Night, Green Forest, Orange Sunset, Cyber Pink
 - **Split-View Layout** - 56px sidebar | 320px explorer | flex details panel
 - **TreeView for CAs** - Hierarchical display with Root CAs / Orphans sections
+- **ErrorBoundary** - Graceful error handling with recovery option
+- **Code Splitting** - React.lazy for optimized page loading (121KB main bundle)
+- **Rate Limiting** - Flask-Limiter protection (200/min, 2000/hour)
 
 #### Import/Export System
 - **Unified Import** - Auto-detect PEM, DER, PKCS12, PKCS7 formats
@@ -25,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-Routing** - CA certificates (CA:TRUE) auto-routed to CAs table
 - **Duplicate Detection** - Auto-update existing entries
 - **Smart Navigation** - Redirects to correct page after import with selection
+
+#### Certificate Management
+- **Delete Certificate** - Remove certificates from system
+- **Renew Certificate** - In-place renewal with new key pair (same ID)
+- **Sorted List** - Default sort by Common Name (A-Z)
+- **Server-side Sorting** - Consistent pagination across all pages
 
 #### Authentication
 - **WebAuthn/FIDO2** - Hardware security key support (YubiKey, etc.)
@@ -48,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export uses correct attribute (`descr` not `name`)
 - Modal props fixed for Radix (`open` not `isOpen`)
 - Select defaults fixed for Radix (`'auto'` not `''`)
+- Certificate renewal now works (was stub returning fake data)
+- CA lookup for renewal handles different refid formats
 
 ---
 

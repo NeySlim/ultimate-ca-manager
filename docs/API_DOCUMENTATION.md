@@ -76,13 +76,29 @@ curl -X POST https://localhost:8443/api/v2/cas \
   }'
 ```
 
-### 2. Lister les certificats actifs
+### 2. Lister les certificats
 ```bash
-curl -X GET "https://localhost:8443/api/v2/certificates?status=active" \
+# Liste par défaut (triée par CN alphabétiquement)
+curl -X GET "https://localhost:8443/api/v2/certificates" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Filtrer par statut: valid, expired, expiring, revoked
+curl -X GET "https://localhost:8443/api/v2/certificates?status=valid" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Tri personnalisé (sort_by: subject, valid_to, created_at)
+curl -X GET "https://localhost:8443/api/v2/certificates?sort_by=valid_to&sort_order=asc" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### 3. Obtenir les statistiques
+### 3. Renouveler un certificat
+```bash
+# Renouvelle le certificat en place (même ID, nouvelle clé)
+curl -X POST "https://localhost:8443/api/v2/certificates/15/renew" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 4. Obtenir les statistiques
 ```bash
 curl -X GET https://localhost:8443/api/v2/dashboard/stats \
   -H "Authorization: Bearer $TOKEN"
