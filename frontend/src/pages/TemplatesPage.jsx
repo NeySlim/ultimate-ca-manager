@@ -47,7 +47,6 @@ export default function TemplatesPage() {
     try {
       const response = await templatesService.getById(template.id)
       const data = extractData(response)
-      console.log('Template loaded:', data)
       setSelectedTemplate({ ...data })
       setFormData({ ...data })
       setEditing(false)

@@ -321,7 +321,7 @@ export default function CAsPage() {
             <Table
               columns={certColumns}
               data={issuedCerts}
-              onRowClick={(cert) => console.log('View cert:', cert.id)}
+              onRowClick={(cert) => window.location.href = `/certificates?id=${cert.id}`}
             />
           )}
         </div>
@@ -485,12 +485,6 @@ export default function CAsPage() {
                     <p className="text-text-primary font-semibold">-</p>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex gap-3 pt-4 border-t border-border">
-                <Button onClick={() => showSuccess('OCSP settings saved')}>
-                  Save OCSP Settings
-                </Button>
               </div>
             </div>
           </div>

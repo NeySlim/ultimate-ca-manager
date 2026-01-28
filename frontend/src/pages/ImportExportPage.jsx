@@ -55,12 +55,86 @@ export default function ImportExportPage() {
     showSuccess('Configuration saved')
   }
 
-  const handleExportAllCerts = (format) => {
-    showSuccess(`Exporting all certificates as ${format.toUpperCase()}...`)
+  const handleExportAllCerts = async (format) => {
+    setProcessing(true)
+    try {
+      // Fetch all certificates
+      const { certificatesService } = await import('../services')
+      const response = await certificatesService.getAll({ per_page: 1000 })
+      const certs = response.data || []
+      
+      if (certs.length === 0) {
+        showError('No certificates to export')
+        return
+      }
+      
+      // Create export data
+      const exportData = certs.map(c => ({
+        id: c.id,
+        common_name: c.common_name,
+        serial_number: c.serial_number,
+        status: c.status,
+        valid_from: c.valid_from,
+        valid_until: c.valid_until,
+        issuer: c.issuer_name
+      }))
+      
+      // Download as JSON
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `certificates_export_${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      
+      showSuccess(`Exported ${certs.length} certificates`)
+    } catch (err) {
+      showError('Failed to export certificates')
+    } finally {
+      setProcessing(false)
+    }
   }
 
-  const handleExportAllCAs = (format) => {
-    showSuccess(`Exporting all CAs as ${format.toUpperCase()}...`)
+  const handleExportAllCAs = async (format) => {
+    setProcessing(true)
+    try {
+      // Fetch all CAs
+      const { casService } = await import('../services')
+      const response = await casService.getAll()
+      const cas = response.data || []
+      
+      if (cas.length === 0) {
+        showError('No CAs to export')
+        return
+      }
+      
+      // Create export data
+      const exportData = cas.map(ca => ({
+        id: ca.id,
+        name: ca.name,
+        common_name: ca.common_name,
+        ca_type: ca.ca_type,
+        valid_from: ca.valid_from,
+        valid_until: ca.valid_until,
+        serial_number: ca.serial_number
+      }))
+      
+      // Download as JSON
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `cas_export_${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      
+      showSuccess(`Exported ${cas.length} CAs`)
+    } catch (err) {
+      showError('Failed to export CAs')
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const handleTestConf = async () => {
@@ -106,7 +180,6 @@ export default function ImportExportPage() {
       // Extract all item IDs from test results
       const itemIds = testItems.map(item => item.id)
       
-      console.log('Importing items:', itemIds.length, 'items')
       
       const result = await opnsenseService.import({
         host: opnsenseHost,
@@ -117,7 +190,6 @@ export default function ImportExportPage() {
         items: itemIds // Send all item UUIDs
       })
       
-      console.log('Import result:', result)
       
       if (result.success) {
         const total = result.imported.cas + result.imported.certificates

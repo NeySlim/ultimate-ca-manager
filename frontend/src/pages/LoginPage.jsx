@@ -115,7 +115,6 @@ export default function LoginPage() {
       showSuccess(`Welcome back, ${userData.user.username}!`)
       navigate('/dashboard')
     } catch (error) {
-      console.log('mTLS login failed, trying next method:', error.message)
       // Try WebAuthn next
       if (userMethods?.webauthn && userMethods.webauthn_credentials > 0 && authMethodsService.isWebAuthnSupported()) {
         setAuthMethod('webauthn')
@@ -140,7 +139,6 @@ export default function LoginPage() {
       showSuccess(`Welcome back, ${username}!`)
       navigate('/dashboard')
     } catch (error) {
-      console.log('WebAuthn login failed:', error.message)
       // User cancelled or error → show password form
       setAuthMethod('password')
       setStatusMessage('')
