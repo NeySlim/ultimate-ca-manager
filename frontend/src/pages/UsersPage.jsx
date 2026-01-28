@@ -159,63 +159,6 @@ export default function UsersPage() {
   return (
     <>
       <ExplorerPanel
-        title="Users"
-        footer={
-          <div className="text-xs text-text-secondary">
-            {users.length} users
-          </div>
-        }
-      >
-        <div className="p-4 space-y-3">
-          <Select
-            label="Filter by Role"
-            options={[
-              { value: 'all', label: 'All Roles' },
-              { value: 'admin', label: 'Administrators' },
-              { value: 'user', label: 'Users' },
-              { value: 'auditor', label: 'Auditors' },
-            ]}
-            value={roleFilter}
-            onChange={setRoleFilter}
-          />
-
-          <Button onClick={() => setShowCreateModal(true)} className="w-full">
-            <Plus size={18} />
-            Create User
-          </Button>
-        </div>
-
-        <div className="flex-1 overflow-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <LoadingSpinner />
-            </div>
-          ) : users.length === 0 ? (
-            <EmptyState
-              icon={User}
-              title="No users"
-              description="Create your first user account"
-              action={{
-                label: 'Create User',
-                onClick: () => setShowCreateModal(true)
-              }}
-            />
-          ) : (
-            <Table
-              columns={userColumns}
-              data={users}
-              onRowClick={selectUser}
-              selectedId={selectedUser?.id}
-            />
-          )}
-        </div>
-      </ExplorerPanel>
-
-      <DetailsPanel
-        breadcrumb={[
-          { label: 'Users' },
-          { label: selectedUser?.username || '...' }
-        ]}
         title={selectedUser?.username || 'Select a user'}
         actions={selectedUser && (
           <>
@@ -388,6 +331,54 @@ export default function UsersPage() {
             </div>
           </div>
         )}
+      </ExplorerPanel>
+
+      <DetailsPanel
+        breadcrumb={[
+          { label: 'Users' },
+          { label: `${users.length} users` }
+        ]}
+        title="Users"
+      >
+        <div className="p-4 space-y-3">
+          <Select
+            label="Filter by Role"
+            options={[
+              { value: 'all', label: 'All Roles' },
+              { value: 'admin', label: 'Administrators' },
+              { value: 'user', label: 'Users' },
+              { value: 'auditor', label: 'Auditors' },
+            ]}
+            value={roleFilter}
+            onChange={setRoleFilter}
+          />
+
+          <Button onClick={() => setShowCreateModal(true)} className="w-full">
+            <Plus size={18} />
+            Create User
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <LoadingSpinner />
+            </div>
+          ) : users.length === 0 ? (
+            <EmptyState
+              icon={User}
+              title="No users"
+              description="Create your first user account"
+            />
+          ) : (
+            <Table
+              columns={userColumns}
+              data={users}
+              onRowClick={selectUser}
+              selectedId={selectedUser?.id}
+            />
+          )}
+        </div>
       </DetailsPanel>
 
       {/* Create User Modal */}
