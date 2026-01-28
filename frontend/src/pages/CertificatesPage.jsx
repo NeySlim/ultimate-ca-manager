@@ -580,6 +580,7 @@ export default function CertificatesPage() {
               { value: 'expiring', label: 'Expiring Soon' },
               { value: 'expired', label: 'Expired' },
               { value: 'revoked', label: 'Revoked' },
+              { value: 'archived', label: 'Archived' },
             ]}
             value={statusFilter}
             onChange={setStatusFilter}
