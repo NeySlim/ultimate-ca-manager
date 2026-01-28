@@ -10,6 +10,7 @@ import {
 } from '../components'
 import { usersService } from '../services'
 import { useNotification } from '../contexts'
+import { usePermission } from '../hooks/usePermission'
 import { extractData } from '../lib/utils'
 
 export default function UsersPage() {

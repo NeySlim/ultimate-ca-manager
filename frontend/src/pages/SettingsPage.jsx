@@ -9,10 +9,12 @@ import {
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
+import { usePermission } from '../hooks/usePermission'
 import { formatDate } from '../lib/utils'
 
 export default function SettingsPage() {
   const { showSuccess, showError } = useNotification()
+  const { canWrite, hasPermission } = usePermission()
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -312,10 +314,12 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-border">
-            <Button onClick={() => handleSave('general')} disabled={saving}>
-              <FloppyDisk size={16} />
-              Save Changes
-            </Button>
+            {canWrite('settings') && (
+              <Button onClick={() => handleSave('general')} disabled={saving}>
+                <FloppyDisk size={16} />
+                Save Changes
+              </Button>
+            )}
           </div>
         </div>
       )
@@ -373,14 +377,18 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-border">
-            <Button onClick={() => handleSave('email')} disabled={saving}>
-              <FloppyDisk size={16} />
-              Save Changes
-            </Button>
-            <Button variant="secondary" onClick={handleTestEmail}>
-              <Envelope size={16} />
-              Send Test Email
-            </Button>
+            {canWrite('settings') && (
+              <>
+                <Button onClick={() => handleSave('email')} disabled={saving}>
+                  <FloppyDisk size={16} />
+                  Save Changes
+                </Button>
+                <Button variant="secondary" onClick={handleTestEmail}>
+                  <Envelope size={16} />
+                  Send Test Email
+                </Button>
+              </>
+            )}
           </div>
         </div>
       )
@@ -469,10 +477,12 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-border">
-            <Button onClick={() => handleSave('security')} disabled={saving}>
-              <FloppyDisk size={16} />
-              Save Changes
-            </Button>
+            {hasPermission('admin:system') && (
+              <Button onClick={() => handleSave('security')} disabled={saving}>
+                <FloppyDisk size={16} />
+                Save Changes
+              </Button>
+            )}
           </div>
         </div>
       )
@@ -526,10 +536,12 @@ export default function SettingsPage() {
           <div className="border-t border-border pt-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-text-primary">Backup Files</h3>
-              <Button onClick={handleBackup}>
-                <Database size={16} />
-                Create Backup
-              </Button>
+              {hasPermission('admin:system') && (
+                <Button onClick={handleBackup}>
+                  <Database size={16} />
+                  Create Backup
+                </Button>
+              )}
             </div>
 
             {backups.length === 0 ? (
@@ -580,10 +592,12 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-border">
-            <Button onClick={() => handleSave('backup')} disabled={saving}>
-              <FloppyDisk size={16} />
-              Save Changes
-            </Button>
+            {hasPermission('admin:system') && (
+              <Button onClick={() => handleSave('backup')} disabled={saving}>
+                <FloppyDisk size={16} />
+                Save Changes
+              </Button>
+            )}
           </div>
         </div>
       )
@@ -646,10 +660,12 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-border">
-            <Button onClick={() => handleSave('audit')} disabled={saving}>
-              <FloppyDisk size={16} />
-              Save Changes
-            </Button>
+            {hasPermission('admin:system') && (
+              <Button onClick={() => handleSave('audit')} disabled={saving}>
+                <FloppyDisk size={16} />
+                Save Changes
+              </Button>
+            )}
           </div>
         </div>
       )

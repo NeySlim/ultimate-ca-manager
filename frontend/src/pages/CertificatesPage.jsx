@@ -11,10 +11,12 @@ import {
 } from '../components'
 import { certificatesService } from '../services'
 import { useNotification } from '../contexts'
+import { usePermission } from '../hooks/usePermission'
 import { extractCN, extractData, formatDate } from '../lib/utils'
 
 export default function CertificatesPage() {
   const { showSuccess, showError } = useNotification()
+  const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
   
   const [certificates, setCertificates] = useState([])
@@ -416,14 +418,18 @@ export default function CertificatesPage() {
               onExport={(format) => handleExport(selectedCert.id, format)} 
               formats={['pem', 'der', 'pkcs12']}
             />
-            <Button variant="secondary" size="sm" onClick={() => handleRenew(selectedCert.id)}>
-              <ArrowsClockwise size={16} />
-              Renew
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => handleRevoke(selectedCert.id)}>
-              <X size={16} />
-              Revoke
-            </Button>
+            {canWrite('certificates') && (
+              <Button variant="secondary" size="sm" onClick={() => handleRenew(selectedCert.id)}>
+                <ArrowsClockwise size={16} />
+                Renew
+              </Button>
+            )}
+            {canDelete('certificates') && (
+              <Button variant="danger" size="sm" onClick={() => handleRevoke(selectedCert.id)}>
+                <X size={16} />
+                Revoke
+              </Button>
+            )}
           </>
         )}
       >
@@ -464,10 +470,12 @@ export default function CertificatesPage() {
             onChange={setStatusFilter}
           />
 
-          <Button onClick={() => setShowCreateModal(true)} className="w-full">
-            <Certificate size={18} />
-            Issue Certificate
-          </Button>
+          {canWrite('certificates') && (
+            <Button onClick={() => setShowCreateModal(true)} className="w-full">
+              <Certificate size={18} />
+              Issue Certificate
+            </Button>
+          )}
         </div>
 
         <div className="flex-1 overflow-auto">
