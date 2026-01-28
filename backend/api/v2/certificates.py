@@ -20,19 +20,12 @@ def list_certificates():
     
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    status = request.args.get('status')  # valid, revoked, expired, expiring, archived
+    status = request.args.get('status')  # valid, revoked, expired, expiring
     search = request.args.get('search', '').strip()
-    sort_by = request.args.get('sort_by', 'valid_to')  # Default sort by expiry
-    sort_order = request.args.get('sort_order', 'asc')  # Default ascending (expiring first)
-    include_archived = request.args.get('include_archived', 'false').lower() == 'true'
+    sort_by = request.args.get('sort_by', 'subject')  # Default sort by subject (common_name)
+    sort_order = request.args.get('sort_order', 'asc')  # Default ascending (A-Z)
     
     query = Certificate.query
-    
-    # Filter archived by default (unless explicitly requested or status=archived)
-    if status == 'archived':
-        query = query.filter(Certificate.archived == True)
-    elif not include_archived:
-        query = query.filter(or_(Certificate.archived == False, Certificate.archived == None))
     
     # Apply status filter
     if status == 'revoked':
@@ -421,24 +414,16 @@ def renew_certificate(cert_id):
             encryption_algorithm=serialization.NoEncryption()
         ).decode('utf-8')
         
-        # Create new certificate record
-        new_refid = str(uuid.uuid4())[:8]
-        new_db_cert = Certificate(
-            refid=new_refid,
-            descr=cert.descr + ' (renewed)',
-            caref=cert.caref,
-            crt=base64.b64encode(new_cert_pem.encode()).decode(),
-            prv=base64.b64encode(new_key_pem.encode()).decode(),
-            serial_number=format(new_cert.serial_number, 'x'),
-            subject=cert.subject,
-            issuer=cert.issuer,
-            valid_from=not_before,
-            valid_to=not_after,
-            cert_type=cert.cert_type,
-            revoked=False
-        )
+        # Update existing certificate IN-PLACE (replace, no archive)
+        cert.crt = base64.b64encode(new_cert_pem.encode()).decode()
+        cert.prv = base64.b64encode(new_key_pem.encode()).decode()
+        cert.serial_number = format(new_cert.serial_number, 'x')
+        cert.valid_from = not_before
+        cert.valid_to = not_after
+        cert.revoked = False
+        cert.revoked_at = None
+        cert.revoke_reason = None
         
-        db.session.add(new_db_cert)
         db.session.commit()
         
         # Audit log
@@ -447,8 +432,7 @@ def renew_certificate(cert_id):
                 action='certificate_renewed',
                 user_id=g.current_user.id if hasattr(g, 'current_user') else None,
                 details={
-                    'original_id': cert_id,
-                    'new_id': new_db_cert.id,
+                    'certificate_id': cert_id,
                     'subject': cert.subject,
                     'valid_until': not_after.isoformat()
                 }
@@ -456,9 +440,9 @@ def renew_certificate(cert_id):
         except Exception:
             pass
         
-        return created_response(
-            data=new_db_cert.to_dict(),
-            message=f'Certificate renewed successfully. New certificate ID: {new_db_cert.id}'
+        return success_response(
+            data=cert.to_dict(),
+            message='Certificate renewed successfully'
         )
         
     except Exception as e:
