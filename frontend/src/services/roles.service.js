@@ -9,7 +9,7 @@ export const rolesService = {
    * @returns {Promise<Object>} Roles data
    */
   async getAll() {
-    const response = await apiClient.get('/api/v2/roles')
+    const response = await apiClient.get('/roles')
     return response.data
   },
 
@@ -19,7 +19,7 @@ export const rolesService = {
    * @returns {Promise<Object>} Role data
    */
   async getRole(role) {
-    const response = await apiClient.get(`/api/v2/roles/${role}`)
+    const response = await apiClient.get(`/roles/${role}`)
     return response.data
   },
 }
