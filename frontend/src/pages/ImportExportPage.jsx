@@ -1,20 +1,29 @@
 /**
  * Import/Export Page
  */
-import { useState, useEffect } from 'react'
-import { UploadSimple, Certificate, ShieldCheck, Flask, FloppyDisk } from '@phosphor-icons/react'
+import { useState, useEffect, useRef } from 'react'
+import { UploadSimple, Certificate, ShieldCheck, Flask, FloppyDisk, FileArrowUp } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, ExportDropdown, Input, LoadingSpinner
+  ExplorerPanel, DetailsPanel, Button, ExportDropdown, Input, LoadingSpinner, Select
 } from '../components'
-import { opnsenseService } from '../services'
+import { opnsenseService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
 
 const STORAGE_KEY = 'opnsense_config'
 
 export default function ImportExportPage() {
   const { showSuccess, showError } = useNotification()
-  const [selectedAction, setSelectedAction] = useState('export-certs')
+  const [selectedAction, setSelectedAction] = useState('import-cert')
   const [processing, setProcessing] = useState(false)
+  const certFileRef = useRef(null)
+  const caFileRef = useRef(null)
+  
+  // Import form state
+  const [importName, setImportName] = useState('')
+  const [importPassword, setImportPassword] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [cas, setCas] = useState([])
+  const [selectedCaId, setSelectedCaId] = useState('')
   
   // OpnSense connection details
   const [opnsenseHost, setOpnsenseHost] = useState('')
@@ -35,10 +44,75 @@ export default function ImportExportPage() {
         setOpnsenseApiKey(config.api_key || '')
         setOpnsenseApiSecret(config.api_secret || '')
       } catch (e) {
-        console.error('Failed to load saved config:', e)
+        // Ignore
       }
     }
+    // Load CAs for import dropdown
+    loadCAs()
   }, [])
+
+  const loadCAs = async () => {
+    try {
+      const response = await casService.getAll()
+      setCas(response.data || [])
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  const handleImportCertificate = async () => {
+    if (!selectedFile) {
+      showError('Please select a file')
+      return
+    }
+    setProcessing(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+      if (importName) formData.append('name', importName)
+      if (importPassword) formData.append('password', importPassword)
+      if (selectedCaId) formData.append('ca_id', selectedCaId)
+      formData.append('format', 'auto')
+      
+      await certificatesService.import(formData)
+      showSuccess('Certificate imported successfully')
+      setSelectedFile(null)
+      setImportName('')
+      setImportPassword('')
+      if (certFileRef.current) certFileRef.current.value = ''
+    } catch (error) {
+      showError(error.message || 'Failed to import certificate')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const handleImportCA = async () => {
+    if (!selectedFile) {
+      showError('Please select a file')
+      return
+    }
+    setProcessing(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+      if (importName) formData.append('name', importName)
+      if (importPassword) formData.append('password', importPassword)
+      formData.append('format', 'auto')
+      
+      await casService.import(formData)
+      showSuccess('CA imported successfully')
+      setSelectedFile(null)
+      setImportName('')
+      setImportPassword('')
+      if (caFileRef.current) caFileRef.current.value = ''
+      loadCAs() // Refresh CA list
+    } catch (error) {
+      showError(error.message || 'Failed to import CA')
+    } finally {
+      setProcessing(false)
+    }
+  }
 
   const handleSaveConfig = () => {
     if (!opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret) {
@@ -214,18 +288,20 @@ export default function ImportExportPage() {
   }
 
   const actions = [
+    { id: 'import-cert', title: 'Import Certificate', icon: <FileArrowUp size={20} />, category: 'import' },
+    { id: 'import-ca', title: 'Import CA', icon: <FileArrowUp size={20} />, category: 'import' },
+    { id: 'import-opnsense', title: 'Import from OpnSense', icon: <UploadSimple size={20} />, category: 'import' },
     { id: 'export-certs', title: 'Export All Certificates', icon: <Certificate size={20} />, category: 'export' },
     { id: 'export-cas', title: 'Export All CAs', icon: <ShieldCheck size={20} />, category: 'export' },
-    { id: 'import-opnsense', title: 'Import from OpnSense', icon: <UploadSimple size={20} />, category: 'import' }
   ]
 
   return (
     <>
       <ExplorerPanel title="Import/Export">
         <div className="px-2 py-1.5 space-y-1">
-          <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2">Export</p>
-          {actions.filter(a => a.category === 'export').map(action => (
-            <button key={action.id} onClick={() => setSelectedAction(action.id)}
+          <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2">Import</p>
+          {actions.filter(a => a.category === 'import').map(action => (
+            <button key={action.id} onClick={() => { setSelectedAction(action.id); setSelectedFile(null); setImportName(''); setImportPassword('') }}
               className={`w-full flex items-start gap-3 px-2 py-1.5 rounded-sm transition-colors ${
                 selectedAction === action.id ? 'bg-bg-tertiary text-accent' : 'hover:bg-bg-tertiary/50 text-text-primary'
               }`}>
@@ -233,8 +309,8 @@ export default function ImportExportPage() {
               <span className="text-sm font-medium">{action.title}</span>
             </button>
           ))}
-          <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2 mt-3">Import</p>
-          {actions.filter(a => a.category === 'import').map(action => (
+          <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2 mt-3">Export</p>
+          {actions.filter(a => a.category === 'export').map(action => (
             <button key={action.id} onClick={() => setSelectedAction(action.id)}
               className={`w-full flex items-start gap-3 px-2 py-1.5 rounded-sm transition-colors ${
                 selectedAction === action.id ? 'bg-bg-tertiary text-accent' : 'hover:bg-bg-tertiary/50 text-text-primary'
@@ -254,6 +330,105 @@ export default function ImportExportPage() {
             <ExportDropdown onExport={handleExportAllCAs} formats={['pem', 'der']} />
           ) : null
         }>
+        {/* Import Certificate */}
+        {selectedAction === 'import-cert' && (
+          <div className="max-w-2xl space-y-4">
+            <h3 className="text-sm font-semibold text-text-primary">Import Certificate</h3>
+            <p className="text-sm text-text-secondary">Import a certificate from a file. Supports PEM, DER, and PKCS#12 formats.</p>
+            
+            <div className="p-4 bg-bg-tertiary border border-border rounded-sm space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-primary mb-1">Certificate File</label>
+                <input
+                  ref={certFileRef}
+                  type="file"
+                  accept=".pem,.crt,.cer,.der,.p12,.pfx"
+                  onChange={(e) => setSelectedFile(e.target.files[0])}
+                  className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
+                />
+                <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
+              </div>
+              
+              <Input 
+                label="Display Name (optional)" 
+                value={importName}
+                onChange={(e) => setImportName(e.target.value)}
+                placeholder="My Certificate"
+              />
+              
+              <Input 
+                label="Password (for PKCS#12)" 
+                type="password"
+                value={importPassword}
+                onChange={(e) => setImportPassword(e.target.value)}
+                placeholder="Enter password if needed"
+              />
+              
+              <Select
+                label="Link to CA (optional)"
+                value={selectedCaId}
+                onChange={(e) => setSelectedCaId(e.target.value)}
+                options={[
+                  { value: '', label: 'Auto-detect from issuer' },
+                  ...cas.map(ca => ({ value: ca.id.toString(), label: ca.name }))
+                ]}
+              />
+              
+              <div className="flex gap-3 pt-2">
+                <Button onClick={handleImportCertificate} disabled={processing || !selectedFile}>
+                  {processing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
+                  Import Certificate
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Import CA */}
+        {selectedAction === 'import-ca' && (
+          <div className="max-w-2xl space-y-4">
+            <h3 className="text-sm font-semibold text-text-primary">Import Certificate Authority</h3>
+            <p className="text-sm text-text-secondary">Import a CA certificate from a file. Supports PEM, DER, and PKCS#12 formats.</p>
+            
+            <div className="p-4 bg-bg-tertiary border border-border rounded-sm space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-text-primary mb-1">CA Certificate File</label>
+                <input
+                  ref={caFileRef}
+                  type="file"
+                  accept=".pem,.crt,.cer,.der,.p12,.pfx"
+                  onChange={(e) => setSelectedFile(e.target.files[0])}
+                  className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
+                />
+                <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
+              </div>
+              
+              <Input 
+                label="Display Name (optional)" 
+                value={importName}
+                onChange={(e) => setImportName(e.target.value)}
+                placeholder="My Root CA"
+              />
+              
+              <Input 
+                label="Password (for PKCS#12)" 
+                type="password"
+                value={importPassword}
+                onChange={(e) => setImportPassword(e.target.value)}
+                placeholder="Enter password if needed"
+              />
+              
+              <div className="flex gap-3 pt-2">
+                <Button onClick={handleImportCA} disabled={processing || !selectedFile}>
+                  {processing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
+                  Import CA
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Export Certificates */}
         {selectedAction === 'export-certs' && (
           <div className="max-w-2xl space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">Export All Certificates</h3>
@@ -268,12 +443,16 @@ export default function ImportExportPage() {
             </div>
           </div>
         )}
+
+        {/* Export CAs */}
         {selectedAction === 'export-cas' && (
           <div className="max-w-2xl space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">Export All Certificate Authorities</h3>
             <p className="text-sm text-text-secondary">Download all CAs including their hierarchy. Use the Export dropdown above to select format.</p>
           </div>
         )}
+
+        {/* Import from OpnSense */}
         {selectedAction === 'import-opnsense' && (
           <div className="max-w-2xl space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">Import from OpnSense</h3>

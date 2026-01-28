@@ -48,7 +48,16 @@ export const certificatesService = {
     return apiClient.delete(`/certificates/${id}`)
   },
 
-  async import(data) {
-    return apiClient.post('/certificates/import', data)
+  async import(formData) {
+    // FormData for file upload - don't JSON stringify
+    return fetch('/api/v2/certificates/import', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    }).then(async res => {
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || data.error || 'Import failed')
+      return data
+    })
   }
 }
