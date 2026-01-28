@@ -234,31 +234,20 @@ export default function SettingsPage() {
       return
     }
 
-    // TODO: Backend endpoint not implemented yet
-    showError('HTTPS certificate management not yet implemented in backend')
-    return
-
-    /* Will be enabled when backend endpoint exists
     if (!confirm('Apply selected certificate as HTTPS certificate? This will restart the server.')) return
     
     try {
       await systemService.applyHttpsCert({
-        certificate_id: selectedHttpsCert
+        cert_id: selectedHttpsCert
       })
       showSuccess('HTTPS certificate applied. Server will restart.')
       setTimeout(() => window.location.reload(), 3000)
     } catch (error) {
       showError(error.message || 'Failed to apply certificate')
     }
-    */
   }
 
   const handleRegenerateHttpsCert = async () => {
-    // TODO: Backend endpoint not implemented yet
-    showError('HTTPS certificate management not yet implemented in backend')
-    return
-
-    /* Will be enabled when backend endpoint exists
     if (!confirm('Regenerate HTTPS certificate? This will restart the server.')) return
     
     try {
@@ -271,7 +260,6 @@ export default function SettingsPage() {
     } catch (error) {
       showError(error.message || 'Failed to regenerate HTTPS certificate')
     }
-    */
   }
 
   const updateSetting = (key, value) => {
