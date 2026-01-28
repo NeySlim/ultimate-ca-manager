@@ -6,64 +6,55 @@ Ce dossier contient la documentation technique du projet Ultimate CA Manager.
 
 ### Spécifications API
 
-1. **[UCM-API-SPECIFICATION.md](./UCM-API-SPECIFICATION.md)**
-   - Spécification complète du contrat API v2
-   - Analyse endpoint par endpoint
-   - Structures de réponse standardisées
-   - Plan d'implémentation pour corriger les incompatibilités
+1. **[API_REFERENCE.md](./API_REFERENCE.md)**
+   - Documentation complète des 155+ endpoints API v2
+   - Exemples de requêtes et réponses
+   - Authentification et sécurité
 
-2. **[API-WIRING-AUDIT.md](./API-WIRING-AUDIT.md)**
-   - Audit initial du câblage frontend ↔ backend
-   - Liste des bugs critiques trouvés
-   - Historique des corrections appliquées
-   - Recommandations
+2. **[UCM-API-SPECIFICATION.md](./UCM-API-SPECIFICATION.md)**
+   - Spécification du contrat API v2
+   - Structures de réponse standardisées
+
+3. **[API-WIRING-AUDIT.md](./API-WIRING-AUDIT.md)**
+   - Historique de l'audit frontend ↔ backend
+   - Corrections appliquées
 
 ## Statut Actuel
 
-**Date:** 2026-01-27  
-**Statut:** 🔴 CRITICAL - Incompatibilités frontend/backend majeures
+**Date:** 2026-01-28  
+**Statut:** ✅ PRODUCTION READY
 
-### Problèmes Critiques Identifiés
+### Fonctionnalités Complètes
 
-- **9/9 endpoints** ont des incompatibilités de structure de réponse
-- Le backend retourne systématiquement `{data: ..., meta: ...}`
-- Le frontend attend diverses structures (`data.certificates`, `data.users`, etc.)
-- Pages vides malgré données en DB : CAs, Dashboard
-- Dates affichées en "Invalid Date"
-- Session ne persistait pas (corrigé)
+#### PKI Core
+- ✅ Gestion complète des CAs (création, import, export, delete)
+- ✅ Gestion des certificats (génération, signature, révocation, renouvellement)
+- ✅ CSRs (upload, signature, export)
+- ✅ Templates de certificats
+- ✅ CRL & OCSP
+- ✅ SCEP & ACME
 
-### Corrections Appliquées
+#### Import/Export
+- ✅ Import fichier (PEM, DER, PKCS12, PKCS7)
+- ✅ Coller PEM/JSON directement
+- ✅ Auto-détection du format
+- ✅ Auto-routage (CA vs certificat)
+- ✅ Détection des doublons avec mise à jour
+- ✅ Export PEM/DER/PKCS12
+- ✅ Copier PEM en un clic
 
-- ✅ Session persistante (AuthContext)
-- ✅ CertificatesPage structure de données
-- ✅ CAsPage structure de données (partiel)
-- ✅ Session timeout étendu à 24h
+#### Authentification
+- ✅ Login username/password
+- ✅ 2FA TOTP (Google Authenticator)
+- ✅ WebAuthn/FIDO2 (YubiKey)
+- ✅ mTLS (certificat client)
+- ✅ Cascade automatique des méthodes
 
-### Corrections Requises
-
-- ❌ CSRsPage
-- ❌ TemplatesPage
-- ❌ UsersPage
-- ❌ DashboardPage
-- ❌ SettingsPage (tous les tabs)
-- ❌ CAsPage (tree structure)
-- ❌ Mapping des champs de dates
-
-## Plan d'Implémentation
-
-Voir **UCM-API-SPECIFICATION.md** section "Implementation Plan" pour le plan détaillé (90 minutes estimées).
-
-### Phase 1: Pages Critiques (30 min)
-- CSRsPage, TemplatesPage, UsersPage, DashboardPage
-
-### Phase 2: Settings Tabs (15 min)
-- ACME, SCEP, Database, HTTPS tabs
-
-### Phase 3: Dates (15 min)
-- Mapper `valid_from`/`valid_to` → `not_before`/`not_after`
-
-### Phase 4: Tests (30 min)
-- Tests manuels de toutes les pages
+#### UI/UX
+- ✅ 6 thèmes avec gradients
+- ✅ Layout split-view cohérent
+- ✅ TreeView pour hiérarchie CAs
+- ✅ Audit logs avec filtres et export
 
 ## Architecture
 
@@ -112,43 +103,22 @@ Voir **UCM-API-SPECIFICATION.md** section "Implementation Plan" pour le plan dé
 }
 ```
 
-## Utilisation
-
-### Analyse du Contrat API
-
-Un script d'analyse automatique est disponible:
+## Build & Deploy
 
 ```bash
-python3 /tmp/analyze_api_contract.py
+# Frontend build
+cd /root/ucm-src/frontend
+npm run build
+
+# Deploy
+cp dist/assets/* /opt/ucm/frontend/static/assets/
+cp dist/index.html /opt/ucm/frontend/templates/index.html
+sudo systemctl restart ucm
 ```
-
-Ce script:
-- Teste tous les endpoints principaux
-- Compare structure backend vs attentes frontend
-- Génère un rapport JSON détaillé
-- Identifie les incompatibilités
-
-### Génération de la Spec
-
-La spécification complète peut être régénérée avec:
-
-```bash
-python3 /tmp/analyze_api_contract.py
-# Puis générer la spec à partir du rapport JSON
-```
-
-## Contribution
-
-Lors de modifications:
-
-1. **Backend:** Respecter la structure `{data, meta}` pour les listes
-2. **Frontend:** Toujours utiliser `response.data` pour accéder aux données
-3. **Tests:** Vérifier que le contrat est respecté
-4. **Documentation:** Mettre à jour ce document et les specs
 
 ## Ressources
 
-- **Wiki Backend:** `/root/ultimate-ca-manager.wiki/`
-- **Session Copilot:** `/root/.copilot/session-state/434da574-b109-47af-b4e1-c2f9b59f3cb9/`
-- **Logs:** `/var/log/ucm/`
+- **Production:** https://netsuit.lan.pew.pet:8443
+- **Source:** `/root/ucm-src` (branch: `redesign/v3.0.0-clean`)
 - **Database:** `/opt/ucm/data/ucm.db`
+- **Logs:** `/var/log/ucm/`
