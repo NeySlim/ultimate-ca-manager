@@ -1146,3 +1146,20 @@ Major migration from Tailwind utility classes to custom CSS system.
 ---
 
 **Note on Version History**: Versions 1.0.1 through 1.5.0 were developed rapidly between January 4-5, 2026, following repository damage that lost intermediate version tags. This changelog has been reconstructed from commit messages, session notes, and context documentation to preserve the complete development history.
+
+## [2.0.0-beta.5] - 2026-01-29
+
+### Added
+- **SCEP Page**: Complete SCEP management UI with configuration, request approval/rejection, and challenge passwords
+- **Webhook System**: Full CRUD for webhooks with test functionality
+- **Backup System**: Complete encrypted backup/restore with password protection (AES-256-GCM)
+
+### Fixed
+- Settings persistence to database (auto-backup, timezone, etc.)
+- Fixed `current_user` placeholders in CRL and CSR endpoints
+- Save Settings button position in backup section
+
+### Changed
+- SCEP configuration now persisted to database
+- Webhooks stored as JSON in SystemConfig
+- Improved backup file naming with timezone-aware dates

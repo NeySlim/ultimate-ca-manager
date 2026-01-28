@@ -769,6 +769,20 @@ Content-Type: application/json
 GET /api/v2/scep/config
 ```
 
+Response:
+```json
+{
+  "data": {
+    "enabled": true,
+    "url": "/scep/pkiclient.exe",
+    "ca_id": 2,
+    "ca_ident": "ucm-ca",
+    "auto_approve": false,
+    "challenge_validity": 24
+  }
+}
+```
+
 ### Update Configuration
 ```http
 PATCH /api/v2/scep/config
@@ -776,9 +790,10 @@ Content-Type: application/json
 
 {
   "enabled": true,
-  "issuing_ca_id": 2,
-  "challenge_password": "secret123",
-  "validity_days": 365
+  "ca_id": 2,
+  "ca_ident": "ucm-ca",
+  "auto_approve": false,
+  "challenge_validity": 24
 }
 ```
 
@@ -787,7 +802,7 @@ Content-Type: application/json
 GET /api/v2/scep/stats
 ```
 
-### List Pending Requests
+### List Requests
 ```http
 GET /api/v2/scep/requests
 GET /api/v2/scep/requests?status=pending
@@ -806,6 +821,16 @@ Content-Type: application/json
 {
   "reason": "Invalid device"
 }
+```
+
+### Get Challenge Password
+```http
+GET /api/v2/scep/challenge/{ca_id}
+```
+
+### Regenerate Challenge Password
+```http
+POST /api/v2/scep/challenge/{ca_id}/regenerate
 ```
 
 ---
