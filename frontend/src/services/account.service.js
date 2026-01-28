@@ -50,8 +50,12 @@ export const accountService = {
     return apiClient.post('/account/2fa/enable')
   },
 
-  async disable2FA() {
-    return apiClient.post('/account/2fa/disable')
+  async confirm2FA(code) {
+    return apiClient.post('/account/2fa/confirm', { code })
+  },
+
+  async disable2FA(code) {
+    return apiClient.post('/account/2fa/disable', { code })
   },
 
   async verify2FA(code) {
