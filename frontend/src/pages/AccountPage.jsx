@@ -138,7 +138,8 @@ export default function AccountPage() {
       } else {
         // Enable 2FA - show QR modal
         const response = await accountService.enable2FA()
-        setQrData(response)
+        // API returns {data: {qr_code, secret, backup_codes}, message}
+        setQrData(response.data || response)
         setShow2FAModal(true)
       }
     } catch (error) {
