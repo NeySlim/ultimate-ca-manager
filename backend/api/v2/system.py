@@ -11,7 +11,7 @@ import os
 import subprocess
 import shutil
 import werkzeug.utils
-from datetime import datetime
+from datetime import datetime, timezone
 
 bp = Blueprint('system_v2', __name__)
 
@@ -145,7 +145,7 @@ def create_backup():
         backup_bytes = service.create_backup(password)
         
         # Save to disk
-        filename = f"ucm_backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.ucmbkp"
+        filename = f"ucm_backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.ucmbkp"
         backup_dir = "/opt/ucm/data/backups"
         os.makedirs(backup_dir, exist_ok=True)
         
@@ -190,14 +190,25 @@ def list_backups():
             if f.endswith('.ucmbkp') or f.endswith('.json.enc'):
                 path = os.path.join(backup_dir, f)
                 stat = os.stat(path)
+                
+                # Format size
+                size = stat.st_size
+                if size > 1024*1024:
+                    size_str = f"{size/1024/1024:.1f} MB"
+                elif size > 1024:
+                    size_str = f"{size/1024:.1f} KB"
+                else:
+                    size_str = f"{size} B"
+                
                 files.append({
                     'filename': f,
-                    'size': stat.st_size,
-                    'created_at': datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                    'download_url': f'/api/system/backup/{f}/download'
+                    'size': size_str,
+                    'size_bytes': size,
+                    'created_at': datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
                 })
         
         # Sort by date desc
+        files.sort(key=lambda x: x['size_bytes'], reverse=True)
         files.sort(key=lambda x: x['created_at'], reverse=True)
         return success_response(data=files)
     except Exception as e:
