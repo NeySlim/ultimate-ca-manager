@@ -1300,6 +1300,67 @@ POST /api/v2/system/backup/restore
 
 ## Import/Export
 
+### Certificate Import (File Upload)
+```http
+POST /api/v2/certificates/import
+Content-Type: multipart/form-data
+
+file: <certificate file>          # Required: .pem, .crt, .cer, .der, .p12, .pfx
+name: "My Certificate"            # Optional: display name
+password: "pkcs12password"        # Optional: for PKCS12 files
+ca_id: 1                          # Optional: link to specific CA (auto-detected if omitted)
+import_key: true                  # Optional: import private key (default: true)
+
+# Response (201 Created)
+{
+  "data": {
+    "id": 123,
+    "refid": "uuid",
+    "descr": "My Certificate",
+    "subject": "CN=example.com",
+    "issuer": "CN=My CA",
+    ...
+  },
+  "message": "Certificate \"My Certificate\" imported successfully"
+}
+
+# If CA certificate detected (CA:TRUE basic constraint):
+{
+  "data": { ... },  # CA object, not certificate
+  "message": "CA certificate \"My CA\" imported successfully (detected as CA)"
+}
+```
+
+**Features:**
+- Auto-detects format: PEM, DER, PKCS12, PKCS7
+- Handles PEM files with text before/after the certificate block
+- Auto-detects CA certificates (CA:TRUE) and stores in CAs table
+- Auto-links certificates to parent CA by issuer matching
+
+### CA Import (File Upload)
+```http
+POST /api/v2/cas/import
+Content-Type: multipart/form-data
+
+file: <CA certificate file>       # Required
+name: "My Root CA"                # Optional: display name
+password: "pkcs12password"        # Optional: for PKCS12 files
+import_key: true                  # Optional: import private key (default: true)
+
+# Response (201 Created)
+{
+  "data": {
+    "id": 5,
+    "refid": "uuid",
+    "descr": "My Root CA",
+    "subject": "CN=My Root CA,O=Org",
+    "is_root": true,
+    ...
+  },
+  "message": "CA \"My Root CA\" imported successfully"
+}
+```
+
 ### OPNsense Import
 ```http
 # Test connection

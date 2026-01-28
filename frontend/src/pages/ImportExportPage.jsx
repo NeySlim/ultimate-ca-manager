@@ -2,6 +2,7 @@
  * Import/Export Page
  */
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { UploadSimple, Certificate, ShieldCheck, Flask, FloppyDisk, FileArrowUp } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Button, ExportDropdown, Input, LoadingSpinner, Select
@@ -13,6 +14,7 @@ const STORAGE_KEY = 'opnsense_config'
 
 export default function ImportExportPage() {
   const { showSuccess, showError } = useNotification()
+  const navigate = useNavigate()
   const [selectedAction, setSelectedAction] = useState('import-cert')
   const [processing, setProcessing] = useState(false)
   const certFileRef = useRef(null)
@@ -81,7 +83,15 @@ export default function ImportExportPage() {
       setImportPassword('')
       setSelectedCaId('auto')
       if (certFileRef.current) certFileRef.current.value = ''
-      loadCAs() // Refresh CA list in case it was a CA cert
+      
+      // Navigate to the right page with the new item selected
+      if (result.data) {
+        if (result.message?.includes('CA')) {
+          navigate(`/cas?selected=${result.data.id}`)
+        } else {
+          navigate(`/certificates?selected=${result.data.id}`)
+        }
+      }
     } catch (error) {
       showError(error.message || 'Failed to import certificate')
     } finally {
@@ -108,7 +118,11 @@ export default function ImportExportPage() {
       setImportName('')
       setImportPassword('')
       if (caFileRef.current) caFileRef.current.value = ''
-      loadCAs() // Refresh CA list
+      
+      // Navigate to CAs page with the new CA selected
+      if (result.data) {
+        navigate(`/cas?selected=${result.data.id}`)
+      }
     } catch (error) {
       showError(error.message || 'Failed to import CA')
     } finally {
