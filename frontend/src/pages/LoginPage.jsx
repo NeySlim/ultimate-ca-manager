@@ -9,21 +9,21 @@ import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { login, isAuthenticated } = useAuth()
+  const { login, isAuthenticated, loading: authLoading } = useAuth()
   const { showError, showSuccess } = useNotification()
   
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Force redirect if already authenticated
+  // Force redirect if already authenticated (wait for auth check to complete)
   useEffect(() => {
-    console.log('🔍 LoginPage check - isAuthenticated:', isAuthenticated)
-    if (isAuthenticated) {
+    console.log('🔍 LoginPage check - isAuthenticated:', isAuthenticated, 'loading:', loading)
+    if (!loading && isAuthenticated) {
       console.log('✅ User already authenticated, redirecting...')
       navigate('/', { replace: true })
     }
-  }, [isAuthenticated, navigate])
+  }, [isAuthenticated, loading, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
