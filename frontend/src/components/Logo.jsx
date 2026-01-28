@@ -7,59 +7,80 @@ import { cn } from '../lib/utils'
 export function Logo({ 
   variant = 'horizontal', // 'horizontal' | 'vertical' | 'compact' | 'icon'
   withText = true,
-  size = 'md', // 'sm' | 'md' | 'lg'
+  size = 'md', // 'sm' | 'md' | 'lg' | 'xl'
   filled = false,
   className 
 }) {
-  // Chain styles based on variant
-  const chainStyles = {
+  // Gradient style for chain links (from reference design)
+  const gradientStyle = {
+    background: filled 
+      ? 'linear-gradient(135deg, #5a8fc7, #7aa5d9)'
+      : 'transparent',
+    borderImage: filled 
+      ? 'none' 
+      : 'linear-gradient(135deg, #5a8fc7, #7aa5d9) 1',
+    borderStyle: 'solid'
+  }
+
+  // Chain configuration based on variant (from reference design)
+  const configs = {
     horizontal: {
-      container: 'flex items-center gap-1',
-      link: 'w-4 h-6 border-[3px] rounded-lg',
-      transforms: ['', 'translate-y-2', '-translate-y-1']
+      container: 'flex items-center',
+      gap: size === 'sm' ? '2px' : '4px',
+      linkWidth: size === 'sm' ? '12px' : size === 'lg' ? '24px' : '16px',
+      linkHeight: size === 'sm' ? '18px' : size === 'lg' ? '36px' : '24px',
+      borderWidth: size === 'sm' ? '2px' : size === 'lg' ? '4px' : '3px',
+      borderRadius: '8px',
+      transforms: [
+        'translateY(0)',
+        size === 'sm' ? 'translateY(6px)' : size === 'lg' ? 'translateY(12px)' : 'translateY(8px)',
+        size === 'sm' ? 'translateY(-3px)' : size === 'lg' ? 'translateY(-6px)' : 'translateY(-4px)'
+      ]
     },
     compact: {
-      container: 'flex items-center gap-0.5',
-      link: 'w-3 h-5 border-2 rounded-md',
-      transforms: ['', 'translate-y-1.5', '-translate-y-0.5']
+      container: 'flex items-center',
+      gap: '2px',
+      linkWidth: '12px',
+      linkHeight: '20px',
+      borderWidth: '2px',
+      borderRadius: '8px',
+      transforms: ['translateY(0)', 'translateY(6px)', 'translateY(-3px)']
     },
     vertical: {
-      container: 'flex flex-col items-center gap-1',
-      link: 'w-6 h-4 border-[3px] rounded-lg',
-      transforms: ['', 'translate-x-2', '-translate-x-1']
+      container: 'flex flex-col items-center',
+      gap: '4px',
+      linkWidth: '24px',
+      linkHeight: '16px',
+      borderWidth: '3px',
+      borderRadius: '8px',
+      transforms: ['translateX(0)', 'translateX(8px)', 'translateX(-4px)']
     },
     icon: {
-      container: 'flex items-center gap-1',
-      link: 'w-4 h-6 border-[3px] rounded-lg',
-      transforms: ['', 'translate-y-2', '-translate-y-1']
+      container: 'flex items-center',
+      gap: '4px',
+      linkWidth: '16px',
+      linkHeight: '24px',
+      borderWidth: '3px',
+      borderRadius: '8px',
+      transforms: ['translateY(0)', 'translateY(8px)', 'translateY(-4px)']
     }
   }
 
-  // Size adjustments
-  const sizeClasses = {
-    sm: variant === 'compact' ? 'scale-75' : 'scale-50',
-    md: '',
-    lg: variant === 'compact' ? 'scale-110' : 'scale-125',
-    xl: 'scale-150'
-  }
-
-  const style = chainStyles[variant] || chainStyles.horizontal
-  
-  // Border or filled
-  const linkClass = filled
-    ? 'bg-gradient-to-br from-accent to-accent-secondary'
-    : 'border-accent bg-transparent [border-image:linear-gradient(135deg,var(--color-accent),var(--color-accent-secondary))_1]'
+  const config = configs[variant] || configs.horizontal
 
   const chainIcon = (
-    <div className={cn(style.container, sizeClasses[size])}>
+    <div className={config.container} style={{ gap: config.gap }}>
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className={cn(
-            style.link,
-            linkClass,
-            style.transforms[i]
-          )}
+          style={{
+            width: config.linkWidth,
+            height: config.linkHeight,
+            borderWidth: filled ? '0' : config.borderWidth,
+            borderRadius: config.borderRadius,
+            transform: config.transforms[i],
+            ...gradientStyle
+          }}
         />
       ))}
     </div>
@@ -69,16 +90,35 @@ export function Logo({
     return <div className={className}>{chainIcon}</div>
   }
 
-  // With text variants
+  // Text gradient (matching chain gradient)
+  const textGradientStyle = {
+    background: 'linear-gradient(135deg, #5a8fc7, #7aa5d9)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text'
+  }
+
+  // With text - vertical variant (login page)
   if (variant === 'vertical') {
     return (
-      <div className={cn('flex flex-col items-center gap-3', className)}>
+      <div className={cn('flex flex-col items-center', className)} style={{ gap: '12px' }}>
         {chainIcon}
         <div className="text-center">
-          <div className="text-3xl font-black tracking-tight bg-gradient-to-r from-accent to-accent-secondary bg-clip-text text-transparent">
+          <div 
+            className="font-black tracking-tight leading-none"
+            style={{ fontSize: '32px', letterSpacing: '-1px', ...textGradientStyle }}
+          >
             UCM
           </div>
-          <div className="text-[9px] font-semibold tracking-widest uppercase text-text-tertiary mt-0.5">
+          <div 
+            className="font-semibold uppercase" 
+            style={{ 
+              fontSize: '9px', 
+              letterSpacing: '2px', 
+              color: '#888', 
+              marginTop: '2px' 
+            }}
+          >
             Certificate Manager
           </div>
         </div>
@@ -86,19 +126,31 @@ export function Logo({
     )
   }
 
-  // Horizontal and compact with text
+  // Horizontal with text (main logo)
   return (
-    <div className={cn('flex items-center gap-3', className)}>
+    <div className={cn('flex items-center', className)} style={{ gap: '12px' }}>
       {chainIcon}
       <div className="flex flex-col">
-        <div className={cn(
-          'font-black tracking-tight bg-gradient-to-r from-accent to-accent-secondary bg-clip-text text-transparent leading-none',
-          variant === 'compact' ? 'text-lg' : 'text-2xl'
-        )}>
+        <div 
+          className="font-black tracking-tight leading-none"
+          style={{ 
+            fontSize: variant === 'compact' ? '18px' : '32px',
+            letterSpacing: '-1px',
+            ...textGradientStyle 
+          }}
+        >
           UCM
         </div>
         {variant !== 'compact' && (
-          <div className="text-[9px] font-semibold tracking-widest uppercase text-text-tertiary mt-0.5">
+          <div 
+            className="font-semibold uppercase" 
+            style={{ 
+              fontSize: '9px', 
+              letterSpacing: '2px', 
+              color: '#888',
+              marginTop: '2px'
+            }}
+          >
             Certificate Manager
           </div>
         )}
