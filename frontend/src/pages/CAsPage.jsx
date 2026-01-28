@@ -252,13 +252,18 @@ export default function CAsPage() {
       if (importPassword) formData.append('password', importPassword)
       formData.append('format', 'auto')
       
-      await casService.import(formData)
-      showSuccess('CA imported successfully')
+      const result = await casService.import(formData)
+      showSuccess(result.message || 'CA imported successfully')
       setShowImportModal(false)
       setImportFile(null)
       setImportName('')
       setImportPassword('')
-      loadCAs()
+      await loadCAs()
+      
+      // Auto-select the imported CA to show details
+      if (result.data) {
+        setSelectedCA(result.data)
+      }
     } catch (error) {
       showError(error.message || 'Failed to import CA')
     } finally {

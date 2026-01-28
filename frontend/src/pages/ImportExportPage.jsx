@@ -74,13 +74,14 @@ export default function ImportExportPage() {
       if (selectedCaId && selectedCaId !== 'auto') formData.append('ca_id', selectedCaId)
       formData.append('format', 'auto')
       
-      await certificatesService.import(formData)
-      showSuccess('Certificate imported successfully')
+      const result = await certificatesService.import(formData)
+      showSuccess(result.message || 'Certificate imported successfully')
       setSelectedFile(null)
       setImportName('')
       setImportPassword('')
       setSelectedCaId('auto')
       if (certFileRef.current) certFileRef.current.value = ''
+      loadCAs() // Refresh CA list in case it was a CA cert
     } catch (error) {
       showError(error.message || 'Failed to import certificate')
     } finally {
@@ -101,8 +102,8 @@ export default function ImportExportPage() {
       if (importPassword) formData.append('password', importPassword)
       formData.append('format', 'auto')
       
-      await casService.import(formData)
-      showSuccess('CA imported successfully')
+      const result = await casService.import(formData)
+      showSuccess(result.message || 'CA imported successfully')
       setSelectedFile(null)
       setImportName('')
       setImportPassword('')
