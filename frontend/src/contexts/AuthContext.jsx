@@ -15,6 +15,12 @@ export function AuthProvider({ children }) {
 
   // Check session on mount
   useEffect(() => {
+    // Don't check session if already on login page (prevents redirect loop)
+    if (window.location.pathname === '/login') {
+      setLoading(false)
+      return
+    }
+    
     checkSession()
   }, [])
 
@@ -38,11 +44,21 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const login = async (username, password) => {
+  const login = async (username, password, preAuthData = null) => {
     setLoading(true)
     try {
-      console.log('🔐 Attempting login for:', username)
-      const response = await authService.login(username, password)
+      console.log('🔐 Login called:', { username, hasPreAuthData: !!preAuthData })
+      
+      let response
+      if (preAuthData) {
+        // Already authenticated via multi-method (mTLS, WebAuthn, etc.)
+        response = { data: preAuthData }
+      } else {
+        // Legacy password auth
+        console.log('🔐 Attempting password login for:', username)
+        response = await authService.login(username, password)
+      }
+      
       console.log('✅ Login response:', response)
       const userData = response.data?.user || response.user || { username }
       setUser(userData)
