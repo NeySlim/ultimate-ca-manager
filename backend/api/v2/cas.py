@@ -206,6 +206,146 @@ def create_ca():
         return error_response(str(e), 500)
 
 
+@bp.route('/api/v2/cas/import', methods=['POST'])
+@require_auth(['write:cas'])
+def import_ca():
+    """
+    Import CA certificate from file
+    Supports: PEM, DER, PKCS12
+    
+    Form data:
+        file: Certificate file
+        format: auto, pem, der, pkcs12
+        password: Password for PKCS12
+        name: Optional display name
+        import_key: Whether to import private key (default: true)
+    """
+    from models import CA, db
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import serialization
+    import base64
+    import uuid
+    
+    if 'file' not in request.files:
+        return error_response('No file provided', 400)
+    
+    file = request.files['file']
+    if file.filename == '':
+        return error_response('No file selected', 400)
+    
+    format_type = request.form.get('format', 'auto').lower()
+    password = request.form.get('password')
+    name = request.form.get('name', '')
+    import_key = request.form.get('import_key', 'true').lower() == 'true'
+    
+    try:
+        file_data = file.read()
+        cert = None
+        private_key = None
+        
+        # Auto-detect format
+        if format_type == 'auto':
+            if file_data.startswith(b'-----BEGIN'):
+                format_type = 'pem'
+            elif file.filename.endswith('.p12') or file.filename.endswith('.pfx'):
+                format_type = 'pkcs12'
+            else:
+                format_type = 'der'
+        
+        if format_type == 'pem':
+            cert = x509.load_pem_x509_certificate(file_data, default_backend())
+            # Try to extract private key
+            if import_key and b'-----BEGIN' in file_data and b'PRIVATE KEY' in file_data:
+                try:
+                    private_key = serialization.load_pem_private_key(
+                        file_data, password=password.encode() if password else None, backend=default_backend()
+                    )
+                except:
+                    pass
+                    
+        elif format_type == 'der':
+            cert = x509.load_der_x509_certificate(file_data, default_backend())
+            
+        elif format_type == 'pkcs12':
+            if not password:
+                return error_response('Password required for PKCS12', 400)
+            from cryptography.hazmat.primitives.serialization import pkcs12
+            private_key, cert, chain = pkcs12.load_key_and_certificates(
+                file_data, password.encode(), default_backend()
+            )
+        
+        if not cert:
+            return error_response('Could not parse certificate', 400)
+        
+        # Extract certificate info
+        subject = cert.subject
+        issuer = cert.issuer
+        
+        def get_name_attr(name_obj, oid):
+            try:
+                return name_obj.get_attributes_for_oid(oid)[0].value
+            except:
+                return ''
+        
+        from cryptography.x509.oid import NameOID
+        cn = get_name_attr(subject, NameOID.COMMON_NAME)
+        org = get_name_attr(subject, NameOID.ORGANIZATION_NAME)
+        country = get_name_attr(subject, NameOID.COUNTRY_NAME)
+        
+        # Check if self-signed (root CA)
+        is_root = cert.subject == cert.issuer
+        
+        # Serialize certificate to PEM
+        cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+        
+        # Serialize private key if available
+        key_pem = None
+        if private_key and import_key:
+            key_pem = private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+        
+        # Create CA record
+        refid = str(uuid.uuid4())
+        ca = CA(
+            refid=refid,
+            descr=name or cn or file.filename,
+            crt=base64.b64encode(cert_pem).decode('utf-8'),
+            prv=base64.b64encode(key_pem).decode('utf-8') if key_pem else None,
+            serial=str(cert.serial_number),
+            is_root=is_root,
+            subject=subject.rfc4514_string(),
+            issuer=issuer.rfc4514_string(),
+            valid_from=cert.not_valid_before_utc,
+            valid_to=cert.not_valid_after_utc,
+            created_by='import'
+        )
+        
+        db.session.add(ca)
+        db.session.commit()
+        
+        # Audit log
+        from services.audit_service import AuditService
+        AuditService.log_action(
+            action='ca_imported',
+            resource_type='ca',
+            resource_id=ca.id,
+            details=f'Imported CA: {ca.descr}',
+            success=True
+        )
+        
+        return created_response(
+            data=ca.to_dict(),
+            message=f'CA "{ca.descr}" imported successfully'
+        )
+        
+    except Exception as e:
+        return error_response(f'Import failed: {str(e)}', 500)
+
+
 @bp.route('/api/v2/cas/<int:ca_id>', methods=['GET'])
 @require_auth(['read:cas'])
 def get_ca(ca_id):

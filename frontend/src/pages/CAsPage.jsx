@@ -1,11 +1,11 @@
 /**
  * CAs (Certificate Authorities) Page
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   ShieldCheck, Crown, Key, Download, Trash, PencilSimple,
-  Tree, SquaresFour, Certificate
+  Tree, SquaresFour, Certificate, UploadSimple
 } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, TreeView, Table, Button, 
@@ -140,8 +140,14 @@ export default function CAsPage() {
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState('tree') // 'tree' or 'grid'
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [createFormType, setCreateFormType] = useState('root')
+  const [importFile, setImportFile] = useState(null)
+  const [importName, setImportName] = useState('')
+  const [importPassword, setImportPassword] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importFileRef = useRef(null)
 
   useEffect(() => {
     loadCAs()
@@ -230,6 +236,33 @@ export default function CAsPage() {
       setSelectedCA(null)
     } catch (error) {
       showError(error.message || 'Failed to delete CA')
+    }
+  }
+
+  const handleImportCA = async () => {
+    if (!importFile) {
+      showError('Please select a file')
+      return
+    }
+    setImporting(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', importFile)
+      if (importName) formData.append('name', importName)
+      if (importPassword) formData.append('password', importPassword)
+      formData.append('format', 'auto')
+      
+      await casService.import(formData)
+      showSuccess('CA imported successfully')
+      setShowImportModal(false)
+      setImportFile(null)
+      setImportName('')
+      setImportPassword('')
+      loadCAs()
+    } catch (error) {
+      showError(error.message || 'Failed to import CA')
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -584,10 +617,16 @@ export default function CAsPage() {
           </div>
 
           {canWrite('cas') && (
-            <Button onClick={() => setShowCreateModal(true)} className="w-full">
-              <ShieldCheck size={18} />
-              Create CA
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setShowCreateModal(true)} className="flex-1">
+                <ShieldCheck size={18} />
+                Create
+              </Button>
+              <Button variant="secondary" onClick={() => setShowImportModal(true)}>
+                <UploadSimple size={18} />
+                Import
+              </Button>
+            </div>
           )}
         </div>
 
@@ -862,6 +901,60 @@ export default function CAsPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Import CA Modal */}
+      <Modal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Import CA"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            Import an existing CA certificate from a file. Supports PEM, DER, and PKCS#12 formats.
+          </p>
+          
+          <div>
+            <label className="block text-xs font-medium text-text-primary mb-1">CA Certificate File</label>
+            <input
+              ref={importFileRef}
+              type="file"
+              accept=".pem,.crt,.cer,.der,.p12,.pfx"
+              onChange={(e) => setImportFile(e.target.files[0])}
+              className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
+            />
+            <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
+          </div>
+          
+          <Input 
+            label="Display Name (optional)" 
+            value={importName}
+            onChange={(e) => setImportName(e.target.value)}
+            placeholder="My Root CA"
+          />
+          
+          <Input 
+            label="Password (for PKCS#12)" 
+            type="password"
+            value={importPassword}
+            onChange={(e) => setImportPassword(e.target.value)}
+            placeholder="Enter password if needed"
+          />
+          
+          <div className="flex gap-3 justify-end pt-4 border-t border-border">
+            <Button
+              variant="secondary"
+              onClick={() => setShowImportModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleImportCA} disabled={importing || !importFile}>
+              {importing ? <LoadingSpinner size="sm" /> : <UploadSimple size={16} />}
+              Import CA
+            </Button>
+          </div>
+        </div>
       </Modal>
     </>
   )

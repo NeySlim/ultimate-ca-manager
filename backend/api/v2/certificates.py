@@ -261,9 +261,23 @@ def renew_certificate(cert_id):
 def import_certificate():
     """
     Import certificate from file
-    Supports: PEM, DER, PKCS12, JKS
+    Supports: PEM, DER, PKCS12
+    
+    Form data:
+        file: Certificate file
+        format: auto, pem, der, pkcs12
+        password: Password for PKCS12
+        name: Optional display name
+        ca_id: Optional CA ID to link to
+        import_key: Whether to import private key (default: true)
     """
-    # Check for file upload
+    from models import Certificate, CA, db
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import serialization
+    import base64
+    import uuid
+    
     if 'file' not in request.files:
         return error_response('No file provided', 400)
     
@@ -271,27 +285,121 @@ def import_certificate():
     if file.filename == '':
         return error_response('No file selected', 400)
     
-    # Get optional parameters
-    format_type = request.form.get('format', 'auto')  # auto, pem, der, pkcs12, jks
-    password = request.form.get('password')  # For PKCS12/JKS
-    ca_id = request.form.get('ca_id', type=int)  # Optional: link to CA
-    import_chain = request.form.get('import_chain', 'false') == 'true'
-    import_private_key = request.form.get('import_private_key', 'false') == 'true'
+    format_type = request.form.get('format', 'auto').lower()
+    password = request.form.get('password')
+    name = request.form.get('name', '')
+    ca_id = request.form.get('ca_id', type=int)
+    import_key = request.form.get('import_key', 'true').lower() == 'true'
     
-    # TODO: Implement actual certificate import logic
-    # - Detect format if auto
-    # - Parse certificate
-    # - Validate certificate
-    # - Store in database
-    # - Save files
-    
-    return created_response(
-        data={
-            'id': 999,
-            'filename': file.filename,
-            'format': format_type,
-            'has_private_key': import_private_key,
-            'imported': True
-        },
-        message='Certificate imported successfully'
-    )
+    try:
+        file_data = file.read()
+        cert = None
+        private_key = None
+        
+        # Auto-detect format
+        if format_type == 'auto':
+            if file_data.startswith(b'-----BEGIN'):
+                format_type = 'pem'
+            elif file.filename.endswith('.p12') or file.filename.endswith('.pfx'):
+                format_type = 'pkcs12'
+            else:
+                format_type = 'der'
+        
+        if format_type == 'pem':
+            cert = x509.load_pem_x509_certificate(file_data, default_backend())
+            # Try to extract private key
+            if import_key and b'-----BEGIN' in file_data and b'PRIVATE KEY' in file_data:
+                try:
+                    private_key = serialization.load_pem_private_key(
+                        file_data, password=password.encode() if password else None, backend=default_backend()
+                    )
+                except:
+                    pass
+                    
+        elif format_type == 'der':
+            cert = x509.load_der_x509_certificate(file_data, default_backend())
+            
+        elif format_type == 'pkcs12':
+            if not password:
+                return error_response('Password required for PKCS12', 400)
+            from cryptography.hazmat.primitives.serialization import pkcs12
+            private_key, cert, chain = pkcs12.load_key_and_certificates(
+                file_data, password.encode(), default_backend()
+            )
+        
+        if not cert:
+            return error_response('Could not parse certificate', 400)
+        
+        # Extract certificate info
+        subject = cert.subject
+        issuer = cert.issuer
+        
+        def get_name_attr(name_obj, oid):
+            try:
+                return name_obj.get_attributes_for_oid(oid)[0].value
+            except:
+                return ''
+        
+        from cryptography.x509.oid import NameOID
+        cn = get_name_attr(subject, NameOID.COMMON_NAME)
+        
+        # Serialize certificate to PEM
+        cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+        
+        # Serialize private key if available
+        key_pem = None
+        if private_key and import_key:
+            key_pem = private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+        
+        # Find CA by issuer if not specified
+        caref = None
+        if ca_id:
+            ca = CA.query.get(ca_id)
+            if ca:
+                caref = ca.refid
+        else:
+            # Try to match issuer with existing CA
+            issuer_str = issuer.rfc4514_string()
+            ca = CA.query.filter_by(subject=issuer_str).first()
+            if ca:
+                caref = ca.refid
+        
+        # Create certificate record
+        refid = str(uuid.uuid4())
+        certificate = Certificate(
+            refid=refid,
+            descr=name or cn or file.filename,
+            crt=base64.b64encode(cert_pem).decode('utf-8'),
+            prv=base64.b64encode(key_pem).decode('utf-8') if key_pem else None,
+            caref=caref,
+            subject=subject.rfc4514_string(),
+            issuer=issuer.rfc4514_string(),
+            valid_from=cert.not_valid_before_utc,
+            valid_to=cert.not_valid_after_utc,
+            created_by='import'
+        )
+        
+        db.session.add(certificate)
+        db.session.commit()
+        
+        # Audit log
+        from services.audit_service import AuditService
+        AuditService.log_action(
+            action='certificate_imported',
+            resource_type='certificate',
+            resource_id=certificate.id,
+            details=f'Imported certificate: {certificate.descr}',
+            success=True
+        )
+        
+        return created_response(
+            data=certificate.to_dict(),
+            message=f'Certificate "{certificate.descr}" imported successfully'
+        )
+        
+    except Exception as e:
+        return error_response(f'Import failed: {str(e)}', 500)

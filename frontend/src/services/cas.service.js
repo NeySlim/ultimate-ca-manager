@@ -28,6 +28,19 @@ export const casService = {
     return apiClient.delete(`/cas/${id}`)
   },
 
+  async import(formData) {
+    // FormData for file upload - don't JSON stringify
+    return fetch('/api/v2/cas/import', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    }).then(async res => {
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || data.error || 'Import failed')
+      return data
+    })
+  },
+
   async export(id, format = 'pem', options = {}) {
     const params = new URLSearchParams()
     params.append('format', format)

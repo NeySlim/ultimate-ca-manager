@@ -1,15 +1,15 @@
 /**
  * Certificates Page
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Certificate, Download, X, ArrowsClockwise, Trash } from '@phosphor-icons/react'
+import { Certificate, Download, X, ArrowsClockwise, Trash, UploadSimple } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge, 
   StatusIndicator, Modal, Input, Select, ExportDropdown,
   Tabs, LoadingSpinner, EmptyState
 } from '../components'
-import { certificatesService } from '../services'
+import { certificatesService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks/usePermission'
 import { extractCN, extractData, formatDate } from '../lib/utils'
@@ -25,11 +25,20 @@ export default function CertificatesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
+  const [cas, setCas] = useState([])
+  const [importFile, setImportFile] = useState(null)
+  const [importName, setImportName] = useState('')
+  const [importPassword, setImportPassword] = useState('')
+  const [importCaId, setImportCaId] = useState('')
+  const [importing, setImporting] = useState(false)
+  const importFileRef = useRef(null)
 
   useEffect(() => {
     loadCertificates()
+    loadCAs()
     // Check if we should auto-open create modal
     if (searchParams.get('action') === 'create') {
       setShowCreateModal(true)
@@ -37,6 +46,15 @@ export default function CertificatesPage() {
       setSearchParams(searchParams)
     }
   }, [page, statusFilter, searchQuery])
+
+  const loadCAs = async () => {
+    try {
+      const response = await casService.getAll()
+      setCas(response.data || [])
+    } catch (e) {
+      // Ignore
+    }
+  }
 
   const loadCertificates = async () => {
     setLoading(true)
@@ -67,7 +85,6 @@ export default function CertificatesPage() {
       const certData = extractData(response)
       setSelectedCert({ ...certData }) // Force new object reference
     } catch (error) {
-      console.error('Failed to load certificate details:', error)
       showError(error.message || 'Failed to load certificate details')
     }
   }
@@ -91,6 +108,35 @@ export default function CertificatesPage() {
       loadCertificates()
     } catch (error) {
       showError(error.message || 'Failed to renew certificate')
+    }
+  }
+
+  const handleImportCertificate = async () => {
+    if (!importFile) {
+      showError('Please select a file')
+      return
+    }
+    setImporting(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', importFile)
+      if (importName) formData.append('name', importName)
+      if (importPassword) formData.append('password', importPassword)
+      if (importCaId) formData.append('ca_id', importCaId)
+      formData.append('format', 'auto')
+      
+      await certificatesService.import(formData)
+      showSuccess('Certificate imported successfully')
+      setShowImportModal(false)
+      setImportFile(null)
+      setImportName('')
+      setImportPassword('')
+      setImportCaId('')
+      loadCertificates()
+    } catch (error) {
+      showError(error.message || 'Failed to import certificate')
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -474,10 +520,16 @@ export default function CertificatesPage() {
           />
 
           {canWrite('certificates') && (
-            <Button onClick={() => setShowCreateModal(true)} className="w-full">
-              <Certificate size={18} />
-              Issue Certificate
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setShowCreateModal(true)} className="flex-1">
+                <Certificate size={18} />
+                Issue
+              </Button>
+              <Button variant="secondary" onClick={() => setShowImportModal(true)}>
+                <UploadSimple size={18} />
+                Import
+              </Button>
+            </div>
           )}
         </div>
 
@@ -599,6 +651,70 @@ export default function CertificatesPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Import Certificate Modal */}
+      <Modal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Import Certificate"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            Import an existing certificate from a file. Supports PEM, DER, and PKCS#12 formats.
+          </p>
+          
+          <div>
+            <label className="block text-xs font-medium text-text-primary mb-1">Certificate File</label>
+            <input
+              ref={importFileRef}
+              type="file"
+              accept=".pem,.crt,.cer,.der,.p12,.pfx"
+              onChange={(e) => setImportFile(e.target.files[0])}
+              className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
+            />
+            <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
+          </div>
+          
+          <Input 
+            label="Display Name (optional)" 
+            value={importName}
+            onChange={(e) => setImportName(e.target.value)}
+            placeholder="My Certificate"
+          />
+          
+          <Input 
+            label="Password (for PKCS#12)" 
+            type="password"
+            value={importPassword}
+            onChange={(e) => setImportPassword(e.target.value)}
+            placeholder="Enter password if needed"
+          />
+          
+          <Select
+            label="Link to CA (optional)"
+            value={importCaId}
+            onChange={(value) => setImportCaId(value)}
+            options={[
+              { value: '', label: 'Auto-detect from issuer' },
+              ...cas.map(ca => ({ value: ca.id.toString(), label: ca.name }))
+            ]}
+          />
+          
+          <div className="flex gap-3 justify-end pt-4 border-t border-border">
+            <Button
+              variant="secondary"
+              onClick={() => setShowImportModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleImportCertificate} disabled={importing || !importFile}>
+              {importing ? <LoadingSpinner size="sm" /> : <UploadSimple size={16} />}
+              Import Certificate
+            </Button>
+          </div>
+        </div>
       </Modal>
     </>
   )
