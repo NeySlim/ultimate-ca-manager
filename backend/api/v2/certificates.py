@@ -103,7 +103,7 @@ def delete_certificate(cert_id):
     if not cert:
         return error_response('Certificate not found', 404)
     
-    cert_name = cert.descr or cert.name or f'Certificate #{cert_id}'
+    cert_name = cert.descr or cert.descr or f'Certificate #{cert_id}'
     
     # Delete the certificate
     db.session.delete(cert)
