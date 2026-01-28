@@ -30,7 +30,7 @@ export function TabsComponent({ tabs, defaultTab, className, children }) {
         <Tabs.Content 
           key={tab.id} 
           value={tab.id}
-          className="flex-1 py-4 px-4 focus:outline-none"
+          className="flex-1 py-4 focus:outline-none"
         >
           {tab.content}
         </Tabs.Content>
