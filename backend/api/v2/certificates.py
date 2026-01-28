@@ -261,20 +261,21 @@ def renew_certificate(cert_id):
 def import_certificate():
     """
     Import certificate from file
-    Supports: PEM, DER, PKCS12
+    Supports: PEM, DER, PKCS12, PKCS7
+    Auto-detects CA certificates and stores them in CA table
     
     Form data:
         file: Certificate file
-        format: auto, pem, der, pkcs12
         password: Password for PKCS12
         name: Optional display name
         ca_id: Optional CA ID to link to
         import_key: Whether to import private key (default: true)
     """
     from models import Certificate, CA, db
-    from cryptography import x509
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.hazmat.primitives import serialization
+    from services.import_service import (
+        parse_certificate_file, is_ca_certificate, extract_cert_info,
+        serialize_cert_to_pem, serialize_key_to_pem
+    )
     import base64
     import uuid
     
@@ -285,7 +286,6 @@ def import_certificate():
     if file.filename == '':
         return error_response('No file selected', 400)
     
-    format_type = request.form.get('format', 'auto').lower()
     password = request.form.get('password')
     name = request.form.get('name', '')
     ca_id = request.form.get('ca_id', type=int)
@@ -293,87 +293,32 @@ def import_certificate():
     
     try:
         file_data = file.read()
-        cert = None
-        private_key = None
         
-        # Auto-detect format
-        if format_type == 'auto':
-            if file_data.startswith(b'-----BEGIN'):
-                format_type = 'pem'
-            elif file.filename.endswith('.p12') or file.filename.endswith('.pfx'):
-                format_type = 'pkcs12'
-            else:
-                format_type = 'der'
+        # Parse certificate using shared service
+        cert, private_key, format_detected = parse_certificate_file(
+            file_data, file.filename, password, import_key
+        )
         
-        if format_type == 'pem':
-            cert = x509.load_pem_x509_certificate(file_data, default_backend())
-            # Try to extract private key
-            if import_key and b'-----BEGIN' in file_data and b'PRIVATE KEY' in file_data:
-                try:
-                    private_key = serialization.load_pem_private_key(
-                        file_data, password=password.encode() if password else None, backend=default_backend()
-                    )
-                except:
-                    pass
-                    
-        elif format_type == 'der':
-            cert = x509.load_der_x509_certificate(file_data, default_backend())
-            
-        elif format_type == 'pkcs12':
-            if not password:
-                return error_response('Password required for PKCS12', 400)
-            from cryptography.hazmat.primitives.serialization import pkcs12
-            private_key, cert, chain = pkcs12.load_key_and_certificates(
-                file_data, password.encode(), default_backend()
-            )
+        # Extract certificate info
+        cert_info = extract_cert_info(cert)
         
-        if not cert:
-            return error_response('Could not parse certificate', 400)
+        # Serialize to PEM
+        cert_pem = serialize_cert_to_pem(cert)
+        key_pem = serialize_key_to_pem(private_key) if import_key else None
         
-        # Check if this is a CA certificate (has CA:TRUE basic constraint)
-        is_ca_cert = False
-        try:
-            basic_constraints = cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.BASIC_CONSTRAINTS)
-            if basic_constraints.value.ca:
-                is_ca_cert = True
-        except x509.extensions.ExtensionNotFound:
-            pass
-        
-        # If it's a CA certificate, redirect to CA import
-        if is_ca_cert:
-            # Import as CA instead
-            subject = cert.subject
-            issuer = cert.issuer
-            
-            def get_name_attr(name_obj, oid):
-                try:
-                    return name_obj.get_attributes_for_oid(oid)[0].value
-                except:
-                    return ''
-            
-            from cryptography.x509.oid import NameOID
-            cn = get_name_attr(subject, NameOID.COMMON_NAME)
-            
-            cert_pem = cert.public_bytes(serialization.Encoding.PEM)
-            key_pem = None
-            if private_key and import_key:
-                key_pem = private_key.private_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PrivateFormat.TraditionalOpenSSL,
-                    encryption_algorithm=serialization.NoEncryption()
-                )
-            
+        # Check if this is a CA certificate - auto-route to CA table
+        if is_ca_certificate(cert):
             refid = str(uuid.uuid4())
             ca = CA(
                 refid=refid,
-                descr=name or cn or file.filename,
+                descr=name or cert_info['cn'] or file.filename,
                 crt=base64.b64encode(cert_pem).decode('utf-8'),
                 prv=base64.b64encode(key_pem).decode('utf-8') if key_pem else None,
                 serial=0,
-                subject=subject.rfc4514_string(),
-                issuer=issuer.rfc4514_string(),
-                valid_from=cert.not_valid_before_utc,
-                valid_to=cert.not_valid_after_utc,
+                subject=cert_info['subject'],
+                issuer=cert_info['issuer'],
+                valid_from=cert_info['valid_from'],
+                valid_to=cert_info['valid_to'],
                 imported_from='manual'
             )
             
@@ -385,7 +330,7 @@ def import_certificate():
                 action='ca_imported',
                 resource_type='ca',
                 resource_id=ca.id,
-                details=f'Imported CA (detected): {ca.descr}',
+                details=f'Imported CA (auto-detected): {ca.descr}',
                 success=True
             )
             
@@ -394,41 +339,15 @@ def import_certificate():
                 message=f'CA certificate "{ca.descr}" imported successfully (detected as CA)'
             )
         
-        # Extract certificate info
-        subject = cert.subject
-        issuer = cert.issuer
-        
-        def get_name_attr(name_obj, oid):
-            try:
-                return name_obj.get_attributes_for_oid(oid)[0].value
-            except:
-                return ''
-        
-        from cryptography.x509.oid import NameOID
-        cn = get_name_attr(subject, NameOID.COMMON_NAME)
-        
-        # Serialize certificate to PEM
-        cert_pem = cert.public_bytes(serialization.Encoding.PEM)
-        
-        # Serialize private key if available
-        key_pem = None
-        if private_key and import_key:
-            key_pem = private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption()
-            )
-        
-        # Find CA by issuer if not specified
+        # Regular certificate - find parent CA
         caref = None
         if ca_id:
             ca = CA.query.get(ca_id)
             if ca:
                 caref = ca.refid
         else:
-            # Try to match issuer with existing CA
-            issuer_str = issuer.rfc4514_string()
-            ca = CA.query.filter_by(subject=issuer_str).first()
+            # Auto-link by matching issuer with CA subject
+            ca = CA.query.filter_by(subject=cert_info['issuer']).first()
             if ca:
                 caref = ca.refid
         
@@ -436,21 +355,20 @@ def import_certificate():
         refid = str(uuid.uuid4())
         certificate = Certificate(
             refid=refid,
-            descr=name or cn or file.filename,
+            descr=name or cert_info['cn'] or file.filename,
             crt=base64.b64encode(cert_pem).decode('utf-8'),
             prv=base64.b64encode(key_pem).decode('utf-8') if key_pem else None,
             caref=caref,
-            subject=subject.rfc4514_string(),
-            issuer=issuer.rfc4514_string(),
-            valid_from=cert.not_valid_before_utc,
-            valid_to=cert.not_valid_after_utc,
+            subject=cert_info['subject'],
+            issuer=cert_info['issuer'],
+            valid_from=cert_info['valid_from'],
+            valid_to=cert_info['valid_to'],
             created_by='import'
         )
         
         db.session.add(certificate)
         db.session.commit()
         
-        # Audit log
         from services.audit_service import AuditService
         AuditService.log_action(
             action='certificate_imported',
@@ -465,5 +383,10 @@ def import_certificate():
             message=f'Certificate "{certificate.descr}" imported successfully'
         )
         
+    except ValueError as e:
+        return error_response(str(e), 400)
     except Exception as e:
+        import traceback
+        print(f"Certificate Import Error: {str(e)}")
+        print(traceback.format_exc())
         return error_response(f'Import failed: {str(e)}', 500)
