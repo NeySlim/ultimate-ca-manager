@@ -68,7 +68,6 @@ export default function CSRsPage() {
     try {
       const response = await csrsService.getById(id)
       const data = extractData(response)
-      console.log('CSR loaded:', data)
       setSelectedCSR({ ...data })
     } catch (error) {
       console.error('Failed to load CSR:', error)

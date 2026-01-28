@@ -67,7 +67,6 @@ export default function UsersPage() {
     try {
       const response = await usersService.getById(user.id)
       const data = extractData(response)
-      console.log('User loaded:', data)
       setSelectedUser({ ...data })
       setFormData({ ...data })
       setEditing(false)
