@@ -32,20 +32,56 @@ def update_general_settings():
 @require_auth(['admin:users'])
 def list_users():
     """List users (admin only)"""
-    return success_response(data=[])
+    from models import User
+    users = User.query.all()
+    return success_response(data=[u.to_dict() for u in users])
 
 
 @bp.route('/api/v2/settings/users', methods=['POST'])
 @require_auth(['admin:users'])
 def create_user():
     """Create user (admin only)"""
+    from models import User, db
+    from werkzeug.security import generate_password_hash
+    
     data = request.json
     
     if not data or not data.get('username'):
         return error_response('Username required', 400)
     
+    if not data.get('password'):
+        return error_response('Password required', 400)
+    
+    if User.query.filter_by(username=data['username']).first():
+        return error_response('Username already exists', 409)
+    
+    if data.get('email') and User.query.filter_by(email=data['email']).first():
+        return error_response('Email already exists', 409)
+    
+    user = User(
+        username=data['username'],
+        email=data.get('email'),
+        password_hash=generate_password_hash(data['password']),
+        role=data.get('role', 'user'),
+        is_active=data.get('is_active', True)
+    )
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    # Audit log
+    try:
+        from services.audit_service import AuditService
+        AuditService.log(
+            action='user_created',
+            user_id=g.current_user.id if hasattr(g, 'current_user') else None,
+            details={'new_user_id': user.id, 'username': user.username}
+        )
+    except Exception:
+        pass
+    
     return success_response(
-        data={'id': 1, 'username': data['username']},
+        data=user.to_dict(),
         message='User created',
         status=201
     )
@@ -55,19 +91,37 @@ def create_user():
 @require_auth(['admin:users'])
 def update_user(user_id):
     """Update user (admin only)"""
+    from models import User, db
+    from werkzeug.security import generate_password_hash
+    
     data = request.json
     
     if not data:
         return error_response('No data provided', 400)
     
-    # TODO: Implement actual user update logic
-    # - Validate input
-    # - Check if user exists
-    # - Update user in database
-    # - Handle password hashing if password is updated
+    user = User.query.get(user_id)
+    if not user:
+        return error_response('User not found', 404)
+    
+    # Update fields
+    if 'email' in data:
+        if data['email'] and User.query.filter(User.email == data['email'], User.id != user_id).first():
+            return error_response('Email already exists', 409)
+        user.email = data['email']
+    
+    if 'role' in data:
+        user.role = data['role']
+    
+    if 'is_active' in data:
+        user.is_active = data['is_active']
+    
+    if 'password' in data and data['password']:
+        user.password_hash = generate_password_hash(data['password'])
+    
+    db.session.commit()
     
     return success_response(
-        data={'id': user_id, **data},
+        data=user.to_dict(),
         message='User updated successfully'
     )
 
@@ -76,16 +130,38 @@ def update_user(user_id):
 @require_auth(['admin:users'])
 def delete_user(user_id):
     """Delete user (admin only)"""
+    from models import User, db
+    from utils.response import no_content_response
+    
     # Prevent deleting yourself
-    if hasattr(g, 'user') and g.user.get('id') == user_id:
+    if hasattr(g, 'current_user') and g.current_user.id == user_id:
         return error_response('Cannot delete your own account', 403)
     
-    # TODO: Implement actual user deletion logic
-    # - Check if user exists
-    # - Check for dependencies (certs created by user, etc.)
-    # - Soft delete or hard delete based on policy
+    user = User.query.get(user_id)
+    if not user:
+        return error_response('User not found', 404)
     
-    from utils.response import no_content_response
+    # Prevent deleting the last admin
+    if user.role == 'admin':
+        admin_count = User.query.filter_by(role='admin').count()
+        if admin_count <= 1:
+            return error_response('Cannot delete the last admin user', 403)
+    
+    username = user.username
+    db.session.delete(user)
+    db.session.commit()
+    
+    # Audit log
+    try:
+        from services.audit_service import AuditService
+        AuditService.log(
+            action='user_deleted',
+            user_id=g.current_user.id if hasattr(g, 'current_user') else None,
+            details={'deleted_user_id': user_id, 'username': username}
+        )
+    except Exception:
+        pass
+    
     return no_content_response()
 
 
@@ -103,20 +179,45 @@ def get_backup_settings():
 @require_auth(['admin:system'])
 def create_backup():
     """Create backup now"""
-    return success_response(
-        data={'filename': 'backup_20260118.tar.gz'},
-        message='Backup created'
-    )
+    from datetime import datetime
+    import os
+    
+    try:
+        from services.backup_service import BackupService
+        data = request.json or {}
+        password = data.get('password', 'default_backup_password')
+        
+        service = BackupService()
+        backup_bytes = service.create_backup(password)
+        
+        # Save to disk
+        filename = f"ucm_backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.ucmbkp"
+        backup_dir = "/opt/ucm/data/backups"
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        filepath = os.path.join(backup_dir, filename)
+        with open(filepath, 'wb') as f:
+            f.write(backup_bytes)
+        
+        return success_response(
+            data={
+                'filename': filename,
+                'size': len(backup_bytes),
+                'path': filepath
+            },
+            message='Backup created successfully'
+        )
+    except Exception as e:
+        return error_response(f'Backup failed: {str(e)}', 500)
 
 
 @bp.route('/api/v2/settings/backup/restore', methods=['POST'])
 @require_auth(['admin:system'])
 def restore_backup():
-    """
-    Restore from backup
-    Supports: full restore, partial restore
-    """
-    # Check for file upload
+    """Restore from backup file"""
+    import tempfile
+    import os
+    
     if 'file' not in request.files:
         return error_response('No backup file provided', 400)
     
@@ -124,42 +225,38 @@ def restore_backup():
     if file.filename == '':
         return error_response('No file selected', 400)
     
-    # Get restore options
-    restore_type = request.form.get('restore_type', 'full')  # full, partial
-    restore_items = request.form.getlist('restore_items')  # cas, certs, settings, users
+    password = request.form.get('password', 'default_backup_password')
     
-    # TODO: Implement actual restore logic
-    # - Validate backup file
-    # - Extract backup
-    # - Validate integrity
-    # - Stop services if full restore
-    # - Restore selected items
-    # - Restart services
-    
-    return success_response(
-        data={
-            'filename': file.filename,
-            'restore_type': restore_type,
-            'restored_items': restore_items if restore_type == 'partial' else ['all'],
-            'restored': True
-        },
-        message='Backup restored successfully. Please restart the application.'
-    )
+    try:
+        from services.backup_service import BackupService
+        
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.ucmbkp') as tmp:
+            file.save(tmp.name)
+            tmp_path = tmp.name
+        
+        service = BackupService()
+        service.restore_backup(tmp_path, password)
+        
+        os.unlink(tmp_path)
+        
+        return success_response(
+            data={'filename': file.filename, 'restored': True},
+            message='Backup restored successfully. Please restart the application.'
+        )
+    except Exception as e:
+        return error_response(f'Restore failed: {str(e)}', 500)
 
 
-@bp.route('/api/v2/settings/backup/<int:backup_id>/download', methods=['GET'])
+@bp.route('/api/v2/settings/backup/<path:filename>/download', methods=['GET'])
 @require_auth(['read:settings'])
-def download_backup(backup_id):
+def download_backup(filename):
     """Download backup file"""
     from flask import send_file
     import os
     
-    # TODO: Implement actual download logic
-    # - Get backup info from database
-    # - Verify file exists
-    # - Return file with proper headers
-    
-    backup_file = f'/tmp/backup_{backup_id}.tar.gz'
+    backup_dir = "/opt/ucm/data/backups"
+    backup_file = os.path.join(backup_dir, os.path.basename(filename))
     
     if not os.path.exists(backup_file):
         return error_response('Backup file not found', 404)
@@ -167,23 +264,24 @@ def download_backup(backup_id):
     return send_file(
         backup_file,
         as_attachment=True,
-        download_name=f'ucm_backup_{backup_id}.tar.gz',
-        mimetype='application/gzip'
+        download_name=os.path.basename(filename),
+        mimetype='application/octet-stream'
     )
 
 
-@bp.route('/api/v2/settings/backup/<int:backup_id>', methods=['DELETE'])
+@bp.route('/api/v2/settings/backup/<path:filename>', methods=['DELETE'])
 @require_auth(['admin:system'])
-def delete_backup(backup_id):
-    """Delete backup"""
+def delete_backup(filename):
+    """Delete backup file"""
     import os
-    
-    # TODO: Implement actual deletion logic
-    # - Get backup info from database
-    # - Delete file from storage
-    # - Delete database record
-    
     from utils.response import no_content_response
+    
+    backup_dir = "/opt/ucm/data/backups"
+    backup_file = os.path.join(backup_dir, os.path.basename(filename))
+    
+    if os.path.exists(backup_file):
+        os.unlink(backup_file)
+    
     return no_content_response()
 
 
@@ -201,15 +299,23 @@ def get_email_settings():
 @require_auth(['write:settings'])
 def update_email_settings():
     """Update email settings"""
+    from models import SystemConfig, db
+    
     data = request.json
     
     if not data:
         return error_response('No data provided', 400)
     
-    # TODO: Implement actual email settings update
-    # - Validate SMTP settings
-    # - Test connection (optional)
-    # - Save to database
+    # Save each setting to SystemConfig
+    for key, value in data.items():
+        config = SystemConfig.query.filter_by(key=f'email_{key}').first()
+        if config:
+            config.value = str(value) if value is not None else ''
+        else:
+            config = SystemConfig(key=f'email_{key}', value=str(value) if value is not None else '')
+            db.session.add(config)
+    
+    db.session.commit()
     
     return success_response(
         data=data,
@@ -237,11 +343,10 @@ def test_email():
 @bp.route('/api/v2/settings/audit-logs', methods=['GET'])
 @require_auth(['admin:system'])
 def get_audit_logs():
-    """
-    Get system audit logs
+    """Get system audit logs"""
+    from models import AuditLog
+    from datetime import datetime
     
-    GET /api/settings/audit-logs?page=1&per_page=50&user_id=1&action=login&start_date=...
-    """
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
     user_id = request.args.get('user_id', type=int)
@@ -249,27 +354,31 @@ def get_audit_logs():
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     
-    # TODO: Query audit logs from database
-    # - Filter by user_id, action, date range
-    # - Paginate results
-    # - Include IP, user agent, details
+    query = AuditLog.query
+    
+    if user_id:
+        query = query.filter_by(user_id=user_id)
+    if action:
+        query = query.filter_by(action=action)
+    if start_date:
+        try:
+            start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            query = query.filter(AuditLog.created_at >= start)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            query = query.filter(AuditLog.created_at <= end)
+        except ValueError:
+            pass
+    
+    query = query.order_by(AuditLog.created_at.desc())
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     
     return success_response(
-        data=[
-            {
-                'id': 1,
-                'user_id': 1,
-                'username': 'admin',
-                'action': 'login',
-                'resource': 'auth',
-                'resource_id': None,
-                'ip_address': '192.168.1.100',
-                'user_agent': 'Mozilla/5.0...',
-                'timestamp': '2026-01-19T08:00:00Z',
-                'details': {'method': 'session'}
-            }
-        ],
-        meta={'total': 1, 'page': page, 'per_page': per_page}
+        data=[log.to_dict() for log in pagination.items],
+        meta={'total': pagination.total, 'page': page, 'per_page': per_page}
     )
 
 
@@ -299,14 +408,23 @@ def get_ldap_settings():
 @require_auth(['write:settings'])
 def update_ldap_settings():
     """Update LDAP configuration"""
+    from models import SystemConfig, db
+    
     data = request.json
     
     if not data:
         return error_response('No data provided', 400)
     
-    # TODO: Validate and save LDAP settings
-    # - Validate server, port, DN format
-    # - Save to database
+    # Save each LDAP setting
+    for key, value in data.items():
+        config = SystemConfig.query.filter_by(key=f'ldap_{key}').first()
+        if config:
+            config.value = str(value) if value is not None else ''
+        else:
+            config = SystemConfig(key=f'ldap_{key}', value=str(value) if value is not None else '')
+            db.session.add(config)
+    
+    db.session.commit()
     
     return success_response(
         data=data,
@@ -317,25 +435,31 @@ def update_ldap_settings():
 @bp.route('/api/v2/settings/ldap/test', methods=['POST'])
 @require_auth(['write:settings'])
 def test_ldap_connection():
-    """Test LDAP connection and authentication"""
-    data = request.json
+    """Test LDAP connection"""
+    data = request.json or {}
     
-    test_username = data.get('test_username') if data else None
-    test_password = data.get('test_password') if data else None
-    
-    # TODO: Test LDAP connection
-    # - Connect to LDAP server
-    # - Try bind with test credentials
-    # - Return success/failure details
-    
-    return success_response(
-        data={
-            'connected': True,
-            'authenticated': True if test_username else None,
-            'user_dn': f'uid={test_username},dc=example,dc=com' if test_username else None
-        },
-        message='LDAP connection successful'
-    )
+    # LDAP testing requires ldap3 library
+    try:
+        import ldap3
+        from ldap3 import Server, Connection, ALL
+        
+        server_url = data.get('server', 'localhost')
+        port = data.get('port', 389)
+        use_ssl = data.get('use_ssl', False)
+        bind_dn = data.get('bind_dn')
+        bind_password = data.get('bind_password')
+        
+        server = Server(server_url, port=port, use_ssl=use_ssl, get_info=ALL)
+        conn = Connection(server, bind_dn, bind_password, auto_bind=True)
+        
+        return success_response(
+            data={'connected': True, 'server_info': str(server.info)},
+            message='LDAP connection successful'
+        )
+    except ImportError:
+        return error_response('LDAP support not installed (pip install ldap3)', 501)
+    except Exception as e:
+        return error_response(f'LDAP connection failed: {str(e)}', 400)
 
 
 # ============================================================================

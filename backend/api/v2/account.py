@@ -80,16 +80,10 @@ def update_profile():
 @bp.route('/api/v2/account/password', methods=['POST'])
 @require_auth()
 def change_password():
-    """
-    Change password
+    """Change password"""
+    from models import User, db
+    from werkzeug.security import check_password_hash, generate_password_hash
     
-    POST /api/account/password
-    Body: {
-        "current_password": "old",
-        "new_password": "new",
-        "confirm_password": "new"
-    }
-    """
     data = request.json
     
     if not data:
@@ -112,14 +106,28 @@ def change_password():
     if len(new_password) < 8:
         return error_response('Password must be at least 8 characters', 400)
     
-    user = g.current_user
+    user = User.query.get(g.current_user.id)
+    if not user:
+        return error_response('User not found', 404)
     
-    # TODO: Implement actual password change logic
-    # - Verify current password
-    # - Hash new password
-    # - Save to database
-    # - Invalidate all sessions except current (optional)
-    # - Send email notification
+    # Verify current password
+    if not check_password_hash(user.password_hash, current_password):
+        return error_response('Current password is incorrect', 401)
+    
+    # Update password
+    user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+    
+    # Audit log
+    try:
+        from services.audit_service import AuditService
+        AuditService.log(
+            action='password_changed',
+            user_id=user.id,
+            details={'user_id': user.id}
+        )
+    except Exception:
+        pass
     
     return success_response(
         message='Password changed successfully'
@@ -346,30 +354,27 @@ def regenerate_api_key(key_id):
 @bp.route('/api/v2/account/2fa/enable', methods=['POST'])
 @require_auth()
 def enable_2fa():
-    """
-    Enable 2FA (TOTP)
-    
-    POST /api/account/2fa/enable
-    Returns: QR code and secret
-    """
-    user = g.current_user
-    
-    # TODO: Implement actual 2FA enable logic
-    # - Generate TOTP secret
-    # - Store in database (unconfirmed)
-    # - Generate QR code
-    # - Return secret and QR for user to scan
-    
+    """Enable 2FA (TOTP) - generates QR code and secret"""
+    from models import User, db
     import pyotp
     import qrcode
     import io
     import base64
     
+    user = User.query.get(g.current_user.id)
+    if not user:
+        return error_response('User not found', 404)
+    
+    # Generate new TOTP secret
     secret = pyotp.random_base32()
     totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
         name=user.username,
         issuer_name='UCM'
     )
+    
+    # Store secret temporarily (will be confirmed with code)
+    user.totp_secret = secret  # Store unconfirmed
+    db.session.commit()
     
     # Generate QR code
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
@@ -385,7 +390,6 @@ def enable_2fa():
         data={
             'secret': secret,
             'qr_code': f'data:image/png;base64,{qr_base64}',
-            'backup_codes': []  # Will be generated after confirmation
         },
         message='Scan QR code with authenticator app, then verify with code'
     )
@@ -394,28 +398,33 @@ def enable_2fa():
 @bp.route('/api/v2/account/2fa/confirm', methods=['POST'])
 @require_auth()
 def confirm_2fa():
-    """
-    Confirm 2FA setup with verification code
+    """Confirm 2FA setup with verification code"""
+    from models import User, db
+    import pyotp
+    import secrets
     
-    POST /api/account/2fa/confirm
-    Body: {"code": "123456"}
-    """
     data = request.json
     code = data.get('code') if data else None
     
     if not code:
         return error_response('Verification code required', 400)
     
-    # TODO: Verify code and enable 2FA
-    # - Get unconfirmed secret from database
-    # - Verify code
-    # - Generate backup codes
-    # - Save confirmed 2FA to database
+    user = User.query.get(g.current_user.id)
+    if not user or not user.totp_secret:
+        return error_response('2FA setup not initiated', 400)
     
-    backup_codes = [
-        'ABCD-1234-EFGH-5678',
-        'IJKL-9012-MNOP-3456'
-    ]
+    # Verify code
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(code):
+        return error_response('Invalid verification code', 400)
+    
+    # Generate backup codes
+    backup_codes = [f'{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}' for _ in range(8)]
+    
+    # Enable 2FA
+    user.two_factor_enabled = True
+    user.backup_codes = ','.join(backup_codes)
+    db.session.commit()
     
     return success_response(
         data={'backup_codes': backup_codes},
@@ -426,12 +435,10 @@ def confirm_2fa():
 @bp.route('/api/v2/account/2fa/disable', methods=['POST'])
 @require_auth()
 def disable_2fa():
-    """
-    Disable 2FA
+    """Disable 2FA"""
+    from models import User, db
+    import pyotp
     
-    POST /api/account/2fa/disable
-    Body: {"code": "123456"} or {"backup_code": "ABCD-1234"}
-    """
     data = request.json
     
     if not data:
@@ -443,10 +450,28 @@ def disable_2fa():
     if not code and not backup_code:
         return error_response('Code or backup code required', 400)
     
-    # TODO: Verify code/backup_code and disable 2FA
-    # - Verify authentication
-    # - Remove 2FA from database
-    # - Invalidate backup codes
+    user = User.query.get(g.current_user.id)
+    if not user:
+        return error_response('User not found', 404)
+    
+    # Verify with TOTP code
+    if code:
+        if not user.totp_secret:
+            return error_response('2FA not enabled', 400)
+        totp = pyotp.TOTP(user.totp_secret)
+        if not totp.verify(code):
+            return error_response('Invalid verification code', 400)
+    # Or verify with backup code
+    elif backup_code:
+        stored_codes = (user.backup_codes or '').split(',')
+        if backup_code not in stored_codes:
+            return error_response('Invalid backup code', 400)
+    
+    # Disable 2FA
+    user.two_factor_enabled = False
+    user.totp_secret = None
+    user.backup_codes = None
+    db.session.commit()
     
     return success_response(message='2FA disabled successfully')
 
@@ -454,20 +479,20 @@ def disable_2fa():
 @bp.route('/api/v2/account/2fa/recovery-codes', methods=['GET'])
 @require_auth()
 def get_recovery_codes():
-    """
-    Get current recovery codes (masked)
+    """Get current recovery codes (masked)"""
+    from models import User
     
-    GET /api/account/2fa/recovery-codes
-    """
-    # TODO: Get recovery codes from database (masked)
+    user = User.query.get(g.current_user.id)
+    if not user or not user.two_factor_enabled:
+        return error_response('2FA not enabled', 400)
+    
+    stored_codes = (user.backup_codes or '').split(',')
+    masked_codes = [f'{c[:4]}...{c[-4:]}' if len(c) > 8 else '****' for c in stored_codes if c]
     
     return success_response(
         data={
-            'codes': [
-                '****-****-****-5678',
-                '****-****-****-3456'
-            ],
-            'remaining': 2
+            'codes': masked_codes,
+            'count': len([c for c in stored_codes if c])
         }
     )
 
@@ -475,28 +500,31 @@ def get_recovery_codes():
 @bp.route('/api/v2/account/2fa/recovery-codes/regenerate', methods=['POST'])
 @require_auth()
 def regenerate_recovery_codes():
-    """
-    Regenerate recovery codes (invalidates old ones)
+    """Regenerate recovery codes (invalidates old ones)"""
+    from models import User, db
+    import pyotp
+    import secrets
     
-    POST /api/account/2fa/recovery-codes/regenerate
-    Body: {"code": "123456"}
-    """
     data = request.json
     code = data.get('code') if data else None
     
     if not code:
         return error_response('2FA code required', 400)
     
-    # TODO: Verify code and regenerate
-    # - Verify 2FA code
-    # - Generate new backup codes
-    # - Save to database
-    # - Invalidate old codes
+    user = User.query.get(g.current_user.id)
+    if not user or not user.two_factor_enabled:
+        return error_response('2FA not enabled', 400)
     
-    new_codes = [
-        'WXYZ-7890-ABCD-1234',
-        'EFGH-5678-IJKL-9012'
-    ]
+    # Verify code
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(code):
+        return error_response('Invalid verification code', 400)
+    
+    # Generate new backup codes
+    new_codes = [f'{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}' for _ in range(8)]
+    
+    user.backup_codes = ','.join(new_codes)
+    db.session.commit()
     
     return success_response(
         data={'backup_codes': new_codes},
@@ -511,48 +539,39 @@ def regenerate_recovery_codes():
 @bp.route('/api/v2/account/sessions', methods=['GET'])
 @require_auth()
 def list_sessions():
-    """
-    List active sessions for current user
+    """List active sessions for current user"""
+    from models import UserSession
     
-    GET /api/account/sessions
-    """
-    user = g.current_user
+    sessions = UserSession.query.filter_by(user_id=g.current_user.id).all()
     
-    # TODO: Get sessions from database
-    # - Query active sessions for user
-    # - Include device, location, last activity
+    # Get current session ID from cookie/token
+    current_session_id = request.cookies.get('session_id')
     
     return success_response(
-        data=[
-            {
-                'id': 1,
-                'ip_address': '192.168.1.100',
-                'user_agent': 'Mozilla/5.0...',
-                'device': 'Chrome on Windows',
-                'location': 'Paris, France',
-                'created_at': '2026-01-19T08:00:00Z',
-                'last_activity': '2026-01-19T08:10:00Z',
-                'is_current': True
-            }
-        ],
-        meta={'total': 1}
+        data=[{
+            'id': s.id,
+            'ip_address': s.ip_address,
+            'user_agent': s.user_agent,
+            'created_at': s.created_at.isoformat() if s.created_at else None,
+            'last_activity': s.last_activity.isoformat() if s.last_activity else None,
+            'is_current': str(s.id) == current_session_id
+        } for s in sessions],
+        meta={'total': len(sessions)}
     )
 
 
 @bp.route('/api/v2/account/sessions/<int:session_id>', methods=['DELETE'])
 @require_auth()
 def revoke_session(session_id):
-    """
-    Revoke/logout a specific session
+    """Revoke a specific session"""
+    from models import UserSession, db
     
-    DELETE /api/account/sessions/:id
-    """
-    user = g.current_user
+    session = UserSession.query.filter_by(id=session_id, user_id=g.current_user.id).first()
+    if not session:
+        return error_response('Session not found', 404)
     
-    # TODO: Revoke session
-    # - Verify session belongs to user
-    # - Prevent revoking current session (optional)
-    # - Delete session from database/cache
+    db.session.delete(session)
+    db.session.commit()
     
     return success_response(message='Session revoked successfully')
 
@@ -560,21 +579,20 @@ def revoke_session(session_id):
 @bp.route('/api/v2/account/sessions/revoke-all', methods=['POST'])
 @require_auth()
 def revoke_all_sessions():
-    """
-    Revoke all sessions except current
+    """Revoke all sessions except current"""
+    from models import UserSession, db
     
-    POST /api/account/sessions/revoke-all
-    """
-    user = g.current_user
+    current_session_id = request.cookies.get('session_id')
     
-    # TODO: Revoke all other sessions
-    # - Get current session ID
-    # - Delete all other sessions for user
+    # Delete all sessions except current
+    UserSession.query.filter(
+        UserSession.user_id == g.current_user.id,
+        UserSession.id != current_session_id
+    ).delete(synchronize_session=False)
     
-    return success_response(
-        data={'revoked_count': 3},
-        message='All other sessions revoked'
-    )
+    db.session.commit()
+    
+    return success_response(message='All other sessions revoked')
 
 
 # ============================================================================
@@ -584,27 +602,17 @@ def revoke_all_sessions():
 @bp.route('/api/v2/account/activity', methods=['GET'])
 @require_auth()
 def get_activity_log():
-    """
-    Get user activity log
+    """Get user activity log"""
+    from models import AuditLog
     
-    GET /api/account/activity?page=1&per_page=20
-    """
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     
-    # TODO: Get activity from audit log
-    # - Filter by user ID
-    # - Paginate results
+    query = AuditLog.query.filter_by(user_id=g.current_user.id)
+    query = query.order_by(AuditLog.created_at.desc())
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     
     return success_response(
-        data=[
-            {
-                'id': 1,
-                'action': 'login',
-                'timestamp': '2026-01-19T08:00:00Z',
-                'ip_address': '192.168.1.100',
-                'details': 'Successful login'
-            }
-        ],
-        meta={'total': 1, 'page': page, 'per_page': per_page}
+        data=[log.to_dict() for log in pagination.items],
+        meta={'total': pagination.total, 'page': page, 'per_page': per_page}
     )
