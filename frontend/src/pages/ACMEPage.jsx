@@ -435,6 +435,7 @@ export default function ACMEPage() {
               columns={accountColumns}
               data={accounts}
               onRowClick={selectAccount}
+              selectedId={selectedAccount?.id}
             />
           )}
         </div>

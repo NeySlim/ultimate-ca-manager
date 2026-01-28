@@ -205,6 +205,7 @@ export default function UsersPage() {
               columns={userColumns}
               data={users}
               onRowClick={selectUser}
+              selectedId={selectedUser?.id}
             />
           )}
         </div>

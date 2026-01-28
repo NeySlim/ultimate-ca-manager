@@ -480,6 +480,7 @@ export default function CertificatesPage() {
               columns={certColumns}
               data={filteredCerts}
               onRowClick={(cert) => loadCertificateDetails(cert.id)}
+              selectedId={selectedCert?.id}
               pagination={{
                 total,
                 page,
