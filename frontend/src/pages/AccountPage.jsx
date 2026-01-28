@@ -46,8 +46,8 @@ export default function AccountPage() {
   const loadAccount = async () => {
     setLoading(true)
     try {
-      const data = await accountService.getProfile()
-      setAccountData(data)
+      const response = await accountService.getProfile()
+      setAccountData(response.data || response)
     } catch (error) {
       showError(error.message || 'Failed to load account')
     } finally {
@@ -57,8 +57,8 @@ export default function AccountPage() {
 
   const loadApiKeys = async () => {
     try {
-      const data = await accountService.getApiKeys()
-      setApiKeys(data || [])
+      const response = await accountService.getApiKeys()
+      setApiKeys(response.data || response || [])
     } catch (error) {
       console.error('Failed to load API keys:', error)
     }
@@ -66,8 +66,8 @@ export default function AccountPage() {
 
   const loadWebAuthnCredentials = async () => {
     try {
-      const data = await accountService.getWebAuthnCredentials()
-      setWebauthnCredentials(data.credentials || [])
+      const response = await accountService.getWebAuthnCredentials()
+      setWebauthnCredentials(response.credentials || [])
     } catch (error) {
       console.error('Failed to load WebAuthn credentials:', error)
     }
@@ -75,8 +75,8 @@ export default function AccountPage() {
 
   const loadMTLSCertificates = async () => {
     try {
-      const data = await accountService.getMTLSCertificates()
-      setMtlsCertificates(data.certificates || [])
+      const response = await accountService.getMTLSCertificates()
+      setMtlsCertificates(response.certificates || [])
     } catch (error) {
       console.error('Failed to load mTLS certificates:', error)
     }
