@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <Logo variant="vertical" size="lg" />
+          <Logo variant="horizontal" size="md" />
         </div>
 
         {/* Login Card */}
