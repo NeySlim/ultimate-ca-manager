@@ -125,14 +125,20 @@ export default function CertificatesPage() {
       if (importCaId && importCaId !== 'auto') formData.append('ca_id', importCaId)
       formData.append('format', 'auto')
       
-      await certificatesService.import(formData)
-      showSuccess('Certificate imported successfully')
+      const result = await certificatesService.import(formData)
+      showSuccess(result.message || 'Certificate imported successfully')
       setShowImportModal(false)
       setImportFile(null)
       setImportName('')
       setImportPassword('')
       setImportCaId('auto')
-      loadCertificates()
+      await loadCertificates()
+      
+      // Auto-select the imported certificate to show details
+      // Note: If it was a CA cert, it went to CAs table - message will indicate this
+      if (result.data && !result.message?.includes('CA')) {
+        setSelectedCert(result.data)
+      }
     } catch (error) {
       showError(error.message || 'Failed to import certificate')
     } finally {
