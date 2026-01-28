@@ -211,19 +211,19 @@ def create_ca():
 def import_ca():
     """
     Import CA certificate from file
-    Supports: PEM, DER, PKCS12
+    Supports: PEM, DER, PKCS12, PKCS7
     
     Form data:
         file: Certificate file
-        format: auto, pem, der, pkcs12
         password: Password for PKCS12
         name: Optional display name
         import_key: Whether to import private key (default: true)
     """
     from models import CA, db
-    from cryptography import x509
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.hazmat.primitives import serialization
+    from services.import_service import (
+        parse_certificate_file, extract_cert_info,
+        serialize_cert_to_pem, serialize_key_to_pem
+    )
     import base64
     import uuid
     
@@ -234,92 +234,37 @@ def import_ca():
     if file.filename == '':
         return error_response('No file selected', 400)
     
-    format_type = request.form.get('format', 'auto').lower()
     password = request.form.get('password')
     name = request.form.get('name', '')
     import_key = request.form.get('import_key', 'true').lower() == 'true'
     
     try:
         file_data = file.read()
-        cert = None
-        private_key = None
         
-        # Auto-detect format
-        if format_type == 'auto':
-            if file_data.startswith(b'-----BEGIN'):
-                format_type = 'pem'
-            elif file.filename.endswith('.p12') or file.filename.endswith('.pfx'):
-                format_type = 'pkcs12'
-            else:
-                format_type = 'der'
-        
-        if format_type == 'pem':
-            cert = x509.load_pem_x509_certificate(file_data, default_backend())
-            # Try to extract private key
-            if import_key and b'-----BEGIN' in file_data and b'PRIVATE KEY' in file_data:
-                try:
-                    private_key = serialization.load_pem_private_key(
-                        file_data, password=password.encode() if password else None, backend=default_backend()
-                    )
-                except:
-                    pass
-                    
-        elif format_type == 'der':
-            cert = x509.load_der_x509_certificate(file_data, default_backend())
-            
-        elif format_type == 'pkcs12':
-            if not password:
-                return error_response('Password required for PKCS12', 400)
-            from cryptography.hazmat.primitives.serialization import pkcs12
-            private_key, cert, chain = pkcs12.load_key_and_certificates(
-                file_data, password.encode(), default_backend()
-            )
-        
-        if not cert:
-            return error_response('Could not parse certificate', 400)
+        # Parse certificate using shared service
+        cert, private_key, format_detected = parse_certificate_file(
+            file_data, file.filename, password, import_key
+        )
         
         # Extract certificate info
-        subject = cert.subject
-        issuer = cert.issuer
+        cert_info = extract_cert_info(cert)
         
-        def get_name_attr(name_obj, oid):
-            try:
-                return name_obj.get_attributes_for_oid(oid)[0].value
-            except:
-                return ''
-        
-        from cryptography.x509.oid import NameOID
-        cn = get_name_attr(subject, NameOID.COMMON_NAME)
-        org = get_name_attr(subject, NameOID.ORGANIZATION_NAME)
-        country = get_name_attr(subject, NameOID.COUNTRY_NAME)
-        
-        # Check if self-signed (root CA)
-        is_root = cert.subject == cert.issuer
-        
-        # Serialize certificate to PEM
-        cert_pem = cert.public_bytes(serialization.Encoding.PEM)
-        
-        # Serialize private key if available
-        key_pem = None
-        if private_key and import_key:
-            key_pem = private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption()
-            )
+        # Serialize to PEM
+        cert_pem = serialize_cert_to_pem(cert)
+        key_pem = serialize_key_to_pem(private_key) if import_key else None
         
         # Create CA record
         refid = str(uuid.uuid4())
         ca = CA(
             refid=refid,
-            descr=name or cn or file.filename,
+            descr=name or cert_info['cn'] or file.filename,
             crt=base64.b64encode(cert_pem).decode('utf-8'),
             prv=base64.b64encode(key_pem).decode('utf-8') if key_pem else None,
-            serial=0,  # Serial counter for issuing, not cert serial
-            subject=subject.rfc4514_string(),
-            issuer=issuer.rfc4514_string(),
-            valid_from=cert.not_valid_before_utc,
-            valid_to=cert.not_valid_after_utc,
+            serial=0,
+            subject=cert_info['subject'],
+            issuer=cert_info['issuer'],
+            valid_from=cert_info['valid_from'],
+            valid_to=cert_info['valid_to'],
             imported_from='manual'
         )
         
@@ -341,7 +286,12 @@ def import_ca():
             message=f'CA "{ca.descr}" imported successfully'
         )
         
+    except ValueError as e:
+        return error_response(str(e), 400)
     except Exception as e:
+        import traceback
+        print(f"CA Import Error: {str(e)}")
+        print(traceback.format_exc())
         return error_response(f'Import failed: {str(e)}', 500)
 
 

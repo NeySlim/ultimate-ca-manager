@@ -655,7 +655,7 @@ export default function CertificatesPage() {
 
       {/* Import Certificate Modal */}
       <Modal
-        isOpen={showImportModal}
+        open={showImportModal}
         onClose={() => setShowImportModal(false)}
         title="Import Certificate"
         size="md"
