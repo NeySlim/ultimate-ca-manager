@@ -7,6 +7,7 @@ from flask import Blueprint
 
 # Import all route blueprints
 from api.v2.auth import bp as auth_bp
+from api.v2.auth_methods import bp as auth_methods_bp  # Multi-method auth
 from api.v2.account import bp as account_bp
 from api.v2.cas import bp as cas_bp
 from api.v2.certificates import bp as certificates_bp
@@ -21,10 +22,15 @@ from api.v2.users import bp as users_bp
 from api.v2.templates import bp as templates_bp
 from api.v2.truststore import bp as truststore_bp
 from api.v2.import_opnsense import bp as import_opnsense_bp
+from api.v2.roles import bp as roles_bp  # NEW: Roles & Permissions
+from api.v2.webauthn import bp as webauthn_bp  # NEW: WebAuthn
+from api.v2.mtls import bp as mtls_bp  # NEW: mTLS
+from api.v2.audit import bp as audit_bp  # NEW: Audit logs
 
 # List of all blueprints to register
 API_V2_BLUEPRINTS = [
     auth_bp,
+    auth_methods_bp,  # Multi-method auth (NEW)
     account_bp,
     cas_bp,
     certificates_bp,
@@ -38,7 +44,11 @@ API_V2_BLUEPRINTS = [
     users_bp,
     templates_bp,
     truststore_bp,
-    import_opnsense_bp
+    import_opnsense_bp,
+    roles_bp,  # NEW: Roles & Permissions
+    webauthn_bp,  # NEW: WebAuthn management
+    mtls_bp,  # NEW: mTLS management
+    audit_bp,  # NEW: Audit logs
 ]
 
 
