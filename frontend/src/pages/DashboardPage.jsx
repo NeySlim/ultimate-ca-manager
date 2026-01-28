@@ -178,11 +178,25 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-xs text-text-secondary uppercase tracking-wide">System Status</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <StatusIndicator status={systemStatus?.status === 'healthy' ? 'active' : 'inactive'} pulse />
-                    <span className="text-sm font-medium text-text-primary">
-                      {systemStatus?.status || 'Unknown'}
-                    </span>
+                    {systemStatus?.database?.status === 'online' ? (
+                      <>
+                        <StatusIndicator status="active" pulse />
+                        <span className="text-sm font-medium text-text-primary">Online</span>
+                      </>
+                    ) : (
+                      <>
+                        <StatusIndicator status="inactive" />
+                        <span className="text-sm font-medium text-text-primary">
+                          {systemStatus?.database?.status || 'Unknown'}
+                        </span>
+                      </>
+                    )}
                   </div>
+                  {systemStatus?.database?.message && (
+                    <p className="text-xs text-text-tertiary mt-1">
+                      DB: {systemStatus.database.message}
+                    </p>
+                  )}
                 </div>
               </div>
             </Card>
