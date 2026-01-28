@@ -3,8 +3,7 @@
  */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldCheck } from '@phosphor-icons/react'
-import { Card, Button, Input } from '../components'
+import { Card, Button, Input, Logo } from '../components'
 import { useAuth, useNotification } from '../contexts'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 
@@ -41,15 +40,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-bg-primary p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="flex flex-col items-center mb-6">
-          <div 
-            className="w-16 h-16 bg-gradient-to-br from-accent-primary to-blue-600 rounded-lg flex items-center justify-center mb-3 shadow-lg shadow-accent-primary/20"
-            style={{ background: 'var(--gradient-accent)' }}
-          >
-            <ShieldCheck size={32} weight="bold" className="text-white" />
-          </div>
-          <h1 className="text-xl font-bold text-text-primary">UCM</h1>
-          <p className="text-xs text-text-secondary mt-0.5">Ultimate CA Manager</p>
+        <div className="flex flex-col items-center mb-8">
+          <Logo variant="vertical" size="lg" />
         </div>
 
         {/* Login Card */}
