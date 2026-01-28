@@ -6,34 +6,65 @@ SCEP Management Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from models import db, SCEPRequest
-from datetime import datetime
+from models import db, SCEPRequest, SystemConfig, CA
+from datetime import datetime, timezone
+import secrets
 
 bp = Blueprint('scep_v2', __name__)
+
+
+def get_config(key, default=None):
+    """Get config value from database"""
+    config = SystemConfig.query.filter_by(key=key).first()
+    return config.value if config else default
+
+
+def set_config(key, value):
+    """Set config value in database"""
+    config = SystemConfig.query.filter_by(key=key).first()
+    if config:
+        config.value = str(value) if value is not None else None
+    else:
+        config = SystemConfig(key=key, value=str(value) if value is not None else None)
+        db.session.add(config)
 
 
 @bp.route('/api/v2/scep/config', methods=['GET'])
 @require_auth(['read:scep'])
 def get_scep_config():
-    """Get SCEP configuration"""
-    # In future this should come from SystemConfig
+    """Get SCEP configuration from database"""
     return success_response(data={
-        'enabled': True,
-        'url': '/scep/pkiclient.exe',
-        'ca_ident': 'ucm-ca'
+        'enabled': get_config('scep_enabled', 'true') == 'true',
+        'url': get_config('scep_url', '/scep/pkiclient.exe'),
+        'ca_id': int(get_config('scep_ca_id', '0') or 0) or None,
+        'ca_ident': get_config('scep_ca_ident', 'ucm-ca'),
+        'auto_approve': get_config('scep_auto_approve', 'false') == 'true',
+        'challenge_validity': int(get_config('scep_challenge_validity', '24'))
     })
 
 
 @bp.route('/api/v2/scep/config', methods=['PATCH'])
 @require_auth(['write:scep'])
 def update_scep_config():
-    """Update SCEP configuration"""
-    data = request.json
-    # Implement logic
-    return success_response(
-        data=data,
-        message='SCEP config updated'
-    )
+    """Update SCEP configuration in database"""
+    data = request.json or {}
+    
+    if 'enabled' in data:
+        set_config('scep_enabled', 'true' if data['enabled'] else 'false')
+    if 'url' in data:
+        set_config('scep_url', data['url'])
+    if 'ca_id' in data:
+        set_config('scep_ca_id', str(data['ca_id']) if data['ca_id'] else '')
+    if 'ca_ident' in data:
+        set_config('scep_ca_ident', data['ca_ident'])
+    if 'auto_approve' in data:
+        set_config('scep_auto_approve', 'true' if data['auto_approve'] else 'false')
+    if 'challenge_validity' in data:
+        set_config('scep_challenge_validity', str(data['challenge_validity']))
+    
+    db.session.commit()
+    
+    return success_response(message='SCEP configuration saved')
 
 
 @bp.route('/api/v2/scep/requests', methods=['GET'])
@@ -62,13 +93,12 @@ def approve_scep_request(request_id):
         
     if scep_req.status != 'pending':
         return error_response(f'Request is already {scep_req.status}', 400)
-        
-    scep_req.status = 'approved'
-    scep_req.approved_by = 'current_user' # TODO: get from g.user
-    scep_req.approved_at = datetime.utcnow()
     
-    # Trigger SCEP processing (would typically happen async or on next poll)
-    # For now just marking as approved
+    username = getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin'
+    
+    scep_req.status = 'approved'
+    scep_req.approved_by = username
+    scep_req.approved_at = datetime.now(timezone.utc)
     
     db.session.commit()
     
@@ -91,11 +121,13 @@ def reject_scep_request(request_id):
         
     if scep_req.status != 'pending':
         return error_response(f'Request is already {scep_req.status}', 400)
-        
+    
+    username = getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin'
+    
     scep_req.status = 'rejected'
     scep_req.rejection_reason = reason
-    scep_req.approved_by = 'current_user'
-    scep_req.approved_at = datetime.utcnow()
+    scep_req.approved_by = username
+    scep_req.approved_at = datetime.now(timezone.utc)
     
     db.session.commit()
     
@@ -120,4 +152,39 @@ def get_scep_stats():
         'approved': approved,
         'rejected': rejected
     })
+
+
+@bp.route('/api/v2/scep/challenge/<int:ca_id>', methods=['GET'])
+@require_auth(['read:scep'])
+def get_challenge_password(ca_id):
+    """Get challenge password for a CA"""
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    challenge = get_config(f'scep_challenge_{ca_id}')
+    
+    return success_response(data={
+        'ca_id': ca_id,
+        'challenge': challenge or 'Not configured'
+    })
+
+
+@bp.route('/api/v2/scep/challenge/<int:ca_id>/regenerate', methods=['POST'])
+@require_auth(['write:scep'])
+def regenerate_challenge_password(ca_id):
+    """Regenerate challenge password for a CA"""
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    # Generate a secure random challenge password
+    new_challenge = secrets.token_urlsafe(24)
+    set_config(f'scep_challenge_{ca_id}', new_challenge)
+    db.session.commit()
+    
+    return success_response(
+        data={'challenge': new_challenge},
+        message='Challenge password regenerated'
+    )
 

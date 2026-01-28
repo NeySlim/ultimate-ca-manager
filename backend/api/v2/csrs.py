@@ -102,7 +102,7 @@ def create_csr():
             dn=dn,
             key_type=key_type,
             san_dns=data.get('sans', []),
-            username='current_user' # TODO: Get real user
+            username=getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin' # TODO: Get real user
         )
         
         return created_response(
