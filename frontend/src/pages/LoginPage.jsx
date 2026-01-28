@@ -1,7 +1,7 @@
 /**
  * Login Page
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Input, Logo } from '../components'
 import { useAuth, useNotification } from '../contexts'
@@ -9,12 +9,21 @@ import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, isAuthenticated } = useAuth()
   const { showError, showSuccess } = useNotification()
   
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Force redirect if already authenticated
+  useEffect(() => {
+    console.log('🔍 LoginPage check - isAuthenticated:', isAuthenticated)
+    if (isAuthenticated) {
+      console.log('✅ User already authenticated, redirecting...')
+      navigate('/', { replace: true })
+    }
+  }, [isAuthenticated, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
