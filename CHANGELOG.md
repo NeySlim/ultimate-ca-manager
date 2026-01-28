@@ -48,9 +48,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Statistics Dashboard** - Action counts and trends
 
 #### API Enhancements
-- **155+ Endpoints** - Complete REST API v2
+- **155+ Endpoints** - Complete REST API v2 (NO MORE STUBS)
 - **Standardized Responses** - `{data, meta}` structure throughout
 - **OCSP Responder** - RFC 6960 compliant certificate status
+
+#### Full API Implementation (2026-01-28)
+- **Certificate Creation** - Real key generation, signing, SANs support
+- **User Management** - Create, update, delete with password hashing
+- **Backup/Restore** - Full backup service integration
+- **2FA/TOTP** - Real implementation with pyotp, QR codes, backup codes
+- **Session Management** - List, revoke individual/all sessions
+- **Password Change** - With current password verification
+- **LDAP Settings** - Save and test connection
+- **Audit Logs** - Real database queries with filters
 
 #### Bug Fixes
 - Delete CA/Certificate actually deletes (was stub)
@@ -59,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Select defaults fixed for Radix (`'auto'` not `''`)
 - Certificate renewal now works (was stub returning fake data)
 - CA lookup for renewal handles different refid formats
+- All API stubs replaced with real implementations
 
 ---
 
