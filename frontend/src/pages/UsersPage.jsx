@@ -354,10 +354,13 @@ export default function UsersPage() {
             onChange={setRoleFilter}
           />
 
-          <Button onClick={() => setShowCreateModal(true)} className="w-full">
-            <Plus size={18} />
-            Create User
-          </Button>
+
+          {canWrite('users') && (
+            <Button onClick={() => setShowCreateModal(true)} className="w-full">
+              <Plus size={18} />
+              Create User
+            </Button>
+          )}
         </div>
 
         <div className="flex-1 overflow-auto">
