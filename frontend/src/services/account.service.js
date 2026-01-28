@@ -20,18 +20,18 @@ export const accountService = {
   },
 
   async getApiKeys() {
-    return apiClient.get('/account/api-keys')
+    return apiClient.get('/account/apikeys')
   },
 
   async createApiKey(name, expiresIn) {
-    return apiClient.post('/account/api-keys', {
+    return apiClient.post('/account/apikeys', {
       name,
       expires_in: expiresIn,
     })
   },
 
   async revokeApiKey(keyId) {
-    return apiClient.delete(`/account/api-keys/${keyId}`)
+    return apiClient.delete(`/account/apikeys/${keyId}`)
   },
 
   async getSessions() {
