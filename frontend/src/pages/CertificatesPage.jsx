@@ -65,7 +65,6 @@ export default function CertificatesPage() {
     try {
       const response = await certificatesService.getById(id)
       const certData = extractData(response)
-      console.log('Certificate details loaded:', certData)
       setSelectedCert({ ...certData }) // Force new object reference
     } catch (error) {
       console.error('Failed to load certificate details:', error)
