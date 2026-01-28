@@ -210,12 +210,12 @@ export default function LoginPage() {
         {/* Title */}
         <div className="text-center">
           <h1 className="text-2xl font-bold text-text-primary mb-2">
-            {step === 'username' ? 'Sign In' : `Welcome, ${username}`}
+            {step === 'username' ? 'Sign In' : 'Welcome Back'}
           </h1>
           <p className="text-sm text-text-secondary">
             {step === 'username' 
               ? 'Enter your username to continue'
-              : statusMessage || (authMethod === 'password' ? 'Enter your password' : 'Choose authentication method')
+              : statusMessage || (authMethod === 'password' ? 'Enter your password to continue' : 'Choose how to authenticate')
             }
           </p>
         </div>
@@ -257,22 +257,26 @@ export default function LoginPage() {
 
         {/* Step 2: Authentication */}
         {step === 'auth' && (
-          <div className="space-y-4">
-            {/* User badge with change option */}
-            <div className="flex items-center justify-between p-3 bg-bg-secondary rounded-lg border border-border">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
-                  <User size={16} className="text-accent" weight="fill" />
+          <div className="space-y-5">
+            {/* User identity card - modern design */}
+            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-4">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg">
+                  <User size={24} className="text-white" weight="bold" />
                 </div>
-                <span className="font-medium text-text-primary">{username}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">Signing in as</p>
+                  <p className="text-lg font-semibold text-text-primary truncate">{username}</p>
+                </div>
+                <button
+                  onClick={handleChangeUser}
+                  className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-accent hover:bg-accent/10 rounded-lg transition-all"
+                  disabled={loading}
+                >
+                  Change
+                </button>
               </div>
-              <button
-                onClick={handleChangeUser}
-                className="text-xs text-text-secondary hover:text-accent transition-colors"
-                disabled={loading}
-              >
-                Not you?
-              </button>
             </div>
 
             {/* Loading state for auto-auth */}
@@ -314,6 +318,17 @@ export default function LoginPage() {
             {/* Password form */}
             {authMethod === 'password' && (
               <form onSubmit={handlePasswordLogin} className="space-y-4">
+                {/* Hidden username field for accessibility */}
+                <input
+                  type="text"
+                  name="username"
+                  autoComplete="username"
+                  value={username}
+                  readOnly
+                  className="sr-only"
+                  tabIndex={-1}
+                />
+                
                 <Input
                   ref={passwordRef}
                   label="Password"
