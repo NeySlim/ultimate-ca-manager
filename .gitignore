@@ -72,3 +72,4 @@ logs/
 # Test files
 test_*.py
 migrate_*.py
+data/
