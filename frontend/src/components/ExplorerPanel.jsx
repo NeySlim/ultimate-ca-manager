@@ -16,7 +16,7 @@ export function ExplorerPanel({
   className 
 }) {
   return (
-    <div className={cn("w-80 border-r border-border bg-bg-secondary flex flex-col", className)}>
+    <div className={cn("w-96 border-r border-border bg-bg-secondary flex flex-col", className)}>
       {/* Header */}
       <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center justify-between mb-2">
