@@ -97,6 +97,28 @@ def get_certificate(cert_id):
 @require_auth(['delete:certificates'])
 def delete_certificate(cert_id):
     """Delete certificate"""
+    from models import Certificate, db
+    
+    cert = Certificate.query.get(cert_id)
+    if not cert:
+        return error_response('Certificate not found', 404)
+    
+    cert_name = cert.descr or cert.name or f'Certificate #{cert_id}'
+    
+    # Delete the certificate
+    db.session.delete(cert)
+    db.session.commit()
+    
+    # Audit log
+    from services.audit_service import AuditService
+    AuditService.log_action(
+        action='certificate_deleted',
+        resource_type='certificate',
+        resource_id=cert_id,
+        details=f'Deleted certificate: {cert_name}',
+        success=True
+    )
+    
     return no_content_response()
 
 

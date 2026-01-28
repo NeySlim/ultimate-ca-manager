@@ -423,6 +423,28 @@ def update_ca(ca_id):
 @require_auth(['delete:cas'])
 def delete_ca(ca_id):
     """Delete CA"""
+    from models import CA, db
+    
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    ca_name = ca.descr or ca.name or f'CA #{ca_id}'
+    
+    # Delete the CA
+    db.session.delete(ca)
+    db.session.commit()
+    
+    # Audit log
+    from services.audit_service import AuditService
+    AuditService.log_action(
+        action='ca_deleted',
+        resource_type='ca',
+        resource_id=ca_id,
+        details=f'Deleted CA: {ca_name}',
+        success=True
+    )
+    
     return no_content_response()
 
 
