@@ -26,6 +26,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Only load if we're already in this component 
+    // (ProtectedRoute already verified auth)
     loadDashboard()
   }, [])
 
