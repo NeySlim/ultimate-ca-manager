@@ -21,15 +21,21 @@ export const casService = {
   },
 
   async update(id, data) {
-    return apiClient.put(`/cas/${id}`, data)
+    return apiClient.patch(`/cas/${id}`, data)
   },
 
   async delete(id) {
     return apiClient.delete(`/cas/${id}`)
   },
 
-  async export(id, format = 'pem') {
-    return apiClient.get(`/cas/${id}/export?format=${format}`, {
+  async export(id, format = 'pem', options = {}) {
+    const params = new URLSearchParams()
+    params.append('format', format)
+    if (options.includeKey) params.append('include_key', 'true')
+    if (options.includeChain) params.append('include_chain', 'true')  
+    if (options.password) params.append('password', options.password)
+    
+    return apiClient.get(`/cas/${id}/export?${params.toString()}`, {
       responseType: 'blob'
     })
   },
