@@ -360,3 +360,200 @@ class BackupService:
                 del cert['_private_key_plaintext']
         
         return backup_data
+    
+    def restore_backup(self, backup_bytes: bytes, password: str) -> Dict[str, Any]:
+        """
+        Restore from encrypted backup
+        
+        Args:
+            backup_bytes: Encrypted backup file content
+            password: Decryption password
+            
+        Returns:
+            Dict with restore results
+        """
+        # Extract salt from beginning
+        if len(backup_bytes) < self.SALT_SIZE + self.NONCE_SIZE:
+            raise ValueError("Invalid backup file: too small")
+        
+        master_salt = backup_bytes[:self.SALT_SIZE]
+        encrypted_data = backup_bytes[self.SALT_SIZE:]
+        
+        # Derive key from password with saved salt
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=self.KEY_SIZE,
+            salt=master_salt,
+            iterations=self.PBKDF2_ITERATIONS,
+            backend=default_backend()
+        )
+        master_key = kdf.derive(password.encode())
+        
+        # Decrypt backup
+        try:
+            nonce = encrypted_data[:self.NONCE_SIZE]
+            ciphertext = encrypted_data[self.NONCE_SIZE:]
+            
+            aesgcm = AESGCM(master_key)
+            plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+        except Exception as e:
+            raise ValueError("Decryption failed - wrong password or corrupted file")
+        
+        # Parse JSON
+        try:
+            backup_data = json.loads(plaintext.decode())
+        except json.JSONDecodeError:
+            raise ValueError("Invalid backup format: not valid JSON")
+        
+        # Verify checksum
+        saved_checksum = backup_data.pop('checksum', None)
+        if saved_checksum:
+            json_str = json.dumps(backup_data, indent=2, sort_keys=True)
+            calc_checksum = hashlib.sha256(json_str.encode()).hexdigest()
+            if calc_checksum != saved_checksum.get('value'):
+                raise ValueError("Backup checksum mismatch - file may be corrupted")
+        
+        # Restore data
+        results = {
+            'users': 0,
+            'cas': 0,
+            'certificates': 0,
+            'acme_accounts': 0,
+            'settings': 0
+        }
+        
+        # Restore users
+        for user_data in backup_data.get('users', []):
+            existing = User.query.filter_by(username=user_data['username']).first()
+            if existing:
+                existing.email = user_data.get('email')
+                existing.full_name = user_data.get('full_name')
+                existing.role = user_data.get('role', 'user')
+                existing.active = user_data.get('active', True)
+                existing.password_hash = user_data.get('password_hash')
+            else:
+                new_user = User(
+                    username=user_data['username'],
+                    email=user_data.get('email'),
+                    full_name=user_data.get('full_name'),
+                    role=user_data.get('role', 'user'),
+                    active=user_data.get('active', True),
+                    password_hash=user_data.get('password_hash')
+                )
+                db.session.add(new_user)
+            results['users'] += 1
+        
+        # Restore CAs
+        import base64
+        for ca_data in backup_data.get('certificate_authorities', []):
+            existing = CA.query.filter_by(refid=ca_data['refid']).first()
+            
+            # Decrypt private key if encrypted
+            prv_pem = None
+            if ca_data.get('private_key_pem_encrypted'):
+                prv_pem = self._decrypt_private_key(
+                    ca_data['private_key_pem_encrypted'], 
+                    master_key
+                )
+            
+            if existing:
+                existing.descr = ca_data.get('descr')
+                existing.crt = base64.b64encode(ca_data['certificate_pem'].encode()).decode() if ca_data.get('certificate_pem') else None
+                existing.prv = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+            else:
+                new_ca = CA(
+                    refid=ca_data['refid'],
+                    descr=ca_data.get('descr'),
+                    subject=ca_data.get('subject'),
+                    issuer=ca_data.get('issuer'),
+                    serial=ca_data.get('serial'),
+                    caref=ca_data.get('caref'),
+                    crt=base64.b64encode(ca_data['certificate_pem'].encode()).decode() if ca_data.get('certificate_pem') else None,
+                    prv=base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+                )
+                db.session.add(new_ca)
+            results['cas'] += 1
+        
+        # Restore Certificates
+        for cert_data in backup_data.get('certificates', []):
+            existing = Certificate.query.filter_by(refid=cert_data['refid']).first()
+            
+            # Decrypt private key if encrypted
+            prv_pem = None
+            if cert_data.get('private_key_pem_encrypted'):
+                prv_pem = self._decrypt_private_key(
+                    cert_data['private_key_pem_encrypted'],
+                    master_key
+                )
+            
+            if existing:
+                existing.descr = cert_data.get('descr')
+                existing.crt = base64.b64encode(cert_data['certificate_pem'].encode()).decode() if cert_data.get('certificate_pem') else None
+                existing.prv = base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+            else:
+                new_cert = Certificate(
+                    refid=cert_data['refid'],
+                    descr=cert_data.get('descr'),
+                    caref=cert_data.get('caref'),
+                    cert_type=cert_data.get('cert_type'),
+                    subject=cert_data.get('subject'),
+                    issuer=cert_data.get('issuer'),
+                    serial_number=cert_data.get('serial_number'),
+                    crt=base64.b64encode(cert_data['certificate_pem'].encode()).decode() if cert_data.get('certificate_pem') else None,
+                    prv=base64.b64encode(prv_pem.encode()).decode() if prv_pem else None
+                )
+                db.session.add(new_cert)
+            results['certificates'] += 1
+        
+        # Restore ACME accounts
+        for acme_data in backup_data.get('acme_accounts', []):
+            existing = AcmeAccount.query.filter_by(email=acme_data['email']).first()
+            if existing:
+                existing.account_url = acme_data.get('account_url')
+                existing.status = acme_data.get('status')
+            else:
+                new_acme = AcmeAccount(
+                    email=acme_data['email'],
+                    account_url=acme_data.get('account_url'),
+                    status=acme_data.get('status', 'valid'),
+                    private_key=acme_data.get('key_pem')
+                )
+                db.session.add(new_acme)
+            results['acme_accounts'] += 1
+        
+        # Restore settings
+        config_data = backup_data.get('configuration', {}).get('settings', {})
+        for key, value in config_data.items():
+            existing = SystemConfig.query.filter_by(key=key).first()
+            if existing:
+                existing.value = value
+            else:
+                new_config = SystemConfig(key=key, value=value)
+                db.session.add(new_config)
+            results['settings'] += 1
+        
+        db.session.commit()
+        
+        return results
+    
+    def _decrypt_private_key(self, encrypted_data: Dict[str, str], master_key: bytes) -> str:
+        """Decrypt individual private key"""
+        salt = bytes.fromhex(encrypted_data['salt'])
+        nonce = bytes.fromhex(encrypted_data['nonce'])
+        ciphertext = bytes.fromhex(encrypted_data['ciphertext'])
+        
+        # Derive key
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=self.KEY_SIZE,
+            salt=salt,
+            iterations=10000,
+            backend=default_backend()
+        )
+        key = kdf.derive(master_key)
+        
+        # Decrypt
+        aesgcm = AESGCM(key)
+        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+        
+        return plaintext.decode()

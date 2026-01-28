@@ -136,7 +136,10 @@ def create_backup():
         password = data.get('password')
         
         if not password:
-            return error_response("Password required for encryption")
+            return error_response("Password required for encryption", 400)
+        
+        if len(password) < 12:
+            return error_response("Password must be at least 12 characters", 400)
 
         service = BackupService()
         backup_bytes = service.create_backup(password)
@@ -149,18 +152,30 @@ def create_backup():
         filepath = os.path.join(backup_dir, filename)
         with open(filepath, 'wb') as f:
             f.write(backup_bytes)
+        
+        # Format size
+        size = len(backup_bytes)
+        if size > 1024*1024:
+            size_str = f"{size/1024/1024:.1f} MB"
+        elif size > 1024:
+            size_str = f"{size/1024:.1f} KB"
+        else:
+            size_str = f"{size} B"
             
         return success_response(
             message="Backup created successfully", 
             data={
                 'filename': filename,
-                'size': len(backup_bytes),
-                'download_url': f'/api/system/backup/{filename}/download'
+                'size': size_str,
+                'path': filepath
             }
         )
+    except ValueError as e:
+        return error_response(str(e), 400)
     except Exception as e:
-        return error_response(f"Backup failed: {str(e)}")
+        return error_response(f"Backup failed: {str(e)}", 500)
 
+@bp.route('/api/v2/system/backups', methods=['GET'])
 @bp.route('/api/v2/system/backup/list', methods=['GET'])
 @require_auth(['read:settings'])
 def list_backups():
@@ -201,8 +216,54 @@ def download_backup(filename):
         mimetype='application/octet-stream'
     )
 
+@bp.route('/api/v2/system/backup/<filename>', methods=['DELETE'])
+@require_auth(['admin:system'])
+def delete_backup(filename):
+    """Delete a backup file"""
+    try:
+        backup_dir = "/opt/ucm/data/backups"
+        filename = werkzeug.utils.secure_filename(filename)
+        filepath = os.path.join(backup_dir, filename)
+        
+        if not os.path.exists(filepath):
+            return error_response("Backup file not found", 404)
+        
+        os.remove(filepath)
+        return success_response(message="Backup deleted successfully")
+    except Exception as e:
+        return error_response(f"Failed to delete backup: {str(e)}", 500)
+
+@bp.route('/api/v2/system/restore', methods=['POST'])
 @bp.route('/api/v2/system/backup/restore', methods=['POST'])
 @require_auth(['admin:system'])
 def restore_backup():
-    """Restore from backup"""
-    return success_response(message="System restored from backup. Restarting...")
+    """Restore from backup file"""
+    try:
+        from services.backup_service import BackupService
+        
+        if 'file' not in request.files:
+            return error_response("No backup file provided", 400)
+        
+        file = request.files['file']
+        password = request.form.get('password')
+        
+        if not password:
+            return error_response("Password required for decryption", 400)
+        
+        if len(password) < 12:
+            return error_response("Password must be at least 12 characters", 400)
+        
+        # Read file content
+        backup_bytes = file.read()
+        
+        service = BackupService()
+        results = service.restore_backup(backup_bytes, password)
+        
+        return success_response(
+            message="Backup restored successfully",
+            data=results
+        )
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f"Restore failed: {str(e)}", 500)

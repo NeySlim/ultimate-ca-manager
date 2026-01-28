@@ -21,32 +21,39 @@ export const systemService = {
     return apiClient.get('/system/backups')
   },
 
-  async backup() {
-    return apiClient.post('/system/backup', {}, {
-      responseType: 'blob'
-    })
+  async backup(password) {
+    // Returns JSON with backup info (file saved on server)
+    return apiClient.post('/system/backup', { password })
   },
 
   async downloadBackup(filename) {
-    return apiClient.get(`/system/backups/${filename}`, {
-      responseType: 'blob'
+    // Download saved backup file
+    const response = await fetch(`/api/v2/system/backup/${encodeURIComponent(filename)}/download`, {
+      credentials: 'include'
     })
+    if (!response.ok) {
+      throw new Error('Failed to download backup')
+    }
+    return response.blob()
   },
 
   async deleteBackup(filename) {
-    return apiClient.delete(`/system/backups/${filename}`)
+    return apiClient.delete(`/system/backup/${encodeURIComponent(filename)}`)
   },
 
-  async restore(file) {
+  async restore(file, password) {
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('password', password)
     
-    return apiClient.request('/system/restore', {
+    return fetch('/api/v2/system/restore', {
       method: 'POST',
       body: formData,
-      headers: {
-        // Don't set Content-Type, let browser set it with boundary
-      }
+      credentials: 'include'
+    }).then(async res => {
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || data.error || 'Restore failed')
+      return data
     })
   },
 

@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, Envelope, Download, Trash, UploadSimple, HardDrives, Lock, Key } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Button, Input, Select,
-  Textarea, Tabs, LoadingSpinner, FileUpload, Table
+  Textarea, Tabs, LoadingSpinner, FileUpload, Table, Modal
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
@@ -25,10 +25,18 @@ export default function SettingsPage() {
   const [certificates, setCertificates] = useState([])
   const [selectedHttpsCert, setSelectedHttpsCert] = useState('')
   const [cas, setCas] = useState([])
+  
+  // Backup modal states
+  const [showBackupModal, setShowBackupModal] = useState(false)
+  const [showRestoreModal, setShowRestoreModal] = useState(false)
+  const [backupPassword, setBackupPassword] = useState('')
+  const [restorePassword, setRestorePassword] = useState('')
+  const [restoreFile, setRestoreFile] = useState(null)
+  const [backupLoading, setBackupLoading] = useState(false)
 
   useEffect(() => {
     loadSettings()
-    // loadBackups() // TODO: Activer quand endpoint backend existe
+    loadBackups()
     // loadDbStats() // TODO: Activer quand endpoint backend existe
     // loadHttpsInfo() // TODO: Activer quand endpoint backend existe
     loadCAs()
@@ -120,17 +128,32 @@ export default function SettingsPage() {
   }
 
   const handleBackup = async () => {
+    if (!backupPassword || backupPassword.length < 12) {
+      showError('Password must be at least 12 characters')
+      return
+    }
+    
+    setBackupLoading(true)
     try {
-      const blob = await systemService.backup()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ucm-backup-${new Date().toISOString().split('T')[0]}.tar.gz`
-      a.click()
-      showSuccess('Backup downloaded successfully')
-      // await loadBackups() // TODO: Activer quand endpoint backend existe
+      const response = await systemService.backup(backupPassword)
+      if (response.data) {
+        // Server saved file, now download it
+        const blob = await systemService.downloadBackup(response.data.filename)
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = response.data.filename
+        a.click()
+        URL.revokeObjectURL(url)
+        showSuccess('Backup created and downloaded successfully')
+        setShowBackupModal(false)
+        setBackupPassword('')
+        loadBackups()
+      }
     } catch (error) {
       showError(error.message || 'Failed to create backup')
+    } finally {
+      setBackupLoading(false)
     }
   }
 
@@ -142,6 +165,7 @@ export default function SettingsPage() {
       a.href = url
       a.download = filename
       a.click()
+      URL.revokeObjectURL(url)
       showSuccess('Backup downloaded successfully')
     } catch (error) {
       showError(error.message || 'Failed to download backup')
@@ -154,21 +178,34 @@ export default function SettingsPage() {
     try {
       await systemService.deleteBackup(filename)
       showSuccess('Backup deleted successfully')
-      // await loadBackups() // TODO: Activer quand endpoint backend existe
+      loadBackups()
     } catch (error) {
       showError(error.message || 'Failed to delete backup')
     }
   }
 
-  const handleRestoreBackup = async (file) => {
-    if (!confirm('Restore from backup? This will replace all current data!')) return
+  const handleRestoreBackup = async () => {
+    if (!restoreFile) {
+      showError('Please select a backup file')
+      return
+    }
+    if (!restorePassword || restorePassword.length < 12) {
+      showError('Password must be at least 12 characters')
+      return
+    }
     
+    setBackupLoading(true)
     try {
-      await systemService.restore(file)
-      showSuccess('Backup restored successfully. Page will reload.')
+      const result = await systemService.restore(restoreFile, restorePassword)
+      showSuccess(`Backup restored successfully: ${result.data?.users || 0} users, ${result.data?.cas || 0} CAs, ${result.data?.certificates || 0} certificates`)
+      setShowRestoreModal(false)
+      setRestorePassword('')
+      setRestoreFile(null)
       setTimeout(() => window.location.reload(), 2000)
     } catch (error) {
       showError(error.message || 'Failed to restore backup')
+    } finally {
+      setBackupLoading(false)
     }
   }
 
@@ -494,7 +531,7 @@ export default function SettingsPage() {
       content: (
         <div className="space-y-6 max-w-2xl">
           <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Backup Settings</h3>
+            <h3 className="text-sm font-semibold text-text-primary mb-4">Automatic Backups</h3>
             <div className="space-y-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -505,39 +542,53 @@ export default function SettingsPage() {
                 />
                 <div>
                   <p className="text-sm text-text-primary font-medium">Enable Automatic Backups</p>
-                  <p className="text-xs text-text-secondary">Automatically backup database and certificates</p>
+                  <p className="text-xs text-text-secondary">Daily encrypted backups saved to /opt/ucm/data/backups</p>
                 </div>
               </label>
 
-              <Select
-                label="Backup Frequency"
-                options={[
-                  { value: 'daily', label: 'Daily' },
-                  { value: 'weekly', label: 'Weekly' },
-                  { value: 'monthly', label: 'Monthly' },
-                ]}
-                value={settings.backup_frequency || 'daily'}
-                onChange={(val) => updateSetting('backup_frequency', val)}
-                disabled={!settings.auto_backup_enabled}
-              />
+              {settings.auto_backup_enabled && (
+                <>
+                  <Select
+                    label="Backup Frequency"
+                    options={[
+                      { value: 'daily', label: 'Daily' },
+                      { value: 'weekly', label: 'Weekly' },
+                      { value: 'monthly', label: 'Monthly' },
+                    ]}
+                    value={settings.backup_frequency || 'daily'}
+                    onChange={(val) => updateSetting('backup_frequency', val)}
+                  />
 
-              <Input
-                label="Retention Period (days)"
-                type="number"
-                value={settings.backup_retention_days || 30}
-                onChange={(e) => updateSetting('backup_retention_days', parseInt(e.target.value))}
-                min="1"
-                max="365"
-                disabled={!settings.auto_backup_enabled}
-              />
+                  <Input
+                    label="Auto-Backup Password"
+                    type="password"
+                    value={settings.backup_password || ''}
+                    onChange={(e) => updateSetting('backup_password', e.target.value)}
+                    placeholder="Min 12 characters"
+                    helperText="Password used to encrypt automatic backups"
+                  />
+
+                  <Input
+                    label="Retention Period (days)"
+                    type="number"
+                    value={settings.backup_retention_days || 30}
+                    onChange={(e) => updateSetting('backup_retention_days', parseInt(e.target.value))}
+                    min="1"
+                    max="365"
+                  />
+                </>
+              )}
             </div>
           </div>
 
           <div className="border-t border-border pt-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-text-primary">Backup Files</h3>
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary">Manual Backup</h3>
+                <p className="text-xs text-text-secondary">Create an encrypted backup file containing all data</p>
+              </div>
               {hasPermission('admin:system') && (
-                <Button onClick={handleBackup}>
+                <Button onClick={() => setShowBackupModal(true)}>
                   <Database size={16} />
                   Create Backup
                 </Button>
@@ -547,6 +598,7 @@ export default function SettingsPage() {
             {backups.length === 0 ? (
               <div className="p-8 bg-bg-tertiary border border-border rounded-lg text-center">
                 <p className="text-sm text-text-secondary">No backups found</p>
+                <p className="text-xs text-text-tertiary mt-1">Create a backup to protect your data</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -566,7 +618,6 @@ export default function SettingsPage() {
                         onClick={() => handleDownloadBackup(backup.filename)}
                       >
                         <Download size={14} />
-                        Download
                       </Button>
                       <Button 
                         size="sm" 
@@ -583,19 +634,22 @@ export default function SettingsPage() {
           </div>
 
           <div className="border-t border-border pt-6">
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Restore from Backup</h3>
-            <FileUpload
-              accept=".tar.gz,.zip"
-              onFileSelect={(file) => handleRestoreBackup(file)}
-              helperText="Upload a backup file to restore the system. WARNING: This will replace all current data!"
-            />
+            <h3 className="text-sm font-semibold text-text-primary mb-2">Restore from Backup</h3>
+            <p className="text-xs text-text-secondary mb-4">Upload a .ucmbkp file to restore all data</p>
+            <div className="space-y-3">
+              <FileUpload
+                accept=".ucmbkp,.tar.gz"
+                onFileSelect={(file) => { setRestoreFile(file); setShowRestoreModal(true) }}
+                helperText="Select backup file (encrypted .ucmbkp)"
+              />
+            </div>
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-border">
             {hasPermission('admin:system') && (
               <Button onClick={() => handleSave('backup')} disabled={saving}>
                 <FloppyDisk size={16} />
-                Save Changes
+                Save Settings
               </Button>
             )}
           </div>
@@ -898,6 +952,82 @@ export default function SettingsPage() {
       <DetailsPanel>
         <Tabs tabs={tabs} defaultTab="general" />
       </DetailsPanel>
+
+      {/* Backup Password Modal */}
+      <Modal
+        open={showBackupModal}
+        onClose={() => { setShowBackupModal(false); setBackupPassword('') }}
+        title="Create Encrypted Backup"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            Create a backup containing all data (database, certificates, CAs, users, configuration).
+            The backup will be encrypted with your password.
+          </p>
+          <Input
+            label="Encryption Password"
+            type="password"
+            value={backupPassword}
+            onChange={(e) => setBackupPassword(e.target.value)}
+            placeholder="Minimum 12 characters"
+            helperText="Use a strong password - you'll need it to restore the backup"
+            autoFocus
+          />
+          <div className="flex gap-3 justify-end pt-4">
+            <Button variant="secondary" onClick={() => { setShowBackupModal(false); setBackupPassword('') }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleBackup} 
+              disabled={backupLoading || !backupPassword || backupPassword.length < 12}
+            >
+              {backupLoading ? 'Creating...' : 'Create & Download'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Restore Password Modal */}
+      <Modal
+        open={showRestoreModal}
+        onClose={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}
+        title="Restore from Backup"
+      >
+        <div className="space-y-4">
+          <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+            <p className="text-sm text-yellow-500 font-medium">⚠️ Warning</p>
+            <p className="text-xs text-yellow-500/80">
+              This will REPLACE ALL current data with the backup contents.
+              This action cannot be undone.
+            </p>
+          </div>
+          {restoreFile && (
+            <p className="text-sm text-text-primary">
+              File: <strong>{restoreFile.name}</strong>
+            </p>
+          )}
+          <Input
+            label="Backup Password"
+            type="password"
+            value={restorePassword}
+            onChange={(e) => setRestorePassword(e.target.value)}
+            placeholder="Enter the password used to create the backup"
+            autoFocus
+          />
+          <div className="flex gap-3 justify-end pt-4">
+            <Button variant="secondary" onClick={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}>
+              Cancel
+            </Button>
+            <Button 
+              variant="danger"
+              onClick={handleRestoreBackup} 
+              disabled={backupLoading || !restorePassword || restorePassword.length < 12}
+            >
+              {backupLoading ? 'Restoring...' : 'Restore Backup'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }
