@@ -41,6 +41,7 @@ function AppRoutes() {
       
       <Route element={<AppShell />}>
         <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/certificates" element={<ProtectedRoute><CertificatesPage /></ProtectedRoute>} />
         <Route path="/cas" element={<ProtectedRoute><CAsPage /></ProtectedRoute>} />
         <Route path="/csrs" element={<ProtectedRoute><CSRsPage /></ProtectedRoute>} />
