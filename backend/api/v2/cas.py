@@ -395,7 +395,7 @@ def update_ca(ca_id):
     
     # Update allowed fields
     if 'name' in data:
-        ca.name = data['name']
+        ca.descr = data['name']
     if 'ocsp_enabled' in data:
         ca.ocsp_enabled = bool(data['ocsp_enabled'])
     if 'ocsp_url' in data:
@@ -416,7 +416,7 @@ def update_ca(ca_id):
             action='ca_updated',
             resource_type='ca',
             resource_id=ca_id,
-            details=f'CA {ca.name} settings updated',
+            details=f'CA {ca.descr} settings updated',
             success=True
         )
         
@@ -436,7 +436,7 @@ def delete_ca(ca_id):
     if not ca:
         return error_response('CA not found', 404)
     
-    ca_name = ca.descr or ca.name or f'CA #{ca_id}'
+    ca_name = ca.descr or ca.descr or f'CA #{ca_id}'
     
     # Delete the CA
     db.session.delete(ca)
@@ -489,7 +489,7 @@ def export_ca(ca_id):
         if export_format == 'pem':
             result = cert_pem
             content_type = 'application/x-pem-file'
-            filename = f"{ca.name or ca.refid}.crt"
+            filename = f"{ca.descr or ca.refid}.crt"
             
             # Include private key if requested
             if include_key and ca.prv:
@@ -497,7 +497,7 @@ def export_ca(ca_id):
                 if not result.endswith(b'\\n'):
                     result += b'\\n'
                 result += key_pem
-                filename = f"{ca.name or ca.refid}_with_key.pem"
+                filename = f"{ca.descr or ca.refid}_with_key.pem"
             
             # Include parent CA chain if requested
             if include_chain and ca.caref:
@@ -513,9 +513,9 @@ def export_ca(ca_id):
                     else:
                         break
                 if include_key:
-                    filename = f"{ca.name or ca.refid}_full_chain.pem"
+                    filename = f"{ca.descr or ca.refid}_full_chain.pem"
                 else:
-                    filename = f"{ca.name or ca.refid}_chain.pem"
+                    filename = f"{ca.descr or ca.refid}_chain.pem"
             
             return Response(
                 result,
@@ -534,7 +534,7 @@ def export_ca(ca_id):
             return Response(
                 der_bytes,
                 mimetype='application/x-x509-ca-cert',
-                headers={'Content-Disposition': f'attachment; filename="{ca.name or ca.refid}.der"'}
+                headers={'Content-Disposition': f'attachment; filename="{ca.descr or ca.refid}.der"'}
             )
         
         elif export_format == 'pkcs12':
@@ -568,7 +568,7 @@ def export_ca(ca_id):
                         break
             
             p12_bytes = pkcs12.serialize_key_and_certificates(
-                name=(ca.name or ca.refid).encode(),
+                name=(ca.descr or ca.refid).encode(),
                 key=private_key,
                 cert=cert,
                 cas=ca_certs if ca_certs else None,
@@ -578,7 +578,7 @@ def export_ca(ca_id):
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
-                headers={'Content-Disposition': f'attachment; filename="{ca.name or ca.refid}.p12"'}
+                headers={'Content-Disposition': f'attachment; filename="{ca.descr or ca.refid}.p12"'}
             )
         
         else:
