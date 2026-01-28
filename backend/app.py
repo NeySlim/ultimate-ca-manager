@@ -11,6 +11,8 @@ from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 from flask_caching import Cache
 from flask_session import Session
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flasgger import Swagger
 
@@ -24,6 +26,13 @@ from middleware.auth_middleware import init_auth_middleware
 
 # Initialize cache globally
 cache = Cache()
+
+# Initialize rate limiter globally
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per minute", "2000 per hour"],
+    storage_uri="memory://"
+)
 
 
 def create_app(config_name=None):
@@ -86,6 +95,11 @@ def create_app(config_name=None):
         'CACHE_TYPE': 'SimpleCache',  # In-memory cache
         'CACHE_DEFAULT_TIMEOUT': 300   # 5 minutes default
     })
+    
+    # Initialize rate limiter
+    if config.RATE_LIMIT_ENABLED:
+        limiter.init_app(app)
+        app.logger.info("✓ Rate limiting enabled")
     
     # CORS - only HTTPS origins
     CORS(app, resources={
