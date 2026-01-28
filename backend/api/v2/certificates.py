@@ -295,12 +295,27 @@ def renew_certificate(cert_id):
         return error_response('Certificate data not available', 400)
     
     # Get the CA that issued this certificate
+    # Try by refid first, then by matching issuer to CA subject
     ca = CA.query.filter_by(refid=cert.caref).first()
+    if not ca and cert.issuer:
+        # Try to find CA by matching subject to certificate's issuer
+        ca = CA.query.filter(CA.subject == cert.issuer).first()
+        if not ca:
+            # Try partial match (issuer might have different formatting)
+            for potential_ca in CA.query.all():
+                if potential_ca.subject and cert.issuer:
+                    # Extract CN from both and compare
+                    ca_cn = potential_ca.subject.split('CN=')[1].split(',')[0] if 'CN=' in potential_ca.subject else None
+                    cert_issuer_cn = cert.issuer.split('CN=')[1].split(',')[0] if 'CN=' in cert.issuer else None
+                    if ca_cn and cert_issuer_cn and ca_cn == cert_issuer_cn:
+                        ca = potential_ca
+                        break
+    
     if not ca:
-        return error_response('Issuing CA not found', 404)
+        return error_response('Issuing CA not found. The CA that signed this certificate is not in the system.', 404)
     
     if not ca.prv:
-        return error_response('CA private key not available', 400)
+        return error_response('CA private key not available. Cannot renew without CA private key.', 400)
     
     try:
         # Load original certificate
