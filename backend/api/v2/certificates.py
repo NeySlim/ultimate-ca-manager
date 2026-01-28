@@ -330,6 +330,70 @@ def import_certificate():
         if not cert:
             return error_response('Could not parse certificate', 400)
         
+        # Check if this is a CA certificate (has CA:TRUE basic constraint)
+        is_ca_cert = False
+        try:
+            basic_constraints = cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.BASIC_CONSTRAINTS)
+            if basic_constraints.value.ca:
+                is_ca_cert = True
+        except x509.extensions.ExtensionNotFound:
+            pass
+        
+        # If it's a CA certificate, redirect to CA import
+        if is_ca_cert:
+            # Import as CA instead
+            subject = cert.subject
+            issuer = cert.issuer
+            
+            def get_name_attr(name_obj, oid):
+                try:
+                    return name_obj.get_attributes_for_oid(oid)[0].value
+                except:
+                    return ''
+            
+            from cryptography.x509.oid import NameOID
+            cn = get_name_attr(subject, NameOID.COMMON_NAME)
+            
+            cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+            key_pem = None
+            if private_key and import_key:
+                key_pem = private_key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.TraditionalOpenSSL,
+                    encryption_algorithm=serialization.NoEncryption()
+                )
+            
+            refid = str(uuid.uuid4())
+            ca = CA(
+                refid=refid,
+                descr=name or cn or file.filename,
+                crt=base64.b64encode(cert_pem).decode('utf-8'),
+                prv=base64.b64encode(key_pem).decode('utf-8') if key_pem else None,
+                serial=0,
+                subject=subject.rfc4514_string(),
+                issuer=issuer.rfc4514_string(),
+                valid_from=cert.not_valid_before_utc,
+                valid_to=cert.not_valid_after_utc,
+                imported_from='manual'
+            )
+            
+            db.session.add(ca)
+            db.session.commit()
+            
+            from services.audit_service import AuditService
+            AuditService.log_action(
+                action='ca_imported',
+                resource_type='ca',
+                resource_id=ca.id,
+                details=f'Imported CA (detected): {ca.descr}',
+                success=True
+            )
+            
+            return created_response(
+                data=ca.to_dict(),
+                message=f'CA certificate "{ca.descr}" imported successfully (detected as CA)'
+            )
+        
         # Extract certificate info
         subject = cert.subject
         issuer = cert.issuer

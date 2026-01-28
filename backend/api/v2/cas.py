@@ -315,13 +315,12 @@ def import_ca():
             descr=name or cn or file.filename,
             crt=base64.b64encode(cert_pem).decode('utf-8'),
             prv=base64.b64encode(key_pem).decode('utf-8') if key_pem else None,
-            serial=str(cert.serial_number),
-            is_root=is_root,
+            serial=0,  # Serial counter for issuing, not cert serial
             subject=subject.rfc4514_string(),
             issuer=issuer.rfc4514_string(),
             valid_from=cert.not_valid_before_utc,
             valid_to=cert.not_valid_after_utc,
-            created_by='import'
+            imported_from='manual'
         )
         
         db.session.add(ca)
