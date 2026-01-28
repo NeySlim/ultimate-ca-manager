@@ -352,17 +352,17 @@ export default function AuditLogsPage() {
             Top Actions
           </h3>
           <div className="space-y-1 px-2">
-            {stats.top_actions.slice(0, 5).map(([action, count]) => (
+            {stats.top_actions.slice(0, 5).map((item) => (
               <div 
-                key={action} 
+                key={item.action} 
                 className="flex items-center justify-between py-1 px-2 rounded bg-bg-secondary hover:bg-bg-tertiary cursor-pointer transition-colors"
                 onClick={() => {
-                  setFilterAction(action);
+                  setFilterAction(item.action);
                   setPage(1);
                 }}
               >
-                <span className="text-sm">{action.replace(/_/g, ' ')}</span>
-                <Badge variant="gray" size="sm">{count}</Badge>
+                <span className="text-sm">{item.action.replace(/_/g, ' ')}</span>
+                <Badge variant="gray" size="sm">{item.count}</Badge>
               </div>
             ))}
           </div>
