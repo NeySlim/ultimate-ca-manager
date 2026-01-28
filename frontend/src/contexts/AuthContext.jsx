@@ -10,6 +10,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [permissions, setPermissions] = useState([])
+  const [role, setRole] = useState(null)
 
   // Check session on mount
   useEffect(() => {
@@ -23,10 +25,14 @@ export function AuthProvider({ children }) {
       console.log('✅ Session valid:', userData)
       setUser(userData.user || userData)
       setIsAuthenticated(true)
+      setPermissions(userData.permissions || [])
+      setRole(userData.role || null)
     } catch (error) {
       console.log('❌ Session check failed:', error.message)
       setUser(null)
       setIsAuthenticated(false)
+      setPermissions([])
+      setRole(null)
     } finally {
       setLoading(false)
     }
@@ -41,12 +47,16 @@ export function AuthProvider({ children }) {
       const userData = response.data?.user || response.user || { username }
       setUser(userData)
       setIsAuthenticated(true)
+      setPermissions(response.data?.permissions || response.permissions || [])
+      setRole(response.data?.role || response.role || null)
       console.log('✅ User authenticated:', userData)
       return response
     } catch (error) {
       console.error('❌ Login failed:', error.message)
       setUser(null)
       setIsAuthenticated(false)
+      setPermissions([])
+      setRole(null)
       throw error
     } finally {
       setLoading(false)
@@ -65,6 +75,8 @@ export function AuthProvider({ children }) {
       // Always clear local state regardless of API success
       setUser(null)
       setIsAuthenticated(false)
+      setPermissions([])
+      setRole(null)
       setLoading(false)
       console.log('🔓 Local session cleared')
     }
@@ -74,6 +86,8 @@ export function AuthProvider({ children }) {
     user,
     isAuthenticated,
     loading,
+    permissions,
+    role,
     login,
     logout,
     checkSession,
