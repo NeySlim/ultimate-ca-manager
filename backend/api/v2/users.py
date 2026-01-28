@@ -258,6 +258,7 @@ def reset_user_password(user_id):
 
 
 @bp.route('/api/v2/users/<int:user_id>/toggle', methods=['PATCH'])
+@bp.route('/api/v2/users/<int:user_id>/toggle-active', methods=['POST'])
 @require_auth()
 def toggle_user_status(user_id):
     """
