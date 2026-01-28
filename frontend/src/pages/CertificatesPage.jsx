@@ -12,6 +12,7 @@ import {
 import { certificatesService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks/usePermission'
+import { useDebounce } from '../hooks/useDebounce'
 import { extractCN, extractData, formatDate } from '../lib/utils'
 
 export default function CertificatesPage() {
@@ -24,6 +25,7 @@ export default function CertificatesPage() {
   const [selectedCert, setSelectedCert] = useState(null)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const debouncedSearch = useDebounce(searchQuery, 300)
   const [statusFilter, setStatusFilter] = useState('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -46,7 +48,7 @@ export default function CertificatesPage() {
       searchParams.delete('action')
       setSearchParams(searchParams)
     }
-  }, [page, statusFilter, searchQuery])
+  }, [page, statusFilter, debouncedSearch])
 
   // Handle selected param from navigation (e.g., after import redirect)
   useEffect(() => {
