@@ -210,11 +210,14 @@ export default function LoginPage() {
         {/* Title */}
         <div className="text-center">
           <h1 className="text-2xl font-bold text-text-primary mb-2">
-            {step === 'username' ? 'Sign In' : 'Welcome Back'}
+            {step === 'username' 
+              ? (username ? 'Welcome Back' : 'Sign In')
+              : 'Welcome Back'
+            }
           </h1>
           <p className="text-sm text-text-secondary">
             {step === 'username' 
-              ? 'Enter your username to continue'
+              ? (username ? 'Click to continue to your account' : 'Enter your username to continue')
               : statusMessage || (authMethod === 'password' ? 'Enter your password to continue' : 'Choose how to authenticate')
             }
           </p>
@@ -222,37 +225,83 @@ export default function LoginPage() {
 
         {/* Step 1: Username */}
         {step === 'username' && (
-          <form onSubmit={handleContinue} className="space-y-4">
-            <Input
-              label="Username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
-              disabled={loading}
-              autoComplete="username"
-              autoFocus
-              icon={<User size={18} />}
-            />
+          <div className="space-y-4">
+            {/* If username saved: show identity card */}
+            {username ? (
+              <>
+                {/* Clickable user identity card */}
+                <button
+                  onClick={handleContinue}
+                  disabled={loading}
+                  className="w-full text-left relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-4 hover:border-accent/50 hover:shadow-lg transition-all group"
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-accent/10 transition-colors" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                      <User size={24} className="text-white" weight="bold" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">Continue as</p>
+                      <p className="text-lg font-semibold text-text-primary truncate">{username}</p>
+                    </div>
+                    <div className="text-accent group-hover:translate-x-1 transition-transform">
+                      <ArrowRight size={24} weight="bold" />
+                    </div>
+                  </div>
+                  {loading && (
+                    <div className="absolute inset-0 bg-bg-primary/50 flex items-center justify-center rounded-xl">
+                      <LoadingSpinner size="md" />
+                    </div>
+                  )}
+                </button>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading || !username.trim()}
-            >
-              {loading ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  <span>Checking...</span>
-                </>
-              ) : (
-                <>
-                  <span>Continue</span>
-                  <ArrowRight size={18} weight="bold" />
-                </>
-              )}
-            </Button>
-          </form>
+                {/* Option to use different account */}
+                <button
+                  onClick={() => {
+                    setUsername('')
+                    localStorage.removeItem(STORAGE_KEY)
+                  }}
+                  className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-2"
+                  disabled={loading}
+                >
+                  Use a different account
+                </button>
+              </>
+            ) : (
+              /* No saved username: show input field */
+              <form onSubmit={handleContinue} className="space-y-4">
+                <Input
+                  label="Username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your username"
+                  disabled={loading}
+                  autoComplete="username"
+                  autoFocus
+                  icon={<User size={18} />}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={loading || !username.trim()}
+                >
+                  {loading ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      <span>Checking...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue</span>
+                      <ArrowRight size={18} weight="bold" />
+                    </>
+                  )}
+                </Button>
+              </form>
+            )}
+          </div>
         )}
 
         {/* Step 2: Authentication */}
