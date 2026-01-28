@@ -1,6 +1,7 @@
 /**
  * UCM Logo Component - Certificate Chain
  * Based on design from docs/design/logo-chain-complete.html
+ * Uses CSS variables from :root for colors
  */
 import { cn } from '../lib/utils'
 
@@ -11,17 +12,6 @@ export function Logo({
   filled = false,
   className 
 }) {
-  // Gradient style for chain links (from reference design)
-  const gradientStyle = {
-    background: filled 
-      ? 'linear-gradient(135deg, #5a8fc7, #7aa5d9)'
-      : 'transparent',
-    borderImage: filled 
-      ? 'none' 
-      : 'linear-gradient(135deg, #5a8fc7, #7aa5d9) 1',
-    borderStyle: 'solid'
-  }
-
   // Chain configuration based on variant (from reference design)
   const configs = {
     horizontal: {
@@ -73,13 +63,13 @@ export function Logo({
       {[0, 1, 2].map((i) => (
         <div
           key={i}
+          className={filled ? 'chain-link-filled' : 'chain-link-gradient'}
           style={{
             width: config.linkWidth,
             height: config.linkHeight,
             borderWidth: filled ? '0' : config.borderWidth,
             borderRadius: config.borderRadius,
-            transform: config.transforms[i],
-            ...gradientStyle
+            transform: config.transforms[i]
           }}
         />
       ))}
@@ -90,23 +80,15 @@ export function Logo({
     return <div className={className}>{chainIcon}</div>
   }
 
-  // Text gradient (matching chain gradient)
-  const textGradientStyle = {
-    background: 'linear-gradient(135deg, #5a8fc7, #7aa5d9)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text'
-  }
-
-  // With text - vertical variant (login page)
+  // With text - vertical variant
   if (variant === 'vertical') {
     return (
       <div className={cn('flex flex-col items-center', className)} style={{ gap: '12px' }}>
         {chainIcon}
         <div className="text-center">
           <div 
-            className="font-black tracking-tight leading-none"
-            style={{ fontSize: '32px', letterSpacing: '-1px', ...textGradientStyle }}
+            className="font-black tracking-tight leading-none logo-text-gradient"
+            style={{ fontSize: '32px', letterSpacing: '-1px' }}
           >
             UCM
           </div>
@@ -115,7 +97,7 @@ export function Logo({
             style={{ 
               fontSize: '9px', 
               letterSpacing: '2px', 
-              color: '#888', 
+              color: 'var(--text-tertiary)', 
               marginTop: '2px' 
             }}
           >
@@ -132,11 +114,10 @@ export function Logo({
       {chainIcon}
       <div className="flex flex-col">
         <div 
-          className="font-black tracking-tight leading-none"
+          className="font-black tracking-tight leading-none logo-text-gradient"
           style={{ 
             fontSize: variant === 'compact' ? '18px' : '32px',
-            letterSpacing: '-1px',
-            ...textGradientStyle 
+            letterSpacing: '-1px'
           }}
         >
           UCM
@@ -147,7 +128,7 @@ export function Logo({
             style={{ 
               fontSize: '9px', 
               letterSpacing: '2px', 
-              color: '#888',
+              color: 'var(--text-tertiary)',
               marginTop: '2px'
             }}
           >
