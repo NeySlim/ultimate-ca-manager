@@ -27,12 +27,19 @@ export function AuthProvider({ children }) {
   const checkSession = async () => {
     try {
       console.log('🔍 Checking session...')
-      const userData = await authService.getCurrentUser()
-      console.log('✅ Session valid:', userData)
+      const response = await authService.getCurrentUser()
+      console.log('✅ Session valid:', response)
+      
+      // Extract data from response (handles {data: {...}} structure)
+      const userData = response.data || response
+      
       setUser(userData.user || userData)
       setIsAuthenticated(true)
       setPermissions(userData.permissions || [])
       setRole(userData.role || null)
+      
+      console.log('✅ Permissions loaded:', userData.permissions)
+      console.log('✅ Role loaded:', userData.role)
     } catch (error) {
       console.log('❌ Session check failed:', error.message)
       setUser(null)
