@@ -8,11 +8,19 @@ import { apiClient } from './apiClient'
 class AuthMethodsService {
   /**
    * Detect available authentication methods
+   * @param {string} username - Optional username to get user-specific methods
    * @returns {Promise<Object>} Available methods
    */
-  async detectMethods() {
-    const response = await apiClient.get('/auth/methods')
-    return response.data
+  async detectMethods(username = null) {
+    if (username) {
+      // POST with username to get user-specific methods (WebAuthn credentials count, etc.)
+      const response = await apiClient.post('/auth/methods', { username })
+      return response.data
+    } else {
+      // GET for global methods only
+      const response = await apiClient.get('/auth/methods')
+      return response.data
+    }
   }
 
   /**
