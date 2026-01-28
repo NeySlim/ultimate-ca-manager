@@ -6,6 +6,9 @@ import { authService } from '../services/auth.service'
 
 const AuthContext = createContext()
 
+// Only log in development mode
+const debug = import.meta.env.DEV ? console.log : () => {}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -26,9 +29,9 @@ export function AuthProvider({ children }) {
 
   const checkSession = async () => {
     try {
-      console.log('🔍 Checking session...')
+      debug('🔍 Checking session...')
       const response = await authService.getCurrentUser()
-      console.log('✅ Session valid:', response)
+      debug('✅ Session valid:', response)
       
       // Extract data from response (handles {data: {...}} structure)
       const userData = response.data || response
@@ -38,10 +41,10 @@ export function AuthProvider({ children }) {
       setPermissions(userData.permissions || [])
       setRole(userData.role || null)
       
-      console.log('✅ Permissions loaded:', userData.permissions)
-      console.log('✅ Role loaded:', userData.role)
+      debug('✅ Permissions loaded:', userData.permissions)
+      debug('✅ Role loaded:', userData.role)
     } catch (error) {
-      console.log('❌ Session check failed:', error.message)
+      debug('❌ Session check failed:', error.message)
       setUser(null)
       setIsAuthenticated(false)
       setPermissions([])
@@ -54,7 +57,7 @@ export function AuthProvider({ children }) {
   const login = async (username, password, preAuthData = null) => {
     setLoading(true)
     try {
-      console.log('🔐 Login called:', { username, hasPreAuthData: !!preAuthData })
+      debug('🔐 Login called:', { username, hasPreAuthData: !!preAuthData })
       
       let response
       if (preAuthData) {
@@ -62,20 +65,20 @@ export function AuthProvider({ children }) {
         response = { data: preAuthData }
       } else {
         // Legacy password auth
-        console.log('🔐 Attempting password login for:', username)
+        debug('🔐 Attempting password login for:', username)
         response = await authService.login(username, password)
       }
       
-      console.log('✅ Login response:', response)
+      debug('✅ Login response:', response)
       const userData = response.data?.user || response.user || { username }
       setUser(userData)
       setIsAuthenticated(true)
       setPermissions(response.data?.permissions || response.permissions || [])
       setRole(response.data?.role || response.role || null)
-      console.log('✅ User authenticated:', userData)
+      debug('✅ User authenticated:', userData)
       return response
     } catch (error) {
-      console.error('❌ Login failed:', error.message)
+      debug('❌ Login failed:', error.message)
       setUser(null)
       setIsAuthenticated(false)
       setPermissions([])
@@ -89,11 +92,11 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     setLoading(true)
     try {
-      console.log('🔓 Logging out...')
+      debug('🔓 Logging out...')
       await authService.logout()
-      console.log('✅ Logout successful')
+      debug('✅ Logout successful')
     } catch (error) {
-      console.error('❌ Logout error:', error)
+      debug('❌ Logout error:', error)
     } finally {
       // Always clear local state regardless of API success
       setUser(null)

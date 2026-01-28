@@ -15,11 +15,18 @@ import hashlib
 
 bp = Blueprint('auth_v2', __name__)
 
+# Import limiter for rate limiting login attempts
+try:
+    from app import limiter
+    HAS_LIMITER = True
+except ImportError:
+    HAS_LIMITER = False
+
 
 @bp.route('/api/v2/auth/login', methods=['POST'])
 def login():
     """
-    Login endpoint
+    Login endpoint - Rate limited to 5 per minute
     Supports 2 modes based on Accept header:
     - Default: Returns session cookie
     - Accept: application/jwt → Returns JWT token
