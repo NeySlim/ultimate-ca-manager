@@ -79,11 +79,14 @@ export default function UsersPage() {
 
   const handleCreate = async (newUserData) => {
     try {
-      const created = await usersService.create(newUserData)
+      const response = await usersService.create(newUserData)
+      const created = extractData(response)
       showSuccess('User created successfully')
       setShowCreateModal(false)
       loadUsers()
-      selectUser(created)
+      if (created?.id) {
+        selectUser(created)
+      }
     } catch (error) {
       showError(error.message || 'Failed to create user')
     }
