@@ -12,6 +12,7 @@ const CSRsPage = lazy(() => import('./pages/CSRsPage'))
 const TemplatesPage = lazy(() => import('./pages/TemplatesPage'))
 const UsersPage = lazy(() => import('./pages/UsersPage'))
 const ACMEPage = lazy(() => import('./pages/ACMEPage'))
+const SCEPPage = lazy(() => import('./pages/SCEPPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const ImportExportPage = lazy(() => import('./pages/ImportExportPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
@@ -56,6 +57,7 @@ function AppRoutes() {
           <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
           <Route path="/acme" element={<ProtectedRoute><ACMEPage /></ProtectedRoute>} />
+          <Route path="/scep" element={<ProtectedRoute><SCEPPage /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           <Route path="/audit" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
           <Route path="/import" element={<ProtectedRoute><ImportExportPage /></ProtectedRoute>} />

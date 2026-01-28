@@ -3,7 +3,7 @@
  */
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
-  SignOut, Palette, Check, UserCircle, UploadSimple, ClockCounterClockwise
+  SignOut, Palette, Check, UserCircle, UploadSimple, ClockCounterClockwise, Robot
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -25,6 +25,7 @@ export function Sidebar({ activePage }) {
     { id: 'templates', icon: List, label: 'Templates', path: '/templates' },
     { id: 'users', icon: User, label: 'Users', path: '/users' },
     { id: 'acme', icon: Key, label: 'ACME', path: '/acme' },
+    { id: 'scep', icon: Robot, label: 'SCEP', path: '/scep' },
     { id: 'import', icon: UploadSimple, label: 'Import', path: '/import' },
     { id: 'audit', icon: ClockCounterClockwise, label: 'Audit', path: '/audit' },
     { id: 'settings', icon: Gear, label: 'Settings', path: '/settings' },

@@ -5,8 +5,9 @@ Settings Routes v2.0
 
 from flask import Blueprint, request, g
 from auth.unified import require_auth
-from utils.response import success_response, error_response
+from utils.response import success_response, error_response, created_response
 from models import db, SystemConfig
+from datetime import datetime, timezone
 
 bp = Blueprint('settings_v2', __name__)
 
@@ -505,32 +506,46 @@ def test_ldap_connection():
 
 
 # ============================================================================
-# Webhooks
+# Webhooks (stored as JSON in SystemConfig)
 # ============================================================================
+
+def get_webhooks():
+    """Get webhooks from SystemConfig"""
+    import json
+    config = SystemConfig.query.filter_by(key='webhooks').first()
+    if config and config.value:
+        try:
+            return json.loads(config.value)
+        except:
+            return []
+    return []
+
+
+def save_webhooks(webhooks):
+    """Save webhooks to SystemConfig"""
+    import json
+    config = SystemConfig.query.filter_by(key='webhooks').first()
+    if config:
+        config.value = json.dumps(webhooks)
+    else:
+        config = SystemConfig(key='webhooks', value=json.dumps(webhooks))
+        db.session.add(config)
+    db.session.commit()
+
 
 @bp.route('/api/v2/settings/webhooks', methods=['GET'])
 @require_auth(['read:settings'])
 def list_webhooks():
     """List configured webhooks"""
-    return success_response(
-        data=[
-            {
-                'id': 1,
-                'name': 'Slack Notifications',
-                'url': 'https://hooks.slack.com/...',
-                'events': ['certificate.created', 'certificate.revoked'],
-                'enabled': True,
-                'created_at': '2026-01-15T10:00:00Z'
-            }
-        ],
-        meta={'total': 1}
-    )
+    webhooks = get_webhooks()
+    return success_response(data=webhooks, meta={'total': len(webhooks)})
 
 
 @bp.route('/api/v2/settings/webhooks', methods=['POST'])
 @require_auth(['write:settings'])
 def create_webhook():
     """Create webhook"""
+    from datetime import datetime, timezone
     data = request.json
     
     if not data or not data.get('name'):
@@ -542,13 +557,26 @@ def create_webhook():
     if not data.get('events'):
         return error_response('At least one event required', 400)
     
-    # TODO: Validate and create webhook
-    # - Validate URL format
-    # - Validate events
-    # - Save to database
+    # Get existing webhooks
+    webhooks = get_webhooks()
+    
+    # Generate new ID
+    new_id = max([w.get('id', 0) for w in webhooks], default=0) + 1
+    
+    new_webhook = {
+        'id': new_id,
+        'name': data['name'],
+        'url': data['url'],
+        'events': data['events'],
+        'enabled': data.get('enabled', True),
+        'created_at': datetime.now(timezone.utc).isoformat()
+    }
+    
+    webhooks.append(new_webhook)
+    save_webhooks(webhooks)
     
     return created_response(
-        data={'id': 1, **data},
+        data=new_webhook,
         message='Webhook created successfully'
     )
 
@@ -557,7 +585,9 @@ def create_webhook():
 @require_auth(['write:settings'])
 def delete_webhook(webhook_id):
     """Delete webhook"""
-    # TODO: Delete webhook from database
+    webhooks = get_webhooks()
+    webhooks = [w for w in webhooks if w.get('id') != webhook_id]
+    save_webhooks(webhooks)
     
     from utils.response import no_content_response
     return no_content_response()
@@ -567,12 +597,33 @@ def delete_webhook(webhook_id):
 @require_auth(['write:settings'])
 def test_webhook(webhook_id):
     """Test webhook by sending a test event"""
-    # TODO: Send test payload to webhook URL
+    import requests as http_requests
     
-    return success_response(
-        data={'sent': True, 'status_code': 200},
-        message='Test webhook sent successfully'
-    )
+    webhooks = get_webhooks()
+    webhook = next((w for w in webhooks if w.get('id') == webhook_id), None)
+    
+    if not webhook:
+        return error_response('Webhook not found', 404)
+    
+    test_payload = {
+        'event': 'test',
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'data': {'message': 'This is a test webhook from UCM'}
+    }
+    
+    try:
+        response = http_requests.post(
+            webhook['url'],
+            json=test_payload,
+            timeout=10,
+            headers={'Content-Type': 'application/json', 'User-Agent': 'UCM-Webhook/2.0'}
+        )
+        return success_response(
+            data={'sent': True, 'status_code': response.status_code},
+            message=f'Test webhook sent (status: {response.status_code})'
+        )
+    except Exception as e:
+        return error_response(f'Failed to send webhook: {str(e)}', 500)
 
 
 # ============================================================================

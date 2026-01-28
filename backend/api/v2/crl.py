@@ -44,7 +44,7 @@ def regenerate_crl(ca_id):
         return error_response('CA not found', 404)
         
     try:
-        CRLService.generate_crl(ca.id, username='current_user') # TODO: get from g.user
+        CRLService.generate_crl(ca.id, username=getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin') # TODO: get from g.user
         
         crl = CRL.query.filter_by(caref=ca.refid).first()
         
