@@ -20,10 +20,19 @@ def list_certificates():
     
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    status = request.args.get('status')  # valid, revoked, expired, expiring
+    status = request.args.get('status')  # valid, revoked, expired, expiring, archived
     search = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'valid_to')  # Default sort by expiry
+    sort_order = request.args.get('sort_order', 'asc')  # Default ascending (expiring first)
+    include_archived = request.args.get('include_archived', 'false').lower() == 'true'
     
     query = Certificate.query
+    
+    # Filter archived by default (unless explicitly requested or status=archived)
+    if status == 'archived':
+        query = query.filter(Certificate.archived == True)
+    elif not include_archived:
+        query = query.filter(or_(Certificate.archived == False, Certificate.archived == None))
     
     # Apply status filter
     if status == 'revoked':
@@ -50,6 +59,13 @@ def list_certificates():
                 Certificate.serial_number.ilike(f'%{search}%')
             )
         )
+    
+    # Apply sorting BEFORE pagination
+    sort_column = getattr(Certificate, sort_by, Certificate.valid_to)
+    if sort_order == 'desc':
+        query = query.order_by(sort_column.desc())
+    else:
+        query = query.order_by(sort_column.asc())
     
     # Paginate
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
