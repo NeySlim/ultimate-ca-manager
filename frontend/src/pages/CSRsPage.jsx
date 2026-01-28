@@ -11,10 +11,12 @@ import {
 } from '../components'
 import { csrsService, casService } from '../services'
 import { useNotification } from '../contexts'
+import { usePermission } from '../hooks/usePermission'
 import { extractData } from '../lib/utils'
 
 export default function CSRsPage() {
   const { showSuccess, showError } = useNotification()
+  const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
   
   const [csrs, setCSRs] = useState([])
@@ -165,10 +167,12 @@ export default function CSRsPage() {
         }
       >
         <div className="p-4 space-y-3">
-          <Button onClick={() => setShowUploadModal(true)} className="w-full">
-            <Upload size={18} />
-            Upload CSR
-          </Button>
+          {canWrite('csrs') && (
+            <Button onClick={() => setShowUploadModal(true)} className="w-full">
+              <Upload size={18} />
+              Upload CSR
+            </Button>
+          )}
         </div>
 
         <div className="flex-1 overflow-auto">
@@ -204,23 +208,27 @@ export default function CSRsPage() {
         title={selectedCSR?.common_name || 'Select a CSR'}
         actions={selectedCSR && (
           <>
-            <Button 
-              variant="primary" 
-              size="sm" 
-              onClick={() => setShowSignModal(true)}
-              disabled={selectedCSR.status !== 'pending'}
-            >
-              <SignIn size={16} />
-              Sign
-            </Button>
+            {canWrite('csrs') && (
+              <Button 
+                variant="primary" 
+                size="sm" 
+                onClick={() => setShowSignModal(true)}
+                disabled={selectedCSR.status !== 'pending'}
+              >
+                <SignIn size={16} />
+                Sign
+              </Button>
+            )}
             <Button variant="secondary" size="sm" onClick={() => handleDownload(selectedCSR.id)}>
               <Download size={16} />
               Download
             </Button>
-            <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCSR.id)}>
-              <Trash size={16} />
-              Delete
-            </Button>
+            {canDelete('csrs') && (
+              <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCSR.id)}>
+                <Trash size={16} />
+                Delete
+              </Button>
+            )}
           </>
         )}
       >

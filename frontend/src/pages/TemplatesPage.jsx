@@ -319,10 +319,12 @@ export default function TemplatesPage() {
         title="Certificate Templates"
       >
         <div className="p-4 space-y-3">
-          <Button onClick={handleCreate} className="w-full">
-            <Plus size={18} />
-            Create Template
-          </Button>
+          {canWrite('templates') && (
+            <Button onClick={handleCreate} className="w-full">
+              <Plus size={18} />
+              Create Template
+            </Button>
+          )}
         </div>
 
         <div className="flex-1 overflow-auto">

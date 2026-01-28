@@ -14,10 +14,12 @@ import {
 } from '../components'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
+import { usePermission } from '../hooks/usePermission'
 import { extractCN, extractData, formatDate, formatDateTime } from '../lib/utils'
 
 export default function CAsPage() {
   const { showSuccess, showError } = useNotification()
+  const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
   
   const [cas, setCAs] = useState([])
@@ -543,10 +545,12 @@ export default function CAsPage() {
             </Tooltip>
           </div>
 
-          <Button onClick={() => setShowCreateModal(true)} className="w-full">
-            <ShieldCheck size={18} />
-            Create CA
-          </Button>
+          {canWrite('cas') && (
+            <Button onClick={() => setShowCreateModal(true)} className="w-full">
+              <ShieldCheck size={18} />
+              Create CA
+            </Button>
+          )}
         </div>
 
         <div className="flex-1 overflow-auto p-4">
@@ -605,18 +609,22 @@ export default function CAsPage() {
         title={selectedCA?.name || 'Select a CA'}
         actions={selectedCA && (
           <>
-            <Button variant="secondary" size="sm">
-              <PencilSimple size={16} />
-              Edit
-            </Button>
+            {canWrite('cas') && (
+              <Button variant="secondary" size="sm">
+                <PencilSimple size={16} />
+                Edit
+              </Button>
+            )}
             <ExportDropdown 
               onExport={(format) => handleExport(selectedCA.id, format)} 
               formats={['pem', 'der', 'pkcs12']}
             />
-            <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCA.id)}>
-              <Trash size={16} />
-              Delete
-            </Button>
+            {canDelete('cas') && (
+              <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCA.id)}>
+                <Trash size={16} />
+                Delete
+              </Button>
+            )}
           </>
         )}
       >
