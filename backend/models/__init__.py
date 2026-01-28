@@ -342,6 +342,7 @@ class Certificate(db.Model):
     revoked = db.Column(db.Boolean, default=False)
     revoked_at = db.Column(db.DateTime)
     revoke_reason = db.Column(db.String(100))
+    archived = db.Column(db.Boolean, default=False)  # For renewed certificates
     
     # Metadata
     imported_from = db.Column(db.String(50))
@@ -523,6 +524,7 @@ class Certificate(db.Model):
             "revoked": self.revoked,
             "revoked_at": self.revoked_at.isoformat() if self.revoked_at else None,
             "revoke_reason": self.revoke_reason,
+            "archived": self.archived or False,
             "imported_from": self.imported_from,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "created_by": self.created_by,
