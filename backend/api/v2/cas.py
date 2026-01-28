@@ -84,8 +84,21 @@ def list_cas_tree():
         # Add extra fields expected by UI
         ca['name'] = ca['descr']
         ca['type'] = 'Root CA' if ca['is_root'] else 'Intermediate'
-        ca['status'] = 'Active' # TODO: Check expiry
-        ca['certs'] = 0 # TODO: Get count
+        # Check expiry status
+        if ca['valid_to']:
+            from datetime import datetime
+            try:
+                valid_to = datetime.fromisoformat(ca['valid_to'].replace('Z', '+00:00'))
+                if valid_to < datetime.now(valid_to.tzinfo):
+                    ca['status'] = 'Expired'
+                else:
+                    ca['status'] = 'Active'
+            except:
+                ca['status'] = 'Active'
+        else:
+            ca['status'] = 'Active'
+        # Get certificate count
+        ca['certs'] = Certificate.query.filter_by(caref=ca['refid']).count()
         ca['expiry'] = ca['valid_to'].split('T')[0] if ca['valid_to'] else 'N/A'
 
     roots = []
@@ -350,6 +363,18 @@ def get_ca(ca_id):
     # Get basic model data
     ca_data = ca.to_dict()
     
+    # Get CRL status
+    crl_status = 'Not Generated'
+    next_crl_update = 'N/A'
+    try:
+        from services.crl_service import CRLService
+        crl_info = CRLService.get_crl_info(ca_id)
+        if crl_info and crl_info.get('exists'):
+            crl_status = 'Active'
+            next_crl_update = crl_info.get('next_update', 'N/A')
+    except:
+        pass
+    
     # Get parsed certificate details
     try:
         details = CAService.get_ca_details(ca_id)
@@ -361,8 +386,8 @@ def get_ca(ca_id):
             'keyAlgo': details.get('public_key', {}).get('algorithm', 'RSA'),
             'keySize': details.get('public_key', {}).get('size', 2048),
             'fingerprint': details.get('fingerprints', {}).get('sha256', ''),
-            'crlStatus': 'Active', # TODO: Check if CRL exists and is valid
-            'nextCrlUpdate': 'N/A' # TODO: Check CRL next update
+            'crlStatus': crl_status,
+            'nextCrlUpdate': next_crl_update
         })
     except Exception as e:
         # Fallback if parsing fails

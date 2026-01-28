@@ -74,7 +74,18 @@ def list_certificates():
 @bp.route('/api/v2/certificates', methods=['POST'])
 @require_auth(['write:certificates'])
 def create_certificate():
-    """Create certificate"""
+    """Create certificate - Real implementation"""
+    from models import Certificate, CA, db
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa, ec
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID
+    from datetime import datetime, timedelta
+    import base64
+    import uuid
+    import json
+    
     data = request.json
     
     if not data or not data.get('cn'):
@@ -83,10 +94,208 @@ def create_certificate():
     if not data.get('ca_id'):
         return error_response('CA ID is required', 400)
     
-    return created_response(
-        data={'id': 1, 'cn': data['cn']},
-        message='Certificate created successfully'
-    )
+    # Get the CA
+    ca = CA.query.get(data['ca_id'])
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    if not ca.prv:
+        return error_response('CA private key not available', 400)
+    
+    try:
+        # Load CA certificate and key
+        ca_cert_pem = base64.b64decode(ca.crt)
+        ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
+        ca_key_pem = base64.b64decode(ca.prv)
+        ca_key = serialization.load_pem_private_key(ca_key_pem, password=None, backend=default_backend())
+        
+        # Generate key pair
+        key_type = data.get('key_type', 'RSA')
+        key_size = data.get('key_size', 2048)
+        
+        if key_type.upper() == 'EC':
+            curve_name = data.get('curve', 'secp256r1')
+            curves = {
+                'secp256r1': ec.SECP256R1(),
+                'secp384r1': ec.SECP384R1(),
+                'secp521r1': ec.SECP521R1(),
+            }
+            curve = curves.get(curve_name, ec.SECP256R1())
+            new_key = ec.generate_private_key(curve, default_backend())
+        else:
+            new_key = rsa.generate_private_key(
+                public_exponent=65537,
+                key_size=int(key_size),
+                backend=default_backend()
+            )
+        
+        # Build subject
+        subject_attrs = [x509.NameAttribute(NameOID.COMMON_NAME, data['cn'])]
+        if data.get('organization'):
+            subject_attrs.append(x509.NameAttribute(NameOID.ORGANIZATION_NAME, data['organization']))
+        if data.get('organizational_unit'):
+            subject_attrs.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, data['organizational_unit']))
+        if data.get('country'):
+            subject_attrs.append(x509.NameAttribute(NameOID.COUNTRY_NAME, data['country']))
+        if data.get('state'):
+            subject_attrs.append(x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, data['state']))
+        if data.get('locality'):
+            subject_attrs.append(x509.NameAttribute(NameOID.LOCALITY_NAME, data['locality']))
+        if data.get('email'):
+            subject_attrs.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, data['email']))
+        
+        subject = x509.Name(subject_attrs)
+        
+        # Validity
+        validity_days = data.get('validity_days', 365)
+        now = datetime.utcnow()
+        not_before = now
+        not_after = now + timedelta(days=validity_days)
+        
+        # Build certificate
+        builder = x509.CertificateBuilder()
+        builder = builder.subject_name(subject)
+        builder = builder.issuer_name(ca_cert.subject)
+        builder = builder.public_key(new_key.public_key())
+        builder = builder.serial_number(x509.random_serial_number())
+        builder = builder.not_valid_before(not_before)
+        builder = builder.not_valid_after(not_after)
+        
+        # Basic Constraints (not a CA)
+        builder = builder.add_extension(
+            x509.BasicConstraints(ca=False, path_length=None),
+            critical=True
+        )
+        
+        # Key Usage
+        cert_type = data.get('cert_type', 'server')
+        if cert_type == 'server':
+            builder = builder.add_extension(
+                x509.KeyUsage(
+                    digital_signature=True, key_encipherment=True, content_commitment=False,
+                    data_encipherment=False, key_agreement=False, key_cert_sign=False,
+                    crl_sign=False, encipher_only=False, decipher_only=False
+                ),
+                critical=True
+            )
+            builder = builder.add_extension(
+                x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
+                critical=False
+            )
+        elif cert_type == 'client':
+            builder = builder.add_extension(
+                x509.KeyUsage(
+                    digital_signature=True, key_encipherment=False, content_commitment=False,
+                    data_encipherment=False, key_agreement=False, key_cert_sign=False,
+                    crl_sign=False, encipher_only=False, decipher_only=False
+                ),
+                critical=True
+            )
+            builder = builder.add_extension(
+                x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]),
+                critical=False
+            )
+        else:  # combined
+            builder = builder.add_extension(
+                x509.KeyUsage(
+                    digital_signature=True, key_encipherment=True, content_commitment=False,
+                    data_encipherment=False, key_agreement=False, key_cert_sign=False,
+                    crl_sign=False, encipher_only=False, decipher_only=False
+                ),
+                critical=True
+            )
+            builder = builder.add_extension(
+                x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH, ExtendedKeyUsageOID.CLIENT_AUTH]),
+                critical=False
+            )
+        
+        # Subject Alternative Names
+        san_list = []
+        if data.get('san_dns'):
+            for dns in data['san_dns']:
+                san_list.append(x509.DNSName(dns))
+        if data.get('san_ip'):
+            from ipaddress import ip_address
+            for ip in data['san_ip']:
+                san_list.append(x509.IPAddress(ip_address(ip)))
+        if data.get('san_email'):
+            for email in data['san_email']:
+                san_list.append(x509.RFC822Name(email))
+        
+        # Always include CN as DNS SAN for server certs
+        if cert_type in ['server', 'combined'] and data['cn'] not in (data.get('san_dns') or []):
+            san_list.insert(0, x509.DNSName(data['cn']))
+        
+        if san_list:
+            builder = builder.add_extension(
+                x509.SubjectAlternativeName(san_list),
+                critical=False
+            )
+        
+        # Subject Key Identifier
+        builder = builder.add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(new_key.public_key()),
+            critical=False
+        )
+        
+        # Authority Key Identifier
+        builder = builder.add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
+            critical=False
+        )
+        
+        # Sign certificate
+        new_cert = builder.sign(ca_key, hashes.SHA256(), default_backend())
+        
+        # Serialize
+        cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
+        key_pem = new_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption()
+        ).decode('utf-8')
+        
+        # Save to database
+        db_cert = Certificate(
+            refid=str(uuid.uuid4())[:8],
+            descr=data.get('description', data['cn']),
+            caref=ca.refid,
+            crt=base64.b64encode(cert_pem.encode()).decode(),
+            prv=base64.b64encode(key_pem.encode()).decode(),
+            cert_type=cert_type,
+            subject=','.join(f'{attr.oid._name}={attr.value}' for attr in subject),
+            issuer=','.join(f'{attr.oid._name}={attr.value}' for attr in ca_cert.subject),
+            serial_number=format(new_cert.serial_number, 'x'),
+            valid_from=not_before,
+            valid_to=not_after,
+            san_dns=json.dumps(data.get('san_dns', [])),
+            san_ip=json.dumps(data.get('san_ip', [])),
+            san_email=json.dumps(data.get('san_email', [])),
+            created_by=g.current_user.username if hasattr(g, 'current_user') else None
+        )
+        
+        db.session.add(db_cert)
+        db.session.commit()
+        
+        # Audit log
+        try:
+            from services.audit_service import AuditService
+            AuditService.log(
+                action='certificate_created',
+                user_id=g.current_user.id if hasattr(g, 'current_user') else None,
+                details={'certificate_id': db_cert.id, 'cn': data['cn'], 'ca_id': ca.id}
+            )
+        except Exception:
+            pass
+        
+        return created_response(
+            data=db_cert.to_dict(),
+            message='Certificate created successfully'
+        )
+        
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'Failed to create certificate: {str(e)}', 500)
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>', methods=['GET'])
