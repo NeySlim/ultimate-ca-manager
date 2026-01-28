@@ -1,148 +1,206 @@
 /**
  * Multi-Method Login Page
- * Cascade: mTLS → WebAuthn → Password
+ * Flow: Username → mTLS/WebAuthn → Password (fallback)
+ * Remembers last username in localStorage
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldCheck, Fingerprint, Key, LockKey } from '@phosphor-icons/react'
+import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft, CaretRight } from '@phosphor-icons/react'
 import { Card, Button, Input, Logo, LoadingSpinner } from '../components'
 import { useAuth, useNotification } from '../contexts'
 import { authMethodsService } from '../services/authMethods.service'
 
+const STORAGE_KEY = 'ucm_last_username'
+
 export default function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
-  const { showError, showSuccess } = useNotification()
+  const { showError, showSuccess, showInfo } = useNotification()
+  const passwordRef = useRef(null)
   
-  const [detecting, setDetecting] = useState(true)
-  const [methods, setMethods] = useState(null)
-  const [authMethod, setAuthMethod] = useState(null) // 'mtls' | 'webauthn' | 'password'
-  
-  // Password form
+  // Login flow step: 'username' | 'auth'
+  const [step, setStep] = useState('username')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [authMethod, setAuthMethod] = useState(null) // 'mtls' | 'webauthn' | 'password'
+  const [userMethods, setUserMethods] = useState(null) // Methods available for this user
+  const [statusMessage, setStatusMessage] = useState('')
 
-  // Detect available methods on mount
+  // Load last username on mount
   useEffect(() => {
-    detectAuthMethods()
+    const lastUsername = localStorage.getItem(STORAGE_KEY)
+    if (lastUsername) {
+      setUsername(lastUsername)
+    }
   }, [])
 
-  const detectAuthMethods = async () => {
-    try {
-      const availableMethods = await authMethodsService.detectMethods()
-      setMethods(availableMethods)
-      
-      // Auto-select best method in cascade order
-      if (availableMethods.mtls && availableMethods.mtls_status === 'enrolled') {
-        // mTLS certificate present and enrolled → auto-login
-        setAuthMethod('mtls')
-        await handleMTLSLogin()
-      } else if (availableMethods.webauthn && authMethodsService.isWebAuthnSupported()) {
-        // WebAuthn available
-        setAuthMethod('webauthn')
-      } else {
-        // Fallback to password
-        setAuthMethod('password')
-      }
-    } catch (error) {
-      console.error('Failed to detect auth methods:', error)
-      // Fallback to password on error
-      setAuthMethod('password')
-      setMethods({ password: true })
-    } finally {
-      setDetecting(false)
+  // Focus password field when switching to password auth
+  useEffect(() => {
+    if (authMethod === 'password' && step === 'auth' && passwordRef.current) {
+      passwordRef.current.focus()
+    }
+  }, [authMethod, step])
+
+  // Save username to localStorage
+  const saveUsername = (name) => {
+    if (name) {
+      localStorage.setItem(STORAGE_KEY, name)
     }
   }
 
-  const handleMTLSLogin = async () => {
-    setLoading(true)
-    try {
-      const userData = await authMethodsService.loginMTLS()
-      
-      // Update auth context
-      await login(userData.user.username, null, userData)
-      
-      showSuccess(`Logged in via mTLS: ${userData.user.username}`)
-      navigate('/dashboard')
-    } catch (error) {
-      showError(error.message || 'mTLS authentication failed')
-      // Fallback to next method
-      if (methods?.webauthn && authMethodsService.isWebAuthnSupported()) {
-        setAuthMethod('webauthn')
-      } else {
-        setAuthMethod('password')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleWebAuthnLogin = async () => {
-    if (!username) {
+  // Step 1: Continue with username → detect methods and try auto-login
+  const handleContinue = async (e) => {
+    e?.preventDefault()
+    
+    if (!username.trim()) {
       showError('Please enter your username')
       return
     }
 
     setLoading(true)
+    setStatusMessage('Checking authentication methods...')
+    
     try {
-      const userData = await authMethodsService.authenticateWebAuthn(username)
+      // Save username for next time
+      saveUsername(username)
       
-      // Update auth context
-      await login(username, null, userData)
+      // Check available methods for this user
+      const methods = await authMethodsService.detectMethods(username)
+      setUserMethods(methods)
       
-      showSuccess(`Logged in via WebAuthn: ${username}`)
-      navigate('/dashboard')
-    } catch (error) {
-      showError(error.message || 'WebAuthn authentication failed')
-      // Fallback to password
+      // Move to auth step
+      setStep('auth')
+      
+      // Try cascade: mTLS → WebAuthn → Password
+      
+      // 1. Try mTLS if available
+      if (methods.mtls && methods.mtls_status === 'enrolled') {
+        setAuthMethod('mtls')
+        setStatusMessage('Verifying client certificate...')
+        await tryMTLSLogin()
+        return
+      }
+      
+      // 2. Try WebAuthn if user has registered keys
+      if (methods.webauthn && methods.webauthn_credentials > 0 && authMethodsService.isWebAuthnSupported()) {
+        setAuthMethod('webauthn')
+        setStatusMessage('Waiting for security key...')
+        await tryWebAuthnLogin()
+        return
+      }
+      
+      // 3. Fallback to password
       setAuthMethod('password')
+      setStatusMessage('')
+      
+    } catch (error) {
+      console.error('Auth detection failed:', error)
+      // On error, go directly to password
+      setStep('auth')
+      setAuthMethod('password')
+      setUserMethods({ password: true })
+      setStatusMessage('')
     } finally {
       setLoading(false)
     }
   }
 
+  // Try mTLS auto-login
+  const tryMTLSLogin = async () => {
+    try {
+      const userData = await authMethodsService.loginMTLS()
+      saveUsername(userData.user.username)
+      await login(userData.user.username, null, userData)
+      showSuccess(`Welcome back, ${userData.user.username}!`)
+      navigate('/dashboard')
+    } catch (error) {
+      console.log('mTLS login failed, trying next method:', error.message)
+      // Try WebAuthn next
+      if (userMethods?.webauthn && userMethods.webauthn_credentials > 0 && authMethodsService.isWebAuthnSupported()) {
+        setAuthMethod('webauthn')
+        setStatusMessage('Waiting for security key...')
+        await tryWebAuthnLogin()
+      } else {
+        // Fallback to password
+        setAuthMethod('password')
+        setStatusMessage('')
+        setLoading(false)
+      }
+    }
+  }
+
+  // Try WebAuthn login
+  const tryWebAuthnLogin = async () => {
+    try {
+      setStatusMessage('Touch your security key...')
+      const userData = await authMethodsService.authenticateWebAuthn(username)
+      saveUsername(username)
+      await login(username, null, userData)
+      showSuccess(`Welcome back, ${username}!`)
+      navigate('/dashboard')
+    } catch (error) {
+      console.log('WebAuthn login failed:', error.message)
+      // User cancelled or error → show password form
+      setAuthMethod('password')
+      setStatusMessage('')
+      setLoading(false)
+      if (error.message?.includes('cancelled') || error.message?.includes('abort')) {
+        showInfo('Security key cancelled. Use password instead.')
+      }
+    }
+  }
+
+  // Manual WebAuthn retry
+  const handleWebAuthnRetry = async () => {
+    setLoading(true)
+    await tryWebAuthnLogin()
+  }
+
+  // Password login
   const handlePasswordLogin = async (e) => {
     e.preventDefault()
     
-    if (!username || !password) {
-      showError('Please enter username and password')
+    if (!password) {
+      showError('Please enter your password')
       return
     }
 
     setLoading(true)
+    setStatusMessage('Signing in...')
+    
     try {
       const userData = await authMethodsService.loginPassword(username, password)
-      
-      // Update auth context
+      saveUsername(username)
       await login(username, password, userData)
-      
-      showSuccess(`Login successful: ${username}`)
+      showSuccess(`Welcome back, ${username}!`)
       navigate('/dashboard')
     } catch (error) {
-      showError(error.message || 'Login failed')
+      showError(error.message || 'Invalid credentials')
+      setPassword('')
     } finally {
       setLoading(false)
+      setStatusMessage('')
     }
   }
 
-  // Detecting methods
-  if (detecting) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary">
-        <Card className="w-full max-w-md p-8">
-          <div className="flex flex-col items-center gap-4">
-            <Logo variant="horizontal" size="lg" />
-            <LoadingSpinner size="lg" />
-            <p className="text-sm text-text-secondary">Detecting authentication methods...</p>
-          </div>
-        </Card>
-      </div>
-    )
+  // Go back to username step
+  const handleBack = () => {
+    setStep('username')
+    setAuthMethod(null)
+    setPassword('')
+    setStatusMessage('')
+  }
+
+  // Change user (clear username)
+  const handleChangeUser = () => {
+    setUsername('')
+    localStorage.removeItem(STORAGE_KEY)
+    handleBack()
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary p-4">
       <Card className="w-full max-w-md p-8 space-y-6">
         {/* Logo */}
         <div className="flex justify-center mb-2">
@@ -152,82 +210,19 @@ export default function LoginPage() {
         {/* Title */}
         <div className="text-center">
           <h1 className="text-2xl font-bold text-text-primary mb-2">
-            Welcome Back
+            {step === 'username' ? 'Sign In' : `Welcome, ${username}`}
           </h1>
           <p className="text-sm text-text-secondary">
-            {authMethod === 'mtls' && 'Authenticating with client certificate...'}
-            {authMethod === 'webauthn' && 'Sign in with your security key'}
-            {authMethod === 'password' && 'Sign in to your account'}
+            {step === 'username' 
+              ? 'Enter your username to continue'
+              : statusMessage || (authMethod === 'password' ? 'Enter your password' : 'Choose authentication method')
+            }
           </p>
         </div>
 
-        {/* Auth Method Indicator */}
-        <div className="flex justify-center gap-2 p-3 bg-bg-secondary rounded-lg border border-border">
-          {methods?.mtls && (
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${authMethod === 'mtls' ? 'bg-accent text-white' : 'text-text-secondary'}`}>
-              <ShieldCheck weight="fill" size={16} />
-              <span className="text-xs font-medium">mTLS</span>
-            </div>
-          )}
-          {methods?.webauthn && authMethodsService.isWebAuthnSupported() && (
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${authMethod === 'webauthn' ? 'bg-accent text-white' : 'text-text-secondary'}`}>
-              <Fingerprint weight="fill" size={16} />
-              <span className="text-xs font-medium">WebAuthn</span>
-            </div>
-          )}
-          {methods?.password && (
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded ${authMethod === 'password' ? 'bg-accent text-white' : 'text-text-secondary'}`}>
-              <Key weight="fill" size={16} />
-              <span className="text-xs font-medium">Password</span>
-            </div>
-          )}
-        </div>
-
-        {/* mTLS Auto-Login (shown during auto-login) */}
-        {authMethod === 'mtls' && loading && (
-          <div className="flex flex-col items-center gap-4 py-4">
-            <LoadingSpinner size="lg" />
-            <p className="text-sm text-text-secondary">
-              Verifying client certificate...
-            </p>
-          </div>
-        )}
-
-        {/* WebAuthn Form */}
-        {authMethod === 'webauthn' && !loading && (
-          <div className="space-y-4">
-            <Input
-              label="Username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
-              autoComplete="username"
-              autoFocus
-            />
-
-            <Button
-              onClick={handleWebAuthnLogin}
-              className="w-full"
-              disabled={loading || !username}
-            >
-              <Fingerprint weight="fill" size={20} />
-              {loading ? 'Authenticating...' : 'Authenticate with Security Key'}
-            </Button>
-
-            {/* Fallback to password */}
-            <button
-              onClick={() => setAuthMethod('password')}
-              className="w-full text-sm text-text-secondary hover:text-accent transition-colors"
-            >
-              Use password instead
-            </button>
-          </div>
-        )}
-
-        {/* Password Form */}
-        {authMethod === 'password' && (
-          <form onSubmit={handlePasswordLogin} className="space-y-4">
+        {/* Step 1: Username */}
+        {step === 'username' && (
+          <form onSubmit={handleContinue} className="space-y-4">
             <Input
               label="Username"
               type="text"
@@ -237,45 +232,174 @@ export default function LoginPage() {
               disabled={loading}
               autoComplete="username"
               autoFocus
-            />
-
-            <Input
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              disabled={loading}
-              autoComplete="current-password"
+              icon={<User size={18} />}
             />
 
             <Button
               type="submit"
               className="w-full"
-              disabled={loading || !username || !password}
+              disabled={loading || !username.trim()}
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span>Checking...</span>
+                </>
+              ) : (
+                <>
+                  <span>Continue</span>
+                  <ArrowRight size={18} weight="bold" />
+                </>
+              )}
             </Button>
-
-            {/* Show other methods if available */}
-            {(methods?.webauthn && authMethodsService.isWebAuthnSupported()) && (
-              <button
-                onClick={() => setAuthMethod('webauthn')}
-                className="w-full text-sm text-text-secondary hover:text-accent transition-colors"
-                type="button"
-              >
-                Use security key instead
-              </button>
-            )}
           </form>
+        )}
+
+        {/* Step 2: Authentication */}
+        {step === 'auth' && (
+          <div className="space-y-4">
+            {/* User badge with change option */}
+            <div className="flex items-center justify-between p-3 bg-bg-secondary rounded-lg border border-border">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+                  <User size={16} className="text-accent" weight="fill" />
+                </div>
+                <span className="font-medium text-text-primary">{username}</span>
+              </div>
+              <button
+                onClick={handleChangeUser}
+                className="text-xs text-text-secondary hover:text-accent transition-colors"
+                disabled={loading}
+              >
+                Not you?
+              </button>
+            </div>
+
+            {/* Loading state for auto-auth */}
+            {loading && (authMethod === 'mtls' || authMethod === 'webauthn') && (
+              <div className="flex flex-col items-center gap-4 py-6">
+                <div className="relative">
+                  <LoadingSpinner size="lg" />
+                  {authMethod === 'mtls' && <ShieldCheck size={24} className="absolute inset-0 m-auto text-accent" />}
+                  {authMethod === 'webauthn' && <Fingerprint size={24} className="absolute inset-0 m-auto text-accent" />}
+                </div>
+                <p className="text-sm text-text-secondary animate-pulse">
+                  {statusMessage}
+                </p>
+              </div>
+            )}
+
+            {/* WebAuthn option (when not loading) */}
+            {authMethod === 'webauthn' && !loading && (
+              <div className="space-y-3">
+                <Button
+                  onClick={handleWebAuthnRetry}
+                  className="w-full"
+                  variant="secondary"
+                  disabled={loading}
+                >
+                  <Fingerprint size={20} weight="fill" />
+                  <span>Try Security Key Again</span>
+                </Button>
+                
+                <button
+                  onClick={() => setAuthMethod('password')}
+                  className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-2"
+                >
+                  Use password instead
+                </button>
+              </div>
+            )}
+
+            {/* Password form */}
+            {authMethod === 'password' && (
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
+                <Input
+                  ref={passwordRef}
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  disabled={loading}
+                  autoComplete="current-password"
+                  autoFocus
+                  icon={<Key size={18} />}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={loading || !password}
+                >
+                  {loading ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      <span>Signing in...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Key size={18} weight="fill" />
+                      <span>Sign In</span>
+                    </>
+                  )}
+                </Button>
+
+                {/* Show WebAuthn option if available */}
+                {userMethods?.webauthn && userMethods.webauthn_credentials > 0 && authMethodsService.isWebAuthnSupported() && (
+                  <button
+                    onClick={() => {
+                      setAuthMethod('webauthn')
+                      handleWebAuthnRetry()
+                    }}
+                    className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-2 flex items-center justify-center gap-2"
+                    type="button"
+                    disabled={loading}
+                  >
+                    <Fingerprint size={16} />
+                    <span>Use security key instead</span>
+                  </button>
+                )}
+              </form>
+            )}
+
+            {/* Back button */}
+            <button
+              onClick={handleBack}
+              className="w-full text-sm text-text-secondary hover:text-text-primary transition-colors py-2 flex items-center justify-center gap-1"
+              disabled={loading}
+            >
+              <ArrowLeft size={14} />
+              <span>Back</span>
+            </button>
+          </div>
+        )}
+
+        {/* Auth methods available indicator */}
+        {step === 'auth' && userMethods && (
+          <div className="flex justify-center gap-2 pt-2">
+            {userMethods.mtls && (
+              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'mtls' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+                <ShieldCheck size={12} weight="fill" />
+                <span>mTLS</span>
+              </div>
+            )}
+            {userMethods.webauthn && userMethods.webauthn_credentials > 0 && (
+              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'webauthn' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+                <Fingerprint size={12} weight="fill" />
+                <span>Key</span>
+              </div>
+            )}
+            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'password' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+              <Key size={12} weight="fill" />
+              <span>Password</span>
+            </div>
+          </div>
         )}
 
         {/* Footer */}
         <div className="text-center text-xs text-text-secondary pt-4 border-t border-border">
           <p>Ultimate Certificate Manager v4</p>
-          <p className="mt-1 opacity-70">
-            Secured with {authMethod === 'mtls' ? 'mTLS' : authMethod === 'webauthn' ? 'WebAuthn' : 'password'} authentication
-          </p>
         </div>
       </Card>
     </div>
