@@ -1,29 +1,19 @@
 /**
- * Login Page
+ * Login Page - Clean and simple
  */
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, Input, Logo } from '../components'
 import { useAuth, useNotification } from '../contexts'
-import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { login, isAuthenticated, loading: authLoading } = useAuth()
+  const { login } = useAuth()
   const { showError, showSuccess } = useNotification()
   
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-
-  // Force redirect if already authenticated (wait for auth check to complete)
-  useEffect(() => {
-    console.log('🔍 LoginPage check - isAuthenticated:', isAuthenticated, 'loading:', loading)
-    if (!loading && isAuthenticated) {
-      console.log('✅ User already authenticated, redirecting...')
-      navigate('/', { replace: true })
-    }
-  }, [isAuthenticated, loading, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -37,66 +27,69 @@ export default function LoginPage() {
     try {
       await login(username, password)
       showSuccess('Login successful!')
-      navigate('/dashboard')
+      // Force full page reload to ensure cookies are set
+      window.location.href = '/dashboard'
     } catch (error) {
-      showError(error.message || 'Invalid credentials')
-    } finally {
+      showError(error.message || 'Login failed')
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg-primary p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary">
+      <Card className="w-full max-w-md p-8 space-y-6">
         {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <Logo variant="horizontal" size="md" />
+        <div className="flex justify-center mb-6">
+          <Logo variant="horizontal" size="lg" />
         </div>
 
-        {/* Login Card */}
-        <Card>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <h2 className="text-sm font-semibold text-text-primary mb-0.5">Sign In</h2>
-              <p className="text-xs text-text-secondary">Enter your credentials to continue</p>
-            </div>
+        {/* Title */}
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-text-primary mb-2">
+            Welcome Back
+          </h1>
+          <p className="text-sm text-text-secondary">
+            Sign in to your account
+          </p>
+        </div>
 
-            <Input
-              label="Username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
-              disabled={loading}
-              autoComplete="username"
-              autoFocus
-            />
+        {/* Login Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter your username"
+            disabled={loading}
+            autoComplete="username"
+            autoFocus
+          />
 
-            <Input
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              disabled={loading}
-              autoComplete="current-password"
-            />
+          <Input
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            disabled={loading}
+            autoComplete="current-password"
+          />
 
-            <Button 
-              type="submit" 
-              className="w-full"
-              disabled={loading}
-            >
-              {loading ? <LoadingSpinner size="sm" /> : 'Sign In'}
-            </Button>
-          </form>
-        </Card>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading}
+          >
+            {loading ? 'Signing in...' : 'Sign In'}
+          </Button>
+        </form>
 
         {/* Footer */}
-        <p className="text-center text-xs text-text-secondary mt-4">
-          UCM v4.0 • Powered by Radix UI
-        </p>
-      </div>
+        <div className="text-center text-xs text-text-secondary pt-4 border-t border-border">
+          <p>Ultimate Certificate Manager v4</p>
+        </div>
+      </Card>
     </div>
   )
 }
