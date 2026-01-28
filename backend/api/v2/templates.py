@@ -263,3 +263,183 @@ def delete_template(template_id):
     except Exception as e:
         db.session.rollback()
         return error_response(f'Failed to delete template: {str(e)}', 500)
+
+
+@bp.route('/api/v2/templates/<int:template_id>/export', methods=['GET'])
+@require_auth(['read:templates'])
+def export_template(template_id):
+    """
+    Export template as JSON
+    
+    GET /api/v2/templates/{template_id}/export
+    """
+    from flask import Response
+    import json
+    
+    template = CertificateTemplate.query.get(template_id)
+    if not template:
+        return error_response('Template not found', 404)
+    
+    export_data = {
+        'name': template.name,
+        'description': template.description,
+        'template_type': template.template_type,
+        'key_type': template.key_type,
+        'validity_days': template.validity_days,
+        'digest': template.digest,
+        'dn_template': template.dn_template,
+        'extensions_template': template.extensions_template,
+        'is_system': False,  # Exported templates are not system
+        'is_active': template.is_active,
+    }
+    
+    return Response(
+        json.dumps(export_data, indent=2),
+        mimetype='application/json',
+        headers={'Content-Disposition': f'attachment; filename="{template.name}.json"'}
+    )
+
+
+@bp.route('/api/v2/templates/export', methods=['GET'])
+@require_auth(['read:templates'])
+def export_all_templates():
+    """
+    Export all templates as JSON array
+    
+    GET /api/v2/templates/export
+    """
+    from flask import Response
+    import json
+    
+    templates = CertificateTemplate.query.filter_by(is_system=False).all()
+    
+    export_data = []
+    for template in templates:
+        export_data.append({
+            'name': template.name,
+            'description': template.description,
+            'template_type': template.template_type,
+            'key_type': template.key_type,
+            'validity_days': template.validity_days,
+            'digest': template.digest,
+            'dn_template': template.dn_template,
+            'extensions_template': template.extensions_template,
+            'is_system': False,
+            'is_active': template.is_active,
+        })
+    
+    return Response(
+        json.dumps(export_data, indent=2),
+        mimetype='application/json',
+        headers={'Content-Disposition': f'attachment; filename="templates_export.json"'}
+    )
+
+
+@bp.route('/api/v2/templates/import', methods=['POST'])
+@require_auth(['write:templates'])
+def import_template():
+    """
+    Import template from JSON file or pasted JSON content
+    
+    Form data:
+        file: JSON file (optional if json_content provided)
+        json_content: Pasted JSON content (optional if file provided)
+        update_existing: Whether to update if name exists (default: false)
+    """
+    import json
+    
+    # Get JSON data from file or pasted content
+    json_data = None
+    
+    if 'file' in request.files and request.files['file'].filename:
+        file = request.files['file']
+        json_data = file.read().decode('utf-8')
+    elif request.form.get('json_content'):
+        json_data = request.form.get('json_content')
+    else:
+        return error_response('No file or JSON content provided', 400)
+    
+    update_existing = request.form.get('update_existing', 'false').lower() == 'true'
+    
+    try:
+        data = json.loads(json_data)
+        
+        # Handle both single template and array
+        templates_to_import = data if isinstance(data, list) else [data]
+        
+        imported = []
+        updated = []
+        skipped = []
+        
+        for tpl_data in templates_to_import:
+            if not tpl_data.get('name'):
+                skipped.append('Template without name')
+                continue
+            
+            # Check for existing
+            existing = CertificateTemplate.query.filter_by(name=tpl_data['name']).first()
+            
+            if existing:
+                if existing.is_system:
+                    skipped.append(f"{tpl_data['name']} (system template)")
+                    continue
+                    
+                if not update_existing:
+                    skipped.append(f"{tpl_data['name']} (already exists)")
+                    continue
+                
+                # Update existing
+                existing.description = tpl_data.get('description', existing.description)
+                existing.template_type = tpl_data.get('template_type', existing.template_type)
+                existing.key_type = tpl_data.get('key_type', existing.key_type)
+                existing.validity_days = tpl_data.get('validity_days', existing.validity_days)
+                existing.digest = tpl_data.get('digest', existing.digest)
+                existing.dn_template = tpl_data.get('dn_template', existing.dn_template)
+                existing.extensions_template = tpl_data.get('extensions_template', existing.extensions_template)
+                existing.is_active = tpl_data.get('is_active', existing.is_active)
+                updated.append(existing.name)
+            else:
+                # Create new
+                template = CertificateTemplate(
+                    name=tpl_data['name'],
+                    description=tpl_data.get('description', ''),
+                    template_type=tpl_data.get('template_type', 'server'),
+                    key_type=tpl_data.get('key_type', 'rsa:2048'),
+                    validity_days=tpl_data.get('validity_days', 365),
+                    digest=tpl_data.get('digest', 'sha256'),
+                    dn_template=tpl_data.get('dn_template'),
+                    extensions_template=tpl_data.get('extensions_template'),
+                    is_system=False,
+                    is_active=tpl_data.get('is_active', True),
+                )
+                db.session.add(template)
+                imported.append(template.name)
+        
+        db.session.commit()
+        
+        # Build message
+        msg_parts = []
+        if imported:
+            msg_parts.append(f"Imported: {', '.join(imported)}")
+        if updated:
+            msg_parts.append(f"Updated: {', '.join(updated)}")
+        if skipped:
+            msg_parts.append(f"Skipped: {', '.join(skipped)}")
+        
+        return success_response(
+            data={
+                'imported': len(imported),
+                'updated': len(updated),
+                'skipped': len(skipped)
+            },
+            message=' | '.join(msg_parts) or 'No templates imported'
+        )
+        
+    except json.JSONDecodeError as e:
+        return error_response(f'Invalid JSON: {str(e)}', 400)
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(f"Template Import Error: {str(e)}")
+        print(traceback.format_exc())
+        return error_response(f'Import failed: {str(e)}', 500)
