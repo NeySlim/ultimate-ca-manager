@@ -122,6 +122,19 @@ export default function CertificatesPage() {
     }
   }
 
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to permanently delete this certificate? This action cannot be undone.')) return
+    
+    try {
+      await certificatesService.delete(id)
+      showSuccess('Certificate deleted successfully')
+      setSelectedCert(null)
+      loadCertificates()
+    } catch (error) {
+      showError(error.message || 'Failed to delete certificate')
+    }
+  }
+
   const handleRenew = async (id) => {
     try {
       await certificatesService.renew(id)
@@ -519,6 +532,12 @@ export default function CertificatesPage() {
               <Button variant="danger" size="sm" onClick={() => handleRevoke(selectedCert.id)}>
                 <X size={16} />
                 Revoke
+              </Button>
+            )}
+            {canDelete('certificates') && (
+              <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCert.id)}>
+                <Trash size={16} />
+                Delete
               </Button>
             )}
           </>
