@@ -6,26 +6,68 @@ Settings Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from models import db, SystemConfig
 
 bp = Blueprint('settings_v2', __name__)
+
+
+def get_config(key, default=None):
+    """Get config value from database"""
+    config = SystemConfig.query.filter_by(key=key).first()
+    return config.value if config else default
+
+
+def set_config(key, value):
+    """Set config value in database"""
+    config = SystemConfig.query.filter_by(key=key).first()
+    if config:
+        config.value = str(value) if value is not None else None
+    else:
+        config = SystemConfig(key=key, value=str(value) if value is not None else None)
+        db.session.add(config)
 
 
 @bp.route('/api/v2/settings/general', methods=['GET'])
 @require_auth(['read:settings'])
 def get_general_settings():
-    """Get general settings"""
+    """Get general settings from database"""
     return success_response(data={
-        'site_name': 'UCM',
-        'timezone': 'UTC'
+        'site_name': get_config('site_name', 'UCM'),
+        'timezone': get_config('timezone', 'UTC'),
+        'auto_backup_enabled': get_config('auto_backup_enabled', 'false') == 'true',
+        'backup_frequency': get_config('backup_frequency', 'daily'),
+        'backup_retention_days': int(get_config('backup_retention_days', '30')),
+        'backup_password': '',  # Never return password
+        'session_timeout': int(get_config('session_timeout', '3600')),
+        'max_login_attempts': int(get_config('max_login_attempts', '5')),
+        'lockout_duration': int(get_config('lockout_duration', '300')),
     })
 
 
 @bp.route('/api/v2/settings/general', methods=['PATCH'])
 @require_auth(['write:settings'])
 def update_general_settings():
-    """Update general settings"""
-    data = request.json
-    return success_response(data=data, message='Settings updated')
+    """Update general settings in database"""
+    data = request.json or {}
+    
+    # List of allowed settings
+    allowed_keys = [
+        'site_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
+        'backup_retention_days', 'backup_password', 'session_timeout',
+        'max_login_attempts', 'lockout_duration'
+    ]
+    
+    for key in allowed_keys:
+        if key in data:
+            value = data[key]
+            # Convert booleans to string
+            if isinstance(value, bool):
+                value = 'true' if value else 'false'
+            set_config(key, value)
+    
+    db.session.commit()
+    
+    return success_response(message='Settings saved successfully')
 
 
 @bp.route('/api/v2/settings/users', methods=['GET'])
