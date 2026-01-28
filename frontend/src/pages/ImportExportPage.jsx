@@ -23,7 +23,7 @@ export default function ImportExportPage() {
   const [importPassword, setImportPassword] = useState('')
   const [selectedFile, setSelectedFile] = useState(null)
   const [cas, setCas] = useState([])
-  const [selectedCaId, setSelectedCaId] = useState('')
+  const [selectedCaId, setSelectedCaId] = useState('auto')
   
   // OpnSense connection details
   const [opnsenseHost, setOpnsenseHost] = useState('')
@@ -71,7 +71,7 @@ export default function ImportExportPage() {
       formData.append('file', selectedFile)
       if (importName) formData.append('name', importName)
       if (importPassword) formData.append('password', importPassword)
-      if (selectedCaId) formData.append('ca_id', selectedCaId)
+      if (selectedCaId && selectedCaId !== 'auto') formData.append('ca_id', selectedCaId)
       formData.append('format', 'auto')
       
       await certificatesService.import(formData)
@@ -79,6 +79,7 @@ export default function ImportExportPage() {
       setSelectedFile(null)
       setImportName('')
       setImportPassword('')
+      setSelectedCaId('auto')
       if (certFileRef.current) certFileRef.current.value = ''
     } catch (error) {
       showError(error.message || 'Failed to import certificate')
@@ -369,7 +370,7 @@ export default function ImportExportPage() {
                 value={selectedCaId}
                 onChange={(e) => setSelectedCaId(e.target.value)}
                 options={[
-                  { value: '', label: 'Auto-detect from issuer' },
+                  { value: 'auto', label: 'Auto-detect from issuer' },
                   ...cas.map(ca => ({ value: ca.id.toString(), label: ca.name }))
                 ]}
               />
