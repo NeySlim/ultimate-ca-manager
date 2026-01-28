@@ -14,6 +14,7 @@ import { extractData } from '../lib/utils'
 
 export default function UsersPage() {
   const { showSuccess, showError } = useNotification()
+  const { canWrite, canDelete } = usePermission()
   
   const [users, setUsers] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
@@ -160,7 +161,7 @@ export default function UsersPage() {
     <>
       <ExplorerPanel
         title={selectedUser?.username || 'Select a user'}
-        actions={selectedUser && (
+        actions={selectedUser && canWrite('users') && (
           <>
             {editing ? (
               <Button size="sm" onClick={handleUpdate}>
