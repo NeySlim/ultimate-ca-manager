@@ -110,6 +110,8 @@ def login_password():
     
     Returns session cookie + user info
     """
+    from services.audit_service import AuditService
+    
     data = request.json
     
     if not data or not data.get('username') or not data.get('password'):
@@ -122,6 +124,13 @@ def login_password():
     user = User.query.filter_by(username=username).first()
     
     if not user or not user.active:
+        AuditService.log_action(
+            action='login_failure',
+            resource_type='user',
+            details=f'Login failed for username: {username} (user not found or inactive)',
+            success=False,
+            username=username
+        )
         return error_response('Invalid credentials', 401)
     
     # Verify password
@@ -129,6 +138,14 @@ def login_password():
         # Increment failed login counter
         user.failed_logins = (user.failed_logins or 0) + 1
         db.session.commit()
+        AuditService.log_action(
+            action='login_failure',
+            resource_type='user',
+            resource_id=user.id,
+            details=f'Login failed for {username} (invalid password)',
+            success=False,
+            username=username
+        )
         return error_response('Invalid credentials', 401)
     
     # Update login stats
@@ -147,6 +164,16 @@ def login_password():
     # Get permissions
     from auth.permissions import get_role_permissions
     permissions = get_role_permissions(user.role)
+    
+    # Audit log success
+    AuditService.log_action(
+        action='login_success',
+        resource_type='user',
+        resource_id=user.id,
+        details=f'Password login successful for {username}',
+        success=True,
+        username=username
+    )
     
     logger.info(f"✅ Password login successful: {user.username}")
     
@@ -319,12 +346,22 @@ def webauthn_verify():
     
     # Verify authentication response
     try:
+        from services.audit_service import AuditService
+        
         hostname = request.host
         success, message, auth_user = WebAuthnService.verify_authentication(
             user.id, credential_response, hostname
         )
         
         if not success or not auth_user:
+            AuditService.log_action(
+                action='login_failure',
+                resource_type='user',
+                resource_id=user.id,
+                details=f'WebAuthn login failed for {username}: {message}',
+                success=False,
+                username=username
+            )
             return error_response(message or 'WebAuthn verification failed', 401)
         
         # Update login stats
@@ -343,6 +380,16 @@ def webauthn_verify():
         # Get permissions
         from auth.permissions import get_role_permissions
         permissions = get_role_permissions(user.role)
+        
+        # Audit log success
+        AuditService.log_action(
+            action='login_success',
+            resource_type='user',
+            resource_id=user.id,
+            details=f'WebAuthn login successful for {username}',
+            success=True,
+            username=username
+        )
         
         logger.info(f"✅ WebAuthn login successful: {user.username}")
         
@@ -372,8 +419,19 @@ def logout():
     """
     Logout - Clear session
     """
+    from services.audit_service import AuditService
+    
     auth_method = session.get('auth_method', 'unknown')
     username = session.get('username', 'unknown')
+    
+    # Audit log logout
+    AuditService.log_action(
+        action='logout',
+        resource_type='user',
+        details=f'User {username} logged out (method: {auth_method})',
+        success=True,
+        username=username
+    )
     
     logger.info(f"🔓 Logout: {username} (method: {auth_method})")
     

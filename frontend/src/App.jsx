@@ -13,6 +13,7 @@ import {
   SettingsPage,
   ImportExportPage,
   AccountPage,
+  AuditLogsPage,
 } from './pages'
 
 function ProtectedRoute({ children }) {
@@ -49,6 +50,7 @@ function AppRoutes() {
         <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
         <Route path="/acme" element={<ProtectedRoute><ACMEPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/audit" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
         <Route path="/import" element={<ProtectedRoute><ImportExportPage /></ProtectedRoute>} />
         <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
       </Route>
