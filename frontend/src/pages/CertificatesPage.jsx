@@ -32,7 +32,7 @@ export default function CertificatesPage() {
   const [importFile, setImportFile] = useState(null)
   const [importName, setImportName] = useState('')
   const [importPassword, setImportPassword] = useState('')
-  const [importCaId, setImportCaId] = useState('')
+  const [importCaId, setImportCaId] = useState('auto')
   const [importing, setImporting] = useState(false)
   const importFileRef = useRef(null)
 
@@ -122,7 +122,7 @@ export default function CertificatesPage() {
       formData.append('file', importFile)
       if (importName) formData.append('name', importName)
       if (importPassword) formData.append('password', importPassword)
-      if (importCaId) formData.append('ca_id', importCaId)
+      if (importCaId && importCaId !== 'auto') formData.append('ca_id', importCaId)
       formData.append('format', 'auto')
       
       await certificatesService.import(formData)
@@ -131,7 +131,7 @@ export default function CertificatesPage() {
       setImportFile(null)
       setImportName('')
       setImportPassword('')
-      setImportCaId('')
+      setImportCaId('auto')
       loadCertificates()
     } catch (error) {
       showError(error.message || 'Failed to import certificate')
@@ -697,7 +697,7 @@ export default function CertificatesPage() {
             value={importCaId}
             onChange={(value) => setImportCaId(value)}
             options={[
-              { value: '', label: 'Auto-detect from issuer' },
+              { value: 'auto', label: 'Auto-detect from issuer' },
               ...cas.map(ca => ({ value: ca.id.toString(), label: ca.name }))
             ]}
           />
