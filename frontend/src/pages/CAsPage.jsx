@@ -17,6 +17,116 @@ import { useNotification } from '../contexts'
 import { usePermission } from '../hooks/usePermission'
 import { extractCN, extractData, formatDate, formatDateTime } from '../lib/utils'
 
+// OCSP Settings Tab Component
+function OCSPSettingsTab({ ca, onUpdate, showSuccess, showError }) {
+  const [ocspEnabled, setOcspEnabled] = useState(ca?.ocsp_enabled || false)
+  const [ocspUrl, setOcspUrl] = useState(ca?.ocsp_url || `${window.location.origin}/ocsp/${ca?.refid || ''}`)
+  const [cdpEnabled, setCdpEnabled] = useState(ca?.cdp_enabled || false)
+  const [cdpUrl, setCdpUrl] = useState(ca?.cdp_url || `${window.location.origin}/crl/${ca?.refid || ''}.crl`)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (ca) {
+      setOcspEnabled(ca.ocsp_enabled || false)
+      setOcspUrl(ca.ocsp_url || `${window.location.origin}/ocsp/${ca.refid || ''}`)
+      setCdpEnabled(ca.cdp_enabled || false)
+      setCdpUrl(ca.cdp_url || `${window.location.origin}/crl/${ca.refid || ''}.crl`)
+    }
+  }, [ca])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await casService.update(ca.id, {
+        ocsp_enabled: ocspEnabled,
+        ocsp_url: ocspEnabled ? ocspUrl : null,
+        cdp_enabled: cdpEnabled,
+        cdp_url: cdpEnabled ? cdpUrl : null
+      })
+      showSuccess('OCSP/CDP settings saved successfully')
+      if (onUpdate) onUpdate()
+    } catch (error) {
+      showError('Failed to save settings: ' + error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-sm font-semibold text-text-primary mb-4">OCSP Configuration</h3>
+        <p className="text-sm text-text-secondary mb-4">
+          Configure Online Certificate Status Protocol (OCSP) settings for real-time certificate revocation checking.
+        </p>
+
+        <div className="space-y-4">
+          <label className="flex items-center gap-3 cursor-pointer p-3 bg-bg-tertiary border border-border rounded-sm hover:border-accent-primary/50 transition-colors">
+            <input
+              type="checkbox"
+              checked={ocspEnabled}
+              onChange={(e) => setOcspEnabled(e.target.checked)}
+              className="w-4 h-4 rounded border-border bg-bg-primary accent-accent-primary"
+            />
+            <div className="flex-1">
+              <p className="text-sm text-text-primary font-medium">Enable OCSP Responder</p>
+              <p className="text-xs text-text-secondary">Allow OCSP requests for certificates issued by this CA</p>
+            </div>
+          </label>
+
+          {ocspEnabled && (
+            <Input
+              label="OCSP Responder URL"
+              value={ocspUrl}
+              onChange={(e) => setOcspUrl(e.target.value)}
+              placeholder="http://ocsp.example.com/ocsp"
+              helperText="URL that will be embedded in issued certificates for OCSP checking"
+            />
+          )}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold text-text-primary mb-4">CRL Distribution Point (CDP)</h3>
+        <p className="text-sm text-text-secondary mb-4">
+          Configure the CRL Distribution Point URL that will be embedded in issued certificates.
+        </p>
+
+        <div className="space-y-4">
+          <label className="flex items-center gap-3 cursor-pointer p-3 bg-bg-tertiary border border-border rounded-sm hover:border-accent-primary/50 transition-colors">
+            <input
+              type="checkbox"
+              checked={cdpEnabled}
+              onChange={(e) => setCdpEnabled(e.target.checked)}
+              className="w-4 h-4 rounded border-border bg-bg-primary accent-accent-primary"
+            />
+            <div className="flex-1">
+              <p className="text-sm text-text-primary font-medium">Enable CRL Distribution Point</p>
+              <p className="text-xs text-text-secondary">Include CDP URL in issued certificates</p>
+            </div>
+          </label>
+
+          {cdpEnabled && (
+            <Input
+              label="CRL Distribution Point URL"
+              value={cdpUrl}
+              onChange={(e) => setCdpUrl(e.target.value)}
+              placeholder="http://crl.example.com/ca.crl"
+              helperText="URL where the CRL can be downloaded"
+            />
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button variant="primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save Settings'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function CAsPage() {
   const { showSuccess, showError } = useNotification()
   const { canWrite, canDelete } = usePermission()
@@ -121,14 +231,17 @@ export default function CAsPage() {
     }
   }
 
-  const handleExport = async (id, format = 'pem') => {
+  const handleExport = async (format = 'pem', options = {}) => {
+    if (!selectedCA) return
     try {
-      const blob = await casService.export(id, format)
+      const blob = await casService.export(selectedCA.id, format, options)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `ca.${format}`
+      const ext = format === 'pkcs12' ? 'p12' : format === 'der' ? 'der' : 'pem'
+      a.download = `${selectedCA.name || selectedCA.common_name || 'ca'}.${ext}`
       a.click()
+      URL.revokeObjectURL(url)
       showSuccess('CA exported successfully')
     } catch (error) {
       showError(error.message || 'Failed to export CA')
@@ -369,17 +482,28 @@ export default function CAsPage() {
             Export this Certificate Authority in various formats
           </p>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={() => handleExport(selectedCA.id, 'pem')}>
+            <Button onClick={() => handleExport('pem', {})}>
               <Download size={16} />
-              PEM Format
+              PEM (Certificate only)
             </Button>
-            <Button variant="secondary" onClick={() => handleExport(selectedCA.id, 'der')}>
+            <Button variant="secondary" onClick={() => handleExport('pem', { includeKey: true })}>
+              <Download size={16} />
+              PEM + Private Key
+            </Button>
+            <Button variant="secondary" onClick={() => handleExport('pem', { includeChain: true })}>
+              <Download size={16} />
+              PEM + CA Chain
+            </Button>
+            <Button variant="secondary" onClick={() => handleExport('der', {})}>
               <Download size={16} />
               DER Format
             </Button>
-            <Button variant="secondary" onClick={() => handleExport(selectedCA.id, 'p12')}>
+            <Button variant="secondary" onClick={() => {
+              const password = window.prompt('Enter password for PKCS#12 file:')
+              if (password) handleExport('pkcs12', { password })
+            }}>
               <Download size={16} />
-              PKCS#12 (with private key)
+              PKCS#12 (.p12)
             </Button>
           </div>
           
@@ -407,89 +531,7 @@ export default function CAsPage() {
       id: 'ocsp',
       label: 'OCSP',
       icon: <ShieldCheck size={16} />,
-      content: (
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">OCSP Configuration</h3>
-            <p className="text-sm text-text-secondary mb-4">
-              Configure Online Certificate Status Protocol (OCSP) settings for real-time certificate revocation checking.
-            </p>
-
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  defaultChecked={false}
-                  className="rounded border-border bg-bg-tertiary"
-                />
-                <div>
-                  <p className="text-sm text-text-primary font-medium">Enable OCSP Responder</p>
-                  <p className="text-xs text-text-secondary">Allow OCSP requests for this CA</p>
-                </div>
-              </label>
-
-              <Input
-                label="OCSP Responder URL"
-                value={`${window.location.origin}/ocsp/${selectedCA.refid}`}
-                readOnly
-                helperText="URL for OCSP clients to check certificate status"
-                className="bg-bg-tertiary"
-              />
-
-              <Input
-                label="Response Validity (hours)"
-                type="number"
-                defaultValue="24"
-                min="1"
-                max="168"
-                helperText="How long OCSP responses remain valid (1-168 hours)"
-              />
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  defaultChecked={true}
-                  className="rounded border-border bg-bg-tertiary"
-                />
-                <div>
-                  <p className="text-sm text-text-primary font-medium">Include Next Update</p>
-                  <p className="text-xs text-text-secondary">Add nextUpdate field to OCSP responses</p>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  defaultChecked={false}
-                  className="rounded border-border bg-bg-tertiary"
-                />
-                <div>
-                  <p className="text-sm text-text-primary font-medium">Require Nonce</p>
-                  <p className="text-xs text-text-secondary">Prevent replay attacks (recommended)</p>
-                </div>
-              </label>
-
-              <div className="p-4 bg-bg-tertiary border border-border rounded-sm">
-                <h4 className="text-xs font-semibold text-text-primary uppercase mb-2">OCSP Statistics</h4>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-text-secondary text-xs">Total Requests</p>
-                    <p className="text-text-primary font-semibold">-</p>
-                  </div>
-                  <div>
-                    <p className="text-text-secondary text-xs">Good Responses</p>
-                    <p className="text-text-primary font-semibold">-</p>
-                  </div>
-                  <div>
-                    <p className="text-text-secondary text-xs">Revoked Responses</p>
-                    <p className="text-text-primary font-semibold">-</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )
+      content: <OCSPSettingsTab ca={selectedCA} onUpdate={loadCAs} showSuccess={showSuccess} showError={showError} />
     }
   ] : []
 
@@ -610,8 +652,8 @@ export default function CAsPage() {
               </Button>
             )}
             <ExportDropdown 
-              onExport={(format) => handleExport(selectedCA.id, format)} 
-              formats={['pem', 'der', 'pkcs12']}
+              onExport={handleExport}
+              hasPrivateKey={!!selectedCA.prv || selectedCA.has_key}
             />
             {canDelete('cas') && (
               <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCA.id)}>

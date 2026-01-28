@@ -241,9 +241,56 @@ def get_ca(ca_id):
 @bp.route('/api/v2/cas/<int:ca_id>', methods=['PATCH'])
 @require_auth(['write:cas'])
 def update_ca(ca_id):
-    """Update CA"""
-    data = request.json
-    return success_response(data={'id': ca_id}, message='CA updated')
+    """
+    Update CA settings (OCSP, CDP, etc.)
+    
+    Body (all optional):
+        name: Display name
+        ocsp_enabled: bool - Enable OCSP responder
+        ocsp_url: string - OCSP responder URL
+        cdp_enabled: bool - Enable CRL Distribution Point
+        cdp_url: string - CRL Distribution Point URL
+        is_active: bool - Active status
+    """
+    from models import CA, db
+    
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    data = request.json or {}
+    
+    # Update allowed fields
+    if 'name' in data:
+        ca.name = data['name']
+    if 'ocsp_enabled' in data:
+        ca.ocsp_enabled = bool(data['ocsp_enabled'])
+    if 'ocsp_url' in data:
+        ca.ocsp_url = data['ocsp_url']
+    if 'cdp_enabled' in data:
+        ca.cdp_enabled = bool(data['cdp_enabled'])
+    if 'cdp_url' in data:
+        ca.cdp_url = data['cdp_url']
+    if 'is_active' in data:
+        ca.is_active = bool(data['is_active'])
+    
+    try:
+        db.session.commit()
+        
+        # Audit log
+        from services.audit_service import AuditService
+        AuditService.log_action(
+            action='ca_updated',
+            resource_type='ca',
+            resource_id=ca_id,
+            details=f'CA {ca.name} settings updated',
+            success=True
+        )
+        
+        return success_response(data=ca.to_dict(), message='CA updated successfully')
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f'Failed to update CA: {str(e)}', 500)
 
 
 @bp.route('/api/v2/cas/<int:ca_id>', methods=['DELETE'])
@@ -256,44 +303,134 @@ def delete_ca(ca_id):
 @bp.route('/api/v2/cas/<int:ca_id>/export', methods=['GET'])
 @require_auth(['read:cas'])
 def export_ca(ca_id):
-    """Export CA certificate"""
-    format = request.args.get('format', 'pem')
-    include_chain = request.args.get('chain', 'false').lower() == 'true'
-    include_key = request.args.get('key', 'false').lower() == 'true'
+    """
+    Export CA certificate in various formats
+    
+    Query params:
+        format: pem (default), der, pkcs12
+        include_key: bool - Include private key
+        include_chain: bool - Include parent CA chain
+        password: string - Required for PKCS12
+    """
+    from flask import Response
+    from models import CA
+    import base64
+    
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    if not ca.crt:
+        return error_response('CA certificate data not available', 400)
+    
+    export_format = request.args.get('format', 'pem').lower()
+    include_key = request.args.get('include_key', 'false').lower() == 'true'
+    include_chain = request.args.get('include_chain', 'false').lower() == 'true'
     password = request.args.get('password')
     
     try:
-        data = CAService.export_ca_with_options(
-            ca_id=ca_id,
-            export_format=format,
-            include_chain=include_chain,
-            include_key=include_key,
-            password=password
-        )
+        cert_pem = base64.b64decode(ca.crt)
         
-        # Determine content type and filename
-        filename = f"ca_{ca_id}"
-        mimetype = "application/x-pem-file"
-        
-        if format == 'der':
-            filename += ".der"
-            mimetype = "application/x-x509-ca-cert"
-        elif format == 'pkcs12':
-            filename += ".p12"
-            mimetype = "application/x-pkcs12"
-        else:
-            filename += ".crt"
+        if export_format == 'pem':
+            result = cert_pem
+            content_type = 'application/x-pem-file'
+            filename = f"{ca.name or ca.refid}.crt"
             
-        return success_response(
-            data={
-                'content': data.decode('utf-8') if isinstance(data, bytes) and format != 'der' and format != 'pkcs12' else base64.b64encode(data).decode('utf-8'),
-                'filename': filename,
-                'mimetype': mimetype,
-                'is_binary': format in ['der', 'pkcs12']
-            }
-        )
+            # Include private key if requested
+            if include_key and ca.prv:
+                key_pem = base64.b64decode(ca.prv)
+                if not result.endswith(b'\\n'):
+                    result += b'\\n'
+                result += key_pem
+                filename = f"{ca.name or ca.refid}_with_key.pem"
+            
+            # Include parent CA chain if requested
+            if include_chain and ca.caref:
+                parent = CA.query.filter_by(refid=ca.caref).first()
+                while parent:
+                    if parent.crt:
+                        parent_cert = base64.b64decode(parent.crt)
+                        if not result.endswith(b'\\n'):
+                            result += b'\\n'
+                        result += parent_cert
+                    if parent.caref:
+                        parent = CA.query.filter_by(refid=parent.caref).first()
+                    else:
+                        break
+                if include_key:
+                    filename = f"{ca.name or ca.refid}_full_chain.pem"
+                else:
+                    filename = f"{ca.name or ca.refid}_chain.pem"
+            
+            return Response(
+                result,
+                mimetype=content_type,
+                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+            )
+        
+        elif export_format == 'der':
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives import serialization
+            
+            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+            der_bytes = cert.public_bytes(serialization.Encoding.DER)
+            
+            return Response(
+                der_bytes,
+                mimetype='application/x-x509-ca-cert',
+                headers={'Content-Disposition': f'attachment; filename="{ca.name or ca.refid}.der"'}
+            )
+        
+        elif export_format == 'pkcs12':
+            if not password:
+                return error_response('Password required for PKCS12 export', 400)
+            if not ca.prv:
+                return error_response('CA has no private key for PKCS12 export', 400)
+            
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.primitives.serialization import pkcs12
+            
+            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+            key_pem = base64.b64decode(ca.prv)
+            private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+            
+            # Build parent CA chain if available
+            ca_certs = []
+            if ca.caref:
+                parent = CA.query.filter_by(refid=ca.caref).first()
+                while parent:
+                    if parent.crt:
+                        parent_cert = x509.load_pem_x509_certificate(
+                            base64.b64decode(parent.crt), default_backend()
+                        )
+                        ca_certs.append(parent_cert)
+                    if parent.caref:
+                        parent = CA.query.filter_by(refid=parent.caref).first()
+                    else:
+                        break
+            
+            p12_bytes = pkcs12.serialize_key_and_certificates(
+                name=(ca.name or ca.refid).encode(),
+                key=private_key,
+                cert=cert,
+                cas=ca_certs if ca_certs else None,
+                encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
+            )
+            
+            return Response(
+                p12_bytes,
+                mimetype='application/x-pkcs12',
+                headers={'Content-Disposition': f'attachment; filename="{ca.name or ca.refid}.p12"'}
+            )
+        
+        else:
+            return error_response(f'Unsupported format: {export_format}', 400)
+    
     except Exception as e:
-        return error_response(str(e), 400)
+        return error_response(f'Export failed: {str(e)}', 500)
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/certificates', methods=['GET'])

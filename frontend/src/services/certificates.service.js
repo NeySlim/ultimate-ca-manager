@@ -32,8 +32,14 @@ export const certificatesService = {
     return apiClient.post(`/certificates/${id}/renew`)
   },
 
-  async export(id, format = 'pem') {
-    return apiClient.get(`/certificates/${id}/export?format=${format}`, {
+  async export(id, format = 'pem', options = {}) {
+    const params = new URLSearchParams()
+    params.append('format', format)
+    if (options.includeKey) params.append('include_key', 'true')
+    if (options.includeChain) params.append('include_chain', 'true')
+    if (options.password) params.append('password', options.password)
+    
+    return apiClient.get(`/certificates/${id}/export?${params.toString()}`, {
       responseType: 'blob'
     })
   },
