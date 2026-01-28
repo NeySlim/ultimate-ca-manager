@@ -2,7 +2,7 @@
  * Settings Page
  */
 import { useState, useEffect } from 'react'
-import { Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, Envelope, Download, Trash, UploadSimple, HardDrives, Lock } from '@phosphor-icons/react'
+import { Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, Envelope, Download, Trash, UploadSimple, HardDrives, Lock, Key } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Button, Input, Select,
   Textarea, Tabs, LoadingSpinner, FileUpload, Table
