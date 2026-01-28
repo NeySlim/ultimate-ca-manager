@@ -20,6 +20,9 @@ export default function AccountPage() {
   const [apiKeys, setApiKeys] = useState([])
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showApiKeyModal, setShowApiKeyModal] = useState(false)
+  const [show2FAModal, setShow2FAModal] = useState(false)
+  const [qrData, setQrData] = useState(null)
+  const [confirmCode, setConfirmCode] = useState('')
 
   useEffect(() => {
     loadAccount()
@@ -94,15 +97,33 @@ export default function AccountPage() {
   const handleToggle2FA = async () => {
     try {
       if (accountData.two_factor_enabled) {
-        await accountService.disable2FA()
+        // Disable 2FA - ask for confirmation code
+        const code = prompt('Enter your 2FA code to disable:')
+        if (!code) return
+        await accountService.disable2FA(code)
         showSuccess('Two-factor authentication disabled')
+        loadAccount()
       } else {
-        const qr = await accountService.enable2FA()
-        showSuccess('Two-factor authentication enabled')
+        // Enable 2FA - show QR modal
+        const response = await accountService.enable2FA()
+        setQrData(response)
+        setShow2FAModal(true)
       }
-      loadAccount()
     } catch (error) {
       showError(error.message || 'Failed to toggle 2FA')
+    }
+  }
+
+  const handleConfirm2FA = async () => {
+    try {
+      await accountService.confirm2FA(confirmCode)
+      showSuccess('2FA enabled successfully! Save your backup codes.')
+      setShow2FAModal(false)
+      setQrData(null)
+      setConfirmCode('')
+      loadAccount()
+    } catch (error) {
+      showError(error.message || 'Invalid code. Please try again.')
     }
   }
 
@@ -403,6 +424,70 @@ export default function AccountPage() {
           onSubmit={handleCreateApiKey}
           onCancel={() => setShowApiKeyModal(false)}
         />
+      </Modal>
+
+      {/* 2FA Setup Modal */}
+      <Modal
+        open={show2FAModal}
+        onClose={() => {
+          setShow2FAModal(false)
+          setQrData(null)
+          setConfirmCode('')
+        }}
+        title="Enable Two-Factor Authentication"
+      >
+        {qrData && (
+          <div className="space-y-4">
+            <div className="text-sm text-text-secondary">
+              <p className="mb-2">1. Scan this QR code with Google Authenticator, Authy, or any TOTP app:</p>
+              <div className="flex justify-center p-4 bg-surface-elevated rounded-lg">
+                <img src={qrData.qr_code} alt="2FA QR Code" className="w-48 h-48" />
+              </div>
+            </div>
+            
+            <div className="text-sm text-text-secondary">
+              <p className="mb-2">2. Enter the 6-digit code from your authenticator app:</p>
+              <Input
+                type="text"
+                placeholder="000000"
+                value={confirmCode}
+                onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                maxLength={6}
+                className="text-center text-2xl tracking-widest"
+              />
+            </div>
+
+            {qrData.backup_codes && qrData.backup_codes.length > 0 && (
+              <div className="text-sm">
+                <p className="font-semibold text-text-primary mb-2">⚠️ Save these backup codes:</p>
+                <div className="bg-surface-elevated rounded p-3 space-y-1 font-mono text-xs">
+                  {qrData.backup_codes.map((code, i) => (
+                    <div key={i}>{code}</div>
+                  ))}
+                </div>
+                <p className="text-text-secondary mt-2 text-xs">Keep these codes safe! You'll need them if you lose access to your authenticator app.</p>
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <Button variant="secondary" onClick={() => {
+                setShow2FAModal(false)
+                setQrData(null)
+                setConfirmCode('')
+              }} className="flex-1">
+                Cancel
+              </Button>
+              <Button 
+                variant="primary" 
+                onClick={handleConfirm2FA}
+                disabled={confirmCode.length !== 6}
+                className="flex-1"
+              >
+                Confirm & Enable
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   )
