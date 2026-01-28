@@ -205,6 +205,7 @@ export default function TemplatesPage() {
               columns={templateColumns}
               data={templates}
               onRowClick={selectTemplate}
+              selectedId={selectedTemplate?.id}
             />
           )}
         </div>

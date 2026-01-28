@@ -17,7 +17,9 @@ export function Table({
   selectable = false,
   onSelectionChange,
   pagination,
-  emptyMessage = 'No data available'
+  emptyMessage = 'No data available',
+  selectedId = null,
+  idKey = 'id'
 }) {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [selectedRows, setSelectedRows] = useState(new Set())
@@ -112,16 +114,20 @@ export function Table({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {sortedData.map((row, index) => (
-              <tr
-                key={index}
-                onClick={() => onRowClick?.(row)}
-                className={cn(
-                  "transition-colors",
-                  onRowClick && "cursor-pointer hover:bg-bg-tertiary",
-                  selectedRows.has(index) && "bg-bg-tertiary/50"
-                )}
-              >
+            {sortedData.map((row, index) => {
+              const isSelected = selectedId !== null && row[idKey] === selectedId
+              
+              return (
+                <tr
+                  key={index}
+                  onClick={() => onRowClick?.(row)}
+                  className={cn(
+                    "transition-colors",
+                    onRowClick && "cursor-pointer hover:bg-bg-tertiary",
+                    selectedRows.has(index) && "bg-bg-tertiary/50",
+                    isSelected && "bg-accent/10 border-l-2 border-l-accent"
+                  )}
+                >
                 {selectable && (
                   <td className="px-2 py-2">
                     <input
@@ -142,7 +148,8 @@ export function Table({
                   </td>
                 ))}
               </tr>
-            ))}
+            )
+            })}
           </tbody>
         </table>
       </div>
