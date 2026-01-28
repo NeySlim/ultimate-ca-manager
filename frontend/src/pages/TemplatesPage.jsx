@@ -14,6 +14,7 @@ import { extractData } from '../lib/utils'
 
 export default function TemplatesPage() {
   const { showSuccess, showError } = useNotification()
+  const { canWrite, canDelete } = usePermission()
   
   const [templates, setTemplates] = useState([])
   const [selectedTemplate, setSelectedTemplate] = useState(null)
@@ -172,7 +173,7 @@ export default function TemplatesPage() {
     <>
       <ExplorerPanel
         title={selectedTemplate?.name || 'Select a template'}
-        actions={selectedTemplate && (
+        actions={selectedTemplate && canWrite('templates') && (
           <>
             {editing ? (
               <Button size="sm" onClick={handleSave}>
