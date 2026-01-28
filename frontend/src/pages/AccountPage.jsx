@@ -246,7 +246,7 @@ export default function AccountPage() {
             <h3 className="text-sm font-semibold text-text-primary mb-4">Two-Factor Authentication</h3>
             <div className="flex items-center justify-between p-4 bg-bg-tertiary border border-border rounded-lg">
               <div>
-                <p className="text-sm font-medium text-text-primary">2FA Status</p>
+                <p className="text-sm font-medium text-text-primary">Authenticator App (TOTP)</p>
                 <p className="text-xs text-text-secondary mt-1">
                   {accountData.two_factor_enabled ? (
                     <Badge variant="success">Enabled</Badge>
@@ -257,6 +257,36 @@ export default function AccountPage() {
               </div>
               <Button size="sm" variant={accountData.two_factor_enabled ? 'danger' : 'primary'} onClick={handleToggle2FA}>
                 {accountData.two_factor_enabled ? 'Disable 2FA' : 'Enable 2FA'}
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary mb-4">Security Keys (WebAuthn/FIDO2)</h3>
+            <div className="flex items-center justify-between p-4 bg-bg-tertiary border border-border rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-text-primary">Hardware Keys</p>
+                <p className="text-xs text-text-secondary mt-1">
+                  YubiKey, TouchID, Windows Hello · {accountData.webauthn_credentials_count || 0} registered
+                </p>
+              </div>
+              <Button size="sm" onClick={() => alert('WebAuthn registration - Coming soon')}>
+                Add Key
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary mb-4">Client Certificates (mTLS)</h3>
+            <div className="flex items-center justify-between p-4 bg-bg-tertiary border border-border rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-text-primary">X.509 Certificates</p>
+                <p className="text-xs text-text-secondary mt-1">
+                  Mutual TLS authentication · {accountData.mtls_certificates_count || 0} installed
+                </p>
+              </div>
+              <Button size="sm" onClick={() => alert('mTLS upload - Coming soon')}>
+                Upload Certificate
               </Button>
             </div>
           </div>
