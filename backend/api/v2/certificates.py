@@ -263,6 +263,7 @@ def import_certificate():
     Import certificate from file
     Supports: PEM, DER, PKCS12, PKCS7
     Auto-detects CA certificates and stores them in CA table
+    Auto-updates existing cert/CA if duplicate found
     
     Form data:
         file: Certificate file
@@ -270,10 +271,12 @@ def import_certificate():
         name: Optional display name
         ca_id: Optional CA ID to link to
         import_key: Whether to import private key (default: true)
+        update_existing: Whether to update if duplicate found (default: true)
     """
     from models import Certificate, CA, db
     from services.import_service import (
         parse_certificate_file, is_ca_certificate, extract_cert_info,
+        find_existing_ca, find_existing_certificate,
         serialize_cert_to_pem, serialize_key_to_pem
     )
     import base64
@@ -290,6 +293,7 @@ def import_certificate():
     name = request.form.get('name', '')
     ca_id = request.form.get('ca_id', type=int)
     import_key = request.form.get('import_key', 'true').lower() == 'true'
+    update_existing = request.form.get('update_existing', 'true').lower() == 'true'
     
     try:
         file_data = file.read()
@@ -308,6 +312,42 @@ def import_certificate():
         
         # Check if this is a CA certificate - auto-route to CA table
         if is_ca_certificate(cert):
+            # Check for existing CA
+            existing_ca = find_existing_ca(cert_info)
+            
+            if existing_ca:
+                if not update_existing:
+                    return error_response(
+                        f'CA with subject "{cert_info["cn"]}" already exists (ID: {existing_ca.id})',
+                        409
+                    )
+                
+                # Update existing CA
+                existing_ca.descr = name or cert_info['cn'] or existing_ca.descr
+                existing_ca.crt = base64.b64encode(cert_pem).decode('utf-8')
+                if key_pem:
+                    existing_ca.prv = base64.b64encode(key_pem).decode('utf-8')
+                existing_ca.issuer = cert_info['issuer']
+                existing_ca.valid_from = cert_info['valid_from']
+                existing_ca.valid_to = cert_info['valid_to']
+                
+                db.session.commit()
+                
+                from services.audit_service import AuditService
+                AuditService.log_action(
+                    action='ca_updated',
+                    resource_type='ca',
+                    resource_id=existing_ca.id,
+                    details=f'Updated CA via import: {existing_ca.descr}',
+                    success=True
+                )
+                
+                return success_response(
+                    data=existing_ca.to_dict(),
+                    message=f'CA certificate "{existing_ca.descr}" updated (already existed)'
+                )
+            
+            # Create new CA
             refid = str(uuid.uuid4())
             ca = CA(
                 refid=refid,
@@ -337,6 +377,46 @@ def import_certificate():
             return created_response(
                 data=ca.to_dict(),
                 message=f'CA certificate "{ca.descr}" imported successfully (detected as CA)'
+            )
+        
+        # Check for existing certificate
+        existing_cert = find_existing_certificate(cert_info)
+        
+        if existing_cert:
+            if not update_existing:
+                return error_response(
+                    f'Certificate with subject "{cert_info["cn"]}" already exists (ID: {existing_cert.id})',
+                    409
+                )
+            
+            # Update existing certificate
+            existing_cert.descr = name or cert_info['cn'] or existing_cert.descr
+            existing_cert.crt = base64.b64encode(cert_pem).decode('utf-8')
+            if key_pem:
+                existing_cert.prv = base64.b64encode(key_pem).decode('utf-8')
+            existing_cert.valid_from = cert_info['valid_from']
+            existing_cert.valid_to = cert_info['valid_to']
+            
+            # Update CA link if provided
+            if ca_id:
+                ca = CA.query.get(ca_id)
+                if ca:
+                    existing_cert.caref = ca.refid
+            
+            db.session.commit()
+            
+            from services.audit_service import AuditService
+            AuditService.log_action(
+                action='certificate_updated',
+                resource_type='certificate',
+                resource_id=existing_cert.id,
+                details=f'Updated certificate via import: {existing_cert.descr}',
+                success=True
+            )
+            
+            return success_response(
+                data=existing_cert.to_dict(),
+                message=f'Certificate "{existing_cert.descr}" updated (already existed)'
             )
         
         # Regular certificate - find parent CA
