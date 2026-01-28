@@ -46,8 +46,8 @@ export default function SettingsPage() {
   const loadSettings = async () => {
     setLoading(true)
     try {
-      const data = await settingsService.getAll()
-      setSettings(data)
+      const response = await settingsService.getAll()
+      setSettings(response.data || response || {})
     } catch (error) {
       showError(error.message || 'Failed to load settings')
     } finally {
