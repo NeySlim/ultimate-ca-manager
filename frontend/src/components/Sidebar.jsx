@@ -38,7 +38,7 @@ export function Sidebar({ activePage }) {
     <div className="w-14 border-r border-border bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-0.5">
       {/* Logo */}
       <Link to="/" className="w-10 h-10 flex items-center justify-center mb-3" title="UCM Dashboard">
-        <Logo variant="icon" size="md" withText={false} />
+        <Logo variant="compact" size="sm" withText={false} />
       </Link>
 
       {/* Page Icons */}
