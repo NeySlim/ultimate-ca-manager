@@ -6,9 +6,9 @@ import { User, Plus, Trash, LockKey, ToggleLeft, ToggleRight } from '@phosphor-i
 import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge,
   Input, Select, Modal,
-  LoadingSpinner, EmptyState, StatusIndicator
+  LoadingSpinner, EmptyState, StatusIndicator, PermissionsDisplay
 } from '../components'
-import { usersService } from '../services'
+import { usersService, rolesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks/usePermission'
 import { extractData } from '../lib/utils'
@@ -24,6 +24,7 @@ export default function UsersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [formData, setFormData] = useState({})
   const [roleFilter, setRoleFilter] = useState('all')
+  const [rolesData, setRolesData] = useState(null) // NEW: Roles & permissions data
 
   useEffect(() => {
     loadUsers()
@@ -252,32 +253,24 @@ export default function UsersPage() {
                     { value: 'operator', label: 'Operator' },
                     { value: 'viewer', label: 'Viewer' },
                   ]}
-                  value={formData.role || 'user'}
+                  value={formData.role || 'viewer'}
                   onChange={(val) => updateFormData('role', val)}
                   disabled={!editing}
                 />
                 
+                {/* Real RBAC Permissions Display */}
                 <div>
                   <p className="text-sm font-medium text-text-primary mb-2">Permissions</p>
-                  <div className="space-y-2">
-                    {['Manage CAs', 'Issue Certificates', 'Revoke Certificates', 'Manage Users', 'View Audit Logs'].map(perm => (
-                      <label key={perm} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.permissions?.includes(perm) || false}
-                          onChange={(e) => {
-                            const newPerms = e.target.checked
-                              ? [...(formData.permissions || []), perm]
-                              : (formData.permissions || []).filter(p => p !== perm)
-                            updateFormData('permissions', newPerms)
-                          }}
-                          disabled={!editing}
-                          className="rounded border-border bg-bg-tertiary"
-                        />
-                        <span className="text-sm text-text-primary">{perm}</span>
-                      </label>
-                    ))}
-                  </div>
+                  {rolesData && formData.role && (
+                    <PermissionsDisplay
+                      role={formData.role}
+                      permissions={rolesData[formData.role]?.permissions || []}
+                      description={rolesData[formData.role]?.description}
+                    />
+                  )}
+                  {!rolesData && (
+                    <div className="text-xs text-text-secondary">Loading permissions...</div>
+                  )}
                 </div>
               </div>
             </div>
