@@ -14,6 +14,18 @@ import io
 bp = Blueprint('users_v2', __name__)
 
 
+@bp.route('/api/v2/roles', methods=['GET'])
+@require_auth()
+def list_roles():
+    """List available roles"""
+    roles = [
+        {'id': 'admin', 'name': 'Administrator', 'description': 'Full system access'},
+        {'id': 'operator', 'name': 'Operator', 'description': 'Can manage certificates and CAs'},
+        {'id': 'viewer', 'name': 'Viewer', 'description': 'Read-only access'}
+    ]
+    return success_response(data=roles)
+
+
 @bp.route('/api/v2/users', methods=['GET'])
 @require_auth()
 def list_users():
@@ -116,6 +128,16 @@ def create_user():
     except Exception as e:
         db.session.rollback()
         return error_response(f'Failed to create user: {str(e)}', 500)
+
+
+@bp.route('/api/v2/users/<int:user_id>', methods=['GET'])
+@require_auth()
+def get_user(user_id):
+    """Get user by ID"""
+    user = User.query.get(user_id)
+    if not user:
+        return error_response('User not found', 404)
+    return success_response(data=user.to_dict())
 
 
 @bp.route('/api/v2/users/<int:user_id>', methods=['PUT'])
