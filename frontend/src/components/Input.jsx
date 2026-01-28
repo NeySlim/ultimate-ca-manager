@@ -1,16 +1,17 @@
 /**
  * Input Component - Text input with label and error
  */
+import { forwardRef } from 'react'
 import { cn } from '../lib/utils'
 
-export function Input({ 
+export const Input = forwardRef(function Input({ 
   label, 
   error, 
   helperText,
-  icon: Icon,
+  icon,
   className,
   ...props 
-}) {
+}, ref) {
   return (
     <div className={cn("space-y-1", className)}>
       {label && (
@@ -21,12 +22,13 @@ export function Input({
       )}
       
       <div className="relative">
-        {Icon && (
+        {icon && (
           <div className="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary">
-            <Icon size={14} />
+            {icon}
           </div>
         )}
         <input
+          ref={ref}
           className={cn(
             "w-full px-2 py-1 bg-bg-tertiary border rounded-sm text-sm text-text-primary placeholder-text-secondary",
             "focus:outline-none focus:ring-1 focus:ring-accent-primary focus:border-transparent",
@@ -34,7 +36,7 @@ export function Input({
             "transition-all",
             error && "border-red-500 focus:ring-red-500",
             !error && "border-border",
-            Icon && "pl-7"
+            icon && "pl-7"
           )}
           {...props}
         />
@@ -49,4 +51,4 @@ export function Input({
       )}
     </div>
   )
-}
+})
