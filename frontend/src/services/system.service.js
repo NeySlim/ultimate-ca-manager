@@ -75,15 +75,15 @@ export const systemService = {
 
   // HTTPS Certificate Management
   async getHttpsCertInfo() {
-    return apiClient.get('/api/v2/system/https/cert-info')
+    return apiClient.get('/system/https/cert-info')
   },
 
   async regenerateHttpsCert(data) {
-    return apiClient.post('/api/v2/system/https/regenerate', data)
+    return apiClient.post('/system/https/regenerate', data)
   },
 
   async applyHttpsCert(certData) {
-    return apiClient.post('/api/v2/system/https/apply', certData)
+    return apiClient.post('/system/https/apply', certData)
   },
 
   // Logs
