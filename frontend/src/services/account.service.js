@@ -4,61 +4,91 @@
 import { apiClient } from './apiClient'
 
 export const accountService = {
+  // Profile
   async getProfile() {
-    return apiClient.get('/account/profile')
+    return apiClient.get('/api/v2/account/profile')
   },
 
   async updateProfile(data) {
-    return apiClient.put('/account/profile', data)
+    return apiClient.patch('/api/v2/account/profile', data)
   },
 
-  async changePassword(currentPassword, newPassword) {
-    return apiClient.post('/account/change-password', {
-      current_password: currentPassword,
-      new_password: newPassword,
-    })
+  async changePassword(data) {
+    return apiClient.post('/api/v2/account/password', data)
   },
 
+  // API Keys
   async getApiKeys() {
-    return apiClient.get('/account/apikeys')
+    return apiClient.get('/api/v2/account/apikeys')
   },
 
-  async createApiKey(name, expiresIn) {
-    return apiClient.post('/account/apikeys', {
-      name,
-      expires_in: expiresIn,
-    })
+  async createApiKey(data) {
+    return apiClient.post('/api/v2/account/apikeys', data)
   },
 
-  async revokeApiKey(keyId) {
-    return apiClient.delete(`/account/apikeys/${keyId}`)
+  async deleteApiKey(keyId) {
+    return apiClient.delete(`/api/v2/account/apikeys/${keyId}`)
   },
 
+  // Sessions
   async getSessions() {
-    return apiClient.get('/account/sessions')
+    return apiClient.get('/api/v2/account/sessions')
   },
 
   async revokeSession(sessionId) {
-    return apiClient.delete(`/account/sessions/${sessionId}`)
+    return apiClient.delete(`/api/v2/account/sessions/${sessionId}`)
   },
 
-  async get2FAStatus() {
-    return apiClient.get('/account/2fa')
-  },
-
+  // 2FA TOTP
   async enable2FA() {
-    return apiClient.post('/account/2fa/enable')
+    return apiClient.post('/api/v2/account/2fa/enable')
   },
 
   async confirm2FA(code) {
-    return apiClient.post('/account/2fa/confirm', { code })
+    return apiClient.post('/api/v2/account/2fa/confirm', { code })
   },
 
   async disable2FA(code) {
-    return apiClient.post('/account/2fa/disable', { code })
+    return apiClient.post('/api/v2/account/2fa/disable', { code })
   },
 
-  async verify2FA(code) {
-    return apiClient.post('/account/2fa/verify', { code })
+  // WebAuthn / FIDO2
+  async getWebAuthnCredentials() {
+    return apiClient.get('/api/v2/account/webauthn/credentials')
+  },
+
+  async startWebAuthnRegistration() {
+    return apiClient.post('/api/v2/account/webauthn/register/options')
+  },
+
+  async completeWebAuthnRegistration(credential, name) {
+    return apiClient.post('/api/v2/account/webauthn/register/verify', { credential, name })
+  },
+
+  async deleteWebAuthnCredential(credentialId) {
+    return apiClient.delete(`/api/v2/account/webauthn/credentials/${credentialId}`)
+  },
+
+  // mTLS Certificates
+  async getMTLSCertificates() {
+    return apiClient.get('/api/v2/account/mtls/certificates')
+  },
+
+  async createMTLSCertificate(data) {
+    return apiClient.post('/api/v2/account/mtls/certificates/create', data)
+  },
+
+  async enrollMTLSCertificate(certificate, name) {
+    return apiClient.post('/api/v2/account/mtls/certificates/enroll', { certificate, name })
+  },
+
+  async deleteMTLSCertificate(certId) {
+    return apiClient.delete(`/api/v2/account/mtls/certificates/${certId}`)
+  },
+
+  async downloadMTLSCertificate(certId) {
+    return apiClient.get(`/api/v2/account/mtls/certificates/${certId}/download`, {
+      responseType: 'blob'
+    })
   }
 }
