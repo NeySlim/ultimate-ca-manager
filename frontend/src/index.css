@@ -8,11 +8,35 @@
   --bg-tertiary: #1F2428;
   --text-primary: #E6EDF3;
   --text-secondary: #8B949E;
+  --text-tertiary: #888;
   --accent-primary: #3B82F6;
   --accent-success: #22C55E;
   --accent-warning: #F59E0B;
   --accent-danger: #EF4444;
   --border: #30363D;
+  
+  /* Logo gradient colors */
+  --logo-gradient-start: #5a8fc7;
+  --logo-gradient-end: #7aa5d9;
+}
+
+/* Logo chain gradient - uses CSS variables */
+.chain-link-gradient {
+  border-style: solid;
+  background: transparent;
+  border-image: linear-gradient(135deg, var(--logo-gradient-start), var(--logo-gradient-end)) 1;
+}
+
+.chain-link-filled {
+  background: linear-gradient(135deg, var(--logo-gradient-start), var(--logo-gradient-end));
+  border: none;
+}
+
+.logo-text-gradient {
+  background: linear-gradient(135deg, var(--logo-gradient-start), var(--logo-gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 body {
