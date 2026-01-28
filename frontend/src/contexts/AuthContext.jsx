@@ -18,10 +18,13 @@ export function AuthProvider({ children }) {
 
   const checkSession = async () => {
     try {
+      console.log('🔍 Checking session...')
       const userData = await authService.getCurrentUser()
-      setUser(userData)
+      console.log('✅ Session valid:', userData)
+      setUser(userData.user || userData)
       setIsAuthenticated(true)
     } catch (error) {
+      console.log('❌ Session check failed:', error.message)
       setUser(null)
       setIsAuthenticated(false)
     } finally {
@@ -32,11 +35,16 @@ export function AuthProvider({ children }) {
   const login = async (username, password) => {
     setLoading(true)
     try {
+      console.log('🔐 Attempting login for:', username)
       const response = await authService.login(username, password)
-      setUser(response.user || { username })
+      console.log('✅ Login response:', response)
+      const userData = response.data?.user || response.user || { username }
+      setUser(userData)
       setIsAuthenticated(true)
+      console.log('✅ User authenticated:', userData)
       return response
     } catch (error) {
+      console.error('❌ Login failed:', error.message)
       setUser(null)
       setIsAuthenticated(false)
       throw error
@@ -48,13 +56,17 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     setLoading(true)
     try {
+      console.log('🔓 Logging out...')
       await authService.logout()
+      console.log('✅ Logout successful')
     } catch (error) {
-      console.error('Logout error:', error)
+      console.error('❌ Logout error:', error)
     } finally {
+      // Always clear local state regardless of API success
       setUser(null)
       setIsAuthenticated(false)
       setLoading(false)
+      console.log('🔓 Local session cleared')
     }
   }
 

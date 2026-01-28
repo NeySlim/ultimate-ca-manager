@@ -27,6 +27,8 @@ class APIClient {
       config.body = JSON.stringify(options.body)
     }
 
+    console.log(`📡 API ${config.method} ${url}`, config.credentials)
+
     try {
       const response = await fetch(url, config)
       
@@ -46,9 +48,11 @@ class APIClient {
         const error = new Error(data.message || data.error || 'Request failed')
         error.status = response.status
         error.data = data
+        console.error(`❌ API error ${response.status}:`, error.message)
         throw error
       }
 
+      console.log(`✅ API response:`, data)
       return data
     } catch (error) {
       // Network errors or fetch failures
