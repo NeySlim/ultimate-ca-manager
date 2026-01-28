@@ -2,7 +2,7 @@
  * Account Page (User Profile)
  */
 import { useState, useEffect } from 'react'
-import { User, LockKey, Key, FloppyDisk } from '@phosphor-icons/react'
+import { User, LockKey, Key, FloppyDisk, Fingerprint, Certificate } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Button, Input, Badge, Tabs,
   LoadingSpinner, Modal
@@ -23,10 +23,24 @@ export default function AccountPage() {
   const [show2FAModal, setShow2FAModal] = useState(false)
   const [qrData, setQrData] = useState(null)
   const [confirmCode, setConfirmCode] = useState('')
+  
+  // WebAuthn state
+  const [webauthnCredentials, setWebauthnCredentials] = useState([])
+  const [showWebAuthnModal, setShowWebAuthnModal] = useState(false)
+  const [webauthnName, setWebauthnName] = useState('')
+  const [webauthnRegistering, setWebauthnRegistering] = useState(false)
+  
+  // mTLS state
+  const [mtlsCertificates, setMtlsCertificates] = useState([])
+  const [showMTLSModal, setShowMTLSModal] = useState(false)
+  const [mtlsMode, setMtlsMode] = useState('create') // 'create' or 'enroll'
+  const [mtlsFormData, setMtlsFormData] = useState({ cn: '', email: '', validity_days: 365 })
 
   useEffect(() => {
     loadAccount()
     loadApiKeys()
+    loadWebAuthnCredentials()
+    loadMTLSCertificates()
   }, [])
 
   const loadAccount = async () => {
@@ -44,9 +58,27 @@ export default function AccountPage() {
   const loadApiKeys = async () => {
     try {
       const data = await accountService.getApiKeys()
-      setApiKeys(data.keys || [])
+      setApiKeys(data || [])
     } catch (error) {
       console.error('Failed to load API keys:', error)
+    }
+  }
+
+  const loadWebAuthnCredentials = async () => {
+    try {
+      const data = await accountService.getWebAuthnCredentials()
+      setWebauthnCredentials(data.credentials || [])
+    } catch (error) {
+      console.error('Failed to load WebAuthn credentials:', error)
+    }
+  }
+
+  const loadMTLSCertificates = async () => {
+    try {
+      const data = await accountService.getMTLSCertificates()
+      setMtlsCertificates(data.certificates || [])
+    } catch (error) {
+      console.error('Failed to load mTLS certificates:', error)
     }
   }
 
@@ -125,6 +157,134 @@ export default function AccountPage() {
     } catch (error) {
       showError(error.message || 'Invalid code. Please try again.')
     }
+  }
+
+  // ============ WebAuthn Handlers ============
+  const handleRegisterWebAuthn = async () => {
+    if (!webauthnName.trim()) {
+      showError('Please enter a name for the security key')
+      return
+    }
+    
+    setWebauthnRegistering(true)
+    try {
+      // Step 1: Get registration options
+      const options = await accountService.startWebAuthnRegistration()
+      
+      // Convert base64url to ArrayBuffer
+      const challenge = Uint8Array.from(atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+      const userId = Uint8Array.from(atob(options.user.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+      
+      // Step 2: Create credential using browser API
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          ...options,
+          challenge,
+          user: { ...options.user, id: userId },
+          excludeCredentials: (options.excludeCredentials || []).map(cred => ({
+            ...cred,
+            id: Uint8Array.from(atob(cred.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+          }))
+        }
+      })
+      
+      // Step 3: Encode credential for server
+      const credentialData = {
+        id: credential.id,
+        rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
+        type: credential.type,
+        response: {
+          clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
+          attestationObject: btoa(String.fromCharCode(...new Uint8Array(credential.response.attestationObject)))
+        }
+      }
+      
+      // Step 4: Send to server
+      await accountService.completeWebAuthnRegistration(credentialData, webauthnName)
+      
+      showSuccess('Security key registered successfully!')
+      setShowWebAuthnModal(false)
+      setWebauthnName('')
+      loadAccount()
+      loadWebAuthnCredentials()
+    } catch (error) {
+      console.error('WebAuthn registration failed:', error)
+      if (error.name === 'NotAllowedError') {
+        showError('Security key registration was cancelled or timed out')
+      } else {
+        showError(error.message || 'Failed to register security key')
+      }
+    } finally {
+      setWebauthnRegistering(false)
+    }
+  }
+  
+  const handleDeleteWebAuthn = async (credentialId) => {
+    if (!confirm('Delete this security key?')) return
+    try {
+      await accountService.deleteWebAuthnCredential(credentialId)
+      showSuccess('Security key deleted')
+      loadAccount()
+      loadWebAuthnCredentials()
+    } catch (error) {
+      showError(error.message || 'Failed to delete security key')
+    }
+  }
+
+  // ============ mTLS Handlers ============
+  const handleCreateMTLS = async () => {
+    if (!mtlsFormData.cn.trim()) {
+      showError('Please enter a Common Name (CN)')
+      return
+    }
+    
+    try {
+      const response = await accountService.createMTLSCertificate({
+        cn: mtlsFormData.cn,
+        email: mtlsFormData.email || accountData.email,
+        validity_days: mtlsFormData.validity_days,
+        self_signed: false
+      })
+      
+      showSuccess('Certificate created! Download it now.')
+      
+      // Auto-download the certificate and key
+      if (response.cert_pem) {
+        downloadFile(response.cert_pem, `${mtlsFormData.cn}-cert.pem`)
+      }
+      if (response.key_pem) {
+        downloadFile(response.key_pem, `${mtlsFormData.cn}-key.pem`)
+      }
+      
+      setShowMTLSModal(false)
+      setMtlsFormData({ cn: '', email: '', validity_days: 365 })
+      loadAccount()
+      loadMTLSCertificates()
+    } catch (error) {
+      showError(error.message || 'Failed to create certificate')
+    }
+  }
+  
+  const handleDeleteMTLS = async (certId) => {
+    if (!confirm('Delete this certificate?')) return
+    try {
+      await accountService.deleteMTLSCertificate(certId)
+      showSuccess('Certificate deleted')
+      loadAccount()
+      loadMTLSCertificates()
+    } catch (error) {
+      showError(error.message || 'Failed to delete certificate')
+    }
+  }
+  
+  const downloadFile = (content, filename) => {
+    const blob = new Blob([content], { type: 'application/x-pem-file' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const updateField = (field, value) => {
@@ -262,33 +422,72 @@ export default function AccountPage() {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Security Keys (WebAuthn/FIDO2)</h3>
-            <div className="flex items-center justify-between p-4 bg-bg-tertiary border border-border rounded-lg">
-              <div>
-                <p className="text-sm font-medium text-text-primary">Hardware Keys</p>
-                <p className="text-xs text-text-secondary mt-1">
-                  YubiKey, TouchID, Windows Hello · {accountData.webauthn_credentials_count || 0} registered
-                </p>
-              </div>
-              <Button size="sm" onClick={() => alert('WebAuthn registration - Coming soon')}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-text-primary">Security Keys (WebAuthn/FIDO2)</h3>
+              <Button size="sm" onClick={() => setShowWebAuthnModal(true)}>
                 Add Key
               </Button>
             </div>
+            {webauthnCredentials.length === 0 ? (
+              <div className="p-4 bg-bg-tertiary border border-border rounded-lg text-center">
+                <Fingerprint size={32} className="mx-auto mb-2 opacity-50" />
+                <p className="text-sm text-text-secondary">No security keys registered</p>
+                <p className="text-xs text-text-secondary mt-1">Add a YubiKey, TouchID, or Windows Hello for passwordless login</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {webauthnCredentials.map(cred => (
+                  <div key={cred.id} className="flex items-center justify-between p-3 bg-bg-tertiary border border-border rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-text-primary">{cred.name || 'Security Key'}</p>
+                      <p className="text-xs text-text-secondary">
+                        Added {new Date(cred.created_at).toLocaleDateString()}
+                        {cred.last_used_at && ` · Last used ${new Date(cred.last_used_at).toLocaleDateString()}`}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="danger" onClick={() => handleDeleteWebAuthn(cred.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Client Certificates (mTLS)</h3>
-            <div className="flex items-center justify-between p-4 bg-bg-tertiary border border-border rounded-lg">
-              <div>
-                <p className="text-sm font-medium text-text-primary">X.509 Certificates</p>
-                <p className="text-xs text-text-secondary mt-1">
-                  Mutual TLS authentication · {accountData.mtls_certificates_count || 0} installed
-                </p>
-              </div>
-              <Button size="sm" onClick={() => alert('mTLS upload - Coming soon')}>
-                Upload Certificate
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-text-primary">Client Certificates (mTLS)</h3>
+              <Button size="sm" onClick={() => setShowMTLSModal(true)}>
+                Create Certificate
               </Button>
             </div>
+            {mtlsCertificates.length === 0 ? (
+              <div className="p-4 bg-bg-tertiary border border-border rounded-lg text-center">
+                <Certificate size={32} className="mx-auto mb-2 opacity-50" />
+                <p className="text-sm text-text-secondary">No certificates enrolled</p>
+                <p className="text-xs text-text-secondary mt-1">Create a client certificate for mutual TLS authentication</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {mtlsCertificates.map(cert => (
+                  <div key={cert.id} className="flex items-center justify-between p-3 bg-bg-tertiary border border-border rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-text-primary">{cert.name || cert.cert_subject}</p>
+                      <p className="text-xs text-text-secondary">
+                        Expires {new Date(cert.valid_until).toLocaleDateString()}
+                        {' · '}
+                        <Badge variant={cert.enabled ? 'success' : 'secondary'} className="text-xs">
+                          {cert.enabled ? 'Active' : 'Disabled'}
+                        </Badge>
+                      </p>
+                    </div>
+                    <Button size="sm" variant="danger" onClick={() => handleDeleteMTLS(cert.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
@@ -518,6 +717,99 @@ export default function AccountPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* WebAuthn Registration Modal */}
+      <Modal
+        open={showWebAuthnModal}
+        onClose={() => {
+          setShowWebAuthnModal(false)
+          setWebauthnName('')
+        }}
+        title="Register Security Key"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Key Name"
+            value={webauthnName}
+            onChange={(e) => setWebauthnName(e.target.value)}
+            placeholder="YubiKey 5 NFC"
+            helperText="Give your security key a recognizable name"
+          />
+          <p className="text-sm text-text-secondary">
+            Click Register and follow your browser's prompts to activate your security key (YubiKey, TouchID, Windows Hello, etc.)
+          </p>
+          <div className="flex gap-2 pt-2">
+            <Button variant="secondary" onClick={() => {
+              setShowWebAuthnModal(false)
+              setWebauthnName('')
+            }} className="flex-1">
+              Cancel
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleRegisterWebAuthn}
+              disabled={!webauthnName.trim() || webauthnRegistering}
+              className="flex-1"
+            >
+              {webauthnRegistering ? 'Registering...' : 'Register Key'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* mTLS Certificate Modal */}
+      <Modal
+        open={showMTLSModal}
+        onClose={() => {
+          setShowMTLSModal(false)
+          setMtlsFormData({ cn: '', email: '', validity_days: 365 })
+        }}
+        title="Create Client Certificate"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Common Name (CN)"
+            value={mtlsFormData.cn}
+            onChange={(e) => setMtlsFormData(prev => ({ ...prev, cn: e.target.value }))}
+            placeholder="john.doe"
+            helperText="Usually your username or identifier"
+          />
+          <Input
+            label="Email (optional)"
+            type="email"
+            value={mtlsFormData.email}
+            onChange={(e) => setMtlsFormData(prev => ({ ...prev, email: e.target.value }))}
+            placeholder="john@example.com"
+          />
+          <Input
+            label="Validity (days)"
+            type="number"
+            value={mtlsFormData.validity_days}
+            onChange={(e) => setMtlsFormData(prev => ({ ...prev, validity_days: parseInt(e.target.value) || 365 }))}
+            min="1"
+            max="3650"
+          />
+          <p className="text-sm text-text-secondary">
+            A new client certificate will be generated. Download and install it in your browser for mTLS authentication.
+          </p>
+          <div className="flex gap-2 pt-2">
+            <Button variant="secondary" onClick={() => {
+              setShowMTLSModal(false)
+              setMtlsFormData({ cn: '', email: '', validity_days: 365 })
+            }} className="flex-1">
+              Cancel
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleCreateMTLS}
+              disabled={!mtlsFormData.cn.trim()}
+              className="flex-1"
+            >
+              Create Certificate
+            </Button>
+          </div>
+        </div>
       </Modal>
     </>
   )
