@@ -133,7 +133,8 @@ export default function CAsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   
   const [cas, setCAs] = useState([])
-  const [treeData, setTreeData] = useState([])
+  const [treeRoots, setTreeRoots] = useState([])
+  const [treeOrphans, setTreeOrphans] = useState([])
   const [selectedCA, setSelectedCA] = useState(null)
   const [issuedCerts, setIssuedCerts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -166,9 +167,10 @@ export default function CAsPage() {
       setCAs(casList)
       
       // Tree API returns {data: {roots: [], orphans: []}}
-      const treeRoots = treeDataRes.data?.roots || []
-      const treeOrphans = treeDataRes.data?.orphans || []
-      setTreeData(buildTreeNodes([...treeRoots, ...treeOrphans]))
+      const roots = treeDataRes.data?.roots || []
+      const orphans = treeDataRes.data?.orphans || []
+      setTreeRoots(buildTreeNodes(roots))
+      setTreeOrphans(buildTreeNodes(orphans))
       
       if (casList.length > 0 && !selectedCA) {
         loadCADetails(casList[0].id)
@@ -595,18 +597,44 @@ export default function CAsPage() {
               <LoadingSpinner />
             </div>
           ) : viewMode === 'tree' ? (
-            treeData.length === 0 ? (
+            (treeRoots.length === 0 && treeOrphans.length === 0) ? (
               <EmptyState
                 icon={ShieldCheck}
                 title="No CAs yet"
                 description="Create your first Certificate Authority"
               />
             ) : (
-              <TreeView
-                nodes={treeData}
-                selectedId={selectedCA?.id}
-                onSelect={(node) => loadCADetails(node.id)}
-              />
+              <div className="space-y-4">
+                {/* Root CAs Section */}
+                {treeRoots.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2 flex items-center gap-2">
+                      <Crown size={14} className="text-yellow-500" />
+                      Root CAs ({treeRoots.length})
+                    </p>
+                    <TreeView
+                      nodes={treeRoots}
+                      selectedId={selectedCA?.id}
+                      onSelect={(node) => loadCADetails(node.id)}
+                    />
+                  </div>
+                )}
+                
+                {/* Orphaned/Intermediate CAs Section */}
+                {treeOrphans.length > 0 && (
+                  <div className="pt-2 border-t border-border">
+                    <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2 flex items-center gap-2">
+                      <ShieldCheck size={14} className="text-orange-500" />
+                      Orphaned CAs ({treeOrphans.length})
+                    </p>
+                    <TreeView
+                      nodes={treeOrphans}
+                      selectedId={selectedCA?.id}
+                      onSelect={(node) => loadCADetails(node.id)}
+                    />
+                  </div>
+                )}
+              </div>
             )
           ) : (
             <div className="space-y-2">
