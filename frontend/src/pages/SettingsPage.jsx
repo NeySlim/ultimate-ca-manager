@@ -2,12 +2,12 @@
  * Settings Page
  */
 import { useState, useEffect } from 'react'
-import { Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, Envelope, Key, Download, Trash, UploadSimple, HardDrives, Lock } from '@phosphor-icons/react'
+import { Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, Envelope, Download, Trash, UploadSimple, HardDrives, Lock } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Button, Input, Select,
   Textarea, Tabs, LoadingSpinner, FileUpload, Table
 } from '../components'
-import { settingsService, systemService, acmeService, scepService, casService, certificatesService } from '../services'
+import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
 
 export default function SettingsPage() {
@@ -16,20 +16,15 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [settings, setSettings] = useState({})
-  const [acmeSettings, setAcmeSettings] = useState({})
-  const [scepSettings, setScepSettings] = useState({})
   const [backups, setBackups] = useState([])
   const [dbStats, setDbStats] = useState(null)
   const [httpsInfo, setHttpsInfo] = useState(null)
   const [certificates, setCertificates] = useState([])
   const [selectedHttpsCert, setSelectedHttpsCert] = useState('')
   const [cas, setCas] = useState([])
-  const [proxyEmail, setProxyEmail] = useState('')
 
   useEffect(() => {
     loadSettings()
-    loadAcmeSettings()
-    loadScepSettings()
     // loadBackups() // TODO: Activer quand endpoint backend existe
     // loadDbStats() // TODO: Activer quand endpoint backend existe
     // loadHttpsInfo() // TODO: Activer quand endpoint backend existe
@@ -46,24 +41,6 @@ export default function SettingsPage() {
       showError(error.message || 'Failed to load settings')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadAcmeSettings = async () => {
-    try {
-      const data = await acmeService.getSettings()
-      setAcmeSettings(data.data || {})
-    } catch (error) {
-      console.error('Failed to load ACME settings:', error)
-    }
-  }
-
-  const loadScepSettings = async () => {
-    try {
-      const data = await scepService.getConfig()
-      setScepSettings(data.data || {})
-    } catch (error) {
-      console.error('Failed to load SCEP settings:', error)
     }
   }
 
@@ -192,52 +169,6 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSaveAcme = async () => {
-    setSaving(true)
-    try {
-      await acmeService.updateSettings(acmeSettings)
-      showSuccess('ACME settings saved successfully')
-    } catch (error) {
-      showError(error.message || 'Failed to save ACME settings')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleRegisterProxy = async () => {
-    if (!proxyEmail) {
-      showError('Email is required')
-      return
-    }
-    try {
-      await acmeService.registerProxy(proxyEmail)
-      showSuccess('Proxy account registered successfully')
-      setProxyEmail('')
-    } catch (error) {
-      showError(error.message || 'Failed to register proxy account')
-    }
-  }
-
-  const updateAcmeSetting = (key, value) => {
-    setAcmeSettings(prev => ({ ...prev, [key]: value }))
-  }
-
-  const handleSaveScep = async () => {
-    setSaving(true)
-    try {
-      await scepService.updateConfig(scepSettings)
-      showSuccess('SCEP settings saved successfully')
-    } catch (error) {
-      showError(error.message || 'Failed to save SCEP settings')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const updateScepSetting = (key, value) => {
-    setScepSettings(prev => ({ ...prev, [key]: value }))
-  }
-
   // Database Management Handlers
   const handleOptimizeDb = async () => {
     try {
@@ -302,6 +233,11 @@ export default function SettingsPage() {
       return
     }
 
+    // TODO: Backend endpoint not implemented yet
+    showError('HTTPS certificate management not yet implemented in backend')
+    return
+
+    /* Will be enabled when backend endpoint exists
     if (!confirm('Apply selected certificate as HTTPS certificate? This will restart the server.')) return
     
     try {
@@ -313,9 +249,15 @@ export default function SettingsPage() {
     } catch (error) {
       showError(error.message || 'Failed to apply certificate')
     }
+    */
   }
 
   const handleRegenerateHttpsCert = async () => {
+    // TODO: Backend endpoint not implemented yet
+    showError('HTTPS certificate management not yet implemented in backend')
+    return
+
+    /* Will be enabled when backend endpoint exists
     if (!confirm('Regenerate HTTPS certificate? This will restart the server.')) return
     
     try {
@@ -328,6 +270,7 @@ export default function SettingsPage() {
     } catch (error) {
       showError(error.message || 'Failed to regenerate HTTPS certificate')
     }
+    */
   }
 
   const updateSetting = (key, value) => {
@@ -649,164 +592,6 @@ export default function SettingsPage() {
 
           <div className="flex gap-3 pt-4 border-t border-border">
             <Button onClick={() => handleSave('backup')} disabled={saving}>
-              <FloppyDisk size={16} />
-              Save Changes
-            </Button>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 'acme',
-      label: 'ACME',
-      icon: <Key size={16} />,
-      content: (
-        <div className="space-y-6 max-w-2xl">
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">ACME Server Configuration</h3>
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={acmeSettings.enabled || false}
-                  onChange={(e) => updateAcmeSetting('enabled', e.target.checked)}
-                  className="rounded border-border bg-bg-tertiary"
-                />
-                <div>
-                  <p className="text-sm text-text-primary font-medium">Enable ACME Server</p>
-                  <p className="text-xs text-text-secondary">Allow automated certificate issuance via ACME protocol</p>
-                </div>
-              </label>
-
-              <Select
-                label="Default CA for ACME"
-                value={acmeSettings.issuing_ca_id || undefined}
-                onChange={(val) => updateAcmeSetting('issuing_ca_id', val)}
-                disabled={!acmeSettings.enabled}
-                placeholder="Select a CA..."
-                options={cas.map(ca => ({ value: ca.refid, label: ca.common_name }))}
-              />
-
-              <Input
-                label="ACME Directory URL"
-                value={`${window.location.origin}/acme/directory`}
-                readOnly
-                helperText="Use this URL with ACME clients like certbot or acme.sh"
-                className="bg-bg-tertiary"
-              />
-            </div>
-          </div>
-
-          <div className="border-t border-border pt-6">
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Let's Encrypt Proxy</h3>
-            <div className="space-y-4">
-              <p className="text-sm text-text-secondary">
-                Register a proxy account to use UCM as a Let's Encrypt proxy for external certificate issuance.
-              </p>
-
-              <Input
-                label="Proxy Endpoint URL"
-                value={`${window.location.origin}/api/v2/acme/proxy`}
-                readOnly
-                helperText="External ACME clients can use this URL to proxy requests to Let's Encrypt"
-                className="bg-bg-tertiary"
-              />
-              
-              <Input
-                label="Email Address"
-                type="email"
-                value={proxyEmail}
-                onChange={(e) => setProxyEmail(e.target.value)}
-                placeholder="admin@example.com"
-                helperText="Email for Let's Encrypt account registration"
-              />
-
-              <Button 
-                variant="secondary" 
-                onClick={handleRegisterProxy}
-                disabled={!proxyEmail}
-              >
-                <Key size={16} />
-                Register Proxy Account
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t border-border">
-            <Button onClick={handleSaveAcme} disabled={saving}>
-              <FloppyDisk size={16} />
-              Save Changes
-            </Button>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 'scep',
-      label: 'SCEP',
-      icon: <Key size={16} />,
-      content: (
-        <div className="space-y-6 max-w-2xl">
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">SCEP Server Configuration</h3>
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={scepSettings.enabled || false}
-                  onChange={(e) => updateScepSetting('enabled', e.target.checked)}
-                  className="rounded border-border bg-bg-tertiary"
-                />
-                <div>
-                  <p className="text-sm text-text-primary font-medium">Enable SCEP Server</p>
-                  <p className="text-xs text-text-secondary">Allow automated certificate enrollment via SCEP protocol</p>
-                </div>
-              </label>
-
-              <Select
-                label="Default CA for SCEP"
-                value={scepSettings.issuing_ca_id || undefined}
-                onChange={(val) => updateScepSetting('issuing_ca_id', val)}
-                disabled={!scepSettings.enabled}
-                placeholder="Select a CA..."
-                options={cas.map(ca => ({ value: ca.refid, label: ca.common_name }))}
-              />
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={scepSettings.auto_approve || false}
-                  onChange={(e) => updateScepSetting('auto_approve', e.target.checked)}
-                  disabled={!scepSettings.enabled}
-                  className="rounded border-border bg-bg-tertiary"
-                />
-                <div>
-                  <p className="text-sm text-text-primary font-medium">Auto-approve Requests</p>
-                  <p className="text-xs text-text-secondary">Automatically approve certificate requests without manual review</p>
-                </div>
-              </label>
-
-              <Input
-                label="Challenge Password"
-                type="password"
-                value={scepSettings.challenge_password || ''}
-                onChange={(e) => updateScepSetting('challenge_password', e.target.value)}
-                disabled={!scepSettings.enabled}
-                helperText="Static challenge password for SCEP enrollment"
-              />
-
-              <Input
-                label="SCEP URL"
-                value={`${window.location.origin}/scep`}
-                readOnly
-                helperText="Use this URL with SCEP clients"
-                className="bg-bg-tertiary"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t border-border">
-            <Button onClick={handleSaveScep} disabled={saving}>
               <FloppyDisk size={16} />
               Save Changes
             </Button>

@@ -437,11 +437,14 @@ export default function CertificatesPage() {
           { label: `${total} certificates` }
         ]}
         title="Certificates"
-        searchable
-        searchValue={searchQuery}
-        onSearch={setSearchQuery}
       >
         <div className="p-4 space-y-3">
+          <Input
+            placeholder="Search certificates..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          
           <Select
             label="Filter by Status"
             options={[
