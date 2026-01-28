@@ -50,8 +50,11 @@ class APIClient {
         error.data = data
         console.error(`❌ API error ${response.status}:`, error.message)
         
-        // Redirect to login on 401 (unless already on login page)
-        if (response.status === 401 && !window.location.pathname.includes('/login')) {
+        // Redirect to login on 401 (unless already on login page OR this is the login/verify request)
+        const isLoginPage = window.location.pathname.includes('/login')
+        const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/verify')
+        
+        if (response.status === 401 && !isLoginPage && !isAuthEndpoint) {
           console.warn('🚪 401 Unauthorized - redirecting to login')
           window.location.href = '/login'
         }

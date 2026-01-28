@@ -27,8 +27,8 @@ export default function LoginPage() {
     try {
       await login(username, password)
       showSuccess('Login successful!')
-      // Force full page reload to ensure cookies are set
-      window.location.href = '/dashboard'
+      // Use React Router navigation (preserves React state and cookies)
+      navigate('/dashboard')
     } catch (error) {
       showError(error.message || 'Login failed')
       setLoading(false)
