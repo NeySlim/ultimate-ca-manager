@@ -162,7 +162,74 @@ def create_app(config_name=None):
     from middleware.mtls_middleware import init_mtls_middleware
     init_mtls_middleware(app)
     
-    # Initialize general task scheduler (CRL auto-regen, etc)
+    # Create database tables FIRST (before scheduler which may query DB)
+    # Use file lock to prevent race condition with multiple Gunicorn workers
+    app.logger.info("=" * 60)
+    app.logger.info("Starting database initialization...")
+    app.logger.info("=" * 60)
+    
+    import fcntl
+    import time
+    from config.settings import DATA_DIR
+    
+    lock_file = os.path.join(DATA_DIR, '.db_init.lock')
+    
+    with app.app_context():
+        # Acquire exclusive lock to ensure only one worker initializes DB
+        with open(lock_file, 'w') as lock:
+            app.logger.info("Waiting for database initialization lock...")
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            app.logger.info("✓ Database lock acquired")
+            
+            try:
+                # Check if DB is already initialized by another worker
+                from sqlalchemy import inspect
+                inspector = inspect(db.engine)
+                tables = inspector.get_table_names()
+                
+                if 'users' in tables and 'certificate_authorities' in tables:
+                    app.logger.info("✓ Database tables already exist")
+                else:
+                    # Create all tables
+                    app.logger.info("Creating database tables...")
+                    db.create_all()
+                    app.logger.info("✓ Database tables created/verified")
+                
+                # Always verify critical tables exist (whether just created or pre-existing)
+                inspector = inspect(db.engine)
+                tables = inspector.get_table_names()
+                
+                critical_tables = ['users', 'certificate_authorities', 'certificates', 'crl_metadata']
+                missing_tables = [t for t in critical_tables if t not in tables]
+                
+                if missing_tables:
+                    raise RuntimeError(f"Critical tables missing: {missing_tables}")
+                
+                app.logger.info(f"✓ All critical tables verified: {', '.join(critical_tables)}")
+                
+                # Run database health check and repair
+                app.logger.info("Running database health check...")
+                from database_health import check_and_repair_database
+                check_and_repair_database(app)
+                app.logger.info("✓ Database health check complete")
+                
+                # Initialize default data (runs even if tables already existed)
+                app.logger.info("Initializing default data...")
+                init_database(app)
+                app.logger.info("✓ Default data initialized")
+                
+            except Exception as e:
+                app.logger.error(f"❌ FATAL: Database initialization failed: {e}")
+                raise
+            finally:
+                # Lock is automatically released when exiting 'with' block
+                app.logger.info("✓ Database lock released")
+    
+    app.logger.info("=" * 60)
+    app.logger.info("✓ DATABASE INITIALIZATION COMPLETE - Safe to proceed")
+    app.logger.info("=" * 60)
+    
+    # Initialize general task scheduler (CRL auto-regen, etc) - AFTER database is ready
     try:
         from services.scheduler_service import init_scheduler
         from services.crl_scheduler_task import CRLSchedulerTask
@@ -187,24 +254,6 @@ def create_app(config_name=None):
         app.scheduler = scheduler
     except Exception as e:
         app.logger.error(f"Failed to start scheduler service: {e}")
-    
-    # Create database tables and auto-migrate
-    with app.app_context():
-        try:
-            # Always run create_all to ensure all tables exist
-            # SQLAlchemy skips existing tables by default
-            db.create_all()
-            app.logger.info("Database tables created/verified")
-        except Exception as e:
-            # Tables may already exist from another worker - not a real error
-            app.logger.debug(f"Error creating tables (may already exist): {e}")
-        
-        # Run database health check and repair
-        from database_health import check_and_repair_database
-        check_and_repair_database(app)
-        
-        # Initialize default data (legacy, kept for compatibility)
-        init_database(app)
     
     # Register blueprints
     register_blueprints(app)
@@ -334,6 +383,7 @@ def init_database(app):
     from datetime import datetime
     from sqlalchemy.exc import IntegrityError, OperationalError
     from sqlalchemy import inspect
+    import sqlite3
     
     # Verify all tables exist, create if missing
     inspector = inspect(db.engine)
@@ -348,6 +398,117 @@ def init_database(app):
         app.logger.info("Running automatic schema migration...")
         db.create_all()
         app.logger.info("Schema migration completed successfully")
+    
+    # Auto-detect and add missing columns (SQLAlchemy create_all doesn't add new columns to existing tables)
+    def add_missing_columns():
+        """Automatically add missing columns to existing tables"""
+        conn = sqlite3.connect(app.config['DATABASE_PATH'])
+        cursor = conn.cursor()
+        
+        # Define expected columns for users table (2FA columns)
+        expected_columns = {
+            'users': [
+                ('totp_secret', 'VARCHAR(32)', None),
+                ('totp_confirmed', 'BOOLEAN', '0'),
+                ('backup_codes', 'TEXT', None)
+            ]
+        }
+        
+        for table, columns in expected_columns.items():
+            # Get existing columns
+            cursor.execute(f"PRAGMA table_info({table})")
+            existing_cols = {row[1] for row in cursor.fetchall()}
+            
+            for col_name, col_type, default_value in columns:
+                if col_name not in existing_cols:
+                    default_clause = f"DEFAULT {default_value}" if default_value else ""
+                    sql = f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type} {default_clause}".strip()
+                    app.logger.info(f"Adding missing column: {table}.{col_name}")
+                    cursor.execute(sql)
+        
+        conn.commit()
+        conn.close()
+    
+    def create_missing_tables():
+        """Create tables that SQLAlchemy might miss"""
+        conn = sqlite3.connect(app.config['DATABASE_PATH'])
+        cursor = conn.cursor()
+        
+        # Get existing tables
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        existing_tables = {row[0] for row in cursor.fetchall()}
+        
+        # Define tables to create if missing
+        tables_sql = {
+            'api_keys': """
+                CREATE TABLE api_keys (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    name VARCHAR(128) NOT NULL,
+                    key_hash VARCHAR(256) NOT NULL,
+                    key_preview VARCHAR(16),
+                    permissions TEXT DEFAULT '[]',
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_used_at TIMESTAMP,
+                    expires_at TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """,
+            'webauthn_credentials': """
+                CREATE TABLE webauthn_credentials (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    credential_id BLOB UNIQUE NOT NULL,
+                    public_key BLOB NOT NULL,
+                    sign_count INTEGER DEFAULT 0 NOT NULL,
+                    name VARCHAR(128),
+                    aaguid VARCHAR(36),
+                    transports TEXT,
+                    is_backup_eligible BOOLEAN DEFAULT 0,
+                    is_backup_device BOOLEAN DEFAULT 0,
+                    user_verified BOOLEAN DEFAULT 0,
+                    enabled BOOLEAN DEFAULT 1 NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_used_at TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """,
+            'webauthn_challenges': """
+                CREATE TABLE webauthn_challenges (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    challenge VARCHAR(128) UNIQUE NOT NULL,
+                    challenge_type VARCHAR(20) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMP NOT NULL,
+                    used BOOLEAN DEFAULT 0,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """
+        }
+        
+        for table_name, create_sql in tables_sql.items():
+            if table_name not in existing_tables:
+                app.logger.info(f"Creating missing table: {table_name}")
+                cursor.execute(create_sql)
+                # Create indexes
+                if table_name == 'api_keys':
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_api_key_hash ON api_keys(key_hash)")
+                elif table_name == 'webauthn_credentials':
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_webauthn_credential_id ON webauthn_credentials(credential_id)")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_webauthn_user_id ON webauthn_credentials(user_id)")
+                elif table_name == 'webauthn_challenges':
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_webauthn_challenge ON webauthn_challenges(challenge)")
+        
+        conn.commit()
+        conn.close()
+    
+    try:
+        add_missing_columns()
+        create_missing_tables()
+    except Exception as e:
+        app.logger.warning(f"Schema migration check failed (may be normal): {e}")
     
     # Create initial admin user if none exists
     # Use try/except to handle race conditions with multiple workers
@@ -383,6 +544,202 @@ def init_database(app):
         # Another worker already created the initial data
         db.session.rollback()
         pass
+    
+    # Create system certificate templates if none exist
+    try:
+        import json
+        from models.certificate_template import CertificateTemplate
+        
+        if CertificateTemplate.query.count() == 0:
+            app.logger.info("Creating system certificate templates...")
+            
+            templates = [
+                {
+                    "name": "Web Server (TLS/SSL)",
+                    "description": "Standard HTTPS/TLS web server certificate",
+                    "template_type": "web_server",
+                    "key_type": "RSA-2048",
+                    "validity_days": 397,
+                    "digest": "sha256",
+                    "dn_template": json.dumps({"CN": "{hostname}", "O": "Organization", "OU": "IT"}),
+                    "extensions_template": json.dumps({
+                        "key_usage": ["digitalSignature", "keyEncipherment"],
+                        "extended_key_usage": ["serverAuth"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": ["dns", "ip"]
+                    }),
+                    "is_system": True
+                },
+                {
+                    "name": "Client Certificate",
+                    "description": "User authentication certificate for client devices",
+                    "template_type": "client_auth",
+                    "key_type": "RSA-2048",
+                    "validity_days": 365,
+                    "digest": "sha256",
+                    "dn_template": json.dumps({"CN": "{username}", "emailAddress": "{email}"}),
+                    "extensions_template": json.dumps({
+                        "key_usage": ["digitalSignature", "keyEncipherment"],
+                        "extended_key_usage": ["clientAuth"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": ["email"]
+                    }),
+                    "is_system": True
+                },
+                {
+                    "name": "VPN Server",
+                    "description": "VPN server certificate (OpenVPN, IPsec, etc.)",
+                    "template_type": "vpn_server",
+                    "key_type": "RSA-2048",
+                    "validity_days": 730,
+                    "digest": "sha256",
+                    "dn_template": json.dumps({"CN": "{hostname}", "O": "Organization"}),
+                    "extensions_template": json.dumps({
+                        "key_usage": ["digitalSignature", "keyEncipherment"],
+                        "extended_key_usage": ["serverAuth"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": ["dns", "ip"]
+                    }),
+                    "is_system": True
+                },
+                {
+                    "name": "Email (S/MIME)",
+                    "description": "Email encryption and signing certificate",
+                    "template_type": "email",
+                    "key_type": "RSA-2048",
+                    "validity_days": 365,
+                    "digest": "sha256",
+                    "dn_template": json.dumps({"CN": "{username}", "emailAddress": "{email}"}),
+                    "extensions_template": json.dumps({
+                        "key_usage": ["digitalSignature", "keyEncipherment"],
+                        "extended_key_usage": ["emailProtection"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": ["email"]
+                    }),
+                    "is_system": True
+                },
+                {
+                    "name": "Certificate Authority",
+                    "description": "Certificate Authority (CA) for signing other certificates",
+                    "template_type": "ca",
+                    "key_type": "RSA-4096",
+                    "validity_days": 3650,
+                    "digest": "sha256",
+                    "dn_template": json.dumps({"CN": "{ca_name}", "O": "Organization"}),
+                    "extensions_template": json.dumps({
+                        "key_usage": ["keyCertSign", "cRLSign"],
+                        "basic_constraints": {"ca": True, "path_length": 0},
+                        "san_types": []
+                    }),
+                    "is_system": True
+                },
+                {
+                    "name": "Code Signing",
+                    "description": "Code signing certificate for software/drivers",
+                    "template_type": "code_signing",
+                    "key_type": "RSA-2048",
+                    "validity_days": 365,
+                    "digest": "sha256",
+                    "dn_template": json.dumps({"CN": "{username}", "O": "Organization"}),
+                    "extensions_template": json.dumps({
+                        "key_usage": ["digitalSignature"],
+                        "extended_key_usage": ["codeSigning"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": []
+                    }),
+                    "is_system": True
+                }
+            ]
+            
+            for tmpl_data in templates:
+                tmpl = CertificateTemplate(**tmpl_data)
+                db.session.add(tmpl)
+            
+            db.session.commit()
+            app.logger.info(f"✓ Created {len(templates)} system certificate templates")
+    except IntegrityError:
+        db.session.rollback()
+        app.logger.info("✓ System templates already exist")
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Failed to create system templates: {e}")
+    
+    # Generate self-signed HTTPS certificate if none exists
+    try:
+        from pathlib import Path
+        https_cert_path = Path('/opt/ucm/data/https_cert.pem')
+        https_key_path = Path('/opt/ucm/data/https_key.pem')
+        
+        if not https_cert_path.exists() or not https_key_path.exists():
+            app.logger.info("No HTTPS certificate found, generating self-signed certificate...")
+            
+            from cryptography import x509
+            from cryptography.x509.oid import NameOID
+            from cryptography.hazmat.primitives import hashes, serialization
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from datetime import timedelta
+            import socket
+            import ipaddress
+            
+            # Get hostname
+            try:
+                hostname = socket.gethostname()
+            except:
+                hostname = 'ucm.local'
+            
+            # Generate private key
+            private_key = rsa.generate_private_key(
+                public_exponent=65537,
+                key_size=2048
+            )
+            
+            # Create certificate
+            subject = issuer = x509.Name([
+                x509.NameAttribute(NameOID.COMMON_NAME, hostname),
+                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "UCM Self-Signed"),
+            ])
+            
+            cert_builder = x509.CertificateBuilder()
+            cert_builder = cert_builder.subject_name(subject)
+            cert_builder = cert_builder.issuer_name(issuer)
+            cert_builder = cert_builder.public_key(private_key.public_key())
+            cert_builder = cert_builder.serial_number(x509.random_serial_number())
+            cert_builder = cert_builder.not_valid_before(datetime.utcnow())
+            cert_builder = cert_builder.not_valid_after(datetime.utcnow() + timedelta(days=3650))
+            
+            # Add Subject Alternative Names
+            san_list = [
+                x509.DNSName(hostname),
+                x509.DNSName("localhost"),
+                x509.IPAddress(ipaddress.IPv4Address("127.0.0.1"))
+            ]
+            
+            cert_builder = cert_builder.add_extension(
+                x509.SubjectAlternativeName(san_list),
+                critical=False
+            )
+            
+            # Self-sign certificate
+            certificate = cert_builder.sign(private_key, hashes.SHA256())
+            
+            # Write cert and key
+            https_cert_path.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
+            https_key_path.write_bytes(private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            ))
+            
+            # Set permissions
+            import os
+            os.chmod(https_key_path, 0o600)
+            os.chmod(https_cert_path, 0o644)
+            
+            app.logger.info(f"✓ Self-signed HTTPS certificate created (CN={hostname}, 10 years)")
+        else:
+            app.logger.info("✓ HTTPS certificate already exists")
+    except Exception as e:
+        app.logger.error(f"Failed to generate HTTPS certificate: {e}")
 
 
 def register_blueprints(app):
