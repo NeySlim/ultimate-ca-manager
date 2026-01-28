@@ -578,6 +578,13 @@ export default function SettingsPage() {
                   />
                 </>
               )}
+
+              {hasPermission('admin:system') && (
+                <Button onClick={() => handleSave('backup')} disabled={saving} className="mt-4">
+                  <FloppyDisk size={16} />
+                  Save Settings
+                </Button>
+              )}
             </div>
           </div>
 
@@ -643,15 +650,6 @@ export default function SettingsPage() {
                 helperText="Select backup file (encrypted .ucmbkp)"
               />
             </div>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t border-border">
-            {hasPermission('admin:system') && (
-              <Button onClick={() => handleSave('backup')} disabled={saving}>
-                <FloppyDisk size={16} />
-                Save Settings
-              </Button>
-            )}
           </div>
         </div>
       )
