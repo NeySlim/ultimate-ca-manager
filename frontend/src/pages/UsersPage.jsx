@@ -247,8 +247,8 @@ export default function UsersPage() {
                   label="Role"
                   options={[
                     { value: 'admin', label: 'Administrator' },
-                    { value: 'user', label: 'User' },
-                    { value: 'auditor', label: 'Auditor' },
+                    { value: 'operator', label: 'Operator' },
+                    { value: 'viewer', label: 'Viewer' },
                   ]}
                   value={formData.role || 'user'}
                   onChange={(val) => updateFormData('role', val)}
@@ -346,8 +346,8 @@ export default function UsersPage() {
             options={[
               { value: 'all', label: 'All Roles' },
               { value: 'admin', label: 'Administrators' },
-              { value: 'user', label: 'Users' },
-              { value: 'auditor', label: 'Auditors' },
+              { value: 'operator', label: 'Operators' },
+              { value: 'viewer', label: 'Viewers' },
             ]}
             value={roleFilter}
             onChange={setRoleFilter}
@@ -442,8 +442,8 @@ function CreateUserForm({ onSubmit, onCancel }) {
         label="Role"
         options={[
           { value: 'admin', label: 'Administrator' },
-          { value: 'user', label: 'User' },
-          { value: 'auditor', label: 'Auditor' },
+          { value: 'operator', label: 'Operator' },
+          { value: 'viewer', label: 'Viewer' },
         ]}
         value={formData.role}
         onChange={(val) => setFormData(prev => ({ ...prev, role: val }))}
