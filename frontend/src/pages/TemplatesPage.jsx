@@ -201,7 +201,7 @@ export default function TemplatesPage() {
             description="Select a template from the list to edit"
           />
         ) : (
-          <div className="p-4 space-y-6">
+          <div className="space-y-6">
             {/* Basic Info */}
             <div>
               <h3 className="text-sm font-semibold text-text-primary mb-4">Basic Information</h3>
@@ -318,7 +318,7 @@ export default function TemplatesPage() {
         title="Certificate Templates"
       >
         <div className="p-4 space-y-3">
-          <Button onClick={handleCreate}>
+          <Button onClick={handleCreate} className="w-full">
             <Plus size={18} />
             Create Template
           </Button>
@@ -334,27 +334,15 @@ export default function TemplatesPage() {
               icon={List}
               title="No templates"
               description="Create your first certificate template"
-              action={{
-                label: 'Create Template',
-                onClick: handleCreate
-              }}
             />
           ) : (
-            <div className="p-4">
-              <Table
-                columns={templateColumns}
-                data={templates}
-                onRowClick={selectTemplate}
-                selectedId={selectedTemplate?.id}
-              />
-            </div>
+            <Table
+              columns={templateColumns}
+              data={templates}
+              onRowClick={selectTemplate}
+              selectedId={selectedTemplate?.id}
+            />
           )}
-        </div>
-
-        <div className="px-4 py-3 border-t border-border bg-bg-secondary">
-          <div className="text-xs text-text-secondary">
-            {templates.length} templates total
-          </div>
         </div>
       </DetailsPanel>
     </>
