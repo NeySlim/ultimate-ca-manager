@@ -94,14 +94,18 @@ export default function CertificatesPage() {
     }
   }
 
-  const handleExport = async (id, format = 'pem') => {
+  const handleExport = async (format = 'pem', options = {}) => {
+    if (!selectedCert) return
     try {
-      const blob = await certificatesService.export(id, format)
+      const blob = await certificatesService.export(selectedCert.id, format, options)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `certificate.${format}`
+      // Determine file extension
+      const ext = format === 'pkcs12' ? 'p12' : format === 'der' ? 'der' : 'pem'
+      a.download = `${selectedCert.common_name || selectedCert.descr || 'certificate'}.${ext}`
       a.click()
+      URL.revokeObjectURL(url)
       showSuccess('Certificate exported successfully')
     } catch (error) {
       showError(error.message || 'Failed to export certificate')
@@ -414,8 +418,8 @@ export default function CertificatesPage() {
         actions={selectedCert && (
           <>
             <ExportDropdown 
-              onExport={(format) => handleExport(selectedCert.id, format)} 
-              formats={['pem', 'der', 'pkcs12']}
+              onExport={handleExport}
+              hasPrivateKey={!!selectedCert.prv || selectedCert.has_key}
             />
             {canWrite('certificates') && (
               <Button variant="secondary" size="sm" onClick={() => handleRenew(selectedCert.id)}>
