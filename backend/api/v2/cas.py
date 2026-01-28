@@ -210,12 +210,13 @@ def create_ca():
 @require_auth(['write:cas'])
 def import_ca():
     """
-    Import CA certificate from file
+    Import CA certificate from file OR pasted PEM content
     Supports: PEM, DER, PKCS12, PKCS7
     Auto-updates existing CA if duplicate found (same subject)
     
     Form data:
-        file: Certificate file
+        file: Certificate file (optional if pem_content provided)
+        pem_content: Pasted PEM content (optional if file provided)
         password: Password for PKCS12
         name: Optional display name
         import_key: Whether to import private key (default: true)
@@ -229,12 +230,20 @@ def import_ca():
     import base64
     import uuid
     
-    if 'file' not in request.files:
-        return error_response('No file provided', 400)
+    # Get file data from either file upload or pasted PEM content
+    file_data = None
+    filename = 'pasted.pem'
     
-    file = request.files['file']
-    if file.filename == '':
-        return error_response('No file selected', 400)
+    if 'file' in request.files and request.files['file'].filename:
+        file = request.files['file']
+        file_data = file.read()
+        filename = file.filename
+    elif request.form.get('pem_content'):
+        pem_content = request.form.get('pem_content')
+        file_data = pem_content.encode('utf-8')
+        filename = 'pasted.pem'
+    else:
+        return error_response('No file or PEM content provided', 400)
     
     password = request.form.get('password')
     name = request.form.get('name', '')
@@ -242,11 +251,9 @@ def import_ca():
     update_existing = request.form.get('update_existing', 'true').lower() == 'true'
     
     try:
-        file_data = file.read()
-        
         # Parse certificate using shared service
         cert, private_key, format_detected = parse_certificate_file(
-            file_data, file.filename, password, import_key
+            file_data, filename, password, import_key
         )
         
         # Extract certificate info

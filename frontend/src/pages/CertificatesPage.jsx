@@ -454,9 +454,22 @@ export default function CertificatesPage() {
       content: (
         <div className="space-y-6">
           <div>
-            <p className="text-sm font-medium text-text-primary mb-2">PEM Format</p>
-            <pre className="bg-bg-tertiary border border-border rounded-lg p-4 text-xs overflow-x-auto">
-              {selectedCert.pem}
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-text-primary">PEM Format</p>
+              <Button 
+                variant="secondary" 
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(selectedCert.pem || '')
+                  showSuccess('PEM copied to clipboard')
+                }}
+                disabled={!selectedCert.pem}
+              >
+                Copy PEM
+              </Button>
+            </div>
+            <pre className="bg-bg-tertiary border border-border rounded-lg p-4 text-xs overflow-x-auto max-h-64">
+              {selectedCert.pem || 'PEM data not available'}
             </pre>
           </div>
           <div className="p-4 bg-bg-tertiary border border-border rounded-lg">

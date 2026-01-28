@@ -580,6 +580,45 @@ export default function CAsPage() {
       )
     },
     {
+      id: 'raw',
+      label: 'Raw Data',
+      content: (
+        <div className="space-y-6">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-text-primary">PEM Format</p>
+              <Button 
+                variant="secondary" 
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(selectedCA.pem || '')
+                  showSuccess('PEM copied to clipboard')
+                }}
+                disabled={!selectedCA.pem}
+              >
+                Copy PEM
+              </Button>
+            </div>
+            <pre className="bg-bg-tertiary border border-border rounded-lg p-4 text-xs overflow-x-auto max-h-64">
+              {selectedCA.pem || 'PEM data not available'}
+            </pre>
+          </div>
+          <div className="p-4 bg-bg-tertiary border border-border rounded-lg">
+            <p className="text-xs text-text-secondary uppercase mb-2">Full Subject DN</p>
+            <p className="text-xs font-mono text-text-primary break-all">
+              {selectedCA.subject}
+            </p>
+          </div>
+          <div className="p-4 bg-bg-tertiary border border-border rounded-lg">
+            <p className="text-xs text-text-secondary uppercase mb-2">Full Issuer DN</p>
+            <p className="text-xs font-mono text-text-primary break-all">
+              {selectedCA.issuer}
+            </p>
+          </div>
+        </div>
+      )
+    },
+    {
       id: 'ocsp',
       label: 'OCSP',
       icon: <ShieldCheck size={16} />,

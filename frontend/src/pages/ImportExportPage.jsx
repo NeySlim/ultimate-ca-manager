@@ -24,6 +24,7 @@ export default function ImportExportPage() {
   const [importName, setImportName] = useState('')
   const [importPassword, setImportPassword] = useState('')
   const [selectedFile, setSelectedFile] = useState(null)
+  const [pemContent, setPemContent] = useState('')  // For pasting PEM
   const [cas, setCas] = useState([])
   const [selectedCaId, setSelectedCaId] = useState('auto')
   
@@ -63,14 +64,18 @@ export default function ImportExportPage() {
   }
 
   const handleImportCertificate = async () => {
-    if (!selectedFile) {
-      showError('Please select a file')
+    if (!selectedFile && !pemContent.trim()) {
+      showError('Please select a file or paste PEM content')
       return
     }
     setProcessing(true)
     try {
       const formData = new FormData()
-      formData.append('file', selectedFile)
+      if (selectedFile) {
+        formData.append('file', selectedFile)
+      } else {
+        formData.append('pem_content', pemContent)
+      }
       if (importName) formData.append('name', importName)
       if (importPassword) formData.append('password', importPassword)
       if (selectedCaId && selectedCaId !== 'auto') formData.append('ca_id', selectedCaId)
@@ -81,6 +86,7 @@ export default function ImportExportPage() {
       setSelectedFile(null)
       setImportName('')
       setImportPassword('')
+      setPemContent('')
       setSelectedCaId('auto')
       if (certFileRef.current) certFileRef.current.value = ''
       
@@ -100,14 +106,18 @@ export default function ImportExportPage() {
   }
 
   const handleImportCA = async () => {
-    if (!selectedFile) {
-      showError('Please select a file')
+    if (!selectedFile && !pemContent.trim()) {
+      showError('Please select a file or paste PEM content')
       return
     }
     setProcessing(true)
     try {
       const formData = new FormData()
-      formData.append('file', selectedFile)
+      if (selectedFile) {
+        formData.append('file', selectedFile)
+      } else {
+        formData.append('pem_content', pemContent)
+      }
       if (importName) formData.append('name', importName)
       if (importPassword) formData.append('password', importPassword)
       formData.append('format', 'auto')
@@ -117,6 +127,7 @@ export default function ImportExportPage() {
       setSelectedFile(null)
       setImportName('')
       setImportPassword('')
+      setPemContent('')
       if (caFileRef.current) caFileRef.current.value = ''
       
       // Navigate to CAs page with the new CA selected
@@ -350,7 +361,7 @@ export default function ImportExportPage() {
         {selectedAction === 'import-cert' && (
           <div className="max-w-2xl space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">Import Certificate</h3>
-            <p className="text-sm text-text-secondary">Import a certificate from a file. Supports PEM, DER, and PKCS#12 formats.</p>
+            <p className="text-sm text-text-secondary">Import a certificate from a file or paste PEM content. Supports PEM, DER, and PKCS#12 formats.</p>
             
             <div className="p-4 bg-bg-tertiary border border-border rounded-sm space-y-4">
               <div>
@@ -359,10 +370,27 @@ export default function ImportExportPage() {
                   ref={certFileRef}
                   type="file"
                   accept=".pem,.crt,.cer,.der,.p12,.pfx"
-                  onChange={(e) => setSelectedFile(e.target.files[0])}
+                  onChange={(e) => { setSelectedFile(e.target.files[0]); setPemContent('') }}
                   className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
                 />
                 <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="flex-1 border-t border-border"></div>
+                <span className="text-xs text-text-secondary">OR paste PEM content</span>
+                <div className="flex-1 border-t border-border"></div>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium text-text-primary mb-1">Paste PEM Content</label>
+                <textarea
+                  value={pemContent}
+                  onChange={(e) => { setPemContent(e.target.value); setSelectedFile(null); if (certFileRef.current) certFileRef.current.value = '' }}
+                  placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                  rows={6}
+                  className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-sm text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
+                />
               </div>
               
               <Input 
@@ -391,7 +419,7 @@ export default function ImportExportPage() {
               />
               
               <div className="flex gap-3 pt-2">
-                <Button onClick={handleImportCertificate} disabled={processing || !selectedFile}>
+                <Button onClick={handleImportCertificate} disabled={processing || (!selectedFile && !pemContent.trim())}>
                   {processing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
                   Import Certificate
                 </Button>
@@ -404,7 +432,7 @@ export default function ImportExportPage() {
         {selectedAction === 'import-ca' && (
           <div className="max-w-2xl space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">Import Certificate Authority</h3>
-            <p className="text-sm text-text-secondary">Import a CA certificate from a file. Supports PEM, DER, and PKCS#12 formats.</p>
+            <p className="text-sm text-text-secondary">Import a CA certificate from a file or paste PEM content. Supports PEM, DER, and PKCS#12 formats.</p>
             
             <div className="p-4 bg-bg-tertiary border border-border rounded-sm space-y-4">
               <div>
@@ -413,10 +441,27 @@ export default function ImportExportPage() {
                   ref={caFileRef}
                   type="file"
                   accept=".pem,.crt,.cer,.der,.p12,.pfx"
-                  onChange={(e) => setSelectedFile(e.target.files[0])}
+                  onChange={(e) => { setSelectedFile(e.target.files[0]); setPemContent('') }}
                   className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
                 />
                 <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="flex-1 border-t border-border"></div>
+                <span className="text-xs text-text-secondary">OR paste PEM content</span>
+                <div className="flex-1 border-t border-border"></div>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium text-text-primary mb-1">Paste PEM Content</label>
+                <textarea
+                  value={pemContent}
+                  onChange={(e) => { setPemContent(e.target.value); setSelectedFile(null); if (caFileRef.current) caFileRef.current.value = '' }}
+                  placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                  rows={6}
+                  className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-sm text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
+                />
               </div>
               
               <Input 
@@ -435,7 +480,7 @@ export default function ImportExportPage() {
               />
               
               <div className="flex gap-3 pt-2">
-                <Button onClick={handleImportCA} disabled={processing || !selectedFile}>
+                <Button onClick={handleImportCA} disabled={processing || (!selectedFile && !pemContent.trim())}>
                   {processing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
                   Import CA
                 </Button>
