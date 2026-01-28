@@ -265,14 +265,18 @@ def webauthn_start():
         return error_response('Invalid username', 401)
     
     # Check if user has WebAuthn credentials
-    creds = user.webauthn_credentials.filter_by(enabled=True).all()
+    from models.webauthn import WebAuthnCredential
+    creds = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
     if not creds:
         return error_response('No WebAuthn credentials registered', 404)
     
     # Generate authentication options
     try:
         hostname = request.host
-        options = WebAuthnService.generate_authentication_options(user, hostname)
+        options, user_id = WebAuthnService.generate_authentication_options(username, hostname)
+        
+        if not options:
+            return error_response('Failed to generate WebAuthn options', 500)
         
         logger.info(f"WebAuthn auth started for: {user.username}")
         
@@ -316,12 +320,12 @@ def webauthn_verify():
     # Verify authentication response
     try:
         hostname = request.host
-        credential = WebAuthnService.verify_authentication_response(
-            user, credential_response, hostname
+        success, message, auth_user = WebAuthnService.verify_authentication(
+            user.id, credential_response, hostname
         )
         
-        if not credential:
-            return error_response('WebAuthn verification failed', 401)
+        if not success or not auth_user:
+            return error_response(message or 'WebAuthn verification failed', 401)
         
         # Update login stats
         user.last_login = datetime.utcnow()
@@ -334,14 +338,13 @@ def webauthn_verify():
         session['user_id'] = user.id
         session['username'] = user.username
         session['auth_method'] = 'webauthn'
-        session['webauthn_cred_id'] = credential.id
         session.permanent = True
         
         # Get permissions
         from auth.permissions import get_role_permissions
         permissions = get_role_permissions(user.role)
         
-        logger.info(f"✅ WebAuthn login successful: {user.username} (cred: {credential.name})")
+        logger.info(f"✅ WebAuthn login successful: {user.username}")
         
         return success_response(
             data={
@@ -355,11 +358,7 @@ def webauthn_verify():
                 },
                 'role': user.role,
                 'permissions': permissions,
-                'auth_method': 'webauthn',
-                'credential': {
-                    'id': credential.id,
-                    'name': credential.name
-                }
+                'auth_method': 'webauthn'
             },
             message='Login successful via WebAuthn'
         )
