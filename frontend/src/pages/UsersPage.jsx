@@ -37,8 +37,8 @@ export default function UsersPage() {
 
   const loadRolesData = async () => {
     try {
-      const response = await rolesService.getAll()
-      setRolesData(response.data)
+      const data = await rolesService.getAll()
+      setRolesData(data)
     } catch (error) {
       console.error('Failed to load roles:', error)
       showError('Failed to load role permissions')
