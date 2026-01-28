@@ -137,9 +137,14 @@ export default function CertificatesPage() {
 
   const handleRenew = async (id) => {
     try {
-      await certificatesService.renew(id)
-      showSuccess('Certificate renewed successfully')
-      loadCertificates()
+      const response = await certificatesService.renew(id)
+      const newCertId = response.data?.id
+      showSuccess(response.message || 'Certificate renewed successfully')
+      await loadCertificates()
+      // Select the new certificate
+      if (newCertId) {
+        loadCertificateDetails(newCertId)
+      }
     } catch (error) {
       showError(error.message || 'Failed to renew certificate')
     }
