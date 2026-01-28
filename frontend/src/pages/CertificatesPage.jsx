@@ -154,7 +154,13 @@ export default function CertificatesPage() {
               <p className="text-xs text-text-secondary uppercase mb-1">Status</p>
               <div className="flex items-center gap-2">
                 <StatusIndicator status={selectedCert.status} />
-                <Badge variant={selectedCert.revoked ? 'danger' : 'success'}>
+                <Badge variant={
+                  selectedCert.revoked ? 'danger' : 
+                  selectedCert.status === 'expired' ? 'danger' :
+                  selectedCert.status === 'expiring' ? 'warning' :
+                  selectedCert.status === 'valid' ? 'success' :
+                  'secondary'
+                }>
                   {selectedCert.revoked ? 'Revoked' : selectedCert.status || 'Active'}
                 </Badge>
               </div>
