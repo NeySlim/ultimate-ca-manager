@@ -31,12 +31,13 @@ export function Textarea({
       
       <textarea
         className={cn(
-          "w-full px-3 py-2 bg-bg-tertiary border rounded-lg text-sm text-text-primary placeholder-text-secondary",
-          "focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent",
+          "w-full px-3 py-2 bg-bg-tertiary/80 border rounded-md text-sm text-text-primary placeholder-text-secondary/60",
+          "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 focus:bg-bg-tertiary",
           "disabled:opacity-50 disabled:cursor-not-allowed",
-          "transition-all resize-y",
-          error && "border-red-500 focus:ring-red-500",
-          !error && "border-border"
+          "transition-all duration-200 resize-y",
+          "hover:border-border/80 hover:bg-bg-tertiary",
+          error && "border-red-500/50 focus:ring-red-500/50",
+          !error && "border-border/60"
         )}
         value={value}
         maxLength={maxLength}

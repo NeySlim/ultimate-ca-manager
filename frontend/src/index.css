@@ -89,4 +89,73 @@ html, body, #root {
   body {
     @apply bg-bg-primary text-text-primary font-sans antialiased;
   }
+  
+  /* Smooth transitions for interactive elements */
+  button, a, input, select, textarea {
+    @apply transition-all duration-150;
+  }
+  
+  /* Better focus styles for accessibility */
+  :focus-visible {
+    @apply outline-none ring-2 ring-blue-500/50 ring-offset-2 ring-offset-bg-primary;
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Subtle animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slideIn {
+  animation: slideIn 0.2s ease-out;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.15s ease-out;
+}
+
+/* Glass effect utility */
+.glass {
+  backdrop-filter: blur(12px);
+  background: rgba(22, 27, 34, 0.8);
+  border: 1px solid rgba(48, 54, 61, 0.5);
+}
+
+/* Gradient text utility */
+.gradient-text {
+  @apply bg-gradient-to-r from-accent-primary to-blue-400 bg-clip-text text-transparent;
+}
+
+/* Table row selection */
+tr.row-selected td {
+  background-color: color-mix(in srgb, var(--accent-primary) 15%, transparent) !important;
+}
+
+tr.row-selected td:first-child {
+  border-left: 2px solid var(--accent-primary);
+}
+
+/* Hover lift effect */
+.hover-lift {
+  @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg;
 }
