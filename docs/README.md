@@ -4,24 +4,26 @@ Ce dossier contient la documentation technique du projet Ultimate CA Manager.
 
 ## Documents Disponibles
 
+### Guides
+- **[USER_GUIDE.md](./USER_GUIDE.md)** - Guide de démarrage utilisateur
+- **[ADMIN_GUIDE.md](./ADMIN_GUIDE.md)** - Configuration serveur et administration
+- **[PRO-FEATURES.md](./PRO-FEATURES.md)** - Fonctionnalités Pro (SSO, LDAP, HSM, RBAC)
+
 ### Spécifications API
+- **[API_REFERENCE.md](./API_REFERENCE.md)** - Documentation des 155+ endpoints
+- **[openapi.yaml](./openapi.yaml)** - Spécification OpenAPI 3.0 complète
+- **[UCM-API-SPECIFICATION.md](./UCM-API-SPECIFICATION.md)** - Contrat API v2
 
-1. **[API_REFERENCE.md](./API_REFERENCE.md)**
-   - Documentation complète des 155+ endpoints API v2
-   - Exemples de requêtes et réponses
-   - Authentification et sécurité
+### Tests
+- **[TESTING.md](./TESTING.md)** - Guide des tests (unit + E2E)
 
-2. **[UCM-API-SPECIFICATION.md](./UCM-API-SPECIFICATION.md)**
-   - Spécification du contrat API v2
-   - Structures de réponse standardisées
-
-3. **[API-WIRING-AUDIT.md](./API-WIRING-AUDIT.md)**
-   - Historique de l'audit frontend ↔ backend
-   - Corrections appliquées
+### Screenshots
+- **[SCREENSHOTS.md](./SCREENSHOTS.md)** - Captures d'écran de l'interface
 
 ## Statut Actuel
 
-**Date:** 2026-01-28  
+**Date:** 2026-01-29  
+**Version:** 2.0.0  
 **Statut:** ✅ PRODUCTION READY
 
 ### Fonctionnalités Complètes
