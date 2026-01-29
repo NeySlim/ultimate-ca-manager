@@ -125,8 +125,12 @@ html, body, #root {
   
   /* Ensure form inputs have correct background in all cases */
   input, textarea, select {
-    background-color: var(--bg-tertiary);
+    background-color: var(--bg-secondary) !important;
     color: var(--text-primary);
+  }
+  
+  input:hover, textarea:hover, select:hover {
+    background-color: var(--bg-secondary) !important;
   }
   
   /* Better focus styles for accessibility */
