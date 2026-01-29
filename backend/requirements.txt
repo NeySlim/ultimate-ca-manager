@@ -53,3 +53,4 @@ flake8==7.3.0
 email-validator==2.3.0
 Flask-Session==0.8.0
 flasgger>=0.9.7
+pydantic>=2.6.0
