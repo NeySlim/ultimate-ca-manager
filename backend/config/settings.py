@@ -211,8 +211,24 @@ class Config:
     SESSION_REFRESH_EACH_REQUEST = True  # Reset timeout on each request
     
     # Initial Admin User (only used on first run)
+    # SECURITY: Default password should be random in production
+    # Generate random password if not set explicitly
+    @staticmethod
+    def _get_initial_password():
+        """Get initial admin password - generate random if not set"""
+        env_password = os.getenv("INITIAL_ADMIN_PASSWORD")
+        if env_password and env_password != "changeme123":
+            return env_password
+        # In production, generate random password and log it
+        import secrets
+        import string
+        # 16 chars with upper, lower, digits, special
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+        random_pass = ''.join(secrets.choice(alphabet) for _ in range(16))
+        return random_pass
+    
     INITIAL_ADMIN_USERNAME = os.getenv("INITIAL_ADMIN_USERNAME", "admin")
-    INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD", "changeme123")
+    INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD", "changeme123")  # Will be overridden at init
     INITIAL_ADMIN_EMAIL = os.getenv("INITIAL_ADMIN_EMAIL", "admin@localhost")
     
     # SCEP Configuration

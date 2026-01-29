@@ -164,7 +164,8 @@ class PKIResetService:
         stats = {}
         
         # Count PKI records
-        pki_counts = {
+        # SECURITY: Use whitelist to prevent SQL injection
+        ALLOWED_PKI_TABLES = {
             'certificate_authorities': 'CAs',
             'certificates': 'Certificates',
             'crl_metadata': 'CRLs',
@@ -172,10 +173,10 @@ class PKIResetService:
             'scep_requests': 'SCEP Requests',
         }
         
-        for table_name, label in pki_counts.items():
+        for table_name, label in ALLOWED_PKI_TABLES.items():
             try:
                 result = db.session.execute(
-                    db.text(f"SELECT COUNT(*) FROM {table_name}")
+                    db.text("SELECT COUNT(*) FROM " + table_name)
                 )
                 count = result.scalar()
                 stats[label.lower().replace(' ', '_')] = count

@@ -225,7 +225,12 @@ class SCEPService:
             
             # Validate challenge password if configured
             if self.challenge_password:
-                if not challenge_pwd or challenge_pwd != self.challenge_password:
+                # SECURITY: Use constant-time comparison to prevent timing attacks
+                import hmac
+                if not challenge_pwd or not hmac.compare_digest(
+                    challenge_pwd.encode() if isinstance(challenge_pwd, str) else challenge_pwd,
+                    self.challenge_password.encode() if isinstance(self.challenge_password, str) else self.challenge_password
+                ):
                     return self._create_error_response(
                         self.FAIL_BAD_MESSAGE_CHECK, "Invalid challenge password"
                     ), 200

@@ -10,24 +10,58 @@ from models import db, User
 from datetime import datetime
 import csv
 import io
+import re
 
 bp = Blueprint('users_v2', __name__)
+
+
+# Password strength requirements
+MIN_PASSWORD_LENGTH = 12
+PASSWORD_REQUIREMENTS = """Password must:
+- Be at least 12 characters long
+- Contain at least one uppercase letter
+- Contain at least one lowercase letter
+- Contain at least one number
+- Contain at least one special character (!@#$%^&*(),.?":{}|<>)"""
+
+
+def validate_password_strength(password):
+    """
+    SECURITY: Validate password meets security requirements
+    Returns (is_valid, error_message)
+    """
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return False, f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+    if not re.search(r'[A-Z]', password):
+        return False, "Password must contain at least one uppercase letter"
+    if not re.search(r'[a-z]', password):
+        return False, "Password must contain at least one lowercase letter"
+    if not re.search(r'\d', password):
+        return False, "Password must contain at least one number"
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False, "Password must contain at least one special character"
+    return True, None
 
 
 # Roles endpoint moved to api/v2/roles.py
 
 
 @bp.route('/api/v2/users', methods=['GET'])
-@require_auth()
+@require_auth(['read:users'])
 def list_users():
     """
-    List all users
+    List all users (admin only)
     
     Query params:
     - role: Filter by role (admin/operator/viewer)
     - active: Filter by active status (true/false)
     - search: Search username, email, full_name
     """
+    # SECURITY: Only admins can list all users
+    if g.current_user.role != 'admin':
+        # Non-admins can only see themselves
+        return success_response(data=[g.current_user.to_dict()])
+    
     # Filters
     role = request.args.get('role')
     active_str = request.args.get('active')
@@ -60,21 +94,25 @@ def list_users():
 
 
 @bp.route('/api/v2/users', methods=['POST'])
-@require_auth()
+@require_auth(['write:users'])
 def create_user():
     """
-    Create new user
+    Create new user (admin only)
     
     POST /api/v2/users
     {
         "username": "john.doe",
         "email": "john@example.com",
-        "password": "securepass123",
+        "password": "SecurePass123!",
         "full_name": "John Doe",
         "role": "operator",
         "permissions": {...}
     }
     """
+    # SECURITY: Only admins can create users
+    if g.current_user.role != 'admin':
+        return error_response('Insufficient permissions', 403)
+    
     data = request.get_json()
     
     # Required fields
@@ -84,6 +122,11 @@ def create_user():
         return error_response('Email is required', 400)
     if not data.get('password'):
         return error_response('Password is required', 400)
+    
+    # SECURITY: Validate password strength
+    is_valid, error_msg = validate_password_strength(data['password'])
+    if not is_valid:
+        return error_response(error_msg, 400)
     
     # Check if user exists
     if User.query.filter_by(username=data['username']).first():
@@ -118,13 +161,17 @@ def create_user():
         )
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to create user: {str(e)}', 500)
+        return error_response('Failed to create user', 500)
 
 
 @bp.route('/api/v2/users/<int:user_id>', methods=['GET'])
-@require_auth()
+@require_auth(['read:users'])
 def get_user(user_id):
     """Get user by ID"""
+    # SECURITY: Non-admins can only view themselves
+    if g.current_user.role != 'admin' and g.current_user.id != user_id:
+        return error_response('Access denied', 403)
+    
     user = User.query.get(user_id)
     if not user:
         return error_response('User not found', 404)
@@ -132,7 +179,7 @@ def get_user(user_id):
 
 
 @bp.route('/api/v2/users/<int:user_id>', methods=['PUT'])
-@require_auth()
+@require_auth(['write:users'])
 def update_user(user_id):
     """
     Update existing user
@@ -145,6 +192,10 @@ def update_user(user_id):
         "active": true
     }
     """
+    # SECURITY: Non-admins can only update themselves (limited fields)
+    if g.current_user.role != 'admin' and g.current_user.id != user_id:
+        return error_response('Access denied', 403)
+    
     user = User.query.get(user_id)
     if not user:
         return error_response('User not found', 404)
@@ -162,17 +213,27 @@ def update_user(user_id):
     if 'full_name' in data:
         user.full_name = data['full_name']
     
+    # SECURITY: Only admins can change roles
     if 'role' in data:
+        if g.current_user.role != 'admin':
+            return error_response('Only admins can change roles', 403)
         valid_roles = ['admin', 'operator', 'viewer']
         if data['role'] not in valid_roles:
             return error_response(f'Invalid role. Must be one of: {", ".join(valid_roles)}', 400)
         user.role = data['role']
     
+    # SECURITY: Only admins can change active status
     if 'active' in data:
+        if g.current_user.role != 'admin':
+            return error_response('Only admins can change active status', 403)
         user.active = bool(data['active'])
     
     # Update password if provided
     if 'password' in data and data['password']:
+        # SECURITY: Validate password strength
+        is_valid, error_msg = validate_password_strength(data['password'])
+        if not is_valid:
+            return error_response(error_msg, 400)
         user.set_password(data['password'])
     
     try:
@@ -183,17 +244,22 @@ def update_user(user_id):
         )
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to update user: {str(e)}', 500)
+        return error_response('Failed to update user', 500)
 
 
 @bp.route('/api/v2/users/<int:user_id>', methods=['DELETE'])
-@require_auth()
+@require_auth(['delete:users'])
 def delete_user(user_id):
     """
     Delete user (soft delete - set active=False)
+    Admin only.
     
     DELETE /api/v2/users/{user_id}
     """
+    # SECURITY: Only admins can delete users
+    if g.current_user.role != 'admin':
+        return error_response('Insufficient permissions', 403)
+    
     # Prevent deleting yourself
     if g.current_user.id == user_id:
         return error_response('Cannot delete your own account', 403)
@@ -212,20 +278,24 @@ def delete_user(user_id):
         )
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to delete user: {str(e)}', 500)
+        return error_response('Failed to delete user', 500)
 
 
 @bp.route('/api/v2/users/<int:user_id>/reset-password', methods=['POST'])
-@require_auth()
+@require_auth(['write:users'])
 def reset_user_password(user_id):
     """
     Reset user password (admin action)
     
     POST /api/v2/users/{user_id}/reset-password
     {
-        "new_password": "newsecurepass123"
+        "new_password": "NewSecurePass123!"
     }
     """
+    # SECURITY: Only admins can reset other users' passwords
+    if g.current_user.role != 'admin' and g.current_user.id != user_id:
+        return error_response('Access denied', 403)
+    
     user = User.query.get(user_id)
     if not user:
         return error_response('User not found', 404)
@@ -234,6 +304,11 @@ def reset_user_password(user_id):
     
     if not data.get('new_password'):
         return error_response('New password is required', 400)
+    
+    # SECURITY: Validate password strength
+    is_valid, error_msg = validate_password_strength(data['new_password'])
+    if not is_valid:
+        return error_response(error_msg, 400)
     
     # Update password
     user.set_password(data['new_password'])
@@ -245,18 +320,22 @@ def reset_user_password(user_id):
         )
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to reset password: {str(e)}', 500)
+        return error_response('Failed to reset password', 500)
 
 
 @bp.route('/api/v2/users/<int:user_id>/toggle', methods=['PATCH'])
 @bp.route('/api/v2/users/<int:user_id>/toggle-active', methods=['POST'])
-@require_auth()
+@require_auth(['write:users'])
 def toggle_user_status(user_id):
     """
-    Toggle user active/inactive status
+    Toggle user active/inactive status (admin only)
     
     PATCH /api/v2/users/{user_id}/toggle
     """
+    # SECURITY: Only admins can toggle user status
+    if g.current_user.role != 'admin':
+        return error_response('Insufficient permissions', 403)
+    
     # Prevent toggling yourself
     if g.current_user.id == user_id:
         return error_response('Cannot toggle your own account status', 403)
@@ -277,22 +356,26 @@ def toggle_user_status(user_id):
         )
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to toggle user status: {str(e)}', 500)
+        return error_response('Failed to toggle user status', 500)
 
 
 @bp.route('/api/v2/users/import', methods=['POST'])
-@require_auth()
+@require_auth(['write:users'])
 def import_users():
     """
-    Import users from CSV file
+    Import users from CSV file (admin only)
     
     POST /api/v2/users/import
     Content-Type: multipart/form-data
     
     CSV format:
     username,email,full_name,role,password
-    john.doe,john@example.com,John Doe,operator,pass123
+    john.doe,john@example.com,John Doe,operator,SecurePass123!
     """
+    # SECURITY: Only admins can import users
+    if g.current_user.role != 'admin':
+        return error_response('Insufficient permissions', 403)
+    
     if 'file' not in request.files:
         return error_response('No file provided', 400)
     
@@ -313,21 +396,30 @@ def import_users():
         errors = []
         
         for row in csv_reader:
+            row_num = imported + skipped + 1
+            
             # Required fields
             if not row.get('username') or not row.get('email') or not row.get('password'):
                 skipped += 1
-                errors.append(f"Row {imported + skipped + 1}: Missing required fields")
+                errors.append(f"Row {row_num}: Missing required fields")
+                continue
+            
+            # SECURITY: Validate password strength
+            is_valid, error_msg = validate_password_strength(row['password'])
+            if not is_valid:
+                skipped += 1
+                errors.append(f"Row {row_num}: {error_msg}")
                 continue
             
             # Check if user exists
             if User.query.filter_by(username=row['username']).first():
                 skipped += 1
-                errors.append(f"Row {imported + skipped + 1}: Username '{row['username']}' already exists")
+                errors.append(f"Row {row_num}: Username '{row['username']}' already exists")
                 continue
             
             if User.query.filter_by(email=row['email']).first():
                 skipped += 1
-                errors.append(f"Row {imported + skipped + 1}: Email '{row['email']}' already exists")
+                errors.append(f"Row {row_num}: Email '{row['email']}' already exists")
                 continue
             
             # Create user
@@ -360,4 +452,4 @@ def import_users():
     
     except Exception as e:
         db.session.rollback()
-        return error_response(f'Failed to import users: {str(e)}', 500)
+        return error_response('Failed to import users', 500)

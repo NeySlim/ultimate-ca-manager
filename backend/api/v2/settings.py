@@ -296,18 +296,34 @@ def restore_backup():
 def download_backup(filename):
     """Download backup file"""
     from flask import send_file
+    from werkzeug.utils import secure_filename
+    from pathlib import Path
     import os
     
-    backup_dir = "/opt/ucm/data/backups"
-    backup_file = os.path.join(backup_dir, os.path.basename(filename))
+    backup_dir = Path("/opt/ucm/data/backups")
     
-    if not os.path.exists(backup_file):
+    # SECURITY: Sanitize filename to prevent path traversal
+    safe_filename = secure_filename(os.path.basename(filename))
+    if not safe_filename:
+        return error_response('Invalid filename', 400)
+    
+    backup_file = backup_dir / safe_filename
+    
+    # SECURITY: Verify the resolved path is within backup directory
+    try:
+        backup_file = backup_file.resolve()
+        if not backup_file.is_relative_to(backup_dir.resolve()):
+            return error_response('Access denied', 403)
+    except (ValueError, RuntimeError):
+        return error_response('Invalid path', 400)
+    
+    if not backup_file.exists():
         return error_response('Backup file not found', 404)
     
     return send_file(
-        backup_file,
+        str(backup_file),
         as_attachment=True,
-        download_name=os.path.basename(filename),
+        download_name=safe_filename,
         mimetype='application/octet-stream'
     )
 
@@ -316,14 +332,30 @@ def download_backup(filename):
 @require_auth(['admin:system'])
 def delete_backup(filename):
     """Delete backup file"""
-    import os
+    from werkzeug.utils import secure_filename
+    from pathlib import Path
     from utils.response import no_content_response
+    import os
     
-    backup_dir = "/opt/ucm/data/backups"
-    backup_file = os.path.join(backup_dir, os.path.basename(filename))
+    backup_dir = Path("/opt/ucm/data/backups")
     
-    if os.path.exists(backup_file):
-        os.unlink(backup_file)
+    # SECURITY: Sanitize filename to prevent path traversal
+    safe_filename = secure_filename(os.path.basename(filename))
+    if not safe_filename:
+        return error_response('Invalid filename', 400)
+    
+    backup_file = backup_dir / safe_filename
+    
+    # SECURITY: Verify the resolved path is within backup directory
+    try:
+        backup_file = backup_file.resolve()
+        if not backup_file.is_relative_to(backup_dir.resolve()):
+            return error_response('Access denied', 403)
+    except (ValueError, RuntimeError):
+        return error_response('Invalid path', 400)
+    
+    if backup_file.exists():
+        backup_file.unlink()
     
     return no_content_response()
 

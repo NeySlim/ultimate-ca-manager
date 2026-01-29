@@ -301,16 +301,43 @@ def create_app(config_name=None):
     def add_security_headers(response):
         """Add security headers and fix deprecated headers"""
         # Set Permissions-Policy without deprecated features
-        # Only include valid features that are widely supported
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
         
-        # Add security headers if not present
+        # SECURITY: Add comprehensive security headers
         if 'X-Content-Type-Options' not in response.headers:
             response.headers['X-Content-Type-Options'] = 'nosniff'
         if 'X-Frame-Options' not in response.headers:
-            response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+            response.headers['X-Frame-Options'] = 'DENY'  # More strict than SAMEORIGIN
         if 'X-XSS-Protection' not in response.headers:
             response.headers['X-XSS-Protection'] = '1; mode=block'
+        
+        # Content Security Policy - strict but allows app to work
+        if 'Content-Security-Policy' not in response.headers:
+            csp = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "  # React needs this
+                "style-src 'self' 'unsafe-inline'; "  # For inline styles
+                "img-src 'self' data: blob:; "
+                "font-src 'self' data:; "
+                "connect-src 'self'; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'"
+            )
+            response.headers['Content-Security-Policy'] = csp
+        
+        # Referrer Policy - don't leak URLs
+        if 'Referrer-Policy' not in response.headers:
+            response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        
+        # Strict Transport Security (HSTS) - force HTTPS for 1 year
+        if 'Strict-Transport-Security' not in response.headers:
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        
+        # Cache control for sensitive data
+        if request.path.startswith('/api/'):
+            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+            response.headers['Pragma'] = 'no-cache'
         
         return response
     
