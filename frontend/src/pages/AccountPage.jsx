@@ -179,11 +179,25 @@ export default function AccountPage() {
     setWebauthnRegistering(true)
     try {
       // Step 1: Get registration options
-      const options = await accountService.startWebAuthnRegistration()
+      const response = await accountService.startWebAuthnRegistration()
+      const options = response.data  // Extract data from API response
       
-      // Convert base64url to ArrayBuffer
-      const challenge = Uint8Array.from(atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
-      const userId = Uint8Array.from(atob(options.user.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+      // Helper to decode base64url to Uint8Array
+      const base64urlToUint8Array = (base64url) => {
+        // Add padding if needed
+        let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
+        while (base64.length % 4) base64 += '='
+        return Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+      }
+      
+      // Helper to convert string to Uint8Array (for user.id which is just a number string)
+      const stringToUint8Array = (str) => {
+        return new TextEncoder().encode(str)
+      }
+      
+      // Convert challenge (base64url) and userId (plain string)
+      const challenge = base64urlToUint8Array(options.challenge)
+      const userId = stringToUint8Array(options.user.id)
       
       // Step 2: Create credential using browser API
       const credential = await navigator.credentials.create({
@@ -193,7 +207,7 @@ export default function AccountPage() {
           user: { ...options.user, id: userId },
           excludeCredentials: (options.excludeCredentials || []).map(cred => ({
             ...cred,
-            id: Uint8Array.from(atob(cred.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+            id: base64urlToUint8Array(cred.id)
           }))
         }
       })
