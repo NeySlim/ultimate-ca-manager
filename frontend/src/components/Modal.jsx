@@ -8,11 +8,14 @@ import { cn } from '../lib/utils'
 export function Modal({ 
   open, 
   onClose, 
+  onOpenChange,
   title, 
   children, 
   size = 'md',
   showClose = true 
 }) {
+  // Support both onClose and onOpenChange
+  const handleOpenChange = onOpenChange || onClose;
   const sizes = {
     sm: 'max-w-md',
     md: 'max-w-2xl',
@@ -21,7 +24,7 @@ export function Modal({
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={onClose}>
+    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content 
