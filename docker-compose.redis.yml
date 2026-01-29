@@ -1,0 +1,31 @@
+# UCM with Redis - High Availability Setup
+# Use: docker compose -f docker-compose.yml -f docker-compose.redis.yml up -d
+
+version: '3.8'
+
+services:
+  ucm:
+    environment:
+      - UCM_REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: ucm-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - ucm-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis-data:
+    driver: local
