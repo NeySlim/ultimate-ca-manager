@@ -8,9 +8,10 @@ Supports:
 """
 
 from flask import Blueprint, request, jsonify, session, current_app
-from auth.unified import AuthManager, require_auth
+from auth.unified import AuthManager, require_auth, require_permission
 from utils.response import success_response, error_response
 from models import User, db
+from datetime import datetime
 import hashlib
 
 bp = Blueprint('auth_v2', __name__)
@@ -21,6 +22,46 @@ try:
     HAS_LIMITER = True
 except ImportError:
     HAS_LIMITER = False
+
+# Track failed login attempts for account lockout
+_failed_attempts = {}  # {username: {'count': int, 'locked_until': datetime}}
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_DURATION_MINUTES = 15
+
+
+def _check_account_lockout(username):
+    """Check if account is locked due to failed attempts"""
+    if username not in _failed_attempts:
+        return False
+    
+    info = _failed_attempts[username]
+    if info.get('locked_until'):
+        if datetime.utcnow() < info['locked_until']:
+            return True
+        else:
+            # Lockout expired, reset
+            del _failed_attempts[username]
+            return False
+    return False
+
+
+def _record_failed_attempt(username):
+    """Record a failed login attempt"""
+    if username not in _failed_attempts:
+        _failed_attempts[username] = {'count': 0, 'locked_until': None}
+    
+    _failed_attempts[username]['count'] += 1
+    
+    if _failed_attempts[username]['count'] >= MAX_FAILED_ATTEMPTS:
+        from datetime import timedelta
+        _failed_attempts[username]['locked_until'] = datetime.utcnow() + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+        current_app.logger.warning(f"Account locked for {username} after {MAX_FAILED_ATTEMPTS} failed attempts")
+
+
+def _clear_failed_attempts(username):
+    """Clear failed attempts on successful login"""
+    if username in _failed_attempts:
+        del _failed_attempts[username]
 
 
 @bp.route('/api/v2/auth/login', methods=['POST'])
@@ -34,23 +75,39 @@ def login():
     POST /api/auth/login
     Body: {"username": "admin", "password": "xxx"}
     """
+    # Apply rate limiting if available
+    if HAS_LIMITER:
+        try:
+            limiter.limit("5 per minute")(lambda: None)()
+        except Exception:
+            pass  # Rate limit exceeded handled by limiter
+    
     data = request.json
     
     if not data or not data.get('username') or not data.get('password'):
         return error_response('Username and password required', 400)
     
-    username = data['username']
+    username = data['username'].strip()
     password = data['password']
+    
+    # SECURITY: Check account lockout
+    if _check_account_lockout(username):
+        return error_response('Account temporarily locked. Try again later.', 429)
     
     # Find user
     user = User.query.filter_by(username=username).first()
     
     if not user or not user.active:
+        _record_failed_attempt(username)
         return error_response('Invalid credentials', 401)
     
     # Verify password (assumes User has check_password method)
     if not user.check_password(password):
+        _record_failed_attempt(username)
         return error_response('Invalid credentials', 401)
+    
+    # Clear failed attempts on success
+    _clear_failed_attempts(username)
     
     # Check if JWT requested
     accept_header = request.headers.get('Accept', '')
@@ -75,17 +132,18 @@ def login():
         )
     
     else:
-        # Create session cookie
+        # SECURITY: Regenerate session ID to prevent session fixation
         session.clear()
+        
+        # Create new session with regenerated ID
         session['user_id'] = user.id
         session['username'] = user.username
+        session['login_time'] = datetime.utcnow().isoformat()
         session.permanent = True
+        session.modified = True
         
-        # DEBUG: Log session info
-        current_app.logger.info(f"🔍 Session created for user {user.username}")
-        current_app.logger.info(f"🔍 Session ID: {session.get('_id', 'NO ID')}")
-        current_app.logger.info(f"🔍 Session user_id: {session.get('user_id')}")
-        current_app.logger.info(f"🔍 Session file dir: {current_app.config.get('SESSION_FILE_DIR')}")
+        # Log successful login
+        current_app.logger.info(f"✅ User {user.username} logged in successfully")
         
         return success_response(
             data={

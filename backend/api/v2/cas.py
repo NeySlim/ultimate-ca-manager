@@ -5,6 +5,7 @@ CAs Management Routes v2.0
 
 from flask import Blueprint, request, g, jsonify
 import base64
+import re
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import paginate
@@ -12,6 +13,57 @@ from services.ca_service import CAService
 from models import Certificate
 
 bp = Blueprint('cas_v2', __name__)
+
+
+# SECURITY: DN field validation regex patterns
+DN_FIELD_PATTERNS = {
+    'CN': re.compile(r'^[\w\s\-\.\,\'\@\(\)]+$', re.UNICODE),  # Common Name - most permissive
+    'O': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),  # Organization
+    'OU': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),  # Organizational Unit
+    'C': re.compile(r'^[A-Z]{2}$'),  # Country - exactly 2 uppercase letters
+    'ST': re.compile(r'^[\w\s\-\.]+$', re.UNICODE),  # State
+    'L': re.compile(r'^[\w\s\-\.]+$', re.UNICODE),  # Locality
+}
+
+MAX_DN_FIELD_LENGTH = 64
+
+
+def validate_dn_field(field_name, value):
+    """
+    SECURITY: Validate DN field to prevent injection attacks
+    Returns (is_valid, error_message)
+    """
+    if not value:
+        return True, None  # Empty is OK
+    
+    value = str(value).strip()
+    
+    # Check length
+    if len(value) > MAX_DN_FIELD_LENGTH:
+        return False, f"{field_name} must be {MAX_DN_FIELD_LENGTH} characters or less"
+    
+    # Check pattern if defined
+    if field_name in DN_FIELD_PATTERNS:
+        if not DN_FIELD_PATTERNS[field_name].match(value):
+            return False, f"Invalid characters in {field_name}"
+    
+    # Block common injection patterns
+    dangerous_patterns = [';', '|', '`', '$', '\\n', '\\r', '\x00', '\n', '\r']
+    for pattern in dangerous_patterns:
+        if pattern in value:
+            return False, f"Invalid character in {field_name}"
+    
+    return True, None
+
+
+def validate_dn(dn_dict):
+    """Validate all DN fields"""
+    for field, value in dn_dict.items():
+        if value:
+            is_valid, error = validate_dn_field(field, value)
+            if not is_valid:
+                return False, error
+    return True, None
 
 
 @bp.route('/api/v2/cas', methods=['GET'])
@@ -195,6 +247,11 @@ def create_ca():
             'O': data.get('organization'),
             'C': data.get('country')
         }
+        
+        # SECURITY: Validate DN fields
+        is_valid, error = validate_dn(dn)
+        if not is_valid:
+            return error_response(error, 400)
         
         # Determine key type
         key_type = '2048' # Default

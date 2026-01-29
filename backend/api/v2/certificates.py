@@ -4,10 +4,46 @@ Certificates Management Routes v2.0
 """
 
 from flask import Blueprint, request, g
+import re
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 
 bp = Blueprint('certificates_v2', __name__)
+
+
+# SECURITY: DN field validation patterns (reused from cas.py)
+DN_FIELD_PATTERNS = {
+    'CN': re.compile(r'^[\w\s\-\.\,\'\@\(\)\*]+$', re.UNICODE),  # CN allows wildcards
+    'O': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),
+    'OU': re.compile(r'^[\w\s\-\.\,\'\&]+$', re.UNICODE),
+    'C': re.compile(r'^[A-Z]{2}$'),
+    'ST': re.compile(r'^[\w\s\-\.]+$', re.UNICODE),
+    'L': re.compile(r'^[\w\s\-\.]+$', re.UNICODE),
+}
+
+MAX_DN_FIELD_LENGTH = 64
+
+
+def validate_dn_field(field_name, value):
+    """Validate DN field for security"""
+    if not value:
+        return True, None
+    
+    value = str(value).strip()
+    
+    if len(value) > MAX_DN_FIELD_LENGTH:
+        return False, f"{field_name} must be {MAX_DN_FIELD_LENGTH} characters or less"
+    
+    if field_name in DN_FIELD_PATTERNS:
+        if not DN_FIELD_PATTERNS[field_name].match(value):
+            return False, f"Invalid characters in {field_name}"
+    
+    dangerous_patterns = [';', '|', '`', '$', '\\n', '\\r', '\x00', '\n', '\r']
+    for pattern in dangerous_patterns:
+        if pattern in value:
+            return False, f"Invalid character in {field_name}"
+    
+    return True, None
 
 
 @bp.route('/api/v2/certificates', methods=['GET'])
@@ -93,6 +129,20 @@ def create_certificate():
     
     if not data.get('ca_id'):
         return error_response('CA ID is required', 400)
+    
+    # SECURITY: Validate DN fields
+    dn_validations = [
+        ('CN', data.get('cn')),
+        ('O', data.get('organization')),
+        ('OU', data.get('organizational_unit')),
+        ('C', data.get('country')),
+        ('ST', data.get('state')),
+        ('L', data.get('locality')),
+    ]
+    for field_name, value in dn_validations:
+        is_valid, error = validate_dn_field(field_name, value)
+        if not is_valid:
+            return error_response(error, 400)
     
     # Get the CA
     ca = CA.query.get(data['ca_id'])
