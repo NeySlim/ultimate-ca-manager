@@ -11,24 +11,23 @@ import {
 } from '../components'
 import { csrsService, casService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks/usePermission'
+import { usePermission, useModals } from '../hooks'
 import { extractData } from '../lib/utils'
+import { VALIDITY, VALIDITY_OPTIONS } from '../constants/config'
 
 export default function CSRsPage() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
   const fileRef = useRef(null)
+  const { modals, open: openModal, close: closeModal } = useModals(['upload', 'import', 'sign'])
   
   const [csrs, setCSRs] = useState([])
   const [selectedCSR, setSelectedCSR] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showUploadModal, setShowUploadModal] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
-  const [showSignModal, setShowSignModal] = useState(false)
   const [cas, setCAs] = useState([])
   const [signCA, setSignCA] = useState('')
-  const [validityDays, setValidityDays] = useState(365)
+  const [validityDays, setValidityDays] = useState(VALIDITY.DEFAULT_DAYS)
   
   // Import form state
   const [importFile, setImportFile] = useState(null)
@@ -39,9 +38,8 @@ export default function CSRsPage() {
   useEffect(() => {
     loadCSRs()
     loadCAs()
-    // Check if we should auto-open upload modal
     if (searchParams.get('action') === 'upload') {
-      setShowUploadModal(true)
+      openModal('upload')
       searchParams.delete('action')
       setSearchParams(searchParams)
     }
@@ -89,7 +87,7 @@ export default function CSRsPage() {
       const text = await file.text()
       await csrsService.upload(text)
       showSuccess('CSR uploaded successfully')
-      setShowUploadModal(false)
+      closeModal('upload')
       loadCSRs()
     } catch (error) {
       showError(error.message || 'Failed to upload CSR')
@@ -105,7 +103,7 @@ export default function CSRsPage() {
     try {
       await csrsService.sign(selectedCSR.id, signCA, validityDays)
       showSuccess('CSR signed successfully')
-      setShowSignModal(false)
+      closeModal('sign')
       loadCSRs()
     } catch (error) {
       showError(error.message || 'Failed to sign CSR')
@@ -147,7 +145,7 @@ export default function CSRsPage() {
       
       const result = await csrsService.import(formData)
       showSuccess(result.message || 'CSR imported successfully')
-      setShowImportModal(false)
+      closeModal('import')
       setImportFile(null)
       setImportPem('')
       setImportName('')
@@ -216,11 +214,11 @@ export default function CSRsPage() {
         <div className="p-4 space-y-3">
           {canWrite('csrs') && (
             <>
-              <Button onClick={() => setShowUploadModal(true)} className="w-full">
+              <Button onClick={() => openModal('upload')} className="w-full">
                 <Upload size={18} />
                 Create CSR
               </Button>
-              <Button variant="secondary" onClick={() => setShowImportModal(true)} className="w-full">
+              <Button variant="secondary" onClick={() => openModal('import')} className="w-full">
                 <FileArrowUp size={18} />
                 Import CSR
               </Button>
@@ -240,7 +238,7 @@ export default function CSRsPage() {
               description="Create or import a Certificate Signing Request"
               action={{
                 label: 'Import CSR',
-                onClick: () => setShowImportModal(true)
+                onClick: () => openModal('import')
               }}
             />
           ) : (
@@ -265,7 +263,7 @@ export default function CSRsPage() {
               <Button 
                 variant="primary" 
                 size="sm" 
-                onClick={() => setShowSignModal(true)}
+                onClick={() => openModal('sign')}
                 disabled={selectedCSR.status !== 'pending'}
               >
                 <SignIn size={16} />
@@ -369,8 +367,8 @@ export default function CSRsPage() {
 
       {/* Import CSR Modal */}
       <Modal
-        open={showImportModal}
-        onClose={() => setShowImportModal(false)}
+        open={modals.import}
+        onClose={() => closeModal('import')}
         title="Import CSR"
       >
         <div className="space-y-4">
@@ -414,7 +412,7 @@ export default function CSRsPage() {
           />
           
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" onClick={() => setShowImportModal(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => closeModal('import')}>Cancel</Button>
             <Button onClick={handleImportCSR} disabled={importing || (!importFile && !importPem.trim())}>
               {importing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
               Import CSR
@@ -425,8 +423,8 @@ export default function CSRsPage() {
 
       {/* Create CSR Modal */}
       <Modal
-        open={showUploadModal}
-        onClose={() => setShowUploadModal(false)}
+        open={modals.upload}
+        onClose={() => closeModal('upload')}
         title="Create CSR"
       >
         <div className="space-y-4">
@@ -443,8 +441,8 @@ export default function CSRsPage() {
 
       {/* Sign CSR Modal */}
       <Modal
-        open={showSignModal}
-        onClose={() => setShowSignModal(false)}
+        open={modals.sign}
+        onClose={() => closeModal('sign')}
         title="Sign CSR"
       >
         <div className="space-y-4">
@@ -474,7 +472,7 @@ export default function CSRsPage() {
               <SignIn size={16} />
               Sign CSR
             </Button>
-            <Button variant="ghost" onClick={() => setShowSignModal(false)}>
+            <Button variant="ghost" onClick={() => closeModal('sign')}>
               Cancel
             </Button>
           </div>

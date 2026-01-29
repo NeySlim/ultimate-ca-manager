@@ -10,21 +10,21 @@ import {
 } from '../components'
 import { usersService, rolesService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks/usePermission'
+import { usePermission, useModals } from '../hooks'
 import { extractData } from '../lib/utils'
 
 export default function UsersPage() {
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
   const { canWrite, canDelete } = usePermission()
+  const { modals, open: openModal, close: closeModal } = useModals(['create'])
   
   const [users, setUsers] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
-  const [showCreateModal, setShowCreateModal] = useState(false)
   const [formData, setFormData] = useState({})
   const [roleFilter, setRoleFilter] = useState('all')
-  const [rolesData, setRolesData] = useState(null) // NEW: Roles & permissions data
+  const [rolesData, setRolesData] = useState(null)
 
   // Load roles data on mount
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function UsersPage() {
       const response = await usersService.create(newUserData)
       const created = extractData(response)
       showSuccess('User created successfully')
-      setShowCreateModal(false)
+      closeModal('create')
       loadUsers()
       if (created?.id) {
         selectUser(created)
@@ -376,7 +376,7 @@ export default function UsersPage() {
 
 
           {canWrite('users') && (
-            <Button onClick={() => setShowCreateModal(true)} className="w-full">
+            <Button onClick={() => openModal('create')} className="w-full">
               <Plus size={18} />
               Create User
             </Button>
@@ -407,13 +407,13 @@ export default function UsersPage() {
 
       {/* Create User Modal */}
       <Modal
-        open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        open={modals.create}
+        onClose={() => closeModal('create')}
         title="Create New User"
       >
         <CreateUserForm
           onSubmit={handleCreate}
-          onCancel={() => setShowCreateModal(false)}
+          onCancel={() => closeModal('create')}
         />
       </Modal>
     </>
