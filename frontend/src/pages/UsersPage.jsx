@@ -14,7 +14,7 @@ import { usePermission } from '../hooks/usePermission'
 import { extractData } from '../lib/utils'
 
 export default function UsersPage() {
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
   const { canWrite, canDelete } = usePermission()
   
   const [users, setUsers] = useState([])
@@ -103,7 +103,12 @@ export default function UsersPage() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this user?')) return
+    const confirmed = await showConfirm('Are you sure you want to delete this user?', {
+      title: 'Delete User',
+      confirmText: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     
     try {
       await usersService.delete(id)
@@ -129,7 +134,11 @@ export default function UsersPage() {
   }
 
   const handleResetPassword = async (id) => {
-    if (!confirm('Are you sure you want to reset this user\'s password?')) return
+    const confirmed = await showConfirm('Are you sure you want to reset this user\'s password?', {
+      title: 'Reset Password',
+      confirmText: 'Reset Password'
+    })
+    if (!confirmed) return
     
     try {
       const result = await usersService.resetPassword(id)

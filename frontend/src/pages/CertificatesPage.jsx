@@ -16,7 +16,7 @@ import { useDebounce } from '../hooks/useDebounce'
 import { extractCN, extractData, formatDate } from '../lib/utils'
 
 export default function CertificatesPage() {
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -111,7 +111,12 @@ export default function CertificatesPage() {
   }
 
   const handleRevoke = async (id) => {
-    if (!confirm('Are you sure you want to revoke this certificate?')) return
+    const confirmed = await showConfirm('Are you sure you want to revoke this certificate?', {
+      title: 'Revoke Certificate',
+      confirmText: 'Revoke',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     
     try {
       await certificatesService.revoke(id, 'superseded')
@@ -123,7 +128,12 @@ export default function CertificatesPage() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to permanently delete this certificate? This action cannot be undone.')) return
+    const confirmed = await showConfirm('Are you sure you want to permanently delete this certificate? This action cannot be undone.', {
+      title: 'Delete Certificate',
+      confirmText: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     
     try {
       await certificatesService.delete(id)

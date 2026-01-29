@@ -13,7 +13,7 @@ import { usePermission } from '../hooks/usePermission'
 import { formatDate } from '../lib/utils'
 
 export default function SettingsPage() {
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
   const { canWrite, hasPermission } = usePermission()
   
   const [loading, setLoading] = useState(true)
@@ -38,7 +38,7 @@ export default function SettingsPage() {
     loadSettings()
     loadBackups()
     // loadDbStats() // TODO: Activer quand endpoint backend existe
-    // loadHttpsInfo() // TODO: Activer quand endpoint backend existe
+    loadHttpsInfo()
     loadCAs()
     loadCertificates()
   }, [])
@@ -173,7 +173,12 @@ export default function SettingsPage() {
   }
 
   const handleDeleteBackup = async (filename) => {
-    if (!confirm(`Delete backup "${filename}"?`)) return
+    const confirmed = await showConfirm(`Delete backup "${filename}"?`, {
+      title: 'Delete Backup',
+      confirmText: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     
     try {
       await systemService.deleteBackup(filename)
@@ -248,10 +253,17 @@ export default function SettingsPage() {
   }
 
   const handleResetDb = async () => {
-    if (!confirm('⚠️ WARNING: This will DELETE ALL DATA and reset the database to initial state. Are you absolutely sure?')) return
-    if (!confirm('Last chance! Type YES in the next dialog to confirm')) return
-    
-    const confirmation = prompt('Type YES to confirm database reset:')
+    const confirmed1 = await showConfirm('⚠️ WARNING: This will DELETE ALL DATA and reset the database to initial state. Are you absolutely sure?', {
+      title: 'Reset Database',
+      confirmText: 'Continue',
+      variant: 'danger'
+    })
+    if (!confirmed1) return
+
+    const confirmation = await showPrompt('Type YES to confirm database reset:', {
+      title: 'Final Confirmation',
+      placeholder: 'YES'
+    })
     if (confirmation !== 'YES') {
       showError('Database reset cancelled')
       return
@@ -273,7 +285,11 @@ export default function SettingsPage() {
       return
     }
 
-    if (!confirm('Apply selected certificate as HTTPS certificate? This will restart the server.')) return
+    const confirmed = await showConfirm('Apply selected certificate as HTTPS certificate? This will restart the server.', {
+      title: 'Apply Certificate',
+      confirmText: 'Apply & Restart'
+    })
+    if (!confirmed) return
     
     try {
       await systemService.applyHttpsCert({
@@ -287,7 +303,11 @@ export default function SettingsPage() {
   }
 
   const handleRegenerateHttpsCert = async () => {
-    if (!confirm('Regenerate HTTPS certificate? This will restart the server.')) return
+    const confirmed = await showConfirm('Regenerate HTTPS certificate? This will restart the server.', {
+      title: 'Regenerate Certificate',
+      confirmText: 'Regenerate & Restart'
+    })
+    if (!confirmed) return
     
     try {
       await systemService.regenerateHttpsCert({

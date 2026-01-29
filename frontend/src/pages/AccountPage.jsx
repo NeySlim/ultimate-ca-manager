@@ -12,7 +12,7 @@ import { useAuth, useNotification } from '../contexts'
 
 export default function AccountPage() {
   const { user } = useAuth()
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
   
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -115,7 +115,12 @@ export default function AccountPage() {
   }
 
   const handleDeleteApiKey = async (keyId) => {
-    if (!confirm('Are you sure you want to delete this API key?')) return
+    const confirmed = await showConfirm('Are you sure you want to delete this API key?', {
+      title: 'Delete API Key',
+      confirmText: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     
     try {
       await accountService.deleteApiKey(keyId)
@@ -130,7 +135,11 @@ export default function AccountPage() {
     try {
       if (accountData.two_factor_enabled) {
         // Disable 2FA - ask for confirmation code
-        const code = prompt('Enter your 2FA code to disable:')
+        const code = await showPrompt('Enter your 2FA code to disable:', {
+          title: 'Disable Two-Factor Authentication',
+          placeholder: '123456',
+          confirmText: 'Disable 2FA'
+        })
         if (!code) return
         await accountService.disable2FA(code)
         showSuccess('Two-factor authentication disabled')
@@ -221,7 +230,12 @@ export default function AccountPage() {
   }
   
   const handleDeleteWebAuthn = async (credentialId) => {
-    if (!confirm('Delete this security key?')) return
+    const confirmed = await showConfirm('Delete this security key?', {
+      title: 'Delete Security Key',
+      confirmText: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     try {
       await accountService.deleteWebAuthnCredential(credentialId)
       showSuccess('Security key deleted')
@@ -267,7 +281,12 @@ export default function AccountPage() {
   }
   
   const handleDeleteMTLS = async (certId) => {
-    if (!confirm('Delete this certificate?')) return
+    const confirmed = await showConfirm('Delete this certificate?', {
+      title: 'Delete Certificate',
+      confirmText: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     try {
       await accountService.deleteMTLSCertificate(certId)
       showSuccess('Certificate deleted')
@@ -817,6 +836,7 @@ export default function AccountPage() {
 }
 
 function ChangePasswordForm({ onSubmit, onCancel }) {
+  const { showWarning } = useNotification()
   const [formData, setFormData] = useState({
     current_password: '',
     new_password: '',
@@ -826,7 +846,7 @@ function ChangePasswordForm({ onSubmit, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (formData.new_password !== formData.confirm_password) {
-      alert('New passwords do not match')
+      showWarning('New passwords do not match')
       return
     }
     onSubmit(formData)

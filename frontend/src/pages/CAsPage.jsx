@@ -128,7 +128,7 @@ function OCSPSettingsTab({ ca, onUpdate, showSuccess, showError }) {
 }
 
 export default function CAsPage() {
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
   
@@ -237,9 +237,12 @@ export default function CAsPage() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this CA? This action cannot be undone.')) {
-      return
-    }
+    const confirmed = await showConfirm('Are you sure you want to delete this CA? This action cannot be undone.', {
+      title: 'Delete Certificate Authority',
+      confirmText: 'Delete CA',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     
     try {
       await casService.delete(id)
@@ -550,8 +553,13 @@ export default function CAsPage() {
               <Download size={16} />
               DER Format
             </Button>
-            <Button variant="secondary" onClick={() => {
-              const password = window.prompt('Enter password for PKCS#12 file:')
+            <Button variant="secondary" onClick={async () => {
+              const password = await showPrompt('Enter password for PKCS#12 file:', {
+                title: 'Export PKCS#12',
+                type: 'password',
+                placeholder: 'Password',
+                confirmText: 'Export'
+              })
               if (password) handleExport('pkcs12', { password })
             }}>
               <Download size={16} />
