@@ -60,14 +60,15 @@ describe('Button Component', () => {
     render(<Button size="sm">Small</Button>)
     const button = screen.getByRole('button')
     expect(button.className).toContain('px-2')
+    expect(button.className).toContain('py-0.5')
     expect(button.className).toContain('text-xs')
   })
 
   it('renders large size correctly', () => {
     render(<Button size="lg">Large</Button>)
     const button = screen.getByRole('button')
-    expect(button.className).toContain('px-3')
-    expect(button.className).toContain('py-1.5')
+    expect(button.className).toContain('px-4')
+    expect(button.className).toContain('py-2')
   })
 
   it('renders children including icons', () => {

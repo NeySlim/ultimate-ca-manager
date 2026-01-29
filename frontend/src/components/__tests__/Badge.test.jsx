@@ -17,28 +17,28 @@ describe('Badge Component', () => {
   it('renders success variant', () => {
     render(<Badge variant="success">Valid</Badge>)
     const badge = screen.getByText('Valid')
-    expect(badge.className).toContain('bg-green-500/15')
+    expect(badge.className).toContain('bg-green-500/12')
     expect(badge.className).toContain('text-green-400')
   })
 
   it('renders warning variant', () => {
     render(<Badge variant="warning">Expiring</Badge>)
     const badge = screen.getByText('Expiring')
-    expect(badge.className).toContain('bg-yellow-500/15')
+    expect(badge.className).toContain('bg-yellow-500/12')
     expect(badge.className).toContain('text-yellow-400')
   })
 
   it('renders danger variant', () => {
     render(<Badge variant="danger">Revoked</Badge>)
     const badge = screen.getByText('Revoked')
-    expect(badge.className).toContain('bg-red-500/15')
+    expect(badge.className).toContain('bg-red-500/12')
     expect(badge.className).toContain('text-red-400')
   })
 
   it('renders info variant', () => {
     render(<Badge variant="info">Pending</Badge>)
     const badge = screen.getByText('Pending')
-    expect(badge.className).toContain('bg-blue-500/15')
+    expect(badge.className).toContain('bg-blue-500/12')
     expect(badge.className).toContain('text-blue-400')
   })
 
