@@ -22,15 +22,16 @@ from api.v2.users import bp as users_bp
 from api.v2.templates import bp as templates_bp
 from api.v2.truststore import bp as truststore_bp
 from api.v2.import_opnsense import bp as import_opnsense_bp
-from api.v2.roles import bp as roles_bp  # NEW: Roles & Permissions
-from api.v2.webauthn import bp as webauthn_bp  # NEW: WebAuthn
-from api.v2.mtls import bp as mtls_bp  # NEW: mTLS
-from api.v2.audit import bp as audit_bp  # NEW: Audit logs
+from api.v2.roles import bp as roles_bp
+from api.v2.webauthn import bp as webauthn_bp
+from api.v2.mtls import bp as mtls_bp
+from api.v2.audit import bp as audit_bp
 
-# List of all blueprints to register
+# List of all core blueprints to register
+# Pro features are loaded separately via pro/__init__.py in app.py
 API_V2_BLUEPRINTS = [
     auth_bp,
-    auth_methods_bp,  # Multi-method auth (NEW)
+    auth_methods_bp,
     account_bp,
     cas_bp,
     certificates_bp,
@@ -45,10 +46,10 @@ API_V2_BLUEPRINTS = [
     templates_bp,
     truststore_bp,
     import_opnsense_bp,
-    roles_bp,  # NEW: Roles & Permissions
-    webauthn_bp,  # NEW: WebAuthn management
-    mtls_bp,  # NEW: mTLS management
-    audit_bp,  # NEW: Audit logs
+    roles_bp,
+    webauthn_bp,
+    mtls_bp,
+    audit_bp,
 ]
 
 
@@ -59,8 +60,10 @@ def register_api_v2(app):
     Usage in app.py:
         from api.v2 import register_api_v2
         register_api_v2(app)
+    
+    Note: Pro features are loaded separately via pro/__init__.py
     """
     for blueprint in API_V2_BLUEPRINTS:
         app.register_blueprint(blueprint)
     
-    print(f"✅ Registered {len(API_V2_BLUEPRINTS)} API v2 blueprints")
+    print(f"✅ Registered {len(API_V2_BLUEPRINTS)} API v2 core blueprints")
