@@ -1,6 +1,6 @@
 # 🗺️ UCM Roadmap
 
-**Current Version:** v2.0.0 (2026-01-28)  
+**Current Version:** v2.0.0 (2026-01-29)  
 **Status:** Production Ready
 
 ---
@@ -33,6 +33,18 @@
 - ✅ **Export CSV** - Download for compliance
 - ✅ **Statistics** - Action counts and trends
 
+### Code Quality ✅ (2026-01-29)
+- ✅ **Centralized Constants** - `constants/config.js` with VALIDITY, PAGINATION, TIME
+- ✅ **Shared Hooks** - `useModals`, `useDeleteHandler`, `usePagination`
+- ✅ **Styled Dialogs** - `showConfirm()`, `showPrompt()` replace native JS popups
+- ✅ **UI Consistency** - Standardized border-radius, padding, shadows
+- ✅ **HTTPS Cert Display** - Real certificate info with CA-Signed badge
+
+### Testing ✅
+- ✅ **Vitest** - 39 frontend unit tests
+- ✅ **Pytest** - 51 backend API tests
+- ✅ **Playwright** - 14 E2E tests (auth, certificates, settings)
+
 ### Pages ✅
 - ✅ Dashboard - Stats, expiring certs, activity
 - ✅ CAs - TreeView hierarchy, create, import
@@ -41,7 +53,8 @@
 - ✅ Templates - Create, edit, import/export
 - ✅ Users - CRUD, roles, 2FA management
 - ✅ ACME - Accounts, orders, challenges
-- ✅ Settings - General, Email, Security, Backup
+- ✅ SCEP - Configuration, requests, statistics
+- ✅ Settings - General, Email, Security, HTTPS, Backup
 - ✅ Account - Profile, security, API keys
 - ✅ Audit Logs - Full audit trail
 
@@ -50,12 +63,13 @@
 ## 🔄 v2.1.0 - Quality & Polish (February 2026)
 
 ### Testing
-- [ ] E2E tests with Playwright
-- [ ] Unit tests for React components
-- [ ] API integration tests
+- [x] E2E tests with Playwright (14 tests)
+- [x] Unit tests for React components (39 tests)
+- [x] API integration tests (51 tests)
 - [ ] Coverage reports (target: 80%)
 
 ### Documentation
+- [x] API Reference (155 endpoints)
 - [ ] User guide (getting started)
 - [ ] Admin guide (configuration)
 - [ ] OpenAPI/Swagger spec
@@ -144,7 +158,7 @@
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| v2.0.0  | 2026-01-28 | React 18 rewrite, Radix UI, import/export, 2FA/WebAuthn |
+| v2.0.0  | 2026-01-29 | React 18 rewrite, Radix UI, import/export, 2FA/WebAuthn, 104 tests |
 | v1.9.0  | 2026-01-16 | UI modernization, scheduler, CRL auto-regen |
 | v1.8.3  | 2026-01-10 | Universal installer, screenshots |
 | v1.8.0  | 2026-01-09 | mTLS auth, REST API, OPNsense import |
@@ -154,4 +168,4 @@
 
 ---
 
-**Last Updated:** 2026-01-28
+**Last Updated:** 2026-01-29
