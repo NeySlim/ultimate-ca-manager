@@ -44,7 +44,7 @@ git clone -b v1.6.0 https://github.com/NeySlim/ultimate-ca-manager.git
 cd ultimate-ca-manager
 
 # Run installer
-sudo ./install.sh
+sudo ./scripts/install/install.sh
 
 # Start UCM
 sudo systemctl start ucm
