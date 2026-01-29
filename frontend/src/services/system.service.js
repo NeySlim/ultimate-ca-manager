@@ -28,13 +28,7 @@ export const systemService = {
 
   async downloadBackup(filename) {
     // Download saved backup file
-    const response = await fetch(`/api/v2/system/backup/${encodeURIComponent(filename)}/download`, {
-      credentials: 'include'
-    })
-    if (!response.ok) {
-      throw new Error('Failed to download backup')
-    }
-    return response.blob()
+    return apiClient.download(`/system/backup/${encodeURIComponent(filename)}/download`)
   },
 
   async deleteBackup(filename) {
@@ -46,15 +40,7 @@ export const systemService = {
     formData.append('file', file)
     formData.append('password', password)
     
-    return fetch('/api/v2/system/restore', {
-      method: 'POST',
-      body: formData,
-      credentials: 'include'
-    }).then(async res => {
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.message || data.error || 'Restore failed')
-      return data
-    })
+    return apiClient.upload('/system/restore', formData)
   },
 
   // Database Management

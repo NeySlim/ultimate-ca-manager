@@ -1,9 +1,12 @@
 /**
  * Sidebar Component - 56px navigation sidebar
+ * Supports Pro features when license is active
  */
+import { useState, useEffect } from 'react'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
-  SignOut, Palette, Check, UserCircle, UploadSimple, ClockCounterClockwise, Robot
+  SignOut, Palette, Check, UserCircle, UploadSimple, ClockCounterClockwise, Robot,
+  UsersThree, Shield, Crown, Lock
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -12,10 +15,24 @@ import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
 
+// Try to import Pro features (will fail gracefully in community version)
+let useLicense = null
+let ProBadge = null
+try {
+  const pro = require('../pro')
+  useLicense = pro.useLicense
+  ProBadge = pro.ProBadge
+} catch (e) {
+  // Pro module not available - community version
+}
+
 export function Sidebar({ activePage }) {
   const navigate = useNavigate()
   const { currentTheme, setCurrentTheme, themes } = useTheme()
   const { user, logout } = useAuth()
+  
+  // Pro license check (graceful fallback)
+  const license = useLicense ? useLicense() : { isPro: false, loading: false }
 
   const pages = [
     { id: '', icon: House, label: 'Dashboard', path: '/' },
@@ -29,6 +46,14 @@ export function Sidebar({ activePage }) {
     { id: 'import', icon: UploadSimple, label: 'Import', path: '/import' },
     { id: 'audit', icon: ClockCounterClockwise, label: 'Audit', path: '/audit' },
     { id: 'settings', icon: Gear, label: 'Settings', path: '/settings' },
+  ]
+
+  // Pro-only pages (only shown when license is active)
+  const proPages = [
+    { id: 'groups', icon: UsersThree, label: 'Groups', path: '/groups' },
+    { id: 'rbac', icon: Shield, label: 'RBAC', path: '/rbac' },
+    { id: 'sso', icon: Key, label: 'SSO', path: '/sso' },
+    { id: 'hsm', icon: Lock, label: 'HSM', path: '/hsm' },
   ]
 
   const handleLogout = async () => {
@@ -70,6 +95,40 @@ export function Sidebar({ activePage }) {
           </Link>
         )
       })}
+
+      {/* Pro Pages - only show if license is active */}
+      {license.isPro && !license.loading && (
+        <>
+          <div className="w-8 border-t border-border my-1" />
+          {proPages.map(page => {
+            const Icon = page.icon
+            const isActive = activePage === page.id
+            return (
+              <Link
+                key={page.id}
+                to={page.path}
+                className={cn(
+                  "w-10 h-10 rounded-sm flex items-center justify-center transition-all relative group",
+                  isActive
+                    ? "bg-accent-pro/20 text-accent-pro border border-accent-pro/30" 
+                    : "text-accent-pro/60 hover:bg-accent-pro/10 hover:text-accent-pro"
+                )}
+                title={`${page.label} (Pro)`}
+              >
+                <Icon size={18} weight={isActive ? 'fill' : 'regular'} />
+                {isActive && (
+                  <div className="absolute left-0 w-0.5 h-8 bg-accent-pro rounded-r-sm" />
+                )}
+                {/* Tooltip */}
+                <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-accent-pro/30 rounded-sm text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 flex items-center gap-1.5">
+                  <Crown size={12} className="text-accent-pro" />
+                  {page.label}
+                </div>
+              </Link>
+            )
+          })}
+        </>
+      )}
 
       <div className="flex-1" />
 

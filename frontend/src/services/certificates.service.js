@@ -49,15 +49,7 @@ export const certificatesService = {
   },
 
   async import(formData) {
-    // FormData for file upload - don't JSON stringify
-    return fetch('/api/v2/certificates/import', {
-      method: 'POST',
-      body: formData,
-      credentials: 'include'
-    }).then(async res => {
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.message || data.error || 'Import failed')
-      return data
-    })
+    // FormData for file upload
+    return apiClient.upload('/certificates/import', formData)
   }
 }

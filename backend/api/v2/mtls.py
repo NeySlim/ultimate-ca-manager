@@ -3,7 +3,7 @@ mTLS API
 Manage client certificates for mutual TLS authentication
 """
 
-from flask import Blueprint, jsonify, request, current_app, g
+from flask import Blueprint, jsonify, request, current_app, g, Response
 from api.v2.auth import require_auth
 from models import User, Certificate, CA, db
 import json
@@ -15,14 +15,28 @@ bp = Blueprint('mtls', __name__, url_prefix='/api/v2/mtls')
 @bp.route('/certificates', methods=['GET'])
 @require_auth()
 def list_mtls_certificates():
-    """List user's mTLS certificates"""
+    """List user's mTLS certificates (certificates with clientAuth EKU)"""
     user = g.current_user
     
-    # Get certificates from user metadata
-    metadata = json.loads(user.metadata or '{}')
-    mtls_certs = metadata.get('mtls_certificates', [])
+    # Get certificates issued for this user (CN contains username@mtls)
+    mtls_certs = Certificate.query.filter(
+        Certificate.subject.like(f'%CN={user.username}@mtls%')
+    ).order_by(Certificate.created_at.desc()).all()
     
-    return jsonify({'data': mtls_certs})
+    result = []
+    for cert in mtls_certs:
+        result.append({
+            'id': cert.id,
+            'name': f'mTLS Certificate #{cert.id}',
+            'serial': cert.serial_number,
+            'subject': cert.subject,
+            'created_at': cert.created_at.isoformat() if cert.created_at else None,
+            'expires_at': cert.not_after.isoformat() if cert.not_after else None,
+            'status': cert.status,
+            'ca_id': cert.ca_id
+        })
+    
+    return jsonify({'data': result})
 
 
 @bp.route('/certificates', methods=['POST'])
@@ -30,7 +44,7 @@ def list_mtls_certificates():
 def create_mtls_certificate():
     """Issue a new mTLS certificate for the user"""
     user = g.current_user
-    data = request.get_json()
+    data = request.get_json() or {}
     
     # Get CA for issuing
     ca_id = data.get('ca_id')
@@ -70,29 +84,15 @@ def create_mtls_certificate():
             extended_key_usage=['clientAuth']
         )
         
-        # Store reference in user metadata
-        metadata = json.loads(user.metadata or '{}')
-        mtls_certs = metadata.get('mtls_certificates', [])
-        
-        mtls_cert_ref = {
-            'id': cert_data['id'],
-            'name': data.get('name', f'mTLS Certificate {len(mtls_certs) + 1}'),
-            'serial': cert_data.get('serial', ''),
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'expires_at': cert_data.get('not_after', ''),
-            'status': 'valid'
-        }
-        
-        mtls_certs.append(mtls_cert_ref)
-        metadata['mtls_certificates'] = mtls_certs
-        user.metadata = json.dumps(metadata)
-        db.session.commit()
-        
         return jsonify({
             'data': {
-                **mtls_cert_ref,
+                'id': cert_data['id'],
+                'serial': cert_data.get('serial', ''),
                 'certificate': cert_data.get('pem', ''),
-                'private_key': cert_data.get('private_key', '')
+                'private_key': cert_data.get('private_key', ''),
+                'created_at': datetime.now(timezone.utc).isoformat(),
+                'expires_at': cert_data.get('not_after', ''),
+                'status': 'valid'
             },
             'message': 'mTLS certificate created'
         }), 201
@@ -107,31 +107,19 @@ def revoke_mtls_certificate(cert_id):
     """Revoke a mTLS certificate"""
     user = g.current_user
     
-    # Find in user metadata
-    metadata = json.loads(user.metadata or '{}')
-    mtls_certs = metadata.get('mtls_certificates', [])
-    
-    cert_ref = None
-    for c in mtls_certs:
-        if c['id'] == cert_id:
-            cert_ref = c
-            break
-    
-    if not cert_ref:
+    # Find certificate and verify ownership
+    cert = Certificate.query.get(cert_id)
+    if not cert:
         return jsonify({'error': True, 'message': 'Certificate not found'}), 404
     
-    # Revoke the actual certificate
-    cert = Certificate.query.get(cert_id)
-    if cert:
-        cert.status = 'revoked'
-        cert.revoked_at = datetime.now(timezone.utc)
-        cert.revocation_reason = 'User requested'
-        db.session.commit()
+    # Verify ownership (CN should contain username@mtls)
+    if f'{user.username}@mtls' not in (cert.subject or ''):
+        return jsonify({'error': True, 'message': 'Not authorized to revoke this certificate'}), 403
     
-    # Update reference
-    cert_ref['status'] = 'revoked'
-    cert_ref['revoked_at'] = datetime.now(timezone.utc).isoformat()
-    user.metadata = json.dumps(metadata)
+    # Revoke the certificate
+    cert.status = 'revoked'
+    cert.revoked_at = datetime.now(timezone.utc)
+    cert.revocation_reason = 'User requested'
     db.session.commit()
     
     return jsonify({'message': 'Certificate revoked'})
@@ -143,72 +131,60 @@ def download_mtls_certificate(cert_id):
     """Download mTLS certificate as PKCS12"""
     user = g.current_user
     
-    # Check if user owns this cert
-    metadata = json.loads(user.metadata or '{}')
-    mtls_certs = metadata.get('mtls_certificates', [])
-    
-    has_cert = any(c['id'] == cert_id for c in mtls_certs)
-    if not has_cert:
-        return jsonify({'error': True, 'message': 'Certificate not found'}), 404
-    
+    # Find certificate
     cert = Certificate.query.get(cert_id)
     if not cert:
         return jsonify({'error': True, 'message': 'Certificate not found'}), 404
     
-    password = request.args.get('password', 'changeme')
+    # Verify ownership
+    if f'{user.username}@mtls' not in (cert.subject or ''):
+        return jsonify({'error': True, 'message': 'Not authorized'}), 403
     
-    # Generate PKCS12
-    from services.certificate_service import CertificateService
-    cert_service = CertificateService()
+    # Check if we have the certificate PEM
+    if not cert.certificate_pem:
+        return jsonify({'error': True, 'message': 'Certificate data not available'}), 404
     
-    try:
-        pkcs12_data = cert_service.export_pkcs12(cert_id, password)
-        
-        from flask import Response
-        return Response(
-            pkcs12_data,
-            mimetype='application/x-pkcs12',
-            headers={
-                'Content-Disposition': f'attachment; filename=mtls_{user.username}.p12'
-            }
-        )
-    except Exception as e:
-        return jsonify({'error': True, 'message': str(e)}), 500
+    # For now, just return PEM format
+    # TODO: Implement PKCS12 conversion if private key is stored
+    return Response(
+        cert.certificate_pem,
+        mimetype='application/x-pem-file',
+        headers={
+            'Content-Disposition': f'attachment; filename=mtls-{cert_id}.pem'
+        }
+    )
 
 
 @bp.route('/authenticate', methods=['POST'])
-def mtls_authenticate():
-    """Authenticate using client certificate"""
-    # Get client certificate from request (nginx/gunicorn passes via headers)
+def authenticate():
+    """Authenticate via mTLS client certificate"""
+    # Get client certificate from request
+    # This requires NGINX/Apache to pass the client cert in a header
     client_cert = request.headers.get('X-Client-Cert')
-    client_cn = request.headers.get('X-Client-CN')
-    client_verified = request.headers.get('X-Client-Verify')
+    client_cert_verify = request.headers.get('X-Client-Cert-Verify')
     
-    if client_verified != 'SUCCESS':
-        return jsonify({
-            'error': True, 
-            'message': 'Client certificate verification failed'
-        }), 401
+    if not client_cert or client_cert_verify != 'SUCCESS':
+        return jsonify({'error': True, 'message': 'No valid client certificate'}), 401
     
-    if not client_cn:
-        return jsonify({
-            'error': True,
-            'message': 'No client certificate provided'
-        }), 401
+    # Parse certificate to get username
+    # The CN should be in format: username@mtls
+    import re
+    match = re.search(r'CN=([^@,]+)@mtls', client_cert)
+    if not match:
+        return jsonify({'error': True, 'message': 'Invalid certificate subject'}), 401
     
-    # Extract username from CN (format: username@mtls)
-    username = client_cn.split('@')[0] if '@' in client_cn else client_cn
+    username = match.group(1)
     
+    # Find user
     user = User.query.filter_by(username=username).first()
     if not user:
-        return jsonify({'error': True, 'message': 'User not found'}), 404
+        return jsonify({'error': True, 'message': 'User not found'}), 401
     
-    if not user.is_active:
-        return jsonify({'error': True, 'message': 'User account is disabled'}), 403
+    if not user.active:
+        return jsonify({'error': True, 'message': 'Account disabled'}), 401
     
     # Create session
     from flask import session
-    session.clear()
     session['user_id'] = user.id
     session.permanent = True
     

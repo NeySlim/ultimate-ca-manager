@@ -26,12 +26,14 @@ export default function LoginPage() {
   const [authMethod, setAuthMethod] = useState(null) // 'mtls' | 'webauthn' | 'password'
   const [userMethods, setUserMethods] = useState(null) // Methods available for this user
   const [statusMessage, setStatusMessage] = useState('')
+  const [hasSavedUsername, setHasSavedUsername] = useState(false) // Track if we loaded from storage
 
   // Load last username on mount
   useEffect(() => {
     const lastUsername = localStorage.getItem(STORAGE_KEY)
     if (lastUsername) {
       setUsername(lastUsername)
+      setHasSavedUsername(true)
     }
   }, [])
 
@@ -224,8 +226,8 @@ export default function LoginPage() {
         {/* Step 1: Username */}
         {step === 'username' && (
           <div className="space-y-4">
-            {/* If username saved: show identity card */}
-            {username ? (
+            {/* If username saved from localStorage: show identity card */}
+            {hasSavedUsername && username ? (
               <>
                 {/* Clickable user identity card */}
                 <button
@@ -257,6 +259,7 @@ export default function LoginPage() {
                 <button
                   onClick={() => {
                     setUsername('')
+                    setHasSavedUsername(false)
                     localStorage.removeItem(STORAGE_KEY)
                   }}
                   className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-2"
