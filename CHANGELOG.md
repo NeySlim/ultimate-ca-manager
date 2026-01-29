@@ -58,9 +58,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Styled Dialogs** - `showConfirm()`, `showPrompt()` replace native JS popups
 - **UI Consistency** - Standardized border-radius, padding, shadows across components
 - **HTTPS Cert Display** - Real certificate info with CA-Signed/Self-Signed badge
+- **Redis Support** - Optional distributed caching and rate limiting
+- **Pydantic Validation** - Request schema validation with clean error messages
+- **Structured Logging** - JSON logs with request context for observability
 
-#### Testing (104 total tests)
-- **Vitest** - 39 frontend unit tests (components, services)
+#### Testing (129 total tests)
+- **Vitest** - 84 frontend unit tests (89% coverage)
 - **Pytest** - 51 backend API tests (auth, CAs, certs, SCEP)
 - **Playwright** - 14 E2E tests (auth, certificates, settings)
 
@@ -74,6 +77,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All API stubs replaced with real implementations
 - Dropdown component fixed (forwardRef + onSelect for Radix)
 - HTTPS cert info displays real data instead of "Self-Signed"
+
+#### Cleanup
+- Removed prototype files (PrototypeA/B/C/D.jsx)
+- Removed TestPage.jsx and App-test-success.jsx
+- Code reduced by ~890 lines while adding features
 
 ---
 
