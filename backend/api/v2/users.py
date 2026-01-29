@@ -14,16 +14,7 @@ import io
 bp = Blueprint('users_v2', __name__)
 
 
-@bp.route('/api/v2/roles', methods=['GET'])
-@require_auth()
-def list_roles():
-    """List available roles"""
-    roles = [
-        {'id': 'admin', 'name': 'Administrator', 'description': 'Full system access'},
-        {'id': 'operator', 'name': 'Operator', 'description': 'Can manage certificates and CAs'},
-        {'id': 'viewer', 'name': 'Viewer', 'description': 'Read-only access'}
-    ]
-    return success_response(data=roles)
+# Roles endpoint moved to api/v2/roles.py
 
 
 @bp.route('/api/v2/users', methods=['GET'])
