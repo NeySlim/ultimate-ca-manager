@@ -6,7 +6,6 @@ Users Management Routes v2.0
 from flask import Blueprint, request, jsonify, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
-from utils.schemas import UserCreateRequest, UserUpdateRequest, validate_request
 from models import db, User
 from datetime import datetime
 import csv
@@ -71,8 +70,7 @@ def list_users():
 
 @bp.route('/api/v2/users', methods=['POST'])
 @require_auth()
-@validate_request(UserCreateRequest)
-def create_user(validated_data):
+def create_user():
     """
     Create new user
     
@@ -81,24 +79,43 @@ def create_user(validated_data):
         "username": "john.doe",
         "email": "john@example.com",
         "password": "securepass123",
-        "role": "operator"
+        "full_name": "John Doe",
+        "role": "operator",
+        "permissions": {...}
     }
     """
+    data = request.get_json()
+    
+    # Required fields
+    if not data.get('username'):
+        return error_response('Username is required', 400)
+    if not data.get('email'):
+        return error_response('Email is required', 400)
+    if not data.get('password'):
+        return error_response('Password is required', 400)
+    
     # Check if user exists
-    if User.query.filter_by(username=validated_data.username).first():
+    if User.query.filter_by(username=data['username']).first():
         return error_response('Username already exists', 409)
     
-    if validated_data.email and User.query.filter_by(email=validated_data.email).first():
+    if User.query.filter_by(email=data['email']).first():
         return error_response('Email already exists', 409)
+    
+    # Validate role
+    valid_roles = ['admin', 'operator', 'viewer']
+    role = data.get('role', 'viewer')
+    if role not in valid_roles:
+        return error_response(f'Invalid role. Must be one of: {", ".join(valid_roles)}', 400)
     
     # Create user
     user = User(
-        username=validated_data.username,
-        email=validated_data.email,
-        role=validated_data.role,
-        active=validated_data.active
+        username=data['username'],
+        email=data['email'],
+        full_name=data.get('full_name', ''),
+        role=role,
+        active=data.get('active', True)
     )
-    user.set_password(validated_data.password)
+    user.set_password(data['password'])
     
     try:
         db.session.add(user)

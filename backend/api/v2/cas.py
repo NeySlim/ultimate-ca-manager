@@ -13,21 +13,6 @@ from models import Certificate
 
 bp = Blueprint('cas_v2', __name__)
 
-# Import cache
-try:
-    from app import cache
-    HAS_CACHE = True
-except ImportError:
-    HAS_CACHE = False
-
-
-def invalidate_ca_cache():
-    """Invalidate CA list cache after mutations"""
-    if HAS_CACHE:
-        cache.delete_memoized(list_cas)
-        cache.delete('ca_list:list_cas')
-        cache.delete('ca_tree:get_ca_tree')
-
 
 @bp.route('/api/v2/cas', methods=['GET'])
 @require_auth(['read:cas'])
@@ -225,9 +210,6 @@ def create_ca():
             validity_days=int(data.get('validityYears', 10)) * 365,
             username=g.user.username if hasattr(g, 'user') else 'system'
         )
-        
-        # Invalidate cache after creation
-        invalidate_ca_cache()
         
         return created_response(
             data=ca.to_dict(),
@@ -484,9 +466,6 @@ def delete_ca(ca_id):
     # Delete the CA
     db.session.delete(ca)
     db.session.commit()
-    
-    # Invalidate cache after deletion
-    invalidate_ca_cache()
     
     # Audit log
     from services.audit_service import AuditService

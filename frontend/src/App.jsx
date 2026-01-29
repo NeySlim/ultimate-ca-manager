@@ -18,6 +18,20 @@ const ImportExportPage = lazy(() => import('./pages/ImportExportPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'))
 
+// Pro pages - lazy load with graceful fallback
+const GroupsPage = lazy(() => 
+  import('./pro/pages/GroupsPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
+)
+const RBACPage = lazy(() => 
+  import('./pro/pages/RBACPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
+)
+const SSOPage = lazy(() => 
+  import('./pro/pages/SSOPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
+)
+const HSMPage = lazy(() => 
+  import('./pro/pages/HSMPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
+)
+
 // Loading fallback for lazy components
 function PageLoader() {
   return (
@@ -62,6 +76,12 @@ function AppRoutes() {
           <Route path="/audit" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
           <Route path="/import" element={<ProtectedRoute><ImportExportPage /></ProtectedRoute>} />
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+          
+          {/* Pro Routes */}
+          <Route path="/groups" element={<ProtectedRoute><GroupsPage /></ProtectedRoute>} />
+          <Route path="/rbac" element={<ProtectedRoute><RBACPage /></ProtectedRoute>} />
+          <Route path="/sso" element={<ProtectedRoute><SSOPage /></ProtectedRoute>} />
+          <Route path="/hsm" element={<ProtectedRoute><HSMPage /></ProtectedRoute>} />
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />

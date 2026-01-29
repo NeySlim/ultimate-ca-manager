@@ -10,7 +10,6 @@ Supports:
 from flask import Blueprint, request, jsonify, session, current_app
 from auth.unified import AuthManager, require_auth
 from utils.response import success_response, error_response
-from utils.schemas import LoginRequest, validate_request
 from models import User, db
 import hashlib
 
@@ -23,17 +22,9 @@ try:
 except ImportError:
     HAS_LIMITER = False
 
-# Rate limit decorator for login (5 per minute per IP)
-def rate_limit_login(f):
-    if HAS_LIMITER:
-        return limiter.limit("5 per minute")(f)
-    return f
-
 
 @bp.route('/api/v2/auth/login', methods=['POST'])
-@rate_limit_login
-@validate_request(LoginRequest)
-def login(validated_data):
+def login():
     """
     Login endpoint - Rate limited to 5 per minute
     Supports 2 modes based on Accept header:
@@ -43,27 +34,23 @@ def login(validated_data):
     POST /api/auth/login
     Body: {"username": "admin", "password": "xxx"}
     """
-    # Use validated data from Pydantic
-    username = validated_data.username
-    password = validated_data.password
+    data = request.json
     
-    # Import structured logger
-    from utils.logging import logger
+    if not data or not data.get('username') or not data.get('password'):
+        return error_response('Username and password required', 400)
+    
+    username = data['username']
+    password = data['password']
     
     # Find user
     user = User.query.filter_by(username=username).first()
     
     if not user or not user.active:
-        logger.warning("login_failed", username=username, reason="user_not_found", ip=request.remote_addr)
         return error_response('Invalid credentials', 401)
     
     # Verify password (assumes User has check_password method)
     if not user.check_password(password):
-        logger.warning("login_failed", username=username, reason="invalid_password", ip=request.remote_addr)
         return error_response('Invalid credentials', 401)
-    
-    # Log successful login
-    logger.audit("user_login", user_id=user.id, username=username, ip=request.remote_addr)
     
     # Check if JWT requested
     accept_header = request.headers.get('Accept', '')

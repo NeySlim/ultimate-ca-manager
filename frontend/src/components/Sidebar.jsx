@@ -1,6 +1,6 @@
 /**
  * Sidebar Component - 56px navigation sidebar
- * Supports Pro features when license is active
+ * Supports Pro features when license is active (dynamic import)
  */
 import { useState, useEffect } from 'react'
 import { 
@@ -15,24 +15,44 @@ import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
 
-// Try to import Pro features (will fail gracefully in community version)
-let useLicense = null
-let ProBadge = null
-try {
-  const pro = require('../pro')
-  useLicense = pro.useLicense
-  ProBadge = pro.ProBadge
-} catch (e) {
-  // Pro module not available - community version
-}
-
 export function Sidebar({ activePage }) {
   const navigate = useNavigate()
   const { currentTheme, setCurrentTheme, themes } = useTheme()
   const { user, logout } = useAuth()
   
-  // Pro license check (graceful fallback)
-  const license = useLicense ? useLicense() : { isPro: false, loading: false }
+  // Dynamic Pro module loading
+  const [proModule, setProModule] = useState(null)
+  const [license, setLicense] = useState({ isPro: false, loading: true })
+  
+  useEffect(() => {
+    // Try to dynamically import Pro module
+    import('../pro')
+      .then(mod => {
+        setProModule(mod)
+      })
+      .catch(() => {
+        // Pro module not available - community version
+        setLicense({ isPro: false, loading: false })
+      })
+  }, [])
+  
+  // Use Pro license hook if available
+  useEffect(() => {
+    if (proModule?.useLicense) {
+      // We can't use hooks conditionally, so we call the API directly
+      import('../services/apiClient').then(({ apiClient }) => {
+        apiClient.get('/license')
+          .then(res => {
+            const data = res.data || res
+            setLicense({
+              isPro: data.type === 'pro' || data.type === 'enterprise' || data.pro_enabled === true,
+              loading: false
+            })
+          })
+          .catch(() => setLicense({ isPro: false, loading: false }))
+      })
+    }
+  }, [proModule])
 
   const pages = [
     { id: '', icon: House, label: 'Dashboard', path: '/' },
