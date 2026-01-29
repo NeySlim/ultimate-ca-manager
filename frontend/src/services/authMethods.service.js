@@ -93,6 +93,7 @@ class AuthMethodsService {
     // Convert base64url strings to ArrayBuffers
     const publicKeyOptions = {
       ...options,
+      timeout: 10000, // 10 second timeout for WebAuthn prompt
       challenge: this.base64urlToBuffer(options.challenge),
       allowCredentials: options.allowCredentials?.map(cred => ({
         ...cred,
@@ -100,10 +101,19 @@ class AuthMethodsService {
       }))
     }
 
-    // Get credential from authenticator
-    const credential = await navigator.credentials.get({
-      publicKey: publicKeyOptions
-    })
+    // Get credential from authenticator (with AbortController for timeout fallback)
+    const abortController = new AbortController()
+    const timeoutId = setTimeout(() => abortController.abort(), 12000)
+    
+    let credential
+    try {
+      credential = await navigator.credentials.get({
+        publicKey: publicKeyOptions,
+        signal: abortController.signal
+      })
+    } finally {
+      clearTimeout(timeoutId)
+    }
 
     if (!credential) {
       throw new Error('No credential returned from authenticator')
