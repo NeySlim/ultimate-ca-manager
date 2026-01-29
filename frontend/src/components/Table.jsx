@@ -78,10 +78,11 @@ export function Table({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto">
-        <table className="w-full">
-          <thead className="sticky top-0 bg-bg-secondary border-b border-border z-10">
-            <tr>
+      <div className="flex-1 overflow-hidden rounded-lg border border-border bg-bg-tertiary/20">
+        <div className="h-full overflow-auto">
+          <table className="w-full">
+            <thead className="sticky top-0 bg-bg-secondary border-b border-border z-10">
+              <tr>
               {selectable && (
                 <th className="w-8 px-2 py-2">
                   <input
@@ -115,17 +116,19 @@ export function Table({
           </thead>
           <tbody className="divide-y divide-border">
             {sortedData.map((row, index) => {
-              const isSelected = selectedId !== null && row[idKey] === selectedId
+              const rowId = row[idKey]
+              const isSelected = selectedId !== null && selectedId !== undefined && rowId == selectedId
               
               return (
                 <tr
                   key={index}
                   onClick={() => onRowClick?.(row)}
                   className={cn(
-                    "transition-colors",
-                    onRowClick && "cursor-pointer hover:bg-bg-tertiary",
-                    selectedRows.has(index) && "bg-bg-tertiary/50",
-                    isSelected && "bg-accent/10 border-l-2 border-l-accent"
+                    "transition-all duration-150",
+                    onRowClick && "cursor-pointer",
+                    !isSelected && "hover:bg-bg-tertiary",
+                    selectedRows.has(index) && "bg-bg-tertiary",
+                    isSelected && "row-selected"
                   )}
                 >
                 {selectable && (
@@ -138,12 +141,15 @@ export function Table({
                         handleSelectRow(index, e.target.checked)
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className="rounded border-border bg-bg-tertiary"
+                      className="rounded border-border bg-bg-tertiary transition-colors"
                     />
                   </td>
                 )}
-                {columns.map(col => (
-                  <td key={col.key} className="px-3 py-2 text-sm text-text-primary whitespace-nowrap">
+                {columns.map((col) => (
+                  <td 
+                    key={col.key} 
+                    className="px-3 py-2.5 text-sm text-text-primary whitespace-nowrap"
+                  >
                     {col.render ? col.render(row[col.key], row) : row[col.key]}
                   </td>
                 ))}
@@ -152,6 +158,7 @@ export function Table({
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {pagination && (

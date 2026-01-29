@@ -26,12 +26,13 @@ export function SelectComponent({
       <Select.Root value={value} onValueChange={onChange} disabled={disabled}>
         <Select.Trigger
           className={cn(
-            "w-full flex items-center justify-between px-2 py-1 bg-bg-tertiary border rounded-sm text-sm",
-            "focus:outline-none focus:ring-1 focus:ring-accent-primary focus:border-transparent",
+            "w-full flex items-center justify-between px-2.5 py-1.5 bg-bg-tertiary/80 border rounded-md text-sm",
+            "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 focus:bg-bg-tertiary",
             "disabled:opacity-50 disabled:cursor-not-allowed",
-            "transition-all",
-            error ? "border-red-500" : "border-border",
-            value ? "text-text-primary" : "text-text-secondary"
+            "transition-all duration-200",
+            "hover:border-border/80 hover:bg-bg-tertiary",
+            error ? "border-red-500/50" : "border-border/60",
+            value ? "text-text-primary" : "text-text-secondary/60"
           )}
         >
           <Select.Value placeholder={placeholder} />
@@ -42,16 +43,16 @@ export function SelectComponent({
 
         <Select.Portal>
           <Select.Content
-            className="bg-bg-secondary border border-border rounded-lg shadow-xl overflow-hidden z-50"
+            className="bg-bg-secondary/95 backdrop-blur-md border border-border/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden z-50 animate-scaleIn"
             position="popper"
             sideOffset={4}
           >
-            <Select.Viewport className="p-0.5">
+            <Select.Viewport className="p-1">
               {options.filter(opt => opt.value !== '').map(option => (
                 <Select.Item
                   key={option.value}
                   value={option.value}
-                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-primary rounded cursor-pointer outline-none hover:bg-bg-tertiary data-[highlighted]:bg-bg-tertiary transition-colors"
+                  className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-primary rounded-md cursor-pointer outline-none hover:bg-bg-tertiary/80 data-[highlighted]:bg-bg-tertiary/80 transition-colors duration-100"
                 >
                   <Select.ItemText>{option.label}</Select.ItemText>
                   <Select.ItemIndicator className="ml-auto">

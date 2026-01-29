@@ -1,23 +1,33 @@
 import { cn } from '../lib/utils'
 
-export function Badge({ children, variant = 'default', size = 'default', className, ...props }) {
+export function Badge({ children, variant = 'default', size = 'default', dot = false, className, ...props }) {
   const variants = {
-    default: 'bg-bg-tertiary text-text-primary border-border',
-    primary: 'bg-accent-primary/20 text-accent-primary border-accent-primary/30',
-    secondary: 'bg-bg-tertiary text-text-secondary border-border',
-    success: 'bg-green-500/15 text-green-400 border-green-500/25',
-    warning: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/25',
-    danger: 'bg-red-500/15 text-red-400 border-red-500/25',
-    info: 'bg-blue-500/15 text-blue-400 border-blue-500/25',
-    // Color variants for flexible usage
-    emerald: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25',
-    red: 'bg-red-500/15 text-red-400 border-red-500/25',
-    blue: 'bg-blue-500/15 text-blue-400 border-blue-500/25',
-    yellow: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/25',
-    purple: 'bg-purple-500/15 text-purple-400 border-purple-500/25',
-    orange: 'bg-orange-500/15 text-orange-400 border-orange-500/25',
-    cyan: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/25',
-    gray: 'bg-gray-500/15 text-gray-400 border-gray-500/25',
+    default: 'bg-bg-tertiary/80 text-text-primary border-border/50 shadow-sm',
+    primary: 'bg-accent-primary/15 text-accent-primary border-accent-primary/25 shadow-accent-primary/10',
+    secondary: 'bg-bg-tertiary/60 text-text-secondary border-border/40',
+    success: 'bg-green-500/12 text-green-400 border-green-500/20 shadow-green-500/10',
+    warning: 'bg-yellow-500/12 text-yellow-400 border-yellow-500/20 shadow-yellow-500/10',
+    danger: 'bg-red-500/12 text-red-400 border-red-500/20 shadow-red-500/10',
+    info: 'bg-blue-500/12 text-blue-400 border-blue-500/20 shadow-blue-500/10',
+    outline: 'bg-transparent text-text-primary border-border/60 hover:bg-bg-tertiary/50',
+    // Color variants
+    emerald: 'bg-emerald-500/12 text-emerald-400 border-emerald-500/20',
+    red: 'bg-red-500/12 text-red-400 border-red-500/20',
+    blue: 'bg-blue-500/12 text-blue-400 border-blue-500/20',
+    yellow: 'bg-yellow-500/12 text-yellow-400 border-yellow-500/20',
+    purple: 'bg-purple-500/12 text-purple-400 border-purple-500/20',
+    orange: 'bg-orange-500/12 text-orange-400 border-orange-500/20',
+    cyan: 'bg-cyan-500/12 text-cyan-400 border-cyan-500/20',
+    gray: 'bg-gray-500/12 text-gray-400 border-gray-500/20',
+  }
+  
+  const dotColors = {
+    default: 'bg-text-secondary',
+    primary: 'bg-accent-primary',
+    success: 'bg-green-400',
+    warning: 'bg-yellow-400',
+    danger: 'bg-red-400',
+    info: 'bg-blue-400',
   }
   
   const sizes = {
@@ -29,13 +39,17 @@ export function Badge({ children, variant = 'default', size = 'default', classNa
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded font-medium border',
+        'inline-flex items-center gap-1.5 rounded-md font-medium border shadow-sm',
+        'transition-colors duration-150',
         sizes[size],
         variants[variant],
         className
       )}
       {...props}
     >
+      {dot && (
+        <span className={cn('w-1.5 h-1.5 rounded-full', dotColors[variant] || dotColors.default)} />
+      )}
       {children}
     </span>
   )
