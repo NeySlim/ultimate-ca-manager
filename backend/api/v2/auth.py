@@ -22,8 +22,15 @@ try:
 except ImportError:
     HAS_LIMITER = False
 
+# Rate limit decorator for login (5 per minute per IP)
+def rate_limit_login(f):
+    if HAS_LIMITER:
+        return limiter.limit("5 per minute")(f)
+    return f
+
 
 @bp.route('/api/v2/auth/login', methods=['POST'])
+@rate_limit_login
 def login():
     """
     Login endpoint - Rate limited to 5 per minute
@@ -42,15 +49,23 @@ def login():
     username = data['username']
     password = data['password']
     
+    # Import structured logger
+    from utils.logging import logger
+    
     # Find user
     user = User.query.filter_by(username=username).first()
     
     if not user or not user.active:
+        logger.warning("login_failed", username=username, reason="user_not_found", ip=request.remote_addr)
         return error_response('Invalid credentials', 401)
     
     # Verify password (assumes User has check_password method)
     if not user.check_password(password):
+        logger.warning("login_failed", username=username, reason="invalid_password", ip=request.remote_addr)
         return error_response('Invalid credentials', 401)
+    
+    # Log successful login
+    logger.audit("user_login", user_id=user.id, username=username, ip=request.remote_addr)
     
     # Check if JWT requested
     accept_header = request.headers.get('Accept', '')
