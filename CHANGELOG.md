@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.0.0] - 2026-01-28
+## [2.0.0] - 2026-01-29
 
 ### 🎨 Complete React Frontend Rewrite (UCM V4)
 
@@ -52,15 +52,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Standardized Responses** - `{data, meta}` structure throughout
 - **OCSP Responder** - RFC 6960 compliant certificate status
 
-#### Full API Implementation (2026-01-28)
-- **Certificate Creation** - Real key generation, signing, SANs support
-- **User Management** - Create, update, delete with password hashing
-- **Backup/Restore** - Full backup service integration
-- **2FA/TOTP** - Real implementation with pyotp, QR codes, backup codes
-- **Session Management** - List, revoke individual/all sessions
-- **Password Change** - With current password verification
-- **LDAP Settings** - Save and test connection
-- **Audit Logs** - Real database queries with filters
+#### Code Quality (2026-01-29)
+- **Centralized Constants** - `constants/config.js` for VALIDITY, PAGINATION, TIME
+- **Shared Hooks** - `useModals`, `useDeleteHandler`, `usePagination`
+- **Styled Dialogs** - `showConfirm()`, `showPrompt()` replace native JS popups
+- **UI Consistency** - Standardized border-radius, padding, shadows across components
+- **HTTPS Cert Display** - Real certificate info with CA-Signed/Self-Signed badge
+
+#### Testing (104 total tests)
+- **Vitest** - 39 frontend unit tests (components, services)
+- **Pytest** - 51 backend API tests (auth, CAs, certs, SCEP)
+- **Playwright** - 14 E2E tests (auth, certificates, settings)
 
 #### Bug Fixes
 - Delete CA/Certificate actually deletes (was stub)
@@ -70,6 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Certificate renewal now works (was stub returning fake data)
 - CA lookup for renewal handles different refid formats
 - All API stubs replaced with real implementations
+- Dropdown component fixed (forwardRef + onSelect for Radix)
+- HTTPS cert info displays real data instead of "Self-Signed"
 
 ---
 
