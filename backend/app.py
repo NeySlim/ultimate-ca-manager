@@ -769,6 +769,17 @@ def register_blueprints(app):
     from api.v2 import register_api_v2
     register_api_v2(app)
     
+    # ===== PRO MODULES =====
+    # Auto-load Pro modules if available (only in ucm-src-pro repo)
+    try:
+        from pro import register_pro_blueprints
+        register_pro_blueprints(app)
+        app.logger.info("✨ UCM Pro modules loaded successfully")
+    except ImportError:
+        app.config['PRO_ENABLED'] = False
+        app.logger.info("📦 Running UCM Community Edition")
+    # ========================
+    
     # Public endpoints (no auth, no /api prefix - standard paths)
     app.register_blueprint(cdp_bp, url_prefix='/cdp')     # CRL Distribution Points
     app.register_blueprint(ocsp_bp)                        # OCSP Responder (/ocsp)
