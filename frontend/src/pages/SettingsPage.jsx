@@ -4,12 +4,12 @@
 import { useState, useEffect } from 'react'
 import { Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, Envelope, Download, Trash, UploadSimple, HardDrives, Lock, Key } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, Input, Select,
+  ExplorerPanel, DetailsPanel, Button, Input, Select, Badge,
   Textarea, Tabs, LoadingSpinner, FileUpload, Table, Modal
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks/usePermission'
+import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
 
 export default function SettingsPage() {
@@ -827,15 +827,21 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Issuer:</span>
-                  <span className="text-text-primary font-medium">{httpsInfo?.issuer || 'Self-Signed'}</span>
+                  <span className="text-text-primary font-medium">{httpsInfo?.issuer || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-secondary">Type:</span>
+                  <Badge variant={httpsInfo?.type === 'CA-Signed' ? 'success' : httpsInfo?.type === 'Self-Signed' ? 'warning' : 'secondary'}>
+                    {httpsInfo?.type || '-'}
+                  </Badge>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Valid From:</span>
-                  <span className="text-text-primary font-medium">{formatDate(httpsInfo?.valid_from) || '-'}</span>
+                  <span className="text-text-primary font-medium">{formatDate(httpsInfo?.valid_from)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Valid Until:</span>
-                  <span className="text-text-primary font-medium">{formatDate(httpsInfo?.valid_to) || '-'}</span>
+                  <span className="text-text-primary font-medium">{formatDate(httpsInfo?.valid_to)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Fingerprint (SHA256):</span>

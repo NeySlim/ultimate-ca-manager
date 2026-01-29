@@ -143,19 +143,20 @@ export function NotificationProvider({ children }) {
       <Dialog.Root open={!!confirmDialog} onOpenChange={(open) => !open && handleConfirm(false)}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-full max-w-md bg-bg-secondary border border-border rounded-lg shadow-2xl p-6">
-            <Dialog.Title className="text-lg font-semibold text-text-primary mb-2">
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-full max-w-sm bg-bg-secondary border border-border rounded-lg shadow-xl p-4">
+            <Dialog.Title className="text-sm font-semibold text-text-primary mb-2">
               {confirmDialog?.title}
             </Dialog.Title>
-            <Dialog.Description className="text-sm text-text-secondary mb-6">
+            <Dialog.Description className="text-xs text-text-secondary mb-4">
               {confirmDialog?.message}
             </Dialog.Description>
-            <div className="flex justify-end gap-3">
-              <Button variant="secondary" onClick={() => handleConfirm(false)}>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" size="sm" onClick={() => handleConfirm(false)}>
                 {confirmDialog?.cancelText}
               </Button>
               <Button 
                 variant={confirmDialog?.variant === 'danger' ? 'danger' : 'primary'} 
+                size="sm"
                 onClick={() => handleConfirm(true)}
               >
                 {confirmDialog?.confirmText}
@@ -169,11 +170,11 @@ export function NotificationProvider({ children }) {
       <Dialog.Root open={!!promptDialog} onOpenChange={(open) => !open && handlePrompt(false)}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-full max-w-md bg-bg-secondary border border-border rounded-lg shadow-2xl p-6">
-            <Dialog.Title className="text-lg font-semibold text-text-primary mb-2">
+          <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-full max-w-sm bg-bg-secondary border border-border rounded-lg shadow-xl p-4">
+            <Dialog.Title className="text-sm font-semibold text-text-primary mb-2">
               {promptDialog?.title}
             </Dialog.Title>
-            <Dialog.Description className="text-sm text-text-secondary mb-4">
+            <Dialog.Description className="text-xs text-text-secondary mb-3">
               {promptDialog?.message}
             </Dialog.Description>
             <Input
@@ -184,11 +185,11 @@ export function NotificationProvider({ children }) {
               autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handlePrompt(true)}
             />
-            <div className="flex justify-end gap-3 mt-6">
-              <Button variant="secondary" onClick={() => handlePrompt(false)}>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="secondary" size="sm" onClick={() => handlePrompt(false)}>
                 {promptDialog?.cancelText}
               </Button>
-              <Button onClick={() => handlePrompt(true)}>
+              <Button size="sm" onClick={() => handlePrompt(true)}>
                 {promptDialog?.confirmText}
               </Button>
             </div>

@@ -91,13 +91,14 @@ export function ExportDropdown({
   return (
     <Dropdown
       trigger={
-        <div className="flex items-center gap-1.5">
-          <Export size={16} />
+        <div className="flex items-center gap-1">
+          <Export size={14} />
           Export
         </div>
       }
       items={items}
       disabled={disabled}
+      size="sm"
     />
   )
 }

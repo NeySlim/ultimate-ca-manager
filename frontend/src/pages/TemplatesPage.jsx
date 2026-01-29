@@ -10,13 +10,14 @@ import {
 } from '../components'
 import { templatesService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks/usePermission'
+import { usePermission, useModals } from '../hooks'
 import { extractData } from '../lib/utils'
 
 export default function TemplatesPage() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const fileRef = useRef(null)
+  const { modals, open: openModal, close: closeModal } = useModals(['import'])
   
   const [templates, setTemplates] = useState([])
   const [selectedTemplate, setSelectedTemplate] = useState(null)
@@ -25,7 +26,6 @@ export default function TemplatesPage() {
   const [formData, setFormData] = useState({})
   
   // Import state
-  const [showImportModal, setShowImportModal] = useState(false)
   const [importFile, setImportFile] = useState(null)
   const [importJson, setImportJson] = useState('')
   const [importing, setImporting] = useState(false)
@@ -164,7 +164,7 @@ export default function TemplatesPage() {
       
       const result = await templatesService.import(formData)
       showSuccess(result.message || 'Template imported successfully')
-      setShowImportModal(false)
+      closeModal('import')
       setImportFile(null)
       setImportJson('')
       if (fileRef.current) fileRef.current.value = ''
@@ -387,7 +387,7 @@ export default function TemplatesPage() {
                 <Plus size={18} />
                 Create Template
               </Button>
-              <Button variant="secondary" onClick={() => setShowImportModal(true)} className="w-full">
+              <Button variant="secondary" onClick={() => openModal('import')} className="w-full">
                 <FileArrowUp size={18} />
                 Import Template
               </Button>
@@ -419,8 +419,8 @@ export default function TemplatesPage() {
 
       {/* Import Template Modal */}
       <Modal
-        open={showImportModal}
-        onClose={() => setShowImportModal(false)}
+        open={modals.import}
+        onClose={() => closeModal('import')}
         title="Import Template"
       >
         <div className="space-y-4">
@@ -457,7 +457,7 @@ export default function TemplatesPage() {
           </div>
           
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" onClick={() => setShowImportModal(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => closeModal('import')}>Cancel</Button>
             <Button onClick={handleImportTemplate} disabled={importing || (!importFile && !importJson.trim())}>
               {importing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
               Import Template

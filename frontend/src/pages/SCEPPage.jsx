@@ -13,7 +13,7 @@ import {
 } from '../components'
 import { scepService, casService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks/usePermission'
+import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
 
 export default function SCEPPage() {

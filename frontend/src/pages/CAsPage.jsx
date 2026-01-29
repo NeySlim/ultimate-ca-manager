@@ -14,7 +14,7 @@ import {
 } from '../components'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks/usePermission'
+import { usePermission, useModals } from '../hooks'
 import { extractCN, extractData, formatDate, formatDateTime } from '../lib/utils'
 
 // OCSP Settings Tab Component
@@ -139,8 +139,7 @@ export default function CAsPage() {
   const [issuedCerts, setIssuedCerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState('tree') // 'tree' or 'grid'
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
+  const { modals, open: openModal, close: closeModal } = useModals(['create', 'import'])
   const [searchQuery, setSearchQuery] = useState('')
   const [createFormType, setCreateFormType] = useState('root')
   const [importFile, setImportFile] = useState(null)
@@ -151,9 +150,8 @@ export default function CAsPage() {
 
   useEffect(() => {
     loadCAs()
-    // Check if we should auto-open create modal
     if (searchParams.get('action') === 'create') {
-      setShowCreateModal(true)
+      openModal('create')
       searchParams.delete('action')
       setSearchParams(searchParams)
     }
@@ -269,7 +267,7 @@ export default function CAsPage() {
       
       const result = await casService.import(formData)
       showSuccess(result.message || 'CA imported successfully')
-      setShowImportModal(false)
+      closeModal('import')
       setImportFile(null)
       setImportName('')
       setImportPassword('')
@@ -682,11 +680,11 @@ export default function CAsPage() {
 
           {canWrite('cas') && (
             <div className="flex gap-2">
-              <Button onClick={() => setShowCreateModal(true)} className="flex-1">
+              <Button onClick={() => openModal('create')} className="flex-1">
                 <ShieldCheck size={18} />
                 Create
               </Button>
-              <Button variant="secondary" onClick={() => { setShowImportModal(true); }}>
+              <Button variant="secondary" onClick={() => { openModal('import'); }}>
                 <UploadSimple size={18} />
                 Import
               </Button>
@@ -807,8 +805,8 @@ export default function CAsPage() {
 
       {/* Create CA Modal */}
       <Modal
-        open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        open={modals.create}
+        onClose={() => closeModal('create')}
         title="Create Certificate Authority"
         size="lg"
       >
@@ -831,7 +829,7 @@ export default function CAsPage() {
           try {
             await casService.create(data)
             showSuccess('CA created successfully')
-            setShowCreateModal(false)
+            closeModal('create')
             loadCAs()
           } catch (error) {
             showError(error.message || 'Failed to create CA')
@@ -956,7 +954,7 @@ export default function CAsPage() {
             <Button
               type="button"
               variant="secondary"
-              onClick={() => setShowCreateModal(false)}
+              onClick={() => closeModal('create')}
             >
               Cancel
             </Button>
@@ -969,8 +967,8 @@ export default function CAsPage() {
 
       {/* Import CA Modal */}
       <Modal
-        open={showImportModal}
-        onClose={() => setShowImportModal(false)}
+        open={modals.import}
+        onClose={() => closeModal('import')}
         title="Import CA"
         size="md"
       >
@@ -1009,7 +1007,7 @@ export default function CAsPage() {
           <div className="flex gap-3 justify-end pt-4 border-t border-border">
             <Button
               variant="secondary"
-              onClick={() => setShowImportModal(false)}
+              onClick={() => closeModal('import')}
             >
               Cancel
             </Button>

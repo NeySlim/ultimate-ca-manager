@@ -11,15 +11,16 @@ import {
 } from '../components'
 import { certificatesService, casService } from '../services'
 import { useNotification } from '../contexts'
-import { usePermission } from '../hooks/usePermission'
-import { useDebounce } from '../hooks/useDebounce'
+import { usePermission, useModals, useDebounce } from '../hooks'
 import { extractCN, extractData, formatDate } from '../lib/utils'
+import { PAGINATION } from '../constants/config'
 
 export default function CertificatesPage() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
+  const { modals, open: openModal, close: closeModal } = useModals(['create', 'import'])
   
   const [certificates, setCertificates] = useState([])
   const [selectedCert, setSelectedCert] = useState(null)
@@ -27,8 +28,6 @@ export default function CertificatesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedSearch = useDebounce(searchQuery, 300)
   const [statusFilter, setStatusFilter] = useState('all')
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [cas, setCas] = useState([])
@@ -42,9 +41,8 @@ export default function CertificatesPage() {
   useEffect(() => {
     loadCertificates()
     loadCAs()
-    // Check if we should auto-open create modal
     if (searchParams.get('action') === 'create') {
-      setShowCreateModal(true)
+      openModal('create')
       searchParams.delete('action')
       setSearchParams(searchParams)
     }
@@ -176,7 +174,7 @@ export default function CertificatesPage() {
       
       const result = await certificatesService.import(formData)
       showSuccess(result.message || 'Certificate imported successfully')
-      setShowImportModal(false)
+      closeModal('import')
       setImportFile(null)
       setImportName('')
       setImportPassword('')
@@ -597,11 +595,11 @@ export default function CertificatesPage() {
 
           {canWrite('certificates') && (
             <div className="flex gap-2">
-              <Button onClick={() => setShowCreateModal(true)} className="flex-1">
+              <Button onClick={() => openModal('create')} className="flex-1">
                 <Certificate size={18} />
                 Issue
               </Button>
-              <Button variant="secondary" onClick={() => setShowImportModal(true)}>
+              <Button variant="secondary" onClick={() => openModal('import')}>
                 <UploadSimple size={18} />
                 Import
               </Button>
@@ -639,8 +637,8 @@ export default function CertificatesPage() {
 
       {/* Create Certificate Modal */}
       <Modal
-        open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
+        open={modals.create}
+        onClose={() => closeModal('create')}
         title="Issue New Certificate"
         size="lg"
       >
@@ -658,7 +656,7 @@ export default function CertificatesPage() {
           try {
             await certificatesService.create(data)
             showSuccess('Certificate issued successfully')
-            setShowCreateModal(false)
+            closeModal('create')
             loadCertificates()
           } catch (error) {
             showError(error.message || 'Failed to issue certificate')
@@ -718,7 +716,7 @@ export default function CertificatesPage() {
             <Button
               type="button"
               variant="secondary"
-              onClick={() => setShowCreateModal(false)}
+              onClick={() => closeModal('create')}
             >
               Cancel
             </Button>
@@ -731,8 +729,8 @@ export default function CertificatesPage() {
 
       {/* Import Certificate Modal */}
       <Modal
-        open={showImportModal}
-        onClose={() => setShowImportModal(false)}
+        open={modals.import}
+        onClose={() => closeModal('import')}
         title="Import Certificate"
         size="md"
       >
@@ -781,7 +779,7 @@ export default function CertificatesPage() {
           <div className="flex gap-3 justify-end pt-4 border-t border-border">
             <Button
               variant="secondary"
-              onClick={() => setShowImportModal(false)}
+              onClick={() => closeModal('import')}
             >
               Cancel
             </Button>
