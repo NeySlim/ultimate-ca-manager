@@ -1,0 +1,1673 @@
+openapi: 3.1.0
+info:
+  title: UCM API
+  description: |
+    Ultimate CA Manager API for managing PKI infrastructure.
+    
+    ## Authentication
+    
+    All endpoints require authentication via session cookies or JWT tokens.
+    Use `/api/v2/auth/login` to obtain a session.
+    
+    ## Pro Features
+    
+    Endpoints marked with 🔒 require UCM Pro license:
+    - Groups & RBAC
+    - SSO (SAML/OIDC)
+    - HSM Integration
+  version: 2.0.0
+  contact:
+    name: UCM Support
+    url: https://github.com/NeySlim/ultimate-ca-manager
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: /api/v2
+    description: API v2
+
+tags:
+  - name: Auth
+    description: Authentication endpoints
+  - name: Dashboard
+    description: Dashboard statistics and activity
+  - name: Certificates
+    description: Certificate management
+  - name: Certificate Authorities
+    description: CA hierarchy management
+  - name: CSRs
+    description: Certificate Signing Requests
+  - name: Templates
+    description: Certificate templates
+  - name: Users
+    description: User management (admin only)
+  - name: Settings
+    description: System settings
+  - name: ACME
+    description: ACME protocol management
+  - name: SCEP
+    description: SCEP protocol configuration
+  - name: CRL
+    description: Certificate Revocation Lists
+  - name: Truststore
+    description: Trusted certificates store
+  - name: Groups
+    description: User groups (Pro)
+  - name: RBAC
+    description: Role-based access control (Pro)
+  - name: SSO
+    description: Single Sign-On configuration (Pro)
+  - name: HSM
+    description: Hardware Security Module integration (Pro)
+  - name: License
+    description: License management (Pro)
+
+paths:
+  # ===================
+  # AUTH
+  # ===================
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: Authenticate with username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  example: admin
+                password:
+                  type: string
+                  format: password
+                  example: changeme123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: End the current session
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Logout successful
+
+  /auth/verify:
+    get:
+      tags: [Auth]
+      summary: Verify session
+      description: Check if current session is valid
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Session valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================
+  # DASHBOARD
+  # ===================
+  /dashboard/stats:
+    get:
+      tags: [Dashboard]
+      summary: Get dashboard statistics
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  certificates:
+                    type: integer
+                    example: 150
+                  cas:
+                    type: integer
+                    example: 5
+                  users:
+                    type: integer
+                    example: 10
+                  pending_csrs:
+                    type: integer
+                    example: 3
+
+  /dashboard/activity:
+    get:
+      tags: [Dashboard]
+      summary: Get recent activity
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Recent activity list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActivityItem'
+
+  /dashboard/expiring-certs:
+    get:
+      tags: [Dashboard]
+      summary: Get certificates expiring soon
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        '200':
+          description: List of expiring certificates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Certificate'
+
+  # ===================
+  # CERTIFICATES
+  # ===================
+  /certificates:
+    get:
+      tags: [Certificates]
+      summary: List all certificates
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/per_page'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [valid, expired, revoked]
+        - name: ca_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of certificates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Certificate'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  per_page:
+                    type: integer
+
+    post:
+      tags: [Certificates]
+      summary: Issue a new certificate
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertificateRequest'
+      responses:
+        '201':
+          description: Certificate issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /certificates/{id}:
+    get:
+      tags: [Certificates]
+      summary: Get certificate details
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Certificate details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Certificates]
+      summary: Delete a certificate
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Certificate deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /certificates/{id}/revoke:
+    post:
+      tags: [Certificates]
+      summary: Revoke a certificate
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  enum: [unspecified, keyCompromise, caCompromise, affiliationChanged, superseded, cessationOfOperation]
+      responses:
+        '200':
+          description: Certificate revoked
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /certificates/{id}/export:
+    get:
+      tags: [Certificates]
+      summary: Export certificate
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [pem, der, pkcs12]
+            default: pem
+      responses:
+        '200':
+          description: Certificate data
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+
+  # ===================
+  # CAS
+  # ===================
+  /cas:
+    get:
+      tags: [Certificate Authorities]
+      summary: List all CAs
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of CAs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CA'
+
+    post:
+      tags: [Certificate Authorities]
+      summary: Create a new CA
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CARequest'
+      responses:
+        '201':
+          description: CA created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CA'
+
+  /cas/tree:
+    get:
+      tags: [Certificate Authorities]
+      summary: Get CA hierarchy tree
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: CA tree structure
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CATreeNode'
+
+  /cas/{id}:
+    get:
+      tags: [Certificate Authorities]
+      summary: Get CA details
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: CA details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CA'
+
+    put:
+      tags: [Certificate Authorities]
+      summary: Update CA
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CARequest'
+      responses:
+        '200':
+          description: CA updated
+
+    delete:
+      tags: [Certificate Authorities]
+      summary: Delete CA
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: CA deleted
+
+  # ===================
+  # CSRs
+  # ===================
+  /csrs:
+    get:
+      tags: [CSRs]
+      summary: List CSRs
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+      responses:
+        '200':
+          description: List of CSRs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CSR'
+
+    post:
+      tags: [CSRs]
+      summary: Upload a CSR
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+          application/json:
+            schema:
+              type: object
+              properties:
+                pem:
+                  type: string
+                  description: PEM-encoded CSR
+      responses:
+        '201':
+          description: CSR uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CSR'
+
+  /csrs/{id}/sign:
+    post:
+      tags: [CSRs]
+      summary: Sign a CSR
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ca_id:
+                  type: integer
+                template_id:
+                  type: integer
+                validity_days:
+                  type: integer
+                  default: 365
+      responses:
+        '200':
+          description: Certificate issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+
+  # ===================
+  # TEMPLATES
+  # ===================
+  /templates:
+    get:
+      tags: [Templates]
+      summary: List certificate templates
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Template'
+
+    post:
+      tags: [Templates]
+      summary: Create a template
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateRequest'
+      responses:
+        '201':
+          description: Template created
+
+  /templates/{id}:
+    get:
+      tags: [Templates]
+      summary: Get template details
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Template details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Template'
+
+    put:
+      tags: [Templates]
+      summary: Update template
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateRequest'
+      responses:
+        '200':
+          description: Template updated
+
+    delete:
+      tags: [Templates]
+      summary: Delete template
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Template deleted
+
+  # ===================
+  # USERS
+  # ===================
+  /users:
+    get:
+      tags: [Users]
+      summary: List users (admin only)
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+
+    post:
+      tags: [Users]
+      summary: Create user (admin only)
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+      responses:
+        '201':
+          description: User created
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user details
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+    put:
+      tags: [Users]
+      summary: Update user
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+      responses:
+        '200':
+          description: User updated
+
+    delete:
+      tags: [Users]
+      summary: Delete user
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: User deleted
+
+  # ===================
+  # SETTINGS
+  # ===================
+  /settings/general:
+    get:
+      tags: [Settings]
+      summary: Get general settings
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: General settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneralSettings'
+
+    put:
+      tags: [Settings]
+      summary: Update general settings
+      security:
+        - sessionAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeneralSettings'
+      responses:
+        '200':
+          description: Settings updated
+
+  /settings/email:
+    get:
+      tags: [Settings]
+      summary: Get email settings
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Email settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailSettings'
+
+    put:
+      tags: [Settings]
+      summary: Update email settings
+      security:
+        - sessionAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailSettings'
+      responses:
+        '200':
+          description: Settings updated
+
+  # ===================
+  # ACME
+  # ===================
+  /acme/accounts:
+    get:
+      tags: [ACME]
+      summary: List ACME accounts
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of ACME accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ACMEAccount'
+
+  /acme/orders:
+    get:
+      tags: [ACME]
+      summary: List ACME orders
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of ACME orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ACMEOrder'
+
+  # ===================
+  # SCEP
+  # ===================
+  /scep/config:
+    get:
+      tags: [SCEP]
+      summary: Get SCEP configuration
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: SCEP configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SCEPConfig'
+
+    put:
+      tags: [SCEP]
+      summary: Update SCEP configuration
+      security:
+        - sessionAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SCEPConfig'
+      responses:
+        '200':
+          description: Configuration updated
+
+  # ===================
+  # CRL
+  # ===================
+  /crl:
+    get:
+      tags: [CRL]
+      summary: List CRLs
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of CRLs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CRL'
+
+  /crl/generate:
+    post:
+      tags: [CRL]
+      summary: Generate new CRL
+      security:
+        - sessionAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ca_id:
+                  type: integer
+      responses:
+        '200':
+          description: CRL generated
+
+  # ===================
+  # TRUSTSTORE
+  # ===================
+  /truststore:
+    get:
+      tags: [Truststore]
+      summary: List trusted certificates
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of trusted certificates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TrustedCert'
+
+    post:
+      tags: [Truststore]
+      summary: Add trusted certificate
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pem:
+                  type: string
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Certificate added
+
+  # ===================
+  # PRO: GROUPS
+  # ===================
+  /groups:
+    get:
+      tags: [Groups]
+      summary: List user groups 🔒
+      description: Requires UCM Pro license
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Group'
+        '403':
+          $ref: '#/components/responses/ProRequired'
+
+    post:
+      tags: [Groups]
+      summary: Create a group 🔒
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupRequest'
+      responses:
+        '201':
+          description: Group created
+
+  /groups/{id}/members:
+    post:
+      tags: [Groups]
+      summary: Add member to group 🔒
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+      responses:
+        '200':
+          description: Member added
+
+  # ===================
+  # PRO: RBAC
+  # ===================
+  /rbac/roles:
+    get:
+      tags: [RBAC]
+      summary: List roles 🔒
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+
+    post:
+      tags: [RBAC]
+      summary: Create a role 🔒
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+      responses:
+        '201':
+          description: Role created
+
+  /rbac/permissions:
+    get:
+      tags: [RBAC]
+      summary: List available permissions 🔒
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of permissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                example: ['read:cas', 'write:certificates', 'admin:users']
+
+  # ===================
+  # PRO: SSO
+  # ===================
+  /sso/providers:
+    get:
+      tags: [SSO]
+      summary: List SSO providers 🔒
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of SSO providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SSOProvider'
+
+    post:
+      tags: [SSO]
+      summary: Configure SSO provider 🔒
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SSOProviderRequest'
+      responses:
+        '201':
+          description: Provider configured
+
+  # ===================
+  # PRO: HSM
+  # ===================
+  /hsm/providers:
+    get:
+      tags: [HSM]
+      summary: List HSM providers 🔒
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: List of HSM providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HSMProvider'
+
+    post:
+      tags: [HSM]
+      summary: Configure HSM provider 🔒
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HSMProviderRequest'
+      responses:
+        '201':
+          description: Provider configured
+
+  /hsm/providers/{id}/test:
+    post:
+      tags: [HSM]
+      summary: Test HSM connection 🔒
+      security:
+        - sessionAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  # ===================
+  # PRO: LICENSE
+  # ===================
+  /license:
+    get:
+      tags: [License]
+      summary: Get license info
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: License information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/License'
+
+    post:
+      tags: [License]
+      summary: Activate license
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+                  example: UCM-PRO-XXXX-XXXX-XXXX
+      responses:
+        '200':
+          description: License activated
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: session
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+    per_page:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        default: 20
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Permission denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ProRequired:
+      description: UCM Pro license required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, operator, viewer]
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    UserRequest:
+      type: object
+      required: [username, email, password, role]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        role:
+          type: string
+          enum: [admin, operator, viewer]
+
+    Certificate:
+      type: object
+      properties:
+        id:
+          type: integer
+        subject:
+          type: string
+        issuer:
+          type: string
+        serial_number:
+          type: string
+        not_before:
+          type: string
+          format: date-time
+        not_after:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [valid, expired, revoked]
+        key_usage:
+          type: array
+          items:
+            type: string
+
+    CertificateRequest:
+      type: object
+      required: [common_name, ca_id]
+      properties:
+        common_name:
+          type: string
+        organization:
+          type: string
+        organizational_unit:
+          type: string
+        country:
+          type: string
+        state:
+          type: string
+        locality:
+          type: string
+        ca_id:
+          type: integer
+        template_id:
+          type: integer
+        validity_days:
+          type: integer
+          default: 365
+        san:
+          type: array
+          items:
+            type: string
+          description: Subject Alternative Names
+
+    CA:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        subject:
+          type: string
+        type:
+          type: string
+          enum: [root, intermediate]
+        parent_id:
+          type: integer
+          nullable: true
+        not_before:
+          type: string
+          format: date-time
+        not_after:
+          type: string
+          format: date-time
+        cert_count:
+          type: integer
+
+    CARequest:
+      type: object
+      required: [name, common_name]
+      properties:
+        name:
+          type: string
+        common_name:
+          type: string
+        organization:
+          type: string
+        country:
+          type: string
+        parent_id:
+          type: integer
+          nullable: true
+        validity_years:
+          type: integer
+          default: 10
+        key_algorithm:
+          type: string
+          enum: [RSA-2048, RSA-4096, ECDSA-P256, ECDSA-P384]
+          default: RSA-4096
+
+    CATreeNode:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+        cert_count:
+          type: integer
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/CATreeNode'
+
+    CSR:
+      type: object
+      properties:
+        id:
+          type: integer
+        subject:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        submitted_at:
+          type: string
+          format: date-time
+        submitted_by:
+          type: string
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        key_usage:
+          type: array
+          items:
+            type: string
+        extended_key_usage:
+          type: array
+          items:
+            type: string
+        validity_days:
+          type: integer
+        is_ca:
+          type: boolean
+
+    TemplateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        key_usage:
+          type: array
+          items:
+            type: string
+        extended_key_usage:
+          type: array
+          items:
+            type: string
+        validity_days:
+          type: integer
+          default: 365
+        is_ca:
+          type: boolean
+          default: false
+
+    GeneralSettings:
+      type: object
+      properties:
+        instance_name:
+          type: string
+        timezone:
+          type: string
+        date_format:
+          type: string
+        default_validity_days:
+          type: integer
+        auto_renewal_enabled:
+          type: boolean
+        auto_renewal_days:
+          type: integer
+
+    EmailSettings:
+      type: object
+      properties:
+        smtp_host:
+          type: string
+        smtp_port:
+          type: integer
+        smtp_user:
+          type: string
+        smtp_password:
+          type: string
+          format: password
+        smtp_tls:
+          type: boolean
+        from_address:
+          type: string
+          format: email
+
+    ACMEAccount:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ACMEOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+        identifiers:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [pending, ready, processing, valid, invalid]
+        created_at:
+          type: string
+          format: date-time
+
+    SCEPConfig:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        ca_id:
+          type: integer
+        challenge_password:
+          type: string
+        allowed_algorithms:
+          type: array
+          items:
+            type: string
+
+    CRL:
+      type: object
+      properties:
+        id:
+          type: integer
+        ca_id:
+          type: integer
+        ca_name:
+          type: string
+        issued_at:
+          type: string
+          format: date-time
+        next_update:
+          type: string
+          format: date-time
+        entries_count:
+          type: integer
+
+    TrustedCert:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        subject:
+          type: string
+        not_after:
+          type: string
+          format: date-time
+        added_at:
+          type: string
+          format: date-time
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: integer
+        user:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        details:
+          type: object
+
+    # Pro schemas
+    Group:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        members:
+          type: array
+          items:
+            type: integer
+        permissions:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+
+    GroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        is_system:
+          type: boolean
+
+    RoleRequest:
+      type: object
+      required: [name, permissions]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    SSOProvider:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [saml, oidc, ldap]
+        enabled:
+          type: boolean
+        config:
+          type: object
+
+    SSOProviderRequest:
+      type: object
+      required: [name, type, config]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [saml, oidc, ldap]
+        enabled:
+          type: boolean
+          default: false
+        config:
+          type: object
+          description: Provider-specific configuration
+
+    HSMProvider:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [pkcs11, aws_cloudhsm, azure_keyvault, google_kms]
+        status:
+          type: string
+          enum: [connected, disconnected, error]
+        config:
+          type: object
+
+    HSMProviderRequest:
+      type: object
+      required: [name, type, config]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [pkcs11, aws_cloudhsm, azure_keyvault, google_kms]
+        config:
+          type: object
+          description: Provider-specific configuration
+
+    License:
+      type: object
+      properties:
+        is_pro:
+          type: boolean
+        key:
+          type: string
+        type:
+          type: string
+          enum: [community, pro, enterprise]
+        features:
+          type: array
+          items:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        max_cas:
+          type: integer
+          nullable: true
+        max_certs:
+          type: integer
+          nullable: true
