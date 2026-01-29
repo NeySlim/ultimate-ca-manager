@@ -66,6 +66,12 @@
 - [ ] Role templates
 - [ ] Permission inheritance
 
+### Group Management
+- [ ] User groups (teams, departments)
+- [ ] Group-based permissions
+- [ ] CA/Certificate ownership by group
+- [ ] Group administrators
+
 ### High Availability
 - [ ] PostgreSQL support
 - [ ] Redis session store
