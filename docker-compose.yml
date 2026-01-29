@@ -70,12 +70,14 @@ services:
       - UCM_SMTP_TLS=${UCM_SMTP_TLS:-true}
       
       # ========================================
-      # CACHING
+      # CACHING & REDIS (OPTIONAL)
       # ========================================
       
       - UCM_CACHE_ENABLED=${UCM_CACHE_ENABLED:-true}
-      - UCM_CACHE_TYPE=${UCM_CACHE_TYPE:-simple}
       - UCM_CACHE_DEFAULT_TIMEOUT=${UCM_CACHE_DEFAULT_TIMEOUT:-300}
+      # Redis URL - enables distributed cache & rate limiting
+      # Uncomment and add redis service below for multi-instance deployments
+      # - UCM_REDIS_URL=${UCM_REDIS_URL:-redis://redis:6379/0}
       
       # ========================================
       # mTLS AUTHENTICATION (OPTIONAL)
@@ -144,6 +146,29 @@ services:
       - "com.ultimate-ca-manager.description=Certificate Authority Management"
       - "traefik.enable=false"  # Disable if using Traefik
 
+  # ========================================
+  # REDIS (OPTIONAL - for distributed deployments)
+  # ========================================
+  # Uncomment to enable Redis for:
+  # - Distributed rate limiting (works across multiple UCM instances)
+  # - Shared cache (saves memory in multi-instance setups)
+  # - Persistent sessions across restarts
+  #
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: ucm-redis
+  #   restart: unless-stopped
+  #   command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+  #   volumes:
+  #     - redis-data:/data
+  #   networks:
+  #     - ucm-network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+
 networks:
   ucm-network:
     driver: bridge
@@ -154,3 +179,6 @@ networks:
 volumes:
   ucm-data:
     driver: local
+  # Uncomment if using Redis
+  # redis-data:
+  #   driver: local

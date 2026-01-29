@@ -27,11 +27,31 @@ from middleware.auth_middleware import init_auth_middleware
 # Initialize cache globally
 cache = Cache()
 
+# Redis detection for distributed caching/rate limiting
+def get_redis_url():
+    """Get Redis URL from environment, return None if not configured or unavailable"""
+    redis_url = os.environ.get('UCM_REDIS_URL', os.environ.get('REDIS_URL', ''))
+    if not redis_url:
+        return None
+    
+    # Test Redis connection
+    try:
+        import redis
+        r = redis.from_url(redis_url, socket_connect_timeout=2)
+        r.ping()
+        return redis_url
+    except Exception:
+        return None
+
+# Determine storage backend
+_redis_url = get_redis_url()
+_storage_uri = _redis_url if _redis_url else "memory://"
+
 # Initialize rate limiter globally
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per minute", "2000 per hour"],
-    storage_uri="memory://"
+    storage_uri=_storage_uri
 )
 
 
@@ -90,16 +110,28 @@ def create_app(config_name=None):
     if session_dir:
         session_dir.mkdir(parents=True, exist_ok=True)
     
-    # Initialize cache
-    cache.init_app(app, config={
-        'CACHE_TYPE': 'SimpleCache',  # In-memory cache
-        'CACHE_DEFAULT_TIMEOUT': 300   # 5 minutes default
-    })
+    # Initialize cache (use Redis if available)
+    if _redis_url:
+        cache.init_app(app, config={
+            'CACHE_TYPE': 'RedisCache',
+            'CACHE_REDIS_URL': _redis_url,
+            'CACHE_DEFAULT_TIMEOUT': 300
+        })
+        app.logger.info("✓ Cache enabled (Redis)")
+    else:
+        cache.init_app(app, config={
+            'CACHE_TYPE': 'SimpleCache',
+            'CACHE_DEFAULT_TIMEOUT': 300
+        })
+        app.logger.info("✓ Cache enabled (Memory)")
     
     # Initialize rate limiter
     if config.RATE_LIMIT_ENABLED:
         limiter.init_app(app)
-        app.logger.info("✓ Rate limiting enabled")
+        if _redis_url:
+            app.logger.info("✓ Rate limiting enabled (Redis - distributed)")
+        else:
+            app.logger.info("✓ Rate limiting enabled (Memory - per-worker)")
     
     # CORS - only HTTPS origins
     CORS(app, resources={
