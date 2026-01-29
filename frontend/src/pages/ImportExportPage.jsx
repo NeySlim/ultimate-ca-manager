@@ -3,9 +3,9 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UploadSimple, Certificate, ShieldCheck, Flask, FloppyDisk, FileArrowUp } from '@phosphor-icons/react'
+import { UploadSimple, Certificate, ShieldCheck, Flask, FloppyDisk, FileArrowUp, DownloadSimple, ArrowsLeftRight, CheckCircle, Database, CloudArrowUp } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, ExportDropdown, Input, LoadingSpinner, Select
+  ExplorerPanel, DetailsPanel, Button, ExportDropdown, Input, LoadingSpinner, Select, Card, Badge
 } from '../components'
 import { opnsenseService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
@@ -315,37 +315,94 @@ export default function ImportExportPage() {
   }
 
   const actions = [
-    { id: 'import-cert', title: 'Import Certificate', icon: <FileArrowUp size={20} />, category: 'import' },
-    { id: 'import-ca', title: 'Import CA', icon: <FileArrowUp size={20} />, category: 'import' },
-    { id: 'import-opnsense', title: 'Import from OpnSense', icon: <UploadSimple size={20} />, category: 'import' },
-    { id: 'export-certs', title: 'Export All Certificates', icon: <Certificate size={20} />, category: 'export' },
-    { id: 'export-cas', title: 'Export All CAs', icon: <ShieldCheck size={20} />, category: 'export' },
+    { id: 'import-cert', title: 'Import Certificate', icon: <Certificate size={18} weight="duotone" />, category: 'import' },
+    { id: 'import-ca', title: 'Import CA', icon: <ShieldCheck size={18} weight="duotone" />, category: 'import' },
+    { id: 'import-opnsense', title: 'Import from OpnSense', icon: <CloudArrowUp size={18} weight="duotone" />, category: 'import' },
+    { id: 'export-certs', title: 'Export Certificates', icon: <DownloadSimple size={18} weight="duotone" />, category: 'export' },
+    { id: 'export-cas', title: 'Export CAs', icon: <DownloadSimple size={18} weight="duotone" />, category: 'export' },
   ]
 
   return (
     <>
       <ExplorerPanel title="Import/Export">
-        <div className="px-2 py-1.5 space-y-1">
-          <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2">Import</p>
-          {actions.filter(a => a.category === 'import').map(action => (
-            <button key={action.id} onClick={() => { setSelectedAction(action.id); setSelectedFile(null); setImportName(''); setImportPassword('') }}
-              className={`w-full flex items-start gap-3 px-2 py-1.5 rounded-sm transition-colors ${
-                selectedAction === action.id ? 'bg-bg-tertiary text-accent' : 'hover:bg-bg-tertiary/50 text-text-primary'
-              }`}>
-              {action.icon}
-              <span className="text-sm font-medium">{action.title}</span>
-            </button>
-          ))}
-          <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2 mt-3">Export</p>
-          {actions.filter(a => a.category === 'export').map(action => (
-            <button key={action.id} onClick={() => setSelectedAction(action.id)}
-              className={`w-full flex items-start gap-3 px-2 py-1.5 rounded-sm transition-colors ${
-                selectedAction === action.id ? 'bg-bg-tertiary text-accent' : 'hover:bg-bg-tertiary/50 text-text-primary'
-              }`}>
-              {action.icon}
-              <span className="text-sm font-medium">{action.title}</span>
-            </button>
-          ))}
+        <div className="space-y-4">
+          {/* Stats Cards */}
+          <div className="px-2 space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-1">
+              Quick Stats
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <Card className="p-2 text-center">
+                <div className="text-lg font-bold text-accent">{cas.length}</div>
+                <div className="text-xs text-text-secondary">CAs</div>
+              </Card>
+              <Card className="p-2 text-center">
+                <div className="text-lg font-bold text-emerald-500">
+                  <Database size={18} className="inline" />
+                </div>
+                <div className="text-xs text-text-secondary">Ready</div>
+              </Card>
+            </div>
+          </div>
+
+          {/* Import Section */}
+          <div className="space-y-1">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-3">
+              Import
+            </h3>
+            {actions.filter(a => a.category === 'import').map(action => (
+              <button 
+                key={action.id} 
+                onClick={() => { setSelectedAction(action.id); setSelectedFile(null); setImportName(''); setImportPassword(''); setPemContent('') }}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                  selectedAction === action.id 
+                    ? 'bg-accent/10 text-accent border-l-2 border-accent' 
+                    : 'hover:bg-bg-tertiary/50 text-text-primary'
+                }`}
+              >
+                <span className={`p-1.5 rounded ${selectedAction === action.id ? 'bg-accent/20' : 'bg-bg-tertiary'}`}>
+                  {action.icon}
+                </span>
+                <span className="text-sm font-medium">{action.title}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Export Section */}
+          <div className="space-y-1">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-3">
+              Export
+            </h3>
+            {actions.filter(a => a.category === 'export').map(action => (
+              <button 
+                key={action.id} 
+                onClick={() => setSelectedAction(action.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                  selectedAction === action.id 
+                    ? 'bg-accent/10 text-accent border-l-2 border-accent' 
+                    : 'hover:bg-bg-tertiary/50 text-text-primary'
+                }`}
+              >
+                <span className={`p-1.5 rounded ${selectedAction === action.id ? 'bg-accent/20' : 'bg-bg-tertiary'}`}>
+                  {action.icon}
+                </span>
+                <span className="text-sm font-medium">{action.title}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Supported Formats */}
+          <div className="px-3 pt-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary mb-2">
+              Supported Formats
+            </h3>
+            <div className="flex flex-wrap gap-1">
+              <Badge variant="blue" size="sm">PEM</Badge>
+              <Badge variant="purple" size="sm">DER</Badge>
+              <Badge variant="emerald" size="sm">PKCS#12</Badge>
+              <Badge variant="orange" size="sm">CRT</Badge>
+            </div>
+          </div>
         </div>
       </ExplorerPanel>
 
