@@ -93,6 +93,69 @@ class APIClient {
   patch(endpoint, body, options = {}) {
     return this.request(endpoint, { ...options, method: 'PATCH', body })
   }
+
+  /**
+   * Upload FormData (multipart/form-data)
+   * @param {string} endpoint - API endpoint
+   * @param {FormData} formData - Form data to upload
+   * @param {object} options - Additional options
+   */
+  async upload(endpoint, formData, options = {}) {
+    const url = `${this.baseURL}${endpoint}`
+    
+    const config = {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+      // Don't set Content-Type - browser will set it with boundary for FormData
+      ...options,
+    }
+
+    console.log(`📡 API UPLOAD ${url}`)
+
+    try {
+      const response = await fetch(url, config)
+      const data = await response.json()
+
+      if (!response.ok) {
+        const error = new Error(data.message || data.error || 'Upload failed')
+        error.status = response.status
+        error.data = data
+        throw error
+      }
+
+      return data
+    } catch (error) {
+      if (!error.status) {
+        error.message = 'Network error. Please check your connection.'
+        error.status = 0
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Download file as blob
+   * @param {string} endpoint - API endpoint
+   * @param {object} options - Additional options
+   */
+  async download(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint}`
+    
+    const config = {
+      method: 'GET',
+      credentials: 'include',
+      ...options,
+    }
+
+    const response = await fetch(url, config)
+    
+    if (!response.ok) {
+      throw new Error('Download failed')
+    }
+    
+    return response.blob()
+  }
 }
 
 export const apiClient = new APIClient()

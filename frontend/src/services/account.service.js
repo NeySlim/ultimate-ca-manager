@@ -54,40 +54,40 @@ export const accountService = {
 
   // WebAuthn / FIDO2
   async getWebAuthnCredentials() {
-    return apiClient.get('/account/webauthn/credentials')
+    return apiClient.get('/webauthn/credentials')
   },
 
   async startWebAuthnRegistration() {
-    return apiClient.post('/account/webauthn/register/options')
+    return apiClient.post('/webauthn/register/options')
   },
 
   async completeWebAuthnRegistration(credential, name) {
-    return apiClient.post('/account/webauthn/register/verify', { credential, name })
+    return apiClient.post('/webauthn/credentials', { credential, name })
   },
 
   async deleteWebAuthnCredential(credentialId) {
-    return apiClient.delete(`/account/webauthn/credentials/${credentialId}`)
+    return apiClient.delete(`/webauthn/credentials/${credentialId}`)
   },
 
   // mTLS Certificates
   async getMTLSCertificates() {
-    return apiClient.get('/account/mtls/certificates')
+    return apiClient.get('/mtls/certificates')
   },
 
   async createMTLSCertificate(data) {
-    return apiClient.post('/account/mtls/certificates/create', data)
+    return apiClient.post('/mtls/certificates', data)
   },
 
   async enrollMTLSCertificate(certificate, name) {
-    return apiClient.post('/account/mtls/certificates/enroll', { certificate, name })
+    return apiClient.post('/mtls/certificates', { certificate, name })
   },
 
   async deleteMTLSCertificate(certId) {
-    return apiClient.delete(`/account/mtls/certificates/${certId}`)
+    return apiClient.delete(`/mtls/certificates/${certId}`)
   },
 
   async downloadMTLSCertificate(certId) {
-    return apiClient.get(`/account/mtls/certificates/${certId}/download`, {
+    return apiClient.get(`/mtls/certificates/${certId}/download`, {
       responseType: 'blob'
     })
   }
