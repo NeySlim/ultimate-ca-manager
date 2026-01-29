@@ -78,7 +78,7 @@ export function Table({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-hidden rounded-lg border border-border bg-bg-tertiary/20">
+      <div className="flex-1 overflow-hidden rounded-lg border border-border bg-bg-tertiary/20 min-h-0">
         <div className="h-full overflow-auto">
           <table className="w-full">
             <thead className="sticky top-0 bg-bg-secondary border-b border-border z-10">
@@ -162,7 +162,7 @@ export function Table({
       </div>
 
       {pagination && (
-        <div className="border-t border-border mt-auto">
+        <div className="border-t border-border mt-auto flex-shrink-0">
           <Pagination {...pagination} />
         </div>
       )}

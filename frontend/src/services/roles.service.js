@@ -6,11 +6,17 @@ import { apiClient } from './apiClient'
 export const rolesService = {
   /**
    * Get all roles and their permissions
-   * @returns {Promise<Object>} Roles data
+   * @returns {Promise<Object>} Roles data keyed by role id
    */
   async getAll() {
     const response = await apiClient.get('/roles')
-    return response.data
+    // Transform array to object keyed by role id
+    const roles = response.data || []
+    const rolesMap = {}
+    for (const role of roles) {
+      rolesMap[role.id] = role
+    }
+    return rolesMap
   },
 
   /**
