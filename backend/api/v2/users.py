@@ -315,6 +315,15 @@ def reset_user_password(user_id):
     
     try:
         db.session.commit()
+        
+        # Send password changed notification
+        try:
+            from services.notification_service import NotificationService
+            admin_username = g.current_user.username if hasattr(g, 'current_user') else 'admin'
+            NotificationService.on_password_changed(user, admin_username)
+        except Exception:
+            pass  # Non-blocking
+        
         return success_response(
             message=f'Password reset successfully for user {user.username}'
         )

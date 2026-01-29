@@ -284,9 +284,21 @@ def create_app(config_name=None):
             description="Auto-regenerate expiring CRLs"
         )
         
+        # Register notification check task (runs every 6 hours)
+        from services.notification_service import NotificationService
+        scheduler.register_task(
+            name="notification_check",
+            func=NotificationService.run_scheduled_checks,
+            interval=21600,  # Every 6 hours
+            description="Check for expiring certificates and CRLs"
+        )
+        
+        # Create default notification configs if they don't exist
+        NotificationService.create_default_configs()
+        
         # Start scheduler now that tasks are registered
         scheduler.start(app=app)
-        app.logger.info("Scheduler service started with CRL auto-regeneration task")
+        app.logger.info("Scheduler service started with CRL and notification tasks")
         
         # Register scheduler in app context for graceful shutdown
         app.scheduler = scheduler

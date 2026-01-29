@@ -56,6 +56,18 @@ def _record_failed_attempt(username):
         from datetime import timedelta
         _failed_attempts[username]['locked_until'] = datetime.utcnow() + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
         current_app.logger.warning(f"Account locked for {username} after {MAX_FAILED_ATTEMPTS} failed attempts")
+        
+        # Send security alert notification
+        try:
+            from services.notification_service import NotificationService
+            ip_address = request.remote_addr or 'unknown'
+            NotificationService.on_security_alert(
+                event_type='account_locked',
+                username=username,
+                ip_address=ip_address
+            )
+        except Exception:
+            pass  # Non-blocking
 
 
 def _clear_failed_attempts(username):

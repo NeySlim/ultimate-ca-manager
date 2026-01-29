@@ -338,6 +338,14 @@ def create_certificate():
         except Exception:
             pass
         
+        # Send notification
+        try:
+            from services.notification_service import NotificationService
+            username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+            NotificationService.on_certificate_issued(db_cert, username)
+        except Exception:
+            pass  # Non-blocking
+        
         return created_response(
             data=db_cert.to_dict(),
             message='Certificate created successfully'
@@ -527,13 +535,45 @@ def export_certificate(cert_id):
 @require_auth(['write:certificates'])
 def revoke_certificate(cert_id):
     """Revoke certificate"""
+    from models import Certificate, db
+    from services.cert_service import CertificateService
+    from services.audit_service import AuditService
+    
     data = request.json
     reason = data.get('reason', 'unspecified') if data else 'unspecified'
     
-    return success_response(
-        data={'id': cert_id, 'status': 'revoked', 'reason': reason},
-        message='Certificate revoked'
-    )
+    cert = Certificate.query.get(cert_id)
+    if not cert:
+        return error_response('Certificate not found', 404)
+    
+    if cert.revoked:
+        return error_response('Certificate already revoked', 400)
+    
+    try:
+        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+        
+        # Revoke using service
+        cert = CertificateService.revoke_certificate(
+            cert_id=cert_id,
+            reason=reason,
+            username=username
+        )
+        
+        # Send notification
+        try:
+            from services.notification_service import NotificationService
+            NotificationService.on_certificate_revoked(cert, reason, username)
+        except Exception:
+            pass  # Non-blocking
+        
+        return success_response(
+            data=cert.to_dict(),
+            message='Certificate revoked successfully'
+        )
+    except ValueError as e:
+        return error_response(str(e), 400)
+    except Exception as e:
+        return error_response(f'Failed to revoke certificate: {str(e)}', 500)
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>/renew', methods=['POST'])

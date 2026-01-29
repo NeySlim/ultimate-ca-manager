@@ -259,14 +259,23 @@ def create_ca():
             key_type = str(data.get('keySize', 2048))
         elif data.get('keyAlgo') == 'ECDSA':
             key_type = data.get('keySize', 'P-256') # Using keySize field for curve in frontend
+        
+        username = g.user.username if hasattr(g, 'user') else (g.current_user.username if hasattr(g, 'current_user') else 'system')
             
         ca = CAService.create_internal_ca(
             descr=data.get('commonName'), # Use CN as description
             dn=dn,
             key_type=key_type,
             validity_days=int(data.get('validityYears', 10)) * 365,
-            username=g.user.username if hasattr(g, 'user') else 'system'
+            username=username
         )
+        
+        # Send notification for CA creation
+        try:
+            from services.notification_service import NotificationService
+            NotificationService.on_ca_created(ca, username)
+        except Exception:
+            pass  # Non-blocking
         
         return created_response(
             data=ca.to_dict(),
@@ -394,6 +403,14 @@ def import_ca():
             details=f'Imported CA: {ca.descr}',
             success=True
         )
+        
+        # Send notification for CA creation
+        try:
+            from services.notification_service import NotificationService
+            username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+            NotificationService.on_ca_created(ca, username)
+        except Exception:
+            pass  # Non-blocking
         
         return created_response(
             data=ca.to_dict(),

@@ -363,37 +363,72 @@ def delete_backup(filename):
 @bp.route('/api/v2/settings/email', methods=['GET'])
 @require_auth(['read:settings'])
 def get_email_settings():
-    """Get email settings"""
+    """Get email/SMTP settings"""
+    from models.email_notification import SMTPConfig
+    
+    smtp = SMTPConfig.query.first()
+    if not smtp:
+        return success_response(data={
+            'enabled': False,
+            'smtp_host': '',
+            'smtp_port': 587,
+            'smtp_username': '',
+            'smtp_password': '',  # Never return actual password
+            'smtp_tls': True,
+            'from_name': 'UCM Certificate Manager',
+            'from_email': ''
+        })
+    
     return success_response(data={
-        'smtp_host': None,
-        'smtp_port': 587
+        'id': smtp.id,
+        'enabled': smtp.enabled,
+        'smtp_host': smtp.smtp_host or '',
+        'smtp_port': smtp.smtp_port or 587,
+        'smtp_username': smtp.smtp_user or '',  # Model uses smtp_user
+        'smtp_password': '********' if smtp._smtp_password else '',  # Masked
+        'smtp_tls': smtp.smtp_use_tls,  # Model uses smtp_use_tls
+        'from_name': smtp.smtp_from_name or 'UCM Certificate Manager',
+        'from_email': smtp.smtp_from or ''
     })
 
 
 @bp.route('/api/v2/settings/email', methods=['PATCH'])
 @require_auth(['write:settings'])
 def update_email_settings():
-    """Update email settings"""
-    from models import SystemConfig, db
+    """Update email/SMTP settings"""
+    from models.email_notification import SMTPConfig
     
     data = request.json
-    
     if not data:
         return error_response('No data provided', 400)
     
-    # Save each setting to SystemConfig
-    for key, value in data.items():
-        config = SystemConfig.query.filter_by(key=f'email_{key}').first()
-        if config:
-            config.value = str(value) if value is not None else ''
-        else:
-            config = SystemConfig(key=f'email_{key}', value=str(value) if value is not None else '')
-            db.session.add(config)
+    smtp = SMTPConfig.query.first()
+    if not smtp:
+        smtp = SMTPConfig()
+        db.session.add(smtp)
+    
+    # Update fields (map frontend names to model column names)
+    if 'enabled' in data:
+        smtp.enabled = bool(data['enabled'])
+    if 'smtp_host' in data:
+        smtp.smtp_host = data['smtp_host']
+    if 'smtp_port' in data:
+        smtp.smtp_port = int(data['smtp_port'])
+    if 'smtp_username' in data:
+        smtp.smtp_user = data['smtp_username']  # Model uses smtp_user
+    if 'smtp_password' in data and data['smtp_password'] and data['smtp_password'] != '********':
+        smtp.smtp_password = data['smtp_password']  # Uses encrypted setter
+    if 'smtp_tls' in data:
+        smtp.smtp_use_tls = bool(data['smtp_tls'])  # Model uses smtp_use_tls
+    if 'from_name' in data:
+        smtp.smtp_from_name = data['from_name']  # Model uses smtp_from_name
+    if 'from_email' in data:
+        smtp.smtp_from = data['from_email']  # Model uses smtp_from
     
     db.session.commit()
     
     return success_response(
-        data=data,
+        data={'id': smtp.id},
         message='Email settings updated successfully'
     )
 
@@ -402,13 +437,131 @@ def update_email_settings():
 @require_auth(['write:settings'])
 def test_email():
     """Send test email"""
+    from services.notification_service import NotificationService
+    
     data = request.json
     email = data.get('email') if data else None
     
+    if not email:
+        return error_response('Email address required', 400)
+    
+    # Try to send test email
+    success = NotificationService.send_test_email(email)
+    
+    if success:
+        return success_response(
+            data={'sent': True, 'to': email},
+            message='Test email sent successfully'
+        )
+    else:
+        return error_response('Failed to send test email. Check SMTP settings.', 500)
+
+
+# ============================================================================
+# Notification Settings
+# ============================================================================
+
+@bp.route('/api/v2/settings/notifications', methods=['GET'])
+@require_auth(['read:settings'])
+def get_notification_settings():
+    """Get notification configurations"""
+    from models.email_notification import NotificationConfig
+    import json
+    
+    configs = NotificationConfig.query.all()
+    return success_response(data={
+        'configs': [{
+            'id': c.id,
+            'notification_type': c.type,  # Model uses 'type'
+            'enabled': c.enabled,
+            'recipients': json.loads(c.recipients) if c.recipients else [],
+            'threshold_days': c.days_before,  # Model uses 'days_before'
+            'cooldown_hours': c.cooldown_hours,
+            'description': c.description
+        } for c in configs]
+    })
+
+
+@bp.route('/api/v2/settings/notifications', methods=['PATCH'])
+@require_auth(['write:settings'])
+def update_notification_settings():
+    """Update notification configuration"""
+    from models.email_notification import NotificationConfig
+    import json
+    
+    data = request.json
+    if not data:
+        return error_response('No data provided', 400)
+    
+    config_id = data.get('id')
+    if config_id:
+        config = NotificationConfig.query.get(config_id)
+        if not config:
+            return error_response('Configuration not found', 404)
+    else:
+        notification_type = data.get('notification_type')
+        if not notification_type:
+            return error_response('notification_type required', 400)
+        config = NotificationConfig.query.filter_by(type=notification_type).first()  # Model uses 'type'
+        if not config:
+            config = NotificationConfig(type=notification_type)
+            db.session.add(config)
+    
+    # Update fields
+    if 'enabled' in data:
+        config.enabled = bool(data['enabled'])
+    if 'recipients' in data:
+        # Store as JSON string
+        recipients = data['recipients']
+        config.recipients = json.dumps(recipients) if isinstance(recipients, list) else recipients
+    if 'threshold_days' in data:
+        config.days_before = int(data['threshold_days'])  # Model uses 'days_before'
+    if 'cooldown_hours' in data:
+        config.cooldown_hours = int(data['cooldown_hours'])
+    
+    db.session.commit()
+    
     return success_response(
-        data={'sent': True, 'to': email},
-        message='Test email sent'
+        data={'id': config.id},
+        message='Notification settings updated'
     )
+
+
+@bp.route('/api/v2/settings/notifications/logs', methods=['GET'])
+@require_auth(['read:settings'])
+def get_notification_logs():
+    """Get notification logs"""
+    from models.email_notification import NotificationLog
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 50, type=int), 100)
+    notification_type = request.args.get('type')
+    
+    query = NotificationLog.query.order_by(NotificationLog.sent_at.desc())
+    
+    if notification_type:
+        query = query.filter_by(type=notification_type)  # Model uses 'type'
+    
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    return success_response(data={
+        'logs': [{
+            'id': log.id,
+            'notification_type': log.type,  # Model uses 'type'
+            'recipient': log.recipient,
+            'subject': log.subject,
+            'sent_at': log.sent_at.isoformat() if log.sent_at else None,
+            'status': log.status,  # Model uses 'status' not 'success'
+            'error_message': log.error_message,
+            'retry_count': log.retry_count
+        } for log in pagination.items],
+        'pagination': {
+            'page': page,
+            'per_page': per_page,
+            'total': pagination.total,
+            'pages': pagination.pages
+        }
+    })
 
 
 # ============================================================================
