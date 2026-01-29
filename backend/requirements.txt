@@ -1,5 +1,5 @@
 # Ultimate CA Manager - Backend Dependencies
-# Updated: 2026-01-29 - Compatible with Python 3.13
+# Updated: 2026-01-08 - Compatible with Python 3.13
 
 # Flask Core
 Flask==3.1.2
@@ -53,7 +53,3 @@ flake8==7.3.0
 email-validator==2.3.0
 Flask-Session==0.8.0
 flasgger>=0.9.7
-pydantic>=2.6.0
-
-# Redis (optional - for distributed caching/rate limiting)
-redis>=5.0.0

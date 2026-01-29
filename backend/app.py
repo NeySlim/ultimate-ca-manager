@@ -27,31 +27,11 @@ from middleware.auth_middleware import init_auth_middleware
 # Initialize cache globally
 cache = Cache()
 
-# Redis detection for distributed caching/rate limiting
-def get_redis_url():
-    """Get Redis URL from environment, return None if not configured or unavailable"""
-    redis_url = os.environ.get('UCM_REDIS_URL', os.environ.get('REDIS_URL', ''))
-    if not redis_url:
-        return None
-    
-    # Test Redis connection
-    try:
-        import redis
-        r = redis.from_url(redis_url, socket_connect_timeout=2)
-        r.ping()
-        return redis_url
-    except Exception:
-        return None
-
-# Determine storage backend
-_redis_url = get_redis_url()
-_storage_uri = _redis_url if _redis_url else "memory://"
-
 # Initialize rate limiter globally
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per minute", "2000 per hour"],
-    storage_uri=_storage_uri
+    storage_uri="memory://"
 )
 
 
@@ -110,28 +90,16 @@ def create_app(config_name=None):
     if session_dir:
         session_dir.mkdir(parents=True, exist_ok=True)
     
-    # Initialize cache (use Redis if available)
-    if _redis_url:
-        cache.init_app(app, config={
-            'CACHE_TYPE': 'RedisCache',
-            'CACHE_REDIS_URL': _redis_url,
-            'CACHE_DEFAULT_TIMEOUT': 300
-        })
-        app.logger.info("✓ Cache enabled (Redis)")
-    else:
-        cache.init_app(app, config={
-            'CACHE_TYPE': 'SimpleCache',
-            'CACHE_DEFAULT_TIMEOUT': 300
-        })
-        app.logger.info("✓ Cache enabled (Memory)")
+    # Initialize cache
+    cache.init_app(app, config={
+        'CACHE_TYPE': 'SimpleCache',  # In-memory cache
+        'CACHE_DEFAULT_TIMEOUT': 300   # 5 minutes default
+    })
     
     # Initialize rate limiter
     if config.RATE_LIMIT_ENABLED:
         limiter.init_app(app)
-        if _redis_url:
-            app.logger.info("✓ Rate limiting enabled (Redis - distributed)")
-        else:
-            app.logger.info("✓ Rate limiting enabled (Memory - per-worker)")
+        app.logger.info("✓ Rate limiting enabled")
     
     # CORS - only HTTPS origins
     CORS(app, resources={
@@ -201,11 +169,6 @@ def create_app(config_name=None):
     
     Swagger(app, config=swagger_config, template=swagger_template)
     
-    # Initialize structured logging
-    from utils.logging import setup_structured_logging
-    structured_logger = setup_structured_logging(app, json_output=not app.debug)
-    app.structured_logger = structured_logger
-    
     # Initialize auth middleware
     init_auth_middleware(jwt)
     
@@ -245,6 +208,30 @@ def create_app(config_name=None):
                     app.logger.info("Creating database tables...")
                     db.create_all()
                     app.logger.info("✓ Database tables created/verified")
+                
+                # ===== PRO TABLES =====
+                # Import Pro models to register them with SQLAlchemy (if Pro is available)
+                try:
+                    from models.pro.group import Group, GroupMember
+                    from models.pro.rbac import CustomRole, RolePermission
+                    from models.pro.sso import SSOProvider, SSOSession
+                    
+                    # Check if Pro tables exist, create if missing
+                    inspector = inspect(db.engine)
+                    tables = inspector.get_table_names()
+                    pro_tables = ['pro_groups', 'pro_group_members', 'pro_custom_roles', 
+                                  'pro_role_permissions', 'pro_sso_providers', 'pro_sso_sessions']
+                    missing_pro = [t for t in pro_tables if t not in tables]
+                    
+                    if missing_pro:
+                        app.logger.info(f"Creating Pro tables: {', '.join(missing_pro)}")
+                        db.create_all()
+                        app.logger.info("✓ Pro database tables created")
+                    else:
+                        app.logger.info("✓ Pro database tables already exist")
+                except ImportError:
+                    pass  # Pro not available, skip
+                # =======================
                 
                 # Always verify critical tables exist (whether just created or pre-existing)
                 inspector = inspect(db.engine)
@@ -791,6 +778,97 @@ def init_database(app):
             app.logger.info("✓ HTTPS certificate already exists")
     except Exception as e:
         app.logger.error(f"Failed to generate HTTPS certificate: {e}")
+    
+    # ===== INITIALIZE PRO DEFAULT DATA =====
+    try:
+        from models.pro.group import Group
+        from models.pro.rbac import CustomRole, RolePermission
+        
+        # Create default groups if none exist
+        if Group.query.count() == 0:
+            app.logger.info("Creating default Pro groups...")
+            
+            default_groups = [
+                Group(
+                    name="Administrators",
+                    description="Full system administrators with all permissions",
+                    permissions='["*"]'
+                ),
+                Group(
+                    name="Certificate Operators",
+                    description="Can manage certificates and CSRs",
+                    permissions='["read:certificates", "write:certificates", "read:csrs", "write:csrs", "read:cas"]'
+                ),
+                Group(
+                    name="Auditors",
+                    description="Read-only access to audit logs and system status",
+                    permissions='["read:audit", "read:dashboard", "read:certificates", "read:cas"]'
+                )
+            ]
+            
+            for group in default_groups:
+                db.session.add(group)
+            
+            db.session.commit()
+            app.logger.info(f"✓ Created {len(default_groups)} default Pro groups")
+        
+        # Create default custom roles if none exist
+        if CustomRole.query.count() == 0:
+            app.logger.info("Creating default Pro roles...")
+            
+            default_roles = [
+                {
+                    "name": "Certificate Manager",
+                    "description": "Full certificate lifecycle management",
+                    "base_role": "operator",
+                    "permissions": [
+                        "read:certificates", "write:certificates", "delete:certificates",
+                        "read:csrs", "write:csrs", "delete:csrs",
+                        "read:templates", "read:cas"
+                    ]
+                },
+                {
+                    "name": "CA Administrator",
+                    "description": "Certificate Authority management",
+                    "base_role": "operator",
+                    "permissions": [
+                        "read:cas", "write:cas", "delete:cas",
+                        "read:certificates", "write:certificates",
+                        "read:crl", "write:crl"
+                    ]
+                },
+                {
+                    "name": "Security Auditor",
+                    "description": "Read-only audit and compliance access",
+                    "base_role": "viewer",
+                    "permissions": [
+                        "read:audit", "read:dashboard", "read:certificates",
+                        "read:cas", "read:users", "read:settings"
+                    ]
+                }
+            ]
+            
+            for role_data in default_roles:
+                role = CustomRole(
+                    name=role_data["name"],
+                    description=role_data["description"],
+                    base_role=role_data.get("base_role")
+                )
+                db.session.add(role)
+                db.session.flush()  # Get the ID
+                
+                # Add permissions
+                for perm in role_data["permissions"]:
+                    db.session.add(RolePermission(role_id=role.id, permission=perm))
+            
+            db.session.commit()
+            app.logger.info(f"✓ Created {len(default_roles)} default Pro roles")
+    
+    except ImportError:
+        pass  # Pro not available
+    except Exception as e:
+        db.session.rollback()
+        app.logger.warning(f"⚠️ Failed to initialize Pro default data: {e}")
 
 
 def register_blueprints(app):
@@ -812,9 +890,12 @@ def register_blueprints(app):
         from pro import register_pro_blueprints
         register_pro_blueprints(app)
         app.logger.info("✨ UCM Pro modules loaded successfully")
-    except ImportError:
+    except ImportError as e:
         app.config['PRO_ENABLED'] = False
-        app.logger.info("📦 Running UCM Community Edition")
+        app.logger.info(f"📦 Running UCM Community Edition")
+    except Exception as e:
+        app.config['PRO_ENABLED'] = False
+        app.logger.warning(f"⚠️ Pro modules failed to load: {e}")
     # ========================
     
     # Public endpoints (no auth, no /api prefix - standard paths)

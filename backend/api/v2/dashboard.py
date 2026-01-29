@@ -10,33 +10,8 @@ from utils.response import success_response
 
 bp = Blueprint('dashboard_v2', __name__)
 
-# Import cache for caching stats
-try:
-    from app import cache
-    HAS_CACHE = True
-except ImportError:
-    HAS_CACHE = False
-
-
-def cached(timeout=300, key_prefix=''):
-    """Decorator for caching endpoint responses"""
-    def decorator(f):
-        if not HAS_CACHE:
-            return f
-        def wrapped(*args, **kwargs):
-            cache_key = f"{key_prefix}:{f.__name__}"
-            result = cache.get(cache_key)
-            if result is None:
-                result = f(*args, **kwargs)
-                cache.set(cache_key, result, timeout=timeout)
-            return result
-        wrapped.__name__ = f.__name__
-        return wrapped
-    return decorator
-
 
 @bp.route('/api/v2/stats/overview', methods=['GET'])
-@cached(timeout=60, key_prefix='public_stats')
 def get_public_stats():
     """Get public overview statistics (no auth required - for login page)"""
     try:
@@ -77,9 +52,8 @@ def get_public_stats():
 
 @bp.route('/api/v2/dashboard/stats', methods=['GET'])
 @require_auth()
-@cached(timeout=120, key_prefix='dashboard_stats')
 def get_dashboard_stats():
-    """Get dashboard statistics - cached 2 minutes"""
+    """Get dashboard statistics"""
     from models import CA, Certificate
     from datetime import datetime, timedelta
     from models import db
