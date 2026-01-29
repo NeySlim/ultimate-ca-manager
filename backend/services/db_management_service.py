@@ -81,17 +81,32 @@ class DatabaseManagementService:
             cursor.execute("PRAGMA cache_size")
             stats['cache_size'] = cursor.fetchone()[0]
             
-            # Table stats
+            # Table stats - SECURITY: Use whitelist to prevent SQL injection
+            ALLOWED_TABLES = {
+                'users', 'certificate_authorities', 'certificates', 'certificate_signing_requests',
+                'certificate_templates', 'crl_metadata', 'ocsp_responses', 'truststore_entries',
+                'audit_logs', 'settings', 'api_keys', 'webauthn_credentials', 'webauthn_challenges',
+                'acme_accounts', 'acme_orders', 'acme_authorizations', 'acme_challenges',
+                'acme_certificates', 'acme_providers', 'scep_requests', 'email_notifications',
+                'pro_sso_providers', 'pro_sso_sessions', 'pro_groups', 'pro_group_members',
+                'pro_rbac_roles', 'pro_rbac_permissions', 'pro_hsm_providers', 'pro_hsm_keys'
+            }
+            
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [row[0] for row in cursor.fetchall()]
             
             for table in tables:
-                try:
-                    cursor.execute(f"SELECT COUNT(*) FROM {table}")
-                    count = cursor.fetchone()[0]
-                    stats['tables'][table] = count
-                except Exception as e:
-                    logger.warning(f"Could not count table {table}: {e}")
+                if table in ALLOWED_TABLES:
+                    try:
+                        cursor.execute("SELECT COUNT(*) FROM " + table)
+                        count = cursor.fetchone()[0]
+                        stats['tables'][table] = count
+                    except Exception as e:
+                        logger.warning(f"Could not count table {table}: {e}")
+                        stats['tables'][table] = 0
+                else:
+                    # Skip unknown tables but log them
+                    logger.debug(f"Skipping unknown table: {table}")
                     stats['tables'][table] = 0
             
             conn.close()
