@@ -12,10 +12,12 @@ export default {
         'bg-tertiary': 'var(--bg-tertiary)',
         'text-primary': 'var(--text-primary)',
         'text-secondary': 'var(--text-secondary)',
+        'text-tertiary': 'var(--text-tertiary)',
         'accent-primary': 'var(--accent-primary)',
         'accent-success': 'var(--accent-success)',
         'accent-warning': 'var(--accent-warning)',
         'accent-danger': 'var(--accent-danger)',
+        'accent-pro': 'var(--accent-pro)',
         'border': 'var(--border)',
       },
       fontFamily: {
