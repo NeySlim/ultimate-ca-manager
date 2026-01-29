@@ -12,7 +12,7 @@ import { acmeService, casService } from '../services'
 import { useNotification } from '../contexts'
 
 export default function ACMEPage() {
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm, showWarning } = useNotification()
   
   const [accounts, setAccounts] = useState([])
   const [selectedAccount, setSelectedAccount] = useState(null)
@@ -123,7 +123,12 @@ export default function ACMEPage() {
   }
 
   const handleDeactivate = async (id) => {
-    if (!confirm('Are you sure you want to deactivate this ACME account?')) return
+    const confirmed = await showConfirm('Are you sure you want to deactivate this ACME account?', {
+      title: 'Deactivate Account',
+      confirmText: 'Deactivate',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     
     try {
       await acmeService.deactivateAccount(id)
@@ -135,7 +140,12 @@ export default function ACMEPage() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this ACME account?')) return
+    const confirmed = await showConfirm('Are you sure you want to delete this ACME account?', {
+      title: 'Delete Account',
+      confirmText: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     
     try {
       await acmeService.deleteAccount(id)
@@ -487,6 +497,7 @@ export default function ACMEPage() {
 }
 
 function CreateACMEAccountForm({ onSubmit, onCancel }) {
+  const { showWarning } = useNotification()
   const [formData, setFormData] = useState({
     email: '',
     key_type: 'RSA-2048',
@@ -496,7 +507,7 @@ function CreateACMEAccountForm({ onSubmit, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!formData.agree_tos) {
-      alert('You must agree to the Terms of Service')
+      showWarning('You must agree to the Terms of Service')
       return
     }
     onSubmit(formData)

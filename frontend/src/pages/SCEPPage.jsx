@@ -3,10 +3,13 @@
  * Simple Certificate Enrollment Protocol configuration and request management
  */
 import { useState, useEffect } from 'react'
-import { Robot, Gear, CheckCircle, XCircle, Clock, Copy, ArrowsClockwise, Eye } from '@phosphor-icons/react'
+import { 
+  Robot, Gear, CheckCircle, XCircle, Clock, Copy, ArrowsClockwise, 
+  Eye, ShieldCheck, Plugs, Key, Warning, Info, FileText, Globe
+} from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, Input, Select,
-  Table, Badge, LoadingSpinner, Modal, Textarea
+  ExplorerPanel, DetailsPanel, Button, Input, Select, Card,
+  Table, Badge, LoadingSpinner, Modal, Textarea, EmptyState, StatusIndicator
 } from '../components'
 import { scepService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -14,13 +17,14 @@ import { usePermission } from '../hooks/usePermission'
 import { formatDate } from '../lib/utils'
 
 export default function SCEPPage() {
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showInfo } = useNotification()
   const { hasPermission } = usePermission()
   
   const [loading, setLoading] = useState(true)
   const [config, setConfig] = useState({})
   const [requests, setRequests] = useState([])
   const [cas, setCas] = useState([])
+  const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 })
   const [selectedRequest, setSelectedRequest] = useState(null)
   const [activeTab, setActiveTab] = useState('requests')
   const [saving, setSaving] = useState(false)
@@ -37,14 +41,16 @@ export default function SCEPPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [configRes, requestsRes, casRes] = await Promise.all([
+      const [configRes, requestsRes, casRes, statsRes] = await Promise.all([
         scepService.getConfig(),
         scepService.getRequests(),
-        casService.getAll()
+        casService.getAll(),
+        scepService.getStats()
       ])
       setConfig(configRes.data || {})
       setRequests(requestsRes.data || [])
       setCas(casRes.data || [])
+      setStats(statsRes.data || { pending: 0, approved: 0, rejected: 0, total: 0 })
     } catch (error) {
       showError('Failed to load SCEP data')
     } finally {
@@ -67,7 +73,7 @@ export default function SCEPPage() {
   const handleApprove = async (req) => {
     try {
       await scepService.approveRequest(req.id)
-      showSuccess('Request approved')
+      showSuccess('Request approved - Certificate issued')
       loadData()
     } catch (error) {
       showError(error.message || 'Failed to approve request')
@@ -90,7 +96,7 @@ export default function SCEPPage() {
 
   const handleRegenerateChallenge = async (caId) => {
     try {
-      await scepService.regenerateChallenge(caId)
+      const res = await scepService.regenerateChallenge(caId)
       showSuccess('Challenge password regenerated')
       loadData()
     } catch (error) {
@@ -100,24 +106,29 @@ export default function SCEPPage() {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
-    showSuccess('Copied to clipboard')
+    showInfo('Copied to clipboard')
   }
 
   const getStatusBadge = (status) => {
     const variants = {
-      pending: { variant: 'warning', icon: <Clock size={12} /> },
-      approved: { variant: 'success', icon: <CheckCircle size={12} /> },
-      rejected: { variant: 'danger', icon: <XCircle size={12} /> },
-      issued: { variant: 'info', icon: <CheckCircle size={12} /> }
+      pending: 'warning',
+      approved: 'success',
+      rejected: 'danger',
+      issued: 'info'
     }
-    const { variant, icon } = variants[status] || variants.pending
-    return <Badge variant={variant}>{icon} {status}</Badge>
+    return <Badge variant={variants[status] || 'default'}>{status}</Badge>
   }
 
   const requestColumns = [
     { key: 'id', label: 'ID', width: '60px' },
-    { key: 'transaction_id', label: 'Transaction ID', render: (v) => <code className="text-xs">{v?.slice(0, 16)}...</code> },
-    { key: 'subject', label: 'Subject', render: (v) => v || '-' },
+    { 
+      key: 'transaction_id', 
+      label: 'Transaction ID', 
+      render: (v) => (
+        <code className="text-xs bg-bg-tertiary px-1.5 py-0.5 rounded">{v?.slice(0, 16)}...</code>
+      )
+    },
+    { key: 'subject', label: 'Subject', render: (v) => v || <span className="text-text-tertiary">-</span> },
     { key: 'status', label: 'Status', render: (v) => getStatusBadge(v) },
     { key: 'created_at', label: 'Requested', render: (v) => formatDate(v) },
     {
@@ -131,10 +142,10 @@ export default function SCEPPage() {
           </Button>
           {row.status === 'pending' && hasPermission('write:scep') && (
             <>
-              <Button size="sm" variant="success" onClick={() => handleApprove(row)}>
+              <Button size="sm" variant="success" onClick={() => handleApprove(row)} title="Approve">
                 <CheckCircle size={14} />
               </Button>
-              <Button size="sm" variant="danger" onClick={() => { setSelectedRequest(row); setShowRejectModal(true) }}>
+              <Button size="sm" variant="danger" onClick={() => { setSelectedRequest(row); setShowRejectModal(true) }} title="Reject">
                 <XCircle size={14} />
               </Button>
             </>
@@ -144,9 +155,33 @@ export default function SCEPPage() {
     }
   ]
 
+  const menuItems = [
+    { 
+      id: 'requests', 
+      icon: <Clock size={16} weight="duotone" />, 
+      label: 'Enrollment Requests',
+      badge: stats.pending > 0 ? stats.pending : null
+    },
+    { 
+      id: 'config', 
+      icon: <Gear size={16} weight="duotone" />, 
+      label: 'Configuration' 
+    },
+    { 
+      id: 'challenge', 
+      icon: <Key size={16} weight="duotone" />, 
+      label: 'Challenge Passwords' 
+    },
+    { 
+      id: 'info', 
+      icon: <Info size={16} weight="duotone" />, 
+      label: 'SCEP Information' 
+    }
+  ]
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-full w-full">
         <LoadingSpinner size="lg" />
       </div>
     )
@@ -156,103 +191,151 @@ export default function SCEPPage() {
     <>
       <ExplorerPanel
         title="SCEP"
-        icon={<Robot size={20} />}
-        subtitle="Simple Certificate Enrollment Protocol"
+        footer={
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-text-secondary">
+              {config.enabled ? (
+                <StatusIndicator status="online" label="Enabled" />
+              ) : (
+                <StatusIndicator status="offline" label="Disabled" />
+              )}
+            </span>
+            <span className="text-text-tertiary">{stats.total} total requests</span>
+          </div>
+        }
       >
-        <div className="p-4 space-y-2">
-          <button
-            onClick={() => setActiveTab('requests')}
-            className={`w-full text-left px-3 py-2 rounded-sm text-sm transition-colors ${
-              activeTab === 'requests' 
-                ? 'bg-accent-primary/20 text-accent-primary' 
-                : 'text-text-secondary hover:bg-bg-tertiary'
-            }`}
-          >
-            <Clock size={16} className="inline mr-2" />
-            Pending Requests ({requests.filter(r => r.status === 'pending').length})
-          </button>
-          <button
-            onClick={() => setActiveTab('config')}
-            className={`w-full text-left px-3 py-2 rounded-sm text-sm transition-colors ${
-              activeTab === 'config' 
-                ? 'bg-accent-primary/20 text-accent-primary' 
-                : 'text-text-secondary hover:bg-bg-tertiary'
-            }`}
-          >
-            <Gear size={16} className="inline mr-2" />
-            Configuration
-          </button>
-          <button
-            onClick={() => setActiveTab('challenge')}
-            className={`w-full text-left px-3 py-2 rounded-sm text-sm transition-colors ${
-              activeTab === 'challenge' 
-                ? 'bg-accent-primary/20 text-accent-primary' 
-                : 'text-text-secondary hover:bg-bg-tertiary'
-            }`}
-          >
-            <Robot size={16} className="inline mr-2" />
-            Challenge Passwords
-          </button>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="p-3 bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border border-yellow-500/20 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Clock size={16} className="text-yellow-500" weight="duotone" />
+              <span className="text-xs text-text-secondary">Pending</span>
+            </div>
+            <p className="text-lg font-bold text-yellow-500 mt-1">{stats.pending}</p>
+          </div>
+          <div className="p-3 bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20 rounded-lg">
+            <div className="flex items-center gap-2">
+              <CheckCircle size={16} className="text-green-500" weight="duotone" />
+              <span className="text-xs text-text-secondary">Approved</span>
+            </div>
+            <p className="text-lg font-bold text-green-500 mt-1">{stats.approved}</p>
+          </div>
+        </div>
+
+        {/* Navigation Menu */}
+        <div className="space-y-1">
+          {menuItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all ${
+                activeTab === item.id 
+                  ? 'bg-accent-primary/15 text-accent-primary border border-accent-primary/30' 
+                  : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                {item.icon}
+                <span>{item.label}</span>
+              </div>
+              {item.badge && (
+                <Badge variant="warning" size="sm">{item.badge}</Badge>
+              )}
+            </button>
+          ))}
         </div>
       </ExplorerPanel>
 
       <DetailsPanel>
+        {/* Requests Tab */}
         {activeTab === 'requests' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-text-primary">SCEP Requests</h2>
-              <Button variant="secondary" onClick={loadData}>
-                <ArrowsClockwise size={16} />
+              <div>
+                <h2 className="text-lg font-semibold text-text-primary">SCEP Enrollment Requests</h2>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  Review and approve certificate enrollment requests from devices
+                </p>
+              </div>
+              <Button variant="secondary" onClick={loadData} size="sm">
+                <ArrowsClockwise size={14} />
                 Refresh
               </Button>
             </div>
 
             {requests.length === 0 ? (
-              <div className="p-12 text-center bg-bg-secondary border border-border rounded-lg">
-                <Robot size={48} className="mx-auto mb-4 text-text-tertiary" />
-                <p className="text-text-secondary">No SCEP requests</p>
-                <p className="text-xs text-text-tertiary mt-1">
-                  Requests will appear here when devices enroll via SCEP
-                </p>
-              </div>
+              <Card className="p-8">
+                <EmptyState 
+                  icon={Robot}
+                  title="No SCEP requests"
+                  description="Enrollment requests will appear here when devices request certificates via SCEP protocol"
+                />
+              </Card>
             ) : (
-              <Table
-                columns={requestColumns}
-                data={requests}
-                onRowClick={(row) => { setSelectedRequest(row); setShowDetailsModal(true) }}
-              />
+              <Card className="p-0 overflow-hidden">
+                <Table
+                  columns={requestColumns}
+                  data={requests}
+                  onRowClick={(row) => { setSelectedRequest(row); setShowDetailsModal(true) }}
+                />
+              </Card>
             )}
           </div>
         )}
 
+        {/* Configuration Tab */}
         {activeTab === 'config' && (
           <div className="space-y-6 max-w-2xl">
-            <h2 className="text-lg font-semibold text-text-primary">SCEP Configuration</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary">SCEP Configuration</h2>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Configure the Simple Certificate Enrollment Protocol server
+              </p>
+            </div>
             
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.enabled || false}
-                  onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
-                  className="rounded border-border bg-bg-tertiary"
-                />
-                <div>
-                  <p className="text-sm text-text-primary font-medium">Enable SCEP</p>
-                  <p className="text-xs text-text-secondary">Allow devices to enroll certificates via SCEP protocol</p>
+            {/* Enable Toggle Card */}
+            <Card className="p-4">
+              <div className="flex items-start gap-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                  config.enabled ? 'bg-green-500/15' : 'bg-bg-tertiary'
+                }`}>
+                  <Plugs size={24} className={config.enabled ? 'text-green-500' : 'text-text-tertiary'} weight="duotone" />
                 </div>
-              </label>
+                <div className="flex-1">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={config.enabled || false}
+                      onChange={(e) => setConfig({ ...config, enabled: e.target.checked })}
+                      className="w-5 h-5 rounded border-border bg-bg-tertiary accent-accent-primary"
+                    />
+                    <div>
+                      <p className="text-sm text-text-primary font-semibold">Enable SCEP Server</p>
+                      <p className="text-xs text-text-secondary">Allow devices to enroll certificates via SCEP protocol (RFC 8894)</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </Card>
+
+            {/* Server Settings */}
+            <Card className="p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <Globe size={16} className="text-accent-primary" />
+                Server Settings
+              </h3>
 
               <Input
-                label="SCEP URL"
+                label="SCEP Endpoint URL"
                 value={config.url || '/scep/pkiclient.exe'}
                 onChange={(e) => setConfig({ ...config, url: e.target.value })}
-                helperText="The URL path for SCEP enrollment"
+                helperText="The URL path for SCEP enrollment (clients will use this)"
                 disabled={!config.enabled}
               />
 
               <Select
                 label="Issuing CA"
+                placeholder="Select a CA..."
                 options={cas.map(ca => ({ value: ca.id.toString(), label: ca.name || ca.subject }))}
                 value={config.ca_id?.toString() || ''}
                 onChange={(val) => setConfig({ ...config, ca_id: parseInt(val) })}
@@ -263,74 +346,210 @@ export default function SCEPPage() {
                 label="CA Identifier"
                 value={config.ca_ident || 'ucm-ca'}
                 onChange={(e) => setConfig({ ...config, ca_ident: e.target.value })}
-                helperText="Identifier sent to clients during enrollment"
+                helperText="Identifier sent to clients during GetCACaps operation"
                 disabled={!config.enabled}
               />
+            </Card>
 
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.auto_approve || false}
-                  onChange={(e) => setConfig({ ...config, auto_approve: e.target.checked })}
-                  className="rounded border-border bg-bg-tertiary"
-                  disabled={!config.enabled}
-                />
-                <div>
-                  <p className="text-sm text-text-primary font-medium">Auto-approve requests</p>
-                  <p className="text-xs text-text-secondary">Automatically approve valid SCEP requests (not recommended)</p>
-                </div>
-              </label>
+            {/* Security Settings */}
+            <Card className="p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <ShieldCheck size={16} className="text-accent-primary" />
+                Security Settings
+              </h3>
+
+              <div className="p-3 bg-bg-tertiary rounded-lg">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.auto_approve || false}
+                    onChange={(e) => setConfig({ ...config, auto_approve: e.target.checked })}
+                    className="w-5 h-5 rounded border-border bg-bg-secondary accent-accent-primary"
+                    disabled={!config.enabled}
+                  />
+                  <div>
+                    <p className="text-sm text-text-primary font-medium">Auto-approve requests</p>
+                    <p className="text-xs text-text-secondary">Automatically approve valid SCEP requests with correct challenge password</p>
+                  </div>
+                </label>
+                {config.auto_approve && (
+                  <div className="mt-2 flex items-start gap-2 text-yellow-500 text-xs">
+                    <Warning size={14} className="flex-shrink-0 mt-0.5" />
+                    <span>Auto-approve is enabled. Ensure challenge passwords are securely distributed.</span>
+                  </div>
+                )}
+              </div>
 
               <Input
-                label="Challenge Password Validity (hours)"
+                label="Challenge Password Validity"
                 type="number"
                 value={config.challenge_validity || 24}
                 onChange={(e) => setConfig({ ...config, challenge_validity: parseInt(e.target.value) })}
                 min="1"
                 max="168"
                 disabled={!config.enabled}
+                helperText="Hours before challenge passwords expire (1-168)"
+                suffix="hours"
               />
-            </div>
+            </Card>
 
             {hasPermission('write:scep') && (
-              <Button onClick={handleSaveConfig} disabled={saving}>
-                {saving ? 'Saving...' : 'Save Configuration'}
-              </Button>
+              <div className="flex justify-end">
+                <Button onClick={handleSaveConfig} disabled={saving}>
+                  {saving ? <LoadingSpinner size="sm" /> : <Gear size={16} />}
+                  {saving ? 'Saving...' : 'Save Configuration'}
+                </Button>
+              </div>
             )}
           </div>
         )}
 
+        {/* Challenge Passwords Tab */}
         {activeTab === 'challenge' && (
           <div className="space-y-6 max-w-2xl">
-            <h2 className="text-lg font-semibold text-text-primary">Challenge Passwords</h2>
-            <p className="text-sm text-text-secondary">
-              Challenge passwords are used to authenticate SCEP enrollment requests.
-              Each CA has its own challenge password.
-            </p>
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary">Challenge Passwords</h2>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Pre-shared secrets used to authenticate SCEP enrollment requests. Each CA has its own challenge password.
+              </p>
+            </div>
 
-            <div className="space-y-4">
-              {cas.map(ca => (
-                <div key={ca.id} className="p-4 bg-bg-secondary border border-border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-text-primary">{ca.name || ca.subject}</h3>
-                    {hasPermission('write:scep') && (
-                      <Button size="sm" variant="secondary" onClick={() => handleRegenerateChallenge(ca.id)}>
-                        <ArrowsClockwise size={14} />
-                        Regenerate
-                      </Button>
-                    )}
+            {!config.enabled && (
+              <Card className="p-4 border-yellow-500/30 bg-yellow-500/5">
+                <div className="flex items-start gap-3">
+                  <Warning size={20} className="text-yellow-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-yellow-500">SCEP is disabled</p>
+                    <p className="text-xs text-text-secondary">Enable SCEP in the Configuration tab to use challenge passwords.</p>
                   </div>
+                </div>
+              </Card>
+            )}
+
+            <div className="space-y-3">
+              {cas.length === 0 ? (
+                <Card className="p-8">
+                  <EmptyState 
+                    icon={ShieldCheck}
+                    title="No CAs available"
+                    description="Create a Certificate Authority first to configure SCEP challenge passwords"
+                  />
+                </Card>
+              ) : (
+                cas.map(ca => (
+                  <Card key={ca.id} className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <ShieldCheck size={16} className="text-accent-primary" weight="duotone" />
+                          <h3 className="text-sm font-semibold text-text-primary truncate">{ca.name || ca.subject}</h3>
+                        </div>
+                        <p className="text-xs text-text-tertiary truncate">{ca.subject}</p>
+                      </div>
+                      {hasPermission('write:scep') && (
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          onClick={() => handleRegenerateChallenge(ca.id)}
+                          title="Generate new challenge password"
+                        >
+                          <ArrowsClockwise size={14} />
+                          Regenerate
+                        </Button>
+                      )}
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-bg-tertiary border border-border rounded-lg font-mono text-sm">
+                        <Key size={14} className="text-text-tertiary flex-shrink-0" />
+                        <code className="flex-1 truncate text-text-primary">
+                          {ca.scep_challenge || 'No challenge password set'}
+                        </code>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => copyToClipboard(ca.scep_challenge || '')}
+                        disabled={!ca.scep_challenge}
+                        title="Copy to clipboard"
+                      >
+                        <Copy size={14} />
+                      </Button>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Information Tab */}
+        {activeTab === 'info' && (
+          <div className="space-y-6 max-w-2xl">
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary">SCEP Protocol Information</h2>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Reference information for configuring SCEP clients
+              </p>
+            </div>
+
+            <Card className="p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <Globe size={16} className="text-accent-primary" />
+                Connection Details
+              </h3>
+              <div className="grid gap-3">
+                <div className="p-3 bg-bg-tertiary rounded-lg">
+                  <p className="text-xs text-text-secondary mb-1">SCEP URL</p>
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 px-3 py-2 bg-bg-tertiary rounded text-sm font-mono">
-                      {ca.scep_challenge || 'Not configured'}
+                    <code className="flex-1 text-sm text-accent-primary">
+                      https://your-server:8443{config.url || '/scep/pkiclient.exe'}
                     </code>
-                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(ca.scep_challenge || '')}>
+                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`https://your-server:8443${config.url || '/scep/pkiclient.exe'}`)}>
                       <Copy size={14} />
                     </Button>
                   </div>
                 </div>
-              ))}
-            </div>
+                <div className="p-3 bg-bg-tertiary rounded-lg">
+                  <p className="text-xs text-text-secondary mb-1">CA Identifier</p>
+                  <code className="text-sm text-text-primary">{config.ca_ident || 'ucm-ca'}</code>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <FileText size={16} className="text-accent-primary" />
+                Supported Operations
+              </h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                {['GetCACaps', 'GetCACert', 'GetCACertChain', 'PKIOperation'].map(op => (
+                  <div key={op} className="flex items-center gap-2 p-2 bg-bg-tertiary rounded">
+                    <CheckCircle size={14} className="text-green-500" />
+                    <span className="text-text-primary">{op}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="p-4 space-y-4">
+              <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <Info size={16} className="text-accent-primary" />
+                Client Configuration Example
+              </h3>
+              <div className="p-3 bg-bg-tertiary rounded-lg">
+                <p className="text-xs text-text-secondary mb-2">Cisco IOS Example:</p>
+                <pre className="text-xs text-text-primary font-mono overflow-x-auto">
+{`crypto ca trustpoint UCM-CA
+ enrollment url https://your-server:8443${config.url || '/scep/pkiclient.exe'}
+ subject-name CN=device.example.com
+ revocation-check none
+ auto-enroll 70
+!
+crypto ca authenticate UCM-CA
+crypto ca enroll UCM-CA`}
+                </pre>
+              </div>
+            </Card>
           </div>
         )}
       </DetailsPanel>
@@ -340,21 +559,30 @@ export default function SCEPPage() {
         open={showRejectModal}
         onClose={() => { setShowRejectModal(false); setRejectReason('') }}
         title="Reject SCEP Request"
+        size="md"
       >
         <div className="space-y-4">
-          <p className="text-sm text-text-secondary">
-            Reject request from: <strong>{selectedRequest?.subject || selectedRequest?.transaction_id}</strong>
-          </p>
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+            <p className="text-sm text-text-primary">
+              Reject enrollment request from:
+            </p>
+            <p className="text-sm font-mono text-red-400 mt-1">
+              {selectedRequest?.subject || selectedRequest?.transaction_id}
+            </p>
+          </div>
           <Textarea
-            label="Rejection Reason"
+            label="Rejection Reason (optional)"
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="Optional reason for rejection"
+            placeholder="Enter a reason for rejection..."
             rows={3}
           />
-          <div className="flex gap-3 justify-end">
+          <div className="flex gap-3 justify-end pt-2">
             <Button variant="secondary" onClick={() => setShowRejectModal(false)}>Cancel</Button>
-            <Button variant="danger" onClick={handleReject}>Reject Request</Button>
+            <Button variant="danger" onClick={handleReject}>
+              <XCircle size={16} />
+              Reject Request
+            </Button>
           </div>
         </div>
       </Modal>
@@ -364,41 +592,61 @@ export default function SCEPPage() {
         open={showDetailsModal}
         onClose={() => setShowDetailsModal(false)}
         title="SCEP Request Details"
+        size="lg"
       >
         {selectedRequest && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-text-tertiary">Transaction ID</p>
-                <p className="text-text-primary font-mono">{selectedRequest.transaction_id}</p>
-              </div>
-              <div>
-                <p className="text-text-tertiary">Status</p>
-                <p>{getStatusBadge(selectedRequest.status)}</p>
-              </div>
-              <div>
-                <p className="text-text-tertiary">Subject</p>
-                <p className="text-text-primary">{selectedRequest.subject || '-'}</p>
-              </div>
-              <div>
-                <p className="text-text-tertiary">Requested</p>
-                <p className="text-text-primary">{formatDate(selectedRequest.created_at)}</p>
-              </div>
-              <div>
-                <p className="text-text-tertiary">IP Address</p>
-                <p className="text-text-primary">{selectedRequest.ip_address || '-'}</p>
-              </div>
-              <div>
-                <p className="text-text-tertiary">Message Type</p>
-                <p className="text-text-primary">{selectedRequest.message_type || '-'}</p>
-              </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="p-3">
+                <p className="text-xs text-text-tertiary mb-1">Transaction ID</p>
+                <p className="text-sm text-text-primary font-mono break-all">{selectedRequest.transaction_id}</p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-xs text-text-tertiary mb-1">Status</p>
+                <div className="mt-1">{getStatusBadge(selectedRequest.status)}</div>
+              </Card>
+              <Card className="p-3">
+                <p className="text-xs text-text-tertiary mb-1">Subject</p>
+                <p className="text-sm text-text-primary">{selectedRequest.subject || '-'}</p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-xs text-text-tertiary mb-1">Requested</p>
+                <p className="text-sm text-text-primary">{formatDate(selectedRequest.created_at)}</p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-xs text-text-tertiary mb-1">IP Address</p>
+                <p className="text-sm text-text-primary">{selectedRequest.ip_address || '-'}</p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-xs text-text-tertiary mb-1">Message Type</p>
+                <p className="text-sm text-text-primary">{selectedRequest.message_type || '-'}</p>
+              </Card>
             </div>
             {selectedRequest.csr && (
-              <div>
-                <p className="text-text-tertiary text-sm mb-1">CSR</p>
-                <pre className="p-3 bg-bg-tertiary rounded text-xs overflow-auto max-h-40">
+              <Card className="p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-text-tertiary">Certificate Signing Request</p>
+                  <Button size="sm" variant="ghost" onClick={() => copyToClipboard(selectedRequest.csr)}>
+                    <Copy size={14} />
+                    Copy
+                  </Button>
+                </div>
+                <pre className="p-3 bg-bg-tertiary rounded text-xs overflow-auto max-h-40 font-mono">
                   {selectedRequest.csr}
                 </pre>
+              </Card>
+            )}
+            
+            {selectedRequest.status === 'pending' && hasPermission('write:scep') && (
+              <div className="flex gap-3 justify-end pt-2 border-t border-border">
+                <Button variant="danger" onClick={() => { setShowDetailsModal(false); setShowRejectModal(true) }}>
+                  <XCircle size={16} />
+                  Reject
+                </Button>
+                <Button variant="success" onClick={() => { handleApprove(selectedRequest); setShowDetailsModal(false) }}>
+                  <CheckCircle size={16} />
+                  Approve & Issue Certificate
+                </Button>
               </div>
             )}
           </div>

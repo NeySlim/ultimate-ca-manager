@@ -6,14 +6,14 @@ import { Button } from './Button'
 import { cn } from '../lib/utils'
 
 export function Pagination({ 
-  total, 
-  page, 
+  total = 0, 
+  page = 1, 
   perPage = 20, 
   onChange,
   showInfo = true 
 }) {
-  const totalPages = Math.ceil(total / perPage)
-  const start = (page - 1) * perPage + 1
+  const totalPages = Math.max(1, Math.ceil(total / perPage) || 1)
+  const start = total > 0 ? (page - 1) * perPage + 1 : 0
   const end = Math.min(page * perPage, total)
 
   return (

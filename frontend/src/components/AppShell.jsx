@@ -11,9 +11,9 @@ export function AppShell() {
   const activePage = location.pathname.split('/')[1] || ''
 
   return (
-    <div className="flex h-screen bg-bg-primary overflow-hidden">
+    <div className="flex h-full w-full bg-bg-primary overflow-hidden">
       <Sidebar activePage={activePage} />
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
         <Outlet />
       </div>
     </div>

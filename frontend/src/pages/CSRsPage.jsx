@@ -15,7 +15,7 @@ import { usePermission } from '../hooks/usePermission'
 import { extractData } from '../lib/utils'
 
 export default function CSRsPage() {
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
   const fileRef = useRef(null)
@@ -113,7 +113,12 @@ export default function CSRsPage() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this CSR?')) return
+    const confirmed = await showConfirm('Are you sure you want to delete this CSR?', {
+      title: 'Delete CSR',
+      confirmText: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     
     try {
       await csrsService.delete(id)

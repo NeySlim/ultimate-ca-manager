@@ -47,7 +47,7 @@ export function SelectComponent({
             sideOffset={4}
           >
             <Select.Viewport className="p-1">
-              {options.map(option => (
+              {options.filter(opt => opt.value !== '').map(option => (
                 <Select.Item
                   key={option.value}
                   value={option.value}

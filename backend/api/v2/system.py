@@ -7,6 +7,7 @@ from flask import Blueprint, request, current_app, jsonify, send_from_directory
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, Certificate, CA, CRL, OCSPResponse
+from pathlib import Path
 import os
 import subprocess
 import shutil
@@ -75,15 +76,65 @@ def check_integrity():
 @require_auth(['read:settings'])
 def get_https_cert_info():
     """Get information about the current HTTPS certificate"""
-    # This logic assumes we can read the cert file used by Gunicorn/Flask
-    # For now, we'll return mock data or read from a standard location
-    # Real implementation would read /etc/ucm/certs/server.crt
-    return success_response(data={
-        'type': 'Self-Signed', # Logic to detect type needed
-        'subject': 'CN=ucm.local',
-        'expires': '2027-01-01',
-        'source': 'auto' # or 'managed'
-    })
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+    import hashlib
+    
+    cert_path = Path('/opt/ucm/data/https_cert.pem')
+    
+    if not cert_path.exists():
+        return success_response(data={
+            'common_name': 'Not configured',
+            'issuer': '-',
+            'valid_from': None,
+            'valid_to': None,
+            'fingerprint': '-',
+            'type': 'none'
+        })
+    
+    try:
+        cert_pem = cert_path.read_bytes()
+        cert = x509.load_pem_x509_certificate(cert_pem)
+        
+        # Extract subject CN
+        cn = None
+        for attr in cert.subject:
+            if attr.oid == x509.oid.NameOID.COMMON_NAME:
+                cn = attr.value
+                break
+        
+        # Extract issuer CN
+        issuer_cn = None
+        for attr in cert.issuer:
+            if attr.oid == x509.oid.NameOID.COMMON_NAME:
+                issuer_cn = attr.value
+                break
+        
+        # Check if self-signed
+        is_self_signed = cert.subject == cert.issuer
+        
+        # Calculate fingerprint
+        fingerprint = cert.fingerprint(hashes.SHA256()).hex()
+        fingerprint_formatted = ':'.join(fingerprint[i:i+2].upper() for i in range(0, len(fingerprint), 2))
+        
+        return success_response(data={
+            'common_name': cn or 'Unknown',
+            'issuer': issuer_cn or 'Unknown',
+            'valid_from': cert.not_valid_before_utc.isoformat(),
+            'valid_to': cert.not_valid_after_utc.isoformat(),
+            'fingerprint': fingerprint_formatted[:47] + '...',  # Truncate for display
+            'type': 'Self-Signed' if is_self_signed else 'CA-Signed',
+            'serial': format(cert.serial_number, 'x').upper()
+        })
+    except Exception as e:
+        return success_response(data={
+            'common_name': 'Error reading certificate',
+            'issuer': str(e),
+            'valid_from': None,
+            'valid_to': None,
+            'fingerprint': '-',
+            'type': 'error'
+        })
 
 @bp.route('/api/v2/system/https/regenerate', methods=['POST'])
 @require_auth(['admin:system'])

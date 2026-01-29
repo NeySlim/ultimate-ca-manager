@@ -4,6 +4,7 @@
  */
 import { Export, Key, Link, Lock } from '@phosphor-icons/react'
 import { Dropdown } from './Dropdown'
+import { useNotification } from '../contexts/NotificationContext'
 
 export function ExportDropdown({ 
   onExport, 
@@ -11,6 +12,8 @@ export function ExportDropdown({
   formats = ['pem', 'pem-key', 'pem-chain', 'pem-full', 'der', 'pkcs12'],
   hasPrivateKey = true 
 }) {
+  const { showPrompt } = useNotification()
+  
   const formatConfig = {
     'pem': { 
       label: 'PEM (Certificate only)', 
@@ -66,10 +69,15 @@ export function ExportDropdown({
       return {
         label: config.label,
         icon: config.icon,
-        onClick: () => {
+        onClick: async () => {
           if (config.options.password) {
             // Prompt for PKCS12 password
-            const password = window.prompt('Enter password for PKCS#12 file:')
+            const password = await showPrompt('Enter password for PKCS#12 file:', {
+              title: 'Export PKCS#12',
+              type: 'password',
+              placeholder: 'Password',
+              confirmText: 'Export'
+            })
             if (password) {
               onExport(config.format, { ...config.options, password })
             }

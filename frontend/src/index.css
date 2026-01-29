@@ -20,6 +20,31 @@
   --logo-gradient-end: #7aa5d9;
 }
 
+/* Custom scrollbar styling - thin and subtle */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
 /* Logo chain gradient - uses CSS variables */
 .chain-link-gradient {
   border-style: solid;
@@ -44,6 +69,16 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
+  overflow: hidden;
+}
+
+html {
+  overflow: hidden;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
 }
 
 @layer base {

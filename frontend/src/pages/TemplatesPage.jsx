@@ -14,7 +14,7 @@ import { usePermission } from '../hooks/usePermission'
 import { extractData } from '../lib/utils'
 
 export default function TemplatesPage() {
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const fileRef = useRef(null)
   
@@ -115,7 +115,12 @@ export default function TemplatesPage() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this template?')) return
+    const confirmed = await showConfirm('Are you sure you want to delete this template?', {
+      title: 'Delete Template',
+      confirmText: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     
     try {
       await templatesService.delete(id)
