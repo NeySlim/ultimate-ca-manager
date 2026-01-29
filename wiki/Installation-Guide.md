@@ -327,7 +327,7 @@ cd ucm
 
 **Step 3: Run installer**
 ```bash
-sudo ./install.sh
+sudo ./scripts/install/install.sh
 ```
 
 The installer will:
@@ -467,7 +467,7 @@ sudo rpm -e ucm
 **Manual Installation:**
 ```bash
 cd /opt/ucm
-sudo ./uninstall.sh
+sudo ./scripts/install/uninstall.sh
 ```
 
 **To also remove data:**

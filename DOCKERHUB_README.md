@@ -56,7 +56,7 @@ docker-compose logs -f ucm
 ### Linux Installation (Auto-detect)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/mai./scripts/install/install.sh | sudo bash
 ```
 
 **Supports**: Debian, Ubuntu, RHEL, CentOS, Rocky, Alpine, Arch, openSUSE (10+ distributions)

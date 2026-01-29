@@ -74,7 +74,7 @@ sudo rpm -ivh ucm-1.6.0-1.noarch.rpm
 ```bash
 git clone -b v1.6.0 https://github.com/NeySlim/ultimate-ca-manager.git
 cd ultimate-ca-manager
-sudo ./install.sh
+sudo ./scripts/install/install.sh
 ```
 
 ---
