@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   ShieldCheck, Certificate, Warning, ClockCounterClockwise, 
-  Plus, FileArrowUp, Clock
+  Plus, FileArrowUp, Clock, User, CheckCircle, XCircle,
+  SignIn, SignOut, Trash, PencilSimple, Key, UploadSimple
 } from '@phosphor-icons/react'
 import { 
   ExplorerPanel, DetailsPanel, Card, Button, Table, 
@@ -13,6 +14,35 @@ import {
 } from '../components'
 import { dashboardService, systemService } from '../services'
 import { useNotification } from '../contexts'
+
+// Action icons mapping
+const actionIcons = {
+  login_success: SignIn,
+  login_failed: SignIn,
+  logout: SignOut,
+  create: Plus,
+  update: PencilSimple,
+  delete: Trash,
+  revoke: XCircle,
+  export: FileArrowUp,
+  import: UploadSimple,
+  sign: Key,
+  default: ClockCounterClockwise
+}
+
+// Format relative time
+const formatRelativeTime = (timestamp) => {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diff = (now - date) / 1000
+  
+  if (diff < 60) return 'Just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`
+  
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
 
 export default function DashboardPage() {
   const { showError } = useNotification()
@@ -98,12 +128,15 @@ export default function DashboardPage() {
       <ExplorerPanel
         title="Activity"
         footer={
-          <div className="text-xs text-text-secondary">
-            Last updated: {new Date().toLocaleTimeString()}
-          </div>
+          <button 
+            onClick={() => navigate('/settings')}
+            className="text-xs text-accent hover:underline"
+          >
+            View full audit log →
+          </button>
         }
       >
-        <div className="p-4 space-y-2">
+        <div className="space-y-1 px-2">
           {activityLog.length === 0 ? (
             <EmptyState 
               icon={ClockCounterClockwise}
@@ -111,22 +144,32 @@ export default function DashboardPage() {
               description="Recent activities will appear here"
             />
           ) : (
-            activityLog.map((activity, index) => (
-              <div 
-                key={index}
-                className="flex gap-3 p-3 bg-bg-tertiary rounded-lg hover:bg-bg-tertiary/80 transition-colors"
-              >
-                <div className="flex-shrink-0 mt-1">
-                  <ClockCounterClockwise size={16} className="text-accent-primary" />
+            activityLog.map((activity, index) => {
+              const Icon = actionIcons[activity.action] || actionIcons.default
+              const isError = activity.action === 'login_failed'
+              return (
+                <div 
+                  key={index}
+                  className="flex items-start gap-2 p-2 rounded-lg bg-bg-tertiary/50 hover:bg-bg-tertiary transition-colors"
+                >
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${
+                    isError ? 'bg-red-500/10 text-red-400' : 'bg-accent/10 text-accent'
+                  }`}>
+                    <Icon size={14} weight="bold" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-text-primary truncate">
+                      {activity.action?.replace(/_/g, ' ')}
+                    </p>
+                    <div className="flex items-center gap-1 text-[10px] text-text-tertiary">
+                      <span className="truncate">{activity.user}</span>
+                      <span>·</span>
+                      <span className="whitespace-nowrap">{formatRelativeTime(activity.timestamp)}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-text-primary truncate">{activity.message}</p>
-                  <p className="text-xs text-text-secondary mt-1">
-                    {new Date(activity.timestamp).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </ExplorerPanel>

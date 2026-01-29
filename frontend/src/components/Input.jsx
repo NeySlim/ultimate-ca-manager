@@ -30,13 +30,14 @@ export const Input = forwardRef(function Input({
         <input
           ref={ref}
           className={cn(
-            "w-full px-2 py-1 bg-bg-tertiary border rounded-sm text-sm text-text-primary placeholder-text-secondary",
-            "focus:outline-none focus:ring-1 focus:ring-accent-primary focus:border-transparent",
+            "w-full px-2.5 py-1.5 bg-bg-tertiary/80 border rounded-md text-sm text-text-primary placeholder-text-secondary/60",
+            "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 focus:bg-bg-tertiary",
             "disabled:opacity-50 disabled:cursor-not-allowed",
-            "transition-all",
-            error && "border-red-500 focus:ring-red-500",
-            !error && "border-border",
-            icon && "pl-7"
+            "transition-all duration-200",
+            "hover:border-border/80 hover:bg-bg-tertiary",
+            error && "border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50",
+            !error && "border-border/60",
+            icon && "pl-8"
           )}
           {...props}
         />
