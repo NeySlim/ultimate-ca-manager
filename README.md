@@ -3,7 +3,8 @@
 ![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)
-![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-success.svg)
+![Tests](https://img.shields.io/badge/tests-149%20passing-success.svg)
+![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen.svg)
 
 **Ultimate CA Manager (UCM)** is a comprehensive Certificate Authority management platform with full PKI protocol support (SCEP, OCSP, ACME, CRL/CDP), multi-factor authentication, and complete certificate lifecycle management.
 
@@ -26,7 +27,9 @@
 ### 🔒 Advanced Security
 - **mTLS Authentication** - Mutual TLS certificate-based authentication
 - **WebAuthn/FIDO2** - Hardware security key support (YubiKey, etc.)
-- **Multi-Factor Auth** - Multiple authentication methods
+- **2FA TOTP** - Google Authenticator compatible with QR setup
+- **Rate Limiting** - Brute-force protection (Redis-backed)
+- **Pydantic Validation** - Request schema validation
 - **JWT Sessions** - Secure token-based authentication
 - **HTTPS Only** - All traffic encrypted by default
 
@@ -47,7 +50,9 @@
 - **OPNsense Import** - Direct import from OPNsense firewalls
 - **Email Notifications** - Certificate expiration alerts
 - **Database Backup** - Manual backup creation via UI
-- **REST API** - Full API for automation
+- **Redis Support** - Optional distributed caching (multi-instance)
+- **Structured Logging** - JSON logs with request context
+- **REST API** - Full API for automation (155+ endpoints)
 - **Web Configuration** - All settings via web UI
 
 ---
@@ -107,11 +112,11 @@ docker run -d \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/app/backend/data \
-  ghcr.io/neyslim/ultimate-ca-manager:1.8.3
+  ghcr.io/neyslim/ultimate-ca-manager:2.0.0
 ```
 
 **Access:** https://localhost:8443  
-**Credentials:** admin / changeme123 ⚠️ **CHANGE IMMEDIATELY!**
+**Default credentials:** admin / Admin@123 ⚠️ **CHANGE IMMEDIATELY!**
 
 ### Docker Compose
 
@@ -119,7 +124,7 @@ docker run -d \
 version: '3.8'
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.3
+    image: ghcr.io/neyslim/ultimate-ca-manager:2.0.0
     container_name: ucm
     ports:
       - "8443:8443"
@@ -132,25 +137,34 @@ services:
     restart: unless-stopped
 ```
 
+### Docker Compose with Redis (Multi-instance)
+
+```bash
+# Use the Redis overlay for distributed caching/rate limiting
+docker compose -f docker-compose.yml -f docker-compose.redis.yml up -d
+```
+
+See [docs/REDIS.md](docs/REDIS.md) for details.
+
 ### Debian/Ubuntu Package
 
 ```bash
 # Download latest release
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.3/ucm_1.8.3_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0/ucm_2.0.0_all.deb
 
 # Install (nginx optional!)
-sudo dpkg -i ucm_1.8.3_all.deb
+sudo dpkg -i ucm_2.0.0_all.deb
 sudo systemctl enable --now ucm
 ```
 
 ### RHEL/Rocky/Alma Package
 
 ```bash
-# Download latest release (⚠️ UNTESTED)
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.3/ucm-1.8.3-1.el9.noarch.rpm
+# Download latest release
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0/ucm-2.0.0-1.el9.noarch.rpm
 
 # Install
-sudo dnf install ucm-1.8.3-1.el9.noarch.rpm
+sudo dnf install ucm-2.0.0-1.el9.noarch.rpm
 sudo systemctl enable --now ucm
 ```
 
@@ -255,6 +269,9 @@ UCM_MTLS_ENABLED=false          # Mutual TLS auth
 UCM_ACME_ENABLED=true           # ACME protocol
 UCM_CACHE_ENABLED=true          # Response caching
 
+# Redis (Optional - for multi-instance deployments)
+UCM_REDIS_URL=redis://localhost:6379/0
+
 # Email (Optional)
 UCM_SMTP_ENABLED=false
 UCM_SMTP_SERVER=smtp.gmail.com
@@ -290,7 +307,7 @@ Edit `/etc/ucm/config.json` or use the web interface at **Settings → System Co
 ### Docker
 
 ```bash
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.3
+docker pull ghcr.io/neyslim/ultimate-ca-manager:2.0.0
 docker stop ucm
 docker rm ucm
 # Recreate container with same volume
@@ -300,8 +317,8 @@ docker rm ucm
 
 ```bash
 # Download new package
-sudo dpkg -i ucm_1.8.3_all.deb  # Debian/Ubuntu
-sudo dnf upgrade ucm-1.8.3-1.el9.noarch.rpm  # RHEL/Rocky/Alma
+sudo dpkg -i ucm_2.0.0_all.deb  # Debian/Ubuntu
+sudo dnf upgrade ucm-2.0.0-1.el9.noarch.rpm  # RHEL/Rocky/Alma
 sudo systemctl restart ucm
 ```
 
