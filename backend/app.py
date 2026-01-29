@@ -169,6 +169,11 @@ def create_app(config_name=None):
     
     Swagger(app, config=swagger_config, template=swagger_template)
     
+    # Initialize structured logging
+    from utils.logging import setup_structured_logging
+    structured_logger = setup_structured_logging(app, json_output=not app.debug)
+    app.structured_logger = structured_logger
+    
     # Initialize auth middleware
     init_auth_middleware(jwt)
     
