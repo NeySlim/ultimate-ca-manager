@@ -5,7 +5,7 @@
 
 ---
 
-## ✅ v2.0.0 - React Frontend Rewrite (CURRENT)
+## ✅ v2.0.0 - Complete PKI Platform (CURRENT)
 
 ### Complete Frontend Rewrite ✅
 - ✅ **React 18 + Vite** - Modern SPA replacing HTMX/Alpine.js
@@ -33,12 +33,11 @@
 - ✅ **Export CSV** - Download for compliance
 - ✅ **Statistics** - Action counts and trends
 
-### Code Quality ✅ (2026-01-29)
+### Code Quality ✅
 - ✅ **Centralized Constants** - `constants/config.js` with VALIDITY, PAGINATION, TIME
 - ✅ **Shared Hooks** - `useModals`, `useDeleteHandler`, `usePagination`
 - ✅ **Styled Dialogs** - `showConfirm()`, `showPrompt()` replace native JS popups
 - ✅ **UI Consistency** - Standardized border-radius, padding, shadows
-- ✅ **HTTPS Cert Display** - Real certificate info with CA-Signed badge
 
 ### Testing ✅
 - ✅ **Vitest** - 39 frontend unit tests
@@ -46,44 +45,20 @@
 - ✅ **Playwright** - 14 E2E tests (auth, certificates, settings)
 
 ### Pages ✅
-- ✅ Dashboard - Stats, expiring certs, activity
-- ✅ CAs - TreeView hierarchy, create, import
-- ✅ Certificates - Table, issue, revoke, export
-- ✅ CSRs - Upload, sign, export
-- ✅ Templates - Create, edit, import/export
-- ✅ Users - CRUD, roles, 2FA management
-- ✅ ACME - Accounts, orders, challenges
-- ✅ SCEP - Configuration, requests, statistics
-- ✅ Settings - General, Email, Security, HTTPS, Backup
-- ✅ Account - Profile, security, API keys
-- ✅ Audit Logs - Full audit trail
+- ✅ Dashboard, CAs, Certificates, CSRs, Templates
+- ✅ Users, ACME, SCEP, Settings, Account, Audit Logs
 
----
-
-## 🔄 v2.1.0 - Quality & Polish (February 2026)
-
-### Testing
-- [x] E2E tests with Playwright (14 tests)
-- [x] Unit tests for React components (39 tests)
-- [x] API integration tests (51 tests)
+### Remaining for v2.0.0
 - [ ] Coverage reports (target: 80%)
-
-### Documentation
-- [x] API Reference (155 endpoints)
 - [ ] User guide (getting started)
 - [ ] Admin guide (configuration)
 - [ ] OpenAPI/Swagger spec
-- [ ] Video tutorials
-
-### Polish
 - [ ] Mobile responsive improvements
 - [ ] Keyboard shortcuts (Cmd+K, etc.)
-- [ ] Accessibility audit (WCAG 2.1)
-- [ ] Performance optimization (lazy loading)
 
 ---
 
-## 🚀 v2.2.0 - Enterprise Features (Q2 2026)
+## 🚀 v2.0.0 Pro - Enterprise Features
 
 ### RBAC Enhancement
 - [ ] Custom roles
@@ -111,7 +86,7 @@
 
 ---
 
-## 🌟 v3.0.0 - Advanced PKI (Q3-Q4 2026)
+## 🌟 v2.1.0 Pro - Advanced PKI
 
 ### HSM Integration
 - [ ] PKCS#11 support
