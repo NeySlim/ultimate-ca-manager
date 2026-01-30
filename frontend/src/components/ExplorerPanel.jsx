@@ -113,7 +113,7 @@ export function ExplorerPanel({
   // Desktop: fixed width sidebar
   return (
     <>
-      <div className={cn("w-72 border-r border-border bg-bg-secondary flex flex-col min-h-0", className)}>
+      <div className={cn("w-80 xl:w-96 2xl:w-[420px] min-[1800px]:w-[500px] border-r border-border bg-bg-secondary flex flex-col min-h-0", className)}>
         {/* Header */}
         <div className="px-4 py-3 border-b border-border flex-shrink-0">
           <div className="flex items-center justify-between">
