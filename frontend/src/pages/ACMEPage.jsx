@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, HourglassHigh, Globe, Lightning } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge, Card,
-  Input, Modal, Tabs, Select,
+  Input, Modal, Tabs, Select, HelpCard, HelpTooltip,
   LoadingSpinner, EmptyState, StatusIndicator
 } from '../components'
 import { acmeService, casService } from '../services'
@@ -341,6 +341,11 @@ export default function ACMEPage() {
       label: 'Server Configuration',
       content: (
         <div className="space-y-6 max-w-2xl p-4">
+          <HelpCard variant="info" title="About ACME Protocol">
+            ACME (Automatic Certificate Management Environment) enables automated certificate issuance. 
+            Compatible with certbot, acme.sh, and other ACME clients.
+          </HelpCard>
+
           <div>
             <h3 className="text-sm font-semibold text-text-primary mb-4">ACME Server Configuration</h3>
             <div className="space-y-4">
@@ -378,11 +383,12 @@ export default function ACMEPage() {
 
           <div className="border-t border-border pt-6">
             <h3 className="text-sm font-semibold text-text-primary mb-4">Let's Encrypt Proxy</h3>
-            <div className="space-y-4">
-              <p className="text-sm text-text-secondary">
-                Enable UCM as a Let's Encrypt proxy for external certificate issuance.
-              </p>
+            
+            <HelpCard variant="tip" title="What is LE Proxy?" className="mb-4" compact>
+              Proxy certificate requests to Let's Encrypt while maintaining local control and audit logging.
+            </HelpCard>
 
+            <div className="space-y-4">
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"

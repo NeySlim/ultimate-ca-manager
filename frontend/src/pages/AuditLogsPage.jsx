@@ -37,7 +37,7 @@ import {
   Pagination,
   ExplorerPanel, 
   DetailsPanel
-} from '../components';
+, HelpCard } from '../components';
 import { useNotification } from '../contexts';
 import auditService from '../services/audit.service';
 
@@ -461,6 +461,10 @@ export default function AuditLogsPage() {
           </Button>
         }
       >
+        <HelpCard variant="info" title="Audit Trail" className="mb-4" compact>
+          All user actions are logged for security and compliance. Logs can be exported for external analysis.
+        </HelpCard>
+
         {/* Filters Row */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="flex-1 min-w-[200px]">

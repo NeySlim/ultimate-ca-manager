@@ -1,20 +1,28 @@
 /**
  * Details Panel Component - Right panel with breadcrumb and content
+ * On mobile, content displays above the peek bar
  */
 import { CaretRight } from '@phosphor-icons/react'
+import { useMobile } from '../contexts'
 import { cn } from '../lib/utils'
 
 export function DetailsPanel({ 
-  pageTitle,  // Titre de page (pour pages sans ExplorerPanel)
+  pageTitle,
   breadcrumb = [], 
-  title,      // Titre dynamique de l'élément sélectionné
+  title,
   actions,
   children,
-  className 
+  className
 }) {
+  const { isMobile } = useMobile()
+
   return (
-    <div className={cn("flex-1 bg-bg-primary flex flex-col min-h-0 min-w-0", className)}>
-      {/* Page Header - For pages without ExplorerPanel */}
+    <div className={cn(
+      "flex-1 bg-bg-primary flex flex-col min-h-0 min-w-0",
+      isMobile && "pb-14", // Space for peek bar
+      className
+    )}>
+      {/* Page Header */}
       {pageTitle && (
         <div className="px-3 py-2 border-b border-border bg-bg-secondary flex-shrink-0">
           <h1 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
@@ -48,12 +56,12 @@ export function DetailsPanel({
       {/* Item title and actions */}
       {(title || actions) && (
         <div className="px-4 py-2.5 border-b border-border flex-shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             {title && (
-              <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
+              <h2 className="text-sm font-semibold text-text-primary truncate">{title}</h2>
             )}
             {actions && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
                 {actions}
               </div>
             )}

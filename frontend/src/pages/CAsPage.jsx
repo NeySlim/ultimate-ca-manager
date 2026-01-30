@@ -10,7 +10,7 @@ import {
 import {
   ExplorerPanel, DetailsPanel, TreeView, Table, Button, 
   Badge, Modal, Input, Select, ExportDropdown,
-  Tabs, LoadingSpinner, EmptyState, Tooltip
+  Tabs, LoadingSpinner, EmptyState, Tooltip, HelpCard
 } from '../components'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
@@ -54,11 +54,13 @@ function OCSPSettingsTab({ ca, onUpdate, showSuccess, showError }) {
 
   return (
     <div className="space-y-6">
+      <HelpCard variant="info" title="Certificate Revocation" compact>
+        OCSP provides real-time status checks. CRL is a periodic list of revoked certificates. 
+        Enable both for maximum compatibility.
+      </HelpCard>
+
       <div>
         <h3 className="text-sm font-semibold text-text-primary mb-4">OCSP Configuration</h3>
-        <p className="text-sm text-text-secondary mb-4">
-          Configure Online Certificate Status Protocol (OCSP) settings for real-time certificate revocation checking.
-        </p>
 
         <div className="space-y-4">
           <label className="flex items-center gap-3 cursor-pointer p-3 bg-bg-tertiary border border-border rounded-sm hover:border-accent-primary/50 transition-colors">
@@ -88,9 +90,6 @@ function OCSPSettingsTab({ ca, onUpdate, showSuccess, showError }) {
 
       <div>
         <h3 className="text-sm font-semibold text-text-primary mb-4">CRL Distribution Point (CDP)</h3>
-        <p className="text-sm text-text-secondary mb-4">
-          Configure the CRL Distribution Point URL that will be embedded in issued certificates.
-        </p>
 
         <div className="space-y-4">
           <label className="flex items-center gap-3 cursor-pointer p-3 bg-bg-tertiary border border-border rounded-sm hover:border-accent-primary/50 transition-colors">

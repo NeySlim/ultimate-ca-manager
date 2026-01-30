@@ -6,7 +6,7 @@ import { User, LockKey, Key, FloppyDisk, Fingerprint, Certificate } from '@phosp
 import {
   ExplorerPanel, DetailsPanel, Button, Input, Badge, Tabs, Card,
   LoadingSpinner, Modal
-} from '../components'
+, HelpCard } from '../components'
 import { accountService } from '../services'
 import { useAuth, useNotification } from '../contexts'
 
@@ -419,6 +419,12 @@ export default function AccountPage() {
       icon: <LockKey size={16} />,
       content: (
         <div className="space-y-6 max-w-2xl">
+          <HelpCard variant="tip" title="Security Best Practices" items={[
+            'Enable 2FA for additional protection',
+            'Use security keys (WebAuthn) for passwordless login',
+            'Rotate API keys regularly'
+          ]} />
+
           <div>
             <h3 className="text-sm font-semibold text-text-primary mb-4">Password</h3>
             <div className="flex items-center justify-between p-4 bg-bg-tertiary border border-border rounded-lg">
