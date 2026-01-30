@@ -8,11 +8,11 @@ import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge, 
   StatusIndicator, Modal, Input, Select, ExportDropdown,
   Tabs, LoadingSpinner, EmptyState
-} from '../components'
+, HelpCard } from '../components'
 import { certificatesService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals, useDebounce } from '../hooks'
-import { extractCN, extractData, formatDate } from '../lib/utils'
+import { extractCN, extractData, formatDate, safeJsonParse } from '../lib/utils'
 import { PAGINATION } from '../constants/config'
 
 export default function CertificatesPage() {
@@ -29,6 +29,7 @@ export default function CertificatesPage() {
   const debouncedSearch = useDebounce(searchQuery, 300)
   const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(20)
   const [total, setTotal] = useState(0)
   const [cas, setCas] = useState([])
   const [importFile, setImportFile] = useState(null)
@@ -46,7 +47,7 @@ export default function CertificatesPage() {
       searchParams.delete('action')
       setSearchParams(searchParams)
     }
-  }, [page, statusFilter, debouncedSearch])
+  }, [page, perPage, statusFilter, debouncedSearch])
 
   // Handle selected param from navigation (e.g., after import redirect)
   useEffect(() => {
@@ -80,7 +81,7 @@ export default function CertificatesPage() {
     try {
       const data = await certificatesService.getAll({
         page,
-        per_page: 20,
+        per_page: perPage,
         status: statusFilter !== 'all' ? statusFilter : undefined,
         search: searchQuery || undefined,
       })
@@ -398,11 +399,11 @@ export default function CertificatesPage() {
             <h3 className="text-sm font-semibold text-text-primary mb-3">Subject Alternative Names (SAN)</h3>
             
             {/* DNS Names */}
-            {selectedCert.san_dns && JSON.parse(selectedCert.san_dns).length > 0 && (
+            {selectedCert.san_dns && safeJsonParse(selectedCert.san_dns).length > 0 && (
               <div className="mb-4">
                 <p className="text-xs text-text-secondary uppercase mb-2">DNS Names</p>
                 <div className="flex flex-wrap gap-2">
-                  {JSON.parse(selectedCert.san_dns).map((dns, i) => (
+                  {safeJsonParse(selectedCert.san_dns).map((dns, i) => (
                     <Badge key={i} variant="secondary">{dns}</Badge>
                   ))}
                 </div>
@@ -410,11 +411,11 @@ export default function CertificatesPage() {
             )}
             
             {/* IP Addresses */}
-            {selectedCert.san_ip && JSON.parse(selectedCert.san_ip).length > 0 && (
+            {selectedCert.san_ip && safeJsonParse(selectedCert.san_ip).length > 0 && (
               <div className="mb-4">
                 <p className="text-xs text-text-secondary uppercase mb-2">IP Addresses</p>
                 <div className="flex flex-wrap gap-2">
-                  {JSON.parse(selectedCert.san_ip).map((ip, i) => (
+                  {safeJsonParse(selectedCert.san_ip).map((ip, i) => (
                     <Badge key={i} variant="secondary">{ip}</Badge>
                   ))}
                 </div>
@@ -422,11 +423,11 @@ export default function CertificatesPage() {
             )}
             
             {/* Email Addresses */}
-            {selectedCert.san_email && JSON.parse(selectedCert.san_email).length > 0 && (
+            {selectedCert.san_email && safeJsonParse(selectedCert.san_email).length > 0 && (
               <div className="mb-4">
                 <p className="text-xs text-text-secondary uppercase mb-2">Email Addresses</p>
                 <div className="flex flex-wrap gap-2">
-                  {JSON.parse(selectedCert.san_email).map((email, i) => (
+                  {safeJsonParse(selectedCert.san_email).map((email, i) => (
                     <Badge key={i} variant="secondary">{email}</Badge>
                   ))}
                 </div>
@@ -434,11 +435,11 @@ export default function CertificatesPage() {
             )}
             
             {/* URIs */}
-            {selectedCert.san_uri && JSON.parse(selectedCert.san_uri).length > 0 && (
+            {selectedCert.san_uri && safeJsonParse(selectedCert.san_uri).length > 0 && (
               <div className="mb-4">
                 <p className="text-xs text-text-secondary uppercase mb-2">URIs</p>
                 <div className="flex flex-wrap gap-2">
-                  {JSON.parse(selectedCert.san_uri).map((uri, i) => (
+                  {safeJsonParse(selectedCert.san_uri).map((uri, i) => (
                     <Badge key={i} variant="secondary">{uri}</Badge>
                   ))}
                 </div>
@@ -607,7 +608,7 @@ export default function CertificatesPage() {
           )}
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto px-4 pb-4">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <LoadingSpinner />
@@ -627,8 +628,12 @@ export default function CertificatesPage() {
               pagination={{
                 total,
                 page,
-                perPage: 20,
-                onChange: setPage
+                perPage,
+                onChange: setPage,
+                onPerPageChange: (val) => {
+                  setPerPage(val)
+                  setPage(1)
+                }
               }}
             />
           )}

@@ -7,7 +7,7 @@ import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge,
   Input, Select, Textarea, Modal,
   LoadingSpinner, EmptyState
-} from '../components'
+, HelpCard } from '../components'
 import { templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
@@ -259,6 +259,10 @@ export default function TemplatesPage() {
           />
         ) : (
           <div className="space-y-6">
+            <HelpCard variant="info" title="Certificate Templates" compact>
+              Templates define default values for certificate issuance. Use them to standardize certificate properties across your organization.
+            </HelpCard>
+
             {/* Basic Info */}
             <div>
               <h3 className="text-sm font-semibold text-text-primary mb-4">Basic Information</h3>
@@ -395,7 +399,7 @@ export default function TemplatesPage() {
           )}
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto px-4 pb-4">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <LoadingSpinner />

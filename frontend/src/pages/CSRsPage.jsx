@@ -8,7 +8,7 @@ import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge, Card,
   Modal, Input, Select, Textarea,
   FileUpload, LoadingSpinner, EmptyState
-} from '../components'
+, HelpCard } from '../components'
 import { csrsService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
@@ -334,6 +334,10 @@ export default function CSRsPage() {
           />
         ) : (
           <div className="space-y-6">
+            <HelpCard variant="info" title="Certificate Signing Request" compact>
+              Review the CSR details and sign it with a CA to issue a certificate.
+            </HelpCard>
+
             {/* Request Info */}
             <div>
               <h3 className="text-sm font-semibold text-text-primary mb-4">Request Information</h3>

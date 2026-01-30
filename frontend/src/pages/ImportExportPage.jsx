@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { UploadSimple, Certificate, ShieldCheck, Flask, FloppyDisk, FileArrowUp, DownloadSimple, ArrowsLeftRight, CheckCircle, Database, CloudArrowUp } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, ExportDropdown, Input, LoadingSpinner, Select, Card, Badge
+  ExplorerPanel, DetailsPanel, Button, ExportDropdown, Input, LoadingSpinner, Select, Card, Badge, HelpCard
 } from '../components'
 import { opnsenseService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
@@ -418,7 +418,12 @@ export default function ImportExportPage() {
         {selectedAction === 'import-cert' && (
           <div className="max-w-2xl space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">Import Certificate</h3>
-            <p className="text-sm text-text-secondary">Import a certificate from a file or paste PEM content. Supports PEM, DER, and PKCS#12 formats.</p>
+            
+            <HelpCard variant="info" title="Supported Formats" items={[
+              'PEM (.pem, .crt, .cer) - Base64 encoded',
+              'DER (.der) - Binary format',
+              'PKCS#12 (.p12, .pfx) - Password protected bundle'
+            ]} />
             
             <div className="p-4 bg-bg-tertiary border border-border rounded-sm space-y-4">
               <div>

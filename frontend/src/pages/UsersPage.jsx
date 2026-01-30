@@ -7,7 +7,7 @@ import {
   ExplorerPanel, DetailsPanel, Table, Button, Badge,
   Input, Select, Modal,
   LoadingSpinner, EmptyState, StatusIndicator, PermissionsDisplay
-} from '../components'
+, HelpCard } from '../components'
 import { usersService, rolesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
@@ -271,6 +271,11 @@ export default function UsersPage() {
             {/* Role & Permissions */}
             <div>
               <h3 className="text-sm font-semibold text-text-primary mb-4">Role & Permissions</h3>
+              
+              <HelpCard variant="help" title="Role-Based Access" className="mb-4" compact>
+                Admin: Full access. Operator: Manage CAs & certs. Viewer: Read-only access.
+              </HelpCard>
+
               <div className="space-y-4">
                 <Select
                   label="Role"
@@ -383,7 +388,7 @@ export default function UsersPage() {
           )}
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto px-4 pb-4">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <LoadingSpinner />

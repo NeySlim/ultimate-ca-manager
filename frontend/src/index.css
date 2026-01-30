@@ -3,21 +3,21 @@
 @tailwind utilities;
 
 :root {
-  --bg-primary: #0A0E14;
-  --bg-secondary: #161B22;
-  --bg-tertiary: #1F2428;
-  --text-primary: #E6EDF3;
-  --text-secondary: #8B949E;
-  --text-tertiary: #888;
-  --accent-primary: #3B82F6;
-  --accent-success: #22C55E;
-  --accent-warning: #F59E0B;
-  --accent-danger: #EF4444;
-  --border: #30363D;
+  --bg-primary: #12161C;
+  --bg-secondary: #1C222A;
+  --bg-tertiary: #252D38;
+  --text-primary: #F0F4F8;
+  --text-secondary: #9CA8B8;
+  --text-tertiary: #6E7A8A;
+  --accent-primary: #4F8EF7;
+  --accent-success: #34D399;
+  --accent-warning: #FBBF24;
+  --accent-danger: #F87171;
+  --border: #3A4555;
   
   /* Logo gradient colors */
-  --logo-gradient-start: #5a8fc7;
-  --logo-gradient-end: #7aa5d9;
+  --logo-gradient-start: #5a9cf7;
+  --logo-gradient-end: #a78bfa;
 }
 
 /* Custom scrollbar styling - thin and subtle */
@@ -197,3 +197,6 @@ tr.row-selected td:first-child {
 .hover-lift {
   @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg;
 }
+
+/* Force Tailwind to generate responsive grid classes */
+/* lg:grid-cols-2 lg:grid-cols-3 lg:grid-cols-4 lg:gap-4 lg:gap-6 lg:p-6 */

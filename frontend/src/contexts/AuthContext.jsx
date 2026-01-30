@@ -104,7 +104,7 @@ export function AuthProvider({ children }) {
       setPermissions([])
       setRole(null)
       setLoading(false)
-      console.log('🔓 Local session cleared')
+      debug('🔓 Local session cleared')
     }
   }
 

@@ -9,7 +9,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Button, Input, Select, Card,
-  Table, Badge, LoadingSpinner, Modal, Textarea, EmptyState, StatusIndicator
+  Table, Badge, LoadingSpinner, Modal, Textarea, EmptyState, StatusIndicator, HelpCard
 } from '../components'
 import { scepService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -305,6 +305,11 @@ export default function SCEPPage() {
                 Configure the Simple Certificate Enrollment Protocol server
               </p>
             </div>
+
+            <HelpCard variant="info" title="About SCEP">
+              SCEP enables automated certificate enrollment for devices like MDM-managed devices, 
+              network equipment, and IoT devices. Compatible with Microsoft Intune, Jamf, and others.
+            </HelpCard>
             
             {/* Enable Toggle Card */}
             <Card className="p-4">

@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 import { Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, Envelope, Download, Trash, UploadSimple, HardDrives, Lock, Key } from '@phosphor-icons/react'
 import {
   ExplorerPanel, DetailsPanel, Button, Input, Select, Badge, Card,
-  Textarea, Tabs, LoadingSpinner, FileUpload, Table, Modal
+  Textarea, Tabs, LoadingSpinner, FileUpload, Table, Modal, HelpCard, HelpTooltip
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
@@ -332,6 +332,10 @@ export default function SettingsPage() {
       icon: <Gear size={16} />,
       content: (
         <div className="space-y-6 max-w-2xl">
+          <HelpCard variant="info" title="System Configuration">
+            Configure global settings for your UCM instance including display name, timezone, and session management.
+          </HelpCard>
+
           <div>
             <h3 className="text-sm font-semibold text-text-primary mb-4">General Settings</h3>
             <div className="space-y-4">
@@ -387,6 +391,10 @@ export default function SettingsPage() {
       icon: <EnvelopeSimple size={16} />,
       content: (
         <div className="space-y-6 max-w-2xl">
+          <HelpCard variant="tip" title="Email Notifications">
+            Configure SMTP to receive certificate expiration alerts and system notifications.
+          </HelpCard>
+
           <div>
             <h3 className="text-sm font-semibold text-text-primary mb-4">Email Settings</h3>
             <div className="space-y-4">
@@ -550,6 +558,12 @@ export default function SettingsPage() {
       icon: <Database size={16} />,
       content: (
         <div className="space-y-6 max-w-2xl">
+          <HelpCard variant="warning" title="Important" items={[
+            'Backups are encrypted with AES-256',
+            'Store backup password securely - it cannot be recovered',
+            'Test restore procedure regularly'
+          ]} />
+
           <div>
             <h3 className="text-sm font-semibold text-text-primary mb-4">Automatic Backups</h3>
             <div className="space-y-4">

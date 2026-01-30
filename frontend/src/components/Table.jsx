@@ -78,10 +78,10 @@ export function Table({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-hidden rounded-lg border border-border bg-bg-tertiary/20 min-h-0">
+      <div className="flex-1 overflow-hidden rounded-lg border border-border/50 bg-bg-secondary/30 min-h-0">
         <div className="h-full overflow-auto">
           <table className="w-full">
-            <thead className="sticky top-0 bg-bg-secondary border-b border-border z-10">
+            <thead className="sticky top-0 bg-bg-tertiary/80 backdrop-blur-sm border-b border-border/50 z-10">
               <tr>
               {selectable && (
                 <th className="w-8 px-2 py-2">
@@ -98,7 +98,7 @@ export function Table({
                   key={col.key}
                   className={cn(
                     "px-3 py-2 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider",
-                    sortable && col.sortable !== false && "cursor-pointer hover:text-text-primary transition-colors select-none"
+                    sortable && col.sortable !== false && "cursor-pointer hover:text-accent-primary transition-colors select-none"
                   )}
                   onClick={() => sortable && col.sortable !== false && handleSort(col.key)}
                 >
@@ -106,33 +106,33 @@ export function Table({
                     <span>{col.label}</span>
                     {sortable && col.sortable !== false && sortConfig.key === col.key && (
                       sortConfig.direction === 'asc' 
-                        ? <CaretUp size={12} weight="bold" />
-                        : <CaretDown size={12} weight="bold" />
+                        ? <CaretUp size={12} weight="bold" className="text-accent-primary" />
+                        : <CaretDown size={12} weight="bold" className="text-accent-primary" />
                     )}
                   </div>
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
+          <tbody className="divide-y divide-border/30">
             {sortedData.map((row, index) => {
               const rowId = row[idKey]
               const isSelected = selectedId !== null && selectedId !== undefined && rowId == selectedId
               
               return (
                 <tr
-                  key={index}
+                  key={rowId ?? `row-${index}`}
                   onClick={() => onRowClick?.(row)}
                   className={cn(
                     "transition-all duration-150 group",
                     onRowClick && "cursor-pointer",
-                    !isSelected && "hover:bg-accent/5 hover:shadow-sm",
-                    selectedRows.has(index) && "bg-bg-tertiary",
-                    isSelected && "row-selected bg-accent/10 border-l-2 border-accent"
+                    !isSelected && "hover:bg-bg-tertiary",
+                    selectedRows.has(index) && "bg-bg-tertiary/50",
+                    isSelected && "row-selected bg-accent-primary/10"
                   )}
                 >
                 {selectable && (
-                  <td className="px-2 py-2">
+                  <td className="px-2 py-1.5">
                     <input
                       type="checkbox"
                       checked={selectedRows.has(index)}
@@ -148,7 +148,7 @@ export function Table({
                 {columns.map((col) => (
                   <td 
                     key={col.key} 
-                    className="px-3 py-2.5 text-sm text-text-primary whitespace-nowrap"
+                    className="px-3 py-1.5 text-sm text-text-primary whitespace-nowrap"
                   >
                     {col.render ? col.render(row[col.key], row) : row[col.key]}
                   </td>

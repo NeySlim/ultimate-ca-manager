@@ -27,7 +27,7 @@ class APIClient {
       config.body = JSON.stringify(options.body)
     }
 
-    console.log(`📡 API ${config.method} ${url}`, config.credentials)
+    if (import.meta.env.DEV) console.log(`📡 API ${config.method} ${url}`, config.credentials)
 
     try {
       const response = await fetch(url, config)
@@ -62,7 +62,7 @@ class APIClient {
         throw error
       }
 
-      console.log(`✅ API response:`, data)
+      if (import.meta.env.DEV) console.log(`✅ API response:`, data)
       return data
     } catch (error) {
       // Network errors or fetch failures
@@ -111,7 +111,7 @@ class APIClient {
       ...options,
     }
 
-    console.log(`📡 API UPLOAD ${url}`)
+    if (import.meta.env.DEV) console.log(`📡 API UPLOAD ${url}`)
 
     try {
       const response = await fetch(url, config)
