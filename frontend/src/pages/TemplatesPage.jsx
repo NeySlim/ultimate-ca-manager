@@ -202,7 +202,7 @@ export default function TemplatesPage() {
     { 
       key: 'created_at', 
       label: 'Created',
-      render: (val) => new Date(val).toLocaleDateString()
+      render: (val) => val ? new Date(val).toLocaleDateString() : '-'
     },
   ]
 

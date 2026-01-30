@@ -28,10 +28,17 @@ export function extractCN(subject) {
 }
 
 /**
- * Extract data field with fallback
+ * Extract data from API response
+ * If key is provided, extracts that key. Otherwise extracts .data field.
  */
-export function extractData(obj, key, fallback = '') {
-  return obj?.[key] ?? fallback
+export function extractData(obj, key, fallback = null) {
+  if (!obj) return fallback
+  // If key provided, extract that specific key
+  if (key !== undefined) {
+    return obj?.[key] ?? fallback
+  }
+  // Default: extract .data field (standard API response format)
+  return obj?.data ?? obj ?? fallback
 }
 
 /**
