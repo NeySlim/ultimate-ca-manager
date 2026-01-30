@@ -372,7 +372,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex gap-3 pt-4 border-t border-border">
               {canWrite('settings') && (
-                <Button onClick={() => handleSave('general')} disabled={saving}>
+                <Button size="sm" onClick={() => handleSave('general')} disabled={saving}>
                   <FloppyDisk size={16} />
                   Save Changes
                 </Button>
@@ -432,11 +432,11 @@ export default function SettingsPage() {
             <div className="flex gap-3 pt-4 border-t border-border">
               {canWrite('settings') && (
                 <>
-                  <Button onClick={() => handleSave('email')} disabled={saving}>
+                  <Button size="sm" onClick={() => handleSave('email')} disabled={saving}>
                     <FloppyDisk size={16} />
                     Save Changes
                   </Button>
-                  <Button variant="secondary" onClick={handleTestEmail}>
+                  <Button size="sm" variant="secondary" onClick={handleTestEmail}>
                     <Envelope size={16} />
                     Send Test Email
                   </Button>
@@ -527,7 +527,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex gap-3 pt-4 border-t border-border">
               {hasPermission('admin:system') && (
-                <Button onClick={() => handleSave('security')} disabled={saving}>
+                <Button size="sm" onClick={() => handleSave('security')} disabled={saving}>
                   <FloppyDisk size={16} />
                   Save Changes
                 </Button>
@@ -587,7 +587,7 @@ export default function SettingsPage() {
                 )}
 
                 {hasPermission('admin:system') && (
-                  <Button onClick={() => handleSave('backup')} disabled={saving} className="mt-4">
+                  <Button size="sm" onClick={() => handleSave('backup')} disabled={saving} className="mt-4">
                     <FloppyDisk size={16} />
                     Save Settings
                   </Button>
@@ -602,7 +602,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-text-secondary">Create an encrypted backup file containing all data</p>
                 </div>
                 {hasPermission('admin:system') && (
-                  <Button onClick={() => setShowBackupModal(true)}>
+                  <Button size="sm" onClick={() => setShowBackupModal(true)}>
                     <Database size={16} />
                     Create Backup
                   </Button>
@@ -706,7 +706,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex gap-3 pt-4 border-t border-border">
               {hasPermission('admin:system') && (
-                <Button onClick={() => handleSave('audit')} disabled={saving}>
+                <Button size="sm" onClick={() => handleSave('audit')} disabled={saving}>
                   <FloppyDisk size={16} />
                   Save Changes
                 </Button>
@@ -745,7 +745,7 @@ export default function SettingsPage() {
 
               <div className="space-y-3">
                 <div className="flex gap-3">
-                  <Button variant="secondary" onClick={handleOptimizeDb}>
+                  <Button size="sm" variant="secondary" onClick={handleOptimizeDb}>
                     <Database size={16} />
                     Optimize Database
                   </Button>

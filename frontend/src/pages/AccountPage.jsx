@@ -395,11 +395,11 @@ export default function AccountPage() {
           <div className="flex gap-3 pt-4 border-t border-border">
             {editing ? (
               <>
-                <Button onClick={handleUpdateProfile}>
+                <Button size="sm" onClick={handleUpdateProfile}>
                   <FloppyDisk size={16} />
                   Save Changes
                 </Button>
-                <Button variant="ghost" onClick={() => {
+                <Button size="sm" variant="ghost" onClick={() => {
                   setEditing(false)
                   loadAccount()
                 }}>
@@ -407,7 +407,7 @@ export default function AccountPage() {
                 </Button>
               </>
             ) : (
-              <Button onClick={() => setEditing(true)}>
+              <Button size="sm" onClick={() => setEditing(true)}>
                 Edit Profile
               </Button>
             )}
