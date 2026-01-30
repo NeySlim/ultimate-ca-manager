@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { User, LockKey, Key, FloppyDisk, Fingerprint, Certificate } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, Input, Badge, Tabs,
+  ExplorerPanel, DetailsPanel, Button, Input, Badge, Tabs, Card,
   LoadingSpinner, Modal
 } from '../components'
 import { accountService } from '../services'
@@ -611,51 +611,55 @@ export default function AccountPage() {
   return (
     <>
       <ExplorerPanel title="My Account">
-        <div className="p-3 space-y-3">
-          {/* User Info */}
+        <div className="p-3 space-y-4">
+          {/* User Info Card */}
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-text-primary uppercase tracking-wide">User Info</h3>
-            <div className="space-y-1.5">
+            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">User Info</h3>
+            <Card className="p-3 space-y-2 bg-gradient-to-br from-accent/5 to-transparent border-accent/20">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-text-secondary">Username</span>
                 <span className="text-text-primary font-medium">{user?.username || 'N/A'}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-text-secondary">Email</span>
-                <span className="text-text-primary font-medium truncate">{user?.email || 'N/A'}</span>
+                <span className="text-text-primary font-medium truncate max-w-[120px]">{user?.email || 'N/A'}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-text-secondary">Role</span>
-                <Badge variant={user?.is_admin ? 'success' : 'default'}>
+                <Badge variant={user?.is_admin ? 'emerald' : 'blue'} size="sm">
                   {user?.is_admin ? 'Admin' : 'User'}
                 </Badge>
               </div>
-            </div>
+            </Card>
           </div>
 
-          {/* Session Info */}
+          {/* Session Info Card */}
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-text-primary uppercase tracking-wide">Session Info</h3>
-            <div className="space-y-1.5">
+            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Session Info</h3>
+            <Card className="p-3 space-y-2 bg-gradient-to-br from-emerald-500/5 to-transparent border-emerald-500/20">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-text-secondary">Status</span>
-                <span className="text-green-500 font-medium">Active</span>
+                <Badge variant="emerald" size="sm">Active</Badge>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-text-secondary">API Keys</span>
-                <span className="text-text-primary font-medium">{apiKeys.length}</span>
+                <Badge variant="blue" size="sm">{apiKeys.length}</Badge>
               </div>
-            </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-text-secondary">WebAuthn</span>
+                <Badge variant="purple" size="sm">{webauthnCredentials.length}</Badge>
+              </div>
+            </Card>
           </div>
 
           {/* Quick Help */}
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-text-primary uppercase tracking-wide">Quick Help</h3>
-            <div className="text-xs text-text-secondary space-y-1.5">
+            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Quick Help</h3>
+            <div className="text-xs text-text-secondary space-y-1.5 px-1">
               <p>• Update your profile information</p>
               <p>• Change your password regularly</p>
               <p>• Manage API keys for automation</p>
-              <p>• Review your activity history</p>
+              <p>• Add WebAuthn security keys</p>
             </div>
           </div>
         </div>
