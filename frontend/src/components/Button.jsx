@@ -1,5 +1,13 @@
 import { cn } from '../lib/utils'
 
+/**
+ * Button Component - Standardized sizes across the app
+ * 
+ * Size guidelines:
+ * - sm: Content headers, inline actions, compact UI (default for most actions)
+ * - default: Forms, modals, primary actions
+ * - lg: Hero sections, prominent CTAs
+ */
 export function Button({ children, variant = 'primary', size = 'default', loading = false, className, ...props }) {
   const variants = {
     primary: 'text-white shadow-lg shadow-accent-primary/25 hover:shadow-xl hover:shadow-accent-primary/35',
@@ -9,10 +17,12 @@ export function Button({ children, variant = 'primary', size = 'default', loadin
     outline: 'border border-border/60 bg-transparent text-text-primary hover:bg-bg-tertiary/60 hover:border-border shadow-sm',
   }
   
+  // Standardized sizes - sm is the default for content actions
   const sizes = {
-    sm: 'px-2 py-0.5 text-xs gap-1',
-    default: 'px-3 py-1.5 text-sm gap-1.5',
-    lg: 'px-4 py-2 text-sm gap-2',
+    xs: 'px-2 py-1 text-[11px] gap-1',      // Very compact (icon buttons)
+    sm: 'px-2.5 py-1.5 text-xs gap-1.5',    // Content headers, inline actions
+    default: 'px-3 py-2 text-sm gap-1.5',   // Forms, modals
+    lg: 'px-4 py-2.5 text-sm gap-2',        // Prominent actions
   }
   
   const gradientStyle = variant === 'primary' 
