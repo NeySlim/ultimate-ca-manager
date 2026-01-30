@@ -198,5 +198,31 @@ tr.row-selected td:first-child {
   @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg;
 }
 
+/* Interactive card hover */
+.interactive-card {
+  @apply transition-all duration-200 ease-out;
+}
+
+.interactive-card:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
+  box-shadow: 0 10px 25px -5px color-mix(in srgb, var(--accent-primary) 5%, transparent);
+}
+
+/* Subtle glow on focus */
+.glow-focus:focus-within {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 20%, transparent);
+}
+
+/* Smooth transitions for all interactive elements */
+button, a, input, select, textarea {
+  transition: all 0.15s ease-out;
+}
+
+/* Better focus styles */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 /* Force Tailwind to generate responsive grid classes */
 /* lg:grid-cols-2 lg:grid-cols-3 lg:grid-cols-4 lg:gap-4 lg:gap-6 lg:p-6 */
