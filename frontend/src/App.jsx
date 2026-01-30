@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
-import { AuthProvider, ThemeProvider, NotificationProvider, useAuth } from './contexts'
+import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, useAuth } from './contexts'
 import { AppShell, ErrorBoundary, LoadingSpinner } from './components'
 
 // Lazy load pages for code splitting
@@ -71,7 +71,7 @@ function AppRoutes() {
           <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
           <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
           <Route path="/acme" element={<ProtectedRoute><ACMEPage /></ProtectedRoute>} />
-          <Route path="/scep" element={<ProtectedRoute><SCEPPage /></ProtectedRoute>} />
+          <Route path="/scep-config" element={<ProtectedRoute><SCEPPage /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           <Route path="/audit" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
           <Route path="/import" element={<ProtectedRoute><ImportExportPage /></ProtectedRoute>} />
@@ -97,7 +97,9 @@ export default function App() {
         <BrowserRouter>
           <AuthProvider>
             <NotificationProvider>
-              <AppRoutes />
+              <MobileProvider>
+                <AppRoutes />
+              </MobileProvider>
             </NotificationProvider>
           </AuthProvider>
         </BrowserRouter>

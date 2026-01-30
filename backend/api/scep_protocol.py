@@ -70,7 +70,10 @@ def scep_endpoint():
     """
     operation = request.args.get('operation', '')
     
-    if operation == 'GetCACaps':
+    if not operation:
+        # Return capabilities by default (common client behavior)
+        return handle_get_ca_caps()
+    elif operation == 'GetCACaps':
         return handle_get_ca_caps()
     elif operation == 'GetCACert':
         return handle_get_ca_cert()
@@ -169,9 +172,7 @@ def make_error_response(message, status_code):
     return response
 
 
-# Also support alternate URL patterns used by some clients
-@bp.route('/scep', methods=['GET', 'POST'])
-@bp.route('/scep/', methods=['GET', 'POST'])
+# Alternate URL for compatibility (Cisco, etc.)
 @bp.route('/cgi-bin/pkiclient.exe', methods=['GET', 'POST'])
 def scep_alternate():
     """Alternate SCEP URLs for compatibility"""
