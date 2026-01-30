@@ -40,34 +40,34 @@ const themes = {
     name: 'Light',
     isLight: true,
     colors: {
-      // Soft warm neutrals with blue accent
-      'bg-primary': '#F2F3F5',
-      'bg-secondary': '#FAFAFA',
-      'bg-tertiary': '#EAECEF',
-      'text-primary': '#2C3E50',
-      'text-secondary': '#5D6D7E',
-      'text-tertiary': '#95A5A6',
-      'accent-primary': '#5885C5',
-      'accent-success': '#27AE60',
-      'accent-warning': '#E67E22',
-      'accent-danger': '#E74C3C',
-      'accent-pro': '#9B59B6',
-      'border': '#D5D8DC',
-      'gradient-from': '#5885C5',
-      'gradient-to': '#8E7CC3',
-      'gradient-accent': 'linear-gradient(135deg, #5885C5 0%, #8E7CC3 100%)',
-      'gradient-bg': 'linear-gradient(145deg, #f2f3f5 0%, #f5f4f8 50%, #f2f3f5 100%)',
-      // DetailCard colors - warm neutral
-      'detail-header-bg': 'linear-gradient(135deg, rgba(88,133,197,0.06), rgba(142,124,195,0.04), rgba(250,250,250,0.85))',
-      'detail-header-border': 'rgba(0,0,0,0.05)',
-      'detail-header-shadow': 'inset 0 1px 0 0 rgba(255,255,255,0.6)',
-      'detail-icon-bg': 'linear-gradient(135deg, #5885C5, #7094D0)',
-      'detail-icon-shadow': '0 4px 12px rgba(88,133,197,0.18)',
-      'detail-stats-border': 'rgba(0,0,0,0.05)',
-      'detail-section-bg': 'rgba(234,236,239,0.45)',
-      'detail-section-border': '#D5D8DC',
-      'detail-field-bg': 'rgba(0,0,0,0.015)',
-      'detail-field-border': 'rgba(0,0,0,0.045)',
+      // Professional light theme - good contrast without glare
+      'bg-primary': '#F7F8FA',        // Soft off-white, not pure white
+      'bg-secondary': '#FFFFFF',       // White for cards/panels (contrast with bg)
+      'bg-tertiary': '#EEF0F4',        // Slightly darker for depth
+      'text-primary': '#1A202C',       // Near-black for maximum readability
+      'text-secondary': '#4A5568',     // Medium gray, good contrast
+      'text-tertiary': '#718096',      // Lighter but still readable
+      'accent-primary': '#3B82F6',     // Vibrant blue
+      'accent-success': '#10B981',     // Green
+      'accent-warning': '#F59E0B',     // Amber
+      'accent-danger': '#EF4444',      // Red
+      'accent-pro': '#8B5CF6',         // Purple
+      'border': '#E2E8F0',             // Visible but subtle
+      'gradient-from': '#3B82F6',
+      'gradient-to': '#8B5CF6',
+      'gradient-accent': 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)',
+      'gradient-bg': 'linear-gradient(145deg, #F7F8FA 0%, #F0F4FF 50%, #F7F8FA 100%)',
+      // DetailCard colors - elevated cards with subtle shadows
+      'detail-header-bg': 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.05), rgba(255,255,255,0.9))',
+      'detail-header-border': 'rgba(0,0,0,0.08)',
+      'detail-header-shadow': '0 1px 3px rgba(0,0,0,0.08)',
+      'detail-icon-bg': 'linear-gradient(135deg, #3B82F6, #6366F1)',
+      'detail-icon-shadow': '0 4px 12px rgba(59,130,246,0.25)',
+      'detail-stats-border': 'rgba(0,0,0,0.08)',
+      'detail-section-bg': 'rgba(241,245,249,0.7)',
+      'detail-section-border': '#E2E8F0',
+      'detail-field-bg': 'rgba(0,0,0,0.02)',
+      'detail-field-border': 'rgba(0,0,0,0.06)',
     }
   },
   ocean: {
