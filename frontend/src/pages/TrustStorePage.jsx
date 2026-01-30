@@ -4,12 +4,12 @@
  */
 import { useState, useEffect } from 'react'
 import { 
-  ShieldCheck, Plus, Trash, Download, Upload, Certificate,
-  MagnifyingGlass, ArrowsClockwise, CheckCircle, Warning, Info
+  ShieldCheck, Plus, Trash, Download, Certificate, Clock,
+  MagnifyingGlass, Info
 } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, Input, Card, Badge, 
-  Table, Modal, Textarea, LoadingSpinner, EmptyState, HelpCard
+  PageLayout, FocusItem, Button, Input, Card, Badge, 
+  Modal, Textarea, LoadingSpinner, EmptyState, HelpCard
 } from '../components'
 import { truststoreService } from '../services'
 import { useNotification } from '../contexts'
@@ -143,42 +143,104 @@ export default function TrustStorePage() {
       system: 'secondary',
       custom: 'default'
     }
-    return <Badge variant={variants[purpose] || 'default'}>{purpose?.replace('_', ' ')}</Badge>
+    return <Badge variant={variants[purpose] || 'default'} size="sm">{purpose?.replace('_', ' ')}</Badge>
   }
 
-  // Sidebar content
-  const sidebarContent = (
+  const purposeColors = {
+    root_ca: 'bg-emerald-500/15 text-emerald-500',
+    intermediate_ca: 'bg-blue-500/15 text-blue-500',
+    client_auth: 'bg-purple-500/15 text-purple-500',
+    code_signing: 'bg-orange-500/15 text-orange-500',
+    system: 'bg-gray-500/15 text-gray-400',
+    custom: 'bg-gray-500/15 text-gray-400'
+  }
+
+  // Calculate stats by purpose
+  const rootCAs = certificates.filter(c => c.purpose === 'root_ca').length
+  const intermediateCAs = certificates.filter(c => c.purpose === 'intermediate_ca').length
+
+  // Help content for modal
+  const helpContent = (
     <div className="space-y-4">
-      {/* Stats */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Overview</h3>
-        <Card className="p-3 space-y-2 bg-gradient-to-br from-accent-primary/5 to-transparent">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-text-secondary">Total Certificates</span>
-            <span className="text-text-primary font-medium">{certificates.length}</span>
+      {/* Trust Store Overview */}
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-emerald-500/5 to-transparent">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <ShieldCheck size={16} className="text-emerald-500" />
+          Trust Store Overview
+        </h3>
+        <div className="text-center p-4 bg-bg-tertiary rounded-lg">
+          <p className="text-3xl font-bold text-text-primary">{certificates.length}</p>
+          <p className="text-sm text-text-secondary">Trusted Certificates</p>
+        </div>
+      </Card>
+
+      {/* Certificate Breakdown */}
+      <Card className="p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Info size={16} className="text-accent-primary" />
+          By Purpose
+        </h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between py-2 px-3 rounded-md bg-bg-tertiary/50">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-emerald-500" />
+              <span className="text-sm text-text-primary">Root CAs</span>
+            </div>
+            <Badge variant="emerald">{rootCAs}</Badge>
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-text-secondary">Root CAs</span>
-            <span className="text-text-primary font-medium">
-              {certificates.filter(c => c.purpose === 'root_ca').length}
-            </span>
+          <div className="flex items-center justify-between py-2 px-3 rounded-md bg-bg-tertiary/50">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <span className="text-sm text-text-primary">Intermediate CAs</span>
+            </div>
+            <Badge variant="blue">{intermediateCAs}</Badge>
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-text-secondary">Intermediate CAs</span>
-            <span className="text-text-primary font-medium">
-              {certificates.filter(c => c.purpose === 'intermediate_ca').length}
-            </span>
-          </div>
-        </Card>
+        </div>
+      </Card>
+
+      {/* Help Cards */}
+      <div className="space-y-3">
+        <HelpCard variant="info" title="About Trust Store">
+          The Trust Store contains certificates that are explicitly trusted for validating 
+          certificate chains. Add Root and Intermediate CAs here for chain verification.
+        </HelpCard>
+        
+        <HelpCard variant="tip" title="Best Practices">
+          Only add certificates from trusted sources. Regularly review and remove 
+          expired or unnecessary certificates to maintain security.
+        </HelpCard>
+
+        <HelpCard variant="warning" title="Security Note">
+          Certificates in the Trust Store can validate any certificate chain. 
+          Be careful when adding third-party certificates.
+        </HelpCard>
+      </div>
+    </div>
+  )
+
+  // Focus panel content with search and filter
+  const focusContent = (
+    <div className="flex flex-col h-full">
+      {/* Search */}
+      <div className="p-2 border-b border-border shrink-0">
+        <div className="relative">
+          <MagnifyingGlass size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary" />
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-7 pr-2 py-1.5 text-xs bg-bg-tertiary border border-border rounded-md text-text-primary placeholder:text-text-secondary"
+          />
+        </div>
       </div>
 
       {/* Filter */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Filter</h3>
+      <div className="p-2 border-b border-border shrink-0">
         <select
           value={purposeFilter}
           onChange={(e) => setPurposeFilter(e.target.value)}
-          className="w-full px-2 py-1.5 text-xs bg-bg-secondary border border-border rounded-md text-text-primary"
+          className="w-full px-2 py-1.5 text-xs bg-bg-tertiary border border-border rounded-md text-text-primary"
         >
           {purposeOptions.map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -186,41 +248,37 @@ export default function TrustStorePage() {
         </select>
       </div>
 
-      {/* Actions */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Actions</h3>
-        <div className="space-y-1">
-          {canWrite && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="w-full justify-start text-xs"
-              onClick={() => openModal('add')}
-            >
-              <Plus size={14} />
-              Add Certificate
-            </Button>
-          )}
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="w-full justify-start text-xs"
-            onClick={() => loadCertificates()}
-          >
-            <ArrowsClockwise size={14} />
-            Refresh
-          </Button>
-        </div>
+      {/* Certificate List */}
+      <div className="flex-1 overflow-auto p-2 space-y-1">
+        {certificates.length === 0 ? (
+          <EmptyState 
+            icon={ShieldCheck}
+            title="No certificates"
+            description="Add trusted certificates"
+          />
+        ) : (
+          certificates.map((cert) => (
+            <FocusItem
+              key={cert.id}
+              icon={Certificate}
+              title={cert.name}
+              subtitle={cert.not_after ? formatDate(cert.not_after) : 'No expiry'}
+              badge={getPurposeBadge(cert.purpose)}
+              selected={selectedCert?.id === cert.id}
+              onClick={() => handleSelectCert(cert)}
+            />
+          ))
+        )}
       </div>
-
-      {/* Help */}
-      <HelpCard variant="info" className="text-xs">
-        <p className="font-medium mb-1">Trust Store</p>
-        <p className="text-text-secondary">
-          Certificates here are trusted for chain validation during certificate verification.
-        </p>
-      </HelpCard>
     </div>
+  )
+
+  // Focus panel actions
+  const focusActions = canWrite && (
+    <Button size="sm" onClick={() => openModal('add')} className="w-full">
+      <Plus size={14} />
+      Add Certificate
+    </Button>
   )
 
   if (loading && certificates.length === 0) {
@@ -233,185 +291,110 @@ export default function TrustStorePage() {
 
   return (
     <>
-      <div className="flex h-full">
-        {/* Explorer Panel */}
-        <ExplorerPanel 
-          title="Trust Store"
-          width="300px"
-          sidebarContent={sidebarContent}
-          actions={
-            canWrite && (
-              <Button size="sm" onClick={() => openModal('add')}>
-                <Plus size={14} />
-                Add
-              </Button>
-            )
-          }
-        >
-          {/* Search */}
-          <div className="p-2 border-b border-border">
-            <div className="relative">
-              <MagnifyingGlass size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary" />
-              <input
-                type="text"
-                placeholder="Search certificates..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-7 pr-2 py-1.5 text-xs bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-secondary"
-              />
-            </div>
-          </div>
-
-          {/* Certificate List */}
-          <div className="p-2 space-y-1">
-            {certificates.length === 0 ? (
-              <EmptyState 
-                icon={ShieldCheck}
-                title="No certificates"
-                description="Add trusted certificates to the store"
-              />
-            ) : (
-              certificates.map((cert) => (
-                <div
-                  key={cert.id}
-                  onClick={() => handleSelectCert(cert)}
-                  className={`
-                    p-2 rounded-md cursor-pointer transition-colors
-                    ${selectedCert?.id === cert.id 
-                      ? 'bg-accent-primary/10 border border-accent-primary/30' 
-                      : 'hover:bg-bg-tertiary border border-transparent'
-                    }
-                  `}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-text-primary truncate">
-                      {cert.name}
-                    </span>
-                    {getPurposeBadge(cert.purpose)}
-                  </div>
-                  <div className="text-xs text-text-secondary mt-0.5 truncate">
-                    {cert.subject}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </ExplorerPanel>
-
-        {/* Details Panel */}
-        <DetailsPanel title={selectedCert ? selectedCert.name : 'Certificate Details'}>
-          {!selectedCert ? (
+      <PageLayout
+        title="Trust Store"
+        focusTitle="Certificates"
+        focusContent={focusContent}
+        focusActions={focusActions}
+        focusFooter={`${certificates.length} certificate(s)`}
+        helpContent={helpContent}
+        helpTitle="Trust Store - Aide"
+      >
+        {/* Main Content */}
+        {!selectedCert ? (
+          <div className="flex items-center justify-center h-full">
             <EmptyState 
               icon={Certificate}
               title="Select a certificate"
               description="Choose a certificate to view details"
             />
-          ) : (
-            <div className="p-4 space-y-6">
-              {/* Certificate Info */}
-              <div>
-                <h3 className="text-sm font-semibold text-text-primary mb-4">Certificate Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <p className="text-xs text-text-secondary uppercase mb-1">Name</p>
-                    <p className="text-sm text-text-primary">{selectedCert.name}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-xs text-text-secondary uppercase mb-1">Subject</p>
-                    <p className="text-xs font-mono text-text-primary break-all">{selectedCert.subject}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-xs text-text-secondary uppercase mb-1">Issuer</p>
-                    <p className="text-xs font-mono text-text-primary break-all">{selectedCert.issuer}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary uppercase mb-1">Purpose</p>
-                    {getPurposeBadge(selectedCert.purpose)}
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary uppercase mb-1">Serial Number</p>
-                    <p className="text-xs font-mono text-text-primary">{selectedCert.serial_number}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary uppercase mb-1">Valid From</p>
-                    <p className="text-sm text-text-primary">
-                      {selectedCert.not_before ? formatDate(selectedCert.not_before) : '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary uppercase mb-1">Valid Until</p>
-                    <p className="text-sm text-text-primary">
-                      {selectedCert.not_after ? formatDate(selectedCert.not_after) : '-'}
-                    </p>
-                  </div>
+          </div>
+        ) : (
+          <div className="p-6 space-y-6">
+            {/* Certificate Info */}
+            <div>
+              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
+                Certificate Information
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <p className="text-xs text-text-secondary uppercase mb-1">Name</p>
+                  <p className="text-sm text-text-primary">{selectedCert.name}</p>
                 </div>
-              </div>
-
-              {/* Fingerprints */}
-              <div>
-                <h3 className="text-sm font-semibold text-text-primary mb-4">Fingerprints</h3>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-text-secondary uppercase mb-1">SHA-256</p>
-                    <code className="text-xs font-mono text-text-primary bg-bg-tertiary px-2 py-1 rounded block break-all">
-                      {selectedCert.fingerprint_sha256}
-                    </code>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary uppercase mb-1">SHA-1</p>
-                    <code className="text-xs font-mono text-text-primary bg-bg-tertiary px-2 py-1 rounded block break-all">
-                      {selectedCert.fingerprint_sha1}
-                    </code>
-                  </div>
+                <div className="col-span-2">
+                  <p className="text-xs text-text-secondary uppercase mb-1">Subject</p>
+                  <p className="text-xs font-mono text-text-primary break-all">{selectedCert.subject}</p>
                 </div>
-              </div>
-
-              {/* Metadata */}
-              <div>
-                <h3 className="text-sm font-semibold text-text-primary mb-4">Metadata</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-text-secondary uppercase mb-1">Added By</p>
-                    <p className="text-sm text-text-primary">{selectedCert.added_by || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary uppercase mb-1">Added At</p>
-                    <p className="text-sm text-text-primary">
-                      {selectedCert.added_at ? formatDate(selectedCert.added_at) : '-'}
-                    </p>
-                  </div>
-                  {selectedCert.notes && (
-                    <div className="col-span-2">
-                      <p className="text-xs text-text-secondary uppercase mb-1">Notes</p>
-                      <p className="text-sm text-text-primary">{selectedCert.notes}</p>
-                    </div>
-                  )}
+                <div className="col-span-2">
+                  <p className="text-xs text-text-secondary uppercase mb-1">Issuer</p>
+                  <p className="text-xs font-mono text-text-primary break-all">{selectedCert.issuer}</p>
                 </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2 pt-4 border-t border-border">
-                <Button 
-                  variant="secondary"
-                  onClick={() => handleExport(selectedCert)}
-                >
-                  <Download size={16} />
-                  Export PEM
-                </Button>
-                {canDelete && (
-                  <Button 
-                    variant="danger"
-                    onClick={() => handleDelete(selectedCert.id)}
-                  >
-                    <Trash size={16} />
-                    Remove
-                  </Button>
-                )}
+                <div>
+                  <p className="text-xs text-text-secondary uppercase mb-1">Purpose</p>
+                  {getPurposeBadge(selectedCert.purpose)}
+                </div>
+                <div>
+                  <p className="text-xs text-text-secondary uppercase mb-1">Serial Number</p>
+                  <p className="text-xs font-mono text-text-primary">{selectedCert.serial_number}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-text-secondary uppercase mb-1">Valid From</p>
+                  <p className="text-sm text-text-primary">
+                    {selectedCert.not_before ? formatDate(selectedCert.not_before) : '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-text-secondary uppercase mb-1">Valid Until</p>
+                  <p className="text-sm text-text-primary">
+                    {selectedCert.not_after ? formatDate(selectedCert.not_after) : '-'}
+                  </p>
+                </div>
               </div>
             </div>
-          )}
-        </DetailsPanel>
-      </div>
+
+            {/* Fingerprints */}
+            <div>
+              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
+                Fingerprints
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-text-secondary uppercase mb-1">SHA-256</p>
+                  <code className="text-xs font-mono text-text-primary bg-bg-tertiary px-2 py-1 rounded block break-all">
+                    {selectedCert.fingerprint_sha256 || '-'}
+                  </code>
+                </div>
+                <div>
+                  <p className="text-xs text-text-secondary uppercase mb-1">SHA-1</p>
+                  <code className="text-xs font-mono text-text-primary bg-bg-tertiary px-2 py-1 rounded block break-all">
+                    {selectedCert.fingerprint_sha1 || '-'}
+                  </code>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-4 border-t border-border">
+              <Button 
+                variant="secondary"
+                onClick={() => handleExport(selectedCert)}
+              >
+                <Download size={16} />
+                Export PEM
+              </Button>
+              {canDelete && (
+                <Button 
+                  variant="danger"
+                  onClick={() => handleDelete(selectedCert.id)}
+                >
+                  <Trash size={16} />
+                  Remove
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </PageLayout>
 
       {/* Add Certificate Modal */}
       <Modal

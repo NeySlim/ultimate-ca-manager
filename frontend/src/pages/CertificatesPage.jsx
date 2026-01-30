@@ -1,19 +1,21 @@
 /**
- * Certificates Page
+ * Certificates Page - Using PageLayout
  */
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Certificate, Download, X, ArrowsClockwise, Trash, UploadSimple } from '@phosphor-icons/react'
+import { 
+  Certificate, Download, X, ArrowsClockwise, Trash, UploadSimple,
+  ShieldCheck, Clock, Warning, Database
+} from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Table, Button, Badge, 
+  PageLayout, FocusItem, Table, Button, Badge, Card,
   StatusIndicator, Modal, Input, Select, ExportDropdown,
-  Tabs, LoadingSpinner, EmptyState
-, HelpCard } from '../components'
+  Tabs, LoadingSpinner, EmptyState, HelpCard
+} from '../components'
 import { certificatesService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals, useDebounce } from '../hooks'
 import { extractCN, extractData, formatDate, safeJsonParse } from '../lib/utils'
-import { PAGINATION } from '../constants/config'
 
 export default function CertificatesPage() {
   const { showSuccess, showError, showConfirm } = useNotification()
@@ -214,40 +216,13 @@ export default function CertificatesPage() {
     }
   }
 
-  const certColumns = [
-    { 
-      key: 'subject', 
-      label: 'Common Name',
-      render: (val) => <span className="font-medium">{extractCN(val)}</span>
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (val) => (
-        <div className="flex items-center gap-2">
-          <StatusIndicator status={val} />
-          <Badge variant={
-            val === 'valid' ? 'success' : 
-            val === 'expiring' ? 'warning' : 
-            'danger'
-          }>
-            {val}
-          </Badge>
-        </div>
-      )
-    },
-    { 
-      key: 'valid_to', 
-      label: 'Expires',
-      render: (val) => formatDate(val)
-    },
-    { 
-      key: 'issuer', 
-      label: 'Issuer',
-      render: (val) => extractCN(val)
-    },
-  ]
+  // Calculate statistics
+  const validCount = certificates.filter(c => c.status === 'valid').length
+  const expiringCount = certificates.filter(c => c.status === 'expiring').length
+  const expiredCount = certificates.filter(c => c.status === 'expired').length
+  const revokedCount = certificates.filter(c => c.status === 'revoked' || c.revoked).length
 
+  // Detail tabs for selected certificate
   const detailTabs = selectedCert ? [
     {
       id: 'overview',
@@ -368,7 +343,7 @@ export default function CertificatesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-text-secondary uppercase mb-1">Revoked At</p>
-                  <p className="text-sm text-text-primary">{formatDateTime(selectedCert.revoked_at)}</p>
+                  <p className="text-sm text-text-primary">{formatDate(selectedCert.revoked_at)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-text-secondary uppercase mb-1">Reason</p>
@@ -523,122 +498,205 @@ export default function CertificatesPage() {
     }
   ] : []
 
-  // No need to filter client-side - backend does it
-  const filteredCerts = certificates
+  // Help content for modal
+  const helpContent = (
+    <div className="space-y-4">
+      {/* Certificate Statistics */}
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Database size={16} className="text-accent-primary" />
+          Certificate Statistics
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-status-success">{validCount}</p>
+            <p className="text-xs text-text-secondary">Valid</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-status-warning">{expiringCount}</p>
+            <p className="text-xs text-text-secondary">Expiring Soon</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-status-error">{expiredCount}</p>
+            <p className="text-xs text-text-secondary">Expired</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-text-tertiary">{revokedCount}</p>
+            <p className="text-xs text-text-secondary">Revoked</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Help Cards */}
+      <div className="space-y-3">
+        <HelpCard variant="info" title="About Certificates">
+          Digital certificates bind public keys to identities. They are signed by a 
+          Certificate Authority to establish trust and enable secure communications.
+        </HelpCard>
+        
+        <HelpCard variant="tip" title="Certificate Renewal">
+          Renewing a certificate creates a new certificate with the same subject but 
+          fresh validity dates. The old certificate remains valid until it expires.
+        </HelpCard>
+
+        <HelpCard variant="warning" title="Revocation">
+          Revoked certificates are added to the CRL and cannot be un-revoked. 
+          Always verify the certificate before revoking as this action is permanent.
+        </HelpCard>
+      </div>
+    </div>
+  )
+
+  // Focus panel content (certificate list)
+  const focusContent = (
+    <div className="flex flex-col h-full">
+      {/* Search and Filter */}
+      <div className="p-3 space-y-2 border-b border-border">
+        <Input
+          placeholder="Search certificates..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="text-sm"
+        />
+        <Select
+          options={[
+            { value: 'all', label: 'All Certificates' },
+            { value: 'valid', label: 'Valid' },
+            { value: 'expiring', label: 'Expiring Soon' },
+            { value: 'expired', label: 'Expired' },
+            { value: 'revoked', label: 'Revoked' },
+          ]}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+      </div>
+
+      {/* Certificate List */}
+      <div className="flex-1 overflow-auto p-2 space-y-1.5">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <LoadingSpinner />
+          </div>
+        ) : certificates.length === 0 ? (
+          <EmptyState
+            icon={Certificate}
+            title="No certificates"
+            description="Issue your first certificate"
+          />
+        ) : (
+          certificates.map((cert) => {
+            const isSelected = selectedCert?.id === cert.id
+            return (
+              <FocusItem
+                key={cert.id}
+                icon={Certificate}
+                title={extractCN(cert.subject) || cert.common_name || 'Certificate'}
+                subtitle={`Expires ${formatDate(cert.valid_to)}`}
+                badge={
+                  <Badge 
+                    variant={
+                      cert.status === 'valid' ? 'success' : 
+                      cert.status === 'expiring' ? 'warning' : 
+                      'danger'
+                    }
+                    size="sm"
+                  >
+                    {cert.status}
+                  </Badge>
+                }
+                selected={isSelected}
+                onClick={() => loadCertificateDetails(cert.id)}
+              />
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+
+  // Focus panel actions (buttons)
+  const focusActions = canWrite('certificates') && (
+    <>
+      <Button size="sm" onClick={() => openModal('create')} className="flex-1">
+        <Certificate size={16} />
+        Issue
+      </Button>
+      <Button variant="secondary" size="sm" onClick={() => openModal('import')}>
+        <UploadSimple size={16} />
+      </Button>
+    </>
+  )
+
+  if (loading && certificates.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner />
+      </div>
+    )
+  }
 
   return (
     <>
-      <ExplorerPanel
-        title={selectedCert?.common_name || 'Select a certificate'}
-        actions={selectedCert && (
-          <>
-            <ExportDropdown 
-              onExport={handleExport}
-              hasPrivateKey={!!selectedCert.prv || selectedCert.has_key}
-            />
-            {canWrite('certificates') && (
-              <Button variant="secondary" size="sm" onClick={() => handleRenew(selectedCert.id)}>
-                <ArrowsClockwise size={16} />
-                Renew
-              </Button>
-            )}
-            {canDelete('certificates') && (
-              <Button variant="danger" size="sm" onClick={() => handleRevoke(selectedCert.id)}>
-                <X size={16} />
-                Revoke
-              </Button>
-            )}
-            {canDelete('certificates') && (
-              <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCert.id)}>
-                <Trash size={16} />
-                Delete
-              </Button>
-            )}
-          </>
-        )}
-      >
-        {!selectedCert ? (
-          <EmptyState
-            title="No certificate selected"
-            description="Select a certificate from the list to view details"
-          />
-        ) : (
-          <Tabs key={selectedCert.id} tabs={detailTabs} defaultTab="overview" />
-        )}
-      </ExplorerPanel>
-
-      <DetailsPanel
-        breadcrumb={[
-          { label: 'Certificates' },
-          { label: `${total} certificates` }
-        ]}
+      <PageLayout
         title="Certificates"
+        focusTitle="Certificates"
+        focusContent={focusContent}
+        focusActions={focusActions}
+        focusFooter={`${total} certificate(s)`}
+        helpContent={helpContent}
+        helpTitle="Certificates - Help"
       >
-        <div className="p-4 space-y-3">
-          <Input
-            placeholder="Search certificates..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          
-          <Select
-            label="Filter by Status"
-            options={[
-              { value: 'all', label: 'All Certificates' },
-              { value: 'valid', label: 'Valid' },
-              { value: 'expiring', label: 'Expiring Soon' },
-              { value: 'expired', label: 'Expired' },
-              { value: 'revoked', label: 'Revoked' },
-            ]}
-            value={statusFilter}
-            onChange={setStatusFilter}
-          />
-
-          {canWrite('certificates') && (
-            <div className="flex gap-2">
-              <Button onClick={() => openModal('create')} className="flex-1">
-                <Certificate size={18} />
-                Issue
-              </Button>
-              <Button variant="secondary" onClick={() => openModal('import')}>
-                <UploadSimple size={18} />
-                Import
-              </Button>
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-auto px-4 pb-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <LoadingSpinner />
-            </div>
-          ) : filteredCerts.length === 0 ? (
+        {/* Main Content - Certificate Details */}
+        {!selectedCert ? (
+          <div className="flex items-center justify-center h-full">
             <EmptyState
               icon={Certificate}
-              title="No certificates"
-              description="Issue your first certificate to get started"
+              title="No certificate selected"
+              description="Select a certificate from the list to view details"
             />
-          ) : (
-            <Table
-              columns={certColumns}
-              data={filteredCerts}
-              onRowClick={(cert) => loadCertificateDetails(cert.id)}
-              selectedId={selectedCert?.id}
-              pagination={{
-                total,
-                page,
-                perPage,
-                onChange: setPage,
-                onPerPageChange: (val) => {
-                  setPerPage(val)
-                  setPage(1)
-                }
-              }}
-            />
-          )}
-        </div>
-      </DetailsPanel>
+          </div>
+        ) : (
+          <div className="p-6 overflow-auto h-full">
+            {/* Header with actions */}
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
+              <div>
+                <h2 className="text-lg font-semibold text-text-primary">
+                  {selectedCert.common_name || extractCN(selectedCert.subject) || 'Certificate Details'}
+                </h2>
+                <p className="text-sm text-text-secondary mt-1">
+                  Serial: {selectedCert.serial_number?.substring(0, 20)}...
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <ExportDropdown 
+                  onExport={handleExport}
+                  hasPrivateKey={!!selectedCert.prv || selectedCert.has_key}
+                />
+                {canWrite('certificates') && (
+                  <Button variant="secondary" size="sm" onClick={() => handleRenew(selectedCert.id)}>
+                    <ArrowsClockwise size={16} />
+                    Renew
+                  </Button>
+                )}
+                {canDelete('certificates') && (
+                  <Button variant="danger" size="sm" onClick={() => handleRevoke(selectedCert.id)}>
+                    <X size={16} />
+                    Revoke
+                  </Button>
+                )}
+                {canDelete('certificates') && (
+                  <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCert.id)}>
+                    <Trash size={16} />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <Tabs key={selectedCert.id} tabs={detailTabs} defaultTab="overview" />
+          </div>
+        )}
+      </PageLayout>
 
       {/* Create Certificate Modal */}
       <Modal

@@ -1,16 +1,18 @@
 /**
  * CAs (Certificate Authorities) Page
+ * Uses PageLayout for consistent layout structure
  */
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   ShieldCheck, Crown, Key, Download, Trash, PencilSimple,
-  Tree, SquaresFour, Certificate, UploadSimple
+  Tree, SquaresFour, Certificate, UploadSimple, MagnifyingGlass,
+  Database, Pulse
 } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, TreeView, Table, Button, 
-  Badge, Modal, Input, Select, ExportDropdown,
-  Tabs, LoadingSpinner, EmptyState, Tooltip, HelpCard
+  PageLayout, FocusItem, TreeView, Table, Button, 
+  Badge, Modal, Input, Select, ExportDropdown, Card,
+  Tabs, LoadingSpinner, EmptyState, Tooltip, HelpCard, StatusIndicator
 } from '../components'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
@@ -636,171 +638,253 @@ export default function CAsPage() {
     ca.subject?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  return (
-    <>
-      <ExplorerPanel
-        title="Certificate Authorities"
-        searchable
-        searchValue={searchQuery}
-        onSearch={setSearchQuery}
-        footer={
-          <div className="text-xs text-text-secondary">
-            {cas.length} total CAs
-          </div>
-        }
-      >
-        <div className="p-4 space-y-3">
-          <div className="flex gap-2">
-            <Tooltip content="Tree View">
-              <button
-                onClick={() => setViewMode('tree')}
-                className={`flex-1 p-2 rounded-lg transition-colors ${
-                  viewMode === 'tree' 
-                    ? 'bg-accent-primary text-white' 
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <Tree size={18} className="mx-auto" />
-              </button>
-            </Tooltip>
-            <Tooltip content="Grid View">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`flex-1 p-2 rounded-lg transition-colors ${
-                  viewMode === 'grid' 
-                    ? 'bg-accent-primary text-white' 
-                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'
-                }`}
-              >
-                <SquaresFour size={18} className="mx-auto" />
-              </button>
-            </Tooltip>
-          </div>
+  // Calculate stats for help content
+  const rootCAs = cas.filter(ca => ca.type === 'root').length
+  const intermediateCAs = cas.filter(ca => ca.type === 'intermediate').length
+  const totalCerts = cas.reduce((sum, ca) => sum + (ca.certs || 0), 0)
 
-          {canWrite('cas') && (
-            <div className="flex gap-2">
-              <Button onClick={() => openModal('create')} className="flex-1">
-                <ShieldCheck size={18} />
-                Create
-              </Button>
-              <Button variant="secondary" onClick={() => { openModal('import'); }}>
-                <UploadSimple size={18} />
-                Import
-              </Button>
-            </div>
-          )}
+  // Help content for modal
+  const helpContent = (
+    <div className="space-y-4">
+      {/* CA Statistics */}
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Database size={16} className="text-accent-primary" />
+          CA Statistics
+        </h3>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-yellow-500">{rootCAs}</p>
+            <p className="text-xs text-text-secondary">Root CAs</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-blue-500">{intermediateCAs}</p>
+            <p className="text-xs text-text-secondary">Intermediate</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-text-primary">{totalCerts}</p>
+            <p className="text-xs text-text-secondary">Certificates</p>
+          </div>
         </div>
+      </Card>
 
-        <div className="flex-1 overflow-auto p-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <LoadingSpinner />
+      {/* Help Cards */}
+      <div className="space-y-3">
+        <HelpCard variant="info" title="About CAs">
+          Certificate Authorities (CAs) are trusted entities that issue digital certificates.
+          Root CAs are self-signed. Intermediate CAs are signed by their parent CA.
+        </HelpCard>
+        
+        <HelpCard variant="tip" title="Best Practices">
+          Keep your Root CA offline and use Intermediate CAs for issuing end-entity certificates.
+          This limits exposure if an Intermediate CA is compromised.
+        </HelpCard>
+
+        <HelpCard variant="warning" title="Private Keys">
+          Private keys should be protected. Consider using HSM (Hardware Security Module) 
+          for production Root CAs to ensure maximum security.
+        </HelpCard>
+      </div>
+    </div>
+  )
+
+  // Focus panel content (search + tree/list view)
+  const focusContent = (
+    <div className="flex flex-col h-full">
+      {/* Search */}
+      <div className="p-3 border-b border-border">
+        <div className="relative">
+          <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+          <input
+            type="text"
+            placeholder="Search CAs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm bg-bg-tertiary border border-border rounded-md focus:outline-none focus:border-accent-primary text-text-primary placeholder:text-text-tertiary"
+          />
+        </div>
+      </div>
+
+      {/* View mode toggle */}
+      <div className="p-3 border-b border-border">
+        <div className="flex gap-2">
+          <Tooltip content="Tree View">
+            <button
+              onClick={() => setViewMode('tree')}
+              className={`flex-1 p-2 rounded-lg transition-colors ${
+                viewMode === 'tree' 
+                  ? 'bg-accent-primary text-white' 
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <Tree size={18} className="mx-auto" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Grid View">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex-1 p-2 rounded-lg transition-colors ${
+                viewMode === 'grid' 
+                  ? 'bg-accent-primary text-white' 
+                  : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              <SquaresFour size={18} className="mx-auto" />
+            </button>
+          </Tooltip>
+        </div>
+      </div>
+
+      {/* CA list/tree */}
+      <div className="flex-1 overflow-auto p-2">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <LoadingSpinner />
+          </div>
+        ) : viewMode === 'tree' ? (
+          (treeRoots.length === 0 && treeOrphans.length === 0) ? (
+            <EmptyState
+              icon={ShieldCheck}
+              title="No CAs yet"
+              description="Create your first Certificate Authority"
+            />
+          ) : (
+            <div className="space-y-4">
+              {/* Root CAs Section */}
+              {treeRoots.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2 flex items-center gap-2">
+                    <Crown size={14} className="text-yellow-500" />
+                    Root CAs ({treeRoots.length})
+                  </p>
+                  <TreeView
+                    nodes={treeRoots}
+                    selectedId={selectedCA?.id}
+                    onSelect={(node) => loadCADetails(node.id)}
+                  />
+                </div>
+              )}
+              
+              {/* Orphaned/Intermediate CAs Section */}
+              {treeOrphans.length > 0 && (
+                <div className="pt-2 border-t border-border">
+                  <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2 flex items-center gap-2">
+                    <ShieldCheck size={14} className="text-orange-500" />
+                    Orphaned CAs ({treeOrphans.length})
+                  </p>
+                  <TreeView
+                    nodes={treeOrphans}
+                    selectedId={selectedCA?.id}
+                    onSelect={(node) => loadCADetails(node.id)}
+                  />
+                </div>
+              )}
             </div>
-          ) : viewMode === 'tree' ? (
-            (treeRoots.length === 0 && treeOrphans.length === 0) ? (
+          )
+        ) : (
+          <div className="space-y-1.5">
+            {filteredCAs.length === 0 ? (
               <EmptyState
                 icon={ShieldCheck}
-                title="No CAs yet"
-                description="Create your first Certificate Authority"
+                title="No CAs found"
+                description={searchQuery ? "Try a different search" : "Create your first CA"}
               />
             ) : (
-              <div className="space-y-4">
-                {/* Root CAs Section */}
-                {treeRoots.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2 flex items-center gap-2">
-                      <Crown size={14} className="text-yellow-500" />
-                      Root CAs ({treeRoots.length})
-                    </p>
-                    <TreeView
-                      nodes={treeRoots}
-                      selectedId={selectedCA?.id}
-                      onSelect={(node) => loadCADetails(node.id)}
-                    />
-                  </div>
+              filteredCAs.map((ca) => (
+                <FocusItem
+                  key={ca.id}
+                  icon={ca.type === 'root' ? Crown : ShieldCheck}
+                  title={ca.name}
+                  subtitle={ca.subject}
+                  badge={<Badge variant={ca.type === 'root' ? 'primary' : 'secondary'} size="sm">{ca.type}</Badge>}
+                  selected={selectedCA?.id === ca.id}
+                  onClick={() => loadCADetails(ca.id)}
+                />
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
+  // Focus actions (create and import buttons)
+  const focusActions = canWrite('cas') && (
+    <>
+      <Button onClick={() => openModal('create')} size="sm" className="flex-1">
+        <ShieldCheck size={16} />
+        Create
+      </Button>
+      <Button variant="secondary" size="sm" onClick={() => openModal('import')}>
+        <UploadSimple size={16} />
+        Import
+      </Button>
+    </>
+  )
+
+  if (loading && cas.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <PageLayout
+        title="Certificate Authorities"
+        focusTitle="CAs"
+        focusContent={focusContent}
+        focusActions={focusActions}
+        focusFooter={`${cas.length} CA(s)`}
+        helpContent={helpContent}
+        helpTitle="Certificate Authorities - Aide"
+      >
+        {/* Main Content (CA details) */}
+        {!selectedCA ? (
+          <div className="flex items-center justify-center h-full">
+            <EmptyState
+              icon={ShieldCheck}
+              title="No CA selected"
+              description="Select a Certificate Authority from the list"
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col h-full">
+            {/* Header with breadcrumb and actions */}
+            <div className="px-6 py-4 border-b border-border bg-bg-secondary flex items-center justify-between shrink-0">
+              <div>
+                <p className="text-xs text-text-secondary mb-1">CAs / {selectedCA.name || '...'}</p>
+                <h2 className="text-lg font-semibold text-text-primary">{selectedCA.name || 'Select a CA'}</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                {canWrite('cas') && (
+                  <Button variant="secondary" size="sm">
+                    <PencilSimple size={16} />
+                    Edit
+                  </Button>
                 )}
-                
-                {/* Orphaned/Intermediate CAs Section */}
-                {treeOrphans.length > 0 && (
-                  <div className="pt-2 border-t border-border">
-                    <p className="text-xs font-semibold text-text-secondary uppercase px-2 mb-2 flex items-center gap-2">
-                      <ShieldCheck size={14} className="text-orange-500" />
-                      Orphaned CAs ({treeOrphans.length})
-                    </p>
-                    <TreeView
-                      nodes={treeOrphans}
-                      selectedId={selectedCA?.id}
-                      onSelect={(node) => loadCADetails(node.id)}
-                    />
-                  </div>
+                <ExportDropdown 
+                  onExport={handleExport}
+                  hasPrivateKey={!!selectedCA.prv || selectedCA.has_key}
+                />
+                {canDelete('cas') && (
+                  <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCA.id)}>
+                    <Trash size={16} />
+                    Delete
+                  </Button>
                 )}
               </div>
-            )
-          ) : (
-            <div className="space-y-2">
-              {filteredCAs.map((ca) => (
-                <div
-                  key={ca.id}
-                  onClick={() => loadCADetails(ca.id)}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    selectedCA?.id === ca.id
-                      ? 'bg-accent-primary/10 border-accent-primary'
-                      : 'bg-bg-tertiary border-border hover:border-accent-primary/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    {getCAIcon(ca.type)}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-text-primary truncate">{ca.name}</p>
-                      <p className="text-xs text-text-secondary truncate">{ca.subject}</p>
-                    </div>
-                    <Badge variant={ca.type === 'root' ? 'primary' : 'secondary'}>
-                      {ca.type}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
             </div>
-          )}
-        </div>
-      </ExplorerPanel>
 
-      <DetailsPanel
-        breadcrumb={[
-          { label: 'CAs' },
-          { label: selectedCA?.name || '...' }
-        ]}
-        title={selectedCA?.name || 'Select a CA'}
-        actions={selectedCA && (
-          <>
-            {canWrite('cas') && (
-              <Button variant="secondary" size="sm">
-                <PencilSimple size={16} />
-                Edit
-              </Button>
-            )}
-            <ExportDropdown 
-              onExport={handleExport}
-              hasPrivateKey={!!selectedCA.prv || selectedCA.has_key}
-            />
-            {canDelete('cas') && (
-              <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCA.id)}>
-                <Trash size={16} />
-                Delete
-              </Button>
-            )}
-          </>
+            {/* Tabs content */}
+            <div className="flex-1 overflow-auto p-6">
+              <Tabs tabs={detailTabs} defaultTab="overview" />
+            </div>
+          </div>
         )}
-      >
-        {!selectedCA ? (
-          <EmptyState
-            title="No CA selected"
-            description="Select a Certificate Authority from the list"
-          />
-        ) : (
-          <Tabs tabs={detailTabs} defaultTab="overview" />
-        )}
-      </DetailsPanel>
+      </PageLayout>
 
       {/* Create CA Modal */}
       <Modal

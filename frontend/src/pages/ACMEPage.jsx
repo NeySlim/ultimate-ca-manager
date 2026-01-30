@@ -1,11 +1,15 @@
 /**
- * ACME Page
+ * ACME Page - Using PageLayout
+ * ACME Protocol management for automated certificate issuance
  */
 import { useState, useEffect } from 'react'
-import { Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, HourglassHigh, Globe, Lightning } from '@phosphor-icons/react'
+import { 
+  Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
+  Globe, Lightning, MagnifyingGlass, Database
+} from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Table, Button, Badge, Card,
-  Input, Modal, Tabs, Select, HelpCard, HelpTooltip,
+  PageLayout, FocusItem, Table, Button, Badge, Card,
+  Input, Modal, Tabs, Select, HelpCard,
   LoadingSpinner, EmptyState, StatusIndicator
 } from '../components'
 import { acmeService, casService } from '../services'
@@ -24,6 +28,8 @@ export default function ACMEPage() {
   const [cas, setCas] = useState([])
   const [proxyEmail, setProxyEmail] = useState('')
   const [saving, setSaving] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
 
   useEffect(() => {
     loadAccounts()
@@ -70,7 +76,7 @@ export default function ACMEPage() {
       await acmeService.registerProxy(proxyEmail)
       showSuccess('Proxy account registered successfully')
       setProxyEmail('')
-      loadAcmeSettings() // Reload to show registered state
+      loadAcmeSettings()
     } catch (error) {
       showError(error.message || 'Failed to register proxy account')
     }
@@ -83,7 +89,7 @@ export default function ACMEPage() {
     try {
       await acmeService.unregisterProxy()
       showSuccess('Proxy account unregistered')
-      loadAcmeSettings() // Reload to show unregistered state
+      loadAcmeSettings()
     } catch (error) {
       showError(error.message || 'Failed to unregister proxy account')
     }
@@ -171,34 +177,6 @@ export default function ACMEPage() {
     }
   }
 
-  const accountColumns = [
-    { 
-      key: 'email', 
-      label: 'Email',
-      render: (val) => <span className="font-medium">{val}</span>
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (val) => (
-        <div className="flex items-center gap-2">
-          <StatusIndicator status={val === 'valid' ? 'active' : 'inactive'} />
-          <Badge variant={val === 'valid' ? 'success' : 'secondary'}>{val}</Badge>
-        </div>
-      )
-    },
-    {
-      key: 'orders_count',
-      label: 'Orders',
-      render: (val) => val || 0
-    },
-    {
-      key: 'created_at',
-      label: 'Created',
-      render: (val) => val ? new Date(val).toLocaleDateString() : '-'
-    },
-  ]
-
   const orderColumns = [
     { key: 'domain', label: 'Domain' },
     {
@@ -280,6 +258,22 @@ export default function ACMEPage() {
               </div>
             </div>
           </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4 border-t border-border">
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              onClick={() => handleDeactivate(selectedAccount.id)}
+              disabled={selectedAccount.status !== 'valid'}
+            >
+              Deactivate
+            </Button>
+            <Button variant="danger" size="sm" onClick={() => handleDelete(selectedAccount.id)}>
+              <Trash size={16} />
+              Delete
+            </Button>
+          </div>
         </div>
       )
     },
@@ -335,139 +329,133 @@ export default function ACMEPage() {
     },
   ] : []
 
-  const configTabs = [
-    {
-      id: 'config',
-      label: 'Server Configuration',
-      content: (
-        <div className="space-y-6 max-w-2xl p-4">
-          <HelpCard variant="info" title="About ACME Protocol">
-            ACME (Automatic Certificate Management Environment) enables automated certificate issuance. 
-            Compatible with certbot, acme.sh, and other ACME clients.
-          </HelpCard>
+  const configContent = (
+    <div className="space-y-6 max-w-2xl p-6">
+      <HelpCard variant="info" title="About ACME Protocol">
+        ACME (Automatic Certificate Management Environment) enables automated certificate issuance. 
+        Compatible with certbot, acme.sh, and other ACME clients.
+      </HelpCard>
 
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">ACME Server Configuration</h3>
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={acmeSettings.enabled || false}
-                  onChange={(e) => updateAcmeSetting('enabled', e.target.checked)}
-                  className="rounded border-border bg-bg-tertiary"
-                />
-                <div>
-                  <p className="text-sm text-text-primary font-medium">Enable ACME Server</p>
-                  <p className="text-xs text-text-secondary">Allow automated certificate issuance via ACME protocol</p>
-                </div>
-              </label>
+      <div>
+        <h3 className="text-sm font-semibold text-text-primary mb-4">ACME Server Configuration</h3>
+        <div className="space-y-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={acmeSettings.enabled || false}
+              onChange={(e) => updateAcmeSetting('enabled', e.target.checked)}
+              className="rounded border-border bg-bg-tertiary"
+            />
+            <div>
+              <p className="text-sm text-text-primary font-medium">Enable ACME Server</p>
+              <p className="text-xs text-text-secondary">Allow automated certificate issuance via ACME protocol</p>
+            </div>
+          </label>
 
-              <Select
-                label="Default CA for ACME"
-                value={acmeSettings.issuing_ca_id?.toString() || undefined}
-                onChange={(val) => updateAcmeSetting('issuing_ca_id', val ? parseInt(val) : null)}
-                disabled={!acmeSettings.enabled}
-                placeholder="Select a CA..."
-                options={cas.map(ca => ({ value: ca.id.toString(), label: ca.name || ca.common_name || ca.descr }))}
-              />
+          <Select
+            label="Default CA for ACME"
+            value={acmeSettings.issuing_ca_id?.toString() || undefined}
+            onChange={(val) => updateAcmeSetting('issuing_ca_id', val ? parseInt(val) : null)}
+            disabled={!acmeSettings.enabled}
+            placeholder="Select a CA..."
+            options={cas.map(ca => ({ value: ca.id.toString(), label: ca.name || ca.common_name || ca.descr }))}
+          />
 
+          <Input
+            label="ACME Directory URL"
+            value={`${window.location.origin}/acme/directory`}
+            readOnly
+            helperText="Use this URL with ACME clients like certbot or acme.sh"
+            className="bg-bg-tertiary"
+          />
+        </div>
+      </div>
+
+      <div className="border-t border-border pt-6">
+        <h3 className="text-sm font-semibold text-text-primary mb-4">Let's Encrypt Proxy</h3>
+        
+        <HelpCard variant="tip" title="What is LE Proxy?" className="mb-4" compact>
+          Proxy certificate requests to Let's Encrypt while maintaining local control and audit logging.
+        </HelpCard>
+
+        <div className="space-y-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={acmeSettings.proxy_enabled || false}
+              onChange={(e) => updateAcmeSetting('proxy_enabled', e.target.checked)}
+              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
+            />
+            <span className="text-sm font-medium text-text-primary">Enable Let's Encrypt Proxy</span>
+          </label>
+
+          {acmeSettings.proxy_enabled && (
+            <>
               <Input
-                label="ACME Directory URL"
-                value={`${window.location.origin}/acme/directory`}
+                label="Proxy Endpoint URL"
+                value={`${window.location.origin}/api/v2/acme/proxy`}
                 readOnly
-                helperText="Use this URL with ACME clients like certbot or acme.sh"
+                helperText="External ACME clients can use this URL to proxy requests to Let's Encrypt"
                 className="bg-bg-tertiary"
               />
-            </div>
-          </div>
-
-          <div className="border-t border-border pt-6">
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Let's Encrypt Proxy</h3>
-            
-            <HelpCard variant="tip" title="What is LE Proxy?" className="mb-4" compact>
-              Proxy certificate requests to Let's Encrypt while maintaining local control and audit logging.
-            </HelpCard>
-
-            <div className="space-y-4">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={acmeSettings.proxy_enabled || false}
-                  onChange={(e) => updateAcmeSetting('proxy_enabled', e.target.checked)}
-                  className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
-                />
-                <span className="text-sm font-medium text-text-primary">Enable Let's Encrypt Proxy</span>
-              </label>
-
-              {acmeSettings.proxy_enabled && (
-                <>
-                  <Input
-                    label="Proxy Endpoint URL"
-                    value={`${window.location.origin}/api/v2/acme/proxy`}
-                    readOnly
-                    helperText="External ACME clients can use this URL to proxy requests to Let's Encrypt"
-                    className="bg-bg-tertiary"
-                  />
-                  
-                  {acmeSettings.proxy_registered ? (
-                    <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-full bg-emerald-500/20">
-                            <CheckCircle size={20} className="text-emerald-500" weight="fill" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-text-primary">Proxy Account Registered</p>
-                            <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
-                          </div>
-                        </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={handleUnregisterProxy}
-                          className="text-red-500 hover:bg-red-500/10"
-                        >
-                          <Trash size={16} />
-                          Unregister
-                        </Button>
+              
+              {acmeSettings.proxy_registered ? (
+                <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-emerald-500/20">
+                        <CheckCircle size={20} className="text-emerald-500" weight="fill" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-text-primary">Proxy Account Registered</p>
+                        <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
                       </div>
                     </div>
-                  ) : (
-                    <>
-                      <Input
-                        label="Email Address"
-                        type="email"
-                        value={proxyEmail}
-                        onChange={(e) => setProxyEmail(e.target.value)}
-                        placeholder="admin@example.com"
-                        helperText="Email for Let's Encrypt account registration"
-                      />
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={handleUnregisterProxy}
+                      className="text-red-500 hover:bg-red-500/10"
+                    >
+                      <Trash size={16} />
+                      Unregister
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Input
+                    label="Email Address"
+                    type="email"
+                    value={proxyEmail}
+                    onChange={(e) => setProxyEmail(e.target.value)}
+                    placeholder="admin@example.com"
+                    helperText="Email for Let's Encrypt account registration"
+                  />
 
-                      <Button 
-                        variant="secondary" 
-                        onClick={handleRegisterProxy}
-                        disabled={!proxyEmail}
-                      >
-                        <Key size={16} />
-                        Register Proxy Account
-                      </Button>
-                    </>
-                  )}
+                  <Button 
+                    variant="secondary" 
+                    onClick={handleRegisterProxy}
+                    disabled={!proxyEmail}
+                  >
+                    <Key size={16} />
+                    Register Proxy Account
+                  </Button>
                 </>
               )}
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t border-border">
-            <Button onClick={handleSaveConfig} disabled={saving}>
-              <FloppyDisk size={16} />
-              Save Configuration
-            </Button>
-          </div>
+            </>
+          )}
         </div>
-      )
-    }
-  ]
+      </div>
+
+      <div className="flex gap-3 pt-4 border-t border-border">
+        <Button onClick={handleSaveConfig} disabled={saving}>
+          <FloppyDisk size={16} />
+          Save Configuration
+        </Button>
+      </div>
+    </div>
+  )
 
   // Stats computed from accounts
   const stats = {
@@ -477,146 +465,176 @@ export default function ACMEPage() {
     challenges: challenges.filter(c => c.status === 'pending').length
   }
 
+  // Filtered accounts
+  const filteredAccounts = accounts.filter(account => {
+    const matchesSearch = !searchTerm || 
+      account.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || account.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
+  // Help content for modal
+  const helpContent = (
+    <div className="space-y-4">
+      {/* ACME Statistics */}
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Database size={16} className="text-accent-primary" />
+          ACME Statistics
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-text-primary">{stats.total}</p>
+            <p className="text-xs text-text-secondary">Total Accounts</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-status-success">{stats.active}</p>
+            <p className="text-xs text-text-secondary">Active</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-accent-primary">{stats.orders}</p>
+            <p className="text-xs text-text-secondary">Orders</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-status-warning">{stats.challenges}</p>
+            <p className="text-xs text-text-secondary">Pending</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Server Status */}
+      <Card className={`p-4 space-y-3 bg-gradient-to-br ${acmeSettings.enabled ? 'from-emerald-500/10' : 'from-amber-500/10'}`}>
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Lightning size={16} className="text-accent-primary" />
+          Server Status
+        </h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">ACME Server</span>
+            <StatusIndicator status={acmeSettings.enabled ? 'success' : 'warning'}>
+              {acmeSettings.enabled ? 'Enabled' : 'Disabled'}
+            </StatusIndicator>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">LE Proxy</span>
+            <StatusIndicator status={acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'success' : 'warning') : 'inactive'}>
+              {acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'Active' : 'Not Registered') : 'Disabled'}
+            </StatusIndicator>
+          </div>
+        </div>
+      </Card>
+
+      {/* Help Cards */}
+      <div className="space-y-3">
+        <HelpCard variant="info" title="About ACME">
+          ACME (Automatic Certificate Management Environment) is a protocol for automating 
+          certificate issuance and renewal. It powers services like Let's Encrypt.
+        </HelpCard>
+        
+        <HelpCard variant="tip" title="Let's Encrypt Integration">
+          Enable the LE Proxy to forward certificate requests to Let's Encrypt while 
+          maintaining centralized audit logging and management control.
+        </HelpCard>
+
+        <HelpCard variant="warning" title="Account Security">
+          ACME accounts contain private keys. Keep accounts secure and deactivate 
+          or delete unused accounts to minimize security exposure.
+        </HelpCard>
+      </div>
+    </div>
+  )
+
+  // Focus panel content (account list with search/filter)
+  const focusContent = (
+    <div className="flex flex-col h-full">
+      {/* Search and Filter */}
+      <div className="p-3 space-y-2 border-b border-border">
+        <div className="relative">
+          <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+          <input
+            type="text"
+            placeholder="Search accounts..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border border-border bg-bg-tertiary focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/20"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="w-full px-2.5 py-1.5 text-sm rounded-md border border-border bg-bg-tertiary"
+        >
+          <option value="all">All Status</option>
+          <option value="valid">Valid</option>
+          <option value="deactivated">Deactivated</option>
+        </select>
+      </div>
+
+      {/* Account List */}
+      <div className="flex-1 overflow-auto p-2 space-y-1.5">
+        {filteredAccounts.length === 0 ? (
+          <EmptyState 
+            icon={Key}
+            title="No Accounts"
+            description={searchTerm ? "No matching accounts found" : "Create your first ACME account"}
+          />
+        ) : (
+          filteredAccounts.map((account) => (
+            <FocusItem
+              key={account.id}
+              icon={Key}
+              title={account.email}
+              subtitle={`Created ${account.created_at ? new Date(account.created_at).toLocaleDateString() : '-'}`}
+              badge={
+                <Badge variant={account.status === 'valid' ? 'success' : 'secondary'} size="sm">
+                  {account.status}
+                </Badge>
+              }
+              selected={selectedAccount?.id === account.id}
+              onClick={() => selectAccount(account)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  )
+
+  // Focus actions (create button)
+  const focusActions = (
+    <Button onClick={() => setShowCreateModal(true)} size="sm" className="w-full">
+      <Plus size={14} />
+      Create Account
+    </Button>
+  )
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
   return (
     <>
-      <ExplorerPanel
-        title="ACME"
-        footer={
-          <div className="text-xs text-text-secondary">
-            {accounts.length} accounts
-          </div>
-        }
+      <PageLayout
+        title="ACME Protocol"
+        focusTitle="Accounts"
+        focusContent={focusContent}
+        focusActions={focusActions}
+        focusFooter={`${filteredAccounts.length} of ${accounts.length} account(s)`}
+        helpContent={helpContent}
+        helpTitle="ACME Protocol - Aide"
       >
-        <div className="space-y-4">
-          {/* Stats Cards */}
-          <div className="px-3 pt-2 space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Overview
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <Card className="p-2.5 text-center bg-gradient-to-br from-blue-500/10 to-transparent border-blue-500/20">
-                <div className="flex items-center justify-center gap-1.5">
-                  <Key size={16} weight="duotone" className="text-blue-500" />
-                  <span className="text-lg font-bold text-blue-500">{stats.total}</span>
-                </div>
-                <div className="text-xs text-text-secondary">Accounts</div>
-              </Card>
-              <Card className="p-2.5 text-center bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
-                <div className="flex items-center justify-center gap-1.5">
-                  <CheckCircle size={16} weight="duotone" className="text-emerald-500" />
-                  <span className="text-lg font-bold text-emerald-500">{stats.active}</span>
-                </div>
-                <div className="text-xs text-text-secondary">Active</div>
-              </Card>
-            </div>
-          </div>
-
-          {/* Server Status */}
-          <div className="px-3 space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Server Status
-            </h3>
-            <Card className="p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Lightning size={14} weight="duotone" className={acmeSettings.enabled ? 'text-emerald-500' : 'text-gray-500'} />
-                  <span className="text-sm">ACME Server</span>
-                </div>
-                <Badge variant={acmeSettings.enabled ? 'emerald' : 'gray'} size="sm">
-                  {acmeSettings.enabled ? 'Enabled' : 'Disabled'}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Globe size={14} weight="duotone" className="text-purple-500" />
-                  <span className="text-sm">Directory</span>
-                </div>
-                <Badge variant="purple" size="sm">Ready</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={14} weight="duotone" className={acmeSettings.proxy_enabled ? 'text-orange-500' : 'text-gray-500'} />
-                  <span className="text-sm">LE Proxy</span>
-                </div>
-                <Badge variant={acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'emerald' : 'orange') : 'gray'} size="sm">
-                  {acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'Active' : 'Not Registered') : 'Disabled'}
-                </Badge>
-              </div>
-            </Card>
-          </div>
-
-          {/* Actions */}
-          <div className="px-3 space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Actions
-            </h3>
-            <Button onClick={() => setShowCreateModal(true)} className="w-full justify-start">
-              <span className="p-1 rounded bg-accent/20">
-                <Plus size={16} weight="bold" className="text-accent" />
-              </span>
-              Create Account
-            </Button>
-          </div>
-
-          {/* Account List */}
-          {accounts.length > 0 && (
-            <div className="px-3 space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                Accounts
-              </h3>
-              <div className="space-y-1">
-                {accounts.slice(0, 5).map(account => (
-                  <button
-                    key={account.id}
-                    onClick={() => selectAccount(account)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
-                      selectedAccount?.id === account.id 
-                        ? 'bg-accent/10 text-accent border-l-2 border-accent' 
-                        : 'hover:bg-bg-tertiary/50'
-                    }`}
-                  >
-                    <Key size={14} weight="duotone" className={account.status === 'valid' ? 'text-emerald-500' : 'text-gray-500'} />
-                    <span className="text-sm truncate flex-1">{account.email}</span>
-                    <Badge variant={account.status === 'valid' ? 'emerald' : 'gray'} size="sm">
-                      {account.status}
-                    </Badge>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </ExplorerPanel>
-
-      <DetailsPanel
-        breadcrumb={[
-          { label: 'ACME' },
-          { label: selectedAccount?.email || 'Configuration' }
-        ]}
-        title={selectedAccount?.email || 'ACME Configuration'}
-        actions={selectedAccount && (
-          <>
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              onClick={() => handleDeactivate(selectedAccount.id)}
-              disabled={selectedAccount.status !== 'valid'}
-            >
-              Deactivate
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => handleDelete(selectedAccount.id)}>
-              <Trash size={16} />
-              Delete
-            </Button>
-          </>
-        )}
-      >
+        {/* Main Content */}
         {!selectedAccount ? (
-          <Tabs tabs={configTabs} defaultTab="config" />
+          configContent
         ) : (
-          <Tabs tabs={detailTabs} defaultTab="info" />
+          <div className="p-6">
+            <Tabs tabs={detailTabs} defaultTab="info" />
+          </div>
         )}
-      </DetailsPanel>
+      </PageLayout>
 
       {/* Create Account Modal */}
       <Modal

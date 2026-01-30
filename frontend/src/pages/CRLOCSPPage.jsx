@@ -4,12 +4,12 @@
  */
 import { useState, useEffect } from 'react'
 import { 
-  FileX, ShieldCheck, ArrowsClockwise, Download, Globe, Clock,
-  CheckCircle, XCircle, Info, Warning, Database, Activity
+  FileX, ShieldCheck, ArrowsClockwise, Download, Globe,
+  Database, Pulse
 } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, Card, Badge, 
-  Table, LoadingSpinner, EmptyState, StatusIndicator, HelpCard
+  PageLayout, FocusItem, Button, Card, Badge, 
+  LoadingSpinner, EmptyState, StatusIndicator, HelpCard
 } from '../components'
 import { casService, crlService, apiClient } from '../services'
 import { useNotification } from '../contexts'
@@ -35,7 +35,6 @@ export default function CRLOCSPPage() {
   const [selectedCRL, setSelectedCRL] = useState(null)
   const [ocspStatus, setOcspStatus] = useState({ enabled: false, running: false })
   const [ocspStats, setOcspStats] = useState({ total_requests: 0, cache_hits: 0 })
-  const [activeTab, setActiveTab] = useState('crl')
   const [regenerating, setRegenerating] = useState(false)
 
   useEffect(() => {
@@ -111,91 +110,108 @@ export default function CRLOCSPPage() {
     URL.revokeObjectURL(url)
   }
 
-  const crlColumns = [
-    { key: 'ca_name', label: 'CA' },
-    { 
-      key: 'revoked_count', 
-      label: 'Revoked',
-      render: (val) => <Badge variant="secondary">{val || 0}</Badge>
-    },
-    { 
-      key: 'updated_at', 
-      label: 'Last Updated',
-      render: (val) => val ? formatDate(val) : '-'
-    },
-    { 
-      key: 'next_update', 
-      label: 'Next Update',
-      render: (val) => val ? formatDate(val) : '-'
-    },
-  ]
+  // Calculate stats
+  const totalRevoked = crls.reduce((sum, crl) => sum + (crl.revoked_count || 0), 0)
+  const cacheHitRate = ocspStats.total_requests > 0 
+    ? Math.round((ocspStats.cache_hits / ocspStats.total_requests) * 100) 
+    : 0
 
-  // Sidebar content
-  const sidebarContent = (
+  // Help content for modal
+  const helpContent = (
     <div className="space-y-4">
-      {/* Stats */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Overview</h3>
-        <Card className="p-3 space-y-2 bg-gradient-to-br from-accent-primary/5 to-transparent">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-text-secondary">CAs with CRL</span>
-            <span className="text-text-primary font-medium">{crls.length}</span>
+      {/* CRL Statistics */}
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Database size={16} className="text-accent-primary" />
+          CRL Statistics
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-text-primary">{crls.length}</p>
+            <p className="text-xs text-text-secondary">Active CRLs</p>
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-text-secondary">Total Revoked</span>
-            <span className="text-text-primary font-medium">
-              {crls.reduce((sum, crl) => sum + (crl.revoked_count || 0), 0)}
-            </span>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-status-error">{totalRevoked}</p>
+            <p className="text-xs text-text-secondary">Revoked Certs</p>
           </div>
-        </Card>
-      </div>
+        </div>
+      </Card>
 
       {/* OCSP Status */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">OCSP Status</h3>
-        <Card className="p-3 space-y-2 bg-gradient-to-br from-emerald-500/5 to-transparent border-emerald-500/20">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-text-secondary">Service</span>
-            <StatusIndicator status={ocspStatus.enabled ? 'success' : 'warning'} size="sm">
-              {ocspStatus.enabled ? 'Enabled' : 'Disabled'}
+      <Card className={`p-4 space-y-3 bg-gradient-to-br ${ocspStatus.enabled ? 'from-emerald-500/10' : 'from-amber-500/10'}`}>
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Pulse size={16} className="text-accent-primary" />
+          OCSP Responder
+        </h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">Status</span>
+            <StatusIndicator status={ocspStatus.enabled && ocspStatus.running ? 'success' : 'warning'}>
+              {ocspStatus.enabled ? (ocspStatus.running ? 'Running' : 'Stopped') : 'Disabled'}
             </StatusIndicator>
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-text-secondary">Status</span>
-            <StatusIndicator status={ocspStatus.running ? 'success' : 'error'} size="sm">
-              {ocspStatus.running ? 'Running' : 'Stopped'}
-            </StatusIndicator>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">Total Requests</span>
+            <span className="text-sm font-medium text-text-primary">{ocspStats.total_requests}</span>
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-text-secondary">Requests</span>
-            <span className="text-text-primary font-medium">{ocspStats.total_requests}</span>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">Cache Hit Rate</span>
+            <span className="text-sm font-medium text-text-primary">{cacheHitRate}%</span>
           </div>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Actions</h3>
-        <div className="space-y-1">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="w-full justify-start text-xs"
-            onClick={() => loadData()}
-          >
-            <ArrowsClockwise size={14} />
-            Refresh Status
-          </Button>
         </div>
-      </div>
+      </Card>
 
-      {/* Help */}
-      <HelpCard variant="info" className="text-xs">
-        <p className="font-medium mb-1">CRL Distribution</p>
-        <p className="text-text-secondary">
-          CRLs are automatically published at /crl/[ca-refid].crl
-        </p>
-      </HelpCard>
+      {/* Help Cards */}
+      <div className="space-y-3">
+        <HelpCard variant="info" title="About CRLs">
+          Certificate Revocation Lists (CRLs) contain serial numbers of revoked certificates. 
+          They are periodically published and cached by clients for offline verification.
+        </HelpCard>
+        
+        <HelpCard variant="tip" title="OCSP vs CRL">
+          OCSP provides real-time revocation status checks. CRL is a periodic snapshot. 
+          Enable both for maximum compatibility with all clients and applications.
+        </HelpCard>
+
+        <HelpCard variant="warning" title="Distribution Points">
+          Include CDP (CRL Distribution Point) and AIA (Authority Information Access) URLs 
+          in your CA settings to enable automatic revocation checking.
+        </HelpCard>
+      </div>
+    </div>
+  )
+
+  // Focus panel content (CA list)
+  const focusContent = (
+    <div className="p-2 space-y-1.5">
+      {cas.length === 0 ? (
+        <EmptyState 
+          icon={FileX}
+          title="No CAs"
+          description="Create a CA first"
+        />
+      ) : (
+        cas.map((ca) => {
+          const crl = crls.find(c => c.caref === ca.refid)
+          const isSelected = selectedCA?.id === ca.id
+          const hasRevoked = crl && (crl.revoked_count || 0) > 0
+          return (
+            <FocusItem
+              key={ca.id}
+              icon={FileX}
+              title={ca.descr}
+              subtitle={crl ? `Updated ${formatDate(crl.updated_at)}` : 'No CRL'}
+              badge={hasRevoked ? (
+                <Badge variant="danger" size="sm">{crl.revoked_count}</Badge>
+              ) : crl ? (
+                <Badge variant="success" size="sm">0</Badge>
+              ) : null}
+              selected={isSelected}
+              onClick={() => handleSelectCA(ca)}
+            />
+          )
+        })
+      )}
     </div>
   )
 
@@ -208,141 +224,104 @@ export default function CRLOCSPPage() {
   }
 
   return (
-    <div className="flex h-full">
-      {/* Explorer Panel - CA List */}
-      <ExplorerPanel 
-        title="Certificate Authorities"
-        width="280px"
-        sidebarContent={sidebarContent}
-      >
-        <div className="space-y-1">
-          {cas.length === 0 ? (
-            <EmptyState 
-              icon={FileX}
-              title="No CAs"
-              description="Create a CA first"
-            />
-          ) : (
-            cas.map((ca) => {
-              const crl = crls.find(c => c.caref === ca.refid)
-              return (
-                <div
-                  key={ca.id}
-                  onClick={() => handleSelectCA(ca)}
-                  className={`
-                    p-2 rounded-md cursor-pointer transition-colors
-                    ${selectedCA?.id === ca.id 
-                      ? 'bg-accent-primary/10 border border-accent-primary/30' 
-                      : 'hover:bg-bg-tertiary border border-transparent'
-                    }
-                  `}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-text-primary truncate">
-                      {ca.descr}
-                    </span>
-                    {crl && (
-                      <Badge variant="secondary" size="sm">
-                        {crl.revoked_count || 0}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-xs text-text-secondary mt-0.5">
-                    {crl ? `Updated ${formatDate(crl.updated_at)}` : 'No CRL'}
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-      </ExplorerPanel>
-
-      {/* Details Panel */}
-      <DetailsPanel title={selectedCA ? `CRL: ${selectedCA.descr}` : 'CRL Details'}>
-        {!selectedCA ? (
+    <PageLayout
+      title="CRL & OCSP"
+      focusTitle="Certificate Authorities"
+      focusContent={focusContent}
+      focusFooter={`${cas.length} CA(s)`}
+      helpContent={helpContent}
+      helpTitle="CRL & OCSP - Aide"
+    >
+      {/* Main Content */}
+      {!selectedCA ? (
+        <div className="flex items-center justify-center h-full">
           <EmptyState 
             icon={FileX}
             title="Select a CA"
             description="Choose a CA to view its CRL"
           />
-        ) : (
-          <div className="p-4 space-y-6">
-            {/* CRL Info */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">CRL Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">CA Name</p>
-                  <p className="text-sm text-text-primary">{selectedCA.descr}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Status</p>
-                  <StatusIndicator status={selectedCRL ? 'success' : 'warning'}>
-                    {selectedCRL ? 'Active' : 'Not Generated'}
-                  </StatusIndicator>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Revoked Certificates</p>
-                  <p className="text-sm text-text-primary">{selectedCRL?.revoked_count || 0}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">CRL Number</p>
-                  <p className="text-sm text-text-primary font-mono">{selectedCRL?.crl_number || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Last Updated</p>
-                  <p className="text-sm text-text-primary">
-                    {selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Next Update</p>
-                  <p className="text-sm text-text-primary">
-                    {selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'}
-                  </p>
-                </div>
+        </div>
+      ) : (
+        <div className="p-6 space-y-6">
+          {/* CRL Info */}
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
+              CRL Information
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">CA Name</p>
+                <p className="text-sm text-text-primary">{selectedCA.descr}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Status</p>
+                <StatusIndicator status={selectedCRL ? 'success' : 'warning'}>
+                  {selectedCRL ? 'Active' : 'Not Generated'}
+                </StatusIndicator>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Revoked Certificates</p>
+                <p className="text-sm text-text-primary">{selectedCRL?.revoked_count || 0}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">CRL Number</p>
+                <p className="text-sm text-text-primary font-mono">{selectedCRL?.crl_number || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Last Updated</p>
+                <p className="text-sm text-text-primary">
+                  {selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-text-secondary uppercase mb-1">Next Update</p>
+                <p className="text-sm text-text-primary">
+                  {selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'}
+                </p>
               </div>
             </div>
-
-            {/* Distribution Points */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Distribution Points</h3>
-              <Card className="p-3 bg-bg-tertiary/50">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Globe size={14} className="text-accent-primary" />
-                    <code className="text-xs text-text-primary bg-bg-secondary px-2 py-1 rounded flex-1">
-                      {window.location.origin}/crl/{selectedCA.refid}.crl
-                    </code>
-                  </div>
-                  <p className="text-xs text-text-secondary">
-                    This URL can be used as the CDP in issued certificates
-                  </p>
-                </div>
-              </Card>
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-2 pt-4 border-t border-border">
-              <Button 
-                onClick={handleRegenerateCRL}
-                disabled={regenerating}
-              >
-                <ArrowsClockwise size={16} className={regenerating ? 'animate-spin' : ''} />
-                {regenerating ? 'Regenerating...' : 'Regenerate CRL'}
-              </Button>
-              <Button 
-                variant="secondary"
-                onClick={handleDownloadCRL}
-                disabled={!selectedCRL?.crl_pem}
-              >
-                <Download size={16} />
-                Download CRL
-              </Button>
-            </div>
           </div>
-        )}
-      </DetailsPanel>
-    </div>
+
+          {/* Distribution Points */}
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
+              Distribution Points
+            </h3>
+            <Card className="p-4 bg-bg-tertiary/50">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Globe size={16} className="text-accent-primary shrink-0" />
+                  <code className="text-sm text-text-primary bg-bg-secondary px-3 py-1.5 rounded flex-1 overflow-x-auto">
+                    {window.location.origin}/crl/{selectedCA.refid}.crl
+                  </code>
+                </div>
+                <p className="text-xs text-text-secondary">
+                  This URL can be used as the CDP (CRL Distribution Point) in issued certificates
+                </p>
+              </div>
+            </Card>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4 border-t border-border">
+            <Button 
+              onClick={handleRegenerateCRL}
+              disabled={regenerating}
+            >
+              <ArrowsClockwise size={16} className={regenerating ? 'animate-spin' : ''} />
+              {regenerating ? 'Regenerating...' : 'Regenerate CRL'}
+            </Button>
+            <Button 
+              variant="secondary"
+              onClick={handleDownloadCRL}
+              disabled={!selectedCRL?.crl_pem}
+            >
+              <Download size={16} />
+              Download CRL
+            </Button>
+          </div>
+        </div>
+      )}
+    </PageLayout>
   )
 }

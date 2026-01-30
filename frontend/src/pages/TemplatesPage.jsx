@@ -1,13 +1,17 @@
 /**
- * Templates Page
+ * Templates Page - Certificate template management
+ * Uses PageLayout for consistent UI structure
  */
 import { useState, useEffect, useRef } from 'react'
-import { List, Plus, Copy, Trash, FloppyDisk, Download, FileArrowUp } from '@phosphor-icons/react'
+import { 
+  List, Plus, Copy, Trash, FloppyDisk, Download, FileArrowUp,
+  MagnifyingGlass, Database, Files
+} from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Table, Button, Badge,
+  PageLayout, FocusItem, Button, Badge, Card,
   Input, Select, Textarea, Modal,
-  LoadingSpinner, EmptyState
-, HelpCard } from '../components'
+  LoadingSpinner, EmptyState, HelpCard
+} from '../components'
 import { templatesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
@@ -24,6 +28,7 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [formData, setFormData] = useState({})
+  const [searchQuery, setSearchQuery] = useState('')
   
   // Import state
   const [importFile, setImportFile] = useState(null)
@@ -154,15 +159,15 @@ export default function TemplatesPage() {
     }
     setImporting(true)
     try {
-      const formData = new FormData()
+      const formDataObj = new FormData()
       if (importFile) {
-        formData.append('file', importFile)
+        formDataObj.append('file', importFile)
       } else {
-        formData.append('json_content', importJson)
+        formDataObj.append('json_content', importJson)
       }
-      formData.append('update_existing', 'false')
+      formDataObj.append('update_existing', 'false')
       
-      const result = await templatesService.import(formData)
+      const result = await templatesService.import(formDataObj)
       showSuccess(result.message || 'Template imported successfully')
       closeModal('import')
       setImportFile(null)
@@ -187,85 +192,211 @@ export default function TemplatesPage() {
     }))
   }
 
-  const templateColumns = [
-    { key: 'name', label: 'Name', render: (val) => <span className="font-medium">{val}</span> },
-    { 
-      key: 'type', 
-      label: 'Type',
-      render: (val) => <Badge variant="secondary">{val}</Badge>
-    },
-    { 
-      key: 'usage_count', 
-      label: 'Used',
-      render: (val) => val || 0
-    },
-    { 
-      key: 'created_at', 
-      label: 'Created',
-      render: (val) => val ? new Date(val).toLocaleDateString() : '-'
-    },
-  ]
+  // Filter templates by search
+  const filteredTemplates = templates.filter(t => 
+    t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.type?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
-  const keyUsageOptions = [
-    'Digital Signature',
-    'Non Repudiation',
-    'Key Encipherment',
-    'Data Encipherment',
-    'Key Agreement',
-    'Certificate Sign',
-    'CRL Sign',
-  ]
+  // Calculate stats for help content
+  const certTemplates = templates.filter(t => t.type === 'certificate').length
+  const caTemplates = templates.filter(t => t.type === 'ca').length
+  const totalUsage = templates.reduce((sum, t) => sum + (t.usage_count || 0), 0)
 
-  const extendedKeyUsageOptions = [
-    'Server Authentication',
-    'Client Authentication',
-    'Code Signing',
-    'Email Protection',
-    'Time Stamping',
-    'OCSP Signing',
-  ]
+  // Help content for modal
+  const helpContent = (
+    <div className="space-y-4">
+      {/* Template Statistics */}
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Database size={16} className="text-accent-primary" />
+          Template Statistics
+        </h3>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-text-primary">{templates.length}</p>
+            <p className="text-xs text-text-secondary">Total</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-accent-primary">{certTemplates}</p>
+            <p className="text-xs text-text-secondary">Certificate</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-status-warning">{caTemplates}</p>
+            <p className="text-xs text-text-secondary">CA</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Usage Stats */}
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-emerald-500/10 to-transparent">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Files size={16} className="text-accent-primary" />
+          Usage Statistics
+        </h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">Total Certificates Issued</span>
+            <span className="text-sm font-medium text-text-primary">{totalUsage}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">Most Used Type</span>
+            <span className="text-sm font-medium text-text-primary">
+              {certTemplates >= caTemplates ? 'Certificate' : 'CA'}
+            </span>
+          </div>
+        </div>
+      </Card>
+
+      {/* Help Cards */}
+      <div className="space-y-3">
+        <HelpCard variant="info" title="About Templates">
+          Certificate templates define default values for certificate issuance. 
+          Use them to standardize certificate properties across your organization.
+        </HelpCard>
+        
+        <HelpCard variant="tip" title="Template Types">
+          Use "Certificate" type for end-entity certificates (servers, users). 
+          Use "CA" type for intermediate certificate authorities.
+        </HelpCard>
+
+        <HelpCard variant="warning" title="Key Usage">
+          Ensure Key Usage and Extended Key Usage match your certificate's intended purpose. 
+          Incorrect settings may cause validation failures.
+        </HelpCard>
+      </div>
+    </div>
+  )
+
+  // Focus panel content (search + template list)
+  const focusContent = (
+    <div className="p-2 space-y-1.5">
+      {/* Search */}
+      <div className="px-1 pb-2">
+        <div className="relative">
+          <MagnifyingGlass 
+            size={14} 
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" 
+          />
+          <input
+            type="text"
+            placeholder="Search templates..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+          />
+        </div>
+      </div>
+
+      {/* Template List */}
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <LoadingSpinner size="sm" />
+        </div>
+      ) : filteredTemplates.length === 0 ? (
+        <EmptyState 
+          icon={List}
+          title={searchQuery ? "No matches" : "No templates"}
+          description={searchQuery ? "Try a different search" : "Create your first template"}
+        />
+      ) : (
+        filteredTemplates.map((template) => (
+          <FocusItem
+            key={template.id}
+            icon={List}
+            title={template.name}
+            subtitle={`${template.type} • ${template.usage_count || 0} used`}
+            badge={
+              <Badge variant={template.type === 'ca' ? 'warning' : 'secondary'} size="sm">
+                {template.type}
+              </Badge>
+            }
+            selected={selectedTemplate?.id === template.id}
+            onClick={() => selectTemplate(template)}
+          />
+        ))
+      )}
+    </div>
+  )
+
+  // Focus panel actions (create + import buttons)
+  const focusActions = canWrite('templates') && (
+    <>
+      <Button size="sm" onClick={handleCreate} className="flex-1">
+        <Plus size={14} />
+        New
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => openModal('import')}>
+        <FileArrowUp size={14} />
+      </Button>
+    </>
+  )
+
+  if (loading && templates.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner />
+      </div>
+    )
+  }
 
   return (
     <>
-      <ExplorerPanel
-        title={selectedTemplate?.name || 'Select a template'}
-        actions={selectedTemplate && canWrite('templates') && (
-          <>
-            {editing ? (
-              <Button size="sm" onClick={handleSave}>
-                <FloppyDisk size={16} />
-                Save
-              </Button>
-            ) : (
-              <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
-                Edit
-              </Button>
-            )}
-            <Button variant="secondary" size="sm" onClick={() => handleDuplicate(selectedTemplate.id)}>
-              <Copy size={16} />
-              Duplicate
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => handleDelete(selectedTemplate.id)}>
-              <Trash size={16} />
-              Delete
-            </Button>
-          </>
-        )}
+      <PageLayout
+        title="Templates"
+        focusTitle="Templates"
+        focusContent={focusContent}
+        focusActions={focusActions}
+        focusFooter={`${filteredTemplates.length} template(s)`}
+        helpContent={helpContent}
+        helpTitle="Templates - Aide"
       >
+        {/* Main Content - Template Details */}
         {!selectedTemplate ? (
-          <EmptyState
-            title="No template selected"
-            description="Select a template from the list to edit"
-          />
+          <div className="flex items-center justify-center h-full">
+            <EmptyState
+              icon={List}
+              title="No template selected"
+              description="Select a template from the list to view details"
+            />
+          </div>
         ) : (
-          <div className="space-y-6">
-            <HelpCard variant="info" title="Certificate Templates" compact>
-              Templates define default values for certificate issuance. Use them to standardize certificate properties across your organization.
-            </HelpCard>
+          <div className="p-6 space-y-6">
+            {/* Header with actions */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-text-primary">
+                {selectedTemplate.name}
+              </h3>
+              {canWrite('templates') && (
+                <div className="flex items-center gap-2">
+                  {editing ? (
+                    <Button size="sm" onClick={handleSave}>
+                      <FloppyDisk size={16} />
+                      Save
+                    </Button>
+                  ) : (
+                    <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+                      Edit
+                    </Button>
+                  )}
+                  <Button variant="secondary" size="sm" onClick={() => handleExportTemplate(selectedTemplate.id)}>
+                    <Download size={16} />
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => handleDuplicate(selectedTemplate.id)}>
+                    <Copy size={16} />
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => handleDelete(selectedTemplate.id)}>
+                    <Trash size={16} />
+                  </Button>
+                </div>
+              )}
+            </div>
 
             {/* Basic Info */}
             <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Basic Information</h3>
+              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
+                Basic Information
+              </h3>
               <div className="space-y-4">
                 <Input
                   label="Template Name"
@@ -295,8 +426,10 @@ export default function TemplatesPage() {
 
             {/* Validity */}
             <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Validity Period</h3>
-              <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
+                Validity Period
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
                 <Input
                   label="Default Validity (days)"
                   type="number"
@@ -316,8 +449,10 @@ export default function TemplatesPage() {
 
             {/* Subject */}
             <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Subject Template</h3>
-              <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
+                Subject Template
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
                 <Input
                   label="Country (C)"
                   value={formData.subject?.C || ''}
@@ -351,8 +486,10 @@ export default function TemplatesPage() {
 
             {/* Key Usage Summary */}
             <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Usage Summary</h3>
-              <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
+                Usage Summary
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-text-secondary uppercase mb-1">Key Usage</p>
                   <p className="text-sm text-text-primary">
@@ -369,57 +506,7 @@ export default function TemplatesPage() {
             </div>
           </div>
         )}
-      </ExplorerPanel>
-
-      <DetailsPanel
-        breadcrumb={[
-          { label: 'Templates' },
-          { label: `${templates.length} templates` }
-        ]}
-        title="Certificate Templates"
-        actions={selectedTemplate && (
-          <Button variant="secondary" size="sm" onClick={() => handleExportTemplate(selectedTemplate.id)}>
-            <Download size={16} />
-            Export
-          </Button>
-        )}
-      >
-        <div className="p-4 space-y-3">
-          {canWrite('templates') && (
-            <>
-              <Button onClick={handleCreate} className="w-full">
-                <Plus size={18} />
-                Create Template
-              </Button>
-              <Button variant="secondary" onClick={() => openModal('import')} className="w-full">
-                <FileArrowUp size={18} />
-                Import Template
-              </Button>
-            </>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-auto px-4 pb-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <LoadingSpinner />
-            </div>
-          ) : templates.length === 0 ? (
-            <EmptyState
-              icon={List}
-              title="No templates"
-              description="Create your first certificate template"
-            />
-          ) : (
-            <Table
-              columns={templateColumns}
-              data={templates}
-              onRowClick={selectTemplate}
-              selectedId={selectedTemplate?.id}
-            />
-          )}
-        </div>
-      </DetailsPanel>
+      </PageLayout>
 
       {/* Import Template Modal */}
       <Modal

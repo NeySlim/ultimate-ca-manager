@@ -1,11 +1,16 @@
 /**
  * Import/Export Page
+ * Uses PageLayout for consistent UI structure
  */
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UploadSimple, Certificate, ShieldCheck, Flask, FloppyDisk, FileArrowUp, DownloadSimple, ArrowsLeftRight, CheckCircle, Database, CloudArrowUp } from '@phosphor-icons/react'
+import { 
+  UploadSimple, Certificate, ShieldCheck, Flask, FloppyDisk, FileArrowUp, 
+  DownloadSimple, Database, CloudArrowUp, ArrowsLeftRight
+} from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, ExportDropdown, Input, LoadingSpinner, Select, Card, Badge, HelpCard
+  PageLayout, FocusItem, Button, ExportDropdown, Input, LoadingSpinner, 
+  Select, Card, Badge, HelpCard
 } from '../components'
 import { opnsenseService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
@@ -314,110 +319,133 @@ export default function ImportExportPage() {
     }
   }
 
+  // Action definitions for focus panel
   const actions = [
-    { id: 'import-cert', title: 'Import Certificate', icon: <Certificate size={18} weight="duotone" />, category: 'import' },
-    { id: 'import-ca', title: 'Import CA', icon: <ShieldCheck size={18} weight="duotone" />, category: 'import' },
-    { id: 'import-opnsense', title: 'Import from OpnSense', icon: <CloudArrowUp size={18} weight="duotone" />, category: 'import' },
-    { id: 'export-certs', title: 'Export Certificates', icon: <DownloadSimple size={18} weight="duotone" />, category: 'export' },
-    { id: 'export-cas', title: 'Export CAs', icon: <DownloadSimple size={18} weight="duotone" />, category: 'export' },
+    { id: 'import-cert', title: 'Import Certificate', subtitle: 'PEM, DER, PKCS#12', icon: Certificate, category: 'import' },
+    { id: 'import-ca', title: 'Import CA', subtitle: 'Certificate Authority', icon: ShieldCheck, category: 'import' },
+    { id: 'import-opnsense', title: 'Import from OpnSense', subtitle: 'API connection', icon: CloudArrowUp, category: 'import' },
+    { id: 'export-certs', title: 'Export Certificates', subtitle: 'Bulk export', icon: DownloadSimple, category: 'export' },
+    { id: 'export-cas', title: 'Export CAs', subtitle: 'With hierarchy', icon: DownloadSimple, category: 'export' },
   ]
 
-  return (
-    <>
-      <ExplorerPanel title="Import/Export">
-        <div className="space-y-4">
-          {/* Stats Cards */}
-          <div className="px-2 space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-1">
-              Quick Stats
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <Card className="p-2 text-center">
-                <div className="text-lg font-bold text-accent">{cas.length}</div>
-                <div className="text-xs text-text-secondary">CAs</div>
-              </Card>
-              <Card className="p-2 text-center">
-                <div className="text-lg font-bold text-emerald-500">
-                  <Database size={18} className="inline" />
-                </div>
-                <div className="text-xs text-text-secondary">Ready</div>
-              </Card>
-            </div>
+  // Help content for modal
+  const helpContent = (
+    <div className="space-y-4">
+      {/* Quick Stats */}
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Database size={16} className="text-accent-primary" />
+          Quick Stats
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-text-primary">{cas.length}</p>
+            <p className="text-xs text-text-secondary">Available CAs</p>
           </div>
-
-          {/* Import Section */}
-          <div className="space-y-1">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-3">
-              Import
-            </h3>
-            {actions.filter(a => a.category === 'import').map(action => (
-              <button 
-                key={action.id} 
-                onClick={() => { setSelectedAction(action.id); setSelectedFile(null); setImportName(''); setImportPassword(''); setPemContent('') }}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                  selectedAction === action.id 
-                    ? 'bg-accent/10 text-accent border-l-2 border-accent' 
-                    : 'hover:bg-bg-tertiary/50 text-text-primary'
-                }`}
-              >
-                <span className={`p-1.5 rounded ${selectedAction === action.id ? 'bg-accent/20' : 'bg-bg-tertiary'}`}>
-                  {action.icon}
-                </span>
-                <span className="text-sm font-medium">{action.title}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Export Section */}
-          <div className="space-y-1">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-3">
-              Export
-            </h3>
-            {actions.filter(a => a.category === 'export').map(action => (
-              <button 
-                key={action.id} 
-                onClick={() => setSelectedAction(action.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                  selectedAction === action.id 
-                    ? 'bg-accent/10 text-accent border-l-2 border-accent' 
-                    : 'hover:bg-bg-tertiary/50 text-text-primary'
-                }`}
-              >
-                <span className={`p-1.5 rounded ${selectedAction === action.id ? 'bg-accent/20' : 'bg-bg-tertiary'}`}>
-                  {action.icon}
-                </span>
-                <span className="text-sm font-medium">{action.title}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Supported Formats */}
-          <div className="px-3 pt-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary mb-2">
-              Supported Formats
-            </h3>
-            <div className="flex flex-wrap gap-1">
-              <Badge variant="blue" size="sm">PEM</Badge>
-              <Badge variant="purple" size="sm">DER</Badge>
-              <Badge variant="emerald" size="sm">PKCS#12</Badge>
-              <Badge variant="orange" size="sm">CRT</Badge>
-            </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-emerald-500">✓</p>
+            <p className="text-xs text-text-secondary">Ready</p>
           </div>
         </div>
-      </ExplorerPanel>
+      </Card>
 
-      <DetailsPanel breadcrumb={[{ label: 'Import/Export' }]} title={actions.find(a => a.id === selectedAction)?.title || 'Import/Export'}
-        actions={
-          selectedAction === 'export-certs' ? (
-            <ExportDropdown onExport={handleExportAllCerts} formats={['pem', 'der', 'pkcs12']} />
-          ) : selectedAction === 'export-cas' ? (
-            <ExportDropdown onExport={handleExportAllCAs} formats={['pem', 'der']} />
-          ) : null
-        }>
+      {/* Supported Formats */}
+      <Card className="p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-text-primary">Supported Formats</h3>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="blue" size="sm">PEM</Badge>
+          <Badge variant="purple" size="sm">DER</Badge>
+          <Badge variant="emerald" size="sm">PKCS#12</Badge>
+          <Badge variant="orange" size="sm">CRT/CER</Badge>
+        </div>
+      </Card>
+
+      {/* Help Cards */}
+      <div className="space-y-3">
+        <HelpCard variant="info" title="Import Certificates">
+          Import certificates from files (.pem, .crt, .der, .p12) or paste PEM content directly.
+          Certificates are automatically linked to their issuing CA when possible.
+        </HelpCard>
+        
+        <HelpCard variant="tip" title="Import CAs">
+          Import existing Certificate Authorities to manage certificates issued by external PKIs.
+          The CA hierarchy is preserved during import.
+        </HelpCard>
+
+        <HelpCard variant="info" title="OpnSense Import">
+          Connect to an OpnSense firewall to import all certificates and CAs. 
+          Requires API credentials with appropriate permissions.
+        </HelpCard>
+
+        <HelpCard variant="warning" title="Export Security">
+          Exported PKCS#12 files may contain private keys. Store them securely 
+          and use strong passwords when exporting sensitive certificates.
+        </HelpCard>
+      </div>
+    </div>
+  )
+
+  // Focus panel content (operation category list)
+  const focusContent = (
+    <div className="p-2 space-y-4">
+      {/* Import Section */}
+      <div className="space-y-1">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-2 mb-2">
+          Import
+        </h3>
+        {actions.filter(a => a.category === 'import').map(action => (
+          <FocusItem
+            key={action.id}
+            icon={action.icon}
+            title={action.title}
+            subtitle={action.subtitle}
+            selected={selectedAction === action.id}
+            onClick={() => { 
+              setSelectedAction(action.id)
+              setSelectedFile(null)
+              setImportName('')
+              setImportPassword('')
+              setPemContent('')
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Export Section */}
+      <div className="space-y-1">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-2 mb-2">
+          Export
+        </h3>
+        {actions.filter(a => a.category === 'export').map(action => (
+          <FocusItem
+            key={action.id}
+            icon={action.icon}
+            title={action.title}
+            subtitle={action.subtitle}
+            selected={selectedAction === action.id}
+            onClick={() => setSelectedAction(action.id)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+
+  return (
+    <PageLayout
+      title="Import & Export"
+      focusTitle="Operations"
+      focusContent={focusContent}
+      focusActions={null}
+      focusFooter={null}
+      helpContent={helpContent}
+      helpTitle="Import & Export - Aide"
+    >
+      {/* Main Content Area */}
+      <div className="p-6">
         {/* Import Certificate */}
         {selectedAction === 'import-cert' && (
           <div className="max-w-2xl space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary">Import Certificate</h3>
+            <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Import Certificate</h3>
             
             <HelpCard variant="info" title="Supported Formats" items={[
               'PEM (.pem, .crt, .cer) - Base64 encoded',
@@ -425,7 +453,7 @@ export default function ImportExportPage() {
               'PKCS#12 (.p12, .pfx) - Password protected bundle'
             ]} />
             
-            <div className="p-4 bg-bg-tertiary border border-border rounded-sm space-y-4">
+            <div className="p-4 bg-bg-tertiary border border-border rounded-lg space-y-4">
               <div>
                 <label className="block text-xs font-medium text-text-primary mb-1">Certificate File</label>
                 <input
@@ -433,7 +461,7 @@ export default function ImportExportPage() {
                   type="file"
                   accept=".pem,.crt,.cer,.der,.p12,.pfx"
                   onChange={(e) => { setSelectedFile(e.target.files[0]); setPemContent('') }}
-                  className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
+                  className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
                 />
                 <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
               </div>
@@ -451,7 +479,7 @@ export default function ImportExportPage() {
                   onChange={(e) => { setPemContent(e.target.value); setSelectedFile(null); if (certFileRef.current) certFileRef.current.value = '' }}
                   placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
                   rows={6}
-                  className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-sm text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
+                  className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-md text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
                 />
               </div>
               
@@ -493,10 +521,10 @@ export default function ImportExportPage() {
         {/* Import CA */}
         {selectedAction === 'import-ca' && (
           <div className="max-w-2xl space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary">Import Certificate Authority</h3>
+            <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Import Certificate Authority</h3>
             <p className="text-sm text-text-secondary">Import a CA certificate from a file or paste PEM content. Supports PEM, DER, and PKCS#12 formats.</p>
             
-            <div className="p-4 bg-bg-tertiary border border-border rounded-sm space-y-4">
+            <div className="p-4 bg-bg-tertiary border border-border rounded-lg space-y-4">
               <div>
                 <label className="block text-xs font-medium text-text-primary mb-1">CA Certificate File</label>
                 <input
@@ -504,7 +532,7 @@ export default function ImportExportPage() {
                   type="file"
                   accept=".pem,.crt,.cer,.der,.p12,.pfx"
                   onChange={(e) => { setSelectedFile(e.target.files[0]); setPemContent('') }}
-                  className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
+                  className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
                 />
                 <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
               </div>
@@ -522,7 +550,7 @@ export default function ImportExportPage() {
                   onChange={(e) => { setPemContent(e.target.value); setSelectedFile(null); if (caFileRef.current) caFileRef.current.value = '' }}
                   placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
                   rows={6}
-                  className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-sm text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
+                  className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-md text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
                 />
               </div>
               
@@ -554,9 +582,9 @@ export default function ImportExportPage() {
         {/* Export Certificates */}
         {selectedAction === 'export-certs' && (
           <div className="max-w-2xl space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary">Export All Certificates</h3>
-            <p className="text-sm text-text-secondary">Download all certificates in a single archive. Choose your preferred format using the Export dropdown above.</p>
-            <div className="p-4 bg-bg-tertiary border border-border rounded-sm">
+            <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Export All Certificates</h3>
+            <p className="text-sm text-text-secondary">Download all certificates in a single archive. Choose your preferred format below.</p>
+            <div className="p-4 bg-bg-tertiary border border-border rounded-lg">
               <h4 className="text-xs font-semibold text-text-primary uppercase mb-2">Available Formats</h4>
               <ul className="text-sm text-text-secondary space-y-1">
                 <li><strong>PEM:</strong> Base64 encoded, widely compatible</li>
@@ -564,24 +592,30 @@ export default function ImportExportPage() {
                 <li><strong>PKCS#12:</strong> Includes private keys (password protected)</li>
               </ul>
             </div>
+            <div className="pt-2">
+              <ExportDropdown onExport={handleExportAllCerts} formats={['pem', 'der', 'pkcs12']} />
+            </div>
           </div>
         )}
 
         {/* Export CAs */}
         {selectedAction === 'export-cas' && (
           <div className="max-w-2xl space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary">Export All Certificate Authorities</h3>
-            <p className="text-sm text-text-secondary">Download all CAs including their hierarchy. Use the Export dropdown above to select format.</p>
+            <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Export All Certificate Authorities</h3>
+            <p className="text-sm text-text-secondary">Download all CAs including their hierarchy. Select format below.</p>
+            <div className="pt-2">
+              <ExportDropdown onExport={handleExportAllCAs} formats={['pem', 'der']} />
+            </div>
           </div>
         )}
 
         {/* Import from OpnSense */}
         {selectedAction === 'import-opnsense' && (
           <div className="max-w-2xl space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary">Import from OpnSense</h3>
+            <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Import from OpnSense</h3>
             <p className="text-sm text-text-secondary">Connect to OpnSense API to import certificates and CAs.</p>
             
-            <div className="p-4 bg-bg-tertiary border border-border rounded-sm space-y-4">
+            <div className="p-4 bg-bg-tertiary border border-border rounded-lg space-y-4">
               <Input label="OpnSense Host" value={opnsenseHost} 
                 onChange={(e) => setOpnsenseHost(e.target.value)} 
                 placeholder="192.168.1.1" />
@@ -612,7 +646,7 @@ export default function ImportExportPage() {
             </div>
 
             {testResult && (
-              <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-sm">
+              <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
                 <h4 className="text-sm font-semibold text-green-400 mb-2">✓ Connection Successful</h4>
                 <p className="text-sm text-text-secondary"><strong>CAs:</strong> {testResult.cas}</p>
                 <p className="text-sm text-text-secondary"><strong>Certificates:</strong> {testResult.certificates}</p>
@@ -620,8 +654,7 @@ export default function ImportExportPage() {
             )}
           </div>
         )}
-      </DetailsPanel>
-
-    </>
+      </div>
+    </PageLayout>
   )
 }

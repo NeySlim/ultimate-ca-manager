@@ -5,10 +5,10 @@
 import { useState, useEffect } from 'react'
 import { 
   Robot, Gear, CheckCircle, XCircle, Clock, Copy, ArrowsClockwise, 
-  Eye, ShieldCheck, Plugs, Key, Warning, Info, FileText, Globe
+  Eye, ShieldCheck, Plugs, Key, Warning, Info, FileText, Globe, Database, MagnifyingGlass
 } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, Input, Select, Card,
+  PageLayout, FocusItem, Button, Input, Select, Card,
   Table, Badge, LoadingSpinner, Modal, Textarea, EmptyState, StatusIndicator, HelpCard
 } from '../components'
 import { scepService, casService } from '../services'
@@ -28,6 +28,7 @@ export default function SCEPPage() {
   const [selectedRequest, setSelectedRequest] = useState(null)
   const [activeTab, setActiveTab] = useState('requests')
   const [saving, setSaving] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   
   // Modal states
   const [showRejectModal, setShowRejectModal] = useState(false)
@@ -171,26 +172,148 @@ export default function SCEPPage() {
   const menuItems = [
     { 
       id: 'requests', 
-      icon: <Clock size={16} weight="duotone" />, 
+      icon: Clock, 
       label: 'Enrollment Requests',
       badge: stats.pending > 0 ? stats.pending : null
     },
     { 
       id: 'config', 
-      icon: <Gear size={16} weight="duotone" />, 
+      icon: Gear, 
       label: 'Configuration' 
     },
     { 
       id: 'challenge', 
-      icon: <Key size={16} weight="duotone" />, 
+      icon: Key, 
       label: 'Challenge Passwords' 
     },
     { 
       id: 'info', 
-      icon: <Info size={16} weight="duotone" />, 
+      icon: Info, 
       label: 'SCEP Information' 
     }
   ]
+
+  // Filter menu items based on search
+  const filteredMenuItems = menuItems.filter(item =>
+    item.label.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Help content for modal
+  const helpContent = (
+    <div className="space-y-4">
+      {/* SCEP Statistics */}
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Database size={16} className="text-accent-primary" />
+          SCEP Statistics
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-yellow-500">{stats.pending}</p>
+            <p className="text-xs text-text-secondary">Pending</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-green-500">{stats.approved}</p>
+            <p className="text-xs text-text-secondary">Approved</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-status-error">{stats.rejected}</p>
+            <p className="text-xs text-text-secondary">Rejected</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-text-primary">{stats.total}</p>
+            <p className="text-xs text-text-secondary">Total</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* SCEP Status */}
+      <Card className={`p-4 space-y-3 bg-gradient-to-br ${config.enabled ? 'from-emerald-500/10' : 'from-amber-500/10'}`}>
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Plugs size={16} className="text-accent-primary" />
+          SCEP Server Status
+        </h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">Status</span>
+            <StatusIndicator status={config.enabled ? 'success' : 'warning'}>
+              {config.enabled ? 'Enabled' : 'Disabled'}
+            </StatusIndicator>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">Auto-Approve</span>
+            <span className="text-sm font-medium text-text-primary">{config.auto_approve ? 'Yes' : 'No'}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">CAs Configured</span>
+            <span className="text-sm font-medium text-text-primary">{cas.length}</span>
+          </div>
+        </div>
+      </Card>
+
+      {/* Help Cards */}
+      <div className="space-y-3">
+        <HelpCard variant="info" title="About SCEP">
+          Simple Certificate Enrollment Protocol (SCEP) enables automated certificate enrollment 
+          for devices like MDM-managed devices, network equipment, and IoT devices.
+        </HelpCard>
+        
+        <HelpCard variant="tip" title="MDM Integration">
+          Compatible with Microsoft Intune, Jamf Pro, VMware Workspace ONE, and other MDM solutions. 
+          Configure the SCEP URL and challenge password in your MDM profile.
+        </HelpCard>
+
+        <HelpCard variant="warning" title="Challenge Security">
+          Challenge passwords should be securely distributed. Consider using auto-approve only 
+          in trusted environments with proper network segmentation.
+        </HelpCard>
+      </div>
+    </div>
+  )
+
+  // Focus panel content (profile/section list)
+  const focusContent = (
+    <div className="p-2 space-y-1.5">
+      {filteredMenuItems.length === 0 ? (
+        <EmptyState 
+          icon={Robot}
+          title="No matches"
+          description="Try a different search"
+        />
+      ) : (
+        filteredMenuItems.map((item) => {
+          const isSelected = activeTab === item.id
+          return (
+            <FocusItem
+              key={item.id}
+              icon={item.icon}
+              title={item.label}
+              subtitle={item.id === 'requests' ? `${stats.total} total requests` : null}
+              badge={item.badge ? (
+                <Badge variant="warning" size="sm">{item.badge}</Badge>
+              ) : null}
+              selected={isSelected}
+              onClick={() => setActiveTab(item.id)}
+            />
+          )
+        })
+      )}
+    </div>
+  )
+
+  // Focus actions (search)
+  const focusActions = (
+    <div className="flex-1 relative">
+      <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+      <input
+        type="text"
+        placeholder="Search profiles..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full pl-8 pr-3 py-1.5 text-sm bg-bg-tertiary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-accent-primary"
+      />
+    </div>
+  )
 
   if (loading) {
     return (
@@ -201,65 +324,28 @@ export default function SCEPPage() {
   }
 
   return (
-    <>
-      <ExplorerPanel
-        title="SCEP"
-        footer={
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-text-secondary">
-              {config.enabled ? (
-                <StatusIndicator status="online" label="Enabled" />
-              ) : (
-                <StatusIndicator status="offline" label="Disabled" />
-              )}
-            </span>
-            <span className="text-text-tertiary">{stats.total} total requests</span>
-          </div>
-        }
-      >
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          <div className="p-3 bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border border-yellow-500/20 rounded-lg">
-            <div className="flex items-center gap-2">
-              <Clock size={16} className="text-yellow-500" weight="duotone" />
-              <span className="text-xs text-text-secondary">Pending</span>
-            </div>
-            <p className="text-lg font-bold text-yellow-500 mt-1">{stats.pending}</p>
-          </div>
-          <div className="p-3 bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20 rounded-lg">
-            <div className="flex items-center gap-2">
-              <CheckCircle size={16} className="text-green-500" weight="duotone" />
-              <span className="text-xs text-text-secondary">Approved</span>
-            </div>
-            <p className="text-lg font-bold text-green-500 mt-1">{stats.approved}</p>
-          </div>
+    <PageLayout
+      title="SCEP Protocol"
+      focusTitle="Profiles"
+      focusContent={focusContent}
+      focusActions={focusActions}
+      focusFooter={
+        <div className="flex items-center justify-between">
+          <span>
+            {config.enabled ? (
+              <StatusIndicator status="online" label="Enabled" />
+            ) : (
+              <StatusIndicator status="offline" label="Disabled" />
+            )}
+          </span>
+          <span>{menuItems.length} profiles</span>
         </div>
-
-        {/* Navigation Menu */}
-        <div className="space-y-1">
-          {menuItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all ${
-                activeTab === item.id 
-                  ? 'bg-accent-primary/15 text-accent-primary border border-accent-primary/30' 
-                  : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                {item.icon}
-                <span>{item.label}</span>
-              </div>
-              {item.badge && (
-                <Badge variant="warning" size="sm">{item.badge}</Badge>
-              )}
-            </button>
-          ))}
-        </div>
-      </ExplorerPanel>
-
-      <DetailsPanel>
+      }
+      helpContent={helpContent}
+      helpTitle="SCEP Protocol - Aide"
+    >
+      {/* Main Content Area */}
+      <div className="p-6">
         {/* Requests Tab */}
         {activeTab === 'requests' && (
           <div className="space-y-4">
@@ -570,7 +656,7 @@ crypto ca enroll UCM-CA`}
             </Card>
           </div>
         )}
-      </DetailsPanel>
+      </div>
 
       {/* Reject Modal */}
       <Modal
@@ -670,6 +756,6 @@ crypto ca enroll UCM-CA`}
           </div>
         )}
       </Modal>
-    </>
+    </PageLayout>
   )
 }
