@@ -64,6 +64,14 @@ export function ListPageLayout({
   onSelectionChange,
   variant = 'default',
   
+  // Filters
+  filters = [],   // [{ key, label, options: [{value, label}] }]
+  
+  // Hierarchy/Tree
+  hierarchical = false,
+  parentKey = 'parent_id',
+  defaultExpanded = true,
+  
   // Empty state
   emptyIcon,
   emptyTitle,
@@ -150,6 +158,10 @@ export function ListPageLayout({
             multiSelect={multiSelect}
             onSelectionChange={onSelectionChange}
             variant="compact"
+            filters={filters}
+            hierarchical={hierarchical}
+            parentKey={parentKey}
+            defaultExpanded={defaultExpanded}
             emptyIcon={emptyIcon}
             emptyTitle={emptyTitle}
             emptyDescription={emptyDescription}
@@ -226,6 +238,10 @@ export function ListPageLayout({
             multiSelect={multiSelect}
             onSelectionChange={onSelectionChange}
             variant={variant}
+            filters={filters}
+            hierarchical={hierarchical}
+            parentKey={parentKey}
+            defaultExpanded={defaultExpanded}
             emptyIcon={emptyIcon}
             emptyTitle={emptyTitle}
             emptyDescription={emptyDescription}

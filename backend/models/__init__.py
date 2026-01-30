@@ -236,8 +236,8 @@ class CA(db.Model):
     
     def to_dict(self, include_private=False):
         """Convert to dictionary"""
-        # Determine CA type
-        ca_type = "Root CA" if self.is_root else "Intermediate"
+        # Determine CA type (lowercase for frontend)
+        ca_type = "root" if self.is_root else "intermediate"
         
         # Determine status based on expiry
         status = "Active"
@@ -250,6 +250,12 @@ class CA(db.Model):
         expires = self.valid_to.strftime("%Y-%m-%d") if self.valid_to else ""
         expiry = self.valid_to.strftime("%Y-%m-%d") if self.valid_to else ""
         
+        # Get parent_id (numeric id) from caref (uuid)
+        parent_id = None
+        if self.caref:
+            parent_ca = CA.query.filter_by(refid=self.caref).first()
+            parent_id = parent_ca.id if parent_ca else None
+        
         data = {
             "id": self.id,
             "refid": self.refid,
@@ -257,6 +263,7 @@ class CA(db.Model):
             "name": self.descr,  # Alias for frontend
             "serial": self.serial,
             "caref": self.caref,
+            "parent_id": parent_id,  # Numeric parent ID for frontend tree
             "subject": self.subject,
             "issuer": self.issuer,
             "valid_from": self.valid_from.isoformat() if self.valid_from else None,
