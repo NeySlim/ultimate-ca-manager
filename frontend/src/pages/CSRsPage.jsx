@@ -1,6 +1,6 @@
 /**
  * CSRs (Certificate Signing Requests) Page
- * Uses PageLayout for consistent UI structure
+ * Uses PageLayout with Responsive Components for consistent UI structure
  */
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -11,7 +11,9 @@ import {
 import {
   PageLayout, FocusItem, Button, Badge, Card,
   Modal, Input, Select,
-  FileUpload, LoadingSpinner, EmptyState, HelpCard
+  FileUpload, LoadingSpinner, EmptyState, HelpCard,
+  ContentHeader, ContentBody, ResponsiveContentSection as ContentSection,
+  DataGrid, DataField
 } from '../components'
 import { csrsService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -355,117 +357,116 @@ export default function CSRsPage() {
             />
           </div>
         ) : (
-          <div className="p-6 space-y-6">
-            {/* Header with actions */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-text-primary">{selectedCSR.common_name}</h2>
-                <p className="text-sm text-text-secondary">
-                  {selectedCSR.subject || 'No subject information'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {canWrite('csrs') && selectedCSR.status === 'pending' && (
-                  <Button onClick={() => openModal('sign')}>
-                    <SignIn size={16} />
-                    Sign CSR
-                  </Button>
+          <div className="flex flex-col h-full">
+            {/* Responsive Header with actions */}
+            <ContentHeader
+              title={selectedCSR.common_name || 'Unnamed CSR'}
+              subtitle={selectedCSR.subject || 'No subject information'}
+              badge={
+                <Badge variant={selectedCSR.status === 'pending' ? 'warning' : 'success'}>
+                  {selectedCSR.status}
+                </Badge>
+              }
+              actions={[
+                ...(canWrite('csrs') && selectedCSR.status === 'pending' ? [{
+                  label: 'Sign CSR',
+                  icon: SignIn,
+                  onClick: () => openModal('sign'),
+                }] : []),
+                {
+                  label: 'Download',
+                  icon: Download,
+                  onClick: () => handleDownload(selectedCSR.id),
+                },
+                ...(canDelete('csrs') ? [{
+                  label: 'Delete',
+                  icon: Trash,
+                  variant: 'danger',
+                  onClick: () => handleDelete(selectedCSR.id),
+                }] : []),
+              ]}
+            />
+
+            {/* Content Body */}
+            <ContentBody>
+              <div className="space-y-6">
+                {/* Info Card */}
+                <HelpCard variant="info" title="Certificate Signing Request" compact>
+                  Review the CSR details and sign it with a CA to issue a certificate.
+                </HelpCard>
+
+                {/* Request Information */}
+                <ContentSection title="Request Information">
+                  <DataGrid columns={2}>
+                    <DataField 
+                      label="Common Name" 
+                      value={selectedCSR.common_name}
+                    />
+                    <DataField 
+                      label="Status" 
+                      value={
+                        <Badge variant={selectedCSR.status === 'pending' ? 'warning' : 'success'}>
+                          {selectedCSR.status}
+                        </Badge>
+                      }
+                    />
+                    <DataField 
+                      label="Key Algorithm" 
+                      value={selectedCSR.key_algorithm}
+                    />
+                    <DataField 
+                      label="Key Size" 
+                      value={selectedCSR.key_size ? `${selectedCSR.key_size} bits` : null}
+                    />
+                    <DataField 
+                      label="Signature Algorithm" 
+                      value={selectedCSR.signature_algorithm}
+                    />
+                    <DataField 
+                      label="Created" 
+                      value={selectedCSR.created_at ? new Date(selectedCSR.created_at).toLocaleString() : null}
+                    />
+                    <DataField 
+                      label="Subject DN" 
+                      value={selectedCSR.subject}
+                      mono
+                      fullWidth
+                    />
+                  </DataGrid>
+                </ContentSection>
+
+                {/* Subject Alternative Names */}
+                {selectedCSR.san && selectedCSR.san.length > 0 && (
+                  <ContentSection title="Subject Alternative Names">
+                    <div className="flex flex-wrap gap-2">
+                      {selectedCSR.san.map((name, i) => (
+                        <Badge key={i} variant="secondary">{name}</Badge>
+                      ))}
+                    </div>
+                  </ContentSection>
                 )}
-                <Button variant="secondary" onClick={() => handleDownload(selectedCSR.id)}>
-                  <Download size={16} />
-                  Download
-                </Button>
-                {canDelete('csrs') && (
-                  <Button variant="danger" onClick={() => handleDelete(selectedCSR.id)}>
-                    <Trash size={16} />
-                    Delete
-                  </Button>
-                )}
-              </div>
-            </div>
 
-            {/* Info Card */}
-            <HelpCard variant="info" title="Certificate Signing Request" compact>
-              Review the CSR details and sign it with a CA to issue a certificate.
-            </HelpCard>
-
-            {/* Request Info */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
-                Request Information
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Common Name</p>
-                  <p className="text-sm text-text-primary">{selectedCSR.common_name}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Status</p>
-                  <Badge variant={selectedCSR.status === 'pending' ? 'warning' : 'success'}>
-                    {selectedCSR.status}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Key Algorithm</p>
-                  <p className="text-sm text-text-primary">{selectedCSR.key_algorithm || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Key Size</p>
-                  <p className="text-sm text-text-primary">{selectedCSR.key_size ? `${selectedCSR.key_size} bits` : '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Signature Algorithm</p>
-                  <p className="text-sm text-text-primary">{selectedCSR.signature_algorithm || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Created</p>
-                  <p className="text-sm text-text-primary">
-                    {selectedCSR.created_at ? new Date(selectedCSR.created_at).toLocaleString() : '-'}
-                  </p>
-                </div>
-                <div className="col-span-2 md:col-span-3">
-                  <p className="text-xs text-text-secondary uppercase mb-1">Subject DN</p>
-                  <p className="text-sm text-text-primary font-mono">{selectedCSR.subject || '-'}</p>
-                </div>
+                {/* Raw CSR */}
+                <ContentSection title="Raw CSR (PEM)">
+                  <div className="flex items-center justify-end mb-2">
+                    <Button 
+                      variant="secondary" 
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedCSR.csr_pem || selectedCSR.pem || '')
+                        showSuccess('CSR PEM copied to clipboard')
+                      }}
+                      disabled={!selectedCSR.csr_pem && !selectedCSR.pem}
+                    >
+                      Copy PEM
+                    </Button>
+                  </div>
+                  <pre className="bg-bg-tertiary border border-border rounded-lg p-4 text-xs overflow-x-auto max-h-64">
+                    {selectedCSR.csr_pem || selectedCSR.pem || 'PEM data not available'}
+                  </pre>
+                </ContentSection>
               </div>
-            </div>
-
-            {/* Subject Alternative Names */}
-            {selectedCSR.san && selectedCSR.san.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
-                  Subject Alternative Names
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {selectedCSR.san.map((name, i) => (
-                    <Badge key={i} variant="secondary">{name}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Raw CSR */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
-                  Raw CSR (PEM)
-                </h3>
-                <Button 
-                  variant="secondary" 
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(selectedCSR.csr_pem || selectedCSR.pem || '')
-                    showSuccess('CSR PEM copied to clipboard')
-                  }}
-                  disabled={!selectedCSR.csr_pem && !selectedCSR.pem}
-                >
-                  Copy PEM
-                </Button>
-              </div>
-              <pre className="bg-bg-tertiary border border-border rounded-lg p-4 text-xs overflow-x-auto max-h-64">
-                {selectedCSR.csr_pem || selectedCSR.pem || 'PEM data not available'}
-              </pre>
-            </div>
+            </ContentBody>
           </div>
         )}
       </PageLayout>

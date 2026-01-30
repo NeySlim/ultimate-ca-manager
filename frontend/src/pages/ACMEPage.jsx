@@ -10,7 +10,9 @@ import {
 import {
   PageLayout, FocusItem, Table, Button, Badge, Card,
   Input, Modal, Tabs, Select, HelpCard,
-  LoadingSpinner, EmptyState, StatusIndicator
+  LoadingSpinner, EmptyState, StatusIndicator,
+  ContentHeader, ContentBody, ResponsiveContentSection as ContentSection, 
+  DataGrid, DataField, TabsResponsive
 } from '../components'
 import { acmeService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -206,88 +208,75 @@ export default function ACMEPage() {
     { key: 'validated_at', label: 'Validated', render: (val) => val ? new Date(val).toLocaleString() : '-' },
   ]
 
+  const [activeDetailTab, setActiveDetailTab] = useState('info')
+
   const detailTabs = selectedAccount ? [
     {
       id: 'info',
       label: 'Account Info',
-      icon: <Key size={16} />,
+      icon: Key,
       content: (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Email</p>
-              <p className="text-sm text-text-primary">{selectedAccount.email}</p>
-            </div>
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Status</p>
-              <div className="flex items-center gap-2">
-                <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'} />
-                <span className="text-sm">{selectedAccount.status}</span>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Key Type</p>
-              <p className="text-sm text-text-primary">{selectedAccount.key_type || 'RSA-2048'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Created</p>
-              <p className="text-sm text-text-primary">
-                {selectedAccount.created_at ? new Date(selectedAccount.created_at).toLocaleString() : '-'}
-              </p>
-            </div>
-            <div className="col-span-2">
-              <p className="text-xs text-text-secondary uppercase mb-1">Account ID</p>
-              <p className="text-xs font-mono text-text-primary break-all">
-                {selectedAccount.account_id}
-              </p>
-            </div>
-            <div className="col-span-2">
-              <p className="text-xs text-text-secondary uppercase mb-1">Terms of Service</p>
-              <div className="flex items-center gap-2">
-                {selectedAccount.tos_agreed ? (
-                  <>
-                    <CheckCircle size={16} className="text-green-500" />
-                    <span className="text-sm text-green-500">Agreed</span>
-                  </>
-                ) : (
-                  <>
-                    <XCircle size={16} className="text-red-500" />
-                    <span className="text-sm text-red-500">Not Agreed</span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t border-border">
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              onClick={() => handleDeactivate(selectedAccount.id)}
-              disabled={selectedAccount.status !== 'valid'}
-            >
-              Deactivate
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => handleDelete(selectedAccount.id)}>
-              <Trash size={16} />
-              Delete
-            </Button>
-          </div>
+          <ContentSection title="Account Details">
+            <DataGrid columns={2}>
+              <DataField 
+                label="Email" 
+                value={selectedAccount.email} 
+              />
+              <DataField 
+                label="Status" 
+                value={
+                  <div className="flex items-center gap-2">
+                    <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'} />
+                    <span>{selectedAccount.status}</span>
+                  </div>
+                } 
+              />
+              <DataField 
+                label="Key Type" 
+                value={selectedAccount.key_type || 'RSA-2048'} 
+              />
+              <DataField 
+                label="Created" 
+                value={selectedAccount.created_at ? new Date(selectedAccount.created_at).toLocaleString() : '-'} 
+              />
+              <DataField 
+                label="Account ID" 
+                value={selectedAccount.account_id} 
+                mono 
+                copyable 
+                fullWidth 
+              />
+              <DataField 
+                label="Terms of Service" 
+                value={
+                  <div className="flex items-center gap-2">
+                    {selectedAccount.tos_agreed ? (
+                      <>
+                        <CheckCircle size={16} className="text-green-500" />
+                        <span className="text-green-500">Agreed</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle size={16} className="text-red-500" />
+                        <span className="text-red-500">Not Agreed</span>
+                      </>
+                    )}
+                  </div>
+                } 
+                fullWidth 
+              />
+            </DataGrid>
+          </ContentSection>
         </div>
       )
     },
     {
       id: 'orders',
       label: 'Active Orders',
+      icon: Globe,
       content: (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-text-secondary">
-              {orders.length} active orders
-            </p>
-          </div>
-          
+        <ContentSection title={`${orders.length} Active Orders`}>
           {orders.length === 0 ? (
             <EmptyState
               title="No active orders"
@@ -299,20 +288,15 @@ export default function ACMEPage() {
               data={orders}
             />
           )}
-        </div>
+        </ContentSection>
       )
     },
     {
       id: 'challenges',
       label: 'Challenges',
+      icon: ShieldCheck,
       content: (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-text-secondary">
-              {challenges.length} challenges
-            </p>
-          </div>
-          
+        <ContentSection title={`${challenges.length} Challenges`}>
           {challenges.length === 0 ? (
             <EmptyState
               title="No challenges"
@@ -324,7 +308,7 @@ export default function ACMEPage() {
               data={challenges}
             />
           )}
-        </div>
+        </ContentSection>
       )
     },
   ] : []
@@ -630,8 +614,42 @@ export default function ACMEPage() {
         {!selectedAccount ? (
           configContent
         ) : (
-          <div className="p-6">
-            <Tabs tabs={detailTabs} defaultTab="info" />
+          <div className="flex flex-col h-full">
+            {/* Responsive Header with actions */}
+            <ContentHeader
+              title={selectedAccount.email}
+              subtitle={`Account ID: ${selectedAccount.account_id?.substring(0, 20)}...`}
+              badge={
+                <Badge variant={selectedAccount.status === 'valid' ? 'success' : 'secondary'}>
+                  {selectedAccount.status}
+                </Badge>
+              }
+              actions={[
+                {
+                  label: 'Deactivate',
+                  onClick: () => handleDeactivate(selectedAccount.id),
+                  disabled: selectedAccount.status !== 'valid',
+                },
+                {
+                  label: 'Delete',
+                  icon: Trash,
+                  variant: 'danger',
+                  onClick: () => handleDelete(selectedAccount.id),
+                },
+              ]}
+            />
+
+            {/* Responsive Tabs */}
+            <TabsResponsive
+              tabs={detailTabs}
+              activeTab={activeDetailTab}
+              onChange={setActiveDetailTab}
+            />
+
+            {/* Content Body */}
+            <ContentBody>
+              {detailTabs.find(t => t.id === activeDetailTab)?.content}
+            </ContentBody>
           </div>
         )}
       </PageLayout>

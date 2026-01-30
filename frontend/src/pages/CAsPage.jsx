@@ -1,6 +1,6 @@
 /**
  * CAs (Certificate Authorities) Page
- * Uses PageLayout for consistent layout structure
+ * Uses PageLayout with Responsive Components
  */
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -12,7 +12,9 @@ import {
 import {
   PageLayout, FocusItem, TreeView, Table, Button, 
   Badge, Modal, Input, Select, ExportDropdown, Card,
-  Tabs, LoadingSpinner, EmptyState, Tooltip, HelpCard, StatusIndicator
+  Tabs, LoadingSpinner, EmptyState, Tooltip, HelpCard, StatusIndicator,
+  ContentHeader, ContentBody, ResponsiveContentSection as ContentSection,
+  DataGrid, DataField, TabsResponsive
 } from '../components'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
@@ -313,124 +315,137 @@ export default function CAsPage() {
     },
   ]
 
+  // State for active detail tab
+  const [activeDetailTab, setActiveDetailTab] = useState('overview')
+
   const detailTabs = selectedCA ? [
     {
       id: 'overview',
       label: 'Overview',
-      icon: <ShieldCheck size={16} />,
+      icon: ShieldCheck,
       content: (
         <div className="space-y-6">
           {/* Type & Status */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Type</p>
-              <div className="flex items-center gap-2">
-                {getCAIcon(selectedCA.type)}
-                <Badge variant={selectedCA.type === 'root' ? 'primary' : 'secondary'}>
-                  {selectedCA.type}
+          <DataGrid columns={2}>
+            <DataField 
+              label="Type" 
+              value={
+                <div className="flex items-center gap-2">
+                  {getCAIcon(selectedCA.type)}
+                  <Badge variant={selectedCA.type === 'root' ? 'primary' : 'secondary'}>
+                    {selectedCA.type}
+                  </Badge>
+                </div>
+              }
+            />
+            <DataField 
+              label="Status" 
+              value={
+                <Badge variant={selectedCA.status === 'Active' ? 'success' : 'danger'}>
+                  {selectedCA.status}
                 </Badge>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Status</p>
-              <Badge variant={selectedCA.status === 'Active' ? 'success' : 'danger'}>
-                {selectedCA.status}
-              </Badge>
-            </div>
-          </div>
+              }
+            />
+          </DataGrid>
 
           {/* Subject Information */}
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-3">Subject Information</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <p className="text-xs text-text-secondary uppercase mb-1">Common Name (CN)</p>
-                <p className="text-sm text-text-primary font-medium">{selectedCA.common_name || 'N/A'}</p>
-              </div>
+          <ContentSection title="Subject Information">
+            <DataGrid columns={2}>
+              <DataField 
+                label="Common Name (CN)" 
+                value={selectedCA.common_name} 
+                fullWidth
+              />
               {selectedCA.organization && (
-                <div className="col-span-2">
-                  <p className="text-xs text-text-secondary uppercase mb-1">Organization (O)</p>
-                  <p className="text-sm text-text-primary">{selectedCA.organization}</p>
-                </div>
+                <DataField 
+                  label="Organization (O)" 
+                  value={selectedCA.organization} 
+                  fullWidth
+                />
               )}
               {selectedCA.organizational_unit && (
-                <div className="col-span-2">
-                  <p className="text-xs text-text-secondary uppercase mb-1">Organizational Unit (OU)</p>
-                  <p className="text-sm text-text-primary">{selectedCA.organizational_unit}</p>
-                </div>
+                <DataField 
+                  label="Organizational Unit (OU)" 
+                  value={selectedCA.organizational_unit} 
+                  fullWidth
+                />
               )}
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Country (C)</p>
-                <p className="text-sm text-text-primary">{selectedCA.country || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">State (ST)</p>
-                <p className="text-sm text-text-primary">{selectedCA.state || 'N/A'}</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-xs text-text-secondary uppercase mb-1">Locality (L)</p>
-                <p className="text-sm text-text-primary">{selectedCA.locality || 'N/A'}</p>
-              </div>
-            </div>
-          </div>
+              <DataField 
+                label="Country (C)" 
+                value={selectedCA.country}
+              />
+              <DataField 
+                label="State (ST)" 
+                value={selectedCA.state}
+              />
+              <DataField 
+                label="Locality (L)" 
+                value={selectedCA.locality} 
+                fullWidth
+              />
+            </DataGrid>
+          </ContentSection>
 
           {/* Certificate Details */}
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-3">Certificate Details</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Serial Number</p>
-                <p className="text-sm font-mono text-text-primary">{selectedCA.serial || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Issued Certificates</p>
-                <p className="text-sm text-text-primary">{selectedCA.certs || 0} certificates</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Valid From</p>
-                <p className="text-sm text-text-primary">{formatDate(selectedCA.valid_from)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Valid Until</p>
-                <p className="text-sm text-text-primary">{formatDate(selectedCA.valid_to)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Key Algorithm</p>
-                <p className="text-sm text-text-primary">{selectedCA.key_algorithm || selectedCA.key_type || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Signature Algorithm</p>
-                <p className="text-sm text-text-primary">{selectedCA.signature_algorithm || selectedCA.hash_algorithm || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Private Key</p>
-                <Badge variant={selectedCA.has_private_key ? 'success' : 'warning'}>
-                  {selectedCA.has_private_key ? 'Available' : 'Not Available'}
-                </Badge>
-              </div>
+          <ContentSection title="Certificate Details">
+            <DataGrid columns={2}>
+              <DataField 
+                label="Serial Number" 
+                value={selectedCA.serial} 
+                mono 
+                copyable
+              />
+              <DataField 
+                label="Issued Certificates" 
+                value={`${selectedCA.certs || 0} certificates`}
+              />
+              <DataField 
+                label="Valid From" 
+                value={formatDate(selectedCA.valid_from)}
+              />
+              <DataField 
+                label="Valid Until" 
+                value={formatDate(selectedCA.valid_to)}
+              />
+              <DataField 
+                label="Key Algorithm" 
+                value={selectedCA.key_algorithm || selectedCA.key_type}
+              />
+              <DataField 
+                label="Signature Algorithm" 
+                value={selectedCA.signature_algorithm || selectedCA.hash_algorithm}
+              />
+              <DataField 
+                label="Private Key" 
+                value={
+                  <Badge variant={selectedCA.has_private_key ? 'success' : 'warning'}>
+                    {selectedCA.has_private_key ? 'Available' : 'Not Available'}
+                  </Badge>
+                }
+              />
               {selectedCA.caref && (
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Parent CA</p>
-                  <p className="text-sm text-text-primary">{selectedCA.caref}</p>
-                </div>
+                <DataField 
+                  label="Parent CA" 
+                  value={selectedCA.caref}
+                />
               )}
-            </div>
-          </div>
+            </DataGrid>
+          </ContentSection>
 
           {/* CRL & OCSP Configuration */}
           {(selectedCA.cdp_enabled || selectedCA.ocsp_enabled) && (
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Revocation Services</h3>
+            <ContentSection title="Revocation Services">
               <div className="space-y-3">
                 {selectedCA.cdp_enabled && (
                   <div className="p-3 bg-bg-tertiary border border-border rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant="success">CRL Enabled</Badge>
                     </div>
-                    <p className="text-xs text-text-secondary uppercase mb-1">CRL Distribution Point</p>
-                    <p className="text-xs font-mono text-text-primary break-all">
-                      {selectedCA.cdp_url || 'Not configured'}
-                    </p>
+                    <DataField 
+                      label="CRL Distribution Point" 
+                      value={selectedCA.cdp_url || 'Not configured'} 
+                      mono
+                    />
                   </div>
                 )}
                 {selectedCA.ocsp_enabled && (
@@ -438,34 +453,43 @@ export default function CAsPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant="success">OCSP Enabled</Badge>
                     </div>
-                    <p className="text-xs text-text-secondary uppercase mb-1">OCSP Responder URL</p>
-                    <p className="text-xs font-mono text-text-primary break-all">
-                      {selectedCA.ocsp_url || 'Not configured'}
-                    </p>
+                    <DataField 
+                      label="OCSP Responder URL" 
+                      value={selectedCA.ocsp_url || 'Not configured'} 
+                      mono
+                    />
                   </div>
                 )}
               </div>
-            </div>
+            </ContentSection>
           )}
 
           {/* Full Subject/Issuer DN */}
-          <div className="p-4 bg-bg-tertiary border border-border rounded-lg">
-            <p className="text-xs text-text-secondary uppercase mb-2">Full Subject DN</p>
-            <p className="text-xs font-mono text-text-primary break-all mb-4">
-              {selectedCA.subject}
-            </p>
-            <p className="text-xs text-text-secondary uppercase mb-2">Issuer DN</p>
-            <p className="text-xs font-mono text-text-primary break-all">
-              {selectedCA.issuer}
-            </p>
-          </div>
+          <ContentSection title="Distinguished Names">
+            <DataGrid columns={1}>
+              <DataField 
+                label="Full Subject DN" 
+                value={selectedCA.subject} 
+                mono 
+                copyable 
+                fullWidth
+              />
+              <DataField 
+                label="Issuer DN" 
+                value={selectedCA.issuer} 
+                mono 
+                copyable 
+                fullWidth
+              />
+            </DataGrid>
+          </ContentSection>
         </div>
       )
     },
     {
       id: 'issued',
       label: 'Issued Certificates',
-      icon: <Certificate size={16} />,
+      icon: Certificate,
       content: (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -498,38 +522,30 @@ export default function CAsPage() {
       id: 'settings',
       label: 'Settings',
       content: (
-        <div className="space-y-4">
-          <div>
-            <p className="text-sm font-medium text-text-primary mb-2">Default Validity Period</p>
-            <Input 
-              type="number" 
-              value={selectedCA.default_validity_days || 365}
-              disabled
-              helperText="Days"
+        <ContentSection title="CA Settings">
+          <DataGrid columns={1}>
+            <DataField 
+              label="Default Validity Period" 
+              value={`${selectedCA.default_validity_days || 365} days`}
             />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-text-primary mb-2">CRL Distribution Points</p>
-            <Input 
-              value={selectedCA.crl_distribution_points || ''}
-              disabled
-              placeholder="http://example.com/ca.crl"
+            <DataField 
+              label="CRL Distribution Points" 
+              value={selectedCA.crl_distribution_points || 'Not configured'} 
+              mono
             />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-text-primary mb-2">OCSP Responder URL</p>
-            <Input 
-              value={selectedCA.ocsp_url || ''}
-              disabled
-              placeholder="http://ocsp.example.com"
+            <DataField 
+              label="OCSP Responder URL" 
+              value={selectedCA.ocsp_url || 'Not configured'} 
+              mono
             />
-          </div>
-        </div>
+          </DataGrid>
+        </ContentSection>
       )
     },
     {
       id: 'export',
       label: 'Export',
+      icon: Download,
       content: (
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
@@ -566,23 +582,24 @@ export default function CAsPage() {
             </Button>
           </div>
           
-          <div className="mt-6 p-4 bg-bg-tertiary border border-border rounded-lg">
-            <p className="text-xs text-text-secondary uppercase mb-2">Certificate Fingerprints</p>
-            <div className="space-y-2">
-              <div>
-                <p className="text-xs text-text-secondary">SHA-256</p>
-                <p className="text-xs font-mono text-text-primary break-all">
-                  {selectedCA.fingerprint_sha256}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary">SHA-1</p>
-                <p className="text-xs font-mono text-text-primary break-all">
-                  {selectedCA.fingerprint_sha1}
-                </p>
-              </div>
-            </div>
-          </div>
+          <ContentSection title="Certificate Fingerprints">
+            <DataGrid columns={1}>
+              <DataField 
+                label="SHA-256" 
+                value={selectedCA.fingerprint_sha256} 
+                mono 
+                copyable 
+                fullWidth
+              />
+              <DataField 
+                label="SHA-1" 
+                value={selectedCA.fingerprint_sha1} 
+                mono 
+                copyable 
+                fullWidth
+              />
+            </DataGrid>
+          </ContentSection>
         </div>
       )
     },
@@ -610,25 +627,31 @@ export default function CAsPage() {
               {selectedCA.pem || 'PEM data not available'}
             </pre>
           </div>
-          <div className="p-4 bg-bg-tertiary border border-border rounded-lg">
-            <p className="text-xs text-text-secondary uppercase mb-2">Full Subject DN</p>
-            <p className="text-xs font-mono text-text-primary break-all">
-              {selectedCA.subject}
-            </p>
-          </div>
-          <div className="p-4 bg-bg-tertiary border border-border rounded-lg">
-            <p className="text-xs text-text-secondary uppercase mb-2">Full Issuer DN</p>
-            <p className="text-xs font-mono text-text-primary break-all">
-              {selectedCA.issuer}
-            </p>
-          </div>
+          <ContentSection title="Distinguished Names">
+            <DataGrid columns={1}>
+              <DataField 
+                label="Full Subject DN" 
+                value={selectedCA.subject} 
+                mono 
+                copyable 
+                fullWidth
+              />
+              <DataField 
+                label="Full Issuer DN" 
+                value={selectedCA.issuer} 
+                mono 
+                copyable 
+                fullWidth
+              />
+            </DataGrid>
+          </ContentSection>
         </div>
       )
     },
     {
       id: 'ocsp',
       label: 'OCSP',
-      icon: <ShieldCheck size={16} />,
+      icon: ShieldCheck,
       content: <OCSPSettingsTab ca={selectedCA} onUpdate={loadCAs} showSuccess={showSuccess} showError={showError} />
     }
   ] : []
@@ -852,36 +875,42 @@ export default function CAsPage() {
           </div>
         ) : (
           <div className="flex flex-col h-full">
-            {/* Header with breadcrumb and actions */}
-            <div className="px-6 py-4 border-b border-border bg-bg-secondary flex items-center justify-between shrink-0">
-              <div>
-                <p className="text-xs text-text-secondary mb-1">CAs / {selectedCA.name || '...'}</p>
-                <h2 className="text-lg font-semibold text-text-primary">{selectedCA.name || 'Select a CA'}</h2>
-              </div>
-              <div className="flex items-center gap-2">
-                {canWrite('cas') && (
-                  <Button variant="secondary" size="sm">
-                    <PencilSimple size={16} />
-                    Edit
-                  </Button>
-                )}
-                <ExportDropdown 
-                  onExport={handleExport}
-                  hasPrivateKey={!!selectedCA.prv || selectedCA.has_key}
-                />
-                {canDelete('cas') && (
-                  <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCA.id)}>
-                    <Trash size={16} />
-                    Delete
-                  </Button>
-                )}
-              </div>
-            </div>
+            {/* Header with responsive actions */}
+            <ContentHeader
+              title={selectedCA.name || 'Select a CA'}
+              breadcrumb={`CAs / ${selectedCA.name || '...'}`}
+              badge={
+                <Badge variant={selectedCA.type === 'root' ? 'primary' : 'secondary'} size="sm">
+                  {selectedCA.type}
+                </Badge>
+              }
+              actions={[
+                ...(canWrite('cas') ? [{
+                  label: 'Edit',
+                  icon: PencilSimple,
+                  variant: 'secondary',
+                  onClick: () => {}
+                }] : []),
+                ...(canDelete('cas') ? [{
+                  label: 'Delete',
+                  icon: Trash,
+                  variant: 'danger',
+                  onClick: () => handleDelete(selectedCA.id)
+                }] : [])
+              ]}
+            />
 
-            {/* Tabs content */}
-            <div className="flex-1 overflow-auto p-6">
-              <Tabs tabs={detailTabs} defaultTab="overview" />
-            </div>
+            {/* Tabs with responsive scrolling */}
+            <TabsResponsive
+              tabs={detailTabs}
+              activeTab={activeDetailTab}
+              onChange={setActiveDetailTab}
+            />
+
+            {/* Content area */}
+            <ContentBody>
+              {detailTabs.find(t => t.id === activeDetailTab)?.content}
+            </ContentBody>
           </div>
         )}
       </PageLayout>
