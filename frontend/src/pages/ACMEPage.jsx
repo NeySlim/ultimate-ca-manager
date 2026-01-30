@@ -2,9 +2,9 @@
  * ACME Page
  */
 import { useState, useEffect } from 'react'
-import { Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk } from '@phosphor-icons/react'
+import { Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, HourglassHigh, Globe, Lightning } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Table, Button, Badge,
+  ExplorerPanel, DetailsPanel, Table, Button, Badge, Card,
   Input, Modal, Tabs, Select,
   LoadingSpinner, EmptyState, StatusIndicator
 } from '../components'
@@ -408,45 +408,112 @@ export default function ACMEPage() {
     }
   ]
 
+  // Stats computed from accounts
+  const stats = {
+    total: accounts.length,
+    active: accounts.filter(a => a.status === 'valid').length,
+    orders: orders.length,
+    challenges: challenges.filter(c => c.status === 'pending').length
+  }
+
   return (
     <>
       <ExplorerPanel
-        title="ACME Accounts"
+        title="ACME"
         footer={
           <div className="text-xs text-text-secondary">
             {accounts.length} accounts
           </div>
         }
       >
-        <div className="p-4">
-          <Button onClick={() => setShowCreateModal(true)} className="w-full">
-            <Plus size={18} />
-            Create Account
-          </Button>
-        </div>
-
-        <div className="flex-1 overflow-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <LoadingSpinner />
+        <div className="space-y-4">
+          {/* Stats Cards */}
+          <div className="px-3 pt-2 space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Overview
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <Card className="p-2.5 text-center bg-gradient-to-br from-blue-500/10 to-transparent border-blue-500/20">
+                <div className="flex items-center justify-center gap-1.5">
+                  <Key size={16} weight="duotone" className="text-blue-500" />
+                  <span className="text-lg font-bold text-blue-500">{stats.total}</span>
+                </div>
+                <div className="text-xs text-text-secondary">Accounts</div>
+              </Card>
+              <Card className="p-2.5 text-center bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
+                <div className="flex items-center justify-center gap-1.5">
+                  <CheckCircle size={16} weight="duotone" className="text-emerald-500" />
+                  <span className="text-lg font-bold text-emerald-500">{stats.active}</span>
+                </div>
+                <div className="text-xs text-text-secondary">Active</div>
+              </Card>
             </div>
-          ) : accounts.length === 0 ? (
-            <EmptyState
-              icon={Key}
-              title="No ACME accounts"
-              description="Create an ACME account to use automatic certificate issuance"
-              action={{
-                label: 'Create Account',
-                onClick: () => setShowCreateModal(true)
-              }}
-            />
-          ) : (
-            <Table
-              columns={accountColumns}
-              data={accounts}
-              onRowClick={selectAccount}
-              selectedId={selectedAccount?.id}
-            />
+          </div>
+
+          {/* Server Status */}
+          <div className="px-3 space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Server Status
+            </h3>
+            <Card className="p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Lightning size={14} weight="duotone" className={acmeSettings.enabled ? 'text-emerald-500' : 'text-gray-500'} />
+                  <span className="text-sm">ACME Server</span>
+                </div>
+                <Badge variant={acmeSettings.enabled ? 'emerald' : 'gray'} size="sm">
+                  {acmeSettings.enabled ? 'Enabled' : 'Disabled'}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Globe size={14} weight="duotone" className="text-purple-500" />
+                  <span className="text-sm">Directory</span>
+                </div>
+                <Badge variant="purple" size="sm">Ready</Badge>
+              </div>
+            </Card>
+          </div>
+
+          {/* Actions */}
+          <div className="px-3 space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Actions
+            </h3>
+            <Button onClick={() => setShowCreateModal(true)} className="w-full justify-start">
+              <span className="p-1 rounded bg-accent/20">
+                <Plus size={16} weight="bold" className="text-accent" />
+              </span>
+              Create Account
+            </Button>
+          </div>
+
+          {/* Account List */}
+          {accounts.length > 0 && (
+            <div className="px-3 space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                Accounts
+              </h3>
+              <div className="space-y-1">
+                {accounts.slice(0, 5).map(account => (
+                  <button
+                    key={account.id}
+                    onClick={() => selectAccount(account)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
+                      selectedAccount?.id === account.id 
+                        ? 'bg-accent/10 text-accent border-l-2 border-accent' 
+                        : 'hover:bg-bg-tertiary/50'
+                    }`}
+                  >
+                    <Key size={14} weight="duotone" className={account.status === 'valid' ? 'text-emerald-500' : 'text-gray-500'} />
+                    <span className="text-sm truncate flex-1">{account.email}</span>
+                    <Badge variant={account.status === 'valid' ? 'emerald' : 'gray'} size="sm">
+                      {account.status}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </ExplorerPanel>
