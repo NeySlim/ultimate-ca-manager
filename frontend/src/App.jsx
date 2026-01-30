@@ -17,6 +17,8 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const ImportExportPage = lazy(() => import('./pages/ImportExportPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'))
+const CRLOCSPPage = lazy(() => import('./pages/CRLOCSPPage'))
+const TrustStorePage = lazy(() => import('./pages/TrustStorePage'))
 
 // Pro pages - lazy load with graceful fallback
 const GroupsPage = lazy(() => 
@@ -76,6 +78,8 @@ function AppRoutes() {
           <Route path="/audit" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
           <Route path="/import" element={<ProtectedRoute><ImportExportPage /></ProtectedRoute>} />
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+          <Route path="/crl-ocsp" element={<ProtectedRoute><CRLOCSPPage /></ProtectedRoute>} />
+          <Route path="/truststore" element={<ProtectedRoute><TrustStorePage /></ProtectedRoute>} />
           
           {/* Pro Routes */}
           <Route path="/groups" element={<ProtectedRoute><GroupsPage /></ProtectedRoute>} />
