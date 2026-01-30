@@ -1,11 +1,11 @@
 /**
  * CAs (Certificate Authorities) Page - Using ListPageLayout for consistent UI
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   ShieldCheck, Crown, Key, Download, Trash, PencilSimple,
-  Certificate, UploadSimple, Clock, Plus
+  Certificate, UploadSimple, Clock, Plus, Warning
 } from '@phosphor-icons/react'
 import {
   ListPageLayout, Badge, Button, Modal, Input, Select,
@@ -141,6 +141,35 @@ export default function CAsPage() {
     }
   }
 
+  // Check if intermediate CA is orphan (no parent found in our list)
+  const isOrphanIntermediate = (ca) => {
+    if (ca.type !== 'intermediate') return false
+    if (!ca.parent_id) return true // No parent_id means orphan
+    // Check if parent exists in our CA list
+    return !cas.some(c => c.id === ca.parent_id)
+  }
+
+  // Table filters
+  const tableFilters = useMemo(() => [
+    {
+      key: 'type',
+      label: 'Type',
+      options: [
+        { value: 'root', label: 'Root CA' },
+        { value: 'intermediate', label: 'Intermediate' }
+      ]
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      options: [
+        { value: 'Active', label: 'Active' },
+        { value: 'Expired', label: 'Expired' },
+        { value: 'Revoked', label: 'Revoked' }
+      ]
+    }
+  ], [])
+
   // Table columns
   const columns = [
     {
@@ -154,6 +183,11 @@ export default function CAsPage() {
             <ShieldCheck size={16} weight="duotone" className="text-blue-500 shrink-0" />
           )}
           <span className="font-medium truncate">{val || row.common_name || 'CA'}</span>
+          {isOrphanIntermediate(row) && (
+            <Badge variant="warning" size="sm" className="ml-1">
+              <Warning size={12} className="mr-0.5" /> orphan
+            </Badge>
+          )}
         </div>
       )
     },
@@ -320,10 +354,14 @@ export default function CAsPage() {
         searchPlaceholder="Search CAs..."
         searchKeys={['name', 'common_name', 'subject']}
         sortable
-        defaultSort={{ key: 'name', direction: 'asc' }}
+        defaultSort={{ key: 'type', direction: 'asc' }}
         paginated
         pageSize={25}
         rowActions={rowActions}
+        filters={tableFilters}
+        hierarchical
+        parentKey="parent_id"
+        defaultExpanded={true}
         emptyIcon={ShieldCheck}
         emptyTitle="No Certificate Authorities"
         emptyDescription="Create your first CA to get started"

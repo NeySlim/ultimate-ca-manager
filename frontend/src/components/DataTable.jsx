@@ -3,10 +3,11 @@
  * 
  * Features:
  * - Pagination with configurable page sizes
- * - Search/filter
+ * - Search/filter with dropdown filters
  * - Column visibility toggle
  * - Sortable columns
  * - Row selection (single/multi)
+ * - Hierarchical/tree display
  * - Responsive (cards on mobile)
  * - Theme-aware styling
  * - Multiple variants (default, compact, striped)
@@ -16,7 +17,7 @@ import { cn } from '../lib/utils'
 import { 
   MagnifyingGlass, CaretUp, CaretDown, CaretLeft, CaretRight,
   Columns, Funnel, Check, X, DotsThree, ArrowsDownUp,
-  CaretDoubleLeft, CaretDoubleRight
+  CaretDoubleLeft, CaretDoubleRight, CaretRight as ChevronRight
 } from '@phosphor-icons/react'
 import { useMobile } from '../contexts'
 import { Button } from './Button'
@@ -46,12 +47,23 @@ export function DataTable({
   searchPlaceholder = "Search...",
   searchKeys = [], // Which columns to search in (empty = all)
   
+  // Filters
+  filters = [], // [{ key: 'status', label: 'Status', options: [{value, label}] }]
+  
   // Sorting
   sortable = true,
   defaultSort = null, // { key: 'name', direction: 'asc' }
   
   // Column management
   columnToggle = true,
+  
+  // Tree/hierarchy display
+  hierarchical = false,   // Enable tree view
+  parentKey = 'parent_id', // Key for parent reference
+  childrenKey = 'children', // Key for nested children (if pre-built)
+  expandedRows = null,     // Controlled expanded state
+  defaultExpanded = true,  // Expand all by default
+  indentWidth = 24,        // Pixels per level
   
   // Styling
   variant = 'default', // default, compact, striped
@@ -86,33 +98,132 @@ export function DataTable({
     columns.filter(c => c.visible !== false).map(c => c.key)
   )
   const [showColumnMenu, setShowColumnMenu] = useState(false)
+  const [showFiltersMenu, setShowFiltersMenu] = useState(false)
   const [internalSelection, setInternalSelection] = useState(selectedRows)
+  const [activeFilters, setActiveFilters] = useState({}) // { status: 'active', type: 'root' }
+  const [internalExpanded, setInternalExpanded] = useState(
+    expandedRows !== null ? expandedRows : (defaultExpanded ? 'all' : new Set())
+  )
   
   // Sync selection with prop
   useEffect(() => {
     setInternalSelection(selectedRows)
   }, [selectedRows])
   
-  // Filter data by search
-  const filteredData = useMemo(() => {
-    if (!searchQuery.trim()) return data
+  // Build tree structure if hierarchical
+  const treeData = useMemo(() => {
+    if (!hierarchical) return null
     
-    const query = searchQuery.toLowerCase()
-    const keysToSearch = searchKeys.length > 0 
-      ? searchKeys 
-      : columns.map(c => c.key)
+    // If data already has children, use it directly
+    if (data.some(item => item[childrenKey]?.length > 0)) {
+      return data.filter(item => !item[parentKey])
+    }
     
-    return data.filter(row => 
-      keysToSearch.some(key => {
-        const value = row[key]
-        if (value == null) return false
-        return String(value).toLowerCase().includes(query)
-      })
-    )
-  }, [data, searchQuery, searchKeys, columns])
+    // Build tree from flat data
+    const idMap = new Map()
+    const roots = []
+    
+    // First pass: create map
+    data.forEach(item => {
+      idMap.set(item.id, { ...item, _children: [], _level: 0 })
+    })
+    
+    // Second pass: build tree
+    data.forEach(item => {
+      const node = idMap.get(item.id)
+      const parentId = item[parentKey]
+      
+      if (parentId && idMap.has(parentId)) {
+        const parent = idMap.get(parentId)
+        parent._children.push(node)
+        node._level = parent._level + 1
+        node._parent = parent
+      } else {
+        roots.push(node)
+      }
+    })
+    
+    return roots
+  }, [data, hierarchical, parentKey, childrenKey])
   
-  // Sort data
+  // Flatten tree for display (respects expansion)
+  const flattenedTreeData = useMemo(() => {
+    if (!hierarchical || !treeData) return null
+    
+    const result = []
+    
+    // Sort function for nodes at same level
+    const sortNodes = (nodes) => {
+      return [...nodes].sort((a, b) => {
+        // Roots first (type = root), then intermediates
+        if (a.type !== b.type) {
+          return a.type === 'root' ? -1 : 1
+        }
+        // Then by name
+        const aName = a.name || a.descr || ''
+        const bName = b.name || b.descr || ''
+        return aName.localeCompare(bName)
+      })
+    }
+    
+    const traverse = (nodes, level = 0) => {
+      const sorted = sortNodes(nodes)
+      sorted.forEach(node => {
+        const nodeWithLevel = { ...node, _level: level, _hasChildren: node._children?.length > 0 }
+        result.push(nodeWithLevel)
+        
+        const isExpanded = internalExpanded === 'all' || internalExpanded.has?.(node.id)
+        if (isExpanded && node._children?.length > 0) {
+          traverse(node._children, level + 1)
+        }
+      })
+    }
+    
+    traverse(treeData)
+    return result
+  }, [treeData, hierarchical, internalExpanded])
+  
+  // Use flattened tree or regular data
+  const baseData = hierarchical && flattenedTreeData ? flattenedTreeData : data
+  
+  // Filter data by search and active filters
+  const filteredData = useMemo(() => {
+    let result = baseData
+    
+    // Apply search
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      const keysToSearch = searchKeys.length > 0 
+        ? searchKeys 
+        : columns.map(c => c.key)
+      
+      result = result.filter(row => 
+        keysToSearch.some(key => {
+          const value = row[key]
+          if (value == null) return false
+          return String(value).toLowerCase().includes(query)
+        })
+      )
+    }
+    
+    // Apply dropdown filters
+    if (Object.keys(activeFilters).length > 0) {
+      result = result.filter(row => {
+        return Object.entries(activeFilters).every(([key, value]) => {
+          if (!value || value === 'all') return true
+          return row[key] === value
+        })
+      })
+    }
+    
+    return result
+  }, [baseData, searchQuery, searchKeys, columns, activeFilters])
+  
+  // Sort data (disabled for hierarchical mode - tree order takes precedence)
   const sortedData = useMemo(() => {
+    // In hierarchical mode, don't sort globally (tree structure defines order)
+    if (hierarchical) return filteredData
+    
     if (!sortConfig) return filteredData
     
     return [...filteredData].sort((a, b) => {
@@ -136,7 +247,7 @@ export function DataTable({
       
       return sortConfig.direction === 'desc' ? -comparison : comparison
     })
-  }, [filteredData, sortConfig, columns])
+  }, [filteredData, sortConfig, columns, hierarchical])
   
   // Paginate data
   const paginatedData = useMemo(() => {
@@ -151,7 +262,34 @@ export function DataTable({
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, pageSize])
+  }, [searchQuery, pageSize, activeFilters])
+  
+  // Handle filter change
+  const handleFilterChange = (key, value) => {
+    setActiveFilters(prev => ({
+      ...prev,
+      [key]: value
+    }))
+  }
+  
+  // Handle expand/collapse for tree
+  const toggleExpand = (rowId) => {
+    setInternalExpanded(prev => {
+      if (prev === 'all') {
+        // First collapse: expand all except this one
+        const newSet = new Set(flattenedTreeData.filter(r => r._hasChildren).map(r => r.id))
+        newSet.delete(rowId)
+        return newSet
+      }
+      const newSet = new Set(prev)
+      if (newSet.has(rowId)) {
+        newSet.delete(rowId)
+      } else {
+        newSet.add(rowId)
+      }
+      return newSet
+    })
+  }
   
   // Handlers
   const handleSort = (key) => {
@@ -312,6 +450,11 @@ export function DataTable({
         showColumnMenu={showColumnMenu}
         setShowColumnMenu={setShowColumnMenu}
         selectedCount={internalSelection.length}
+        filters={filters}
+        activeFilters={activeFilters}
+        onFilterChange={handleFilterChange}
+        showFiltersMenu={showFiltersMenu}
+        setShowFiltersMenu={setShowFiltersMenu}
       />
       
       {/* Table */}
@@ -388,6 +531,10 @@ export function DataTable({
             ) : (
               paginatedData.map((row, idx) => {
                 const isSelected = internalSelection.some(r => r.id === row.id)
+                const level = hierarchical ? (row._level || 0) : 0
+                const hasChildren = hierarchical && row._hasChildren
+                const isExpanded = internalExpanded === 'all' || internalExpanded.has?.(row.id)
+                
                 return (
                   <tr
                     key={row.id || idx}
@@ -413,7 +560,7 @@ export function DataTable({
                         />
                       </td>
                     )}
-                    {displayColumns.map(column => (
+                    {displayColumns.map((column, colIdx) => (
                       <td
                         key={column.key}
                         className={cn(
@@ -423,10 +570,35 @@ export function DataTable({
                           column.align === 'right' && 'text-right'
                         )}
                       >
-                        {column.render 
-                          ? column.render(row[column.key], row)
-                          : row[column.key]
-                        }
+                        {/* First column gets tree indentation */}
+                        {hierarchical && colIdx === 0 ? (
+                          <div className="flex items-center" style={{ paddingLeft: level * indentWidth }}>
+                            {hasChildren ? (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleExpand(row.id) }}
+                                className="p-0.5 mr-1 rounded hover:bg-bg-tertiary text-text-secondary"
+                              >
+                                <ChevronRight 
+                                  size={14} 
+                                  className={cn(
+                                    "transition-transform duration-150",
+                                    isExpanded && "rotate-90"
+                                  )}
+                                />
+                              </button>
+                            ) : (
+                              <span className="w-5 mr-1" /> // Spacer for alignment
+                            )}
+                            {column.render 
+                              ? column.render(row[column.key], row)
+                              : row[column.key]
+                            }
+                          </div>
+                        ) : (
+                          column.render 
+                            ? column.render(row[column.key], row)
+                            : row[column.key]
+                        )}
                       </td>
                     ))}
                     {rowActions && (
@@ -473,8 +645,15 @@ function TableToolbar({
   onToggleColumn,
   showColumnMenu,
   setShowColumnMenu,
-  selectedCount
+  selectedCount,
+  filters = [],
+  activeFilters = {},
+  onFilterChange,
+  showFiltersMenu,
+  setShowFiltersMenu
 }) {
+  const activeFilterCount = Object.values(activeFilters).filter(v => v && v !== 'all').length
+  
   return (
     <div className="flex items-center justify-between gap-4 p-3 border-b border-border bg-bg-secondary/50">
       <div className="flex items-center gap-3 flex-1">
@@ -496,6 +675,34 @@ function TableToolbar({
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-bg-primary rounded"
               >
                 <X size={14} className="text-text-tertiary" />
+              </button>
+            )}
+          </div>
+        )}
+        
+        {/* Filter dropdowns */}
+        {filters.length > 0 && (
+          <div className="flex items-center gap-2">
+            {filters.map(filter => (
+              <select
+                key={filter.key}
+                value={activeFilters[filter.key] || 'all'}
+                onChange={(e) => onFilterChange(filter.key, e.target.value)}
+                className="bg-bg-tertiary border border-border rounded-lg px-2.5 py-1.5 text-sm text-text-primary 
+                  focus:outline-none focus:border-accent-primary cursor-pointer"
+              >
+                <option value="all">{filter.label}: All</option>
+                {filter.options.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            ))}
+            {activeFilterCount > 0 && (
+              <button
+                onClick={() => filters.forEach(f => onFilterChange(f.key, 'all'))}
+                className="text-xs text-accent-primary hover:text-accent-primary/80 px-2"
+              >
+                Clear filters
               </button>
             )}
           </div>
