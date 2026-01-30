@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, Envelope, Download, Trash, UploadSimple, HardDrives, Lock, Key } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, Input, Select, Badge,
+  ExplorerPanel, DetailsPanel, Button, Input, Select, Badge, Card,
   Textarea, Tabs, LoadingSpinner, FileUpload, Table, Modal
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
@@ -925,32 +925,32 @@ export default function SettingsPage() {
   return (
     <>
       <ExplorerPanel title="Settings">
-        <div className="p-3 space-y-3">
-          {/* System Status */}
+        <div className="p-3 space-y-4">
+          {/* System Status Card */}
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-text-primary uppercase tracking-wide">System Status</h3>
-            <div className="space-y-1.5">
+            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">System Status</h3>
+            <Card className="p-3 space-y-2 bg-gradient-to-br from-emerald-500/5 to-transparent border-emerald-500/20">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-text-secondary">Service</span>
-                <span className="text-green-500 font-medium">Running</span>
+                <Badge variant="emerald" size="sm">Running</Badge>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-text-secondary">Database</span>
-                <span className="text-green-500 font-medium">Connected</span>
+                <Badge variant="emerald" size="sm">Connected</Badge>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-text-secondary">Version</span>
-                <span className="text-text-primary font-medium">1.0.0</span>
+                <Badge variant="blue" size="sm">2.0.0</Badge>
               </div>
-            </div>
+            </Card>
           </div>
 
           {/* Quick Help */}
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-text-primary uppercase tracking-wide">Quick Help</h3>
-            <div className="text-xs text-text-secondary space-y-1.5">
-              <p>• General settings control core application behavior</p>
-              <p>• Email settings require SMTP configuration</p>
+            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Quick Help</h3>
+            <div className="text-xs text-text-secondary space-y-1.5 px-1">
+              <p>• General settings control core behavior</p>
+              <p>• Email settings require SMTP</p>
               <p>• Security settings affect all users</p>
               <p>• Database settings require restart</p>
             </div>
@@ -958,14 +958,18 @@ export default function SettingsPage() {
 
           {/* Actions */}
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-text-primary uppercase tracking-wide">Actions</h3>
+            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Actions</h3>
             <div className="space-y-1.5">
               <Button size="sm" variant="secondary" className="w-full justify-start">
-                <Database size={14} />
+                <span className="p-1 rounded bg-blue-500/20">
+                  <Database size={14} className="text-blue-500" />
+                </span>
                 Backup Database
               </Button>
               <Button size="sm" variant="secondary" className="w-full justify-start">
-                <ShieldCheck size={14} />
+                <span className="p-1 rounded bg-emerald-500/20">
+                  <ShieldCheck size={14} className="text-emerald-500" />
+                </span>
                 Test Security
               </Button>
             </div>
