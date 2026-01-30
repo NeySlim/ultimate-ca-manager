@@ -632,8 +632,8 @@ export default function AccountPage() {
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-text-secondary">Role</span>
-                <Badge variant={user?.is_admin ? 'emerald' : 'blue'} size="sm">
-                  {user?.is_admin ? 'Admin' : 'User'}
+                <Badge variant={user?.role === 'admin' ? 'emerald' : 'blue'} size="sm">
+                  {user?.role || 'User'}
                 </Badge>
               </div>
             </Card>
