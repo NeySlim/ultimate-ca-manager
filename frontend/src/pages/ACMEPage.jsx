@@ -214,21 +214,21 @@ export default function ACMEPage() {
   // Note: Detail tabs content is now inline in the render below
 
   const configContent = (
-    <div className="space-y-6 max-w-2xl p-6">
+    <div className="space-y-6 p-6">
       <HelpCard variant="info" title="About ACME Protocol">
         ACME (Automatic Certificate Management Environment) enables automated certificate issuance. 
         Compatible with certbot, acme.sh, and other ACME clients.
       </HelpCard>
 
-      <div>
-        <h3 className="text-sm font-semibold text-text-primary mb-4">ACME Server Configuration</h3>
+      {/* ACME Server Configuration */}
+      <DetailSection title="ACME Server Configuration" icon={Globe}>
         <div className="space-y-4">
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
             <input
               type="checkbox"
               checked={acmeSettings.enabled || false}
               onChange={(e) => updateAcmeSetting('enabled', e.target.checked)}
-              className="rounded border-border bg-bg-tertiary"
+              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
             />
             <div>
               <p className="text-sm text-text-primary font-medium">Enable ACME Server</p>
@@ -244,26 +244,31 @@ export default function ACMEPage() {
             placeholder="Select a CA..."
             options={cas.map(ca => ({ value: ca.id.toString(), label: ca.name || ca.common_name || ca.descr }))}
           />
-
-          <Input
-            label="ACME Directory URL"
-            value={`${window.location.origin}/acme/directory`}
-            readOnly
-            helperText="Use this URL with ACME clients like certbot or acme.sh"
-            className="bg-bg-tertiary"
-          />
         </div>
-      </div>
+      </DetailSection>
 
-      <div className="border-t border-border pt-6">
-        <h3 className="text-sm font-semibold text-text-primary mb-4">Let's Encrypt Proxy</h3>
-        
+      {/* ACME Endpoints */}
+      <DetailSection title="ACME Endpoints" icon={Lightning}>
+        <DetailGrid columns={1}>
+          <DetailField 
+            label="ACME Directory URL" 
+            value={`${window.location.origin}/acme/directory`}
+            mono
+            copyable
+            fullWidth
+            helperText="Use this URL with ACME clients like certbot or acme.sh"
+          />
+        </DetailGrid>
+      </DetailSection>
+
+      {/* Let's Encrypt Proxy */}
+      <DetailSection title="Let's Encrypt Proxy" icon={ShieldCheck}>
         <HelpCard variant="tip" title="What is LE Proxy?" className="mb-4" compact>
           Proxy certificate requests to Let's Encrypt while maintaining local control and audit logging.
         </HelpCard>
 
         <div className="space-y-4">
-          <label className="flex items-center gap-3 cursor-pointer">
+          <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
             <input
               type="checkbox"
               checked={acmeSettings.proxy_enabled || false}
@@ -275,13 +280,16 @@ export default function ACMEPage() {
 
           {acmeSettings.proxy_enabled && (
             <>
-              <Input
-                label="Proxy Endpoint URL"
-                value={`${window.location.origin}/api/v2/acme/proxy`}
-                readOnly
-                helperText="External ACME clients can use this URL to proxy requests to Let's Encrypt"
-                className="bg-bg-tertiary"
-              />
+              <DetailGrid columns={1}>
+                <DetailField 
+                  label="Proxy Endpoint URL" 
+                  value={`${window.location.origin}/api/v2/acme/proxy`}
+                  mono
+                  copyable
+                  fullWidth
+                  helperText="External ACME clients can use this URL to proxy requests to Let's Encrypt"
+                />
+              </DetailGrid>
               
               {acmeSettings.proxy_registered ? (
                 <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
@@ -330,7 +338,7 @@ export default function ACMEPage() {
             </>
           )}
         </div>
-      </div>
+      </DetailSection>
 
       <div className="flex gap-3 pt-4 border-t border-border">
         <Button onClick={handleSaveConfig} disabled={saving}>
@@ -508,7 +516,7 @@ export default function ACMEPage() {
         focusActions={focusActions}
         focusFooter={`${filteredAccounts.length} of ${accounts.length} account(s)`}
         helpContent={helpContent}
-        helpTitle="ACME Protocol - Aide"
+        
       >
         {/* Main Content */}
         {!selectedAccount ? (
