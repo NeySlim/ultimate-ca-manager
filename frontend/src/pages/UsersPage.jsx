@@ -1,15 +1,17 @@
 /**
- * Users Page - User management with PageLayout
+ * Users Page - User management with PageLayout and Responsive Components
  */
 import { useState, useEffect } from 'react'
 import { 
   User, Plus, Trash, LockKey, ToggleLeft, ToggleRight, 
-  ShieldCheck, UserCircle, Eye, MagnifyingGlass, UsersThree
+  ShieldCheck, UserCircle, Eye, MagnifyingGlass, UsersThree, PencilSimple
 } from '@phosphor-icons/react'
 import {
   PageLayout, FocusItem, Button, Badge, Card,
   Input, Select, Modal,
-  LoadingSpinner, EmptyState, StatusIndicator, PermissionsDisplay, HelpCard
+  LoadingSpinner, EmptyState, StatusIndicator, PermissionsDisplay, HelpCard,
+  ContentHeader, ContentBody, ResponsiveContentSection as ContentSection, 
+  DataGrid, DataField
 } from '../components'
 import { usersService, rolesService } from '../services'
 import { useNotification } from '../contexts'
@@ -356,185 +358,186 @@ export default function UsersPage() {
             />
           </div>
         ) : (
-          <div className="p-6 space-y-6">
-            {/* Header with actions */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-accent-primary/10 flex items-center justify-center">
-                  {selectedUser.role === 'admin' ? (
-                    <ShieldCheck size={24} className="text-accent-primary" />
-                  ) : (
-                    <User size={24} className="text-accent-primary" />
-                  )}
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-text-primary">{selectedUser.username}</h2>
-                  <p className="text-sm text-text-secondary">{selectedUser.email}</p>
-                </div>
-              </div>
-              {canWrite('users') && (
-                <div className="flex items-center gap-2">
-                  {editing ? (
-                    <>
-                      <Button size="sm" onClick={handleUpdate}>Save</Button>
-                      <Button variant="ghost" size="sm" onClick={() => {
-                        setEditing(false)
-                        setFormData({ ...selectedUser })
-                      }}>Cancel</Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>Edit</Button>
-                      <Button 
-                        variant="secondary" 
-                        size="sm" 
-                        onClick={() => handleToggleActive(selectedUser.id)}
-                      >
-                        {selectedUser.active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                        {selectedUser.active ? 'Disable' : 'Enable'}
-                      </Button>
-                      <Button 
-                        variant="secondary" 
-                        size="sm" 
-                        onClick={() => handleResetPassword(selectedUser.id)}
-                      >
-                        <LockKey size={16} />
-                        Reset Password
-                      </Button>
-                      <Button variant="danger" size="sm" onClick={() => handleDelete(selectedUser.id)}>
-                        <Trash size={16} />
-                        Delete
-                      </Button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
+          <div className="flex flex-col h-full">
+            {/* Responsive Header with actions */}
+            <ContentHeader
+              title={selectedUser.username}
+              subtitle={selectedUser.email}
+              badge={
+                <Badge 
+                  variant={selectedUser.role === 'admin' ? 'primary' : selectedUser.role === 'operator' ? 'warning' : 'secondary'}
+                >
+                  {selectedUser.role}
+                </Badge>
+              }
+              actions={
+                editing ? [
+                  {
+                    label: 'Save',
+                    icon: ShieldCheck,
+                    variant: 'primary',
+                    onClick: handleUpdate,
+                  },
+                  {
+                    label: 'Cancel',
+                    icon: null,
+                    variant: 'ghost',
+                    onClick: () => {
+                      setEditing(false)
+                      setFormData({ ...selectedUser })
+                    },
+                  }
+                ] : canWrite('users') ? [
+                  {
+                    label: 'Edit',
+                    icon: PencilSimple,
+                    onClick: () => setEditing(true),
+                  },
+                  {
+                    label: selectedUser.active ? 'Disable' : 'Enable',
+                    icon: selectedUser.active ? ToggleRight : ToggleLeft,
+                    onClick: () => handleToggleActive(selectedUser.id),
+                  },
+                  {
+                    label: 'Reset Password',
+                    icon: LockKey,
+                    onClick: () => handleResetPassword(selectedUser.id),
+                  },
+                  {
+                    label: 'Delete',
+                    icon: Trash,
+                    variant: 'danger',
+                    onClick: () => handleDelete(selectedUser.id),
+                  }
+                ] : []
+              }
+            />
 
-            {/* Basic Info */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">Basic Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="Username"
-                  value={formData.username || ''}
-                  onChange={(e) => updateFormData('username', e.target.value)}
-                  disabled={!editing}
-                />
-                <Input
-                  label="Email"
-                  type="email"
-                  value={formData.email || ''}
-                  onChange={(e) => updateFormData('email', e.target.value)}
-                  disabled={!editing}
-                />
-                <Input
-                  label="Full Name"
-                  value={formData.full_name || ''}
-                  onChange={(e) => updateFormData('full_name', e.target.value)}
-                  disabled={!editing}
-                />
-                <div className="flex items-center gap-3 pt-6">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.active || false}
-                      onChange={(e) => updateFormData('active', e.target.checked)}
+            {/* Content Body */}
+            <ContentBody>
+              <div className="space-y-6">
+                {/* Basic Info */}
+                <ContentSection title="Basic Information">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Username"
+                      value={formData.username || ''}
+                      onChange={(e) => updateFormData('username', e.target.value)}
                       disabled={!editing}
-                      className="rounded border-border bg-bg-tertiary"
                     />
-                    <span className="text-sm text-text-primary">Active</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Role & Permissions */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">Role & Permissions</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <Select
-                  label="Role"
-                  options={[
-                    { value: 'admin', label: 'Administrator' },
-                    { value: 'operator', label: 'Operator' },
-                    { value: 'viewer', label: 'Viewer' },
-                  ]}
-                  value={formData.role || 'viewer'}
-                  onChange={(val) => updateFormData('role', val)}
-                  disabled={!editing}
-                />
-                <div>
-                  <p className="text-sm font-medium text-text-primary mb-2">Permissions</p>
-                  {rolesData && formData.role && (
-                    <PermissionsDisplay
-                      role={formData.role}
-                      permissions={rolesData[formData.role]?.permissions || []}
-                      description={rolesData[formData.role]?.description}
+                    <Input
+                      label="Email"
+                      type="email"
+                      value={formData.email || ''}
+                      onChange={(e) => updateFormData('email', e.target.value)}
+                      disabled={!editing}
                     />
-                  )}
-                  {!rolesData && (
-                    <div className="text-xs text-text-secondary">Loading permissions...</div>
-                  )}
-                </div>
-              </div>
-            </div>
+                    <Input
+                      label="Full Name"
+                      value={formData.full_name || ''}
+                      onChange={(e) => updateFormData('full_name', e.target.value)}
+                      disabled={!editing}
+                    />
+                    <div className="flex items-center gap-3 pt-6">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.active || false}
+                          onChange={(e) => updateFormData('active', e.target.checked)}
+                          disabled={!editing}
+                          className="rounded border-border bg-bg-tertiary"
+                        />
+                        <span className="text-sm text-text-primary">Active</span>
+                      </label>
+                    </div>
+                  </div>
+                </ContentSection>
 
-            {/* Security */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">Security</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">2FA Status</p>
-                  <Badge variant={selectedUser.two_factor_enabled ? 'success' : 'secondary'}>
-                    {selectedUser.two_factor_enabled ? 'Enabled' : 'Disabled'}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Last Password Change</p>
-                  <p className="text-sm text-text-primary">
-                    {selectedUser.password_changed_at 
-                      ? new Date(selectedUser.password_changed_at).toLocaleDateString()
-                      : 'Never'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Login Count</p>
-                  <p className="text-sm text-text-primary">{selectedUser.login_count || 0}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Failed Logins</p>
-                  <p className="text-sm text-text-primary">{selectedUser.failed_login_count || 0}</p>
-                </div>
-              </div>
-            </div>
+                {/* Role & Permissions */}
+                <ContentSection title="Role & Permissions">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Select
+                      label="Role"
+                      options={[
+                        { value: 'admin', label: 'Administrator' },
+                        { value: 'operator', label: 'Operator' },
+                        { value: 'viewer', label: 'Viewer' },
+                      ]}
+                      value={formData.role || 'viewer'}
+                      onChange={(val) => updateFormData('role', val)}
+                      disabled={!editing}
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-text-primary mb-2">Permissions</p>
+                      {rolesData && formData.role && (
+                        <PermissionsDisplay
+                          role={formData.role}
+                          permissions={rolesData[formData.role]?.permissions || []}
+                          description={rolesData[formData.role]?.description}
+                        />
+                      )}
+                      {!rolesData && (
+                        <div className="text-xs text-text-secondary">Loading permissions...</div>
+                      )}
+                    </div>
+                  </div>
+                </ContentSection>
 
-            {/* Activity */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">Activity</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Last Login</p>
-                  <p className="text-sm text-text-primary">
-                    {selectedUser.last_login 
-                      ? new Date(selectedUser.last_login).toLocaleString()
-                      : 'Never'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Created</p>
-                  <p className="text-sm text-text-primary">
-                    {selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleDateString() : '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Account Status</p>
-                  <StatusIndicator status={selectedUser.active ? 'success' : 'warning'}>
-                    {selectedUser.active ? 'Active' : 'Inactive'}
-                  </StatusIndicator>
-                </div>
+                {/* Security */}
+                <ContentSection title="Security">
+                  <DataGrid columns={4}>
+                    <DataField 
+                      label="2FA Status" 
+                      value={
+                        <Badge variant={selectedUser.two_factor_enabled ? 'success' : 'secondary'}>
+                          {selectedUser.two_factor_enabled ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                      }
+                    />
+                    <DataField 
+                      label="Last Password Change" 
+                      value={selectedUser.password_changed_at 
+                        ? new Date(selectedUser.password_changed_at).toLocaleDateString()
+                        : 'Never'}
+                    />
+                    <DataField 
+                      label="Login Count" 
+                      value={selectedUser.login_count || 0}
+                    />
+                    <DataField 
+                      label="Failed Logins" 
+                      value={selectedUser.failed_login_count || 0}
+                    />
+                  </DataGrid>
+                </ContentSection>
+
+                {/* Activity */}
+                <ContentSection title="Activity">
+                  <DataGrid columns={3}>
+                    <DataField 
+                      label="Last Login" 
+                      value={selectedUser.last_login 
+                        ? new Date(selectedUser.last_login).toLocaleString()
+                        : 'Never'}
+                    />
+                    <DataField 
+                      label="Created" 
+                      value={selectedUser.created_at 
+                        ? new Date(selectedUser.created_at).toLocaleDateString() 
+                        : '-'}
+                    />
+                    <DataField 
+                      label="Account Status" 
+                      value={
+                        <StatusIndicator status={selectedUser.active ? 'success' : 'warning'}>
+                          {selectedUser.active ? 'Active' : 'Inactive'}
+                        </StatusIndicator>
+                      }
+                    />
+                  </DataGrid>
+                </ContentSection>
               </div>
-            </div>
+            </ContentBody>
           </div>
         )}
       </PageLayout>

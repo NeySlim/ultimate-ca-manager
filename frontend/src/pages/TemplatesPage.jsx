@@ -1,6 +1,6 @@
 /**
  * Templates Page - Certificate template management
- * Uses PageLayout for consistent UI structure
+ * Uses PageLayout for consistent UI structure with responsive components
  */
 import { useState, useEffect, useRef } from 'react'
 import { 
@@ -10,7 +10,9 @@ import {
 import {
   PageLayout, FocusItem, Button, Badge, Card,
   Input, Select, Textarea, Modal,
-  LoadingSpinner, EmptyState, HelpCard
+  LoadingSpinner, EmptyState, HelpCard,
+  ContentHeader, ContentBody, ResponsiveContentSection as ContentSection,
+  DataGrid, DataField
 } from '../components'
 import { templatesService } from '../services'
 import { useNotification } from '../contexts'
@@ -361,149 +363,179 @@ export default function TemplatesPage() {
             />
           </div>
         ) : (
-          <div className="p-6 space-y-6">
-            {/* Header with actions */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-text-primary">
-                {selectedTemplate.name}
-              </h3>
-              {canWrite('templates') && (
-                <div className="flex items-center gap-2">
+          <div className="flex flex-col h-full">
+            {/* Responsive Header with actions */}
+            <ContentHeader
+              title={selectedTemplate.name}
+              subtitle={`Type: ${selectedTemplate.type} • ${selectedTemplate.usage_count || 0} certificates issued`}
+              badge={
+                <Badge variant={selectedTemplate.type === 'ca' ? 'warning' : 'secondary'} size="sm">
+                  {selectedTemplate.type}
+                </Badge>
+              }
+              actions={[
+                ...(canWrite('templates') ? [
+                  editing ? {
+                    label: 'Save',
+                    icon: FloppyDisk,
+                    variant: 'primary',
+                    onClick: handleSave,
+                  } : {
+                    label: 'Edit',
+                    icon: List,
+                    onClick: () => setEditing(true),
+                  }
+                ] : []),
+                {
+                  label: 'Export',
+                  icon: Download,
+                  onClick: () => handleExportTemplate(selectedTemplate.id),
+                },
+                ...(canWrite('templates') ? [{
+                  label: 'Duplicate',
+                  icon: Copy,
+                  onClick: () => handleDuplicate(selectedTemplate.id),
+                }] : []),
+                ...(canDelete('templates') ? [{
+                  label: 'Delete',
+                  icon: Trash,
+                  variant: 'danger',
+                  onClick: () => handleDelete(selectedTemplate.id),
+                }] : []),
+              ]}
+            />
+
+            {/* Content Body */}
+            <ContentBody>
+              {/* Basic Information */}
+              <ContentSection title="Basic Information">
+                <div className="space-y-4">
+                  <Input
+                    label="Template Name"
+                    value={formData.name || ''}
+                    onChange={(e) => updateFormData('name', e.target.value)}
+                    disabled={!editing}
+                  />
+                  <Textarea
+                    label="Description"
+                    value={formData.description || ''}
+                    onChange={(e) => updateFormData('description', e.target.value)}
+                    disabled={!editing}
+                    rows={3}
+                  />
+                  <Select
+                    label="Type"
+                    options={[
+                      { value: 'certificate', label: 'Certificate' },
+                      { value: 'ca', label: 'Certificate Authority' },
+                    ]}
+                    value={formData.type || 'certificate'}
+                    onChange={(val) => updateFormData('type', val)}
+                    disabled={!editing}
+                  />
+                </div>
+              </ContentSection>
+
+              {/* Validity Period */}
+              <ContentSection title="Validity Period">
+                <DataGrid columns={2}>
                   {editing ? (
-                    <Button size="sm" onClick={handleSave}>
-                      <FloppyDisk size={16} />
-                      Save
-                    </Button>
+                    <>
+                      <Input
+                        label="Default Validity (days)"
+                        type="number"
+                        value={formData.validity_days || 365}
+                        onChange={(e) => updateFormData('validity_days', parseInt(e.target.value))}
+                      />
+                      <Input
+                        label="Max Validity (days)"
+                        type="number"
+                        value={formData.max_validity_days || 3650}
+                        onChange={(e) => updateFormData('max_validity_days', parseInt(e.target.value))}
+                      />
+                    </>
                   ) : (
-                    <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
-                      Edit
-                    </Button>
+                    <>
+                      <DataField 
+                        label="Default Validity"
+                        value={`${formData.validity_days || 365} days`}
+                      />
+                      <DataField 
+                        label="Max Validity"
+                        value={`${formData.max_validity_days || 3650} days`}
+                      />
+                    </>
                   )}
-                  <Button variant="secondary" size="sm" onClick={() => handleExportTemplate(selectedTemplate.id)}>
-                    <Download size={16} />
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => handleDuplicate(selectedTemplate.id)}>
-                    <Copy size={16} />
-                  </Button>
-                  <Button variant="danger" size="sm" onClick={() => handleDelete(selectedTemplate.id)}>
-                    <Trash size={16} />
-                  </Button>
-                </div>
-              )}
-            </div>
+                </DataGrid>
+              </ContentSection>
 
-            {/* Basic Info */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
-                Basic Information
-              </h3>
-              <div className="space-y-4">
-                <Input
-                  label="Template Name"
-                  value={formData.name || ''}
-                  onChange={(e) => updateFormData('name', e.target.value)}
-                  disabled={!editing}
-                />
-                <Textarea
-                  label="Description"
-                  value={formData.description || ''}
-                  onChange={(e) => updateFormData('description', e.target.value)}
-                  disabled={!editing}
-                  rows={3}
-                />
-                <Select
-                  label="Type"
-                  options={[
-                    { value: 'certificate', label: 'Certificate' },
-                    { value: 'ca', label: 'Certificate Authority' },
-                  ]}
-                  value={formData.type || 'certificate'}
-                  onChange={(val) => updateFormData('type', val)}
-                  disabled={!editing}
-                />
-              </div>
-            </div>
+              {/* Subject Template */}
+              <ContentSection title="Subject Template">
+                <DataGrid columns={2}>
+                  {editing ? (
+                    <>
+                      <Input
+                        label="Country (C)"
+                        value={formData.subject?.C || ''}
+                        onChange={(e) => updateSubject('C', e.target.value)}
+                        placeholder="US"
+                      />
+                      <Input
+                        label="State (ST)"
+                        value={formData.subject?.ST || ''}
+                        onChange={(e) => updateSubject('ST', e.target.value)}
+                        placeholder="California"
+                      />
+                      <Input
+                        label="Organization (O)"
+                        value={formData.subject?.O || ''}
+                        onChange={(e) => updateSubject('O', e.target.value)}
+                        placeholder="Example Corp"
+                      />
+                      <Input
+                        label="Common Name (CN)"
+                        value={formData.subject?.CN || ''}
+                        onChange={(e) => updateSubject('CN', e.target.value)}
+                        placeholder="*.example.com"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <DataField 
+                        label="Country (C)"
+                        value={formData.subject?.C}
+                      />
+                      <DataField 
+                        label="State (ST)"
+                        value={formData.subject?.ST}
+                      />
+                      <DataField 
+                        label="Organization (O)"
+                        value={formData.subject?.O}
+                      />
+                      <DataField 
+                        label="Common Name (CN)"
+                        value={formData.subject?.CN}
+                      />
+                    </>
+                  )}
+                </DataGrid>
+              </ContentSection>
 
-            {/* Validity */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
-                Validity Period
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="Default Validity (days)"
-                  type="number"
-                  value={formData.validity_days || 365}
-                  onChange={(e) => updateFormData('validity_days', parseInt(e.target.value))}
-                  disabled={!editing}
-                />
-                <Input
-                  label="Max Validity (days)"
-                  type="number"
-                  value={formData.max_validity_days || 3650}
-                  onChange={(e) => updateFormData('max_validity_days', parseInt(e.target.value))}
-                  disabled={!editing}
-                />
-              </div>
-            </div>
-
-            {/* Subject */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
-                Subject Template
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="Country (C)"
-                  value={formData.subject?.C || ''}
-                  onChange={(e) => updateSubject('C', e.target.value)}
-                  disabled={!editing}
-                  placeholder="US"
-                />
-                <Input
-                  label="State (ST)"
-                  value={formData.subject?.ST || ''}
-                  onChange={(e) => updateSubject('ST', e.target.value)}
-                  disabled={!editing}
-                  placeholder="California"
-                />
-                <Input
-                  label="Organization (O)"
-                  value={formData.subject?.O || ''}
-                  onChange={(e) => updateSubject('O', e.target.value)}
-                  disabled={!editing}
-                  placeholder="Example Corp"
-                />
-                <Input
-                  label="Common Name (CN)"
-                  value={formData.subject?.CN || ''}
-                  onChange={(e) => updateSubject('CN', e.target.value)}
-                  disabled={!editing}
-                  placeholder="*.example.com"
-                />
-              </div>
-            </div>
-
-            {/* Key Usage Summary */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
-                Usage Summary
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Key Usage</p>
-                  <p className="text-sm text-text-primary">
-                    {formData.key_usage?.length > 0 ? formData.key_usage.join(', ') : 'None'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Extended Key Usage</p>
-                  <p className="text-sm text-text-primary">
-                    {formData.extended_key_usage?.length > 0 ? formData.extended_key_usage.join(', ') : 'None'}
-                  </p>
-                </div>
-              </div>
-            </div>
+              {/* Usage Summary */}
+              <ContentSection title="Usage Summary">
+                <DataGrid columns={2}>
+                  <DataField 
+                    label="Key Usage"
+                    value={formData.key_usage?.length > 0 ? formData.key_usage.join(', ') : 'None'}
+                  />
+                  <DataField 
+                    label="Extended Key Usage"
+                    value={formData.extended_key_usage?.length > 0 ? formData.extended_key_usage.join(', ') : 'None'}
+                  />
+                </DataGrid>
+              </ContentSection>
+            </ContentBody>
           </div>
         )}
       </PageLayout>

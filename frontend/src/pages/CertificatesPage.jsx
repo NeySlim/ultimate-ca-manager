@@ -1,5 +1,5 @@
 /**
- * Certificates Page - Using PageLayout
+ * Certificates Page - Using PageLayout with Responsive Components
  */
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
@@ -10,7 +10,9 @@ import {
 import {
   PageLayout, FocusItem, Table, Button, Badge, Card,
   StatusIndicator, Modal, Input, Select, ExportDropdown,
-  Tabs, LoadingSpinner, EmptyState, HelpCard
+  Tabs, LoadingSpinner, EmptyState, HelpCard,
+  ContentHeader, ContentBody, ResponsiveContentSection as ContentSection, 
+  DataGrid, DataField, TabsResponsive
 } from '../components'
 import { certificatesService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -39,6 +41,7 @@ export default function CertificatesPage() {
   const [importPassword, setImportPassword] = useState('')
   const [importCaId, setImportCaId] = useState('auto')
   const [importing, setImporting] = useState(false)
+  const [activeDetailTab, setActiveDetailTab] = useState('overview')
   const importFileRef = useRef(null)
 
   useEffect(() => {
@@ -222,117 +225,129 @@ export default function CertificatesPage() {
   const expiredCount = certificates.filter(c => c.status === 'expired').length
   const revokedCount = certificates.filter(c => c.status === 'revoked' || c.revoked).length
 
-  // Detail tabs for selected certificate
+  // Detail tabs for selected certificate (responsive format)
   const detailTabs = selectedCert ? [
     {
       id: 'overview',
       label: 'Overview',
-      icon: <Certificate size={16} />,
+      icon: Certificate,
       content: (
         <div className="space-y-6">
           {/* Status & Type */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Status</p>
-              <div className="flex items-center gap-2">
-                <StatusIndicator status={selectedCert.status} />
-                <Badge variant={
-                  selectedCert.revoked ? 'danger' : 
-                  selectedCert.status === 'expired' ? 'danger' :
-                  selectedCert.status === 'expiring' ? 'warning' :
-                  selectedCert.status === 'valid' ? 'success' :
-                  'secondary'
-                }>
-                  {selectedCert.revoked ? 'Revoked' : selectedCert.status || 'Active'}
-                </Badge>
-              </div>
-            </div>
-            <div>
-              <p className="text-xs text-text-secondary uppercase mb-1">Certificate Type</p>
-              <Badge variant="secondary">{selectedCert.cert_type || 'Standard'}</Badge>
-            </div>
-          </div>
+          <DataGrid columns={2}>
+            <DataField 
+              label="Status" 
+              value={
+                <div className="flex items-center gap-2">
+                  <StatusIndicator status={selectedCert.status} />
+                  <Badge variant={
+                    selectedCert.revoked ? 'danger' : 
+                    selectedCert.status === 'expired' ? 'danger' :
+                    selectedCert.status === 'expiring' ? 'warning' :
+                    selectedCert.status === 'valid' ? 'success' :
+                    'secondary'
+                  }>
+                    {selectedCert.revoked ? 'Revoked' : selectedCert.status || 'Active'}
+                  </Badge>
+                </div>
+              }
+            />
+            <DataField 
+              label="Certificate Type" 
+              value={<Badge variant="secondary">{selectedCert.cert_type || 'Standard'}</Badge>}
+            />
+          </DataGrid>
 
           {/* Subject Information */}
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-3">Subject Information</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <p className="text-xs text-text-secondary uppercase mb-1">Common Name (CN)</p>
-                <p className="text-sm text-text-primary font-medium">{selectedCert.common_name || 'N/A'}</p>
-              </div>
+          <ContentSection title="Subject Information">
+            <DataGrid columns={2}>
+              <DataField 
+                label="Common Name (CN)" 
+                value={selectedCert.common_name} 
+                fullWidth
+              />
               {selectedCert.organization && (
-                <div className="col-span-2">
-                  <p className="text-xs text-text-secondary uppercase mb-1">Organization (O)</p>
-                  <p className="text-sm text-text-primary">{selectedCert.organization}</p>
-                </div>
+                <DataField 
+                  label="Organization (O)" 
+                  value={selectedCert.organization} 
+                  fullWidth
+                />
               )}
               {selectedCert.organizational_unit && (
-                <div className="col-span-2">
-                  <p className="text-xs text-text-secondary uppercase mb-1">Organizational Unit (OU)</p>
-                  <p className="text-sm text-text-primary">{selectedCert.organizational_unit}</p>
-                </div>
+                <DataField 
+                  label="Organizational Unit (OU)" 
+                  value={selectedCert.organizational_unit} 
+                  fullWidth
+                />
               )}
-            </div>
-          </div>
+            </DataGrid>
+          </ContentSection>
 
           {/* Certificate Details */}
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-3">Certificate Details</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <p className="text-xs text-text-secondary uppercase mb-1">Serial Number</p>
-                <p className="text-sm font-mono text-text-primary break-all">{selectedCert.serial_number}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Valid From</p>
-                <p className="text-sm text-text-primary">{formatDate(selectedCert.valid_from)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Valid Until</p>
-                <p className="text-sm text-text-primary">{formatDate(selectedCert.valid_to)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Key Algorithm</p>
-                <p className="text-sm text-text-primary">{selectedCert.key_algorithm || selectedCert.key_type || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Key Size</p>
-                <p className="text-sm text-text-primary">{selectedCert.key_size ? `${selectedCert.key_size} bits` : 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Signature Algorithm</p>
-                <p className="text-sm text-text-primary">{selectedCert.signature_algorithm || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Private Key</p>
-                <Badge variant={selectedCert.has_private_key ? 'success' : 'warning'}>
-                  {selectedCert.has_private_key ? 'Available' : 'Not Available'}
-                </Badge>
-              </div>
-            </div>
-          </div>
+          <ContentSection title="Certificate Details">
+            <DataGrid columns={2}>
+              <DataField 
+                label="Serial Number" 
+                value={selectedCert.serial_number} 
+                mono 
+                copyable 
+                fullWidth
+              />
+              <DataField 
+                label="Valid From" 
+                value={formatDate(selectedCert.valid_from)}
+              />
+              <DataField 
+                label="Valid Until" 
+                value={formatDate(selectedCert.valid_to)}
+              />
+              <DataField 
+                label="Key Algorithm" 
+                value={selectedCert.key_algorithm || selectedCert.key_type}
+              />
+              <DataField 
+                label="Key Size" 
+                value={selectedCert.key_size ? `${selectedCert.key_size} bits` : null}
+              />
+              <DataField 
+                label="Signature Algorithm" 
+                value={selectedCert.signature_algorithm}
+              />
+              <DataField 
+                label="Private Key" 
+                value={
+                  <Badge variant={selectedCert.has_private_key ? 'success' : 'warning'}>
+                    {selectedCert.has_private_key ? 'Available' : 'Not Available'}
+                  </Badge>
+                }
+              />
+            </DataGrid>
+          </ContentSection>
 
           {/* Issuer Information */}
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-3">Issuer Information</h3>
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Issuer Name</p>
-                <p className="text-sm text-text-primary">{selectedCert.issuer_name || extractCN(selectedCert.issuer)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Full Issuer DN</p>
-                <p className="text-xs font-mono text-text-primary break-all">{selectedCert.issuer}</p>
-              </div>
-            </div>
-          </div>
+          <ContentSection title="Issuer Information">
+            <DataGrid columns={1}>
+              <DataField 
+                label="Issuer Name" 
+                value={selectedCert.issuer_name || extractCN(selectedCert.issuer)}
+              />
+              <DataField 
+                label="Full Issuer DN" 
+                value={selectedCert.issuer} 
+                mono
+              />
+            </DataGrid>
+          </ContentSection>
 
           {/* OCSP */}
           {selectedCert.ocsp_uri && (
             <div className="p-3 bg-bg-tertiary border border-border rounded-lg">
-              <p className="text-xs text-text-secondary uppercase mb-1">OCSP Responder</p>
-              <p className="text-xs font-mono text-text-primary break-all">{selectedCert.ocsp_uri}</p>
+              <DataField 
+                label="OCSP Responder" 
+                value={selectedCert.ocsp_uri} 
+                mono 
+                copyable
+              />
             </div>
           )}
 
@@ -340,25 +355,27 @@ export default function CertificatesPage() {
           {selectedCert.revoked && (
             <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
               <h3 className="text-sm font-semibold text-red-400 mb-3">Revocation Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Revoked At</p>
-                  <p className="text-sm text-text-primary">{formatDate(selectedCert.revoked_at)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Reason</p>
-                  <p className="text-sm text-text-primary">{selectedCert.revoke_reason || 'Unspecified'}</p>
-                </div>
-              </div>
+              <DataGrid columns={2}>
+                <DataField 
+                  label="Revoked At" 
+                  value={formatDate(selectedCert.revoked_at)}
+                />
+                <DataField 
+                  label="Reason" 
+                  value={selectedCert.revoke_reason || 'Unspecified'}
+                />
+              </DataGrid>
             </div>
           )}
 
           {/* Full Subject DN */}
           <div className="p-4 bg-bg-tertiary border border-border rounded-lg">
-            <p className="text-xs text-text-secondary uppercase mb-2">Full Subject DN</p>
-            <p className="text-xs font-mono text-text-primary break-all">
-              {selectedCert.subject}
-            </p>
+            <DataField 
+              label="Full Subject DN" 
+              value={selectedCert.subject} 
+              mono 
+              copyable
+            />
           </div>
         </div>
       )
@@ -366,17 +383,15 @@ export default function CertificatesPage() {
     {
       id: 'extensions',
       label: 'Extensions',
-      icon: <Certificate size={16} />,
+      icon: Certificate,
       content: (
         <div className="space-y-6">
           {/* Subject Alternative Names */}
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-3">Subject Alternative Names (SAN)</h3>
-            
+          <ContentSection title="Subject Alternative Names (SAN)">
             {/* DNS Names */}
             {selectedCert.san_dns && safeJsonParse(selectedCert.san_dns).length > 0 && (
               <div className="mb-4">
-                <p className="text-xs text-text-secondary uppercase mb-2">DNS Names</p>
+                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">DNS Names</p>
                 <div className="flex flex-wrap gap-2">
                   {safeJsonParse(selectedCert.san_dns).map((dns, i) => (
                     <Badge key={i} variant="secondary">{dns}</Badge>
@@ -388,7 +403,7 @@ export default function CertificatesPage() {
             {/* IP Addresses */}
             {selectedCert.san_ip && safeJsonParse(selectedCert.san_ip).length > 0 && (
               <div className="mb-4">
-                <p className="text-xs text-text-secondary uppercase mb-2">IP Addresses</p>
+                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">IP Addresses</p>
                 <div className="flex flex-wrap gap-2">
                   {safeJsonParse(selectedCert.san_ip).map((ip, i) => (
                     <Badge key={i} variant="secondary">{ip}</Badge>
@@ -400,7 +415,7 @@ export default function CertificatesPage() {
             {/* Email Addresses */}
             {selectedCert.san_email && safeJsonParse(selectedCert.san_email).length > 0 && (
               <div className="mb-4">
-                <p className="text-xs text-text-secondary uppercase mb-2">Email Addresses</p>
+                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Email Addresses</p>
                 <div className="flex flex-wrap gap-2">
                   {safeJsonParse(selectedCert.san_email).map((email, i) => (
                     <Badge key={i} variant="secondary">{email}</Badge>
@@ -412,7 +427,7 @@ export default function CertificatesPage() {
             {/* URIs */}
             {selectedCert.san_uri && safeJsonParse(selectedCert.san_uri).length > 0 && (
               <div className="mb-4">
-                <p className="text-xs text-text-secondary uppercase mb-2">URIs</p>
+                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">URIs</p>
                 <div className="flex flex-wrap gap-2">
                   {safeJsonParse(selectedCert.san_uri).map((uri, i) => (
                     <Badge key={i} variant="secondary">{uri}</Badge>
@@ -424,30 +439,28 @@ export default function CertificatesPage() {
             {(!selectedCert.san_dns && !selectedCert.san_ip && !selectedCert.san_email && !selectedCert.san_uri) && (
               <p className="text-sm text-text-secondary">No subject alternative names configured</p>
             )}
-          </div>
+          </ContentSection>
 
           {/* Key Usage */}
           {selectedCert.key_usage && (
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Key Usage</h3>
+            <ContentSection title="Key Usage">
               <div className="flex flex-wrap gap-2">
                 {selectedCert.key_usage.map((usage, i) => (
                   <Badge key={i} variant="primary">{usage}</Badge>
                 ))}
               </div>
-            </div>
+            </ContentSection>
           )}
           
           {/* Extended Key Usage */}
           {selectedCert.extended_key_usage && (
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Extended Key Usage</h3>
+            <ContentSection title="Extended Key Usage">
               <div className="flex flex-wrap gap-2">
                 {selectedCert.extended_key_usage.map((usage, i) => (
                   <Badge key={i} variant="primary">{usage}</Badge>
                 ))}
               </div>
-            </div>
+            </ContentSection>
           )}
         </div>
       )
@@ -455,11 +468,11 @@ export default function CertificatesPage() {
     {
       id: 'raw',
       label: 'Raw Data',
+      icon: Database,
       content: (
         <div className="space-y-6">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-text-primary">PEM Format</p>
+          <ContentSection title="PEM Format">
+            <div className="flex items-center justify-end mb-2">
               <Button 
                 variant="secondary" 
                 size="sm"
@@ -475,24 +488,24 @@ export default function CertificatesPage() {
             <pre className="bg-bg-tertiary border border-border rounded-lg p-4 text-xs overflow-x-auto max-h-64">
               {selectedCert.pem || 'PEM data not available'}
             </pre>
-          </div>
-          <div className="p-4 bg-bg-tertiary border border-border rounded-lg">
-            <p className="text-xs text-text-secondary uppercase mb-2">Certificate Fingerprints</p>
-            <div className="space-y-2">
-              <div>
-                <p className="text-xs text-text-secondary">SHA-256</p>
-                <p className="text-xs font-mono text-text-primary break-all">
-                  {selectedCert.fingerprint_sha256}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary">SHA-1</p>
-                <p className="text-xs font-mono text-text-primary break-all">
-                  {selectedCert.fingerprint_sha1}
-                </p>
-              </div>
-            </div>
-          </div>
+          </ContentSection>
+          
+          <ContentSection title="Certificate Fingerprints">
+            <DataGrid columns={1}>
+              <DataField 
+                label="SHA-256" 
+                value={selectedCert.fingerprint_sha256} 
+                mono 
+                copyable
+              />
+              <DataField 
+                label="SHA-1" 
+                value={selectedCert.fingerprint_sha1} 
+                mono 
+                copyable
+              />
+            </DataGrid>
+          </ContentSection>
         </div>
       )
     }
@@ -656,44 +669,48 @@ export default function CertificatesPage() {
             />
           </div>
         ) : (
-          <div className="p-6 overflow-auto h-full">
-            {/* Header with actions */}
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
-              <div>
-                <h2 className="text-lg font-semibold text-text-primary">
-                  {selectedCert.common_name || extractCN(selectedCert.subject) || 'Certificate Details'}
-                </h2>
-                <p className="text-sm text-text-secondary mt-1">
-                  Serial: {selectedCert.serial_number?.substring(0, 20)}...
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <ExportDropdown 
-                  onExport={handleExport}
-                  hasPrivateKey={!!selectedCert.prv || selectedCert.has_key}
-                />
-                {canWrite('certificates') && (
-                  <Button variant="secondary" size="sm" onClick={() => handleRenew(selectedCert.id)}>
-                    <ArrowsClockwise size={16} />
-                    Renew
-                  </Button>
-                )}
-                {canDelete('certificates') && (
-                  <Button variant="danger" size="sm" onClick={() => handleRevoke(selectedCert.id)}>
-                    <X size={16} />
-                    Revoke
-                  </Button>
-                )}
-                {canDelete('certificates') && (
-                  <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCert.id)}>
-                    <Trash size={16} />
-                  </Button>
-                )}
-              </div>
-            </div>
+          <div className="flex flex-col h-full">
+            {/* Responsive Header with actions */}
+            <ContentHeader
+              title={selectedCert.common_name || extractCN(selectedCert.subject) || 'Certificate Details'}
+              subtitle={`Serial: ${selectedCert.serial_number?.substring(0, 20)}...`}
+              actions={[
+                {
+                  label: 'Export',
+                  icon: Download,
+                  onClick: () => handleExport('pem'),
+                },
+                ...(canWrite('certificates') ? [{
+                  label: 'Renew',
+                  icon: ArrowsClockwise,
+                  onClick: () => handleRenew(selectedCert.id),
+                }] : []),
+                ...(canDelete('certificates') ? [{
+                  label: 'Revoke',
+                  icon: X,
+                  variant: 'danger',
+                  onClick: () => handleRevoke(selectedCert.id),
+                }] : []),
+                ...(canDelete('certificates') ? [{
+                  label: 'Delete',
+                  icon: Trash,
+                  variant: 'danger',
+                  onClick: () => handleDelete(selectedCert.id),
+                }] : []),
+              ]}
+            />
 
-            {/* Tabs */}
-            <Tabs key={selectedCert.id} tabs={detailTabs} defaultTab="overview" />
+            {/* Responsive Tabs */}
+            <TabsResponsive
+              tabs={detailTabs}
+              activeTab={activeDetailTab}
+              onChange={setActiveDetailTab}
+            />
+
+            {/* Content Body */}
+            <ContentBody>
+              {detailTabs.find(t => t.id === activeDetailTab)?.content}
+            </ContentBody>
           </div>
         )}
       </PageLayout>
