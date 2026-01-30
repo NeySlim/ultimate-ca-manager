@@ -25,7 +25,7 @@ export function DetailsPanel({
       {/* Page Header */}
       {pageTitle && (
         <div className="px-3 py-2 border-b border-border bg-bg-secondary flex-shrink-0">
-          <h1 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
+          <h1 className="text-sm font-semibold text-text-primary tracking-wide">
             {pageTitle}
           </h1>
         </div>
