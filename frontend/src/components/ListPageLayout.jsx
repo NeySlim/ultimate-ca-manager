@@ -299,7 +299,7 @@ export function ListPageLayout({
       
       {/* Details Panel - wider on larger screens for management tasks */}
       {renderDetails && detailsOpen && (
-        <div className="w-80 xl:w-96 2xl:w-[420px] border-l border-border bg-bg-secondary flex flex-col min-h-0 shrink-0">
+        <div className="w-80 xl:w-96 2xl:w-[420px] min-[1800px]:w-[500px] border-l border-border bg-bg-secondary flex flex-col min-h-0 shrink-0">
           {/* Details Header */}
           <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
             <h2 className="text-sm font-semibold text-text-primary">

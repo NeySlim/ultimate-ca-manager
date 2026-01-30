@@ -14,11 +14,17 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
+import { useMobile } from '../contexts/MobileContext'
 
 export function Sidebar({ activePage }) {
   const navigate = useNavigate()
   const { currentTheme, setCurrentTheme, themes } = useTheme()
   const { user, logout } = useAuth()
+  const { isLargeScreen } = useMobile()
+  
+  // Sizes based on screen width (larger icons/buttons on big screens)
+  const iconSize = isLargeScreen ? 22 : 18
+  const buttonSize = isLargeScreen ? 'w-11 h-11' : 'w-10 h-10'
   
   // Dynamic Pro module loading
   const [proModule, setProModule] = useState(null)
@@ -72,7 +78,7 @@ export function Sidebar({ activePage }) {
   return (
     <div className="w-14 h-full border-r border-border bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-0.5">
       {/* Logo */}
-      <Link to="/" className="w-10 h-10 flex items-center justify-center mb-3" title="UCM Dashboard">
+      <Link to="/" className={cn(buttonSize, "flex items-center justify-center mb-3")} title="UCM Dashboard">
         <Logo variant="compact" size="sm" withText={false} />
       </Link>
 
@@ -85,14 +91,15 @@ export function Sidebar({ activePage }) {
             key={page.id}
             to={page.path}
             className={cn(
-              "w-10 h-10 rounded-sm flex items-center justify-center transition-all relative group",
+              buttonSize,
+              "rounded-sm flex items-center justify-center transition-all relative group",
               isActive
                 ? "bg-bg-tertiary text-accent-primary" 
                 : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
             )}
             title={page.label}
           >
-            <Icon size={18} weight={isActive ? 'fill' : 'regular'} />
+            <Icon size={iconSize} weight={isActive ? 'fill' : 'regular'} />
             {isActive && (
               <div className="absolute left-0 w-0.5 h-8 bg-accent-primary rounded-r-sm" />
             )}
@@ -116,14 +123,15 @@ export function Sidebar({ activePage }) {
                 key={page.id}
                 to={page.path}
                 className={cn(
-                  "w-10 h-10 rounded-sm flex items-center justify-center transition-all relative group",
+                  buttonSize,
+                  "rounded-sm flex items-center justify-center transition-all relative group",
                   isActive
                     ? "bg-accent-pro/20 text-accent-pro border border-accent-pro/30" 
                     : "text-accent-pro/60 hover:bg-accent-pro/10 hover:text-accent-pro"
                 )}
                 title={`${page.label} (Pro)`}
               >
-                <Icon size={18} weight={isActive ? 'fill' : 'regular'} />
+                <Icon size={iconSize} weight={isActive ? 'fill' : 'regular'} />
                 {isActive && (
                   <div className="absolute left-0 w-0.5 h-8 bg-accent-pro rounded-r-sm" />
                 )}
@@ -143,8 +151,8 @@ export function Sidebar({ activePage }) {
       {/* Theme Selector */}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
-          <button className="w-10 h-10 rounded-sm flex items-center justify-center text-text-secondary hover:bg-bg-tertiary hover:text-text-primary transition-all group">
-            <Palette size={18} />
+          <button className={cn(buttonSize, "rounded-sm flex items-center justify-center text-text-secondary hover:bg-bg-tertiary hover:text-text-primary transition-all group")}>
+            <Palette size={iconSize} />
             <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-sm text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
               Theme
             </div>
@@ -176,8 +184,8 @@ export function Sidebar({ activePage }) {
       {/* User Menu */}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
-          <button className="w-10 h-10 rounded-sm bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary hover:bg-accent-primary/20 transition-all group">
-            <UserCircle size={18} weight="bold" />
+          <button className={cn(buttonSize, "rounded-sm bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary hover:bg-accent-primary/20 transition-all group")}>
+            <UserCircle size={iconSize} weight="bold" />
             <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-sm text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
               {user?.username || 'User'}
             </div>
