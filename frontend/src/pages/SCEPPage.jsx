@@ -49,8 +49,21 @@ export default function SCEPPage() {
       ])
       setConfig(configRes.data || {})
       setRequests(requestsRes.data || [])
-      setCas(casRes.data || [])
       setStats(statsRes.data || { pending: 0, approved: 0, rejected: 0, total: 0 })
+      
+      // Load challenge passwords for each CA
+      const casData = casRes.data || []
+      const casWithChallenges = await Promise.all(
+        casData.map(async (ca) => {
+          try {
+            const challengeRes = await scepService.getChallenge(ca.id)
+            return { ...ca, scep_challenge: challengeRes.data?.challenge }
+          } catch {
+            return { ...ca, scep_challenge: null }
+          }
+        })
+      )
+      setCas(casWithChallenges)
     } catch (error) {
       showError('Failed to load SCEP data')
     } finally {
@@ -327,10 +340,10 @@ export default function SCEPPage() {
 
               <Input
                 label="SCEP Endpoint URL"
-                value={config.url || '/scep/pkiclient.exe'}
-                onChange={(e) => setConfig({ ...config, url: e.target.value })}
-                helperText="The URL path for SCEP enrollment (clients will use this)"
-                disabled={!config.enabled}
+                value={`${window.location.origin}/scep/pkiclient.exe`}
+                readOnly
+                helperText="The full URL for SCEP enrollment (use this in client configuration)"
+                className="bg-bg-tertiary"
               />
 
               <Select
@@ -502,9 +515,9 @@ export default function SCEPPage() {
                   <p className="text-xs text-text-secondary mb-1">SCEP URL</p>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 text-sm text-accent-primary">
-                      https://your-server:8443{config.url || '/scep/pkiclient.exe'}
+                      {window.location.origin}/scep/pkiclient.exe
                     </code>
-                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`https://your-server:8443${config.url || '/scep/pkiclient.exe'}`)}>
+                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/scep/pkiclient.exe`)}>
                       <Copy size={14} />
                     </Button>
                   </div>
@@ -540,7 +553,7 @@ export default function SCEPPage() {
                 <p className="text-xs text-text-secondary mb-2">Cisco IOS Example:</p>
                 <pre className="text-xs text-text-primary font-mono overflow-x-auto">
 {`crypto ca trustpoint UCM-CA
- enrollment url https://your-server:8443${config.url || '/scep/pkiclient.exe'}
+ enrollment url ${window.location.origin}/scep/pkiclient.exe
  subject-name CN=device.example.com
  revocation-check none
  auto-enroll 70

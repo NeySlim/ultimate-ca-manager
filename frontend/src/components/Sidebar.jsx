@@ -29,6 +29,8 @@ export function Sidebar({ activePage }) {
     import('../pro')
       .then(mod => {
         setProModule(mod)
+        // Pro module loaded = Pro features enabled (no license check needed)
+        setLicense({ isPro: true, loading: false })
       })
       .catch(() => {
         // Pro module not available - community version
@@ -36,23 +38,8 @@ export function Sidebar({ activePage }) {
       })
   }, [])
   
-  // Use Pro license hook if available
-  useEffect(() => {
-    if (proModule?.useLicense) {
-      // We can't use hooks conditionally, so we call the API directly
-      import('../services/apiClient').then(({ apiClient }) => {
-        apiClient.get('/license')
-          .then(res => {
-            const data = res.data || res
-            setLicense({
-              isPro: data.type === 'pro' || data.type === 'enterprise' || data.pro_enabled === true,
-              loading: false
-            })
-          })
-          .catch(() => setLicense({ isPro: false, loading: false }))
-      })
-    }
-  }, [proModule])
+  // Pro is enabled by module presence, no API call needed
+  // (keeping this effect empty for backwards compatibility)
 
   const pages = [
     { id: '', icon: House, label: 'Dashboard', path: '/' },
@@ -62,7 +49,7 @@ export function Sidebar({ activePage }) {
     { id: 'templates', icon: List, label: 'Templates', path: '/templates' },
     { id: 'users', icon: User, label: 'Users', path: '/users' },
     { id: 'acme', icon: Key, label: 'ACME', path: '/acme' },
-    { id: 'scep', icon: Robot, label: 'SCEP', path: '/scep' },
+    { id: 'scep', icon: Robot, label: 'SCEP', path: '/scep-config' },
     { id: 'import', icon: UploadSimple, label: 'Import', path: '/import' },
     { id: 'audit', icon: ClockCounterClockwise, label: 'Audit', path: '/audit' },
     { id: 'settings', icon: Gear, label: 'Settings', path: '/settings' },
