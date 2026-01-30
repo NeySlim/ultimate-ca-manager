@@ -34,7 +34,7 @@ export default function ACMEPage() {
   const loadCAs = async () => {
     try {
       const data = await casService.getAll()
-      setCas(data.cas || [])
+      setCas(data.data || data.cas || [])
     } catch (error) {
       // Silent fail
     }
@@ -42,8 +42,8 @@ export default function ACMEPage() {
 
   const loadAcmeSettings = async () => {
     try {
-      const data = await acmeService.getConfig()
-      setAcmeSettings(data || {})
+      const response = await acmeService.getSettings()
+      setAcmeSettings(response.data || response || {})
     } catch (error) {
       // Silent fail
     }
@@ -52,7 +52,7 @@ export default function ACMEPage() {
   const handleSaveConfig = async () => {
     setSaving(true)
     try {
-      await acmeService.updateConfig(acmeSettings)
+      await acmeService.updateSettings(acmeSettings)
       showSuccess('ACME settings saved successfully')
     } catch (error) {
       showError(error.message || 'Failed to save ACME settings')
@@ -70,8 +70,22 @@ export default function ACMEPage() {
       await acmeService.registerProxy(proxyEmail)
       showSuccess('Proxy account registered successfully')
       setProxyEmail('')
+      loadAcmeSettings() // Reload to show registered state
     } catch (error) {
       showError(error.message || 'Failed to register proxy account')
+    }
+  }
+
+  const handleUnregisterProxy = async () => {
+    const confirmed = await showConfirm('Are you sure you want to unregister the proxy account?')
+    if (!confirmed) return
+    
+    try {
+      await acmeService.unregisterProxy()
+      showSuccess('Proxy account unregistered')
+      loadAcmeSettings() // Reload to show unregistered state
+    } catch (error) {
+      showError(error.message || 'Failed to unregister proxy account')
     }
   }
 
@@ -345,11 +359,11 @@ export default function ACMEPage() {
 
               <Select
                 label="Default CA for ACME"
-                value={acmeSettings.issuing_ca_id || undefined}
-                onChange={(val) => updateAcmeSetting('issuing_ca_id', val)}
+                value={acmeSettings.issuing_ca_id?.toString() || undefined}
+                onChange={(val) => updateAcmeSetting('issuing_ca_id', val ? parseInt(val) : null)}
                 disabled={!acmeSettings.enabled}
                 placeholder="Select a CA..."
-                options={cas.map(ca => ({ value: ca.refid, label: ca.common_name || ca.descr }))}
+                options={cas.map(ca => ({ value: ca.id.toString(), label: ca.name || ca.common_name || ca.descr }))}
               />
 
               <Input
@@ -377,23 +391,50 @@ export default function ACMEPage() {
                 className="bg-bg-tertiary"
               />
               
-              <Input
-                label="Email Address"
-                type="email"
-                value={proxyEmail}
-                onChange={(e) => setProxyEmail(e.target.value)}
-                placeholder="admin@example.com"
-                helperText="Email for Let's Encrypt account registration"
-              />
+              {acmeSettings.proxy_registered ? (
+                <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-emerald-500/20">
+                        <CheckCircle size={20} className="text-emerald-500" weight="fill" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-text-primary">Proxy Account Registered</p>
+                        <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={handleUnregisterProxy}
+                      className="text-red-500 hover:bg-red-500/10"
+                    >
+                      <Trash size={16} />
+                      Unregister
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Input
+                    label="Email Address"
+                    type="email"
+                    value={proxyEmail}
+                    onChange={(e) => setProxyEmail(e.target.value)}
+                    placeholder="admin@example.com"
+                    helperText="Email for Let's Encrypt account registration"
+                  />
 
-              <Button 
-                variant="secondary" 
-                onClick={handleRegisterProxy}
-                disabled={!proxyEmail}
-              >
-                <Key size={16} />
-                Register Proxy Account
-              </Button>
+                  <Button 
+                    variant="secondary" 
+                    onClick={handleRegisterProxy}
+                    disabled={!proxyEmail}
+                  >
+                    <Key size={16} />
+                    Register Proxy Account
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 

@@ -17,8 +17,13 @@ export const acmeService = {
     return apiClient.get('/acme/stats')
   },
 
+  // Proxy
   async registerProxy(email) {
     return apiClient.post('/acme/proxy/register', { email })
+  },
+
+  async unregisterProxy() {
+    return apiClient.post('/acme/proxy/unregister')
   },
 
   // Accounts
