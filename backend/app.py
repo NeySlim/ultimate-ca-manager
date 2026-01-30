@@ -284,21 +284,9 @@ def create_app(config_name=None):
             description="Auto-regenerate expiring CRLs"
         )
         
-        # Register notification check task (runs every 6 hours)
-        from services.notification_service import NotificationService
-        scheduler.register_task(
-            name="notification_check",
-            func=NotificationService.run_scheduled_checks,
-            interval=21600,  # Every 6 hours
-            description="Check for expiring certificates and CRLs"
-        )
-        
-        # Create default notification configs if they don't exist
-        NotificationService.create_default_configs()
-        
         # Start scheduler now that tasks are registered
         scheduler.start(app=app)
-        app.logger.info("Scheduler service started with CRL and notification tasks")
+        app.logger.info("Scheduler service started with CRL auto-regeneration task")
         
         # Register scheduler in app context for graceful shutdown
         app.scheduler = scheduler
@@ -313,43 +301,16 @@ def create_app(config_name=None):
     def add_security_headers(response):
         """Add security headers and fix deprecated headers"""
         # Set Permissions-Policy without deprecated features
+        # Only include valid features that are widely supported
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
         
-        # SECURITY: Add comprehensive security headers
+        # Add security headers if not present
         if 'X-Content-Type-Options' not in response.headers:
             response.headers['X-Content-Type-Options'] = 'nosniff'
         if 'X-Frame-Options' not in response.headers:
-            response.headers['X-Frame-Options'] = 'DENY'  # More strict than SAMEORIGIN
+            response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         if 'X-XSS-Protection' not in response.headers:
             response.headers['X-XSS-Protection'] = '1; mode=block'
-        
-        # Content Security Policy - strict but allows app to work
-        if 'Content-Security-Policy' not in response.headers:
-            csp = (
-                "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "  # React needs this
-                "style-src 'self' 'unsafe-inline'; "  # For inline styles
-                "img-src 'self' data: blob:; "
-                "font-src 'self' data:; "
-                "connect-src 'self'; "
-                "frame-ancestors 'none'; "
-                "base-uri 'self'; "
-                "form-action 'self'"
-            )
-            response.headers['Content-Security-Policy'] = csp
-        
-        # Referrer Policy - don't leak URLs
-        if 'Referrer-Policy' not in response.headers:
-            response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        
-        # Strict Transport Security (HSTS) - force HTTPS for 1 year
-        if 'Strict-Transport-Security' not in response.headers:
-            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        
-        # Cache control for sensitive data
-        if request.path.startswith('/api/'):
-            response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
-            response.headers['Pragma'] = 'no-cache'
         
         return response
     
@@ -917,6 +878,7 @@ def register_blueprints(app):
     from api.cdp_routes import cdp_bp
     from api.ocsp_routes import ocsp_bp
     from api.health_routes import health_bp
+    from api.scep_protocol import bp as scep_protocol_bp
     
     # Register Unified API v2.0 FIRST (routes already have /api/* prefix)
     # This must be before ui_bp which has catch-all routing
@@ -940,6 +902,7 @@ def register_blueprints(app):
     # Public endpoints (no auth, no /api prefix - standard paths)
     app.register_blueprint(cdp_bp, url_prefix='/cdp')     # CRL Distribution Points
     app.register_blueprint(ocsp_bp)                        # OCSP Responder (/ocsp)
+    app.register_blueprint(scep_protocol_bp)               # SCEP Protocol (/scep)
     app.register_blueprint(health_bp)  # Health check endpoints (no auth)
     
     # Register UI routes LAST (catch-all for React SPA)

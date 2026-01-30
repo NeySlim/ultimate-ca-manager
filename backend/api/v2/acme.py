@@ -19,10 +19,12 @@ def get_acme_settings():
     enabled_cfg = SystemConfig.query.filter_by(key='acme.enabled').first()
     ca_id_cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
     proxy_email_cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
+    proxy_enabled_cfg = SystemConfig.query.filter_by(key='acme.proxy_enabled').first()
     
     enabled = enabled_cfg.value == 'true' if enabled_cfg else True
     ca_id = ca_id_cfg.value if ca_id_cfg else None
     proxy_email = proxy_email_cfg.value if proxy_email_cfg else None
+    proxy_enabled = proxy_enabled_cfg.value == 'true' if proxy_enabled_cfg else False
     
     # Get CA name if CA ID is set
     ca_name = None
@@ -43,6 +45,7 @@ def get_acme_settings():
         'issuing_ca_name': ca_name,
         'provider': 'Built-in ACME Server',
         'contact_email': 'admin@ucm.local',
+        'proxy_enabled': proxy_enabled,
         'proxy_email': proxy_email,
         'proxy_registered': bool(proxy_email)
     })
@@ -69,6 +72,14 @@ def update_acme_settings():
             ca_id_cfg = SystemConfig(key='acme.issuing_ca_id', description='ACME issuing CA refid')
             db.session.add(ca_id_cfg)
         ca_id_cfg.value = data['issuing_ca_id'] if data['issuing_ca_id'] else ''
+    
+    # Update proxy enabled
+    if 'proxy_enabled' in data:
+        proxy_cfg = SystemConfig.query.filter_by(key='acme.proxy_enabled').first()
+        if not proxy_cfg:
+            proxy_cfg = SystemConfig(key='acme.proxy_enabled', description='ACME proxy enabled')
+            db.session.add(proxy_cfg)
+        proxy_cfg.value = 'true' if data['proxy_enabled'] else 'false'
     
     db.session.commit()
     
