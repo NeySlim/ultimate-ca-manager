@@ -24,12 +24,18 @@ import { useMobile } from '../contexts'
 import { DataTable } from './DataTable'
 import { HelpModal } from './HelpModal'
 import { Button } from './Button'
+import { Badge } from './Badge'
 import { Question, CaretLeft, CaretRight, X } from '@phosphor-icons/react'
 import { BottomSheet } from './BottomSheet'
 
 export function ListPageLayout({
   // Page metadata
   title,
+  
+  // Tabs (optional - for pages with multiple views like Users/Groups)
+  tabs,                 // [{ id, label, icon, pro }]
+  activeTab,
+  onTabChange,
   
   // DataTable props
   data = [],
@@ -126,16 +132,47 @@ export function ListPageLayout({
     )
   )
   
+  // Tab component (inline)
+  const TabsHeader = tabs?.length > 0 ? (
+    <div className="flex gap-1 ml-4">
+      {tabs.map(tab => {
+        const Icon = tab.icon
+        const isActive = activeTab === tab.id
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onTabChange?.(tab.id)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+              isActive 
+                ? "bg-accent-primary/15 text-accent-primary" 
+                : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
+            )}
+          >
+            {Icon && <Icon size={14} />}
+            {tab.label}
+            {tab.pro && <Badge variant="info" size="sm">Pro</Badge>}
+          </button>
+        )
+      })}
+    </div>
+  ) : null
+  
   // Mobile layout
   if (isMobile) {
     return (
       <div className={cn("flex flex-col h-full w-full", className)}>
         {/* Header */}
-        <div className="px-4 py-3 border-b border-border bg-bg-secondary flex items-center justify-between shrink-0">
-          <h1 className="text-base font-semibold text-text-primary">{title}</h1>
-          <div className="flex items-center gap-2">
-            {actions}
-            <HelpButton />
+        <div className="px-4 py-3 border-b border-border bg-bg-secondary shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <h1 className="text-base font-semibold text-text-primary">{title}</h1>
+              {TabsHeader}
+            </div>
+            <div className="flex items-center gap-2">
+              {actions}
+              <HelpButton />
+            </div>
           </div>
         </div>
         
@@ -203,7 +240,10 @@ export function ListPageLayout({
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Header */}
         <div className="px-6 py-4 border-b border-border bg-bg-secondary flex items-center justify-between shrink-0">
-          <h1 className="text-lg font-semibold text-text-primary">{title}</h1>
+          <div className="flex items-center">
+            <h1 className="text-lg font-semibold text-text-primary">{title}</h1>
+            {TabsHeader}
+          </div>
           <div className="flex items-center gap-3">
             {actions}
             <HelpButton />

@@ -25,6 +25,11 @@ export function ManagementLayout({
   // Page metadata
   title,
   
+  // Tabs (optional)
+  tabs,
+  activeTab,
+  onTabChange,
+  
   // Data
   items = [],
   loading = false,
@@ -100,6 +105,32 @@ export function ManagementLayout({
       <Question size={14} weight="bold" />
       <span>{labels.help}</span>
     </button>
+  ) : null
+  
+  // Tab component (inline)
+  const TabsHeader = tabs?.length > 0 ? (
+    <div className="flex gap-1 ml-4">
+      {tabs.map(tab => {
+        const Icon = tab.icon
+        const isActive = activeTab === tab.id
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onTabChange?.(tab.id)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+              isActive 
+                ? "bg-accent-primary/15 text-accent-primary" 
+                : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
+            )}
+          >
+            {Icon && <Icon size={14} />}
+            {tab.label}
+            {tab.pro && <Badge variant="info" size="sm">Pro</Badge>}
+          </button>
+        )
+      })}
+    </div>
   ) : null
   
   // Default item renderer
@@ -244,16 +275,21 @@ export function ManagementLayout({
     return (
       <div className={cn("flex flex-col h-full w-full", className)}>
         {/* Header */}
-        <div className="px-4 py-3 border-b border-border bg-bg-secondary flex items-center justify-between shrink-0">
-          <h1 className="text-base font-semibold text-text-primary">{title}</h1>
-          <div className="flex items-center gap-2">
-            {onCreate && (
-              <Button onClick={onCreate} size="sm">
-                <Plus size={16} />
-                {createLabel}
-              </Button>
-            )}
-            <HelpButton />
+        <div className="px-4 py-3 border-b border-border bg-bg-secondary shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <h1 className="text-base font-semibold text-text-primary">{title}</h1>
+              {TabsHeader}
+            </div>
+            <div className="flex items-center gap-2">
+              {onCreate && (
+                <Button onClick={onCreate} size="sm">
+                  <Plus size={16} />
+                  {createLabel}
+                </Button>
+              )}
+              <HelpButton />
+            </div>
           </div>
         </div>
         
@@ -391,7 +427,10 @@ export function ManagementLayout({
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Header */}
         <div className="px-6 py-4 border-b border-border bg-bg-secondary flex items-center justify-between shrink-0">
-          <h1 className="text-lg font-semibold text-text-primary">{title}</h1>
+          <div className="flex items-center">
+            <h1 className="text-lg font-semibold text-text-primary">{title}</h1>
+            {TabsHeader}
+          </div>
           <div className="flex items-center gap-3">
             <HelpButton />
             <button

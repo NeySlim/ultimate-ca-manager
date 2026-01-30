@@ -61,16 +61,11 @@ export default function UsersPage() {
     const ProComponent = activeProTab.component
     return (
       <div className="flex flex-col h-full w-full">
-        {/* Tab Navigation */}
-        <TabNavigation 
-          tabs={allTabs} 
-          activeTab={activeTab} 
-          onTabChange={handleTabChange} 
+        <ProComponent 
+          tabs={allTabs}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
         />
-        {/* Pro Tab Content - full size, let component control layout */}
-        <div className="flex-1 min-h-0 w-full">
-          <ProComponent />
-        </div>
       </div>
     )
   }
@@ -78,53 +73,17 @@ export default function UsersPage() {
   // Default: render Users tab
   return (
     <div className="flex flex-col h-full w-full">
-      {/* Only show tabs if there are Pro tabs */}
-      {proTabs.length > 0 && (
-        <TabNavigation 
-          tabs={allTabs} 
-          activeTab={activeTab} 
-          onTabChange={handleTabChange} 
-        />
-      )}
-      {/* Users Content */}
-      <div className="flex-1 min-h-0 w-full">
-        <UsersContent />
-      </div>
-    </div>
-  )
-}
-
-// Tab navigation component
-function TabNavigation({ tabs, activeTab, onTabChange }) {
-  return (
-    <div className="border-b border-border bg-bg-secondary px-4 shrink-0">
-      <div className="flex gap-1">
-        {tabs.map(tab => {
-          const Icon = tab.icon
-          const isActive = activeTab === tab.id
-          return (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                isActive 
-                  ? 'border-accent-primary text-accent-primary' 
-                  : 'border-transparent text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              <Icon size={16} />
-              {tab.label}
-              {tab.pro && <Badge variant="info" size="sm">Pro</Badge>}
-            </button>
-          )
-        })}
-      </div>
+      <UsersContent 
+        tabs={proTabs.length > 0 ? allTabs : null}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+      />
     </div>
   )
 }
 
 // Users content (extracted from original UsersPage)
-function UsersContent() {
+function UsersContent({ tabs, activeTab, onTabChange }) {
   const [users, setUsers] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -427,6 +386,9 @@ function UsersContent() {
     <>
       <ListPageLayout
         title="Users"
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={onTabChange}
         data={users}
         columns={columns}
         loading={loading}
