@@ -1,7 +1,7 @@
 /**
  * Users Page - Using ListPageLayout for consistent UI
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   User, Plus, Trash, LockKey, PencilSimple, Clock,
   ShieldCheck, UserCircle, Eye
@@ -107,6 +107,27 @@ export default function UsersPage() {
       showError(error.message || 'Failed to reset password')
     }
   }
+
+  // Table filters
+  const tableFilters = useMemo(() => [
+    {
+      key: 'role',
+      label: 'Role',
+      options: [
+        { value: 'admin', label: 'Admin' },
+        { value: 'operator', label: 'Operator' },
+        { value: 'viewer', label: 'Viewer' }
+      ]
+    },
+    {
+      key: 'active',
+      label: 'Status',
+      options: [
+        { value: true, label: 'Active' },
+        { value: false, label: 'Inactive' }
+      ]
+    }
+  ], [])
 
   // Table columns
   const columns = [
@@ -312,6 +333,7 @@ export default function UsersPage() {
         paginated
         pageSize={25}
         rowActions={rowActions}
+        filters={tableFilters}
         emptyIcon={User}
         emptyTitle="No users"
         emptyDescription="Create your first user to get started"

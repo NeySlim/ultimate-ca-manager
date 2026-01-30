@@ -1,7 +1,7 @@
 /**
  * Certificates Page - Using ListPageLayout for consistent UI
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   Certificate, Download, Trash, ArrowsClockwise, X, Key,
   CheckCircle, Warning, Clock, ShieldCheck, Plus, UploadSimple
@@ -91,6 +91,28 @@ export default function CertificatesPage() {
       showError('Delete failed')
     }
   }
+
+  // Table filters
+  const tableFilters = useMemo(() => [
+    {
+      key: 'status',
+      label: 'Status',
+      options: [
+        { value: 'valid', label: 'Valid' },
+        { value: 'expiring', label: 'Expiring' },
+        { value: 'expired', label: 'Expired' },
+        { value: 'revoked', label: 'Revoked' }
+      ]
+    }
+  ], [])
+
+  // Normalize status for filtering
+  const normalizedCerts = useMemo(() => {
+    return certificates.map(cert => ({
+      ...cert,
+      status: cert.revoked ? 'revoked' : cert.status
+    }))
+  }, [certificates])
 
   // Table columns
   const columns = [
@@ -227,7 +249,7 @@ export default function CertificatesPage() {
     <>
       <ListPageLayout
         title="Certificates"
-        data={certificates}
+        data={normalizedCerts}
         columns={columns}
         loading={loading}
         selectedItem={selectedCert}
@@ -242,6 +264,7 @@ export default function CertificatesPage() {
         paginated
         pageSize={25}
         rowActions={rowActions}
+        filters={tableFilters}
         emptyIcon={Certificate}
         emptyTitle="No certificates"
         emptyDescription="Issue your first certificate to get started"
