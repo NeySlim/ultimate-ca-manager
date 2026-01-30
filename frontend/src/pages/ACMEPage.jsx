@@ -380,59 +380,73 @@ export default function ACMEPage() {
             <h3 className="text-sm font-semibold text-text-primary mb-4">Let's Encrypt Proxy</h3>
             <div className="space-y-4">
               <p className="text-sm text-text-secondary">
-                Register a proxy account to use UCM as a Let's Encrypt proxy for external certificate issuance.
+                Enable UCM as a Let's Encrypt proxy for external certificate issuance.
               </p>
 
-              <Input
-                label="Proxy Endpoint URL"
-                value={`${window.location.origin}/api/v2/acme/proxy`}
-                readOnly
-                helperText="External ACME clients can use this URL to proxy requests to Let's Encrypt"
-                className="bg-bg-tertiary"
-              />
-              
-              {acmeSettings.proxy_registered ? (
-                <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-emerald-500/20">
-                        <CheckCircle size={20} className="text-emerald-500" weight="fill" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-text-primary">Proxy Account Registered</p>
-                        <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={handleUnregisterProxy}
-                      className="text-red-500 hover:bg-red-500/10"
-                    >
-                      <Trash size={16} />
-                      Unregister
-                    </Button>
-                  </div>
-                </div>
-              ) : (
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acmeSettings.proxy_enabled || false}
+                  onChange={(e) => updateAcmeSetting('proxy_enabled', e.target.checked)}
+                  className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
+                />
+                <span className="text-sm font-medium text-text-primary">Enable Let's Encrypt Proxy</span>
+              </label>
+
+              {acmeSettings.proxy_enabled && (
                 <>
                   <Input
-                    label="Email Address"
-                    type="email"
-                    value={proxyEmail}
-                    onChange={(e) => setProxyEmail(e.target.value)}
-                    placeholder="admin@example.com"
-                    helperText="Email for Let's Encrypt account registration"
+                    label="Proxy Endpoint URL"
+                    value={`${window.location.origin}/api/v2/acme/proxy`}
+                    readOnly
+                    helperText="External ACME clients can use this URL to proxy requests to Let's Encrypt"
+                    className="bg-bg-tertiary"
                   />
+                  
+                  {acmeSettings.proxy_registered ? (
+                    <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-full bg-emerald-500/20">
+                            <CheckCircle size={20} className="text-emerald-500" weight="fill" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-text-primary">Proxy Account Registered</p>
+                            <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={handleUnregisterProxy}
+                          className="text-red-500 hover:bg-red-500/10"
+                        >
+                          <Trash size={16} />
+                          Unregister
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <Input
+                        label="Email Address"
+                        type="email"
+                        value={proxyEmail}
+                        onChange={(e) => setProxyEmail(e.target.value)}
+                        placeholder="admin@example.com"
+                        helperText="Email for Let's Encrypt account registration"
+                      />
 
-                  <Button 
-                    variant="secondary" 
-                    onClick={handleRegisterProxy}
-                    disabled={!proxyEmail}
-                  >
-                    <Key size={16} />
-                    Register Proxy Account
-                  </Button>
+                      <Button 
+                        variant="secondary" 
+                        onClick={handleRegisterProxy}
+                        disabled={!proxyEmail}
+                      >
+                        <Key size={16} />
+                        Register Proxy Account
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -512,6 +526,15 @@ export default function ACMEPage() {
                   <span className="text-sm">Directory</span>
                 </div>
                 <Badge variant="purple" size="sm">Ready</Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={14} weight="duotone" className={acmeSettings.proxy_enabled ? 'text-orange-500' : 'text-gray-500'} />
+                  <span className="text-sm">LE Proxy</span>
+                </div>
+                <Badge variant={acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'emerald' : 'orange') : 'gray'} size="sm">
+                  {acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'Active' : 'Not Registered') : 'Disabled'}
+                </Badge>
               </div>
             </Card>
           </div>
