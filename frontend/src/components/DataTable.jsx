@@ -210,8 +210,13 @@ export function DataTable({
     if (Object.keys(activeFilters).length > 0) {
       result = result.filter(row => {
         return Object.entries(activeFilters).every(([key, value]) => {
-          if (!value || value === 'all') return true
-          return row[key] === value
+          if (value === '' || value === 'all') return true
+          // Handle boolean comparisons (select converts to string)
+          const rowValue = row[key]
+          if (typeof rowValue === 'boolean') {
+            return String(rowValue) === String(value)
+          }
+          return rowValue === value
         })
       })
     }

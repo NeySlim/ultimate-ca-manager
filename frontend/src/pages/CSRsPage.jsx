@@ -1,7 +1,7 @@
 /**
  * CSRs (Certificate Signing Requests) Page - Using ListPageLayout
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   FileText, Upload, SignIn, Trash, Download, FileArrowUp, 
@@ -126,6 +126,19 @@ export default function CSRsPage() {
       showError(error.message || 'Failed to download CSR')
     }
   }
+
+  // Table filters
+  const tableFilters = useMemo(() => [
+    {
+      key: 'status',
+      label: 'Status',
+      options: [
+        { value: 'pending', label: 'Pending' },
+        { value: 'signed', label: 'Signed' },
+        { value: 'rejected', label: 'Rejected' }
+      ]
+    }
+  ], [])
 
   // Table columns
   const columns = [
@@ -270,6 +283,7 @@ export default function CSRsPage() {
         paginated
         pageSize={25}
         rowActions={rowActions}
+        filters={tableFilters}
         emptyIcon={FileText}
         emptyTitle="No CSRs"
         emptyDescription="Upload a CSR to get started"
