@@ -4,6 +4,7 @@ const themes = {
   dark: {
     id: 'dark',
     name: 'Dark Gray',
+    isLight: false,
     colors: {
       'bg-primary': '#12161C',
       'bg-secondary': '#1C222A',
@@ -21,11 +22,57 @@ const themes = {
       'gradient-to': '#A78BFA',
       'gradient-accent': 'linear-gradient(135deg, #4F8EF7 0%, #A78BFA 100%)',
       'gradient-bg': 'linear-gradient(145deg, #1e2633 0%, #252035 50%, #1e2633 100%)',
+      // DetailCard colors
+      'detail-header-bg': 'linear-gradient(135deg, rgba(79,142,247,0.08), rgba(167,139,250,0.04), transparent)',
+      'detail-header-border': 'rgba(255,255,255,0.06)',
+      'detail-header-shadow': 'inset 0 1px 0 0 rgba(255,255,255,0.04)',
+      'detail-icon-bg': 'linear-gradient(135deg, #4F8EF7, rgba(79,142,247,0.7))',
+      'detail-icon-shadow': '0 4px 12px rgba(79,142,247,0.25)',
+      'detail-stats-border': 'rgba(255,255,255,0.06)',
+      'detail-section-bg': 'rgba(28,34,42,0.6)',
+      'detail-section-border': '#3A4555',
+      'detail-field-bg': 'rgba(255,255,255,0.02)',
+      'detail-field-border': 'rgba(255,255,255,0.05)',
+    }
+  },
+  light: {
+    id: 'light',
+    name: 'Light',
+    isLight: true,
+    colors: {
+      'bg-primary': '#F8FAFC',
+      'bg-secondary': '#FFFFFF',
+      'bg-tertiary': '#F1F5F9',
+      'text-primary': '#1E293B',
+      'text-secondary': '#64748B',
+      'text-tertiary': '#94A3B8',
+      'accent-primary': '#3B82F6',
+      'accent-success': '#10B981',
+      'accent-warning': '#F59E0B',
+      'accent-danger': '#EF4444',
+      'accent-pro': '#8B5CF6',
+      'border': '#E2E8F0',
+      'gradient-from': '#3B82F6',
+      'gradient-to': '#8B5CF6',
+      'gradient-accent': 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)',
+      'gradient-bg': 'linear-gradient(145deg, #f0f4ff 0%, #f8f0ff 50%, #f0f4ff 100%)',
+      // DetailCard colors - light
+      'detail-header-bg': 'linear-gradient(135deg, rgba(59,130,246,0.06), rgba(139,92,246,0.03), white)',
+      'detail-header-border': 'rgba(0,0,0,0.06)',
+      'detail-header-shadow': 'inset 0 1px 0 0 rgba(255,255,255,0.8)',
+      'detail-icon-bg': 'linear-gradient(135deg, #3B82F6, #6366F1)',
+      'detail-icon-shadow': '0 4px 12px rgba(59,130,246,0.2)',
+      'detail-stats-border': 'rgba(0,0,0,0.06)',
+      'detail-section-bg': 'rgba(241,245,249,0.6)',
+      'detail-section-border': '#E2E8F0',
+      'detail-field-bg': 'rgba(0,0,0,0.02)',
+      'detail-field-border': 'rgba(0,0,0,0.06)',
     }
   },
   ocean: {
     id: 'ocean',
     name: 'Blue Ocean',
+    isLight: false,
     colors: {
       'bg-primary': '#0A1628',
       'bg-secondary': '#0F1E35',
@@ -43,11 +90,23 @@ const themes = {
       'gradient-to': '#06B6D4',
       'gradient-accent': 'linear-gradient(135deg, #0EA5E9 0%, #06B6D4 100%)',
       'gradient-bg': 'linear-gradient(135deg, #0d2d4f 0%, #1a4d6d 100%)',
+      // DetailCard colors
+      'detail-header-bg': 'linear-gradient(135deg, rgba(14,165,233,0.08), rgba(6,182,212,0.04), transparent)',
+      'detail-header-border': 'rgba(255,255,255,0.06)',
+      'detail-header-shadow': 'inset 0 1px 0 0 rgba(255,255,255,0.04)',
+      'detail-icon-bg': 'linear-gradient(135deg, #0EA5E9, rgba(14,165,233,0.7))',
+      'detail-icon-shadow': '0 4px 12px rgba(14,165,233,0.25)',
+      'detail-stats-border': 'rgba(255,255,255,0.06)',
+      'detail-section-bg': 'rgba(15,30,53,0.6)',
+      'detail-section-border': '#1E3A5F',
+      'detail-field-bg': 'rgba(255,255,255,0.02)',
+      'detail-field-border': 'rgba(255,255,255,0.05)',
     }
   },
   purple: {
     id: 'purple',
     name: 'Purple Night',
+    isLight: false,
     colors: {
       'bg-primary': '#1A0B2E',
       'bg-secondary': '#251438',
@@ -65,11 +124,23 @@ const themes = {
       'gradient-to': '#EC4899',
       'gradient-accent': 'linear-gradient(135deg, #A855F7 0%, #EC4899 100%)',
       'gradient-bg': 'linear-gradient(135deg, #3d2555 0%, #4a1942 100%)',
+      // DetailCard colors
+      'detail-header-bg': 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(236,72,153,0.04), transparent)',
+      'detail-header-border': 'rgba(255,255,255,0.06)',
+      'detail-header-shadow': 'inset 0 1px 0 0 rgba(255,255,255,0.04)',
+      'detail-icon-bg': 'linear-gradient(135deg, #A855F7, rgba(168,85,247,0.7))',
+      'detail-icon-shadow': '0 4px 12px rgba(168,85,247,0.25)',
+      'detail-stats-border': 'rgba(255,255,255,0.06)',
+      'detail-section-bg': 'rgba(37,20,56,0.6)',
+      'detail-section-border': '#442B66',
+      'detail-field-bg': 'rgba(255,255,255,0.02)',
+      'detail-field-border': 'rgba(255,255,255,0.05)',
     }
   },
   forest: {
     id: 'forest',
     name: 'Green Forest',
+    isLight: false,
     colors: {
       'bg-primary': '#0A1910',
       'bg-secondary': '#0F2418',
@@ -87,11 +158,23 @@ const themes = {
       'gradient-to': '#059669',
       'gradient-accent': 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
       'gradient-bg': 'linear-gradient(135deg, #1a3d2a 0%, #0d5231 100%)',
+      // DetailCard colors
+      'detail-header-bg': 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.04), transparent)',
+      'detail-header-border': 'rgba(255,255,255,0.06)',
+      'detail-header-shadow': 'inset 0 1px 0 0 rgba(255,255,255,0.04)',
+      'detail-icon-bg': 'linear-gradient(135deg, #10B981, rgba(16,185,129,0.7))',
+      'detail-icon-shadow': '0 4px 12px rgba(16,185,129,0.25)',
+      'detail-stats-border': 'rgba(255,255,255,0.06)',
+      'detail-section-bg': 'rgba(15,36,24,0.6)',
+      'detail-section-border': '#1E4D2B',
+      'detail-field-bg': 'rgba(255,255,255,0.02)',
+      'detail-field-border': 'rgba(255,255,255,0.05)',
     }
   },
   sunset: {
     id: 'sunset',
     name: 'Orange Sunset',
+    isLight: false,
     colors: {
       'bg-primary': '#1F0F0A',
       'bg-secondary': '#2A1510',
@@ -109,11 +192,23 @@ const themes = {
       'gradient-to': '#DC2626',
       'gradient-accent': 'linear-gradient(135deg, #F97316 0%, #DC2626 100%)',
       'gradient-bg': 'linear-gradient(135deg, #4a2618 0%, #5c1a1a 100%)',
+      // DetailCard colors
+      'detail-header-bg': 'linear-gradient(135deg, rgba(249,115,22,0.08), rgba(220,38,38,0.04), transparent)',
+      'detail-header-border': 'rgba(255,255,255,0.06)',
+      'detail-header-shadow': 'inset 0 1px 0 0 rgba(255,255,255,0.04)',
+      'detail-icon-bg': 'linear-gradient(135deg, #F97316, rgba(249,115,22,0.7))',
+      'detail-icon-shadow': '0 4px 12px rgba(249,115,22,0.25)',
+      'detail-stats-border': 'rgba(255,255,255,0.06)',
+      'detail-section-bg': 'rgba(42,21,16,0.6)',
+      'detail-section-border': '#4D2815',
+      'detail-field-bg': 'rgba(255,255,255,0.02)',
+      'detail-field-border': 'rgba(255,255,255,0.05)',
     }
   },
   cyber: {
     id: 'cyber',
     name: 'Cyber Pink',
+    isLight: false,
     colors: {
       'bg-primary': '#0D0221',
       'bg-secondary': '#190933',
@@ -131,6 +226,17 @@ const themes = {
       'gradient-to': '#F472B6',
       'gradient-accent': 'linear-gradient(135deg, #EC4899 0%, #F472B6 100%)',
       'gradient-bg': 'linear-gradient(135deg, #3d1854 0%, #5a1359 100%)',
+      // DetailCard colors
+      'detail-header-bg': 'linear-gradient(135deg, rgba(236,72,153,0.08), rgba(244,114,182,0.04), transparent)',
+      'detail-header-border': 'rgba(255,255,255,0.06)',
+      'detail-header-shadow': 'inset 0 1px 0 0 rgba(255,255,255,0.04)',
+      'detail-icon-bg': 'linear-gradient(135deg, #EC4899, rgba(236,72,153,0.7))',
+      'detail-icon-shadow': '0 4px 12px rgba(236,72,153,0.25)',
+      'detail-stats-border': 'rgba(255,255,255,0.06)',
+      'detail-section-bg': 'rgba(25,9,51,0.6)',
+      'detail-section-border': '#3D1754',
+      'detail-field-bg': 'rgba(255,255,255,0.02)',
+      'detail-field-border': 'rgba(255,255,255,0.05)',
     }
   }
 }

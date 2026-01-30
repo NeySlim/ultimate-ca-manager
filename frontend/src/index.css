@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================
+   THEME: Dark (default)
+   ============================================ */
 :root {
   --bg-primary: #12161C;
   --bg-secondary: #1C222A;
@@ -18,6 +21,59 @@
   /* Logo gradient colors */
   --logo-gradient-start: #5a9cf7;
   --logo-gradient-end: #a78bfa;
+  
+  /* DetailCard soft colors - dark theme */
+  --detail-header-bg: linear-gradient(135deg, 
+    color-mix(in srgb, var(--accent-primary) 8%, transparent),
+    color-mix(in srgb, var(--logo-gradient-end) 4%, transparent),
+    transparent
+  );
+  --detail-header-border: rgba(255, 255, 255, 0.06);
+  --detail-header-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+  --detail-icon-bg: linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, transparent));
+  --detail-icon-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 25%, transparent);
+  --detail-stats-border: rgba(255, 255, 255, 0.06);
+  --detail-section-bg: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
+  --detail-section-border: var(--border);
+  --detail-field-bg: rgba(255, 255, 255, 0.02);
+  --detail-field-border: rgba(255, 255, 255, 0.05);
+}
+
+/* ============================================
+   THEME: Light
+   ============================================ */
+.theme-light {
+  --bg-primary: #FAFBFC;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F3F4F6;
+  --text-primary: #1F2937;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --accent-primary: #3B82F6;
+  --accent-success: #10B981;
+  --accent-warning: #F59E0B;
+  --accent-danger: #EF4444;
+  --border: #E5E7EB;
+  
+  /* Logo gradient colors - light */
+  --logo-gradient-start: #3B82F6;
+  --logo-gradient-end: #8B5CF6;
+  
+  /* DetailCard soft colors - light theme */
+  --detail-header-bg: linear-gradient(135deg, 
+    color-mix(in srgb, var(--accent-primary) 6%, white),
+    color-mix(in srgb, var(--logo-gradient-end) 3%, white),
+    white
+  );
+  --detail-header-border: rgba(0, 0, 0, 0.06);
+  --detail-header-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+  --detail-icon-bg: linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 80%, #8B5CF6));
+  --detail-icon-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 20%, transparent);
+  --detail-stats-border: rgba(0, 0, 0, 0.06);
+  --detail-section-bg: rgba(0, 0, 0, 0.02);
+  --detail-section-border: var(--border);
+  --detail-field-bg: rgba(0, 0, 0, 0.02);
+  --detail-field-border: rgba(0, 0, 0, 0.06);
 }
 
 /* Custom scrollbar styling - thin and subtle */
@@ -62,6 +118,34 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* ============================================
+   DetailCard Component Styles (theme-aware)
+   ============================================ */
+.detail-header-gradient {
+  background: var(--detail-header-bg);
+  border: 1px solid var(--detail-header-border);
+  box-shadow: var(--detail-header-shadow);
+}
+
+.detail-icon-gradient {
+  background: var(--detail-icon-bg);
+  box-shadow: var(--detail-icon-shadow);
+}
+
+.detail-stats-border {
+  border-color: var(--detail-stats-border);
+}
+
+.detail-section-frame {
+  background: var(--detail-section-bg);
+  border: 1px solid var(--detail-section-border);
+}
+
+.detail-field-frame {
+  background: var(--detail-field-bg);
+  border: 1px solid var(--detail-field-border);
 }
 
 body {

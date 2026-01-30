@@ -1,6 +1,7 @@
 /**
  * DetailCard Components - Mix of Header A + Sections B
  * Modern card header with clean minimal sections
+ * Theme-aware soft color palette
  */
 import { useState } from 'react'
 import { cn } from '../lib/utils'
@@ -10,7 +11,8 @@ import { Badge } from './Badge'
 import { Button } from './Button'
 
 /**
- * DetailHeader - Gradient card header with icon (Style A)
+ * DetailHeader - Soft gradient card header with icon (Style A)
+ * Uses CSS variables for theme compatibility
  */
 export function DetailHeader({
   icon: Icon,
@@ -27,9 +29,7 @@ export function DetailHeader({
 
   return (
     <div className={cn(
-      "relative overflow-hidden rounded-xl",
-      "bg-gradient-to-br from-accent-primary/10 via-accent-primary/5 to-transparent",
-      "border border-accent-primary/20",
+      "relative overflow-hidden rounded-xl detail-header-gradient",
       isMobile ? "p-4" : "p-5",
       className
     )}>
@@ -38,8 +38,8 @@ export function DetailHeader({
         <div className="flex items-center gap-3 md:gap-4 min-w-0">
           {Icon && (
             <div className={cn(
-              "rounded-xl bg-gradient-to-br from-accent-primary to-accent-primary/70",
-              "flex items-center justify-center shadow-lg shadow-accent-primary/30 shrink-0",
+              "rounded-xl detail-icon-gradient",
+              "flex items-center justify-center shrink-0",
               isMobile ? "w-11 h-11" : "w-14 h-14"
             )}>
               <Icon size={isMobile ? 22 : 28} className="text-white" weight="duotone" />
@@ -123,7 +123,7 @@ export function DetailHeader({
       {/* Stats row */}
       {stats && stats.length > 0 && (
         <div className={cn(
-          "flex flex-wrap gap-4 md:gap-6 mt-4 pt-4 border-t border-accent-primary/10",
+          "flex flex-wrap gap-4 md:gap-6 mt-4 pt-4 border-t detail-stats-border",
         )}>
           {stats.map((stat, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -141,6 +141,7 @@ export function DetailHeader({
 
 /**
  * DetailSection - Clean minimal section with card frame (Style B + frames)
+ * Theme-aware styling
  */
 export function DetailSection({ title, description, children, className, noBorder = false }) {
   const { isMobile } = useMobile()
@@ -160,10 +161,10 @@ export function DetailSection({ title, description, children, className, noBorde
           )}
         </div>
       )}
-      {/* Content in a framed card */}
+      {/* Content in a framed card - uses theme-aware class */}
       <div className={cn(
         "rounded-lg p-4",
-        !noBorder && "bg-bg-secondary/50 border border-border"
+        !noBorder && "detail-section-frame"
       )}>
         {children}
       </div>
@@ -190,6 +191,7 @@ export function DetailGrid({ children, columns = 2, className }) {
 
 /**
  * DetailField - Single field in DetailGrid with subtle frame
+ * Theme-aware styling
  */
 export function DetailField({ 
   label, 
@@ -212,7 +214,7 @@ export function DetailField({
   
   return (
     <div className={cn(
-      "rounded-md p-3 border border-white/5 bg-white/[0.02]",
+      "rounded-md p-3 detail-field-frame",
       fullWidth && "col-span-full",
       className
     )}>
