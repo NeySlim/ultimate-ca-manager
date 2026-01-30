@@ -117,17 +117,17 @@ export function ContentHeader({
                 )}
               </div>
             ) : (
-              // Desktop or few actions: show all buttons
+              // Desktop or few actions: show all buttons (always small)
               actions.map((action, i) => (
                 <Button
                   key={i}
                   variant={action.variant || 'secondary'}
-                  size={isMobile ? 'sm' : 'default'}
+                  size="sm"
                   onClick={action.onClick}
                   disabled={action.disabled}
                   className={isMobile ? "flex-1" : ""}
                 >
-                  {action.icon && <action.icon size={isMobile ? 14 : 16} />}
+                  {action.icon && <action.icon size={14} />}
                   <span className={isMobile && actions.length > 2 ? "sr-only" : ""}>
                     {action.label}
                   </span>
