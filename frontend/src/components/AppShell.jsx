@@ -2,17 +2,46 @@
  * AppShell Component - Main application layout with mobile support
  */
 import { useState, useEffect } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
-import { List, X } from '@phosphor-icons/react'
+import { Outlet, useLocation, Link } from 'react-router-dom'
+import { 
+  List, X, MagnifyingGlass,
+  House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
+  UploadSimple, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock
+} from '@phosphor-icons/react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { cn } from '../lib/utils'
+import { Logo } from './Logo'
+
+// Mobile navigation items (grid menu)
+const mobileNavItems = [
+  { id: '', icon: House, label: 'Dashboard', path: '/' },
+  { id: 'certificates', icon: Certificate, label: 'Certificates', path: '/certificates' },
+  { id: 'cas', icon: ShieldCheck, label: 'CAs', path: '/cas' },
+  { id: 'csrs', icon: FileText, label: 'CSRs', path: '/csrs' },
+  { id: 'templates', icon: ListIcon, label: 'Templates', path: '/templates' },
+  { id: 'users', icon: User, label: 'Users', path: '/users' },
+  { id: 'acme', icon: Key, label: 'ACME', path: '/acme' },
+  { id: 'scep', icon: Robot, label: 'SCEP', path: '/scep-config' },
+  { id: 'crl-ocsp', icon: FileX, label: 'CRL/OCSP', path: '/crl-ocsp' },
+  { id: 'truststore', icon: Vault, label: 'Trust Store', path: '/truststore' },
+  { id: 'import', icon: UploadSimple, label: 'Import', path: '/import' },
+  { id: 'audit', icon: ClockCounterClockwise, label: 'Audit', path: '/audit' },
+  { id: 'settings', icon: Gear, label: 'Settings', path: '/settings' },
+]
+
+// Pro items (added dynamically)
+const proNavItems = [
+  { id: 'rbac', icon: Shield, label: 'RBAC', path: '/rbac', pro: true },
+  { id: 'hsm', icon: Lock, label: 'HSM', path: '/hsm', pro: true },
+]
 
 export function AppShell() {
   const location = useLocation()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [isPro, setIsPro] = useState(false)
   
   // Extract current page from pathname (empty string for dashboard)
   const activePage = location.pathname.split('/')[1] || ''
@@ -25,6 +54,13 @@ export function AppShell() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Check for Pro module
+  useEffect(() => {
+    import('../pro')
+      .then(() => setIsPro(true))
+      .catch(() => setIsPro(false))
+  }, [])
+
   // Close mobile menu on navigation
   useEffect(() => {
     setMobileMenuOpen(false)
@@ -35,47 +71,93 @@ export function AppShell() {
     onCommandPalette: () => setCommandPaletteOpen(true)
   })
 
+  // All nav items (including Pro if available)
+  const allNavItems = isPro ? [...mobileNavItems, ...proNavItems] : mobileNavItems
+
   return (
     <div className="flex h-full w-full bg-bg-primary overflow-hidden">
-      {/* Mobile Header */}
+      {/* Mobile Header - Search left, Hamburger right */}
       {isMobile && (
         <div className="fixed top-0 left-0 right-0 h-12 bg-bg-secondary border-b border-border flex items-center px-3 z-40">
+          {/* Search button - LEFT */}
+          <button
+            onClick={() => setCommandPaletteOpen(true)}
+            className="w-9 h-9 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
+          >
+            <MagnifyingGlass size={20} />
+          </button>
+          
+          {/* Logo and page title - CENTER */}
+          <div className="flex-1 flex items-center justify-center gap-2">
+            <Logo size={20} />
+            <span className="text-sm font-semibold text-text-primary tracking-wide capitalize">
+              {activePage || 'Dashboard'}
+            </span>
+          </div>
+          
+          {/* Hamburger menu - RIGHT */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="w-9 h-9 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
           >
             {mobileMenuOpen ? <X size={20} /> : <List size={20} />}
           </button>
-          <span className="ml-3 text-sm font-semibold text-text-primary uppercase tracking-wide">
-            {activePage || 'Dashboard'}
-          </span>
-          <div className="flex-1" />
-          <button
-            onClick={() => setCommandPaletteOpen(true)}
-            className="px-2 py-1 text-xs text-text-tertiary bg-bg-tertiary border border-border rounded flex items-center gap-1.5"
-          >
-            <span>Search</span>
-            <kbd className="text-[10px]">⌘K</kbd>
-          </button>
         </div>
       )}
 
-      {/* Sidebar - Hidden on mobile, shown in overlay */}
-      <div className={cn(
-        "flex-shrink-0 z-50",
-        isMobile && "fixed inset-y-0 left-0 transform transition-transform duration-200",
-        isMobile && !mobileMenuOpen && "-translate-x-full",
-        isMobile && mobileMenuOpen && "translate-x-0"
-      )}>
-        <Sidebar activePage={activePage} />
-      </div>
-
-      {/* Mobile overlay */}
+      {/* Mobile Grid Menu Overlay */}
       {isMobile && mobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => setMobileMenuOpen(false)}
-        />
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          
+          {/* Grid Menu Panel */}
+          <div className="fixed top-12 right-0 left-0 z-50 p-3 animate-in slide-in-from-top-2 duration-200">
+            <div className="bg-bg-secondary border border-border rounded-xl shadow-2xl p-4 max-h-[70vh] overflow-auto">
+              {/* Navigation Grid */}
+              <div className="grid grid-cols-4 gap-2">
+                {allNavItems.map((item) => {
+                  const Icon = item.icon
+                  const isActive = activePage === item.id
+                  
+                  return (
+                    <Link
+                      key={item.id}
+                      to={item.path}
+                      className={cn(
+                        "flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg transition-all",
+                        "hover:bg-bg-tertiary active:scale-95",
+                        isActive 
+                          ? "bg-accent-primary/15 text-accent-primary" 
+                          : "text-text-secondary hover:text-text-primary"
+                      )}
+                    >
+                      <Icon size={24} weight={isActive ? "fill" : "regular"} />
+                      <span className="text-[10px] font-medium text-center leading-tight">
+                        {item.label}
+                      </span>
+                      {item.pro && (
+                        <span className="text-[8px] px-1 py-0.5 bg-amber-500/20 text-amber-500 rounded">
+                          PRO
+                        </span>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Desktop Sidebar - Hidden on mobile */}
+      {!isMobile && (
+        <div className="flex-shrink-0">
+          <Sidebar activePage={activePage} />
+        </div>
       )}
 
       {/* Main Content */}
@@ -90,7 +172,7 @@ export function AppShell() {
       <CommandPalette 
         open={commandPaletteOpen} 
         onOpenChange={setCommandPaletteOpen}
-        isPro={true} // TODO: Get from license context
+        isPro={isPro}
       />
     </div>
   )
