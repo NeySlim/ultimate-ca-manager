@@ -8,6 +8,7 @@ import { BottomSheet } from './BottomSheet'
 import { HelpModal } from './HelpModal'
 import { useMobile } from '../contexts'
 import { cn } from '../lib/utils'
+import { labels, getHelpTitle } from '../lib/ui'
 import { Question } from '@phosphor-icons/react'
 
 export function ExplorerPanel({ 
@@ -73,10 +74,10 @@ export function ExplorerPanel({
         "text-accent-primary hover:bg-accent-primary/20 hover:border-accent-primary/50",
         "text-xs font-medium"
       )}
-      title="Aide et informations"
+      title={labels.helpAndInfo}
     >
       <Question size={14} weight="bold" />
-      <span className="hidden sm:inline">Aide</span>
+      <span className="hidden sm:inline">{labels.help}</span>
     </button>
   ) : null
 
@@ -101,7 +102,7 @@ export function ExplorerPanel({
         <HelpModal 
           open={helpOpen} 
           onClose={() => setHelpOpen(false)}
-          title={helpTitle || `${title} - Aide`}
+          title={helpTitle || getHelpTitle(title)}
         >
           {helpContent}
         </HelpModal>
@@ -116,7 +117,7 @@ export function ExplorerPanel({
         {/* Header */}
         <div className="px-4 py-3 border-b border-border flex-shrink-0">
           <div className="flex items-center justify-between">
-            <h1 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
+            <h1 className="text-sm font-semibold text-text-primary tracking-wide">
               {title}
             </h1>
             <HelpButton />
@@ -130,7 +131,7 @@ export function ExplorerPanel({
       <HelpModal 
         open={helpOpen} 
         onClose={() => setHelpOpen(false)}
-        title={helpTitle || `${title} - Aide`}
+        title={helpTitle || getHelpTitle(title)}
       >
         {helpContent}
       </HelpModal>

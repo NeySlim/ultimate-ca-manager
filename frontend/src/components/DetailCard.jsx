@@ -25,7 +25,8 @@ export function DetailHeader({
 }) {
   const { isMobile } = useMobile()
   const [menuOpen, setMenuOpen] = useState(false)
-  const showDropdown = isMobile && actions?.length > 2
+  // Use dropdown when: mobile with 2+ actions OR desktop with 3+ actions (narrow panels)
+  const showDropdown = (isMobile && actions?.length > 1) || actions?.length > 2
 
   return (
     <div className={cn(
@@ -101,7 +102,7 @@ export function DetailHeader({
                 )}
               </div>
             ) : (
-              <div className="hidden md:flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 {actions.map((action, i) => (
                   <Button
                     key={i}
@@ -151,13 +152,13 @@ export function DetailSection({ title, description, children, className, noBorde
       {title && (
         <div className="mb-3">
           <h2 className={cn(
-            "font-bold text-text-tertiary uppercase tracking-widest",
-            isMobile ? "text-[10px]" : "text-xs"
+            "font-semibold text-text-secondary tracking-wide",
+            isMobile ? "text-xs" : "text-sm"
           )}>
             {title}
           </h2>
           {description && (
-            <p className="text-xs text-text-secondary mt-1">{description}</p>
+            <p className="text-xs text-text-tertiary mt-1">{description}</p>
           )}
         </div>
       )}

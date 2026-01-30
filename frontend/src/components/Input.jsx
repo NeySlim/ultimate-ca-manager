@@ -31,12 +31,12 @@ export const Input = forwardRef(function Input({
           ref={ref}
           className={cn(
             "w-full px-2.5 py-1.5 bg-bg-secondary border rounded-md text-sm text-text-primary placeholder-text-secondary/60",
-            "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 focus:bg-bg-secondary",
+            "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary focus:bg-bg-secondary",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             "transition-all duration-200",
-            "hover:border-border",
-            error && "border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50",
-            !error && "border-border/60",
+            "hover:border-text-secondary/50",
+            error && "border-red-500 focus:ring-red-500/50 focus:border-red-500",
+            !error && "border-border",
             icon && "pl-8"
           )}
           {...props}

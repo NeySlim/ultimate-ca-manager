@@ -9,6 +9,7 @@
  */
 import { useState } from 'react'
 import { cn } from '../lib/utils'
+import { labels, getHelpTitle } from '../lib/ui'
 import { Question, CaretLeft, CaretRight } from '@phosphor-icons/react'
 import { HelpModal } from './HelpModal'
 import { useMobile } from '../contexts'
@@ -50,10 +51,10 @@ export function PageLayout({
         "text-accent-primary hover:bg-accent-primary/20 hover:border-accent-primary/50",
         "text-xs font-medium"
       )}
-      title="Aide et informations"
+      title={labels.helpAndInfo}
     >
       <Question size={14} weight="bold" />
-      <span>Aide</span>
+      <span>{labels.help}</span>
     </button>
   ) : null
 
@@ -110,7 +111,7 @@ export function PageLayout({
         <HelpModal 
           open={helpOpen} 
           onClose={() => setHelpOpen(false)}
-          title={helpTitle || `${title} - Aide`}
+          title={helpTitle || getHelpTitle(title)}
         >
           {helpContent}
         </HelpModal>
@@ -152,8 +153,8 @@ export function PageLayout({
           {/* Focus Header */}
           <div className="px-4 py-3 border-b border-border shrink-0">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
-                {focusTitle || 'Sélection'}
+              <h2 className="text-sm font-semibold text-text-primary tracking-wide">
+                {focusTitle || 'Selection'}
               </h2>
             </div>
           </div>
@@ -183,7 +184,7 @@ export function PageLayout({
       <HelpModal 
         open={helpOpen} 
         onClose={() => setHelpOpen(false)}
-        title={helpTitle || `${title} - Aide`}
+        title={helpTitle || getHelpTitle(title)}
       >
         {helpContent}
       </HelpModal>
@@ -198,7 +199,7 @@ export function ContentSection({ title, children, className }) {
   return (
     <div className={cn("p-6", className)}>
       {title && (
-        <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-text-primary mb-4 tracking-wide">
           {title}
         </h3>
       )}

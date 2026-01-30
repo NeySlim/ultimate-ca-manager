@@ -183,7 +183,7 @@ export function BottomSheet({
           <div className="flex items-center justify-between px-4 h-10">
             <div className="flex items-center gap-3">
               <List size={18} className="text-text-secondary" />
-              <span className="text-sm font-semibold text-text-primary uppercase tracking-wide">
+              <span className="text-sm font-semibold text-text-primary tracking-wide">
                 {title}
               </span>
             </div>

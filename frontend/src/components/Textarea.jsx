@@ -32,12 +32,12 @@ export function Textarea({
       <textarea
         className={cn(
           "w-full px-3 py-2 bg-bg-tertiary/80 border rounded-md text-sm text-text-primary placeholder-text-secondary/60",
-          "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 focus:bg-bg-tertiary",
+          "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary focus:bg-bg-tertiary",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           "transition-all duration-200 resize-y",
-          "hover:border-border/80 hover:bg-bg-tertiary",
-          error && "border-red-500/50 focus:ring-red-500/50",
-          !error && "border-border/60"
+          "hover:border-text-secondary/50 hover:bg-bg-tertiary",
+          error && "border-red-500 focus:ring-red-500/50",
+          !error && "border-border"
         )}
         value={value}
         maxLength={maxLength}

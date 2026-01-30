@@ -27,11 +27,11 @@ export function SelectComponent({
         <Select.Trigger
           className={cn(
             "w-full flex items-center justify-between px-2.5 py-1.5 bg-bg-tertiary/80 border rounded-md text-sm",
-            "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary/50 focus:bg-bg-tertiary",
+            "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary focus:bg-bg-tertiary",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             "transition-all duration-200",
-            "hover:border-border/80 hover:bg-bg-tertiary",
-            error ? "border-red-500/50" : "border-border/60",
+            "hover:border-text-secondary/50 hover:bg-bg-tertiary",
+            error ? "border-red-500" : "border-border",
             value ? "text-text-primary" : "text-text-secondary/60"
           )}
         >

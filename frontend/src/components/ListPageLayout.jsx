@@ -19,6 +19,7 @@
  */
 import { useState } from 'react'
 import { cn } from '../lib/utils'
+import { labels, getHelpTitle } from '../lib/ui'
 import { useMobile } from '../contexts'
 import { DataTable } from './DataTable'
 import { HelpModal } from './HelpModal'
@@ -107,9 +108,10 @@ export function ListPageLayout({
         "text-accent-primary hover:bg-accent-primary/20 hover:border-accent-primary/50",
         "text-xs font-medium"
       )}
+      title={labels.helpAndInfo}
     >
       <Question size={14} weight="bold" />
-      <span>Aide</span>
+      <span>{labels.help}</span>
     </button>
   ) : null
   
@@ -186,7 +188,7 @@ export function ListPageLayout({
         <HelpModal
           open={helpOpen}
           onClose={() => setHelpOpen(false)}
-          title={helpTitle || `${title} - Aide`}
+          title={helpTitle || getHelpTitle(title)}
         >
           {helpContent}
         </HelpModal>
@@ -284,7 +286,7 @@ export function ListPageLayout({
       <HelpModal
         open={helpOpen}
         onClose={() => setHelpOpen(false)}
-        title={helpTitle || `${title} - Aide`}
+        title={helpTitle || getHelpTitle(title)}
       >
         {helpContent}
       </HelpModal>
