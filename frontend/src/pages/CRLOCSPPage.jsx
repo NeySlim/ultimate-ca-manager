@@ -5,11 +5,12 @@
 import { useState, useEffect } from 'react'
 import { 
   FileX, ShieldCheck, ArrowsClockwise, Download, Globe,
-  Database, Pulse
+  Database, Pulse, Calendar, Hash, CheckCircle, XCircle
 } from '@phosphor-icons/react'
 import {
   PageLayout, FocusItem, Button, Card, Badge, 
-  LoadingSpinner, EmptyState, StatusIndicator, HelpCard
+  LoadingSpinner, EmptyState, StatusIndicator, HelpCard,
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
 } from '../components'
 import { casService, crlService, apiClient } from '../services'
 import { useNotification } from '../contexts'
@@ -242,85 +243,104 @@ export default function CRLOCSPPage() {
           />
         </div>
       ) : (
-        <div className="p-6 space-y-6">
-          {/* CRL Info */}
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
-              CRL Information
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">CA Name</p>
-                <p className="text-sm text-text-primary">{selectedCA.descr}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Status</p>
-                <StatusIndicator status={selectedCRL ? 'success' : 'warning'}>
-                  {selectedCRL ? 'Active' : 'Not Generated'}
-                </StatusIndicator>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Revoked Certificates</p>
-                <p className="text-sm text-text-primary">{selectedCRL?.revoked_count || 0}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">CRL Number</p>
-                <p className="text-sm text-text-primary font-mono">{selectedCRL?.crl_number || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Last Updated</p>
-                <p className="text-sm text-text-primary">
-                  {selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Next Update</p>
-                <p className="text-sm text-text-primary">
-                  {selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'}
-                </p>
-              </div>
-            </div>
-          </div>
+        <DetailContent>
+          {/* Detail Header */}
+          <DetailHeader
+            icon={FileX}
+            title={selectedCA.descr}
+            subtitle="CRL & OCSP Configuration"
+            badge={
+              <Badge variant={selectedCRL ? 'success' : 'warning'}>
+                {selectedCRL ? 'Active' : 'Not Generated'}
+              </Badge>
+            }
+            stats={[
+              { icon: Hash, label: 'CRL Number', value: selectedCRL?.crl_number || '-' },
+              { icon: XCircle, label: 'Revoked', value: selectedCRL?.revoked_count || 0 },
+              { icon: Calendar, label: 'Updated', value: selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-' }
+            ]}
+            actions={[
+              { 
+                label: regenerating ? 'Regenerating...' : 'Regenerate CRL', 
+                icon: ArrowsClockwise, 
+                onClick: handleRegenerateCRL,
+                disabled: regenerating
+              },
+              { 
+                label: 'Download CRL', 
+                icon: Download, 
+                onClick: handleDownloadCRL,
+                disabled: !selectedCRL?.crl_pem,
+                variant: 'secondary'
+              }
+            ]}
+          />
 
-          {/* Distribution Points */}
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
-              Distribution Points
-            </h3>
-            <Card className="p-4 bg-bg-tertiary/50">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Globe size={16} className="text-accent-primary shrink-0" />
-                  <code className="text-sm text-text-primary bg-bg-secondary px-3 py-1.5 rounded flex-1 overflow-x-auto">
-                    {window.location.origin}/crl/{selectedCA.refid}.crl
-                  </code>
-                </div>
-                <p className="text-xs text-text-secondary">
-                  This URL can be used as the CDP (CRL Distribution Point) in issued certificates
-                </p>
-              </div>
-            </Card>
-          </div>
+          {/* CRL Configuration Section */}
+          <DetailSection title="CRL Configuration">
+            <DetailGrid columns={2}>
+              <DetailField label="CA Name" value={selectedCA.descr} />
+              <DetailField 
+                label="Status" 
+                value={
+                  <StatusIndicator status={selectedCRL ? 'success' : 'warning'}>
+                    {selectedCRL ? 'Active' : 'Not Generated'}
+                  </StatusIndicator>
+                } 
+              />
+              <DetailField label="CRL Number" value={selectedCRL?.crl_number || '-'} mono />
+              <DetailField label="Revoked Certificates" value={selectedCRL?.revoked_count || 0} />
+              <DetailField 
+                label="Last Updated" 
+                value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} 
+              />
+              <DetailField 
+                label="Next Update" 
+                value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'} 
+              />
+            </DetailGrid>
+          </DetailSection>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t border-border">
-            <Button 
-              onClick={handleRegenerateCRL}
-              disabled={regenerating}
-            >
-              <ArrowsClockwise size={16} className={regenerating ? 'animate-spin' : ''} />
-              {regenerating ? 'Regenerating...' : 'Regenerate CRL'}
-            </Button>
-            <Button 
-              variant="secondary"
-              onClick={handleDownloadCRL}
-              disabled={!selectedCRL?.crl_pem}
-            >
-              <Download size={16} />
-              Download CRL
-            </Button>
-          </div>
-        </div>
+          {/* OCSP Configuration Section */}
+          <DetailSection title="OCSP Configuration">
+            <DetailGrid columns={2}>
+              <DetailField 
+                label="OCSP Status" 
+                value={
+                  <StatusIndicator status={ocspStatus.enabled && ocspStatus.running ? 'success' : 'warning'}>
+                    {ocspStatus.enabled ? (ocspStatus.running ? 'Running' : 'Stopped') : 'Disabled'}
+                  </StatusIndicator>
+                } 
+              />
+              <DetailField label="Total Requests" value={ocspStats.total_requests} />
+              <DetailField label="Cache Hits" value={ocspStats.cache_hits} />
+              <DetailField label="Cache Hit Rate" value={`${cacheHitRate}%`} />
+            </DetailGrid>
+          </DetailSection>
+
+          {/* Distribution Points Section */}
+          <DetailSection title="Distribution Points">
+            <DetailGrid columns={1}>
+              <DetailField 
+                label="CRL Distribution Point (CDP)" 
+                value={`${window.location.origin}/crl/${selectedCA.refid}.crl`}
+                mono
+                copyable
+                fullWidth
+              />
+              <DetailField 
+                label="OCSP Responder URL (AIA)" 
+                value={`${window.location.origin}/ocsp/${selectedCA.refid}`}
+                mono
+                copyable
+                fullWidth
+              />
+            </DetailGrid>
+            <p className="text-xs text-text-secondary mt-3">
+              Include these URLs in your CA settings to enable automatic revocation checking in issued certificates.
+            </p>
+          </DetailSection>
+        </DetailContent>
       )}
     </PageLayout>
   )

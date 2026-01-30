@@ -1,16 +1,17 @@
 /**
  * Import/Export Page
  * Uses PageLayout for consistent UI structure
+ * Uses DetailCard design system for content
  */
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   UploadSimple, Certificate, ShieldCheck, Flask, FloppyDisk, FileArrowUp, 
-  DownloadSimple, Database, CloudArrowUp, ArrowsLeftRight
+  DownloadSimple, Database, CloudArrowUp, ArrowsLeftRight, CheckCircle, File
 } from '@phosphor-icons/react'
 import {
   PageLayout, FocusItem, Button, ExportDropdown, Input, LoadingSpinner, 
-  Select, Card, Badge, HelpCard
+  Select, Card, Badge, HelpCard, DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
 } from '../components'
 import { opnsenseService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
@@ -440,221 +441,286 @@ export default function ImportExportPage() {
       helpContent={helpContent}
       helpTitle="Import & Export - Aide"
     >
-      {/* Main Content Area */}
-      <div className="p-6">
+      <DetailContent>
         {/* Import Certificate */}
         {selectedAction === 'import-cert' && (
-          <div className="max-w-2xl space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Import Certificate</h3>
+          <div className="max-w-3xl space-y-0">
+            <DetailHeader
+              icon={Certificate}
+              title="Import Certificate"
+              subtitle="Import certificates from files or paste PEM content"
+              badge={<Badge variant="blue">PEM / DER / PKCS#12</Badge>}
+              stats={[
+                { icon: File, label: 'Formats', value: '.pem, .crt, .der, .p12' },
+                { icon: ShieldCheck, label: 'Available CAs', value: cas.length }
+              ]}
+              actions={[
+                { 
+                  label: 'Import', 
+                  icon: FileArrowUp, 
+                  onClick: handleImportCertificate, 
+                  disabled: processing || (!selectedFile && !pemContent.trim())
+                }
+              ]}
+            />
             
-            <HelpCard variant="info" title="Supported Formats" items={[
-              'PEM (.pem, .crt, .cer) - Base64 encoded',
-              'DER (.der) - Binary format',
-              'PKCS#12 (.p12, .pfx) - Password protected bundle'
-            ]} />
+            <DetailSection title="Certificate File">
+              <div className="space-y-4">
+                <div>
+                  <input
+                    ref={certFileRef}
+                    type="file"
+                    accept=".pem,.crt,.cer,.der,.p12,.pfx"
+                    onChange={(e) => { setSelectedFile(e.target.files[0]); setPemContent('') }}
+                    className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
+                  />
+                  <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 border-t border-border"></div>
+                  <span className="text-xs text-text-secondary">OR paste PEM content</span>
+                  <div className="flex-1 border-t border-border"></div>
+                </div>
+                
+                <div>
+                  <label className="block text-[10px] md:text-xs text-text-tertiary uppercase tracking-wide mb-1">Paste PEM Content</label>
+                  <textarea
+                    value={pemContent}
+                    onChange={(e) => { setPemContent(e.target.value); setSelectedFile(null); if (certFileRef.current) certFileRef.current.value = '' }}
+                    placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                    rows={5}
+                    className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-md text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
+                  />
+                </div>
+              </div>
+            </DetailSection>
             
-            <div className="p-4 bg-bg-tertiary border border-border rounded-lg space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-text-primary mb-1">Certificate File</label>
-                <input
-                  ref={certFileRef}
-                  type="file"
-                  accept=".pem,.crt,.cer,.der,.p12,.pfx"
-                  onChange={(e) => { setSelectedFile(e.target.files[0]); setPemContent('') }}
-                  className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
-                />
-                <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="flex-1 border-t border-border"></div>
-                <span className="text-xs text-text-secondary">OR paste PEM content</span>
-                <div className="flex-1 border-t border-border"></div>
-              </div>
-              
-              <div>
-                <label className="block text-xs font-medium text-text-primary mb-1">Paste PEM Content</label>
-                <textarea
-                  value={pemContent}
-                  onChange={(e) => { setPemContent(e.target.value); setSelectedFile(null); if (certFileRef.current) certFileRef.current.value = '' }}
-                  placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
-                  rows={6}
-                  className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-md text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
-                />
-              </div>
-              
-              <Input 
-                label="Display Name (optional)" 
-                value={importName}
-                onChange={(e) => setImportName(e.target.value)}
-                placeholder="My Certificate"
-              />
-              
-              <Input 
-                label="Password (for PKCS#12)" 
-                type="password"
-                value={importPassword}
-                onChange={(e) => setImportPassword(e.target.value)}
-                placeholder="Enter password if needed"
-              />
-              
-              <Select
-                label="Link to CA (optional)"
-                value={selectedCaId}
-                onChange={(e) => setSelectedCaId(e.target.value)}
-                options={[
-                  { value: 'auto', label: 'Auto-detect from issuer' },
-                  ...cas.map(ca => ({ value: ca.id.toString(), label: ca.name }))
-                ]}
-              />
-              
-              <div className="flex gap-3 pt-2">
-                <Button size="sm" onClick={handleImportCertificate} disabled={processing || (!selectedFile && !pemContent.trim())}>
-                  {processing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
-                  Import Certificate
-                </Button>
-              </div>
-            </div>
+            <DetailSection title="Options">
+              <DetailGrid columns={2}>
+                <div className="col-span-full md:col-span-1">
+                  <Input 
+                    label="Display Name (optional)" 
+                    value={importName}
+                    onChange={(e) => setImportName(e.target.value)}
+                    placeholder="My Certificate"
+                  />
+                </div>
+                <div className="col-span-full md:col-span-1">
+                  <Input 
+                    label="Password (for PKCS#12)" 
+                    type="password"
+                    value={importPassword}
+                    onChange={(e) => setImportPassword(e.target.value)}
+                    placeholder="Enter password if needed"
+                  />
+                </div>
+                <div className="col-span-full">
+                  <Select
+                    label="Link to CA (optional)"
+                    value={selectedCaId}
+                    onChange={(e) => setSelectedCaId(e.target.value)}
+                    options={[
+                      { value: 'auto', label: 'Auto-detect from issuer' },
+                      ...cas.map(ca => ({ value: ca.id.toString(), label: ca.name }))
+                    ]}
+                  />
+                </div>
+              </DetailGrid>
+            </DetailSection>
           </div>
         )}
 
         {/* Import CA */}
         {selectedAction === 'import-ca' && (
-          <div className="max-w-2xl space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Import Certificate Authority</h3>
-            <p className="text-sm text-text-secondary">Import a CA certificate from a file or paste PEM content. Supports PEM, DER, and PKCS#12 formats.</p>
+          <div className="max-w-3xl space-y-0">
+            <DetailHeader
+              icon={ShieldCheck}
+              title="Import Certificate Authority"
+              subtitle="Import a CA certificate from a file or paste PEM content"
+              badge={<Badge variant="emerald">CA Import</Badge>}
+              stats={[
+                { icon: File, label: 'Formats', value: 'PEM, DER, PKCS#12' }
+              ]}
+              actions={[
+                { 
+                  label: 'Import CA', 
+                  icon: FileArrowUp, 
+                  onClick: handleImportCA, 
+                  disabled: processing || (!selectedFile && !pemContent.trim())
+                }
+              ]}
+            />
             
-            <div className="p-4 bg-bg-tertiary border border-border rounded-lg space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-text-primary mb-1">CA Certificate File</label>
-                <input
-                  ref={caFileRef}
-                  type="file"
-                  accept=".pem,.crt,.cer,.der,.p12,.pfx"
-                  onChange={(e) => { setSelectedFile(e.target.files[0]); setPemContent('') }}
-                  className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
-                />
-                <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
+            <DetailSection title="CA Certificate File">
+              <div className="space-y-4">
+                <div>
+                  <input
+                    ref={caFileRef}
+                    type="file"
+                    accept=".pem,.crt,.cer,.der,.p12,.pfx"
+                    onChange={(e) => { setSelectedFile(e.target.files[0]); setPemContent('') }}
+                    className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary/80"
+                  />
+                  <p className="text-xs text-text-secondary mt-1">Accepted: .pem, .crt, .cer, .der, .p12, .pfx</p>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 border-t border-border"></div>
+                  <span className="text-xs text-text-secondary">OR paste PEM content</span>
+                  <div className="flex-1 border-t border-border"></div>
+                </div>
+                
+                <div>
+                  <label className="block text-[10px] md:text-xs text-text-tertiary uppercase tracking-wide mb-1">Paste PEM Content</label>
+                  <textarea
+                    value={pemContent}
+                    onChange={(e) => { setPemContent(e.target.value); setSelectedFile(null); if (caFileRef.current) caFileRef.current.value = '' }}
+                    placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+                    rows={5}
+                    className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-md text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
+                  />
+                </div>
               </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="flex-1 border-t border-border"></div>
-                <span className="text-xs text-text-secondary">OR paste PEM content</span>
-                <div className="flex-1 border-t border-border"></div>
-              </div>
-              
-              <div>
-                <label className="block text-xs font-medium text-text-primary mb-1">Paste PEM Content</label>
-                <textarea
-                  value={pemContent}
-                  onChange={(e) => { setPemContent(e.target.value); setSelectedFile(null); if (caFileRef.current) caFileRef.current.value = '' }}
-                  placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
-                  rows={6}
-                  className="w-full px-2 py-1.5 bg-bg-secondary border border-border rounded-md text-sm text-text-primary font-mono placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-accent-primary resize-y"
-                />
-              </div>
-              
-              <Input 
-                label="Display Name (optional)" 
-                value={importName}
-                onChange={(e) => setImportName(e.target.value)}
-                placeholder="My Root CA"
-              />
-              
-              <Input 
-                label="Password (for PKCS#12)" 
-                type="password"
-                value={importPassword}
-                onChange={(e) => setImportPassword(e.target.value)}
-                placeholder="Enter password if needed"
-              />
-              
-              <div className="flex gap-3 pt-2">
-                <Button size="sm" onClick={handleImportCA} disabled={processing || (!selectedFile && !pemContent.trim())}>
-                  {processing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
-                  Import CA
-                </Button>
-              </div>
-            </div>
+            </DetailSection>
+            
+            <DetailSection title="Options">
+              <DetailGrid columns={2}>
+                <div className="col-span-full md:col-span-1">
+                  <Input 
+                    label="Display Name (optional)" 
+                    value={importName}
+                    onChange={(e) => setImportName(e.target.value)}
+                    placeholder="My Root CA"
+                  />
+                </div>
+                <div className="col-span-full md:col-span-1">
+                  <Input 
+                    label="Password (for PKCS#12)" 
+                    type="password"
+                    value={importPassword}
+                    onChange={(e) => setImportPassword(e.target.value)}
+                    placeholder="Enter password if needed"
+                  />
+                </div>
+              </DetailGrid>
+            </DetailSection>
           </div>
         )}
 
         {/* Export Certificates */}
         {selectedAction === 'export-certs' && (
-          <div className="max-w-2xl space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Export All Certificates</h3>
-            <p className="text-sm text-text-secondary">Download all certificates in a single archive. Choose your preferred format below.</p>
-            <div className="p-4 bg-bg-tertiary border border-border rounded-lg">
-              <h4 className="text-xs font-semibold text-text-primary uppercase mb-2">Available Formats</h4>
-              <ul className="text-sm text-text-secondary space-y-1">
-                <li><strong>PEM:</strong> Base64 encoded, widely compatible</li>
-                <li><strong>DER:</strong> Binary format, compact</li>
-                <li><strong>PKCS#12:</strong> Includes private keys (password protected)</li>
-              </ul>
-            </div>
-            <div className="pt-2">
+          <div className="max-w-3xl space-y-0">
+            <DetailHeader
+              icon={DownloadSimple}
+              title="Export All Certificates"
+              subtitle="Download all certificates in a single archive"
+              badge={<Badge variant="purple">Bulk Export</Badge>}
+            />
+            
+            <DetailSection title="Available Formats">
+              <DetailGrid columns={3}>
+                <DetailField label="PEM" value="Base64 encoded, widely compatible" />
+                <DetailField label="DER" value="Binary format, compact" />
+                <DetailField label="PKCS#12" value="Includes private keys (password protected)" />
+              </DetailGrid>
+            </DetailSection>
+            
+            <DetailSection title="Export" noBorder>
               <ExportDropdown onExport={handleExportAllCerts} formats={['pem', 'der', 'pkcs12']} />
-            </div>
+            </DetailSection>
           </div>
         )}
 
         {/* Export CAs */}
         {selectedAction === 'export-cas' && (
-          <div className="max-w-2xl space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Export All Certificate Authorities</h3>
-            <p className="text-sm text-text-secondary">Download all CAs including their hierarchy. Select format below.</p>
-            <div className="pt-2">
+          <div className="max-w-3xl space-y-0">
+            <DetailHeader
+              icon={DownloadSimple}
+              title="Export All Certificate Authorities"
+              subtitle="Download all CAs including their hierarchy"
+              badge={<Badge variant="emerald">CA Export</Badge>}
+              stats={[
+                { icon: ShieldCheck, label: 'Total CAs', value: cas.length }
+              ]}
+            />
+            
+            <DetailSection title="Available Formats">
+              <DetailGrid columns={2}>
+                <DetailField label="PEM" value="Base64 encoded, widely compatible" />
+                <DetailField label="DER" value="Binary format, compact" />
+              </DetailGrid>
+            </DetailSection>
+            
+            <DetailSection title="Export" noBorder>
               <ExportDropdown onExport={handleExportAllCAs} formats={['pem', 'der']} />
-            </div>
+            </DetailSection>
           </div>
         )}
 
         {/* Import from OpnSense */}
         {selectedAction === 'import-opnsense' && (
-          <div className="max-w-2xl space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">Import from OpnSense</h3>
-            <p className="text-sm text-text-secondary">Connect to OpnSense API to import certificates and CAs.</p>
+          <div className="max-w-3xl space-y-0">
+            <DetailHeader
+              icon={CloudArrowUp}
+              title="Import from OpnSense"
+              subtitle="Connect to OpnSense API to import certificates and CAs"
+              badge={testResult ? <Badge variant="emerald">Connected</Badge> : <Badge variant="secondary">Not Connected</Badge>}
+              stats={testResult ? [
+                { icon: ShieldCheck, label: 'CAs Found', value: testResult.cas },
+                { icon: Certificate, label: 'Certificates', value: testResult.certificates }
+              ] : undefined}
+              actions={[
+                { label: 'Save Config', icon: FloppyDisk, onClick: handleSaveConfig, variant: 'secondary', disabled: processing },
+                { label: 'Test', icon: Flask, onClick: handleTestConf, variant: 'secondary', disabled: processing },
+                { label: 'Import', icon: UploadSimple, onClick: handleImport, disabled: processing || !testResult }
+              ]}
+            />
             
-            <div className="p-4 bg-bg-tertiary border border-border rounded-lg space-y-4">
-              <Input label="OpnSense Host" value={opnsenseHost} 
-                onChange={(e) => setOpnsenseHost(e.target.value)} 
-                placeholder="192.168.1.1" />
-              
-              <Input label="Port" value={opnsensePort} 
-                onChange={(e) => setOpnsensePort(e.target.value)} 
-                placeholder="443" />
-              
-              <Input label="API Key" value={opnsenseApiKey} 
-                onChange={(e) => setOpnsenseApiKey(e.target.value)} 
-                placeholder="Enter API Key" />
-              
-              <Input label="API Secret" type="password" value={opnsenseApiSecret} 
-                onChange={(e) => setOpnsenseApiSecret(e.target.value)} 
-                placeholder="Enter API Secret" />
-              
-              <div className="flex gap-3 pt-2">
-                <Button size="sm" variant="secondary" onClick={handleSaveConfig} disabled={processing}>
-                  <FloppyDisk size={16} />Save Conf
-                </Button>
-                <Button size="sm" variant="secondary" onClick={handleTestConf} disabled={processing}>
-                  {processing ? <LoadingSpinner size="sm" /> : <Flask size={16} />}Test Conf
-                </Button>
-                <Button size="sm" onClick={handleImport} disabled={processing || !testResult}>
-                  {processing ? <LoadingSpinner size="sm" /> : <UploadSimple size={16} />}Import
-                </Button>
-              </div>
-            </div>
+            <DetailSection title="Connection Settings">
+              <DetailGrid columns={2}>
+                <div className="col-span-full md:col-span-1">
+                  <Input label="OpnSense Host" value={opnsenseHost} 
+                    onChange={(e) => setOpnsenseHost(e.target.value)} 
+                    placeholder="192.168.1.1" />
+                </div>
+                <div className="col-span-full md:col-span-1">
+                  <Input label="Port" value={opnsensePort} 
+                    onChange={(e) => setOpnsensePort(e.target.value)} 
+                    placeholder="443" />
+                </div>
+              </DetailGrid>
+            </DetailSection>
+            
+            <DetailSection title="API Credentials">
+              <DetailGrid columns={2}>
+                <div className="col-span-full md:col-span-1">
+                  <Input label="API Key" value={opnsenseApiKey} 
+                    onChange={(e) => setOpnsenseApiKey(e.target.value)} 
+                    placeholder="Enter API Key" />
+                </div>
+                <div className="col-span-full md:col-span-1">
+                  <Input label="API Secret" type="password" value={opnsenseApiSecret} 
+                    onChange={(e) => setOpnsenseApiSecret(e.target.value)} 
+                    placeholder="Enter API Secret" />
+                </div>
+              </DetailGrid>
+            </DetailSection>
 
             {testResult && (
-              <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-                <h4 className="text-sm font-semibold text-green-400 mb-2">✓ Connection Successful</h4>
-                <p className="text-sm text-text-secondary"><strong>CAs:</strong> {testResult.cas}</p>
-                <p className="text-sm text-text-secondary"><strong>Certificates:</strong> {testResult.certificates}</p>
-              </div>
+              <DetailSection title="Connection Status">
+                <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <CheckCircle size={24} className="text-green-500" weight="fill" />
+                  <div>
+                    <h4 className="text-sm font-semibold text-green-400">Connection Successful</h4>
+                    <p className="text-xs text-text-secondary">Found {testResult.cas} CAs and {testResult.certificates} certificates ready to import</p>
+                  </div>
+                </div>
+              </DetailSection>
             )}
           </div>
         )}
-      </div>
+      </DetailContent>
     </PageLayout>
   )
 }

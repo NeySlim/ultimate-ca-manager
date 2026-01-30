@@ -39,7 +39,12 @@ import {
   LoadingSpinner,
   EmptyState,
   Pagination,
-  HelpCard
+  HelpCard,
+  DetailHeader,
+  DetailSection,
+  DetailGrid,
+  DetailField,
+  DetailContent
 } from '../components';
 import { useNotification } from '../contexts';
 import auditService from '../services/audit.service';
@@ -593,61 +598,85 @@ export default function AuditLogsPage() {
         size="md"
       >
         {selectedLog && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-xs text-text-secondary mb-1">Timestamp</div>
-                <div className="text-sm font-medium">
-                  {new Date(selectedLog.timestamp).toLocaleString()}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-text-secondary mb-1">User</div>
-                <div className="text-sm font-medium">{selectedLog.username || 'system'}</div>
-              </div>
-              <div>
-                <div className="text-xs text-text-secondary mb-1">Action</div>
-                <Badge variant={selectedLog.success ? 'emerald' : 'red'}>
-                  {selectedLog.action?.replace(/_/g, ' ')}
+          <DetailContent className="p-0">
+            {/* Header with action type, icon, and status badge */}
+            <DetailHeader
+              icon={actionIcons[selectedLog.action] || actionIcons.default}
+              title={selectedLog.action?.replace(/_/g, ' ') || 'Event'}
+              subtitle={`${selectedLog.resource_type || 'System'}${selectedLog.resource_id ? ` #${selectedLog.resource_id}` : ''}`}
+              badge={
+                <Badge variant={selectedLog.success ? 'emerald' : 'red'} size="sm">
+                  {selectedLog.success ? (
+                    <><CheckCircle size={12} weight="fill" /> Success</>
+                  ) : (
+                    <><XCircle size={12} weight="fill" /> Failed</>
+                  )}
                 </Badge>
-              </div>
-              <div>
-                <div className="text-xs text-text-secondary mb-1">Resource</div>
-                <div className="text-sm">
-                  {selectedLog.resource_type}
-                  {selectedLog.resource_id && ` #${selectedLog.resource_id}`}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-text-secondary mb-1">IP Address</div>
-                <div className="text-sm font-mono">{selectedLog.ip_address || '-'}</div>
-              </div>
-              <div>
-                <div className="text-xs text-text-secondary mb-1">Status</div>
-                <Badge variant={selectedLog.success ? 'emerald' : 'red'}>
-                  {selectedLog.success ? 'Success' : 'Failed'}
-                </Badge>
-              </div>
-            </div>
-            
+              }
+              stats={[
+                { icon: User, label: 'User:', value: selectedLog.username || 'system' },
+                { icon: ClockCounterClockwise, label: 'Time:', value: formatTime(selectedLog.timestamp) }
+              ]}
+            />
+
+            {/* Event Details Section */}
+            <DetailSection title="Event Details">
+              <DetailGrid columns={2}>
+                <DetailField 
+                  label="Timestamp" 
+                  value={new Date(selectedLog.timestamp).toLocaleString()} 
+                />
+                <DetailField 
+                  label="User" 
+                  value={selectedLog.username || 'system'} 
+                />
+                <DetailField 
+                  label="Action" 
+                  value={selectedLog.action?.replace(/_/g, ' ')} 
+                />
+                <DetailField 
+                  label="Resource" 
+                  value={`${selectedLog.resource_type || '-'}${selectedLog.resource_id ? ` #${selectedLog.resource_id}` : ''}`} 
+                />
+                <DetailField 
+                  label="IP Address" 
+                  value={selectedLog.ip_address} 
+                  mono 
+                  copyable 
+                />
+                <DetailField 
+                  label="Status" 
+                  value={selectedLog.success ? 'Success' : 'Failed'} 
+                />
+              </DetailGrid>
+            </DetailSection>
+
+            {/* Details Section - if present */}
             {selectedLog.details && (
-              <div>
-                <div className="text-xs text-text-secondary mb-1">Details</div>
-                <div className="text-sm bg-bg-secondary p-2 rounded font-mono text-xs whitespace-pre-wrap">
-                  {selectedLog.details}
-                </div>
-              </div>
+              <DetailSection title="Details">
+                <DetailField 
+                  label="Event Details" 
+                  value={selectedLog.details} 
+                  mono 
+                  fullWidth 
+                  copyable
+                />
+              </DetailSection>
             )}
-            
+
+            {/* User Agent Section - if present */}
             {selectedLog.user_agent && (
-              <div>
-                <div className="text-xs text-text-secondary mb-1">User Agent</div>
-                <div className="text-xs text-text-secondary font-mono break-all">
-                  {selectedLog.user_agent}
-                </div>
-              </div>
+              <DetailSection title="Client Information">
+                <DetailField 
+                  label="User Agent" 
+                  value={selectedLog.user_agent} 
+                  mono 
+                  fullWidth 
+                  copyable
+                />
+              </DetailSection>
             )}
-          </div>
+          </DetailContent>
         )}
       </Modal>
 
