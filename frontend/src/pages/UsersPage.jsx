@@ -342,7 +342,7 @@ export default function UsersPage() {
                 <div>
                   <p className="text-xs text-text-secondary uppercase mb-1">Created</p>
                   <p className="text-sm text-text-primary">
-                    {new Date(selectedUser.created_at).toLocaleDateString()}
+                    {selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleDateString() : '-'}
                   </p>
                 </div>
                 <div>

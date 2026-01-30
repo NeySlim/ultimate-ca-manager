@@ -18,15 +18,27 @@ bp = Blueprint('account_v2', __name__)
 @bp.route('/api/v2/account/profile', methods=['GET'])
 @require_auth()
 def get_profile():
-    """Get current user profile"""
-    user = g.current_user
+    """Get current user profile with full details"""
+    from models import User
+    
+    # Get fresh user data from DB
+    user = User.query.get(g.current_user.id)
+    if not user:
+        return error_response('User not found', 404)
     
     return success_response(
         data={
             'id': user.id,
             'username': user.username,
             'email': getattr(user, 'email', None),
-            'created_at': user.created_at.isoformat() if hasattr(user, 'created_at') else None
+            'full_name': getattr(user, 'full_name', None),
+            'role': user.role,
+            'active': getattr(user, 'active', True),
+            'created_at': user.created_at.isoformat() if hasattr(user, 'created_at') and user.created_at else None,
+            'last_login': user.last_login.isoformat() if hasattr(user, 'last_login') and user.last_login else None,
+            'login_count': getattr(user, 'login_count', 0),
+            'two_factor_enabled': getattr(user, 'two_factor_enabled', False),
+            'password_changed_at': user.password_changed_at.isoformat() if hasattr(user, 'password_changed_at') and user.password_changed_at else None,
         }
     )
 

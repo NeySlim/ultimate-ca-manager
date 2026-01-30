@@ -303,7 +303,7 @@ export default function CAsPage() {
   const certColumns = [
     { key: 'common_name', label: 'Common Name' },
     { key: 'serial_number', label: 'Serial' },
-    { key: 'valid_to', label: 'Expires', render: (val) => new Date(val).toLocaleDateString() },
+    { key: 'valid_to', label: 'Expires', render: (val) => val ? new Date(val).toLocaleDateString() : '-' },
     { 
       key: 'status', 
       label: 'Status',

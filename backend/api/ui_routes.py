@@ -3,9 +3,13 @@ UI Routes - Serve React SPA
 Single Page Application - all routes serve index.html
 """
 from flask import Blueprint, send_from_directory, current_app
+from pathlib import Path
 import os
 
 ui_bp = Blueprint('ui', __name__)
+
+# Frontend directory - relative to backend parent (BASE_DIR/frontend)
+FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
 
 
 @ui_bp.route('/', defaults={'path': ''})
@@ -16,8 +20,7 @@ def spa(path):
     - If path is a file (has extension), try to serve it from frontend/
     - Otherwise serve index.html (React Router handles routing)
     """
-    # Use the static_folder configured in app.py
-    frontend_dir = current_app.static_folder
+    frontend_dir = str(FRONTEND_DIR)
     
     # SPECIAL: Serve demo file if requested
     if path == 'topbar-demo.html':

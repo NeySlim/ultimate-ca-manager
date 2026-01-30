@@ -188,7 +188,7 @@ export default function CSRsPage() {
     { 
       key: 'created_at', 
       label: 'Created',
-      render: (val) => new Date(val).toLocaleDateString()
+      render: (val) => val ? new Date(val).toLocaleDateString() : '-'
     },
     {
       key: 'status',
@@ -371,7 +371,7 @@ export default function CSRsPage() {
                 <div>
                   <p className="text-xs text-text-secondary uppercase mb-1">Created</p>
                   <p className="text-sm text-text-primary">
-                    {new Date(selectedCSR.created_at).toLocaleString()}
+                    {selectedCSR.created_at ? new Date(selectedCSR.created_at).toLocaleString() : '-'}
                   </p>
                 </div>
               </div>

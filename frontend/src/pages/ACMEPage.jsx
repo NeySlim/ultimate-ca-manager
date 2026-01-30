@@ -195,7 +195,7 @@ export default function ACMEPage() {
     {
       key: 'created_at',
       label: 'Created',
-      render: (val) => new Date(val).toLocaleDateString()
+      render: (val) => val ? new Date(val).toLocaleDateString() : '-'
     },
   ]
 
@@ -206,7 +206,7 @@ export default function ACMEPage() {
       label: 'Status',
       render: (val) => <Badge variant={val === 'valid' ? 'success' : 'warning'}>{val}</Badge>
     },
-    { key: 'created_at', label: 'Created', render: (val) => new Date(val).toLocaleString() },
+    { key: 'created_at', label: 'Created', render: (val) => val ? new Date(val).toLocaleString() : '-' },
   ]
 
   const challengeColumns = [
@@ -254,7 +254,7 @@ export default function ACMEPage() {
             <div>
               <p className="text-xs text-text-secondary uppercase mb-1">Created</p>
               <p className="text-sm text-text-primary">
-                {new Date(selectedAccount.created_at).toLocaleString()}
+                {selectedAccount.created_at ? new Date(selectedAccount.created_at).toLocaleString() : '-'}
               </p>
             </div>
             <div className="col-span-2">
