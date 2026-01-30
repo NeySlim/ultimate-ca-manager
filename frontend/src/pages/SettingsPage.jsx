@@ -1,8 +1,11 @@
 /**
  * Settings Page - Uses PageLayout with FocusPanel for category navigation
  * Migrated to use DetailCard design system
+ * 
+ * Pro features (SSO) are dynamically added when Pro module is present
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { 
   Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
   Envelope, Download, Trash, HardDrives, Lock, Key 
@@ -17,8 +20,8 @@ import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
 
-// Settings categories with icons
-const SETTINGS_CATEGORIES = [
+// Base settings categories (Community)
+const BASE_SETTINGS_CATEGORIES = [
   { id: 'general', label: 'General', icon: Gear, description: 'System name, URL, timezone' },
   { id: 'email', label: 'Email', icon: EnvelopeSimple, description: 'SMTP configuration' },
   { id: 'security', label: 'Security', icon: ShieldCheck, description: 'Password, 2FA, sessions' },
@@ -31,6 +34,7 @@ const SETTINGS_CATEGORIES = [
 export default function SettingsPage() {
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
   const { canWrite, hasPermission } = usePermission()
+  const [searchParams, setSearchParams] = useSearchParams()
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -42,8 +46,24 @@ export default function SettingsPage() {
   const [selectedHttpsCert, setSelectedHttpsCert] = useState('')
   const [cas, setCas] = useState([])
   
-  // Selected category
-  const [selectedCategory, setSelectedCategory] = useState('general')
+  // Pro settings categories (dynamically loaded)
+  const [proCategories, setProCategories] = useState([])
+  
+  // Selected category - read from URL param or default to 'general'
+  const [selectedCategory, setSelectedCategory] = useState(
+    searchParams.get('tab') || 'general'
+  )
+  
+  // Update URL when category changes
+  const handleCategoryChange = (categoryId) => {
+    setSelectedCategory(categoryId)
+    if (categoryId === 'general') {
+      searchParams.delete('tab')
+    } else {
+      searchParams.set('tab', categoryId)
+    }
+    setSearchParams(searchParams, { replace: true })
+  }
   
   // Backup modal states
   const [showBackupModal, setShowBackupModal] = useState(false)
@@ -52,6 +72,20 @@ export default function SettingsPage() {
   const [restorePassword, setRestorePassword] = useState('')
   const [restoreFile, setRestoreFile] = useState(null)
   const [backupLoading, setBackupLoading] = useState(false)
+
+  // Dynamically load Pro settings categories
+  useEffect(() => {
+    import('../pro/settings')
+      .then(module => setProCategories(module.proSettingsCategories || []))
+      .catch(() => {}) // Pro module not available - Community edition
+  }, [])
+
+  // Merge base + Pro categories
+  const SETTINGS_CATEGORIES = useMemo(() => [
+    ...BASE_SETTINGS_CATEGORIES.slice(0, 4), // general, email, security, backup
+    ...proCategories,                         // SSO (Pro) - empty in Community
+    ...BASE_SETTINGS_CATEGORIES.slice(4),     // audit, database, https
+  ], [proCategories])
 
   useEffect(() => {
     loadSettings()
@@ -887,6 +921,12 @@ export default function SettingsPage() {
         )
 
       default:
+        // Check if it's a Pro category with a custom component
+        const proCategory = SETTINGS_CATEGORIES.find(c => c.id === selectedCategory && c.component)
+        if (proCategory?.component) {
+          const ProComponent = proCategory.component
+          return <ProComponent />
+        }
         return null
     }
   }
@@ -936,7 +976,8 @@ export default function SettingsPage() {
           title={category.label}
           subtitle={category.description}
           selected={selectedCategory === category.id}
-          onClick={() => setSelectedCategory(category.id)}
+          onClick={() => handleCategoryChange(category.id)}
+          badge={category.pro ? <Badge variant="info" size="sm">Pro</Badge> : null}
         />
       ))}
     </div>
