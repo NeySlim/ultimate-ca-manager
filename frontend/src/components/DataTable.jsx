@@ -930,10 +930,11 @@ function RowActionsMenu({ actions }) {
 
 // Mobile components
 function MobileToolbar({ searchable, searchQuery, onSearchChange, searchPlaceholder, columnToggle, columns, visibleColumns, onToggleColumn }) {
-  const [showColumns, setShowColumns] = useState(false)
+  // Don't show column toggle on mobile by default - cards show all data
+  // Column toggle is mainly useful for table views on desktop
   
   return (
-    <div className="p-3 border-b border-border bg-bg-secondary/50 space-y-2">
+    <div className="p-3 border-b border-border bg-bg-secondary/50">
       {searchable && (
         <div className="relative">
           <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
@@ -945,25 +946,6 @@ function MobileToolbar({ searchable, searchQuery, onSearchChange, searchPlacehol
             className="w-full pl-9 pr-3 py-2 text-sm bg-bg-tertiary border border-border rounded-lg 
               focus:outline-none focus:border-accent-primary text-text-primary placeholder:text-text-tertiary"
           />
-        </div>
-      )}
-      
-      {columnToggle && (
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {columns.map(col => (
-            <button
-              key={col.key}
-              onClick={() => onToggleColumn(col.key)}
-              className={cn(
-                "px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
-                visibleColumns.includes(col.key)
-                  ? "bg-accent-primary text-white"
-                  : "bg-bg-tertiary text-text-secondary"
-              )}
-            >
-              {col.header || col.key}
-            </button>
-          ))}
         </div>
       )}
     </div>
