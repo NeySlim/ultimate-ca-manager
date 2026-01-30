@@ -1,5 +1,6 @@
 /**
  * Settings Page - Uses PageLayout with FocusPanel for category navigation
+ * Migrated to use DetailCard design system
  */
 import { useState, useEffect } from 'react'
 import { 
@@ -8,7 +9,8 @@ import {
 } from '@phosphor-icons/react'
 import {
   PageLayout, FocusItem, Button, Input, Select, Badge, Card,
-  LoadingSpinner, FileUpload, Modal, HelpCard
+  LoadingSpinner, FileUpload, Modal, HelpCard,
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
@@ -332,9 +334,16 @@ export default function SettingsPage() {
     switch (selectedCategory) {
       case 'general':
         return (
-          <div className="space-y-6 max-w-2xl">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">General Settings</h3>
+          <DetailContent>
+            <DetailHeader
+              icon={Gear}
+              title="General Settings"
+              subtitle="System name, URL, timezone configuration"
+              actions={canWrite('settings') ? [
+                { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('general'), disabled: saving }
+              ] : []}
+            />
+            <DetailSection title="System Configuration">
               <div className="space-y-4">
                 <Input
                   label="System Name"
@@ -349,6 +358,10 @@ export default function SettingsPage() {
                   placeholder="https://ucm.example.com"
                   helperText="Public URL of this UCM instance"
                 />
+              </div>
+            </DetailSection>
+            <DetailSection title="Session & Timezone">
+              <div className="space-y-4">
                 <Input
                   label="Session Timeout (minutes)"
                   type="number"
@@ -369,36 +382,44 @@ export default function SettingsPage() {
                   onChange={(val) => updateSetting('timezone', val)}
                 />
               </div>
-            </div>
-            <div className="flex gap-3 pt-4 border-t border-border">
-              {canWrite('settings') && (
-                <Button size="sm" onClick={() => handleSave('general')} disabled={saving}>
-                  <FloppyDisk size={16} />
-                  Save Changes
-                </Button>
-              )}
-            </div>
-          </div>
+            </DetailSection>
+          </DetailContent>
         )
 
       case 'email':
         return (
-          <div className="space-y-6 max-w-2xl">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Email Settings</h3>
+          <DetailContent>
+            <DetailHeader
+              icon={EnvelopeSimple}
+              title="Email Settings"
+              subtitle="SMTP server configuration for notifications"
+              actions={canWrite('settings') ? [
+                { label: 'Test Email', icon: Envelope, onClick: handleTestEmail, variant: 'secondary' },
+                { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('email'), disabled: saving }
+              ] : []}
+            />
+            <DetailSection title="SMTP Server">
+              <DetailGrid columns={2}>
+                <div className="col-span-full md:col-span-1">
+                  <Input
+                    label="SMTP Host"
+                    value={settings.smtp_host || ''}
+                    onChange={(e) => updateSetting('smtp_host', e.target.value)}
+                    placeholder="smtp.example.com"
+                  />
+                </div>
+                <div className="col-span-full md:col-span-1">
+                  <Input
+                    label="SMTP Port"
+                    type="number"
+                    value={settings.smtp_port || 587}
+                    onChange={(e) => updateSetting('smtp_port', parseInt(e.target.value))}
+                  />
+                </div>
+              </DetailGrid>
+            </DetailSection>
+            <DetailSection title="Authentication">
               <div className="space-y-4">
-                <Input
-                  label="SMTP Host"
-                  value={settings.smtp_host || ''}
-                  onChange={(e) => updateSetting('smtp_host', e.target.value)}
-                  placeholder="smtp.example.com"
-                />
-                <Input
-                  label="SMTP Port"
-                  type="number"
-                  value={settings.smtp_port || 587}
-                  onChange={(e) => updateSetting('smtp_port', parseInt(e.target.value))}
-                />
                 <Input
                   label="SMTP Username"
                   value={settings.smtp_username || ''}
@@ -411,6 +432,10 @@ export default function SettingsPage() {
                   onChange={(e) => updateSetting('smtp_password', e.target.value)}
                   placeholder="••••••••"
                 />
+              </div>
+            </DetailSection>
+            <DetailSection title="Email Options">
+              <div className="space-y-4">
                 <Input
                   label="From Email"
                   type="email"
@@ -428,119 +453,115 @@ export default function SettingsPage() {
                   <span className="text-sm text-text-primary">Use TLS/STARTTLS</span>
                 </label>
               </div>
-            </div>
-            <div className="flex gap-3 pt-4 border-t border-border">
-              {canWrite('settings') && (
-                <>
-                  <Button size="sm" onClick={() => handleSave('email')} disabled={saving}>
-                    <FloppyDisk size={16} />
-                    Save Changes
-                  </Button>
-                  <Button size="sm" variant="secondary" onClick={handleTestEmail}>
-                    <Envelope size={16} />
-                    Send Test Email
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
+            </DetailSection>
+          </DetailContent>
         )
 
       case 'security':
         return (
-          <div className="space-y-6 max-w-2xl">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Security Settings</h3>
-              <div className="space-y-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.enforce_2fa || false}
-                    onChange={(e) => updateSetting('enforce_2fa', e.target.checked)}
-                    className="rounded border-border bg-bg-tertiary"
-                  />
-                  <div>
-                    <p className="text-sm text-text-primary font-medium">Enforce Two-Factor Authentication</p>
-                    <p className="text-xs text-text-secondary">Require all users to enable 2FA</p>
-                  </div>
-                </label>
-
+          <DetailContent>
+            <DetailHeader
+              icon={ShieldCheck}
+              title="Security Settings"
+              subtitle="Password, 2FA, sessions configuration"
+              actions={hasPermission('admin:system') ? [
+                { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('security'), disabled: saving }
+              ] : []}
+            />
+            <DetailSection title="Two-Factor Authentication">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.enforce_2fa || false}
+                  onChange={(e) => updateSetting('enforce_2fa', e.target.checked)}
+                  className="rounded border-border bg-bg-tertiary"
+                />
                 <div>
-                  <p className="text-sm font-medium text-text-primary mb-2">Password Policy</p>
-                  <div className="space-y-2">
-                    <Input
-                      label="Minimum Password Length"
-                      type="number"
-                      value={settings.min_password_length || 8}
-                      onChange={(e) => updateSetting('min_password_length', parseInt(e.target.value))}
-                      min="6"
-                      max="32"
-                    />
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.password_require_uppercase || false}
-                        onChange={(e) => updateSetting('password_require_uppercase', e.target.checked)}
-                        className="rounded border-border bg-bg-tertiary"
-                      />
-                      <span className="text-sm text-text-primary">Require uppercase letters</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.password_require_numbers || false}
-                        onChange={(e) => updateSetting('password_require_numbers', e.target.checked)}
-                        className="rounded border-border bg-bg-tertiary"
-                      />
-                      <span className="text-sm text-text-primary">Require numbers</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings.password_require_special || false}
-                        onChange={(e) => updateSetting('password_require_special', e.target.checked)}
-                        className="rounded border-border bg-bg-tertiary"
-                      />
-                      <span className="text-sm text-text-primary">Require special characters</span>
-                    </label>
-                  </div>
+                  <p className="text-sm text-text-primary font-medium">Enforce Two-Factor Authentication</p>
+                  <p className="text-xs text-text-secondary">Require all users to enable 2FA</p>
                 </div>
-
+              </label>
+            </DetailSection>
+            <DetailSection title="Password Policy">
+              <div className="space-y-4">
                 <Input
-                  label="Session Duration (hours)"
+                  label="Minimum Password Length"
                   type="number"
-                  value={settings.session_duration || 24}
-                  onChange={(e) => updateSetting('session_duration', parseInt(e.target.value))}
-                  min="1"
-                  max="720"
+                  value={settings.min_password_length || 8}
+                  onChange={(e) => updateSetting('min_password_length', parseInt(e.target.value))}
+                  min="6"
+                  max="32"
                 />
-
-                <Input
-                  label="API Rate Limit (requests/minute)"
-                  type="number"
-                  value={settings.api_rate_limit || 60}
-                  onChange={(e) => updateSetting('api_rate_limit', parseInt(e.target.value))}
-                  min="10"
-                  max="1000"
-                />
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.password_require_uppercase || false}
+                      onChange={(e) => updateSetting('password_require_uppercase', e.target.checked)}
+                      className="rounded border-border bg-bg-tertiary"
+                    />
+                    <span className="text-sm text-text-primary">Require uppercase letters</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.password_require_numbers || false}
+                      onChange={(e) => updateSetting('password_require_numbers', e.target.checked)}
+                      className="rounded border-border bg-bg-tertiary"
+                    />
+                    <span className="text-sm text-text-primary">Require numbers</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.password_require_special || false}
+                      onChange={(e) => updateSetting('password_require_special', e.target.checked)}
+                      className="rounded border-border bg-bg-tertiary"
+                    />
+                    <span className="text-sm text-text-primary">Require special characters</span>
+                  </label>
+                </div>
               </div>
-            </div>
-            <div className="flex gap-3 pt-4 border-t border-border">
-              {hasPermission('admin:system') && (
-                <Button size="sm" onClick={() => handleSave('security')} disabled={saving}>
-                  <FloppyDisk size={16} />
-                  Save Changes
-                </Button>
-              )}
-            </div>
-          </div>
+            </DetailSection>
+            <DetailSection title="Session & Rate Limits">
+              <DetailGrid columns={2}>
+                <div className="col-span-full md:col-span-1">
+                  <Input
+                    label="Session Duration (hours)"
+                    type="number"
+                    value={settings.session_duration || 24}
+                    onChange={(e) => updateSetting('session_duration', parseInt(e.target.value))}
+                    min="1"
+                    max="720"
+                  />
+                </div>
+                <div className="col-span-full md:col-span-1">
+                  <Input
+                    label="API Rate Limit (requests/minute)"
+                    type="number"
+                    value={settings.api_rate_limit || 60}
+                    onChange={(e) => updateSetting('api_rate_limit', parseInt(e.target.value))}
+                    min="10"
+                    max="1000"
+                  />
+                </div>
+              </DetailGrid>
+            </DetailSection>
+          </DetailContent>
         )
 
       case 'backup':
         return (
-          <div className="space-y-6 max-w-2xl">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Automatic Backups</h3>
+          <DetailContent>
+            <DetailHeader
+              icon={Database}
+              title="Backup & Restore"
+              subtitle="Data backup and recovery options"
+              actions={hasPermission('admin:system') ? [
+                { label: 'Create Backup', icon: Database, onClick: () => setShowBackupModal(true) }
+              ] : []}
+            />
+            <DetailSection title="Automatic Backups">
               <div className="space-y-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -587,37 +608,24 @@ export default function SettingsPage() {
                 )}
 
                 {hasPermission('admin:system') && (
-                  <Button size="sm" onClick={() => handleSave('backup')} disabled={saving} className="mt-4">
+                  <Button size="sm" onClick={() => handleSave('backup')} disabled={saving}>
                     <FloppyDisk size={16} />
                     Save Settings
                   </Button>
                 )}
               </div>
-            </div>
+            </DetailSection>
 
-            <div className="border-t border-border pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-text-primary">Manual Backup</h3>
-                  <p className="text-xs text-text-secondary">Create an encrypted backup file containing all data</p>
-                </div>
-                {hasPermission('admin:system') && (
-                  <Button size="sm" onClick={() => setShowBackupModal(true)}>
-                    <Database size={16} />
-                    Create Backup
-                  </Button>
-                )}
-              </div>
-
+            <DetailSection title="Available Backups">
               {backups.length === 0 ? (
-                <div className="p-8 bg-bg-tertiary border border-border rounded-lg text-center">
+                <div className="p-6 text-center">
                   <p className="text-sm text-text-secondary">No backups found</p>
                   <p className="text-xs text-text-tertiary mt-1">Create a backup to protect your data</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {backups.map((backup) => (
-                    <div key={backup.filename} className="flex items-center justify-between p-3 bg-bg-tertiary border border-border rounded-sm">
+                    <div key={backup.filename} className="flex items-center justify-between p-3 bg-bg-tertiary/50 border border-white/5 rounded-lg">
                       <div>
                         <p className="text-sm font-medium text-text-primary">{backup.filename}</p>
                         <div className="flex gap-4 mt-1">
@@ -637,25 +645,33 @@ export default function SettingsPage() {
                   ))}
                 </div>
               )}
-            </div>
+            </DetailSection>
 
-            <div className="border-t border-border pt-6">
-              <h3 className="text-sm font-semibold text-text-primary mb-2">Restore from Backup</h3>
-              <p className="text-xs text-text-secondary mb-4">Upload a .ucmbkp file to restore all data</p>
-              <FileUpload
-                accept=".ucmbkp,.tar.gz"
-                onFileSelect={(file) => { setRestoreFile(file); setShowRestoreModal(true) }}
-                helperText="Select backup file (encrypted .ucmbkp)"
-              />
-            </div>
-          </div>
+            <DetailSection title="Restore from Backup">
+              <div>
+                <p className="text-xs text-text-secondary mb-4">Upload a .ucmbkp file to restore all data</p>
+                <FileUpload
+                  accept=".ucmbkp,.tar.gz"
+                  onFileSelect={(file) => { setRestoreFile(file); setShowRestoreModal(true) }}
+                  helperText="Select backup file (encrypted .ucmbkp)"
+                />
+              </div>
+            </DetailSection>
+          </DetailContent>
         )
 
       case 'audit':
         return (
-          <div className="space-y-6 max-w-2xl">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Audit Log Settings</h3>
+          <DetailContent>
+            <DetailHeader
+              icon={ListBullets}
+              title="Audit Log Settings"
+              subtitle="Logging configuration and retention"
+              actions={hasPermission('admin:system') ? [
+                { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('audit'), disabled: saving }
+              ] : []}
+            />
+            <DetailSection title="Audit Logging">
               <div className="space-y-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -679,202 +695,195 @@ export default function SettingsPage() {
                   max="730"
                   disabled={!settings.audit_enabled}
                 />
-
-                <div>
-                  <p className="text-sm font-medium text-text-primary mb-2">Events to Log</p>
-                  <div className="space-y-2">
-                    {[
-                      'User Login/Logout',
-                      'Certificate Issue/Revoke',
-                      'CA Create/Delete',
-                      'Settings Changes',
-                      'User Management',
-                    ].map(event => (
-                      <label key={event} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={true}
-                          disabled={!settings.audit_enabled}
-                          className="rounded border-border bg-bg-tertiary"
-                        />
-                        <span className="text-sm text-text-primary">{event}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
               </div>
-            </div>
-            <div className="flex gap-3 pt-4 border-t border-border">
-              {hasPermission('admin:system') && (
-                <Button size="sm" onClick={() => handleSave('audit')} disabled={saving}>
-                  <FloppyDisk size={16} />
-                  Save Changes
-                </Button>
-              )}
-            </div>
-          </div>
+            </DetailSection>
+            <DetailSection title="Events to Log">
+              <div className="space-y-2">
+                {[
+                  'User Login/Logout',
+                  'Certificate Issue/Revoke',
+                  'CA Create/Delete',
+                  'Settings Changes',
+                  'User Management',
+                ].map(event => (
+                  <label key={event} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={true}
+                      disabled={!settings.audit_enabled}
+                      className="rounded border-border bg-bg-tertiary"
+                    />
+                    <span className="text-sm text-text-primary">{event}</span>
+                  </label>
+                ))}
+              </div>
+            </DetailSection>
+          </DetailContent>
         )
 
       case 'database':
         return (
-          <div className="space-y-6 max-w-2xl">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Database Management</h3>
-              
-              <div className="p-4 bg-bg-tertiary border border-border rounded-sm mb-4">
-                <h4 className="text-xs font-semibold text-text-primary uppercase mb-3">Database Statistics</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-text-secondary text-xs">Total Certificates</p>
-                    <p className="text-text-primary font-semibold">{dbStats?.certificates || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-text-secondary text-xs">Certificate Authorities</p>
-                    <p className="text-text-primary font-semibold">{dbStats?.cas || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-text-secondary text-xs">Database Size</p>
-                    <p className="text-text-primary font-semibold">{dbStats?.size || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-text-secondary text-xs">Last Optimized</p>
-                    <p className="text-text-primary font-semibold">{dbStats?.last_optimized || '-'}</p>
-                  </div>
-                </div>
-              </div>
+          <DetailContent>
+            <DetailHeader
+              icon={HardDrives}
+              title="Database Management"
+              subtitle="Database statistics and maintenance"
+            />
+            <DetailSection title="Database Statistics">
+              <DetailGrid columns={2}>
+                <DetailField
+                  label="Total Certificates"
+                  value={dbStats?.certificates || '-'}
+                />
+                <DetailField
+                  label="Certificate Authorities"
+                  value={dbStats?.cas || '-'}
+                />
+                <DetailField
+                  label="Database Size"
+                  value={dbStats?.size || '-'}
+                />
+                <DetailField
+                  label="Last Optimized"
+                  value={dbStats?.last_optimized || '-'}
+                />
+              </DetailGrid>
+            </DetailSection>
 
+            <DetailSection title="Maintenance">
               <div className="space-y-3">
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   <Button size="sm" variant="secondary" onClick={handleOptimizeDb}>
                     <Database size={16} />
                     Optimize Database
                   </Button>
-                  <Button variant="secondary" onClick={handleIntegrityCheck}>
+                  <Button size="sm" variant="secondary" onClick={handleIntegrityCheck}>
                     <ShieldCheck size={16} />
                     Integrity Check
                   </Button>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button variant="secondary" onClick={handleExportDb}>
+                  <Button size="sm" variant="secondary" onClick={handleExportDb}>
                     <Download size={16} />
                     Export Database
                   </Button>
                 </div>
-
-                <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-sm">
-                  <h4 className="text-sm font-semibold text-red-400 mb-2">⚠️ Danger Zone</h4>
-                  <p className="text-xs text-text-secondary mb-3">
-                    Reset database to initial state. This will DELETE ALL certificates, CAs, users, and settings.
-                  </p>
-                  <Button variant="danger" onClick={handleResetDb}>
-                    <Trash size={16} />
-                    Reset Database
-                  </Button>
-                </div>
               </div>
-            </div>
-          </div>
+            </DetailSection>
+
+            <DetailSection title="Danger Zone" className="mt-4">
+              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <h4 className="text-sm font-semibold text-red-400 mb-2">⚠️ Database Reset</h4>
+                <p className="text-xs text-text-secondary mb-3">
+                  Reset database to initial state. This will DELETE ALL certificates, CAs, users, and settings.
+                </p>
+                <Button variant="danger" size="sm" onClick={handleResetDb}>
+                  <Trash size={16} />
+                  Reset Database
+                </Button>
+              </div>
+            </DetailSection>
+          </DetailContent>
         )
 
       case 'https':
         return (
-          <div className="space-y-6 max-w-2xl">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">HTTPS Certificate Management</h3>
-              
-              <div className="p-4 bg-bg-tertiary border border-border rounded-sm mb-4">
-                <h4 className="text-xs font-semibold text-text-primary uppercase mb-3">Current Certificate</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Common Name:</span>
-                    <span className="text-text-primary font-medium">{httpsInfo?.common_name || window.location.hostname}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Issuer:</span>
-                    <span className="text-text-primary font-medium">{httpsInfo?.issuer || '-'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Type:</span>
-                    <Badge variant={httpsInfo?.type === 'CA-Signed' ? 'success' : httpsInfo?.type === 'Self-Signed' ? 'warning' : 'secondary'}>
-                      {httpsInfo?.type || '-'}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Valid From:</span>
-                    <span className="text-text-primary font-medium">{formatDate(httpsInfo?.valid_from)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Valid Until:</span>
-                    <span className="text-text-primary font-medium">{formatDate(httpsInfo?.valid_to)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Fingerprint (SHA256):</span>
-                    <span className="text-text-primary font-mono text-xs">{httpsInfo?.fingerprint || '-'}</span>
-                  </div>
-                </div>
-              </div>
+          <DetailContent>
+            <DetailHeader
+              icon={Lock}
+              title="HTTPS Certificate Management"
+              subtitle="SSL/TLS certificate for secure connections"
+              badge={httpsInfo?.type && (
+                <Badge variant={httpsInfo?.type === 'CA-Signed' ? 'success' : httpsInfo?.type === 'Self-Signed' ? 'warning' : 'secondary'}>
+                  {httpsInfo?.type}
+                </Badge>
+              )}
+            />
+            <DetailSection title="Current Certificate">
+              <DetailGrid columns={2}>
+                <DetailField
+                  label="Common Name"
+                  value={httpsInfo?.common_name || window.location.hostname}
+                />
+                <DetailField
+                  label="Issuer"
+                  value={httpsInfo?.issuer || '-'}
+                />
+                <DetailField
+                  label="Valid From"
+                  value={formatDate(httpsInfo?.valid_from)}
+                />
+                <DetailField
+                  label="Valid Until"
+                  value={formatDate(httpsInfo?.valid_to)}
+                />
+                <DetailField
+                  label="Fingerprint (SHA256)"
+                  value={httpsInfo?.fingerprint || '-'}
+                  mono
+                  copyable
+                  fullWidth
+                />
+              </DetailGrid>
+            </DetailSection>
 
+            <DetailSection title="Use UCM Certificate">
               <div className="space-y-4">
-                <div className="p-4 bg-bg-tertiary border border-border rounded-sm">
-                  <h4 className="text-sm font-medium text-text-primary mb-2">Use UCM Certificate</h4>
-                  <p className="text-xs text-text-secondary mb-3">
-                    Apply an existing certificate from UCM as the HTTPS certificate. Only valid certificates with private keys are shown.
+                <p className="text-xs text-text-secondary">
+                  Apply an existing certificate from UCM as the HTTPS certificate. Only valid certificates with private keys are shown.
+                </p>
+                <Select
+                  label="Select Certificate"
+                  value={selectedHttpsCert}
+                  onChange={setSelectedHttpsCert}
+                  placeholder="Choose a certificate..."
+                  options={certificates.map(cert => ({
+                    value: cert.id,
+                    label: `${cert.common_name || 'Certificate'} (expires ${formatDate(cert.valid_to)})`
+                  }))}
+                />
+                {certificates.length === 0 && (
+                  <p className="text-xs text-text-secondary">
+                    No valid certificates with private keys found. Issue a certificate first.
                   </p>
-                  <div className="space-y-3">
-                    <Select
-                      label="Select Certificate"
-                      value={selectedHttpsCert}
-                      onChange={setSelectedHttpsCert}
-                      placeholder="Choose a certificate..."
-                      options={certificates.map(cert => ({
-                        value: cert.id,
-                        label: `${cert.common_name || 'Certificate'} (expires ${formatDate(cert.valid_to)})`
-                      }))}
-                    />
-                    {certificates.length === 0 && (
-                      <p className="text-xs text-text-secondary">
-                        No valid certificates with private keys found. Issue a certificate first.
-                      </p>
-                    )}
-                    <Button 
-                      variant="secondary" 
-                      onClick={handleApplyUcmCert}
-                      disabled={!selectedHttpsCert}
-                    >
-                      <ShieldCheck size={16} />
-                      Apply Selected Certificate
-                    </Button>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="text-sm font-medium text-text-primary mb-2">Regenerate Certificate</h4>
-                  <p className="text-xs text-text-secondary mb-3">
-                    Generate a new self-signed HTTPS certificate. The server will restart automatically.
-                  </p>
-                  <Button variant="secondary" onClick={handleRegenerateHttpsCert}>
-                    <Key size={16} />
-                    Regenerate Self-Signed Certificate
-                  </Button>
-                </div>
-
-                <div className="p-4 bg-bg-tertiary border border-border rounded-sm">
-                  <h4 className="text-sm font-medium text-text-primary mb-2">Apply Custom Certificate</h4>
-                  <p className="text-xs text-text-secondary mb-3">
-                    Upload your own certificate and private key (PEM format).
-                  </p>
-                  <FileUpload
-                    accept=".pem,.crt,.key"
-                    onFileSelect={(file) => {
-                      showError('Feature coming soon: Upload custom HTTPS certificate')
-                    }}
-                    helperText="Select certificate or key file (PEM format)"
-                  />
-                </div>
+                )}
+                <Button 
+                  variant="secondary" 
+                  size="sm"
+                  onClick={handleApplyUcmCert}
+                  disabled={!selectedHttpsCert}
+                >
+                  <ShieldCheck size={16} />
+                  Apply Selected Certificate
+                </Button>
               </div>
-            </div>
-          </div>
+            </DetailSection>
+
+            <DetailSection title="Regenerate Certificate">
+              <div className="space-y-3">
+                <p className="text-xs text-text-secondary">
+                  Generate a new self-signed HTTPS certificate. The server will restart automatically.
+                </p>
+                <Button variant="secondary" size="sm" onClick={handleRegenerateHttpsCert}>
+                  <Key size={16} />
+                  Regenerate Self-Signed Certificate
+                </Button>
+              </div>
+            </DetailSection>
+
+            <DetailSection title="Apply Custom Certificate">
+              <div className="space-y-3">
+                <p className="text-xs text-text-secondary">
+                  Upload your own certificate and private key (PEM format).
+                </p>
+                <FileUpload
+                  accept=".pem,.crt,.key"
+                  onFileSelect={(file) => {
+                    showError('Feature coming soon: Upload custom HTTPS certificate')
+                  }}
+                  helperText="Select certificate or key file (PEM format)"
+                />
+              </div>
+            </DetailSection>
+          </DetailContent>
         )
 
       default:
@@ -952,9 +961,7 @@ export default function SettingsPage() {
         helpContent={helpContent}
         helpTitle="Settings - Help"
       >
-        <div className="p-6">
-          {renderCategoryContent()}
-        </div>
+        {renderCategoryContent()}
       </PageLayout>
 
       {/* Backup Password Modal */}
