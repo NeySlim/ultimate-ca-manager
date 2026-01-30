@@ -56,3 +56,14 @@ export {
   TabsResponsive,
   DetailView 
 } from './ResponsiveContent'
+
+// Detail Card Components (Mix Header A + Sections B)
+export { 
+  DetailHeader, 
+  DetailSection, 
+  DetailGrid, 
+  DetailField, 
+  DetailDivider,
+  DetailContent,
+  DetailTabs 
+} from './DetailCard'

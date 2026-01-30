@@ -1,12 +1,13 @@
 /**
  * Account Page (User Profile)
- * Uses PageLayout for consistent structure
+ * Uses PageLayout for consistent structure + DetailCard components
  */
 import { useState, useEffect } from 'react'
-import { User, LockKey, Key, FloppyDisk, Fingerprint, Certificate, Gear, Pulse } from '@phosphor-icons/react'
+import { User, LockKey, Key, FloppyDisk, Fingerprint, Certificate, Gear, Pulse, PencilSimple, SignOut } from '@phosphor-icons/react'
 import {
-  PageLayout, FocusItem, Button, Input, Badge, Tabs, Card,
-  LoadingSpinner, Modal, HelpCard
+  PageLayout, FocusItem, Button, Input, Badge, Card,
+  LoadingSpinner, Modal, HelpCard,
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent, DetailTabs
 } from '../components'
 import { accountService } from '../services'
 import { useAuth, useNotification } from '../contexts'
@@ -24,7 +25,7 @@ export default function AccountPage() {
   const [show2FAModal, setShow2FAModal] = useState(false)
   const [qrData, setQrData] = useState(null)
   const [confirmCode, setConfirmCode] = useState('')
-  const [activeSection, setActiveSection] = useState('profile')
+  const [activeTab, setActiveTab] = useState('profile')
   
   // WebAuthn state
   const [webauthnCredentials, setWebauthnCredentials] = useState([])
@@ -327,251 +328,244 @@ export default function AccountPage() {
     setAccountData(prev => ({ ...prev, [field]: value }))
   }
 
+  // Tabs for DetailTabs component
   const tabs = [
-    {
-      id: 'profile',
-      label: 'Profile',
-      icon: <User size={16} />,
-      content: (
-        <div className="space-y-6 max-w-2xl">
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Personal Information</h3>
-            <div className="space-y-4">
-              <Input
-                label="Username"
-                value={accountData.username || ''}
-                disabled
-                helperText="Username cannot be changed"
-              />
-              <Input
-                label="Email"
-                type="email"
-                value={accountData.email || ''}
-                onChange={(e) => updateField('email', e.target.value)}
-                disabled={!editing}
-              />
-              <Input
-                label="Full Name"
-                value={accountData.full_name || ''}
-                onChange={(e) => updateField('full_name', e.target.value)}
-                disabled={!editing}
-              />
-              
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Role</p>
-                <Badge variant="primary">{accountData.role}</Badge>
-              </div>
-            </div>
-          </div>
+    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'security', label: 'Security', icon: LockKey },
+    { id: 'api-keys', label: 'API Keys', icon: Key, count: apiKeys.length },
+  ]
 
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Account Information</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Account Created</p>
-                <p className="text-sm text-text-primary">
-                  {accountData.created_at ? new Date(accountData.created_at).toLocaleDateString() : '-'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Last Login</p>
-                <p className="text-sm text-text-primary">
-                  {accountData.last_login ? new Date(accountData.last_login).toLocaleString() : '-'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Total Logins</p>
-                <p className="text-sm text-text-primary">{accountData.login_count || 0}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary uppercase mb-1">Status</p>
-                <Badge variant={accountData.active ? 'success' : 'danger'}>
-                  {accountData.active ? 'Active' : 'Inactive'}
-                </Badge>
-              </div>
-            </div>
-          </div>
+  // Profile sections for focus panel
+  const profileSections = [
+    { id: 'profile', title: 'Personal Info', subtitle: 'Username, email, name', icon: User },
+    { id: 'security', title: 'Security', subtitle: 'Password, 2FA, keys', icon: LockKey },
+    { id: 'api-keys', title: 'API Keys', subtitle: `${apiKeys.length} key(s)`, icon: Key },
+    { id: 'activity', title: 'Pulse', subtitle: 'Sessions & logins', icon: Pulse },
+  ]
 
-          <div className="flex gap-3 pt-4 border-t border-border">
-            {editing ? (
-              <>
-                <Button size="sm" onClick={handleUpdateProfile}>
-                  <FloppyDisk size={16} />
-                  Save Changes
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => {
-                  setEditing(false)
-                  loadAccount()
-                }}>
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <Button size="sm" onClick={() => setEditing(true)}>
-                Edit Profile
+  // Render Profile Tab Content
+  const renderProfileTab = () => (
+    <>
+      <DetailSection title="Personal Information">
+        {editing ? (
+          <div className="space-y-4">
+            <Input
+              label="Username"
+              value={accountData.username || ''}
+              disabled
+              helperText="Username cannot be changed"
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={accountData.email || ''}
+              onChange={(e) => updateField('email', e.target.value)}
+            />
+            <Input
+              label="Full Name"
+              value={accountData.full_name || ''}
+              onChange={(e) => updateField('full_name', e.target.value)}
+            />
+            <div className="flex gap-3 pt-2">
+              <Button size="sm" onClick={handleUpdateProfile}>
+                <FloppyDisk size={16} />
+                Save Changes
               </Button>
-            )}
+              <Button size="sm" variant="ghost" onClick={() => {
+                setEditing(false)
+                loadAccount()
+              }}>
+                Cancel
+              </Button>
+            </div>
           </div>
+        ) : (
+          <DetailGrid columns={2}>
+            <DetailField label="Username" value={accountData.username} />
+            <DetailField label="Email" value={accountData.email} copyable />
+            <DetailField label="Full Name" value={accountData.full_name || '—'} />
+            <DetailField 
+              label="Role" 
+              value={<Badge variant="primary">{accountData.role}</Badge>}
+            />
+          </DetailGrid>
+        )}
+      </DetailSection>
+
+      <DetailSection title="Account Information">
+        <DetailGrid columns={2}>
+          <DetailField 
+            label="Account Created" 
+            value={accountData.created_at ? new Date(accountData.created_at).toLocaleDateString() : '—'} 
+          />
+          <DetailField 
+            label="Last Login" 
+            value={accountData.last_login ? new Date(accountData.last_login).toLocaleString() : '—'} 
+          />
+          <DetailField 
+            label="Total Logins" 
+            value={accountData.login_count || 0} 
+          />
+          <DetailField 
+            label="Status" 
+            value={
+              <Badge variant={accountData.active ? 'success' : 'danger'}>
+                {accountData.active ? 'Active' : 'Inactive'}
+              </Badge>
+            }
+          />
+        </DetailGrid>
+      </DetailSection>
+    </>
+  )
+
+  // Render Security Tab Content
+  const renderSecurityTab = () => (
+    <>
+      <HelpCard variant="tip" title="Security Best Practices" items={[
+        'Enable 2FA for additional protection',
+        'Use security keys (WebAuthn) for passwordless login',
+        'Rotate API keys regularly'
+      ]} />
+
+      <DetailSection title="Password">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-text-primary">Change Password</p>
+            <p className="text-xs text-text-secondary mt-1">
+              Last changed: {accountData.password_changed_at 
+                ? new Date(accountData.password_changed_at).toLocaleDateString()
+                : 'Never'}
+            </p>
+          </div>
+          <Button size="sm" onClick={() => setShowPasswordModal(true)}>
+            Change Password
+          </Button>
         </div>
-      )
-    },
-    {
-      id: 'security',
-      label: 'Security',
-      icon: <LockKey size={16} />,
-      content: (
-        <div className="space-y-6 max-w-2xl">
-          <HelpCard variant="tip" title="Security Best Practices" items={[
-            'Enable 2FA for additional protection',
-            'Use security keys (WebAuthn) for passwordless login',
-            'Rotate API keys regularly'
-          ]} />
+      </DetailSection>
 
+      <DetailSection title="Two-Factor Authentication">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Password</h3>
-            <div className="flex items-center justify-between p-4 bg-bg-tertiary border border-border rounded-lg">
-              <div>
-                <p className="text-sm font-medium text-text-primary">Change Password</p>
-                <p className="text-xs text-text-secondary mt-1">
-                  Last changed: {accountData.password_changed_at 
-                    ? new Date(accountData.password_changed_at).toLocaleDateString()
-                    : 'Never'}
-                </p>
-              </div>
-              <Button size="sm" onClick={() => setShowPasswordModal(true)}>
-                Change Password
-              </Button>
+            <p className="text-sm font-medium text-text-primary">Authenticator App (TOTP)</p>
+            <div className="mt-1">
+              {accountData.two_factor_enabled ? (
+                <Badge variant="success">Enabled</Badge>
+              ) : (
+                <Badge variant="secondary">Disabled</Badge>
+              )}
             </div>
           </div>
+          <Button size="sm" variant={accountData.two_factor_enabled ? 'danger' : 'primary'} onClick={handleToggle2FA}>
+            {accountData.two_factor_enabled ? 'Disable 2FA' : 'Enable 2FA'}
+          </Button>
+        </div>
+      </DetailSection>
 
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Two-Factor Authentication</h3>
-            <div className="flex items-center justify-between p-4 bg-bg-tertiary border border-border rounded-lg">
-              <div>
-                <p className="text-sm font-medium text-text-primary">Authenticator App (TOTP)</p>
-                <p className="text-xs text-text-secondary mt-1">
-                  {accountData.two_factor_enabled ? (
-                    <Badge variant="success">Enabled</Badge>
-                  ) : (
-                    <Badge variant="secondary">Disabled</Badge>
-                  )}
-                </p>
-              </div>
-              <Button size="sm" variant={accountData.two_factor_enabled ? 'danger' : 'primary'} onClick={handleToggle2FA}>
-                {accountData.two_factor_enabled ? 'Disable 2FA' : 'Enable 2FA'}
-              </Button>
-            </div>
+      <DetailSection title="Security Keys (WebAuthn/FIDO2)">
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => setShowWebAuthnModal(true)}>
+              Add Key
+            </Button>
           </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-text-primary">Security Keys (WebAuthn/FIDO2)</h3>
-              <Button size="sm" onClick={() => setShowWebAuthnModal(true)}>
-                Add Key
-              </Button>
+          {webauthnCredentials.length === 0 ? (
+            <div className="p-4 bg-bg-tertiary border border-border rounded-lg text-center">
+              <Fingerprint size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm text-text-secondary">No security keys registered</p>
+              <p className="text-xs text-text-secondary mt-1">Add a YubiKey, TouchID, or Windows Hello for passwordless login</p>
             </div>
-            {webauthnCredentials.length === 0 ? (
-              <div className="p-4 bg-bg-tertiary border border-border rounded-lg text-center">
-                <Fingerprint size={32} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm text-text-secondary">No security keys registered</p>
-                <p className="text-xs text-text-secondary mt-1">Add a YubiKey, TouchID, or Windows Hello for passwordless login</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {webauthnCredentials.map(cred => (
-                  <div key={cred.id} className="flex items-center justify-between p-3 bg-bg-tertiary border border-border rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">{cred.name || 'Security Key'}</p>
-                      <p className="text-xs text-text-secondary">
-                        Added {new Date(cred.created_at).toLocaleDateString()}
-                        {cred.last_used_at && ` · Last used ${new Date(cred.last_used_at).toLocaleDateString()}`}
-                      </p>
-                    </div>
-                    <Button size="sm" variant="danger" onClick={() => handleDeleteWebAuthn(cred.id)}>
-                      Delete
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-text-primary">Client Certificates (mTLS)</h3>
-              <Button size="sm" onClick={() => setShowMTLSModal(true)}>
-                Create Certificate
-              </Button>
-            </div>
-            {mtlsCertificates.length === 0 ? (
-              <div className="p-4 bg-bg-tertiary border border-border rounded-lg text-center">
-                <Certificate size={32} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm text-text-secondary">No certificates enrolled</p>
-                <p className="text-xs text-text-secondary mt-1">Create a client certificate for mutual TLS authentication</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {mtlsCertificates.map(cert => (
-                  <div key={cert.id} className="flex items-center justify-between p-3 bg-bg-tertiary border border-border rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">{cert.name || cert.cert_subject}</p>
-                      <p className="text-xs text-text-secondary">
-                        Expires {new Date(cert.valid_until).toLocaleDateString()}
-                        {' · '}
-                        <Badge variant={cert.enabled ? 'success' : 'secondary'} className="text-xs">
-                          {cert.enabled ? 'Active' : 'Disabled'}
-                        </Badge>
-                      </p>
-                    </div>
-                    <Button size="sm" variant="danger" onClick={() => handleDeleteMTLS(cert.id)}>
-                      Delete
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Active Sessions</h3>
+          ) : (
             <div className="space-y-2">
-              <div className="p-3 bg-bg-tertiary border border-border rounded">
-                <div className="flex items-center justify-between">
+              {webauthnCredentials.map(cred => (
+                <div key={cred.id} className="flex items-center justify-between p-3 bg-bg-tertiary border border-border rounded-lg">
                   <div>
-                    <p className="text-sm font-medium text-text-primary">Current Session</p>
-                    <p className="text-xs text-text-secondary">Started {new Date().toLocaleString()}</p>
+                    <p className="text-sm font-medium text-text-primary">{cred.name || 'Security Key'}</p>
+                    <p className="text-xs text-text-secondary">
+                      Added {new Date(cred.created_at).toLocaleDateString()}
+                      {cred.last_used_at && ` · Last used ${new Date(cred.last_used_at).toLocaleDateString()}`}
+                    </p>
                   </div>
-                  <Badge variant="success">Active</Badge>
+                  <Button size="sm" variant="danger" onClick={() => handleDeleteWebAuthn(cred.id)}>
+                    Delete
+                  </Button>
                 </div>
-              </div>
+              ))}
             </div>
-          </div>
+          )}
         </div>
-      )
-    },
-    {
-      id: 'api-keys',
-      label: 'API Keys',
-      icon: <Key size={16} />,
-      content: (
-        <div className="space-y-6 max-w-2xl">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-text-primary">API Keys</h3>
+      </DetailSection>
+
+      <DetailSection title="Client Certificates (mTLS)">
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => setShowMTLSModal(true)}>
+              Create Certificate
+            </Button>
+          </div>
+          {mtlsCertificates.length === 0 ? (
+            <div className="p-4 bg-bg-tertiary border border-border rounded-lg text-center">
+              <Certificate size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm text-text-secondary">No certificates enrolled</p>
+              <p className="text-xs text-text-secondary mt-1">Create a client certificate for mutual TLS authentication</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {mtlsCertificates.map(cert => (
+                <div key={cert.id} className="flex items-center justify-between p-3 bg-bg-tertiary border border-border rounded-lg">
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">{cert.name || cert.cert_subject}</p>
+                    <p className="text-xs text-text-secondary">
+                      Expires {new Date(cert.valid_until).toLocaleDateString()}
+                      {' · '}
+                      <Badge variant={cert.enabled ? 'success' : 'secondary'} className="text-xs">
+                        {cert.enabled ? 'Active' : 'Disabled'}
+                      </Badge>
+                    </p>
+                  </div>
+                  <Button size="sm" variant="danger" onClick={() => handleDeleteMTLS(cert.id)}>
+                    Delete
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </DetailSection>
+
+      <DetailSection title="Active Sessions">
+        <div className="flex items-center justify-between p-3 bg-bg-tertiary border border-border rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-text-primary">Current Session</p>
+            <p className="text-xs text-text-secondary">Started {new Date().toLocaleString()}</p>
+          </div>
+          <Badge variant="success">Active</Badge>
+        </div>
+      </DetailSection>
+    </>
+  )
+
+  // Render API Keys Tab Content
+  const renderApiKeysTab = () => (
+    <>
+      <DetailSection title="API Keys" noBorder>
+        <div className="space-y-4">
+          <div className="flex justify-end">
             <Button size="sm" onClick={() => setShowApiKeyModal(true)}>
               <Key size={16} />
               Create API Key
             </Button>
           </div>
 
-          <div className="space-y-2">
-            {apiKeys.length === 0 ? (
-              <div className="text-center py-12 text-text-secondary">
-                <Key size={48} className="mx-auto mb-3 opacity-50" />
-                <p className="text-sm">No API keys</p>
-                <p className="text-xs mt-1">Create an API key for programmatic access</p>
-              </div>
-            ) : (
-              apiKeys.map(key => (
+          {apiKeys.length === 0 ? (
+            <div className="text-center py-12 text-text-secondary bg-bg-tertiary border border-border rounded-lg">
+              <Key size={48} className="mx-auto mb-3 opacity-50" />
+              <p className="text-sm">No API keys</p>
+              <p className="text-xs mt-1">Create an API key for programmatic access</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {apiKeys.map(key => (
                 <div key={key.id} className="p-4 bg-bg-tertiary border border-border rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -593,9 +587,9 @@ export default function AccountPage() {
                     </Button>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
 
           <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
             <p className="text-sm text-amber-500 font-medium">⚠️ API Key Security</p>
@@ -604,17 +598,9 @@ export default function AccountPage() {
             </p>
           </div>
         </div>
-      )
-    },
-  ]
-
-  // Profile sections for focus panel
-  const profileSections = [
-    { id: 'profile', title: 'Personal Info', subtitle: 'Username, email, name', icon: User },
-    { id: 'security', title: 'Security', subtitle: 'Password, 2FA, keys', icon: LockKey },
-    { id: 'api-keys', title: 'API Keys', subtitle: `${apiKeys.length} key(s)`, icon: Key },
-    { id: 'activity', title: 'Pulse', subtitle: 'Sessions & logins', icon: Pulse },
-  ]
+      </DetailSection>
+    </>
+  )
 
   // Help content for modal
   const helpContent = (
@@ -697,8 +683,8 @@ export default function AccountPage() {
           ) : section.id === 'api-keys' && apiKeys.length > 0 ? (
             <Badge variant="primary" size="sm">{apiKeys.length}</Badge>
           ) : null}
-          selected={activeSection === section.id}
-          onClick={() => setActiveSection(section.id)}
+          selected={activeTab === section.id}
+          onClick={() => setActiveTab(section.id)}
         />
       ))}
     </div>
@@ -721,10 +707,41 @@ export default function AccountPage() {
       helpContent={helpContent}
       helpTitle="My Account - Aide"
     >
-      {/* Main Content - Tabs */}
-      <div className="p-6">
-        <Tabs tabs={tabs} defaultTab="profile" activeTab={activeSection} onTabChange={setActiveSection} />
+      {/* Detail Header */}
+      <div className="p-4 md:p-6">
+        <DetailHeader
+          icon={User}
+          title={accountData.username || 'User'}
+          subtitle={accountData.email}
+          badge={<Badge variant={accountData.role === 'admin' ? 'primary' : 'secondary'}>{accountData.role}</Badge>}
+          stats={[
+            { label: 'API Keys:', value: apiKeys.length },
+            { label: 'Security Keys:', value: webauthnCredentials.length },
+            { label: '2FA:', value: accountData.two_factor_enabled ? 'Enabled' : 'Disabled' },
+          ]}
+          actions={editing ? [] : [
+            { 
+              label: 'Edit Profile', 
+              icon: PencilSimple, 
+              onClick: () => setEditing(true) 
+            },
+          ]}
+        />
       </div>
+
+      {/* Detail Tabs */}
+      <DetailTabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+      />
+
+      {/* Tab Content */}
+      <DetailContent>
+        {activeTab === 'profile' && renderProfileTab()}
+        {activeTab === 'security' && renderSecurityTab()}
+        {activeTab === 'api-keys' && renderApiKeysTab()}
+      </DetailContent>
 
       {/* Change Password Modal */}
       <Modal
