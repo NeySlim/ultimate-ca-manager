@@ -1,19 +1,23 @@
 /**
  * CSRs (Certificate Signing Requests) Page
+ * Uses PageLayout for consistent UI structure
  */
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { FileText, Upload, SignIn, Trash, Download, FileArrowUp, ClockCounterClockwise, CheckCircle, HourglassHigh } from '@phosphor-icons/react'
+import { 
+  FileText, Upload, SignIn, Trash, Download, FileArrowUp, 
+  CheckCircle, HourglassHigh, MagnifyingGlass, Database
+} from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Table, Button, Badge, Card,
-  Modal, Input, Select, Textarea,
-  FileUpload, LoadingSpinner, EmptyState
-, HelpCard } from '../components'
+  PageLayout, FocusItem, Button, Badge, Card,
+  Modal, Input, Select,
+  FileUpload, LoadingSpinner, EmptyState, HelpCard
+} from '../components'
 import { csrsService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
-import { extractData } from '../lib/utils'
-import { VALIDITY, VALIDITY_OPTIONS } from '../constants/config'
+import { extractData, formatDate } from '../lib/utils'
+import { VALIDITY } from '../constants/config'
 
 export default function CSRsPage() {
   const { showSuccess, showError, showConfirm } = useNotification()
@@ -28,6 +32,8 @@ export default function CSRsPage() {
   const [cas, setCAs] = useState([])
   const [signCA, setSignCA] = useState('')
   const [validityDays, setValidityDays] = useState(VALIDITY.DEFAULT_DAYS)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   
   // Import form state
   const [importFile, setImportFile] = useState(null)
@@ -177,30 +183,6 @@ export default function CSRsPage() {
     }
   }
 
-  const csrColumns = [
-    { 
-      key: 'common_name', 
-      label: 'Common Name',
-      render: (val) => <span className="font-medium">{val}</span>
-    },
-    { key: 'key_algorithm', label: 'Algorithm' },
-    { key: 'key_size', label: 'Key Size', render: (val) => `${val} bits` },
-    { 
-      key: 'created_at', 
-      label: 'Created',
-      render: (val) => val ? new Date(val).toLocaleDateString() : '-'
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (val) => (
-        <Badge variant={val === 'pending' ? 'warning' : 'success'}>
-          {val}
-        </Badge>
-      )
-    },
-  ]
-
   // Stats computed from CSRs
   const stats = {
     total: csrs.length,
@@ -208,140 +190,211 @@ export default function CSRsPage() {
     signed: csrs.filter(c => c.status === 'signed').length
   }
 
-  return (
-    <>
-      <ExplorerPanel
-        title="CSRs"
-        footer={
-          <div className="text-xs text-text-secondary">
-            {csrs.length} total CSRs
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          {/* Stats Cards */}
-          <div className="px-3 pt-2 space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Overview
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <Card className="p-2.5 text-center bg-gradient-to-br from-yellow-500/10 to-transparent border-yellow-500/20">
-                <div className="flex items-center justify-center gap-1.5">
-                  <HourglassHigh size={16} weight="duotone" className="text-yellow-500" />
-                  <span className="text-lg font-bold text-yellow-500">{stats.pending}</span>
-                </div>
-                <div className="text-xs text-text-secondary">Pending</div>
-              </Card>
-              <Card className="p-2.5 text-center bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
-                <div className="flex items-center justify-center gap-1.5">
-                  <CheckCircle size={16} weight="duotone" className="text-emerald-500" />
-                  <span className="text-lg font-bold text-emerald-500">{stats.signed}</span>
-                </div>
-                <div className="text-xs text-text-secondary">Signed</div>
-              </Card>
-            </div>
-          </div>
+  // Filter CSRs based on search and status
+  const filteredCSRs = csrs.filter(csr => {
+    const matchesSearch = !searchQuery || 
+      csr.common_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      csr.subject?.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || csr.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
 
-          {/* Actions */}
-          <div className="px-3 space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Actions
-            </h3>
-            {canWrite('csrs') && (
-              <div className="space-y-2">
-                <Button onClick={() => openModal('upload')} className="w-full justify-start">
-                  <span className="p-1 rounded bg-accent/20">
-                    <Upload size={16} weight="duotone" className="text-accent" />
-                  </span>
-                  Create CSR
-                </Button>
-                <Button variant="secondary" onClick={() => openModal('import')} className="w-full justify-start">
-                  <span className="p-1 rounded bg-purple-500/20">
-                    <FileArrowUp size={16} weight="duotone" className="text-purple-500" />
-                  </span>
-                  Import CSR
-                </Button>
-              </div>
-            )}
+  // Help content for modal
+  const helpContent = (
+    <div className="space-y-4">
+      {/* CSR Statistics */}
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <Database size={16} className="text-accent-primary" />
+          CSR Statistics
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-yellow-500">{stats.pending}</p>
+            <p className="text-xs text-text-secondary">Pending</p>
           </div>
-
-          {/* Recent Activity */}
-          {csrs.length > 0 && (
-            <div className="px-3 space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                Recent
-              </h3>
-              <div className="space-y-1">
-                {csrs.slice(0, 4).map(csr => (
-                  <button
-                    key={csr.id}
-                    onClick={() => loadCSRDetails(csr.id)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
-                      selectedCSR?.id === csr.id 
-                        ? 'bg-accent/10 text-accent border-l-2 border-accent' 
-                        : 'hover:bg-bg-tertiary/50'
-                    }`}
-                  >
-                    <FileText size={14} weight="duotone" className={csr.status === 'pending' ? 'text-yellow-500' : 'text-emerald-500'} />
-                    <span className="text-sm truncate flex-1">{csr.common_name}</span>
-                    <Badge variant={csr.status === 'pending' ? 'warning' : 'success'} size="sm">
-                      {csr.status}
-                    </Badge>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-emerald-500">{stats.signed}</p>
+            <p className="text-xs text-text-secondary">Signed</p>
+          </div>
         </div>
-      </ExplorerPanel>
+      </Card>
 
-      <DetailsPanel
-        breadcrumb={[
-          { label: 'CSRs' },
-          { label: selectedCSR?.common_name || '...' }
-        ]}
-        title={selectedCSR?.common_name || 'Select a CSR'}
-        actions={selectedCSR && (
-          <>
-            {canWrite('csrs') && (
-              <Button 
-                variant="primary" 
-                size="sm" 
-                onClick={() => openModal('sign')}
-                disabled={selectedCSR.status !== 'pending'}
-              >
-                <SignIn size={16} />
-                Sign
-              </Button>
-            )}
-            <Button variant="secondary" size="sm" onClick={() => handleDownload(selectedCSR.id)}>
-              <Download size={16} />
-              Download
-            </Button>
-            {canDelete('csrs') && (
-              <Button variant="danger" size="sm" onClick={() => handleDelete(selectedCSR.id)}>
-                <Trash size={16} />
-                Delete
-              </Button>
-            )}
-          </>
-        )}
-      >
-        {!selectedCSR ? (
-          <EmptyState
-            title="No CSR selected"
-            description="Select a CSR from the list to view details"
+      {/* Help Cards */}
+      <div className="space-y-3">
+        <HelpCard variant="info" title="What is a CSR?">
+          A Certificate Signing Request (CSR) contains the public key and identity 
+          information needed to issue a certificate. The private key remains with the requester.
+        </HelpCard>
+        
+        <HelpCard variant="tip" title="CSR Workflow">
+          1. Upload or import a CSR from an external source
+          2. Review the request details and subject information
+          3. Sign with a CA to issue a certificate
+          4. Download and deploy the issued certificate
+        </HelpCard>
+
+        <HelpCard variant="warning" title="Best Practices">
+          Always verify the CSR subject and key details before signing. 
+          Ensure the common name matches the intended use (domain, server, etc.).
+        </HelpCard>
+      </div>
+    </div>
+  )
+
+  // Focus panel content (search, filter, CSR list)
+  const focusContent = (
+    <div className="flex flex-col h-full">
+      {/* Search */}
+      <div className="p-3 border-b border-border">
+        <div className="relative">
+          <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+          <input
+            type="text"
+            placeholder="Search CSRs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 text-sm bg-bg-tertiary border border-border rounded-md text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary"
+          />
+        </div>
+      </div>
+
+      {/* Status Filter */}
+      <div className="px-3 py-2 border-b border-border flex gap-1.5">
+        {['all', 'pending', 'signed'].map((status) => (
+          <button
+            key={status}
+            onClick={() => setStatusFilter(status)}
+            className={`px-2 py-1 text-xs rounded-md transition-colors ${
+              statusFilter === status
+                ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
+                : 'bg-bg-tertiary text-text-secondary hover:bg-bg-tertiary/80 border border-transparent'
+            }`}
+          >
+            {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* CSR List */}
+      <div className="flex-1 overflow-auto p-2 space-y-1.5">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <LoadingSpinner />
+          </div>
+        ) : filteredCSRs.length === 0 ? (
+          <EmptyState 
+            icon={FileText}
+            title="No CSRs"
+            description={searchQuery ? "No CSRs match your search" : "Upload or import a CSR to get started"}
           />
         ) : (
-          <div className="space-y-6">
+          filteredCSRs.map((csr) => (
+            <FocusItem
+              key={csr.id}
+              icon={FileText}
+              title={csr.common_name || 'Unnamed CSR'}
+              subtitle={csr.created_at ? `Created ${formatDate(csr.created_at)}` : 'No date'}
+              badge={
+                <Badge 
+                  variant={csr.status === 'pending' ? 'warning' : 'success'} 
+                  size="sm"
+                >
+                  {csr.status}
+                </Badge>
+              }
+              selected={selectedCSR?.id === csr.id}
+              onClick={() => loadCSRDetails(csr.id)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  )
+
+  // Focus panel actions (upload button)
+  const focusActions = canWrite('csrs') ? (
+    <>
+      <Button size="sm" onClick={() => openModal('upload')} className="flex-1">
+        <Upload size={14} />
+        Upload
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => openModal('import')} className="flex-1">
+        <FileArrowUp size={14} />
+        Import
+      </Button>
+    </>
+  ) : null
+
+  if (loading && csrs.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <PageLayout
+        title="Certificate Signing Requests"
+        focusTitle="CSRs"
+        focusContent={focusContent}
+        focusActions={focusActions}
+        focusFooter={`${filteredCSRs.length} of ${csrs.length} CSR(s)`}
+        helpContent={helpContent}
+        helpTitle="CSRs - Aide"
+      >
+        {/* Main Content - CSR Details */}
+        {!selectedCSR ? (
+          <div className="flex items-center justify-center h-full">
+            <EmptyState
+              icon={FileText}
+              title="Select a CSR"
+              description="Choose a CSR from the list to view details"
+            />
+          </div>
+        ) : (
+          <div className="p-6 space-y-6">
+            {/* Header with actions */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-text-primary">{selectedCSR.common_name}</h2>
+                <p className="text-sm text-text-secondary">
+                  {selectedCSR.subject || 'No subject information'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {canWrite('csrs') && selectedCSR.status === 'pending' && (
+                  <Button onClick={() => openModal('sign')}>
+                    <SignIn size={16} />
+                    Sign CSR
+                  </Button>
+                )}
+                <Button variant="secondary" onClick={() => handleDownload(selectedCSR.id)}>
+                  <Download size={16} />
+                  Download
+                </Button>
+                {canDelete('csrs') && (
+                  <Button variant="danger" onClick={() => handleDelete(selectedCSR.id)}>
+                    <Trash size={16} />
+                    Delete
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Info Card */}
             <HelpCard variant="info" title="Certificate Signing Request" compact>
               Review the CSR details and sign it with a CA to issue a certificate.
             </HelpCard>
 
             {/* Request Info */}
             <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Request Information</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
+                Request Information
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-xs text-text-secondary uppercase mb-1">Common Name</p>
                   <p className="text-sm text-text-primary">{selectedCSR.common_name}</p>
@@ -354,19 +407,15 @@ export default function CSRsPage() {
                 </div>
                 <div>
                   <p className="text-xs text-text-secondary uppercase mb-1">Key Algorithm</p>
-                  <p className="text-sm text-text-primary">{selectedCSR.key_algorithm}</p>
+                  <p className="text-sm text-text-primary">{selectedCSR.key_algorithm || '-'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-text-secondary uppercase mb-1">Key Size</p>
-                  <p className="text-sm text-text-primary">{selectedCSR.key_size} bits</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-text-secondary uppercase mb-1">Subject DN</p>
-                  <p className="text-sm text-text-primary">{selectedCSR.subject}</p>
+                  <p className="text-sm text-text-primary">{selectedCSR.key_size ? `${selectedCSR.key_size} bits` : '-'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-text-secondary uppercase mb-1">Signature Algorithm</p>
-                  <p className="text-sm text-text-primary">{selectedCSR.signature_algorithm}</p>
+                  <p className="text-sm text-text-primary">{selectedCSR.signature_algorithm || '-'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-text-secondary uppercase mb-1">Created</p>
@@ -374,13 +423,19 @@ export default function CSRsPage() {
                     {selectedCSR.created_at ? new Date(selectedCSR.created_at).toLocaleString() : '-'}
                   </p>
                 </div>
+                <div className="col-span-2 md:col-span-3">
+                  <p className="text-xs text-text-secondary uppercase mb-1">Subject DN</p>
+                  <p className="text-sm text-text-primary font-mono">{selectedCSR.subject || '-'}</p>
+                </div>
               </div>
             </div>
 
             {/* Subject Alternative Names */}
             {selectedCSR.san && selectedCSR.san.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-text-primary mb-4">Subject Alternative Names</h3>
+                <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
+                  Subject Alternative Names
+                </h3>
                 <div className="flex flex-wrap gap-2">
                   {selectedCSR.san.map((name, i) => (
                     <Badge key={i} variant="secondary">{name}</Badge>
@@ -392,7 +447,9 @@ export default function CSRsPage() {
             {/* Raw CSR */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-text-primary">Raw CSR (PEM)</h3>
+                <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wide">
+                  Raw CSR (PEM)
+                </h3>
                 <Button 
                   variant="secondary" 
                   size="sm"
@@ -411,7 +468,7 @@ export default function CSRsPage() {
             </div>
           </div>
         )}
-      </DetailsPanel>
+      </PageLayout>
 
       {/* Import CSR Modal */}
       <Modal
@@ -473,11 +530,11 @@ export default function CSRsPage() {
       <Modal
         open={modals.upload}
         onClose={() => closeModal('upload')}
-        title="Create CSR"
+        title="Upload CSR"
       >
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
-            Create a new Certificate Signing Request
+            Upload a Certificate Signing Request file
           </p>
           <FileUpload
             accept=".pem,.csr"

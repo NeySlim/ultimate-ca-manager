@@ -21,9 +21,13 @@ import {
   Gear,
   Database,
   SignIn,
-  SignOut
+  SignOut,
+  ListBullets,
+  Export
 } from '@phosphor-icons/react';
 import { 
+  PageLayout,
+  FocusItem,
   Card, 
   Button, 
   Badge, 
@@ -35,9 +39,8 @@ import {
   LoadingSpinner,
   EmptyState,
   Pagination,
-  ExplorerPanel, 
-  DetailsPanel
-, HelpCard } from '../components';
+  HelpCard
+} from '../components';
 import { useNotification } from '../contexts';
 import auditService from '../services/audit.service';
 
@@ -315,126 +318,196 @@ export default function AuditLogsPage() {
     }
   ];
 
-  // Explorer content - Stats panel
-  const ExplorerContent = () => (
+  // Help content for modal
+  const helpContent = (
     <div className="space-y-4">
-      {/* Stats */}
+      {/* Statistics */}
       {stats && (
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-2">
-            Last 30 Days
+        <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+          <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+            <Database size={16} className="text-accent-primary" />
+            Last 30 Days Statistics
           </h3>
-          <div className="grid grid-cols-2 gap-2 px-2">
-            <Card className="p-2">
-              <div className="text-lg font-bold text-accent">{stats.total_logs || 0}</div>
-              <div className="text-xs text-text-secondary">Total Events</div>
-            </Card>
-            <Card className="p-2">
-              <div className="text-lg font-bold text-emerald-500">{stats.success_count || 0}</div>
-              <div className="text-xs text-text-secondary">Successful</div>
-            </Card>
-            <Card className="p-2">
-              <div className="text-lg font-bold text-red-500">{stats.failure_count || 0}</div>
-              <div className="text-xs text-text-secondary">Failed</div>
-            </Card>
-            <Card className="p-2">
-              <div className="text-lg font-bold text-text-primary">{stats.unique_users || 0}</div>
-              <div className="text-xs text-text-secondary">Active Users</div>
-            </Card>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+              <p className="text-2xl font-bold text-text-primary">{stats.total_logs || 0}</p>
+              <p className="text-xs text-text-secondary">Total Events</p>
+            </div>
+            <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+              <p className="text-2xl font-bold text-emerald-500">{stats.success_count || 0}</p>
+              <p className="text-xs text-text-secondary">Successful</p>
+            </div>
+            <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+              <p className="text-2xl font-bold text-red-500">{stats.failure_count || 0}</p>
+              <p className="text-xs text-text-secondary">Failed</p>
+            </div>
+            <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+              <p className="text-2xl font-bold text-text-primary">{stats.unique_users || 0}</p>
+              <p className="text-xs text-text-secondary">Active Users</p>
+            </div>
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Top Actions */}
-      {stats?.top_actions && stats.top_actions.length > 0 && (
+      {/* Help Cards */}
+      <div className="space-y-3">
+        <HelpCard variant="info" title="About Audit Logs">
+          All user actions are logged for security and compliance purposes.
+          Logs include timestamps, users, actions, resources, and IP addresses.
+        </HelpCard>
+        
+        <HelpCard variant="tip" title="Filtering & Search">
+          Use filters to narrow down logs by date range, user, action type, or status.
+          The search box supports full-text search across all log fields.
+        </HelpCard>
+
+        <HelpCard variant="warning" title="Data Retention">
+          Old logs can be cleaned up to save storage space.
+          The minimum retention period is 30 days for compliance requirements.
+        </HelpCard>
+
+        <HelpCard variant="info" title="Export Options">
+          Export logs in JSON or CSV format for external analysis,
+          compliance reporting, or integration with SIEM systems.
+        </HelpCard>
+      </div>
+    </div>
+  );
+
+  // Focus panel content - Filters
+  const focusContent = (
+    <div className="p-3 space-y-4">
+      {/* Date Range Filter */}
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+          Date Range
+        </h4>
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-2">
-            Top Actions
-          </h3>
-          <div className="space-y-1 px-2">
-            {stats.top_actions.slice(0, 5).map((item) => (
-              <div 
-                key={item.action} 
-                className="flex items-center justify-between py-1 px-2 rounded bg-bg-secondary hover:bg-bg-tertiary cursor-pointer transition-colors"
-                onClick={() => {
-                  setFilterAction(item.action);
-                  setPage(1);
-                }}
-              >
-                <span className="text-sm">{item.action.replace(/_/g, ' ')}</span>
-                <Badge variant="gray" size="sm">{item.count}</Badge>
-              </div>
-            ))}
-          </div>
+          <Input
+            type="date"
+            value={filterDateFrom}
+            onChange={(e) => { setFilterDateFrom(e.target.value); setPage(1); }}
+            placeholder="From"
+            className="w-full"
+          />
+          <Input
+            type="date"
+            value={filterDateTo}
+            onChange={(e) => { setFilterDateTo(e.target.value); setPage(1); }}
+            placeholder="To"
+            className="w-full"
+          />
         </div>
-      )}
+      </div>
+
+      {/* Action Type Filter */}
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+          Action Type
+        </h4>
+        <Select
+          value={filterAction}
+          onChange={(v) => { setFilterAction(v); setPage(1); }}
+          placeholder="All Actions"
+          className="w-full"
+        >
+          <option value="">All Actions</option>
+          {(actions.actions || []).map(action => (
+            <option key={action} value={action}>{action.replace(/_/g, ' ')}</option>
+          ))}
+        </Select>
+      </div>
+
+      {/* User Filter */}
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+          User
+        </h4>
+        <Select
+          value={filterUsername}
+          onChange={(v) => { setFilterUsername(v); setPage(1); }}
+          placeholder="All Users"
+          className="w-full"
+        >
+          <option value="">All Users</option>
+          {uniqueUsernames.map(name => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </Select>
+      </div>
+
+      {/* Status Filter */}
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+          Status
+        </h4>
+        <Select
+          value={filterSuccess}
+          onChange={(v) => { setFilterSuccess(v); setPage(1); }}
+          placeholder="All Status"
+          className="w-full"
+        >
+          <option value="">All Status</option>
+          <option value="true">Success</option>
+          <option value="false">Failed</option>
+        </Select>
+      </div>
 
       {/* Quick Filters */}
       <div className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
           Quick Filters
-        </h3>
-        <div className="space-y-1 px-2">
-          <button 
-            className="w-full text-left py-1.5 px-2 rounded bg-bg-secondary hover:bg-bg-tertiary text-sm transition-colors flex items-center gap-2"
+        </h4>
+        <div className="space-y-1">
+          <FocusItem 
+            icon={XCircle}
+            title="Failed Logins"
+            subtitle="Security events"
+            selected={filterAction === 'login_failure'}
             onClick={() => { setFilterAction('login_failure'); setPage(1); }}
-          >
-            <XCircle size={14} className="text-red-500" />
-            Failed Logins
-          </button>
-          <button 
-            className="w-full text-left py-1.5 px-2 rounded bg-bg-secondary hover:bg-bg-tertiary text-sm transition-colors flex items-center gap-2"
-            onClick={() => { setFilterSuccess('false'); setPage(1); }}
-          >
-            <Warning size={14} className="text-yellow-500" />
-            All Failures
-          </button>
-          <button 
-            className="w-full text-left py-1.5 px-2 rounded bg-bg-secondary hover:bg-bg-tertiary text-sm transition-colors flex items-center gap-2"
-            onClick={() => clearFilters()}
-          >
-            <ArrowsClockwise size={14} className="text-text-secondary" />
-            Clear Filters
-          </button>
+          />
+          <FocusItem 
+            icon={Warning}
+            title="All Failures"
+            subtitle="Error events"
+            selected={filterSuccess === 'false' && !filterAction}
+            onClick={() => { setFilterSuccess('false'); setFilterAction(''); setPage(1); }}
+          />
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-2">
-          Actions
-        </h3>
-        <div className="space-y-1 px-2">
-          <Button 
-            variant="secondary" 
-            size="sm" 
-            className="w-full justify-start"
-            onClick={() => handleExport('json')}
-          >
-            <DownloadSimple size={14} />
-            Export JSON
-          </Button>
-          <Button 
-            variant="secondary" 
-            size="sm" 
-            className="w-full justify-start"
-            onClick={() => handleExport('csv')}
-          >
-            <DownloadSimple size={14} />
-            Export CSV
-          </Button>
-          <Button 
-            variant="danger" 
-            size="sm" 
-            className="w-full justify-start"
-            onClick={() => setShowCleanupModal(true)}
-          >
-            <Trash size={14} />
-            Cleanup Old Logs
-          </Button>
-        </div>
-      </div>
+      {/* Clear Filters */}
+      {(search || filterUsername || filterAction || filterSuccess || filterDateFrom || filterDateTo) && (
+        <Button variant="ghost" size="sm" className="w-full" onClick={clearFilters}>
+          <ArrowsClockwise size={14} />
+          Clear All Filters
+        </Button>
+      )}
     </div>
+  );
+
+  // Focus panel actions - Export buttons
+  const focusActions = (
+    <>
+      <Button 
+        variant="secondary" 
+        size="sm" 
+        onClick={() => handleExport('json')}
+        className="flex-1"
+      >
+        <Export size={14} />
+        JSON
+      </Button>
+      <Button 
+        variant="secondary" 
+        size="sm" 
+        onClick={() => handleExport('csv')}
+        className="flex-1"
+      >
+        <Export size={14} />
+        CSV
+      </Button>
+    </>
   );
 
   if (loading) {
@@ -446,96 +519,38 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <>
-      <ExplorerPanel title="AUDIT LOGS">
-        <ExplorerContent />
-      </ExplorerPanel>
-
-      <DetailsPanel 
-        breadcrumb={[{ label: 'Audit Logs' }]}
-        title="Activity Log"
-        actions={
-          <Button variant="secondary" size="sm" onClick={loadLogs}>
-            <ArrowsClockwise size={14} />
-            Refresh
-          </Button>
-        }
-      >
-        <HelpCard variant="info" title="Audit Trail" className="mb-4" compact>
-          All user actions are logged for security and compliance. Logs can be exported for external analysis.
-        </HelpCard>
-
-        {/* Filters Row */}
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="flex-1 min-w-[200px]">
+    <PageLayout
+      title="Audit Logs"
+      focusTitle="Filters"
+      focusContent={focusContent}
+      focusActions={focusActions}
+      focusFooter={`${total} log entries`}
+      helpContent={helpContent}
+      helpTitle="Audit Logs - Aide"
+    >
+      {/* Main Content */}
+      <div className="p-6 space-y-4">
+        {/* Search Bar and Refresh */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
             <SearchBar
               value={search}
               onChange={setSearch}
               placeholder="Search logs..."
             />
           </div>
-          
-          <Select
-            value={filterUsername}
-            onChange={setFilterUsername}
-            placeholder="All Users"
-            className="w-32"
-          >
-            <option value="">All Users</option>
-            {uniqueUsernames.map(name => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </Select>
-          
-          <Select
-            value={filterAction}
-            onChange={setFilterAction}
-            placeholder="All Actions"
-            className="w-40"
-          >
-            <option value="">All Actions</option>
-            {(actions.actions || []).map(action => (
-              <option key={action} value={action}>{action.replace(/_/g, ' ')}</option>
-            ))}
-          </Select>
-          
-          <Select
-            value={filterSuccess}
-            onChange={setFilterSuccess}
-            placeholder="All Status"
-            className="w-28"
-          >
-            <option value="">All Status</option>
-            <option value="true">Success</option>
-            <option value="false">Failed</option>
-          </Select>
-          
-          <Input
-            type="date"
-            value={filterDateFrom}
-            onChange={(e) => setFilterDateFrom(e.target.value)}
-            className="w-36"
-            placeholder="From"
-          />
-          
-          <Input
-            type="date"
-            value={filterDateTo}
-            onChange={(e) => setFilterDateTo(e.target.value)}
-            className="w-36"
-            placeholder="To"
-          />
-          
-          {(search || filterUsername || filterAction || filterSuccess || filterDateFrom || filterDateTo) && (
-            <Button variant="ghost" size="sm" onClick={clearFilters}>
-              <XCircle size={14} />
-              Clear
-            </Button>
-          )}
+          <Button variant="secondary" size="sm" onClick={loadLogs}>
+            <ArrowsClockwise size={14} />
+            Refresh
+          </Button>
+          <Button variant="danger" size="sm" onClick={() => setShowCleanupModal(true)}>
+            <Trash size={14} />
+            Cleanup
+          </Button>
         </div>
 
         {/* Results info */}
-        <div className="mb-2 text-xs text-text-secondary">
+        <div className="text-xs text-text-secondary">
           Showing {logs.length} of {total} entries
           {(search || filterUsername || filterAction || filterSuccess || filterDateFrom || filterDateTo) && (
             <span className="ml-1">(filtered)</span>
@@ -568,116 +583,116 @@ export default function AuditLogsPage() {
             )}
           </>
         )}
+      </div>
 
-        {/* Log Detail Modal */}
-        <Modal
-          open={!!selectedLog}
-          onOpenChange={() => setSelectedLog(null)}
-          title="Log Details"
-          size="md"
-        >
-          {selectedLog && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs text-text-secondary mb-1">Timestamp</div>
-                  <div className="text-sm font-medium">
-                    {new Date(selectedLog.timestamp).toLocaleString()}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-text-secondary mb-1">User</div>
-                  <div className="text-sm font-medium">{selectedLog.username || 'system'}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-text-secondary mb-1">Action</div>
-                  <Badge variant={selectedLog.success ? 'emerald' : 'red'}>
-                    {selectedLog.action?.replace(/_/g, ' ')}
-                  </Badge>
-                </div>
-                <div>
-                  <div className="text-xs text-text-secondary mb-1">Resource</div>
-                  <div className="text-sm">
-                    {selectedLog.resource_type}
-                    {selectedLog.resource_id && ` #${selectedLog.resource_id}`}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-text-secondary mb-1">IP Address</div>
-                  <div className="text-sm font-mono">{selectedLog.ip_address || '-'}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-text-secondary mb-1">Status</div>
-                  <Badge variant={selectedLog.success ? 'emerald' : 'red'}>
-                    {selectedLog.success ? 'Success' : 'Failed'}
-                  </Badge>
+      {/* Log Detail Modal */}
+      <Modal
+        open={!!selectedLog}
+        onOpenChange={() => setSelectedLog(null)}
+        title="Log Details"
+        size="md"
+      >
+        {selectedLog && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-text-secondary mb-1">Timestamp</div>
+                <div className="text-sm font-medium">
+                  {new Date(selectedLog.timestamp).toLocaleString()}
                 </div>
               </div>
-              
-              {selectedLog.details && (
-                <div>
-                  <div className="text-xs text-text-secondary mb-1">Details</div>
-                  <div className="text-sm bg-bg-secondary p-2 rounded font-mono text-xs whitespace-pre-wrap">
-                    {selectedLog.details}
-                  </div>
+              <div>
+                <div className="text-xs text-text-secondary mb-1">User</div>
+                <div className="text-sm font-medium">{selectedLog.username || 'system'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary mb-1">Action</div>
+                <Badge variant={selectedLog.success ? 'emerald' : 'red'}>
+                  {selectedLog.action?.replace(/_/g, ' ')}
+                </Badge>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary mb-1">Resource</div>
+                <div className="text-sm">
+                  {selectedLog.resource_type}
+                  {selectedLog.resource_id && ` #${selectedLog.resource_id}`}
                 </div>
-              )}
-              
-              {selectedLog.user_agent && (
-                <div>
-                  <div className="text-xs text-text-secondary mb-1">User Agent</div>
-                  <div className="text-xs text-text-secondary font-mono break-all">
-                    {selectedLog.user_agent}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </Modal>
-
-        {/* Cleanup Modal */}
-        <Modal
-          open={showCleanupModal}
-          onOpenChange={setShowCleanupModal}
-          title="Cleanup Old Logs"
-          size="sm"
-        >
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">
-              Delete audit logs older than the specified number of days.
-              This action cannot be undone.
-            </p>
-            
-            <div>
-              <label className="block text-xs font-medium mb-1">Retention Days</label>
-              <Input
-                type="number"
-                min={30}
-                max={365}
-                value={cleanupDays}
-                onChange={(e) => setCleanupDays(Math.max(30, parseInt(e.target.value) || 90))}
-              />
-              <p className="text-xs text-text-secondary mt-1">
-                Minimum: 30 days
-              </p>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary mb-1">IP Address</div>
+                <div className="text-sm font-mono">{selectedLog.ip_address || '-'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary mb-1">Status</div>
+                <Badge variant={selectedLog.success ? 'emerald' : 'red'}>
+                  {selectedLog.success ? 'Success' : 'Failed'}
+                </Badge>
+              </div>
             </div>
             
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setShowCleanupModal(false)}>
-                Cancel
-              </Button>
-              <Button 
-                variant="danger" 
-                onClick={handleCleanup}
-                loading={cleanupLoading}
-              >
-                <Trash size={14} />
-                Delete Old Logs
-              </Button>
-            </div>
+            {selectedLog.details && (
+              <div>
+                <div className="text-xs text-text-secondary mb-1">Details</div>
+                <div className="text-sm bg-bg-secondary p-2 rounded font-mono text-xs whitespace-pre-wrap">
+                  {selectedLog.details}
+                </div>
+              </div>
+            )}
+            
+            {selectedLog.user_agent && (
+              <div>
+                <div className="text-xs text-text-secondary mb-1">User Agent</div>
+                <div className="text-xs text-text-secondary font-mono break-all">
+                  {selectedLog.user_agent}
+                </div>
+              </div>
+            )}
           </div>
-        </Modal>
-      </DetailsPanel>
-    </>
+        )}
+      </Modal>
+
+      {/* Cleanup Modal */}
+      <Modal
+        open={showCleanupModal}
+        onOpenChange={setShowCleanupModal}
+        title="Cleanup Old Logs"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            Delete audit logs older than the specified number of days.
+            This action cannot be undone.
+          </p>
+          
+          <div>
+            <label className="block text-xs font-medium mb-1">Retention Days</label>
+            <Input
+              type="number"
+              min={30}
+              max={365}
+              value={cleanupDays}
+              onChange={(e) => setCleanupDays(Math.max(30, parseInt(e.target.value) || 90))}
+            />
+            <p className="text-xs text-text-secondary mt-1">
+              Minimum: 30 days
+            </p>
+          </div>
+          
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setShowCleanupModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="danger" 
+              onClick={handleCleanup}
+              loading={cleanupLoading}
+            >
+              <Trash size={14} />
+              Delete Old Logs
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </PageLayout>
   );
 }

@@ -1,12 +1,13 @@
 /**
  * Account Page (User Profile)
+ * Uses PageLayout for consistent structure
  */
 import { useState, useEffect } from 'react'
-import { User, LockKey, Key, FloppyDisk, Fingerprint, Certificate } from '@phosphor-icons/react'
+import { User, LockKey, Key, FloppyDisk, Fingerprint, Certificate, Gear, Pulse } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Button, Input, Badge, Tabs, Card,
-  LoadingSpinner, Modal
-, HelpCard } from '../components'
+  PageLayout, FocusItem, Button, Input, Badge, Tabs, Card,
+  LoadingSpinner, Modal, HelpCard
+} from '../components'
 import { accountService } from '../services'
 import { useAuth, useNotification } from '../contexts'
 
@@ -23,6 +24,7 @@ export default function AccountPage() {
   const [show2FAModal, setShow2FAModal] = useState(false)
   const [qrData, setQrData] = useState(null)
   const [confirmCode, setConfirmCode] = useState('')
+  const [activeSection, setActiveSection] = useState('profile')
   
   // WebAuthn state
   const [webauthnCredentials, setWebauthnCredentials] = useState([])
@@ -606,6 +608,102 @@ export default function AccountPage() {
     },
   ]
 
+  // Profile sections for focus panel
+  const profileSections = [
+    { id: 'profile', title: 'Personal Info', subtitle: 'Username, email, name', icon: User },
+    { id: 'security', title: 'Security', subtitle: 'Password, 2FA, keys', icon: LockKey },
+    { id: 'api-keys', title: 'API Keys', subtitle: `${apiKeys.length} key(s)`, icon: Key },
+    { id: 'activity', title: 'Pulse', subtitle: 'Sessions & logins', icon: Pulse },
+  ]
+
+  // Help content for modal
+  const helpContent = (
+    <div className="space-y-4">
+      {/* Account Overview */}
+      <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <User size={16} className="text-accent-primary" />
+          Account Overview
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-text-primary">{apiKeys.length}</p>
+            <p className="text-xs text-text-secondary">API Keys</p>
+          </div>
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-2xl font-bold text-text-primary">{webauthnCredentials.length}</p>
+            <p className="text-xs text-text-secondary">Security Keys</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Security Status */}
+      <Card className={`p-4 space-y-3 bg-gradient-to-br ${accountData.two_factor_enabled ? 'from-emerald-500/10' : 'from-amber-500/10'}`}>
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+          <LockKey size={16} className="text-accent-primary" />
+          Security Status
+        </h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">2FA</span>
+            <Badge variant={accountData.two_factor_enabled ? 'success' : 'warning'}>
+              {accountData.two_factor_enabled ? 'Enabled' : 'Disabled'}
+            </Badge>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">mTLS Certs</span>
+            <span className="text-sm font-medium text-text-primary">{mtlsCertificates.length}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-secondary">Role</span>
+            <Badge variant={user?.role === 'admin' ? 'primary' : 'secondary'}>
+              {user?.role || 'User'}
+            </Badge>
+          </div>
+        </div>
+      </Card>
+
+      {/* Help Cards */}
+      <div className="space-y-3">
+        <HelpCard variant="info" title="Account Management">
+          Manage your profile information, security settings, and API access from this page.
+          Keep your contact information up to date for important notifications.
+        </HelpCard>
+        
+        <HelpCard variant="tip" title="Security Best Practices">
+          Enable two-factor authentication and use security keys (WebAuthn) for maximum protection.
+          Rotate API keys regularly and never share them.
+        </HelpCard>
+
+        <HelpCard variant="warning" title="API Key Security">
+          API keys provide full access to your account. Keep them secure, store them safely,
+          and delete unused keys immediately.
+        </HelpCard>
+      </div>
+    </div>
+  )
+
+  // Focus panel content (profile sections list)
+  const focusContent = (
+    <div className="p-2 space-y-1.5">
+      {profileSections.map((section) => (
+        <FocusItem
+          key={section.id}
+          icon={section.icon}
+          title={section.title}
+          subtitle={section.subtitle}
+          badge={section.id === 'security' && accountData.two_factor_enabled ? (
+            <Badge variant="success" size="sm">2FA</Badge>
+          ) : section.id === 'api-keys' && apiKeys.length > 0 ? (
+            <Badge variant="primary" size="sm">{apiKeys.length}</Badge>
+          ) : null}
+          selected={activeSection === section.id}
+          onClick={() => setActiveSection(section.id)}
+        />
+      ))}
+    </div>
+  )
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -615,65 +713,18 @@ export default function AccountPage() {
   }
 
   return (
-    <>
-      <ExplorerPanel title="My Account">
-        <div className="p-3 space-y-4">
-          {/* User Info Card */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">User Info</h3>
-            <Card className="p-3 space-y-2 bg-gradient-to-br from-accent/5 to-transparent border-accent/20">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-text-secondary">Username</span>
-                <span className="text-text-primary font-medium">{user?.username || 'N/A'}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-text-secondary">Email</span>
-                <span className="text-text-primary font-medium truncate max-w-[120px]">{user?.email || 'N/A'}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-text-secondary">Role</span>
-                <Badge variant={user?.role === 'admin' ? 'emerald' : 'blue'} size="sm">
-                  {user?.role || 'User'}
-                </Badge>
-              </div>
-            </Card>
-          </div>
-
-          {/* Session Info Card */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Session Info</h3>
-            <Card className="p-3 space-y-2 bg-gradient-to-br from-emerald-500/5 to-transparent border-emerald-500/20">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-text-secondary">Status</span>
-                <Badge variant="emerald" size="sm">Active</Badge>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-text-secondary">API Keys</span>
-                <Badge variant="blue" size="sm">{apiKeys.length}</Badge>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-text-secondary">WebAuthn</span>
-                <Badge variant="purple" size="sm">{webauthnCredentials.length}</Badge>
-              </div>
-            </Card>
-          </div>
-
-          {/* Quick Help */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Quick Help</h3>
-            <div className="text-xs text-text-secondary space-y-1.5 px-1">
-              <p>• Update your profile information</p>
-              <p>• Change your password regularly</p>
-              <p>• Manage API keys for automation</p>
-              <p>• Add WebAuthn security keys</p>
-            </div>
-          </div>
-        </div>
-      </ExplorerPanel>
-
-      <DetailsPanel>
-        <Tabs tabs={tabs} defaultTab="profile" />
-      </DetailsPanel>
+    <PageLayout
+      title="My Account"
+      focusTitle="Profile"
+      focusContent={focusContent}
+      focusFooter={`${user?.username || 'User'} • ${user?.role || 'User'}`}
+      helpContent={helpContent}
+      helpTitle="My Account - Aide"
+    >
+      {/* Main Content - Tabs */}
+      <div className="p-6">
+        <Tabs tabs={tabs} defaultTab="profile" activeTab={activeSection} onTabChange={setActiveSection} />
+      </div>
 
       {/* Change Password Modal */}
       <Modal
@@ -855,7 +906,7 @@ export default function AccountPage() {
           </div>
         </div>
       </Modal>
-    </>
+    </PageLayout>
   )
 }
 
