@@ -149,7 +149,7 @@ export function PageLayout({
 
       {/* Focus Panel (right sidebar) */}
       {focusContent && focusOpen && (
-        <div className="w-72 border-l border-border bg-bg-secondary flex flex-col min-h-0 shrink-0">
+        <div className="w-80 xl:w-96 2xl:w-[420px] min-[1800px]:w-[500px] border-l border-border bg-bg-secondary flex flex-col min-h-0 shrink-0">
           {/* Focus Header */}
           <div className="px-4 py-3 border-b border-border shrink-0">
             <div className="flex items-center justify-between">
