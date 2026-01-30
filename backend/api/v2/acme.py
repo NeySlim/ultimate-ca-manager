@@ -18,14 +18,22 @@ def get_acme_settings():
     # Get settings from SystemConfig
     enabled_cfg = SystemConfig.query.filter_by(key='acme.enabled').first()
     ca_id_cfg = SystemConfig.query.filter_by(key='acme.issuing_ca_id').first()
+    proxy_email_cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
     
     enabled = enabled_cfg.value == 'true' if enabled_cfg else True
     ca_id = ca_id_cfg.value if ca_id_cfg else None
+    proxy_email = proxy_email_cfg.value if proxy_email_cfg else None
     
     # Get CA name if CA ID is set
     ca_name = None
     if ca_id:
         ca = CA.query.filter_by(refid=ca_id).first()
+        if not ca:
+            # Try by ID
+            try:
+                ca = CA.query.get(int(ca_id))
+            except:
+                pass
         if ca:
             ca_name = ca.common_name
     
@@ -34,7 +42,9 @@ def get_acme_settings():
         'issuing_ca_id': ca_id,
         'issuing_ca_name': ca_name,
         'provider': 'Built-in ACME Server',
-        'contact_email': 'admin@ucm.local'
+        'contact_email': 'admin@ucm.local',
+        'proxy_email': proxy_email,
+        'proxy_registered': bool(proxy_email)
     })
 
 
@@ -156,7 +166,32 @@ def register_proxy_account():
     if not data or not data.get('email'):
         return error_response('Email is required', 400)
     
+    email = data['email']
+    
+    # Store proxy email in SystemConfig
+    proxy_cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
+    if not proxy_cfg:
+        proxy_cfg = SystemConfig(key='acme.proxy_email', description='ACME proxy account email')
+        db.session.add(proxy_cfg)
+    proxy_cfg.value = email
+    db.session.commit()
+    
     return success_response(
-        data={'registered': True, 'email': data['email']},
+        data={'registered': True, 'email': email},
         message='Proxy account registered'
+    )
+
+
+@bp.route('/api/v2/acme/proxy/unregister', methods=['POST'])
+@require_auth(['write:acme'])
+def unregister_proxy_account():
+    """Unregister ACME proxy account"""
+    proxy_cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
+    if proxy_cfg:
+        db.session.delete(proxy_cfg)
+        db.session.commit()
+    
+    return success_response(
+        data={'registered': False},
+        message='Proxy account unregistered'
     )
