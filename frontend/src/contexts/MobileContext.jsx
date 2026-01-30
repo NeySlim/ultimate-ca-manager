@@ -1,5 +1,5 @@
 /**
- * Mobile Context - Manages mobile layout state
+ * Mobile Context - Manages responsive layout state
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
@@ -7,18 +7,22 @@ const MobileContext = createContext(null)
 
 export function MobileProvider({ children }) {
   const [isMobile, setIsMobile] = useState(false)
+  const [isLargeScreen, setIsLargeScreen] = useState(false)
   const [explorerOpen, setExplorerOpen] = useState(false)
 
   useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth < 1024
+    const checkScreen = () => {
+      const width = window.innerWidth
+      const mobile = width < 1024
+      const large = width >= 1300
       setIsMobile(mobile)
+      setIsLargeScreen(large)
       // Close explorer when switching to desktop
       if (!mobile) setExplorerOpen(false)
     }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+    checkScreen()
+    window.addEventListener('resize', checkScreen)
+    return () => window.removeEventListener('resize', checkScreen)
   }, [])
 
   // Close explorer when item is selected (for mobile)
@@ -30,11 +34,12 @@ export function MobileProvider({ children }) {
 
   const value = {
     isMobile,
+    isLargeScreen, // >= 1300px
     explorerOpen,
     openExplorer: () => setExplorerOpen(true),
     closeExplorer: () => setExplorerOpen(false),
     toggleExplorer: () => setExplorerOpen(prev => !prev),
-    closeOnSelect // Call this when an item is selected
+    closeOnSelect
   }
 
   return (
@@ -47,9 +52,9 @@ export function MobileProvider({ children }) {
 export function useMobile() {
   const context = useContext(MobileContext)
   if (!context) {
-    // Return default values if not wrapped in provider
     return {
       isMobile: false,
+      isLargeScreen: false,
       explorerOpen: false,
       openExplorer: () => {},
       closeExplorer: () => {},
