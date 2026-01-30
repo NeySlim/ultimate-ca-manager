@@ -509,7 +509,7 @@ export default function ImportExportPage() {
               />
               
               <div className="flex gap-3 pt-2">
-                <Button onClick={handleImportCertificate} disabled={processing || (!selectedFile && !pemContent.trim())}>
+                <Button size="sm" onClick={handleImportCertificate} disabled={processing || (!selectedFile && !pemContent.trim())}>
                   {processing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
                   Import Certificate
                 </Button>
@@ -570,7 +570,7 @@ export default function ImportExportPage() {
               />
               
               <div className="flex gap-3 pt-2">
-                <Button onClick={handleImportCA} disabled={processing || (!selectedFile && !pemContent.trim())}>
+                <Button size="sm" onClick={handleImportCA} disabled={processing || (!selectedFile && !pemContent.trim())}>
                   {processing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
                   Import CA
                 </Button>
@@ -633,13 +633,13 @@ export default function ImportExportPage() {
                 placeholder="Enter API Secret" />
               
               <div className="flex gap-3 pt-2">
-                <Button variant="secondary" onClick={handleSaveConfig} disabled={processing}>
+                <Button size="sm" variant="secondary" onClick={handleSaveConfig} disabled={processing}>
                   <FloppyDisk size={16} />Save Conf
                 </Button>
-                <Button variant="secondary" onClick={handleTestConf} disabled={processing}>
+                <Button size="sm" variant="secondary" onClick={handleTestConf} disabled={processing}>
                   {processing ? <LoadingSpinner size="sm" /> : <Flask size={16} />}Test Conf
                 </Button>
-                <Button onClick={handleImport} disabled={processing || !testResult}>
+                <Button size="sm" onClick={handleImport} disabled={processing || !testResult}>
                   {processing ? <LoadingSpinner size="sm" /> : <UploadSimple size={16} />}Import
                 </Button>
               </div>

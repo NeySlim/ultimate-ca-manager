@@ -499,7 +499,7 @@ export default function SCEPPage() {
 
             {hasPermission('write:scep') && (
               <div className="flex justify-end">
-                <Button onClick={handleSaveConfig} disabled={saving}>
+                <Button size="sm" onClick={handleSaveConfig} disabled={saving}>
                   {saving ? <LoadingSpinner size="sm" /> : <Gear size={16} />}
                   {saving ? 'Saving...' : 'Save Configuration'}
                 </Button>
@@ -682,8 +682,8 @@ crypto ca enroll UCM-CA`}
             rows={3}
           />
           <div className="flex gap-3 justify-end pt-2">
-            <Button variant="secondary" onClick={() => setShowRejectModal(false)}>Cancel</Button>
-            <Button variant="danger" onClick={handleReject}>
+            <Button size="sm" variant="secondary" onClick={() => setShowRejectModal(false)}>Cancel</Button>
+            <Button size="sm" variant="danger" onClick={handleReject}>
               <XCircle size={16} />
               Reject Request
             </Button>

@@ -444,10 +444,10 @@ export default function TrustStorePage() {
             onChange={(e) => setAddForm(prev => ({ ...prev, notes: e.target.value }))}
           />
           <div className="flex gap-2 justify-end pt-4 border-t border-border">
-            <Button variant="ghost" onClick={() => closeModal('add')}>
+            <Button size="sm" variant="ghost" onClick={() => closeModal('add')}>
               Cancel
             </Button>
-            <Button onClick={handleAdd} disabled={adding}>
+            <Button size="sm" onClick={handleAdd} disabled={adding}>
               {adding ? 'Adding...' : 'Add Certificate'}
             </Button>
           </div>

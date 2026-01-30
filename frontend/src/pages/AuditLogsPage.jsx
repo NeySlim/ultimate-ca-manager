@@ -679,7 +679,7 @@ export default function AuditLogsPage() {
           </div>
           
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowCleanupModal(false)}>
+            <Button size="sm" variant="secondary" onClick={() => setShowCleanupModal(false)}>
               Cancel
             </Button>
             <Button 
