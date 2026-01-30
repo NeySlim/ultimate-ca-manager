@@ -58,9 +58,8 @@ export function Sidebar({ activePage }) {
   ]
 
   // Pro-only pages (only shown when license is active)
-  // SSO is now in Settings, not a separate page
+  // SSO is now in Settings, Groups is now in Users
   const proPages = [
-    { id: 'groups', icon: UsersThree, label: 'Groups', path: '/groups' },
     { id: 'rbac', icon: Shield, label: 'RBAC', path: '/rbac' },
     { id: 'hsm', icon: Lock, label: 'HSM', path: '/hsm' },
   ]

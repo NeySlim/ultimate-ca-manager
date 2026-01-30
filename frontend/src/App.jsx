@@ -20,15 +20,9 @@ const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'))
 const CRLOCSPPage = lazy(() => import('./pages/CRLOCSPPage'))
 const TrustStorePage = lazy(() => import('./pages/TrustStorePage'))
 
-// Pro pages - lazy load with graceful fallback
-const GroupsPage = lazy(() => 
-  import('./pro/pages/GroupsPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
-)
+// Pro pages - lazy load with graceful fallback (will fail silently in Community)
 const RBACPage = lazy(() => 
   import('./pro/pages/RBACPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
-)
-const SSOPage = lazy(() => 
-  import('./pro/pages/SSOPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
 )
 const HSMPage = lazy(() => 
   import('./pro/pages/HSMPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
@@ -81,10 +75,10 @@ function AppRoutes() {
           <Route path="/crl-ocsp" element={<ProtectedRoute><CRLOCSPPage /></ProtectedRoute>} />
           <Route path="/truststore" element={<ProtectedRoute><TrustStorePage /></ProtectedRoute>} />
           
-          {/* Pro Routes */}
-          <Route path="/groups" element={<ProtectedRoute><GroupsPage /></ProtectedRoute>} />
+          {/* Pro Routes - redirect integrated pages, lazy load standalone */}
+          <Route path="/groups" element={<Navigate to="/users?tab=groups" replace />} />
           <Route path="/rbac" element={<ProtectedRoute><RBACPage /></ProtectedRoute>} />
-          <Route path="/sso" element={<ProtectedRoute><SSOPage /></ProtectedRoute>} />
+          <Route path="/sso" element={<Navigate to="/settings?tab=sso" replace />} />
           <Route path="/hsm" element={<ProtectedRoute><HSMPage /></ProtectedRoute>} />
         </Route>
         
