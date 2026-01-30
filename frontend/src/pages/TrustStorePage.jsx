@@ -9,7 +9,8 @@ import {
 } from '@phosphor-icons/react'
 import {
   PageLayout, FocusItem, Button, Input, Card, Badge, 
-  Modal, Textarea, LoadingSpinner, EmptyState, HelpCard
+  Modal, Textarea, LoadingSpinner, EmptyState, HelpCard,
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
 } from '../components'
 import { truststoreService } from '../services'
 import { useNotification } from '../contexts'
@@ -310,89 +311,54 @@ export default function TrustStorePage() {
             />
           </div>
         ) : (
-          <div className="p-6 space-y-6">
-            {/* Certificate Info */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
-                Certificate Information
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <p className="text-xs text-text-secondary uppercase mb-1">Name</p>
-                  <p className="text-sm text-text-primary">{selectedCert.name}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-text-secondary uppercase mb-1">Subject</p>
-                  <p className="text-xs font-mono text-text-primary break-all">{selectedCert.subject}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-text-secondary uppercase mb-1">Issuer</p>
-                  <p className="text-xs font-mono text-text-primary break-all">{selectedCert.issuer}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Purpose</p>
-                  {getPurposeBadge(selectedCert.purpose)}
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Serial Number</p>
-                  <p className="text-xs font-mono text-text-primary">{selectedCert.serial_number}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Valid From</p>
-                  <p className="text-sm text-text-primary">
-                    {selectedCert.not_before ? formatDate(selectedCert.not_before) : '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">Valid Until</p>
-                  <p className="text-sm text-text-primary">
-                    {selectedCert.not_after ? formatDate(selectedCert.not_after) : '-'}
-                  </p>
-                </div>
-              </div>
+          <>
+            {/* Header with gradient card style */}
+            <div className="p-4 md:p-6">
+              <DetailHeader
+                icon={ShieldCheck}
+                title={selectedCert.name}
+                subtitle={selectedCert.subject}
+                badge={getPurposeBadge(selectedCert.purpose)}
+                actions={[
+                  {
+                    label: 'Export PEM',
+                    icon: Download,
+                    onClick: () => handleExport(selectedCert)
+                  },
+                  ...(canDelete ? [{
+                    label: 'Remove',
+                    icon: Trash,
+                    variant: 'danger',
+                    onClick: () => handleDelete(selectedCert.id)
+                  }] : [])
+                ]}
+              />
             </div>
 
-            {/* Fingerprints */}
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-4 uppercase tracking-wide">
-                Fingerprints
-              </h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">SHA-256</p>
-                  <code className="text-xs font-mono text-text-primary bg-bg-tertiary px-2 py-1 rounded block break-all">
-                    {selectedCert.fingerprint_sha256 || '-'}
-                  </code>
-                </div>
-                <div>
-                  <p className="text-xs text-text-secondary uppercase mb-1">SHA-1</p>
-                  <code className="text-xs font-mono text-text-primary bg-bg-tertiary px-2 py-1 rounded block break-all">
-                    {selectedCert.fingerprint_sha1 || '-'}
-                  </code>
-                </div>
-              </div>
-            </div>
+            {/* Content */}
+            <DetailContent>
+              {/* Certificate Information */}
+              <DetailSection title="Certificate Information">
+                <DetailGrid columns={2}>
+                  <DetailField label="Name" value={selectedCert.name} />
+                  <DetailField label="Purpose" value={selectedCert.purpose?.replace('_', ' ')} />
+                  <DetailField label="Subject" value={selectedCert.subject} mono copyable fullWidth />
+                  <DetailField label="Issuer" value={selectedCert.issuer} mono copyable fullWidth />
+                  <DetailField label="Serial Number" value={selectedCert.serial_number} mono copyable />
+                  <DetailField label="Valid From" value={selectedCert.not_before ? formatDate(selectedCert.not_before) : null} />
+                  <DetailField label="Valid Until" value={selectedCert.not_after ? formatDate(selectedCert.not_after) : null} />
+                </DetailGrid>
+              </DetailSection>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-4 border-t border-border">
-              <Button 
-                variant="secondary"
-                onClick={() => handleExport(selectedCert)}
-              >
-                <Download size={16} />
-                Export PEM
-              </Button>
-              {canDelete && (
-                <Button 
-                  variant="danger"
-                  onClick={() => handleDelete(selectedCert.id)}
-                >
-                  <Trash size={16} />
-                  Remove
-                </Button>
-              )}
-            </div>
-          </div>
+              {/* Fingerprints */}
+              <DetailSection title="Fingerprints">
+                <DetailGrid columns={1}>
+                  <DetailField label="SHA-256" value={selectedCert.fingerprint_sha256} mono copyable fullWidth />
+                  <DetailField label="SHA-1" value={selectedCert.fingerprint_sha1} mono copyable fullWidth />
+                </DetailGrid>
+              </DetailSection>
+            </DetailContent>
+          </>
         )}
       </PageLayout>
 

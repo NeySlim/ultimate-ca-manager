@@ -5,14 +5,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { 
   List, Plus, Copy, Trash, FloppyDisk, Download, FileArrowUp,
-  MagnifyingGlass, Database, Files
+  MagnifyingGlass, Database, Files, FileText, PencilSimple, Calendar
 } from '@phosphor-icons/react'
 import {
   PageLayout, FocusItem, Button, Badge, Card,
   Input, Select, Textarea, Modal,
   LoadingSpinner, EmptyState, HelpCard,
-  ContentHeader, ContentBody, ResponsiveContentSection as ContentSection,
-  DataGrid, DataField
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
 } from '../components'
 import { templatesService } from '../services'
 import { useNotification } from '../contexts'
@@ -363,180 +362,173 @@ export default function TemplatesPage() {
             />
           </div>
         ) : (
-          <div className="flex flex-col h-full">
-            {/* Responsive Header with actions */}
-            <ContentHeader
-              title={selectedTemplate.name}
-              subtitle={`Type: ${selectedTemplate.type} • ${selectedTemplate.usage_count || 0} certificates issued`}
-              badge={
-                <Badge variant={selectedTemplate.type === 'ca' ? 'warning' : 'secondary'} size="sm">
-                  {selectedTemplate.type}
-                </Badge>
-              }
-              actions={[
-                ...(canWrite('templates') ? [
-                  editing ? {
-                    label: 'Save',
-                    icon: FloppyDisk,
-                    variant: 'primary',
-                    onClick: handleSave,
-                  } : {
-                    label: 'Edit',
-                    icon: List,
-                    onClick: () => setEditing(true),
-                  }
-                ] : []),
-                {
-                  label: 'Export',
-                  icon: Download,
-                  onClick: () => handleExportTemplate(selectedTemplate.id),
-                },
-                ...(canWrite('templates') ? [{
-                  label: 'Duplicate',
-                  icon: Copy,
-                  onClick: () => handleDuplicate(selectedTemplate.id),
-                }] : []),
-                ...(canDelete('templates') ? [{
-                  label: 'Delete',
-                  icon: Trash,
-                  variant: 'danger',
-                  onClick: () => handleDelete(selectedTemplate.id),
-                }] : []),
-              ]}
-            />
+          <>
+            {/* Header with gradient card style */}
+            <div className="p-4 md:p-6">
+              <DetailHeader
+                icon={FileText}
+                title={selectedTemplate.name}
+                subtitle={`${selectedTemplate.usage_count || 0} certificates issued using this template`}
+                badge={
+                  <Badge 
+                    variant={selectedTemplate.type === 'ca' ? 'warning' : 'secondary'} 
+                    size="lg"
+                  >
+                    {selectedTemplate.type === 'ca' ? 'CA Template' : 'Certificate Template'}
+                  </Badge>
+                }
+                stats={[
+                  { icon: Calendar, label: 'Validity:', value: `${formData.validity_days || 365} days` },
+                  { icon: Files, label: 'Used:', value: `${selectedTemplate.usage_count || 0} times` },
+                ]}
+                actions={[
+                  ...(canWrite('templates') ? [
+                    editing ? {
+                      label: 'Save',
+                      icon: FloppyDisk,
+                      variant: 'primary',
+                      onClick: handleSave,
+                    } : {
+                      label: 'Edit',
+                      icon: PencilSimple,
+                      onClick: () => setEditing(true),
+                    }
+                  ] : []),
+                  {
+                    label: 'Export',
+                    icon: Download,
+                    onClick: () => handleExportTemplate(selectedTemplate.id),
+                  },
+                  ...(canWrite('templates') ? [{
+                    label: 'Duplicate',
+                    icon: Copy,
+                    onClick: () => handleDuplicate(selectedTemplate.id),
+                  }] : []),
+                  ...(canDelete('templates') ? [{
+                    label: 'Delete',
+                    icon: Trash,
+                    variant: 'danger',
+                    onClick: () => handleDelete(selectedTemplate.id),
+                  }] : []),
+                ]}
+              />
+            </div>
 
-            {/* Content Body */}
-            <ContentBody>
+            {/* Content */}
+            <DetailContent>
               {/* Basic Information */}
-              <ContentSection title="Basic Information">
-                <div className="space-y-4">
-                  <Input
-                    label="Template Name"
-                    value={formData.name || ''}
-                    onChange={(e) => updateFormData('name', e.target.value)}
-                    disabled={!editing}
-                  />
-                  <Textarea
-                    label="Description"
-                    value={formData.description || ''}
-                    onChange={(e) => updateFormData('description', e.target.value)}
-                    disabled={!editing}
-                    rows={3}
-                  />
-                  <Select
-                    label="Type"
-                    options={[
-                      { value: 'certificate', label: 'Certificate' },
-                      { value: 'ca', label: 'Certificate Authority' },
-                    ]}
-                    value={formData.type || 'certificate'}
-                    onChange={(val) => updateFormData('type', val)}
-                    disabled={!editing}
-                  />
-                </div>
-              </ContentSection>
+              <DetailSection title="Basic Information">
+                {editing ? (
+                  <div className="space-y-4">
+                    <Input
+                      label="Template Name"
+                      value={formData.name || ''}
+                      onChange={(e) => updateFormData('name', e.target.value)}
+                    />
+                    <Textarea
+                      label="Description"
+                      value={formData.description || ''}
+                      onChange={(e) => updateFormData('description', e.target.value)}
+                      rows={3}
+                    />
+                    <Select
+                      label="Type"
+                      options={[
+                        { value: 'certificate', label: 'Certificate' },
+                        { value: 'ca', label: 'Certificate Authority' },
+                      ]}
+                      value={formData.type || 'certificate'}
+                      onChange={(val) => updateFormData('type', val)}
+                    />
+                  </div>
+                ) : (
+                  <DetailGrid columns={2}>
+                    <DetailField label="Template Name" value={formData.name} />
+                    <DetailField label="Type" value={formData.type === 'ca' ? 'Certificate Authority' : 'Certificate'} />
+                    <DetailField label="Description" value={formData.description} fullWidth />
+                  </DetailGrid>
+                )}
+              </DetailSection>
 
               {/* Validity Period */}
-              <ContentSection title="Validity Period">
-                <DataGrid columns={2}>
-                  {editing ? (
-                    <>
-                      <Input
-                        label="Default Validity (days)"
-                        type="number"
-                        value={formData.validity_days || 365}
-                        onChange={(e) => updateFormData('validity_days', parseInt(e.target.value))}
-                      />
-                      <Input
-                        label="Max Validity (days)"
-                        type="number"
-                        value={formData.max_validity_days || 3650}
-                        onChange={(e) => updateFormData('max_validity_days', parseInt(e.target.value))}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <DataField 
-                        label="Default Validity"
-                        value={`${formData.validity_days || 365} days`}
-                      />
-                      <DataField 
-                        label="Max Validity"
-                        value={`${formData.max_validity_days || 3650} days`}
-                      />
-                    </>
-                  )}
-                </DataGrid>
-              </ContentSection>
+              <DetailSection title="Validity Period">
+                {editing ? (
+                  <DetailGrid columns={2}>
+                    <Input
+                      label="Default Validity (days)"
+                      type="number"
+                      value={formData.validity_days || 365}
+                      onChange={(e) => updateFormData('validity_days', parseInt(e.target.value))}
+                    />
+                    <Input
+                      label="Max Validity (days)"
+                      type="number"
+                      value={formData.max_validity_days || 3650}
+                      onChange={(e) => updateFormData('max_validity_days', parseInt(e.target.value))}
+                    />
+                  </DetailGrid>
+                ) : (
+                  <DetailGrid columns={2}>
+                    <DetailField label="Default Validity" value={`${formData.validity_days || 365} days`} />
+                    <DetailField label="Max Validity" value={`${formData.max_validity_days || 3650} days`} />
+                  </DetailGrid>
+                )}
+              </DetailSection>
 
               {/* Subject Template */}
-              <ContentSection title="Subject Template">
-                <DataGrid columns={2}>
-                  {editing ? (
-                    <>
-                      <Input
-                        label="Country (C)"
-                        value={formData.subject?.C || ''}
-                        onChange={(e) => updateSubject('C', e.target.value)}
-                        placeholder="US"
-                      />
-                      <Input
-                        label="State (ST)"
-                        value={formData.subject?.ST || ''}
-                        onChange={(e) => updateSubject('ST', e.target.value)}
-                        placeholder="California"
-                      />
-                      <Input
-                        label="Organization (O)"
-                        value={formData.subject?.O || ''}
-                        onChange={(e) => updateSubject('O', e.target.value)}
-                        placeholder="Example Corp"
-                      />
-                      <Input
-                        label="Common Name (CN)"
-                        value={formData.subject?.CN || ''}
-                        onChange={(e) => updateSubject('CN', e.target.value)}
-                        placeholder="*.example.com"
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <DataField 
-                        label="Country (C)"
-                        value={formData.subject?.C}
-                      />
-                      <DataField 
-                        label="State (ST)"
-                        value={formData.subject?.ST}
-                      />
-                      <DataField 
-                        label="Organization (O)"
-                        value={formData.subject?.O}
-                      />
-                      <DataField 
-                        label="Common Name (CN)"
-                        value={formData.subject?.CN}
-                      />
-                    </>
-                  )}
-                </DataGrid>
-              </ContentSection>
+              <DetailSection title="Subject Template">
+                {editing ? (
+                  <DetailGrid columns={2}>
+                    <Input
+                      label="Country (C)"
+                      value={formData.subject?.C || ''}
+                      onChange={(e) => updateSubject('C', e.target.value)}
+                      placeholder="US"
+                    />
+                    <Input
+                      label="State (ST)"
+                      value={formData.subject?.ST || ''}
+                      onChange={(e) => updateSubject('ST', e.target.value)}
+                      placeholder="California"
+                    />
+                    <Input
+                      label="Organization (O)"
+                      value={formData.subject?.O || ''}
+                      onChange={(e) => updateSubject('O', e.target.value)}
+                      placeholder="Example Corp"
+                    />
+                    <Input
+                      label="Common Name (CN)"
+                      value={formData.subject?.CN || ''}
+                      onChange={(e) => updateSubject('CN', e.target.value)}
+                      placeholder="*.example.com"
+                    />
+                  </DetailGrid>
+                ) : (
+                  <DetailGrid columns={2}>
+                    <DetailField label="Country (C)" value={formData.subject?.C} />
+                    <DetailField label="State (ST)" value={formData.subject?.ST} />
+                    <DetailField label="Organization (O)" value={formData.subject?.O} />
+                    <DetailField label="Common Name (CN)" value={formData.subject?.CN} />
+                  </DetailGrid>
+                )}
+              </DetailSection>
 
               {/* Usage Summary */}
-              <ContentSection title="Usage Summary">
-                <DataGrid columns={2}>
-                  <DataField 
+              <DetailSection title="Usage Summary">
+                <DetailGrid columns={2}>
+                  <DetailField 
                     label="Key Usage"
                     value={formData.key_usage?.length > 0 ? formData.key_usage.join(', ') : 'None'}
                   />
-                  <DataField 
+                  <DetailField 
                     label="Extended Key Usage"
                     value={formData.extended_key_usage?.length > 0 ? formData.extended_key_usage.join(', ') : 'None'}
                   />
-                </DataGrid>
-              </ContentSection>
-            </ContentBody>
-          </div>
+                </DetailGrid>
+              </DetailSection>
+            </DetailContent>
+          </>
         )}
       </PageLayout>
 

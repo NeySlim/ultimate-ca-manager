@@ -5,14 +5,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { 
   Certificate, Download, X, ArrowsClockwise, Trash, UploadSimple,
-  ShieldCheck, Clock, Warning, Database
+  ShieldCheck, Clock, Warning, Database, CheckCircle, Key
 } from '@phosphor-icons/react'
 import {
   PageLayout, FocusItem, Table, Button, Badge, Card,
   StatusIndicator, Modal, Input, Select, ExportDropdown,
   Tabs, LoadingSpinner, EmptyState, HelpCard,
-  ContentHeader, ContentBody, ResponsiveContentSection as ContentSection, 
-  DataGrid, DataField, TabsResponsive
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailDivider, DetailContent, DetailTabs
 } from '../components'
 import { certificatesService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -41,7 +40,7 @@ export default function CertificatesPage() {
   const [importPassword, setImportPassword] = useState('')
   const [importCaId, setImportCaId] = useState('auto')
   const [importing, setImporting] = useState(false)
-  const [activeDetailTab, setActiveDetailTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('overview')
   const importFileRef = useRef(null)
 
   useEffect(() => {
@@ -225,292 +224,6 @@ export default function CertificatesPage() {
   const expiredCount = certificates.filter(c => c.status === 'expired').length
   const revokedCount = certificates.filter(c => c.status === 'revoked' || c.revoked).length
 
-  // Detail tabs for selected certificate (responsive format)
-  const detailTabs = selectedCert ? [
-    {
-      id: 'overview',
-      label: 'Overview',
-      icon: Certificate,
-      content: (
-        <div className="space-y-6">
-          {/* Status & Type */}
-          <DataGrid columns={2}>
-            <DataField 
-              label="Status" 
-              value={
-                <div className="flex items-center gap-2">
-                  <StatusIndicator status={selectedCert.status} />
-                  <Badge variant={
-                    selectedCert.revoked ? 'danger' : 
-                    selectedCert.status === 'expired' ? 'danger' :
-                    selectedCert.status === 'expiring' ? 'warning' :
-                    selectedCert.status === 'valid' ? 'success' :
-                    'secondary'
-                  }>
-                    {selectedCert.revoked ? 'Revoked' : selectedCert.status || 'Active'}
-                  </Badge>
-                </div>
-              }
-            />
-            <DataField 
-              label="Certificate Type" 
-              value={<Badge variant="secondary">{selectedCert.cert_type || 'Standard'}</Badge>}
-            />
-          </DataGrid>
-
-          {/* Subject Information */}
-          <ContentSection title="Subject Information">
-            <DataGrid columns={2}>
-              <DataField 
-                label="Common Name (CN)" 
-                value={selectedCert.common_name} 
-                fullWidth
-              />
-              {selectedCert.organization && (
-                <DataField 
-                  label="Organization (O)" 
-                  value={selectedCert.organization} 
-                  fullWidth
-                />
-              )}
-              {selectedCert.organizational_unit && (
-                <DataField 
-                  label="Organizational Unit (OU)" 
-                  value={selectedCert.organizational_unit} 
-                  fullWidth
-                />
-              )}
-            </DataGrid>
-          </ContentSection>
-
-          {/* Certificate Details */}
-          <ContentSection title="Certificate Details">
-            <DataGrid columns={2}>
-              <DataField 
-                label="Serial Number" 
-                value={selectedCert.serial_number} 
-                mono 
-                copyable 
-                fullWidth
-              />
-              <DataField 
-                label="Valid From" 
-                value={formatDate(selectedCert.valid_from)}
-              />
-              <DataField 
-                label="Valid Until" 
-                value={formatDate(selectedCert.valid_to)}
-              />
-              <DataField 
-                label="Key Algorithm" 
-                value={selectedCert.key_algorithm || selectedCert.key_type}
-              />
-              <DataField 
-                label="Key Size" 
-                value={selectedCert.key_size ? `${selectedCert.key_size} bits` : null}
-              />
-              <DataField 
-                label="Signature Algorithm" 
-                value={selectedCert.signature_algorithm}
-              />
-              <DataField 
-                label="Private Key" 
-                value={
-                  <Badge variant={selectedCert.has_private_key ? 'success' : 'warning'}>
-                    {selectedCert.has_private_key ? 'Available' : 'Not Available'}
-                  </Badge>
-                }
-              />
-            </DataGrid>
-          </ContentSection>
-
-          {/* Issuer Information */}
-          <ContentSection title="Issuer Information">
-            <DataGrid columns={1}>
-              <DataField 
-                label="Issuer Name" 
-                value={selectedCert.issuer_name || extractCN(selectedCert.issuer)}
-              />
-              <DataField 
-                label="Full Issuer DN" 
-                value={selectedCert.issuer} 
-                mono
-              />
-            </DataGrid>
-          </ContentSection>
-
-          {/* OCSP */}
-          {selectedCert.ocsp_uri && (
-            <div className="p-3 bg-bg-tertiary border border-border rounded-lg">
-              <DataField 
-                label="OCSP Responder" 
-                value={selectedCert.ocsp_uri} 
-                mono 
-                copyable
-              />
-            </div>
-          )}
-
-          {/* Revocation Info */}
-          {selectedCert.revoked && (
-            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-              <h3 className="text-sm font-semibold text-red-400 mb-3">Revocation Information</h3>
-              <DataGrid columns={2}>
-                <DataField 
-                  label="Revoked At" 
-                  value={formatDate(selectedCert.revoked_at)}
-                />
-                <DataField 
-                  label="Reason" 
-                  value={selectedCert.revoke_reason || 'Unspecified'}
-                />
-              </DataGrid>
-            </div>
-          )}
-
-          {/* Full Subject DN */}
-          <div className="p-4 bg-bg-tertiary border border-border rounded-lg">
-            <DataField 
-              label="Full Subject DN" 
-              value={selectedCert.subject} 
-              mono 
-              copyable
-            />
-          </div>
-        </div>
-      )
-    },
-    {
-      id: 'extensions',
-      label: 'Extensions',
-      icon: Certificate,
-      content: (
-        <div className="space-y-6">
-          {/* Subject Alternative Names */}
-          <ContentSection title="Subject Alternative Names (SAN)">
-            {/* DNS Names */}
-            {selectedCert.san_dns && safeJsonParse(selectedCert.san_dns).length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">DNS Names</p>
-                <div className="flex flex-wrap gap-2">
-                  {safeJsonParse(selectedCert.san_dns).map((dns, i) => (
-                    <Badge key={i} variant="secondary">{dns}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* IP Addresses */}
-            {selectedCert.san_ip && safeJsonParse(selectedCert.san_ip).length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">IP Addresses</p>
-                <div className="flex flex-wrap gap-2">
-                  {safeJsonParse(selectedCert.san_ip).map((ip, i) => (
-                    <Badge key={i} variant="secondary">{ip}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Email Addresses */}
-            {selectedCert.san_email && safeJsonParse(selectedCert.san_email).length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Email Addresses</p>
-                <div className="flex flex-wrap gap-2">
-                  {safeJsonParse(selectedCert.san_email).map((email, i) => (
-                    <Badge key={i} variant="secondary">{email}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* URIs */}
-            {selectedCert.san_uri && safeJsonParse(selectedCert.san_uri).length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">URIs</p>
-                <div className="flex flex-wrap gap-2">
-                  {safeJsonParse(selectedCert.san_uri).map((uri, i) => (
-                    <Badge key={i} variant="secondary">{uri}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {(!selectedCert.san_dns && !selectedCert.san_ip && !selectedCert.san_email && !selectedCert.san_uri) && (
-              <p className="text-sm text-text-secondary">No subject alternative names configured</p>
-            )}
-          </ContentSection>
-
-          {/* Key Usage */}
-          {selectedCert.key_usage && (
-            <ContentSection title="Key Usage">
-              <div className="flex flex-wrap gap-2">
-                {selectedCert.key_usage.map((usage, i) => (
-                  <Badge key={i} variant="primary">{usage}</Badge>
-                ))}
-              </div>
-            </ContentSection>
-          )}
-          
-          {/* Extended Key Usage */}
-          {selectedCert.extended_key_usage && (
-            <ContentSection title="Extended Key Usage">
-              <div className="flex flex-wrap gap-2">
-                {selectedCert.extended_key_usage.map((usage, i) => (
-                  <Badge key={i} variant="primary">{usage}</Badge>
-                ))}
-              </div>
-            </ContentSection>
-          )}
-        </div>
-      )
-    },
-    {
-      id: 'raw',
-      label: 'Raw Data',
-      icon: Database,
-      content: (
-        <div className="space-y-6">
-          <ContentSection title="PEM Format">
-            <div className="flex items-center justify-end mb-2">
-              <Button 
-                variant="secondary" 
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(selectedCert.pem || '')
-                  showSuccess('PEM copied to clipboard')
-                }}
-                disabled={!selectedCert.pem}
-              >
-                Copy PEM
-              </Button>
-            </div>
-            <pre className="bg-bg-tertiary border border-border rounded-lg p-4 text-xs overflow-x-auto max-h-64">
-              {selectedCert.pem || 'PEM data not available'}
-            </pre>
-          </ContentSection>
-          
-          <ContentSection title="Certificate Fingerprints">
-            <DataGrid columns={1}>
-              <DataField 
-                label="SHA-256" 
-                value={selectedCert.fingerprint_sha256} 
-                mono 
-                copyable
-              />
-              <DataField 
-                label="SHA-1" 
-                value={selectedCert.fingerprint_sha1} 
-                mono 
-                copyable
-              />
-            </DataGrid>
-          </ContentSection>
-        </div>
-      )
-    }
-  ] : []
-
   // Help content for modal
   const helpContent = (
     <div className="space-y-4">
@@ -669,49 +382,262 @@ export default function CertificatesPage() {
             />
           </div>
         ) : (
-          <div className="flex flex-col h-full">
-            {/* Responsive Header with actions */}
-            <ContentHeader
-              title={selectedCert.common_name || extractCN(selectedCert.subject) || 'Certificate Details'}
-              subtitle={`Serial: ${selectedCert.serial_number?.substring(0, 20)}...`}
-              actions={[
-                {
-                  label: 'Export',
-                  icon: Download,
-                  onClick: () => handleExport('pem'),
-                },
-                ...(canWrite('certificates') ? [{
-                  label: 'Renew',
-                  icon: ArrowsClockwise,
-                  onClick: () => handleRenew(selectedCert.id),
-                }] : []),
-                ...(canDelete('certificates') ? [{
-                  label: 'Revoke',
-                  icon: X,
-                  variant: 'danger',
-                  onClick: () => handleRevoke(selectedCert.id),
-                }] : []),
-                ...(canDelete('certificates') ? [{
-                  label: 'Delete',
-                  icon: Trash,
-                  variant: 'danger',
-                  onClick: () => handleDelete(selectedCert.id),
-                }] : []),
+          <>
+            {/* Header with gradient card style */}
+            <div className="p-4 md:p-6">
+              <DetailHeader
+                icon={Certificate}
+                title={selectedCert.common_name || extractCN(selectedCert.subject) || 'Certificate Details'}
+                subtitle={selectedCert.subject}
+                badge={
+                  <Badge 
+                    variant={
+                      selectedCert.revoked ? 'red' : 
+                      selectedCert.status === 'expired' ? 'red' :
+                      selectedCert.status === 'expiring' ? 'amber' :
+                      selectedCert.status === 'valid' ? 'emerald' :
+                      'secondary'
+                    } 
+                    size="lg"
+                  >
+                    {selectedCert.status === 'valid' && <CheckCircle size={14} weight="fill" />}
+                    {selectedCert.status === 'expiring' && <Warning size={14} weight="fill" />}
+                    {selectedCert.revoked ? 'Revoked' : selectedCert.status || 'Active'}
+                  </Badge>
+                }
+                stats={[
+                  { icon: Clock, label: 'Expires', value: formatDate(selectedCert.valid_to) },
+                  { icon: Key, label: 'Key:', value: selectedCert.key_algorithm || selectedCert.key_type || 'RSA' },
+                  ...(selectedCert.has_private_key ? [{ icon: ShieldCheck, label: 'Private Key:', value: 'Available' }] : []),
+                ]}
+                actions={[
+                  { label: 'Export', icon: Download, onClick: () => handleExport('pem') },
+                  ...(canWrite('certificates') ? [{ label: 'Renew', icon: ArrowsClockwise, onClick: () => handleRenew(selectedCert.id) }] : []),
+                  ...(canDelete('certificates') ? [{ label: 'Revoke', icon: X, variant: 'danger', onClick: () => handleRevoke(selectedCert.id) }] : []),
+                  ...(canDelete('certificates') ? [{ label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(selectedCert.id) }] : []),
+                ]}
+              />
+            </div>
+
+            {/* Tabs Navigation */}
+            <DetailTabs
+              tabs={[
+                { id: 'overview', label: 'Overview', icon: Certificate },
+                { id: 'usage', label: 'Usage', icon: ShieldCheck },
+                { id: 'pem', label: 'PEM', icon: Database },
               ]}
+              activeTab={activeTab}
+              onChange={setActiveTab}
             />
 
-            {/* Responsive Tabs */}
-            <TabsResponsive
-              tabs={detailTabs}
-              activeTab={activeDetailTab}
-              onChange={setActiveDetailTab}
-            />
+            {/* Tab Content */}
+            <DetailContent>
+              {/* Overview Tab */}
+              {activeTab === 'overview' && (
+                <>
+                  {/* Subject Information */}
+                  <DetailSection title="Subject Information">
+                    <DetailGrid columns={2}>
+                      <DetailField label="Common Name (CN)" value={selectedCert.common_name} />
+                      <DetailField label="Organization (O)" value={selectedCert.organization} />
+                      {selectedCert.organizational_unit && (
+                        <DetailField label="Organizational Unit (OU)" value={selectedCert.organizational_unit} />
+                      )}
+                      {selectedCert.country && (
+                        <DetailField label="Country (C)" value={selectedCert.country} />
+                      )}
+                      <DetailField label="Full Subject DN" value={selectedCert.subject} mono copyable fullWidth />
+                    </DetailGrid>
+                  </DetailSection>
 
-            {/* Content Body */}
-            <ContentBody>
-              {detailTabs.find(t => t.id === activeDetailTab)?.content}
-            </ContentBody>
-          </div>
+                  <DetailDivider />
+
+                  {/* Validity Period */}
+                  <DetailSection title="Validity Period">
+                    <DetailGrid columns={2}>
+                      <DetailField label="Not Before" value={formatDate(selectedCert.valid_from)} />
+                      <DetailField label="Not After" value={formatDate(selectedCert.valid_to)} />
+                    </DetailGrid>
+                  </DetailSection>
+
+                  <DetailDivider />
+
+                  {/* Issuer Information */}
+                  <DetailSection title="Issuer Information">
+                    <DetailGrid columns={2}>
+                      <DetailField label="Issuer Name" value={selectedCert.issuer_name || extractCN(selectedCert.issuer)} />
+                      <DetailField label="Full Issuer DN" value={selectedCert.issuer} mono fullWidth />
+                    </DetailGrid>
+                  </DetailSection>
+
+                  <DetailDivider />
+
+                  {/* Technical Details */}
+                  <DetailSection title="Technical Details">
+                    <DetailGrid columns={2}>
+                      <DetailField label="Key Algorithm" value={selectedCert.key_algorithm || selectedCert.key_type} />
+                      <DetailField label="Key Size" value={selectedCert.key_size ? `${selectedCert.key_size} bits` : null} />
+                      <DetailField label="Signature Algorithm" value={selectedCert.signature_algorithm} />
+                      <DetailField 
+                        label="Private Key" 
+                        value={
+                          <Badge variant={selectedCert.has_private_key ? 'success' : 'warning'}>
+                            {selectedCert.has_private_key ? 'Available' : 'Not Available'}
+                          </Badge>
+                        }
+                      />
+                      <DetailField label="Serial Number" value={selectedCert.serial_number} mono copyable fullWidth />
+                    </DetailGrid>
+                  </DetailSection>
+
+                  {/* Revocation Info */}
+                  {selectedCert.revoked && (
+                    <>
+                      <DetailDivider />
+                      <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg mt-4">
+                        <h3 className="text-sm font-semibold text-red-400 mb-3">Revocation Information</h3>
+                        <DetailGrid columns={2}>
+                          <DetailField label="Revoked At" value={formatDate(selectedCert.revoked_at)} />
+                          <DetailField label="Reason" value={selectedCert.revoke_reason || 'Unspecified'} />
+                        </DetailGrid>
+                      </div>
+                    </>
+                  )}
+
+                  {/* OCSP */}
+                  {selectedCert.ocsp_uri && (
+                    <>
+                      <DetailDivider />
+                      <DetailSection title="OCSP Responder">
+                        <DetailGrid columns={1}>
+                          <DetailField label="OCSP URI" value={selectedCert.ocsp_uri} mono copyable fullWidth />
+                        </DetailGrid>
+                      </DetailSection>
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* Usage Tab */}
+              {activeTab === 'usage' && (
+                <>
+                  {/* Subject Alternative Names */}
+                  <DetailSection title="Subject Alternative Names (SAN)">
+                    <div className="space-y-3">
+                      {selectedCert.san_dns && safeJsonParse(selectedCert.san_dns).length > 0 && (
+                        <div>
+                          <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">DNS Names</p>
+                          <div className="flex flex-wrap gap-2">
+                            {safeJsonParse(selectedCert.san_dns).map((dns, i) => (
+                              <Badge key={i} variant="secondary">{dns}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedCert.san_ip && safeJsonParse(selectedCert.san_ip).length > 0 && (
+                        <div>
+                          <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">IP Addresses</p>
+                          <div className="flex flex-wrap gap-2">
+                            {safeJsonParse(selectedCert.san_ip).map((ip, i) => (
+                              <Badge key={i} variant="secondary">{ip}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedCert.san_email && safeJsonParse(selectedCert.san_email).length > 0 && (
+                        <div>
+                          <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Email Addresses</p>
+                          <div className="flex flex-wrap gap-2">
+                            {safeJsonParse(selectedCert.san_email).map((email, i) => (
+                              <Badge key={i} variant="secondary">{email}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {selectedCert.san_uri && safeJsonParse(selectedCert.san_uri).length > 0 && (
+                        <div>
+                          <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">URIs</p>
+                          <div className="flex flex-wrap gap-2">
+                            {safeJsonParse(selectedCert.san_uri).map((uri, i) => (
+                              <Badge key={i} variant="secondary">{uri}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {(!selectedCert.san_dns && !selectedCert.san_ip && !selectedCert.san_email && !selectedCert.san_uri) && (
+                        <p className="text-sm text-text-secondary">No subject alternative names configured</p>
+                      )}
+                    </div>
+                  </DetailSection>
+
+                  <DetailDivider />
+
+                  {/* Key Usage */}
+                  <DetailSection title="Key Usage">
+                    {selectedCert.key_usage ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCert.key_usage.map((usage, i) => (
+                          <Badge key={i} variant="primary">{usage}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-text-secondary">No key usage defined</p>
+                    )}
+                  </DetailSection>
+
+                  <DetailDivider />
+
+                  {/* Extended Key Usage */}
+                  <DetailSection title="Extended Key Usage">
+                    {selectedCert.extended_key_usage ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCert.extended_key_usage.map((usage, i) => (
+                          <Badge key={i} variant="primary">{usage}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-text-secondary">No extended key usage defined</p>
+                    )}
+                  </DetailSection>
+                </>
+              )}
+
+              {/* PEM Tab */}
+              {activeTab === 'pem' && (
+                <>
+                  {/* Certificate Fingerprints */}
+                  <DetailSection title="Certificate Fingerprints">
+                    <DetailGrid columns={1}>
+                      <DetailField label="SHA-256" value={selectedCert.fingerprint_sha256} mono copyable fullWidth />
+                      <DetailField label="SHA-1" value={selectedCert.fingerprint_sha1} mono copyable fullWidth />
+                    </DetailGrid>
+                  </DetailSection>
+
+                  <DetailDivider />
+
+                  {/* PEM Data */}
+                  <DetailSection title="PEM Format">
+                    <div className="flex items-center justify-end mb-2">
+                      <Button 
+                        variant="secondary" 
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedCert.pem || '')
+                          showSuccess('PEM copied to clipboard')
+                        }}
+                        disabled={!selectedCert.pem}
+                      >
+                        Copy PEM
+                      </Button>
+                    </div>
+                    <pre className="bg-bg-tertiary border border-border rounded-lg p-4 text-xs overflow-x-auto max-h-64">
+                      {selectedCert.pem || 'PEM data not available'}
+                    </pre>
+                  </DetailSection>
+                </>
+              )}
+            </DetailContent>
+          </>
         )}
       </PageLayout>
 

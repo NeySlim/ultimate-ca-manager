@@ -10,8 +10,7 @@ import {
   PageLayout, FocusItem, Button, Badge, Card,
   Input, Select, Modal,
   LoadingSpinner, EmptyState, StatusIndicator, PermissionsDisplay, HelpCard,
-  ContentHeader, ContentBody, ResponsiveContentSection as ContentSection, 
-  DataGrid, DataField
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailDivider, DetailContent
 } from '../components'
 import { usersService, rolesService } from '../services'
 import { useNotification } from '../contexts'
@@ -358,18 +357,24 @@ export default function UsersPage() {
             />
           </div>
         ) : (
-          <div className="flex flex-col h-full">
-            {/* Responsive Header with actions */}
-            <ContentHeader
+          <DetailContent>
+            {/* Detail Header with User icon, role badge, and actions */}
+            <DetailHeader
+              icon={selectedUser.role === 'admin' ? ShieldCheck : User}
               title={selectedUser.username}
               subtitle={selectedUser.email}
               badge={
                 <Badge 
                   variant={selectedUser.role === 'admin' ? 'primary' : selectedUser.role === 'operator' ? 'warning' : 'secondary'}
+                  size="lg"
                 >
                   {selectedUser.role}
                 </Badge>
               }
+              stats={[
+                { icon: ShieldCheck, label: 'Status:', value: selectedUser.active ? 'Active' : 'Inactive' },
+                { icon: LockKey, label: '2FA:', value: selectedUser.two_factor_enabled ? 'Enabled' : 'Disabled' },
+              ]}
               actions={
                 editing ? [
                   {
@@ -380,7 +385,6 @@ export default function UsersPage() {
                   },
                   {
                     label: 'Cancel',
-                    icon: null,
                     variant: 'ghost',
                     onClick: () => {
                       setEditing(false)
@@ -413,132 +417,163 @@ export default function UsersPage() {
               }
             />
 
-            {/* Content Body */}
-            <ContentBody>
-              <div className="space-y-6">
-                {/* Basic Info */}
-                <ContentSection title="Basic Information">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                      label="Username"
-                      value={formData.username || ''}
-                      onChange={(e) => updateFormData('username', e.target.value)}
-                      disabled={!editing}
-                    />
-                    <Input
-                      label="Email"
-                      type="email"
-                      value={formData.email || ''}
-                      onChange={(e) => updateFormData('email', e.target.value)}
-                      disabled={!editing}
-                    />
-                    <Input
-                      label="Full Name"
-                      value={formData.full_name || ''}
-                      onChange={(e) => updateFormData('full_name', e.target.value)}
-                      disabled={!editing}
-                    />
-                    <div className="flex items-center gap-3 pt-6">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.active || false}
-                          onChange={(e) => updateFormData('active', e.target.checked)}
-                          disabled={!editing}
-                          className="rounded border-border bg-bg-tertiary"
-                        />
-                        <span className="text-sm text-text-primary">Active</span>
-                      </label>
-                    </div>
+            {/* Basic Information Section */}
+            <DetailSection title="Basic Information">
+              {editing ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="Username"
+                    value={formData.username || ''}
+                    onChange={(e) => updateFormData('username', e.target.value)}
+                  />
+                  <Input
+                    label="Email"
+                    type="email"
+                    value={formData.email || ''}
+                    onChange={(e) => updateFormData('email', e.target.value)}
+                  />
+                  <Input
+                    label="Full Name"
+                    value={formData.full_name || ''}
+                    onChange={(e) => updateFormData('full_name', e.target.value)}
+                  />
+                  <div className="flex items-center gap-3 pt-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.active || false}
+                        onChange={(e) => updateFormData('active', e.target.checked)}
+                        className="rounded border-border bg-bg-tertiary"
+                      />
+                      <span className="text-sm text-text-primary">Active</span>
+                    </label>
                   </div>
-                </ContentSection>
+                </div>
+              ) : (
+                <DetailGrid columns={2}>
+                  <DetailField label="Username" value={selectedUser.username} />
+                  <DetailField label="Email" value={selectedUser.email} copyable />
+                  <DetailField label="Full Name" value={selectedUser.full_name} />
+                  <DetailField 
+                    label="Account Status" 
+                    value={
+                      <StatusIndicator status={selectedUser.active ? 'success' : 'warning'}>
+                        {selectedUser.active ? 'Active' : 'Inactive'}
+                      </StatusIndicator>
+                    }
+                  />
+                </DetailGrid>
+              )}
+            </DetailSection>
 
-                {/* Role & Permissions */}
-                <ContentSection title="Role & Permissions">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Select
-                      label="Role"
-                      options={[
-                        { value: 'admin', label: 'Administrator' },
-                        { value: 'operator', label: 'Operator' },
-                        { value: 'viewer', label: 'Viewer' },
-                      ]}
-                      value={formData.role || 'viewer'}
-                      onChange={(val) => updateFormData('role', val)}
-                      disabled={!editing}
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-text-primary mb-2">Permissions</p>
-                      {rolesData && formData.role && (
+            <DetailDivider />
+
+            {/* Role & Permissions Section */}
+            <DetailSection title="Role & Permissions">
+              {editing ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Select
+                    label="Role"
+                    options={[
+                      { value: 'admin', label: 'Administrator' },
+                      { value: 'operator', label: 'Operator' },
+                      { value: 'viewer', label: 'Viewer' },
+                    ]}
+                    value={formData.role || 'viewer'}
+                    onChange={(val) => updateFormData('role', val)}
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-text-primary mb-2">Permissions</p>
+                    {rolesData && formData.role && (
+                      <PermissionsDisplay
+                        role={formData.role}
+                        permissions={rolesData[formData.role]?.permissions || []}
+                        description={rolesData[formData.role]?.description}
+                      />
+                    )}
+                    {!rolesData && (
+                      <div className="text-xs text-text-secondary">Loading permissions...</div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <DetailGrid columns={2}>
+                  <DetailField 
+                    label="Role" 
+                    value={
+                      <Badge 
+                        variant={selectedUser.role === 'admin' ? 'primary' : selectedUser.role === 'operator' ? 'warning' : 'secondary'}
+                      >
+                        {selectedUser.role}
+                      </Badge>
+                    }
+                  />
+                  <DetailField 
+                    label="Permissions"
+                    value={
+                      rolesData && selectedUser.role ? (
                         <PermissionsDisplay
-                          role={formData.role}
-                          permissions={rolesData[formData.role]?.permissions || []}
-                          description={rolesData[formData.role]?.description}
+                          role={selectedUser.role}
+                          permissions={rolesData[selectedUser.role]?.permissions || []}
+                          description={rolesData[selectedUser.role]?.description}
                         />
-                      )}
-                      {!rolesData && (
-                        <div className="text-xs text-text-secondary">Loading permissions...</div>
-                      )}
-                    </div>
-                  </div>
-                </ContentSection>
+                      ) : 'Loading...'
+                    }
+                  />
+                </DetailGrid>
+              )}
+            </DetailSection>
 
-                {/* Security */}
-                <ContentSection title="Security">
-                  <DataGrid columns={4}>
-                    <DataField 
-                      label="2FA Status" 
-                      value={
-                        <Badge variant={selectedUser.two_factor_enabled ? 'success' : 'secondary'}>
-                          {selectedUser.two_factor_enabled ? 'Enabled' : 'Disabled'}
-                        </Badge>
-                      }
-                    />
-                    <DataField 
-                      label="Last Password Change" 
-                      value={selectedUser.password_changed_at 
-                        ? new Date(selectedUser.password_changed_at).toLocaleDateString()
-                        : 'Never'}
-                    />
-                    <DataField 
-                      label="Login Count" 
-                      value={selectedUser.login_count || 0}
-                    />
-                    <DataField 
-                      label="Failed Logins" 
-                      value={selectedUser.failed_login_count || 0}
-                    />
-                  </DataGrid>
-                </ContentSection>
+            <DetailDivider />
 
-                {/* Activity */}
-                <ContentSection title="Activity">
-                  <DataGrid columns={3}>
-                    <DataField 
-                      label="Last Login" 
-                      value={selectedUser.last_login 
-                        ? new Date(selectedUser.last_login).toLocaleString()
-                        : 'Never'}
-                    />
-                    <DataField 
-                      label="Created" 
-                      value={selectedUser.created_at 
-                        ? new Date(selectedUser.created_at).toLocaleDateString() 
-                        : '-'}
-                    />
-                    <DataField 
-                      label="Account Status" 
-                      value={
-                        <StatusIndicator status={selectedUser.active ? 'success' : 'warning'}>
-                          {selectedUser.active ? 'Active' : 'Inactive'}
-                        </StatusIndicator>
-                      }
-                    />
-                  </DataGrid>
-                </ContentSection>
-              </div>
-            </ContentBody>
-          </div>
+            {/* Security Section */}
+            <DetailSection title="Security">
+              <DetailGrid columns={2}>
+                <DetailField 
+                  label="2FA Status" 
+                  value={
+                    <Badge variant={selectedUser.two_factor_enabled ? 'success' : 'secondary'}>
+                      {selectedUser.two_factor_enabled ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                  }
+                />
+                <DetailField 
+                  label="Last Password Change" 
+                  value={selectedUser.password_changed_at 
+                    ? new Date(selectedUser.password_changed_at).toLocaleDateString()
+                    : 'Never'}
+                />
+                <DetailField 
+                  label="Login Count" 
+                  value={selectedUser.login_count || 0}
+                />
+                <DetailField 
+                  label="Failed Logins" 
+                  value={selectedUser.failed_login_count || 0}
+                />
+              </DetailGrid>
+            </DetailSection>
+
+            <DetailDivider />
+
+            {/* Activity Section */}
+            <DetailSection title="Activity">
+              <DetailGrid columns={2}>
+                <DetailField 
+                  label="Last Login" 
+                  value={selectedUser.last_login 
+                    ? new Date(selectedUser.last_login).toLocaleString()
+                    : 'Never'}
+                />
+                <DetailField 
+                  label="Created" 
+                  value={selectedUser.created_at 
+                    ? new Date(selectedUser.created_at).toLocaleDateString() 
+                    : '-'}
+                />
+              </DetailGrid>
+            </DetailSection>
+          </DetailContent>
         )}
       </PageLayout>
 
