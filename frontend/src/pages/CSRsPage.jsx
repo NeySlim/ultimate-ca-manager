@@ -3,9 +3,9 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { FileText, Upload, SignIn, Trash, Download, FileArrowUp } from '@phosphor-icons/react'
+import { FileText, Upload, SignIn, Trash, Download, FileArrowUp, ClockCounterClockwise, CheckCircle, HourglassHigh } from '@phosphor-icons/react'
 import {
-  ExplorerPanel, DetailsPanel, Table, Button, Badge,
+  ExplorerPanel, DetailsPanel, Table, Button, Badge, Card,
   Modal, Input, Select, Textarea,
   FileUpload, LoadingSpinner, EmptyState
 } from '../components'
@@ -201,6 +201,13 @@ export default function CSRsPage() {
     },
   ]
 
+  // Stats computed from CSRs
+  const stats = {
+    total: csrs.length,
+    pending: csrs.filter(c => c.status === 'pending').length,
+    signed: csrs.filter(c => c.status === 'signed').length
+  }
+
   return (
     <>
       <ExplorerPanel
@@ -211,42 +218,79 @@ export default function CSRsPage() {
           </div>
         }
       >
-        <div className="p-4 space-y-3">
-          {canWrite('csrs') && (
-            <>
-              <Button onClick={() => openModal('upload')} className="w-full">
-                <Upload size={18} />
-                Create CSR
-              </Button>
-              <Button variant="secondary" onClick={() => openModal('import')} className="w-full">
-                <FileArrowUp size={18} />
-                Import CSR
-              </Button>
-            </>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <LoadingSpinner />
+        <div className="space-y-4">
+          {/* Stats Cards */}
+          <div className="px-3 pt-2 space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Overview
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <Card className="p-2.5 text-center bg-gradient-to-br from-yellow-500/10 to-transparent border-yellow-500/20">
+                <div className="flex items-center justify-center gap-1.5">
+                  <HourglassHigh size={16} weight="duotone" className="text-yellow-500" />
+                  <span className="text-lg font-bold text-yellow-500">{stats.pending}</span>
+                </div>
+                <div className="text-xs text-text-secondary">Pending</div>
+              </Card>
+              <Card className="p-2.5 text-center bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
+                <div className="flex items-center justify-center gap-1.5">
+                  <CheckCircle size={16} weight="duotone" className="text-emerald-500" />
+                  <span className="text-lg font-bold text-emerald-500">{stats.signed}</span>
+                </div>
+                <div className="text-xs text-text-secondary">Signed</div>
+              </Card>
             </div>
-          ) : csrs.length === 0 ? (
-            <EmptyState
-              icon={FileText}
-              title="No CSRs"
-              description="Create or import a Certificate Signing Request"
-              action={{
-                label: 'Import CSR',
-                onClick: () => openModal('import')
-              }}
-            />
-          ) : (
-            <Table
-              columns={csrColumns}
-              data={csrs}
-              onRowClick={(csr) => loadCSRDetails(csr.id)}
-            />
+          </div>
+
+          {/* Actions */}
+          <div className="px-3 space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+              Actions
+            </h3>
+            {canWrite('csrs') && (
+              <div className="space-y-2">
+                <Button onClick={() => openModal('upload')} className="w-full justify-start">
+                  <span className="p-1 rounded bg-accent/20">
+                    <Upload size={16} weight="duotone" className="text-accent" />
+                  </span>
+                  Create CSR
+                </Button>
+                <Button variant="secondary" onClick={() => openModal('import')} className="w-full justify-start">
+                  <span className="p-1 rounded bg-purple-500/20">
+                    <FileArrowUp size={16} weight="duotone" className="text-purple-500" />
+                  </span>
+                  Import CSR
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Recent Activity */}
+          {csrs.length > 0 && (
+            <div className="px-3 space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                Recent
+              </h3>
+              <div className="space-y-1">
+                {csrs.slice(0, 4).map(csr => (
+                  <button
+                    key={csr.id}
+                    onClick={() => loadCSRDetails(csr.id)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
+                      selectedCSR?.id === csr.id 
+                        ? 'bg-accent/10 text-accent border-l-2 border-accent' 
+                        : 'hover:bg-bg-tertiary/50'
+                    }`}
+                  >
+                    <FileText size={14} weight="duotone" className={csr.status === 'pending' ? 'text-yellow-500' : 'text-emerald-500'} />
+                    <span className="text-sm truncate flex-1">{csr.common_name}</span>
+                    <Badge variant={csr.status === 'pending' ? 'warning' : 'success'} size="sm">
+                      {csr.status}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </ExplorerPanel>

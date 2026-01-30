@@ -124,11 +124,11 @@ export function Table({
                   key={index}
                   onClick={() => onRowClick?.(row)}
                   className={cn(
-                    "transition-all duration-150",
+                    "transition-all duration-150 group",
                     onRowClick && "cursor-pointer",
-                    !isSelected && "hover:bg-bg-tertiary",
+                    !isSelected && "hover:bg-accent/5 hover:shadow-sm",
                     selectedRows.has(index) && "bg-bg-tertiary",
-                    isSelected && "row-selected"
+                    isSelected && "row-selected bg-accent/10 border-l-2 border-accent"
                   )}
                 >
                 {selectable && (
