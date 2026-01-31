@@ -82,23 +82,28 @@ export function AppShell() {
           {/* Search button - LEFT */}
           <button
             onClick={() => setCommandPaletteOpen(true)}
-            className="w-9 h-9 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
+            className="w-9 h-9 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary shrink-0"
           >
             <MagnifyingGlass size={20} />
           </button>
           
-          {/* Logo and page title - CENTER */}
-          <div className="flex-1 flex items-center justify-center gap-2">
-            <Logo size={20} />
-            <span className="text-sm font-semibold text-text-primary tracking-wide capitalize">
-              {activePage || 'Dashboard'}
-            </span>
+          {/* Logo - LEFT CENTER */}
+          <div className="shrink-0 opacity-60 scale-[0.5] origin-left -ml-1">
+            <Logo variant="compact" size="sm" />
           </div>
+          
+          {/* Spacer */}
+          <div className="flex-1" />
+          
+          {/* Page title - RIGHT (near hamburger) */}
+          <span className="text-sm font-medium text-text-primary mr-2">
+            {activePage ? activePage.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Dashboard'}
+          </span>
           
           {/* Hamburger menu - RIGHT */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="w-9 h-9 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
+            className="w-9 h-9 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary shrink-0"
           >
             {mobileMenuOpen ? <X size={20} /> : <List size={20} />}
           </button>
