@@ -115,16 +115,36 @@ def list_acme_accounts():
     accounts = AcmeAccount.query.order_by(AcmeAccount.created_at.desc()).limit(100).all()
     data = []
     for acc in accounts:
-        # Convert contact array to string for display if needed
         data.append({
             'id': acc.id,
             'account_id': acc.account_id,
             'status': acc.status,
             'contact': acc.contact_list,
+            'terms_of_service_agreed': acc.terms_of_service_agreed,
+            'jwk_thumbprint': acc.jwk_thumbprint,
             'created_at': acc.created_at.isoformat()
         })
         
     return success_response(data=data)
+
+
+@bp.route('/api/v2/acme/accounts/<int:account_id>', methods=['GET'])
+@require_auth(['read:acme'])
+def get_acme_account(account_id):
+    """Get single ACME account details"""
+    acc = AcmeAccount.query.get(account_id)
+    if not acc:
+        return error_response('Account not found', 404)
+    
+    return success_response(data={
+        'id': acc.id,
+        'account_id': acc.account_id,
+        'status': acc.status,
+        'contact': acc.contact_list,
+        'terms_of_service_agreed': acc.terms_of_service_agreed,
+        'jwk_thumbprint': acc.jwk_thumbprint,
+        'created_at': acc.created_at.isoformat()
+    })
 
 
 @bp.route('/api/v2/acme/orders', methods=['GET'])
