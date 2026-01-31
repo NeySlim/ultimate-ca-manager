@@ -157,17 +157,30 @@ def get_activity_log():
     """Get recent activity"""
     from models import db
     from sqlalchemy import text
-    from datetime import datetime
     
     limit = request.args.get('limit', 20, type=int)
     
+    # Human-readable action labels
+    ACTION_LABELS = {
+        'login_success': 'Logged in',
+        'login_failed': 'Login failed',
+        'logout': 'Logged out',
+        'create': 'Created',
+        'update': 'Updated',
+        'delete': 'Deleted',
+        'revoke': 'Revoked',
+        'export': 'Exported',
+        'import': 'Imported',
+        'sign': 'Signed',
+        'renew': 'Renewed',
+    }
+    
     try:
-        # Try to get audit logs if table exists
         results = db.session.execute(
             text("""
-                SELECT action, entity_type, entity_id, user_id, created_at, details
+                SELECT action, resource_type, resource_id, username, timestamp, details
                 FROM audit_logs 
-                ORDER BY created_at DESC 
+                ORDER BY timestamp DESC 
                 LIMIT :limit
             """),
             {'limit': limit}
@@ -175,16 +188,36 @@ def get_activity_log():
         
         activity = []
         for row in results:
+            action = row.action or 'Unknown'
+            resource = row.resource_type or ''
+            
+            # Use details if available, otherwise build message
+            if row.details:
+                message = row.details
+            else:
+                action_label = ACTION_LABELS.get(action, action.replace('_', ' ').title())
+                if resource and resource != 'user':
+                    message = f"{action_label} {resource}"
+                else:
+                    message = action_label
+            
+            # Handle timestamp
+            ts = row.timestamp
+            if ts and hasattr(ts, 'isoformat'):
+                ts = ts.isoformat()
+            
             activity.append({
-                'type': row.entity_type or 'system',
-                'description': row.action or 'Unknown action',
-                'timestamp': row.created_at.isoformat() if row.created_at else None,
-                'user': f'User {row.user_id}' if row.user_id else 'System'
+                'type': resource or 'system',
+                'action': action,
+                'message': message,
+                'timestamp': ts,
+                'user': row.username or 'System',
             })
         
         return success_response(data={'activity': activity})
-    except:
-        # If audit_logs table doesn't exist, return empty
+    except Exception as e:
+        import logging
+        logging.error(f"Activity log error: {e}")
         return success_response(data={'activity': []})
 
 
@@ -209,18 +242,29 @@ def get_system_status():
     except:
         status['database'] = {'status': 'offline', 'message': 'Connection failed'}
     
-    # Check ACME service (check if enabled in config or has active orders)
+    # Check ACME service - check config first, then accounts
     try:
-        acme_count = db.session.execute(text("SELECT COUNT(*) FROM acme_accounts")).scalar()
-        if acme_count > 0:
-            status['acme'] = {'status': 'online', 'message': f'{acme_count} accounts'}
+        acme_enabled = db.session.execute(text("SELECT value FROM system_config WHERE key = 'acme.enabled'")).scalar()
+        acme_count = db.session.execute(text("SELECT COUNT(*) FROM acme_accounts")).scalar() or 0
+        
+        if acme_enabled == 'true' or acme_enabled == '1':
+            if acme_count > 0:
+                status['acme'] = {'status': 'online', 'message': f'{acme_count} accounts'}
+            else:
+                status['acme'] = {'status': 'online', 'message': 'Enabled'}
         else:
-            status['acme'] = {'status': 'idle', 'message': 'No accounts'}
+            status['acme'] = {'status': 'offline', 'message': 'Disabled'}
     except:
-        status['acme'] = {'status': 'disabled', 'message': 'Not configured'}
+        status['acme'] = {'status': 'offline', 'message': 'Not configured'}
     
     # SCEP is always available if UCM is running
     status['scep'] = {'status': 'online', 'message': 'Endpoint available'}
+    
+    # OCSP responder status
+    status['ocsp'] = {'status': 'online', 'message': 'Responder active'}
+    
+    # CRL distribution status
+    status['crl'] = {'status': 'online', 'message': 'Distribution active'}
     
     # Core is online if we can respond
     status['core'] = {'status': 'online', 'message': 'Operational'}

@@ -23,9 +23,8 @@ import { labels, getHelpTitle } from '../lib/ui'
 import { useMobile } from '../contexts'
 import { DataTable } from './DataTable'
 import { HelpModal } from './HelpModal'
-import { Button } from './Button'
 import { Badge } from './Badge'
-import { Question, CaretLeft, CaretRight, X } from '@phosphor-icons/react'
+import { Question, X } from '@phosphor-icons/react'
 import { BottomSheet } from './BottomSheet'
 
 export function ListPageLayout({
@@ -69,7 +68,7 @@ export function ListPageLayout({
   selectable = false,
   multiSelect = false,
   onSelectionChange,
-  variant = 'default',
+  variant = 'compact',
   
   // Filters
   filters = [],   // [{ key, label, options: [{value, label}] }]
@@ -94,7 +93,6 @@ export function ListPageLayout({
 }) {
   const { isMobile } = useMobile()
   const [helpOpen, setHelpOpen] = useState(false)
-  const [detailsOpen, setDetailsOpen] = useState(true)
   
   // Handle row click
   const handleRowClick = (row) => {
@@ -247,15 +245,6 @@ export function ListPageLayout({
           <div className="flex items-center gap-3">
             {actions}
             <HelpButton />
-            {renderDetails && (
-              <button
-                onClick={() => setDetailsOpen(!detailsOpen)}
-                className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
-                title={detailsOpen ? "Hide details" : "Show details"}
-              >
-                {detailsOpen ? <CaretRight size={16} /> : <CaretLeft size={16} />}
-              </button>
-            )}
           </div>
         </div>
         
@@ -297,28 +286,38 @@ export function ListPageLayout({
         </div>
       </div>
       
-      {/* Details Panel - wider on larger screens for management tasks */}
-      {renderDetails && detailsOpen && (
-        <div className="w-80 xl:w-96 2xl:w-[420px] min-[1800px]:w-[500px] border-l border-border bg-bg-secondary flex flex-col min-h-0 shrink-0">
-          {/* Details Header */}
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
-            <h2 className="text-sm font-semibold text-text-primary">
-              {detailsTitle || 'Details'}
-            </h2>
-            {selectedItem && (
-              <button
-                onClick={() => onSelectItem?.(null)}
-                className="p-1 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-          
-          {/* Details Content */}
-          <div className="flex-1 overflow-auto">
-            {detailsContent}
-          </div>
+      {/* Animated Slide-over Panel */}
+      {renderDetails && (
+        <div 
+          className={cn(
+            "border-l border-border bg-bg-secondary flex flex-col shrink-0",
+            "transition-all duration-300 ease-out overflow-hidden",
+            selectedItem 
+              ? "w-80 xl:w-96 2xl:w-[420px] min-[1800px]:w-[500px]" 
+              : "w-0 border-l-0"
+          )}
+        >
+          {selectedItem && (
+            <>
+              {/* Details Header */}
+              <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+                <h2 className="text-sm font-semibold text-text-primary">
+                  {detailsTitle || 'Details'}
+                </h2>
+                <button
+                  onClick={() => onSelectItem?.(null)}
+                  className="p-1 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              
+              {/* Details Content */}
+              <div className="flex-1 overflow-auto">
+                {detailsContent}
+              </div>
+            </>
+          )}
         </div>
       )}
       

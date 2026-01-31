@@ -534,59 +534,66 @@ export default function AuditLogsPage() {
       
     >
       {/* Main Content */}
-      <div className="p-6 space-y-4">
-        {/* Search Bar and Refresh */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <SearchBar
-              value={search}
-              onChange={setSearch}
-              placeholder="Search logs..."
-            />
+      <div className="flex flex-col h-full">
+        {/* Header - Search Bar and Refresh */}
+        <div className="p-4 border-b border-border space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <SearchBar
+                value={search}
+                onChange={setSearch}
+                placeholder="Search logs..."
+              />
+            </div>
+            <Button variant="secondary" size="sm" onClick={loadLogs}>
+              <ArrowsClockwise size={14} />
+              Refresh
+            </Button>
+            <Button variant="danger" size="sm" onClick={() => setShowCleanupModal(true)}>
+              <Trash size={14} />
+              Cleanup
+            </Button>
           </div>
-          <Button variant="secondary" size="sm" onClick={loadLogs}>
-            <ArrowsClockwise size={14} />
-            Refresh
-          </Button>
-          <Button variant="danger" size="sm" onClick={() => setShowCleanupModal(true)}>
-            <Trash size={14} />
-            Cleanup
-          </Button>
+
+          {/* Results info */}
+          <div className="text-xs text-text-secondary">
+            Showing {logs.length} of {total} entries
+            {(search || filterUsername || filterAction || filterSuccess || filterDateFrom || filterDateTo) && (
+              <span className="ml-1">(filtered)</span>
+            )}
+          </div>
         </div>
 
-        {/* Results info */}
-        <div className="text-xs text-text-secondary">
-          Showing {logs.length} of {total} entries
-          {(search || filterUsername || filterAction || filterSuccess || filterDateFrom || filterDateTo) && (
-            <span className="ml-1">(filtered)</span>
-          )}
-        </div>
-
-        {/* Logs Table */}
-        {logs.length === 0 ? (
-          <EmptyState
-            icon={ClockCounterClockwise}
-            title="No audit logs found"
-            description={search || filterAction ? "Try adjusting your filters" : "Activity will appear here"}
-          />
-        ) : (
-          <>
+        {/* Logs Table - Scrollable */}
+        <div className="flex-1 overflow-auto">
+          {logs.length === 0 ? (
+            <div className="p-6">
+              <EmptyState
+                icon={ClockCounterClockwise}
+                title="No audit logs found"
+                description={search || filterAction ? "Try adjusting your filters" : "Activity will appear here"}
+              />
+            </div>
+          ) : (
             <Table
               data={logs}
               columns={columns}
               onRowClick={setSelectedLog}
             />
-            
-            {totalPages > 1 && (
-              <div className="mt-4">
-                <Pagination
-                  page={page}
-                  totalPages={totalPages}
-                  onPageChange={setPage}
-                />
-              </div>
-            )}
-          </>
+          )}
+        </div>
+        
+        {/* Pagination - Fixed at bottom */}
+        {total > perPage && (
+          <div className="border-t border-border bg-bg-secondary">
+            <Pagination
+              page={page}
+              total={total}
+              perPage={perPage}
+              onChange={setPage}
+              onPerPageChange={(newPerPage) => { setPerPage(newPerPage); setPage(1); }}
+            />
+          </div>
         )}
       </div>
 

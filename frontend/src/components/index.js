@@ -65,7 +65,14 @@ export {
   DetailField, 
   DetailDivider,
   DetailContent,
-  DetailTabs 
+  DetailTabs,
+  // Compact components for slide-over panels
+  CompactSection,
+  CompactGrid,
+  CompactField,
+  CompactStats,
+  CompactActions,
+  CompactHeader
 } from './DetailCard'
 
 
@@ -74,3 +81,9 @@ export { DataTable, SimpleTable, CardGrid } from './DataTable'
 
 // List Page Layout (DataTable + Details Panel)
 export { ListPageLayout } from './ListPageLayout'
+
+// Management Layout (Item list + Details for admin pages)
+export { ManagementLayout } from './ManagementLayout'
+export { TablePageLayout } from './TablePageLayout'
+export { UnifiedManagementLayout } from './UnifiedManagementLayout'
+export { SlideOverPanel, useSlideOver } from './SlideOverPanel'

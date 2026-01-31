@@ -10,12 +10,12 @@ import {
 import {
   PageLayout, FocusItem, Button, Card, Badge, 
   LoadingSpinner, EmptyState, StatusIndicator, HelpCard,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
+  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
 import { casService, crlService, apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate } from '../lib/utils'
+import { formatDate, cn } from '../lib/utils'
 
 // Extended CRL service methods
 const crlApi = {
@@ -59,8 +59,14 @@ export default function CRLOCSPPage() {
       setOcspStats(ocspStatsRes.data || { total_requests: 0, cache_hits: 0 })
       
       if (casData.length > 0 && !selectedCA) {
-        setSelectedCA(casData[0])
-        loadCRLForCA(casData[0].id)
+        // Prefer CA with a CRL, fallback to first CA
+        const crlsData = crlsRes.data || []
+        const caWithCrl = casData.find(ca => 
+          crlsData.some(crl => crl.ca_id === ca.id || crl.caref === ca.refid)
+        )
+        const initialCA = caWithCrl || casData[0]
+        setSelectedCA(initialCA)
+        loadCRLForCA(initialCA.id)
       }
     } catch (error) {
       showError(error.message || 'Failed to load CRL/OCSP data')
@@ -246,104 +252,102 @@ export default function CRLOCSPPage() {
           />
         </div>
       ) : (
-        <DetailContent>
-          {/* Detail Header */}
-          <DetailHeader
+        <div className="p-3 space-y-3">
+          {/* Header */}
+          <CompactHeader
             icon={FileX}
+            iconClass={selectedCRL ? "bg-status-success/20" : "bg-status-warning/20"}
             title={selectedCA.descr}
             subtitle="CRL & OCSP Configuration"
             badge={
-              <Badge variant={selectedCRL ? 'success' : 'warning'}>
+              <Badge variant={selectedCRL ? 'success' : 'warning'} size="sm">
                 {selectedCRL ? 'Active' : 'Not Generated'}
               </Badge>
             }
-            stats={[
-              { icon: Hash, label: 'CRL Number', value: selectedCRL?.crl_number || '-' },
-              { icon: XCircle, label: 'Revoked', value: selectedCRL?.revoked_count || 0 },
-              { icon: Calendar, label: 'Updated', value: selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-' }
-            ]}
-            actions={[
-              { 
-                label: regenerating ? 'Regenerating...' : (selectedCA.has_private_key === false ? 'No Private Key' : 'Regenerate CRL'), 
-                icon: ArrowsClockwise, 
-                onClick: handleRegenerateCRL,
-                disabled: regenerating || selectedCA.has_private_key === false
-              },
-              { 
-                label: 'Download CRL', 
-                icon: Download, 
-                onClick: handleDownloadCRL,
-                disabled: !selectedCRL?.crl_pem,
-                variant: 'secondary'
-              }
-            ]}
           />
 
-          {/* CRL Configuration Section */}
-          <DetailSection title="CRL Configuration">
-            <DetailGrid>
-              <DetailField label="CA Name" value={selectedCA.descr} />
-              <DetailField 
-                label="Status" 
-                value={
-                  <StatusIndicator status={selectedCRL ? 'success' : 'warning'}>
-                    {selectedCRL ? 'Active' : 'Not Generated'}
-                  </StatusIndicator>
-                } 
-              />
-              <DetailField label="CRL Number" value={selectedCRL?.crl_number || '-'} mono />
-              <DetailField label="Revoked Certificates" value={selectedCRL?.revoked_count || 0} />
-              <DetailField 
-                label="Last Updated" 
-                value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} 
-              />
-              <DetailField 
-                label="Next Update" 
-                value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'} 
-              />
-            </DetailGrid>
-          </DetailSection>
+          {/* Stats */}
+          <CompactStats stats={[
+            { icon: Hash, value: `#${selectedCRL?.crl_number || '-'}` },
+            { icon: XCircle, value: `${selectedCRL?.revoked_count || 0} revoked` },
+            { icon: Calendar, value: selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-' }
+          ]} />
 
-          {/* OCSP Configuration Section */}
-          <DetailSection title="OCSP Configuration">
-            <DetailGrid>
-              <DetailField 
-                label="OCSP Status" 
-                value={
-                  <StatusIndicator status={ocspStatus.enabled && ocspStatus.running ? 'success' : 'warning'}>
-                    {ocspStatus.enabled ? (ocspStatus.running ? 'Running' : 'Stopped') : 'Disabled'}
-                  </StatusIndicator>
-                } 
-              />
-              <DetailField label="Total Requests" value={ocspStats.total_requests} />
-              <DetailField label="Cache Hits" value={ocspStats.cache_hits} />
-              <DetailField label="Cache Hit Rate" value={`${cacheHitRate}%`} />
-            </DetailGrid>
-          </DetailSection>
+          {/* Actions */}
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant="secondary" 
+              className="flex-1"
+              onClick={handleRegenerateCRL}
+              disabled={regenerating || selectedCA.has_private_key === false}
+            >
+              <ArrowsClockwise size={14} className={regenerating ? 'animate-spin' : ''} />
+              {regenerating ? 'Regenerating...' : (selectedCA.has_private_key === false ? 'No Key' : 'Regenerate')}
+            </Button>
+            <Button 
+              size="sm" 
+              variant="secondary"
+              onClick={handleDownloadCRL}
+              disabled={!selectedCRL?.crl_pem}
+            >
+              <Download size={14} />
+            </Button>
+          </div>
 
-          {/* Distribution Points Section */}
-          <DetailSection title="Distribution Points">
-            <DetailGrid columns={1}>
-              <DetailField 
-                label="CRL Distribution Point (CDP)" 
-                value={`${window.location.origin}/crl/${selectedCA.refid}.crl`}
-                mono
-                copyable
-                fullWidth
-              />
-              <DetailField 
-                label="OCSP Responder URL (AIA)" 
-                value={`${window.location.origin}/ocsp/${selectedCA.refid}`}
-                mono
-                copyable
-                fullWidth
-              />
-            </DetailGrid>
-            <p className="text-xs text-text-secondary mt-3">
-              Include these URLs in your CA settings to enable automatic revocation checking in issued certificates.
-            </p>
-          </DetailSection>
-        </DetailContent>
+          {/* CRL Config */}
+          <CompactSection title="CRL Configuration">
+            <CompactGrid>
+              <CompactField label="CA" value={selectedCA.descr} />
+              <div className="text-xs">
+                <span className="text-text-tertiary">Status:</span>
+                <StatusIndicator status={selectedCRL ? 'success' : 'warning'} className="ml-1 inline-flex">
+                  {selectedCRL ? 'Active' : 'Not Generated'}
+                </StatusIndicator>
+              </div>
+              <CompactField label="CRL #" value={selectedCRL?.crl_number || '-'} />
+              <CompactField label="Revoked" value={selectedCRL ? (selectedCRL.revoked_count || 0) : '-'} />
+              <CompactField label="Updated" value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-'} />
+              <CompactField label="Next Update" value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update, 'short') : '-'} />
+            </CompactGrid>
+          </CompactSection>
+
+          {/* OCSP Config */}
+          <CompactSection title="OCSP Configuration">
+            <CompactGrid>
+              <div className="text-xs">
+                <span className="text-text-tertiary">Status:</span>
+                <StatusIndicator status={ocspStatus.enabled && ocspStatus.running ? 'success' : 'warning'} className="ml-1 inline-flex">
+                  {ocspStatus.enabled ? (ocspStatus.running ? 'Running' : 'Stopped') : 'Disabled'}
+                </StatusIndicator>
+              </div>
+              <CompactField label="Requests" value={ocspStats.total_requests} />
+              <CompactField label="Cache Hits" value={ocspStats.cache_hits} />
+              <CompactField label="Hit Rate" value={`${cacheHitRate}%`} />
+            </CompactGrid>
+          </CompactSection>
+
+          {/* Distribution Points */}
+          <CompactSection title="Distribution Points">
+            <div className="space-y-2">
+              <div className="text-xs">
+                <span className="text-text-tertiary block mb-0.5">CDP (CRL):</span>
+                <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
+                  {`${window.location.origin}/crl/${selectedCA.refid}.crl`}
+                </p>
+              </div>
+              <div className="text-xs">
+                <span className="text-text-tertiary block mb-0.5">AIA (OCSP):</span>
+                <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
+                  {`${window.location.origin}/ocsp/${selectedCA.refid}`}
+                </p>
+              </div>
+              <p className="text-[10px] text-text-tertiary mt-2">
+                Include these URLs in CA settings for automatic revocation checking.
+              </p>
+            </div>
+          </CompactSection>
+        </div>
       )}
     </PageLayout>
   )

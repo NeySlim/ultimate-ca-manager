@@ -3,17 +3,16 @@
  * 
  * Structure: [ContentPanel] → [FocusPanel]
  * - ContentPanel: Main content area (left/center)
- * - FocusPanel: List/selection panel (right) with optional help button
+ * - FocusPanel: List/selection panel (right) - animated slide-over
  * 
  * The Sidebar is handled by AppShell, this component handles the page content area.
  */
 import { useState } from 'react'
 import { cn } from '../lib/utils'
 import { labels, getHelpTitle } from '../lib/ui'
-import { Question, CaretLeft, CaretRight } from '@phosphor-icons/react'
+import { Question, X, ArrowLeft } from '@phosphor-icons/react'
 import { HelpModal } from './HelpModal'
 import { useMobile } from '../contexts'
-import { BottomSheet } from './BottomSheet'
 
 export function PageLayout({
   // Page metadata
@@ -22,24 +21,23 @@ export function PageLayout({
   // Content panel (main area)
   children,
   
-  // Focus panel (right sidebar)
+  // Focus panel (right sidebar) - animated slide-over
   focusTitle,
   focusContent,
   focusActions,
   focusFooter,
+  focusOpen = true,           // Control panel visibility
+  onFocusClose,               // Callback when panel closes
   
   // Help modal
   helpContent,
   helpTitle,
   
   // Options
-  focusCollapsible = false,
-  focusDefaultOpen = true,
   className
 }) {
-  const { isMobile, explorerOpen, openExplorer, closeExplorer } = useMobile()
+  const { isMobile } = useMobile()
   const [helpOpen, setHelpOpen] = useState(false)
-  const [focusOpen, setFocusOpen] = useState(focusDefaultOpen)
 
   // Help button component
   const HelpButton = () => helpContent ? (
@@ -58,54 +56,71 @@ export function PageLayout({
     </button>
   ) : null
 
-  // Mobile layout
+  // Mobile layout - full screen focus panel
   if (isMobile) {
     return (
       <div className={cn("flex flex-col h-full w-full", className)}>
-        {/* Page Header */}
-        <div className="px-4 py-3 border-b border-border bg-bg-secondary flex items-center justify-between shrink-0">
-          <h1 className="text-base font-semibold text-text-primary">{title}</h1>
-          <div className="flex items-center gap-2">
-            <HelpButton />
+        {/* Full-screen Focus Panel Overlay */}
+        {focusContent && (
+          <div 
+            className={cn(
+              "fixed inset-0 z-50 bg-bg-primary flex flex-col",
+              "transition-transform duration-300 ease-out",
+              focusOpen ? "translate-x-0" : "translate-x-full"
+            )}
+          >
+            {/* Header */}
+            <div className="px-4 py-3 border-b border-border bg-bg-secondary flex items-center gap-3 shrink-0">
+              <button
+                onClick={onFocusClose}
+                className="p-1.5 -ml-1.5 rounded-md hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <h2 className="text-base font-semibold text-text-primary flex-1 truncate">
+                {focusTitle || 'Details'}
+              </h2>
+            </div>
+            
+            {/* Actions */}
+            {focusActions && (
+              <div className="px-4 py-2 border-b border-border flex items-center gap-2 shrink-0">
+                {focusActions}
+              </div>
+            )}
+            
+            {/* Content */}
+            <div className="flex-1 overflow-auto">
+              {focusContent}
+            </div>
+            
+            {/* Footer */}
+            {focusFooter && (
+              <div className="px-3 py-2 border-t border-border bg-bg-tertiary shrink-0">
+                {focusFooter}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Main Content (behind overlay) */}
+        <div className={cn(
+          "flex flex-col h-full transition-opacity duration-300",
+          focusOpen && focusContent ? "opacity-50" : "opacity-100"
+        )}>
+          {/* Page Header */}
+          <div className="px-4 py-3 border-b border-border bg-bg-secondary flex items-center justify-between shrink-0">
+            <h1 className="text-base font-semibold text-text-primary">{title}</h1>
+            <div className="flex items-center gap-2">
+              <HelpButton />
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1 overflow-auto">
+            {children}
           </div>
         </div>
-
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto">
-          {children}
-        </div>
-
-        {/* Focus Panel as BottomSheet */}
-        {focusContent && (
-          <BottomSheet
-            open={explorerOpen}
-            onOpenChange={(open) => open ? openExplorer() : closeExplorer()}
-            title={focusTitle || title}
-            snapPoints={['35%', '60%', '85%']}
-            defaultSnap={1}
-          >
-            <div className="flex flex-col h-full">
-              {/* Actions */}
-              {focusActions && (
-                <div className="px-4 py-2 border-b border-border flex items-center gap-2 shrink-0">
-                  {focusActions}
-                </div>
-              )}
-              
-              {/* Content */}
-              <div className="flex-1 overflow-auto">
-                {focusContent}
-              </div>
-              
-              {/* Footer */}
-              {focusFooter && (
-                <div className="px-3 py-2 border-t border-border bg-bg-tertiary shrink-0">
-                  {focusFooter}
-                </div>
-              )}
-            </div>
-          </BottomSheet>
-        )}
 
         {/* Help Modal */}
         <HelpModal 
@@ -119,7 +134,7 @@ export function PageLayout({
     )
   }
 
-  // Desktop layout
+  // Desktop layout - animated slide-over panel
   return (
     <div className={cn("flex h-full w-full", className)}>
       {/* Content Panel (main area) */}
@@ -129,15 +144,6 @@ export function PageLayout({
           <h1 className="text-lg font-semibold text-text-primary">{title}</h1>
           <div className="flex items-center gap-3">
             <HelpButton />
-            {focusCollapsible && focusContent && (
-              <button
-                onClick={() => setFocusOpen(!focusOpen)}
-                className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
-                title={focusOpen ? "Masquer le panneau" : "Afficher le panneau"}
-              >
-                {focusOpen ? <CaretRight size={16} /> : <CaretLeft size={16} />}
-              </button>
-            )}
           </div>
         </div>
 
@@ -147,35 +153,55 @@ export function PageLayout({
         </div>
       </div>
 
-      {/* Focus Panel (right sidebar) */}
-      {focusContent && focusOpen && (
-        <div className="w-80 xl:w-96 2xl:w-[420px] min-[1800px]:w-[500px] border-l border-border bg-bg-secondary flex flex-col min-h-0 shrink-0">
-          {/* Focus Header */}
-          <div className="px-4 py-3 border-b border-border shrink-0">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-text-primary tracking-wide">
-                {focusTitle || 'Selection'}
-              </h2>
-            </div>
-          </div>
-
-          {/* Actions */}
-          {focusActions && (
-            <div className="px-3 py-2 border-b border-border flex items-center gap-2 shrink-0">
-              {focusActions}
-            </div>
+      {/* Animated Slide-over Focus Panel */}
+      {focusContent !== undefined && (
+        <div 
+          className={cn(
+            "border-l border-border bg-bg-secondary flex flex-col shrink-0",
+            "transition-all duration-300 ease-out overflow-hidden",
+            focusOpen && focusContent
+              ? "w-80 xl:w-96 2xl:w-[420px] min-[1800px]:w-[500px]" 
+              : "w-0 border-l-0"
           )}
+        >
+          {focusOpen && focusContent && (
+            <>
+              {/* Focus Header */}
+              <div className="px-4 py-3 border-b border-border shrink-0">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-text-primary tracking-wide">
+                    {focusTitle || 'Selection'}
+                  </h2>
+                  {onFocusClose && (
+                    <button
+                      onClick={onFocusClose}
+                      className="p-1 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-auto">
-            {focusContent}
-          </div>
+              {/* Actions */}
+              {focusActions && (
+                <div className="px-3 py-2 border-b border-border flex items-center gap-2 shrink-0">
+                  {focusActions}
+                </div>
+              )}
 
-          {/* Footer */}
-          {focusFooter && (
-            <div className="px-3 py-2 border-t border-border bg-bg-tertiary shrink-0 text-xs text-text-secondary">
-              {focusFooter}
-            </div>
+              {/* Content */}
+              <div className="flex-1 overflow-auto">
+                {focusContent}
+              </div>
+
+              {/* Footer */}
+              {focusFooter && (
+                <div className="px-3 py-2 border-t border-border bg-bg-tertiary shrink-0 text-xs text-text-secondary">
+                  {focusFooter}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

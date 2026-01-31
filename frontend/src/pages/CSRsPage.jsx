@@ -1,36 +1,45 @@
 /**
- * CSRs (Certificate Signing Requests) Page - Using ListPageLayout
+ * CSRs (Certificate Signing Requests) Page - Using TablePageLayout (Audit pattern)
  */
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
-  FileText, Upload, SignIn, Trash, Download, FileArrowUp, 
-  Clock, Key, UploadSimple
+  FileText, Upload, SignIn, Trash, Download, 
+  Clock, Key, UploadSimple, CheckCircle, Warning, X
 } from '@phosphor-icons/react'
 import {
-  ListPageLayout, Badge, Button, Modal, Input, Select,
-  DetailHeader, DetailSection, DetailGrid, DetailField, HelpCard,
-  FileUpload, LoadingSpinner
+  TablePageLayout, Badge, Button, Modal, Input, Select, HelpCard, FileUpload,
+  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
 import { csrsService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
-import { extractData, formatDate } from '../lib/utils'
+import { extractData, formatDate, cn } from '../lib/utils'
 import { VALIDITY } from '../constants/config'
 
 export default function CSRsPage() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
-  const fileRef = useRef(null)
   const { modals, open: openModal, close: closeModal } = useModals(['upload', 'sign'])
   
+  // Data state
   const [csrs, setCSRs] = useState([])
-  const [selectedCSR, setSelectedCSR] = useState(null)
   const [loading, setLoading] = useState(true)
   const [cas, setCAs] = useState([])
+  
+  // Selection & modals
+  const [selectedCSR, setSelectedCSR] = useState(null)
   const [signCA, setSignCA] = useState('')
   const [validityDays, setValidityDays] = useState(VALIDITY.DEFAULT_DAYS)
+  
+  // Filters
+  const [filterStatus, setFilterStatus] = useState('')
+  const [search, setSearch] = useState('')
+  
+  // Pagination
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
 
   useEffect(() => {
     loadData()
@@ -41,6 +50,10 @@ export default function CSRsPage() {
     }
   }, [])
 
+  useEffect(() => {
+    setPage(1)
+  }, [filterStatus, search])
+
   const loadData = async () => {
     try {
       setLoading(true)
@@ -49,7 +62,7 @@ export default function CSRsPage() {
         casService.getAll()
       ])
       setCSRs(csrsRes.data || [])
-      setCAs(casRes.cas || [])
+      setCAs(casRes.data || casRes.cas || [])
     } catch (error) {
       showError('Failed to load CSRs')
     } finally {
@@ -127,37 +140,53 @@ export default function CSRsPage() {
     }
   }
 
-  // Table filters
-  const tableFilters = useMemo(() => [
-    {
-      key: 'status',
-      label: 'Status',
-      options: [
-        { value: 'pending', label: 'Pending' },
-        { value: 'signed', label: 'Signed' },
-        { value: 'rejected', label: 'Rejected' }
-      ]
+  // Filter data
+  const filteredCSRs = useMemo(() => {
+    let result = csrs.map(csr => ({
+      ...csr,
+      cn: csr.common_name || csr.subject || 'Unnamed CSR'
+    }))
+    
+    if (filterStatus) {
+      result = result.filter(c => c.status === filterStatus)
     }
-  ], [])
+    
+    return result
+  }, [csrs, filterStatus])
+
+  // Stats
+  const stats = useMemo(() => {
+    const pending = csrs.filter(c => c.status === 'pending' || !c.status).length
+    const signed = csrs.filter(c => c.status === 'signed').length
+    const rejected = csrs.filter(c => c.status === 'rejected').length
+    return [
+      { icon: Warning, label: 'Pending', value: pending, color: 'text-amber-500' },
+      { icon: CheckCircle, label: 'Signed', value: signed, color: 'text-emerald-500' },
+      { icon: X, label: 'Rejected', value: rejected, color: 'text-red-500' },
+      { icon: FileText, label: 'Total', value: csrs.length, color: 'text-accent-primary' }
+    ]
+  }, [csrs])
 
   // Table columns
   const columns = [
     {
-      key: 'common_name',
-      header: 'Common Name',
+      key: 'cn',
+      label: 'Common Name',
+      sortable: true,
       render: (val, row) => (
         <div className="flex items-center gap-2">
           <FileText size={16} className="text-accent-primary shrink-0" />
-          <span className="font-medium truncate">{val || row.subject || 'Unnamed CSR'}</span>
+          <span className="font-medium truncate">{val}</span>
         </div>
       )
     },
     {
       key: 'status',
-      header: 'Status',
+      label: 'Status',
+      sortable: true,
       render: (val) => (
         <Badge 
-          variant={val === 'pending' ? 'warning' : 'success'}
+          variant={val === 'signed' ? 'success' : val === 'rejected' ? 'danger' : 'warning'}
           size="sm"
         >
           {val || 'pending'}
@@ -166,97 +195,77 @@ export default function CSRsPage() {
     },
     {
       key: 'created_at',
-      header: 'Created',
-      sortType: 'date',
-      render: (val) => formatDate(val)
+      label: 'Created',
+      sortable: true,
+      render: (val) => (
+        <span className="text-xs text-text-secondary whitespace-nowrap">
+          {formatDate(val)}
+        </span>
+      )
     },
     {
       key: 'key_algorithm',
-      header: 'Key Type',
-      render: (val, row) => `${val || 'RSA'} ${row.key_size ? `(${row.key_size})` : ''}`
+      label: 'Key',
+      render: (val, row) => (
+        <span className="text-xs font-mono text-text-secondary">
+          {val || 'RSA'} {row.key_size ? `(${row.key_size})` : ''}
+        </span>
+      )
     }
   ]
 
-  // Row actions
-  const rowActions = (row) => [
-    ...(canWrite('csrs') && row.status === 'pending' ? [
-      { label: 'Sign', icon: SignIn, onClick: () => { setSelectedCSR(row); openModal('sign') }}
-    ] : []),
-    { label: 'Download CSR', icon: Download, onClick: () => handleDownload(row.id) },
-    ...(canDelete('csrs') ? [
-      { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
-    ] : [])
+  // Filters config
+  const filters = [
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      value: filterStatus,
+      onChange: setFilterStatus,
+      placeholder: 'All Status',
+      options: [
+        { value: 'pending', label: 'Pending' },
+        { value: 'signed', label: 'Signed' },
+        { value: 'rejected', label: 'Rejected' }
+      ]
+    }
   ]
 
-  // Render details panel
-  const renderDetails = (csr) => (
-    <div className="p-4 space-y-4">
-      <DetailHeader
-        icon={FileText}
-        title={csr.common_name || 'Unnamed CSR'}
-        subtitle={csr.subject}
-        badge={
-          <Badge variant={csr.status === 'pending' ? 'warning' : 'success'}>
-            {csr.status || 'pending'}
-          </Badge>
-        }
-        stats={[
-          { icon: Clock, label: 'Created', value: formatDate(csr.created_at) },
-          { icon: Key, label: 'Key', value: `${csr.key_algorithm || 'RSA'} ${csr.key_size ? `(${csr.key_size})` : ''}` },
-        ]}
-        actions={[
-          ...(canWrite('csrs') && csr.status === 'pending' ? [
-            { label: 'Sign', icon: SignIn, onClick: () => openModal('sign') }
-          ] : []),
-          { label: 'Download', icon: Download, variant: 'secondary', onClick: () => handleDownload(csr.id) },
-          ...(canDelete('csrs') ? [
-            { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(csr.id) }
-          ] : [])
-        ]}
-      />
-
-      <DetailSection title="Subject Information">
-        <DetailGrid>
-          <DetailField label="Common Name" value={csr.common_name} />
-          <DetailField label="Organization" value={csr.organization} />
-          <DetailField label="Country" value={csr.country} />
-          <DetailField label="State" value={csr.state} />
-          <DetailField label="Locality" value={csr.locality} />
-          <DetailField label="Email" value={csr.email} />
-        </DetailGrid>
-      </DetailSection>
-
-      <DetailSection title="Key Information">
-        <DetailGrid>
-          <DetailField label="Key Algorithm" value={csr.key_algorithm} />
-          <DetailField label="Key Size" value={csr.key_size ? `${csr.key_size} bits` : null} />
-          <DetailField label="Signature Algorithm" value={csr.signature_algorithm} />
-        </DetailGrid>
-      </DetailSection>
-
-      {csr.san && csr.san.length > 0 && (
-        <DetailSection title="Subject Alternative Names">
-          <div className="flex flex-wrap gap-1">
-            {csr.san.map((name, i) => (
-              <Badge key={i} variant="secondary" size="sm">{name}</Badge>
-            ))}
-          </div>
-        </DetailSection>
-      )}
-    </div>
-  )
+  // Quick filters
+  const quickFilters = [
+    {
+      icon: Warning,
+      title: 'Pending',
+      subtitle: 'Awaiting signature',
+      selected: filterStatus === 'pending',
+      onClick: () => setFilterStatus(filterStatus === 'pending' ? '' : 'pending')
+    },
+    {
+      icon: CheckCircle,
+      title: 'Signed',
+      subtitle: 'Certificates issued',
+      selected: filterStatus === 'signed',
+      onClick: () => setFilterStatus(filterStatus === 'signed' ? '' : 'signed')
+    }
+  ]
 
   // Help content
   const helpContent = (
-    <div className="space-y-4">
-      <HelpCard title="Certificate Signing Requests" variant="info">
-        A CSR contains the public key and identity information needed to issue a certificate.
+    <div className="space-y-3">
+      <HelpCard title="About CSRs" variant="info">
+        A Certificate Signing Request contains the public key and identity information needed to issue a certificate.
       </HelpCard>
-      <HelpCard title="Status" variant="default">
-        <ul className="text-sm space-y-1">
-          <li><Badge variant="warning" size="sm">Pending</Badge> - Awaiting signature</li>
-          <li><Badge variant="success" size="sm">Signed</Badge> - Certificate issued</li>
-        </ul>
+      <HelpCard title="Status Legend" variant="info">
+        <div className="space-y-1 mt-2">
+          <div className="flex items-center gap-2">
+            <Badge variant="warning" size="sm">Pending</Badge>
+            <span className="text-xs">Awaiting signature</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="success" size="sm">Signed</Badge>
+            <span className="text-xs">Certificate issued</span>
+          </div>
+        </div>
       </HelpCard>
       <HelpCard title="Workflow" variant="tip">
         1. Upload CSR → 2. Review details → 3. Sign with CA → 4. Download certificate
@@ -264,26 +273,30 @@ export default function CSRsPage() {
     </div>
   )
 
+  const handleClearFilters = () => {
+    setFilterStatus('')
+    setSearch('')
+  }
+
   return (
     <>
-      <ListPageLayout
+      <TablePageLayout
         title="Certificate Signing Requests"
-        data={csrs}
-        columns={columns}
         loading={loading}
-        selectedItem={selectedCSR}
-        onSelectItem={(csr) => csr ? loadCSRDetails(csr) : setSelectedCSR(null)}
-        renderDetails={renderDetails}
-        detailsTitle="CSR Details"
+        data={filteredCSRs}
+        columns={columns}
         searchable
         searchPlaceholder="Search CSRs..."
-        searchKeys={['common_name', 'subject', 'organization']}
-        sortable
-        defaultSort={{ key: 'created_at', direction: 'desc' }}
-        paginated
-        pageSize={25}
-        rowActions={rowActions}
-        filters={tableFilters}
+        searchKeys={['cn', 'common_name', 'subject', 'organization']}
+        externalSearch={search}
+        onSearch={setSearch}
+        onRowClick={loadCSRDetails}
+        filters={filters}
+        quickFilters={quickFilters}
+        onClearFilters={handleClearFilters}
+        stats={stats}
+        helpContent={helpContent}
+        onRefresh={loadData}
         emptyIcon={FileText}
         emptyTitle="No CSRs"
         emptyDescription="Upload a CSR to get started"
@@ -292,18 +305,104 @@ export default function CSRsPage() {
             <UploadSimple size={16} /> Upload CSR
           </Button>
         )}
-        helpContent={helpContent}
         actions={canWrite('csrs') && (
-          <Button size="sm" onClick={() => openModal('upload')}>
-            <UploadSimple size={16} /> Upload CSR
+          <Button size="sm" onClick={() => openModal('upload')} className="flex-1">
+            <UploadSimple size={14} /> Upload
           </Button>
         )}
+        pagination={{
+          page,
+          total: filteredCSRs.length,
+          perPage,
+          onChange: setPage,
+          onPerPageChange: (v) => { setPerPage(v); setPage(1) }
+        }}
       />
+
+      {/* CSR Details Modal */}
+      <Modal
+        open={!!selectedCSR}
+        onOpenChange={() => setSelectedCSR(null)}
+        title="CSR Details"
+        size="lg"
+      >
+        {selectedCSR && (
+          <div className="p-4 space-y-4">
+            {/* Header */}
+            <CompactHeader
+              icon={FileText}
+              iconClass={selectedCSR.status === 'signed' ? "bg-status-success/20" : selectedCSR.status === 'rejected' ? "bg-status-error/20" : "bg-status-warning/20"}
+              title={selectedCSR.cn || selectedCSR.common_name || 'Unnamed CSR'}
+              subtitle={selectedCSR.subject}
+              badge={
+                <Badge variant={selectedCSR.status === 'signed' ? 'success' : selectedCSR.status === 'rejected' ? 'danger' : 'warning'} size="sm">
+                  {selectedCSR.status || 'pending'}
+                </Badge>
+              }
+            />
+
+            {/* Stats */}
+            <CompactStats stats={[
+              { icon: Clock, value: formatDate(selectedCSR.created_at, 'short') || 'N/A' },
+              { icon: Key, value: `${selectedCSR.key_algorithm || 'RSA'} ${selectedCSR.key_size || ''}` },
+            ]} />
+
+            {/* Actions */}
+            <div className="flex flex-wrap gap-2">
+              {canWrite('csrs') && (!selectedCSR.status || selectedCSR.status === 'pending') && (
+                <Button size="sm" variant="primary" onClick={() => openModal('sign')}>
+                  <SignIn size={14} /> Sign CSR
+                </Button>
+              )}
+              <Button size="sm" variant="secondary" onClick={() => handleDownload(selectedCSR.id)}>
+                <Download size={14} /> Download
+              </Button>
+              {canDelete('csrs') && (
+                <Button size="sm" variant="danger" onClick={() => handleDelete(selectedCSR.id)}>
+                  <Trash size={14} />
+                </Button>
+              )}
+            </div>
+
+            {/* Subject */}
+            <CompactSection title="Subject Information">
+              <CompactGrid>
+                <CompactField label="CN" value={selectedCSR.common_name} />
+                <CompactField label="O" value={selectedCSR.organization} />
+                <CompactField label="C" value={selectedCSR.country} />
+                <CompactField label="ST" value={selectedCSR.state} />
+                <CompactField label="L" value={selectedCSR.locality} />
+                <CompactField label="Email" value={selectedCSR.email} />
+              </CompactGrid>
+            </CompactSection>
+
+            {/* Key Info */}
+            <CompactSection title="Key Information">
+              <CompactGrid>
+                <CompactField label="Algorithm" value={selectedCSR.key_algorithm} />
+                <CompactField label="Size" value={selectedCSR.key_size ? `${selectedCSR.key_size} bits` : null} />
+                <CompactField label="Signature" value={selectedCSR.signature_algorithm} className="col-span-2" />
+              </CompactGrid>
+            </CompactSection>
+
+            {/* SANs */}
+            {selectedCSR.san && selectedCSR.san.length > 0 && (
+              <CompactSection title="Subject Alternative Names">
+                <div className="flex flex-wrap gap-1">
+                  {selectedCSR.san.map((name, i) => (
+                    <Badge key={i} variant="secondary" size="sm">{name}</Badge>
+                  ))}
+                </div>
+              </CompactSection>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Upload CSR Modal */}
       <Modal
         open={modals.upload}
-        onClose={() => closeModal('upload')}
+        onOpenChange={() => closeModal('upload')}
         title="Upload CSR"
       >
         <div className="p-4 space-y-4">
@@ -321,7 +420,7 @@ export default function CSRsPage() {
       {/* Sign CSR Modal */}
       <Modal
         open={modals.sign}
-        onClose={() => closeModal('sign')}
+        onOpenChange={() => closeModal('sign')}
         title="Sign CSR"
       >
         <div className="p-4 space-y-4">
@@ -331,7 +430,7 @@ export default function CSRsPage() {
           
           <Select
             label="Certificate Authority"
-            options={cas.map(ca => ({ value: ca.id, label: ca.name || ca.common_name }))}
+            options={cas.map(ca => ({ value: ca.id, label: ca.descr || ca.name || ca.common_name }))}
             value={signCA}
             onChange={setSignCA}
             placeholder="Select CA..."

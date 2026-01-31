@@ -247,7 +247,7 @@ export function DetailField({
         onClick={copyable ? handleCopy : undefined}
         title={copyable ? (copied ? "Copié!" : "Cliquer pour copier") : undefined}
       >
-        {value || <span className="text-text-tertiary">—</span>}
+        {value !== undefined && value !== null && value !== '' ? value : <span className="text-text-tertiary">—</span>}
         {copyable && (
           copied 
             ? <Check size={14} className="text-emerald-500" /> 
@@ -320,6 +320,128 @@ export function DetailTabs({ tabs, activeTab, onChange, className }) {
             )}
           </button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// ===========================================
+// COMPACT DETAIL COMPONENTS (for slide-over panels)
+// ===========================================
+
+/**
+ * CompactSection - Bordered section with header
+ * For use in slide-over detail panels
+ */
+export function CompactSection({ title, children, className }) {
+  return (
+    <div className={cn("border border-border rounded-lg overflow-hidden", className)}>
+      <div className="px-3 py-1.5 bg-bg-tertiary/50 border-b border-border">
+        <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+          {title}
+        </h4>
+      </div>
+      <div className="p-3">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * CompactGrid - 2-column grid for compact key-value pairs
+ */
+export function CompactGrid({ children, cols = 2, className }) {
+  return (
+    <div className={cn(
+      "grid gap-x-3 gap-y-1.5 text-xs",
+      cols === 2 ? "grid-cols-2" : cols === 3 ? "grid-cols-3" : "grid-cols-1",
+      className
+    )}>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * CompactField - Inline label:value for compact display
+ */
+export function CompactField({ label, value, mono, className, colSpan }) {
+  return (
+    <div className={cn(colSpan && `col-span-${colSpan}`, className)}>
+      <span className="text-text-tertiary">{label}:</span>
+      <span className={cn("ml-1 text-text-primary", mono && "font-mono")}>
+        {value !== undefined && value !== null && value !== '' ? value : '—'}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * CompactStats - Horizontal stats bar
+ */
+export function CompactStats({ stats, className }) {
+  return (
+    <div className={cn(
+      "flex items-center justify-between text-xs",
+      "bg-bg-tertiary/50 rounded-lg px-3 py-2 border border-border",
+      className
+    )}>
+      {stats.map((stat, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          {stat.icon && <stat.icon size={14} className={stat.iconClass || "text-text-tertiary"} />}
+          <span className="text-text-secondary">{stat.value}</span>
+          {stat.badge && (
+            <Badge variant={stat.badgeVariant || 'secondary'} size="sm">
+              {stat.badge}
+            </Badge>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * CompactActions - Action buttons row
+ */
+export function CompactActions({ children, className }) {
+  return (
+    <div className={cn("flex gap-2", className)}>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * CompactHeader - Minimal header with icon, title, badge
+ */
+export function CompactHeader({ 
+  icon: Icon, 
+  iconClass,
+  title, 
+  subtitle, 
+  badge,
+  className 
+}) {
+  return (
+    <div className={cn("flex items-start gap-3 pb-3 border-b border-border", className)}>
+      {Icon && (
+        <div className={cn(
+          "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+          iconClass || "bg-accent-primary/20"
+        )}>
+          <Icon size={20} className="text-accent-primary" />
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <h3 className="font-semibold text-text-primary truncate">{title}</h3>
+          {badge}
+        </div>
+        {subtitle && (
+          <p className="text-xs text-text-tertiary truncate">{subtitle}</p>
+        )}
       </div>
     </div>
   )
