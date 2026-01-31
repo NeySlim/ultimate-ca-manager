@@ -284,9 +284,35 @@ def create_app(config_name=None):
             description="Auto-regenerate expiring CRLs"
         )
         
+        # Register audit log cleanup task (runs daily)
+        try:
+            from services.retention_service import scheduled_audit_cleanup
+            scheduler.register_task(
+                name="audit_log_cleanup",
+                func=scheduled_audit_cleanup,
+                interval=86400,  # 24 hours
+                description="Clean up old audit logs based on retention policy"
+            )
+            app.logger.info("Registered audit log cleanup task (daily)")
+        except ImportError:
+            pass
+        
+        # Register certificate expiry alert task (runs daily)
+        try:
+            from services.expiry_alert_service import scheduled_expiry_check
+            scheduler.register_task(
+                name="cert_expiry_alerts",
+                func=scheduled_expiry_check,
+                interval=86400,  # 24 hours
+                description="Check for expiring certificates and send alerts"
+            )
+            app.logger.info("Registered certificate expiry alert task (daily)")
+        except ImportError:
+            pass
+        
         # Start scheduler now that tasks are registered
         scheduler.start(app=app)
-        app.logger.info("Scheduler service started with CRL auto-regeneration task")
+        app.logger.info("Scheduler service started with all tasks")
         
         # Register scheduler in app context for graceful shutdown
         app.scheduler = scheduler
