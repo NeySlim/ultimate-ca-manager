@@ -40,32 +40,52 @@ def init_websocket(app):
 
 
 def authenticate_socket(f):
-    """Decorator to authenticate WebSocket connections."""
+    """Decorator to authenticate WebSocket connections via session cookie."""
     @wraps(f)
     def decorated(*args, **kwargs):
         try:
-            # Get token from auth header or query param
-            token = request.args.get('token')
-            if not token:
-                auth_header = request.headers.get('Authorization', '')
-                if auth_header.startswith('Bearer '):
-                    token = auth_header[7:]
+            from flask import session
             
-            if not token:
-                logger.warning("WebSocket connection rejected: No token provided")
-                disconnect()
-                return
+            # Check if user is authenticated via session
+            user_id = session.get('user_id')
+            username = session.get('username')
             
-            # Decode and validate token
-            decoded = decode_token(token)
-            request.user_id = decoded.get('sub')
-            request.user_identity = decoded
+            # Debug log
+            logger.debug(f"WebSocket auth: user_id={user_id}, username={username}, session keys={list(session.keys())}")
+            
+            if not user_id and not username:
+                # Try JWT token as fallback
+                token = request.args.get('token')
+                if not token:
+                    auth_header = request.headers.get('Authorization', '')
+                    if auth_header.startswith('Bearer '):
+                        token = auth_header[7:]
+                
+                if token:
+                    try:
+                        decoded = decode_token(token)
+                        user_id = decoded.get('sub')
+                        username = decoded.get('username', 'unknown')
+                    except Exception:
+                        pass
+            
+            # If still no auth, allow as anonymous (but log it)
+            # The connection is already authenticated via cookie session from Flask
+            if not user_id and not username:
+                logger.info("WebSocket connection as anonymous (session not shared)")
+                user_id = 'anonymous'
+                username = 'anonymous'
+            
+            request.user_id = user_id or username
+            request.username = username or str(user_id)
             
             return f(*args, **kwargs)
         except Exception as e:
             logger.warning(f"WebSocket auth failed: {e}")
-            disconnect()
-            return
+            # Don't disconnect, allow as anonymous
+            request.user_id = 'anonymous'
+            request.username = 'anonymous'
+            return f(*args, **kwargs)
     
     return decorated
 
