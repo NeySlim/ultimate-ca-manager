@@ -363,19 +363,27 @@ export function CertificateDetails({
             )}
             <div className="flex gap-2 mt-2">
               <Button 
+                type="button"
                 size="sm" 
                 variant="ghost" 
-                onClick={() => setShowFullPem(!showFullPem)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowFullPem(!showFullPem)
+                }}
               >
                 {showFullPem ? 'Show Less' : 'Show Full'}
               </Button>
               <Button 
+                type="button"
                 size="sm" 
                 variant="ghost"
-                onClick={() => copyToClipboard(cert.pem, () => {
-                  setPemCopied(true)
-                  setTimeout(() => setPemCopied(false), 2000)
-                })}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  copyToClipboard(cert.pem, () => {
+                    setPemCopied(true)
+                    setTimeout(() => setPemCopied(false), 2000)
+                  })
+                }}
               >
                 {pemCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
                 {pemCopied ? 'Copied!' : 'Copy PEM'}
