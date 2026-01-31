@@ -12,8 +12,9 @@ import {
   Input, Modal, Tabs, Select, HelpCard,
   LoadingSpinner, EmptyState, StatusIndicator,
   ContentHeader, ContentBody, ResponsiveContentSection as ContentSection, 
-  DataGrid, DataField, TabsResponsive,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent, DetailTabs
+  DataGrid, DataField, TabsResponsive, DetailTabs,
+  DetailSection, DetailGrid, DetailField,
+  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
 import { acmeService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -516,42 +517,50 @@ export default function ACMEPage() {
         {!selectedAccount ? (
           configContent
         ) : (
-          <>
-            {/* Header with gradient card style */}
-            <div className="p-4 md:p-6">
-              <DetailHeader
-                icon={Globe}
-                title={selectedAccount.email}
-                subtitle={`Account ID: ${selectedAccount.account_id}`}
-                badge={
-                  <Badge 
-                    variant={selectedAccount.status === 'valid' ? 'emerald' : 'secondary'} 
-                    size="lg"
-                  >
-                    {selectedAccount.status === 'valid' && <CheckCircle size={14} weight="fill" />}
-                    {selectedAccount.status}
-                  </Badge>
-                }
-                stats={[
-                  { icon: Key, label: 'Key Type:', value: selectedAccount.key_type || 'RSA-2048' },
-                  { icon: Lightning, label: 'Orders:', value: orders.length },
-                  { icon: ShieldCheck, label: 'Challenges:', value: challenges.length },
-                ]}
-                actions={[
-                  {
-                    label: 'Deactivate',
-                    icon: XCircle,
-                    onClick: () => handleDeactivate(selectedAccount.id),
-                    disabled: selectedAccount.status !== 'valid',
-                  },
-                  {
-                    label: 'Delete',
-                    icon: Trash,
-                    variant: 'danger',
-                    onClick: () => handleDelete(selectedAccount.id),
-                  },
-                ]}
-              />
+          <div className="p-3 space-y-3">
+            {/* Header */}
+            <CompactHeader
+              icon={Globe}
+              iconClass={selectedAccount.status === 'valid' ? "bg-status-success/20" : "bg-bg-tertiary"}
+              title={selectedAccount.email}
+              subtitle={`Account ID: ${selectedAccount.account_id?.substring(0, 20)}...`}
+              badge={
+                <Badge 
+                  variant={selectedAccount.status === 'valid' ? 'success' : 'secondary'} 
+                  size="sm"
+                >
+                  {selectedAccount.status === 'valid' && <CheckCircle size={12} weight="fill" />}
+                  {selectedAccount.status}
+                </Badge>
+              }
+            />
+
+            {/* Stats */}
+            <CompactStats stats={[
+              { icon: Key, value: selectedAccount.key_type || 'RSA-2048' },
+              { icon: Lightning, value: `${orders.length} orders` },
+              { icon: ShieldCheck, value: `${challenges.length} challenges` },
+            ]} />
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                variant="secondary"
+                className="flex-1"
+                onClick={() => handleDeactivate(selectedAccount.id)}
+                disabled={selectedAccount.status !== 'valid'}
+              >
+                <XCircle size={14} />
+                Deactivate
+              </Button>
+              <Button 
+                size="sm" 
+                variant="danger"
+                onClick={() => handleDelete(selectedAccount.id)}
+              >
+                <Trash size={14} />
+              </Button>
             </div>
 
             {/* Tabs Navigation */}
@@ -566,97 +575,83 @@ export default function ACMEPage() {
             />
 
             {/* Tab Content */}
-            <DetailContent>
+            <div className="min-h-0">
               {/* Account Tab */}
               {activeDetailTab === 'account' && (
-                <>
-                  <DetailSection title="Account Information">
-                    <DetailGrid>
-                      <DetailField label="Email" value={selectedAccount.email} />
-                      <DetailField 
-                        label="Status" 
-                        value={
-                          <div className="flex items-center gap-2">
-                            <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'} />
-                            <span>{selectedAccount.status}</span>
-                          </div>
-                        } 
-                      />
-                      <DetailField label="Key Type" value={selectedAccount.key_type || 'RSA-2048'} />
-                      <DetailField 
-                        label="Created" 
-                        value={selectedAccount.created_at ? new Date(selectedAccount.created_at).toLocaleString() : '-'} 
-                      />
-                      <DetailField 
-                        label="Account ID" 
-                        value={selectedAccount.account_id} 
-                        mono 
-                        copyable 
-                        fullWidth 
-                      />
-                    </DetailGrid>
-                  </DetailSection>
+                <div className="space-y-3">
+                  <CompactSection title="Account Information">
+                    <CompactGrid>
+                      <CompactField label="Email" value={selectedAccount.email} />
+                      <div className="text-xs">
+                        <span className="text-text-tertiary">Status:</span>
+                        <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'} className="ml-1 inline-flex">
+                          {selectedAccount.status}
+                        </StatusIndicator>
+                      </div>
+                      <CompactField label="Key Type" value={selectedAccount.key_type || 'RSA-2048'} />
+                      <CompactField label="Created" value={selectedAccount.created_at ? new Date(selectedAccount.created_at).toLocaleDateString() : '-'} />
+                    </CompactGrid>
+                    <div className="mt-2 text-xs">
+                      <span className="text-text-tertiary block mb-0.5">Account ID:</span>
+                      <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
+                        {selectedAccount.account_id || '-'}
+                      </p>
+                    </div>
+                  </CompactSection>
 
-                  <DetailSection title="Terms of Service">
-                    <DetailGrid columns={1}>
-                      <DetailField 
-                        label="Agreement Status" 
-                        value={
-                          <div className="flex items-center gap-2">
-                            {selectedAccount.tos_agreed ? (
-                              <>
-                                <CheckCircle size={16} className="text-green-500" />
-                                <span className="text-green-500">Agreed</span>
-                              </>
-                            ) : (
-                              <>
-                                <XCircle size={16} className="text-red-500" />
-                                <span className="text-red-500">Not Agreed</span>
-                              </>
-                            )}
-                          </div>
-                        } 
-                      />
-                    </DetailGrid>
-                  </DetailSection>
-                </>
+                  <CompactSection title="Terms of Service">
+                    <div className="flex items-center gap-2 text-xs">
+                      {selectedAccount.tos_agreed ? (
+                        <>
+                          <CheckCircle size={14} className="text-green-500" />
+                          <span className="text-green-500">Agreed</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle size={14} className="text-red-500" />
+                          <span className="text-red-500">Not Agreed</span>
+                        </>
+                      )}
+                    </div>
+                  </CompactSection>
+                </div>
               )}
 
               {/* Orders Tab */}
               {activeDetailTab === 'orders' && (
-                <DetailSection title={`${orders.length} Active Orders`} noBorder>
+                <CompactSection title={`${orders.length} Active Orders`}>
                   {orders.length === 0 ? (
-                    <EmptyState
-                      title="No active orders"
-                      description="No pending certificate orders for this account"
-                    />
+                    <p className="text-xs text-text-tertiary py-4 text-center">No pending certificate orders</p>
                   ) : (
-                    <Table
-                      columns={orderColumns}
-                      data={orders}
-                    />
+                    <div className="max-h-48 overflow-y-auto">
+                      <Table
+                        columns={orderColumns}
+                        data={orders}
+                        compact
+                      />
+                    </div>
                   )}
-                </DetailSection>
+                </CompactSection>
               )}
 
               {/* Challenges Tab */}
               {activeDetailTab === 'challenges' && (
-                <DetailSection title={`${challenges.length} Challenges`} noBorder>
+                <CompactSection title={`${challenges.length} Challenges`}>
                   {challenges.length === 0 ? (
-                    <EmptyState
-                      title="No challenges"
-                      description="No active ACME challenges"
-                    />
+                    <p className="text-xs text-text-tertiary py-4 text-center">No active ACME challenges</p>
                   ) : (
-                    <Table
-                      columns={challengeColumns}
-                      data={challenges}
-                    />
+                    <div className="max-h-48 overflow-y-auto">
+                      <Table
+                        columns={challengeColumns}
+                        data={challenges}
+                        compact
+                      />
+                    </div>
                   )}
-                </DetailSection>
+                </CompactSection>
               )}
-            </DetailContent>
-          </>
+            </div>
+          </div>
         )}
       </PageLayout>
 

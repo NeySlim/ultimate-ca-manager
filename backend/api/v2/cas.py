@@ -104,8 +104,24 @@ def list_cas():
     end = start + per_page
     paginated_cas = filtered_cas[start:end]
     
+    # Add certificate count for each CA
+    result = []
+    for ca in paginated_cas:
+        ca_dict = ca.to_dict()
+        # Count certificates by refid first, then by issuer CN
+        cert_count = Certificate.query.filter_by(caref=ca.refid).count()
+        if cert_count == 0 and ca_dict.get('common_name'):
+            cn = ca_dict.get('common_name')
+            cert_count = Certificate.query.filter(
+                Certificate.issuer.ilike(f'CN={cn},%') | 
+                Certificate.issuer.ilike(f'%,CN={cn},%') |
+                Certificate.issuer.ilike(f'%,CN={cn}')
+            ).count()
+        ca_dict['certs'] = cert_count
+        result.append(ca_dict)
+    
     return success_response(
-        data=[ca.to_dict() for ca in paginated_cas],
+        data=result,
         meta={
             'total': total,
             'page': page,
@@ -149,8 +165,17 @@ def list_cas_tree():
                 ca['status'] = 'Active'
         else:
             ca['status'] = 'Active'
-        # Get certificate count
-        ca['certs'] = Certificate.query.filter_by(caref=ca['refid']).count()
+        # Get certificate count - try by refid first, then by issuer CN matching
+        cert_count = Certificate.query.filter_by(caref=ca['refid']).count()
+        if cert_count == 0 and ca.get('common_name'):
+            # Fallback: count certs where issuer contains CN=<ca_common_name>
+            cn = ca.get('common_name')
+            cert_count = Certificate.query.filter(
+                Certificate.issuer.ilike(f'CN={cn},%') | 
+                Certificate.issuer.ilike(f'%,CN={cn},%') |
+                Certificate.issuer.ilike(f'%,CN={cn}')
+            ).count()
+        ca['certs'] = cert_count
         ca['expiry'] = ca['valid_to'].split('T')[0] if ca['valid_to'] else 'N/A'
 
     roots = []
@@ -436,6 +461,17 @@ def get_ca(ca_id):
     
     # Get basic model data
     ca_data = ca.to_dict()
+    
+    # Add certificate count
+    cert_count = Certificate.query.filter_by(caref=ca.refid).count()
+    if cert_count == 0 and ca_data.get('common_name'):
+        cn = ca_data.get('common_name')
+        cert_count = Certificate.query.filter(
+            Certificate.issuer.ilike(f'CN={cn},%') | 
+            Certificate.issuer.ilike(f'%,CN={cn},%') |
+            Certificate.issuer.ilike(f'%,CN={cn}')
+        ).count()
+    ca_data['certs'] = cert_count
     
     # Get CRL status
     crl_status = 'Not Generated'

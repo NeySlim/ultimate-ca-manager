@@ -8,13 +8,13 @@ import {
   Certificate, UploadSimple, Clock, Plus, Warning
 } from '@phosphor-icons/react'
 import {
-  ListPageLayout, Badge, Button, Modal, Input, Select,
-  DetailHeader, DetailSection, DetailGrid, DetailField, HelpCard, LoadingSpinner
+  ListPageLayout, Badge, Button, Modal, Input, Select, HelpCard, LoadingSpinner,
+  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
-import { extractData, formatDate } from '../lib/utils'
+import { extractData, formatDate, cn } from '../lib/utils'
 
 export default function CAsPage() {
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
@@ -238,84 +238,90 @@ export default function CAsPage() {
 
   // Render details panel
   const renderDetails = (ca) => (
-    <div className="p-4 space-y-4">
-      <DetailHeader
+    <div className="p-3 space-y-3">
+      {/* Header */}
+      <CompactHeader
         icon={ca.type === 'root' ? Crown : ShieldCheck}
-        title={ca.name || ca.common_name || 'Certificate Authority'}
+        iconClass={ca.type === 'root' ? "bg-amber-500/20" : "bg-accent-primary/20"}
+        title={ca.name || ca.common_name}
         subtitle={ca.subject}
         badge={
-          <Badge variant={ca.status === 'Active' ? 'success' : 'danger'}>
-            {ca.status || 'Unknown'}
+          <Badge variant={ca.status === 'Active' ? 'success' : 'danger'} size="sm">
+            {ca.status}
           </Badge>
         }
-        stats={[
-          { icon: Certificate, label: 'Certs', value: ca.certs || 0 },
-          { icon: Key, label: 'Key', value: ca.key_algorithm || ca.key_type || 'RSA' },
-          { icon: Clock, label: 'Expires', value: formatDate(ca.valid_to) }
-        ]}
-        actions={[
-          { label: 'Export', icon: Download, onClick: () => handleExport(ca, 'pem') },
-          ...(canDelete('cas') ? [
-            { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(ca.id) }
-          ] : [])
-        ]}
       />
 
-      <DetailSection title="Type & Status">
-        <DetailGrid>
-          <DetailField 
-            label="Type" 
-            value={
-              <Badge variant={ca.type === 'root' ? 'primary' : 'secondary'}>
-                {ca.type || 'unknown'}
-              </Badge>
-            }
-          />
-          <DetailField 
-            label="Status" 
-            value={
-              <Badge variant={ca.status === 'Active' ? 'success' : 'danger'}>
-                {ca.status || 'Unknown'}
-              </Badge>
-            }
-          />
-          <DetailField label="Private Key" value={ca.has_private_key ? 'Available' : 'Not Available'} />
-        </DetailGrid>
-      </DetailSection>
+      {/* Stats */}
+      <CompactStats stats={[
+        { icon: Certificate, iconClass: "text-accent-primary", value: `${ca.certs || 0} certs` },
+        { icon: Key, value: ca.key_algorithm || 'RSA' },
+        { badge: ca.type, badgeVariant: ca.type === 'root' ? 'primary' : 'secondary' }
+      ]} />
 
-      <DetailSection title="Subject">
-        <DetailGrid>
-          <DetailField label="Common Name" value={ca.common_name} />
-          <DetailField label="Organization" value={ca.organization} />
-          <DetailField label="Country" value={ca.country} />
-          <DetailField label="State" value={ca.state} />
-          <DetailField label="Locality" value={ca.locality} />
-        </DetailGrid>
-      </DetailSection>
+      {/* Actions */}
+      <div className="flex gap-2">
+        <Button size="sm" variant="secondary" className="flex-1" onClick={() => handleExport(ca, 'pem')}>
+          <Download size={14} /> Export
+        </Button>
+        {canDelete('cas') && (
+          <Button size="sm" variant="danger" onClick={() => handleDelete(ca.id)}>
+            <Trash size={14} />
+          </Button>
+        )}
+      </div>
 
-      <DetailSection title="Validity">
-        <DetailGrid>
-          <DetailField label="Valid From" value={formatDate(ca.valid_from)} />
-          <DetailField label="Valid Until" value={formatDate(ca.valid_to)} />
-          <DetailField label="Serial Number" value={ca.serial} mono copyable />
-        </DetailGrid>
-      </DetailSection>
+      {/* Subject */}
+      <CompactSection title="Subject">
+        <CompactGrid>
+          <CompactField label="CN" value={ca.common_name} />
+          <CompactField label="O" value={ca.organization} />
+          <CompactField label="C" value={ca.country} />
+          <CompactField label="ST" value={ca.state} />
+        </CompactGrid>
+      </CompactSection>
 
-      <DetailSection title="Technical">
-        <DetailGrid>
-          <DetailField label="Key Algorithm" value={ca.key_algorithm || ca.key_type} />
-          <DetailField label="Signature Algorithm" value={ca.signature_algorithm} />
-          <DetailField label="Issued Certificates" value={`${ca.certs || 0} certificates`} />
-        </DetailGrid>
-      </DetailSection>
+      {/* Validity */}
+      <CompactSection title="Validity">
+        <CompactGrid>
+          <CompactField label="From" value={formatDate(ca.valid_from)} />
+          <CompactField label="Until" value={formatDate(ca.valid_to)} />
+        </CompactGrid>
+      </CompactSection>
 
+      {/* Technical */}
+      <CompactSection title="Technical">
+        <CompactGrid>
+          <CompactField label="Key" value={ca.key_algorithm || ca.key_type} />
+          <div className="text-xs">
+            <span className="text-text-tertiary">Private:</span>
+            <span className={cn("ml-1", ca.has_private_key ? "text-status-success" : "text-status-error")}>
+              {ca.has_private_key ? 'Yes' : 'No'}
+            </span>
+          </div>
+          <CompactField label="Signature" value={ca.signature_algorithm || ca.hash_algorithm} className="col-span-2" />
+        </CompactGrid>
+      </CompactSection>
+
+      {/* Serial */}
+      <CompactSection title="Serial Number">
+        <p className="font-mono text-xs text-text-primary break-all">{ca.serial === 0 ? '0' : (ca.serial || '—')}</p>
+      </CompactSection>
+
+      {/* DN */}
       {ca.subject && (
-        <DetailSection title="Distinguished Name">
-          <DetailGrid>
-            <DetailField label="Subject DN" value={ca.subject} mono copyable />
-            <DetailField label="Issuer DN" value={ca.issuer} mono copyable />
-          </DetailGrid>
-        </DetailSection>
+        <CompactSection title="Distinguished Names">
+          <div className="space-y-2">
+            <div>
+              <span className="text-[10px] text-text-tertiary block mb-0.5">Subject DN</span>
+              <p className="font-mono text-[11px] text-text-primary break-all">{ca.subject}</p>
+            </div>
+            <div className="border-t border-border pt-2">
+              <span className="text-[10px] text-text-tertiary block mb-0.5">Issuer DN</span>
+              <p className="font-mono text-[11px] text-text-primary break-all">{ca.issuer}</p>
+            </div>
+          </div>
+        </CompactSection>
       )}
     </div>
   )

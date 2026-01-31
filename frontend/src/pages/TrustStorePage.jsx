@@ -10,12 +10,12 @@ import {
 import {
   PageLayout, FocusItem, Button, Input, Card, Badge, 
   Modal, Textarea, LoadingSpinner, EmptyState, HelpCard,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
+  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
 import { truststoreService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
-import { formatDate } from '../lib/utils'
+import { formatDate, cn } from '../lib/utils'
 
 export default function TrustStorePage() {
   const { showSuccess, showError, showConfirm } = useNotification()
@@ -311,54 +311,89 @@ export default function TrustStorePage() {
             />
           </div>
         ) : (
-          <>
-            {/* Header with gradient card style */}
-            <div className="p-4 md:p-6">
-              <DetailHeader
-                icon={ShieldCheck}
-                title={selectedCert.name}
-                subtitle={selectedCert.subject}
-                badge={getPurposeBadge(selectedCert.purpose)}
-                actions={[
-                  {
-                    label: 'Export PEM',
-                    icon: Download,
-                    onClick: () => handleExport(selectedCert)
-                  },
-                  ...(canDelete ? [{
-                    label: 'Remove',
-                    icon: Trash,
-                    variant: 'danger',
-                    onClick: () => handleDelete(selectedCert.id)
-                  }] : [])
-                ]}
-              />
+          <div className="p-3 space-y-3">
+            {/* Header */}
+            <CompactHeader
+              icon={ShieldCheck}
+              iconClass="bg-status-success/20"
+              title={selectedCert.name}
+              subtitle={selectedCert.subject?.split(',')[0]?.replace('CN=', '') || selectedCert.subject}
+              badge={getPurposeBadge(selectedCert.purpose)}
+            />
+
+            {/* Stats */}
+            <CompactStats stats={[
+              { icon: Certificate, value: selectedCert.purpose?.replace('_', ' ') || 'Trust' },
+              { icon: Clock, value: selectedCert.not_after ? formatDate(selectedCert.not_after, 'short') : '-' }
+            ]} />
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                variant="secondary" 
+                className="flex-1"
+                onClick={() => handleExport(selectedCert)}
+              >
+                <Download size={14} />
+                Export PEM
+              </Button>
+              {canDelete && (
+                <Button 
+                  size="sm" 
+                  variant="danger"
+                  onClick={() => handleDelete(selectedCert.id)}
+                >
+                  <Trash size={14} />
+                </Button>
+              )}
             </div>
 
-            {/* Content */}
-            <DetailContent>
-              {/* Certificate Information */}
-              <DetailSection title="Certificate Information">
-                <DetailGrid>
-                  <DetailField label="Name" value={selectedCert.name} />
-                  <DetailField label="Purpose" value={selectedCert.purpose?.replace('_', ' ')} />
-                  <DetailField label="Subject" value={selectedCert.subject} mono copyable fullWidth />
-                  <DetailField label="Issuer" value={selectedCert.issuer} mono copyable fullWidth />
-                  <DetailField label="Serial Number" value={selectedCert.serial_number} mono copyable />
-                  <DetailField label="Valid From" value={selectedCert.not_before ? formatDate(selectedCert.not_before) : null} />
-                  <DetailField label="Valid Until" value={selectedCert.not_after ? formatDate(selectedCert.not_after) : null} />
-                </DetailGrid>
-              </DetailSection>
+            {/* Certificate Information */}
+            <CompactSection title="Certificate Information">
+              <CompactGrid>
+                <CompactField label="Name" value={selectedCert.name} />
+                <CompactField label="Purpose" value={selectedCert.purpose?.replace('_', ' ')} />
+              </CompactGrid>
+              <div className="mt-2 space-y-1.5">
+                <div className="text-xs">
+                  <span className="text-text-tertiary block mb-0.5">Subject:</span>
+                  <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
+                    {selectedCert.subject || '-'}
+                  </p>
+                </div>
+                <div className="text-xs">
+                  <span className="text-text-tertiary block mb-0.5">Issuer:</span>
+                  <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
+                    {selectedCert.issuer || '-'}
+                  </p>
+                </div>
+              </div>
+              <CompactGrid className="mt-2">
+                <CompactField label="Serial" value={selectedCert.serial_number} mono />
+                <CompactField label="Valid From" value={selectedCert.not_before ? formatDate(selectedCert.not_before, 'short') : '-'} />
+                <CompactField label="Valid Until" value={selectedCert.not_after ? formatDate(selectedCert.not_after, 'short') : '-'} />
+              </CompactGrid>
+            </CompactSection>
 
-              {/* Fingerprints */}
-              <DetailSection title="Fingerprints">
-                <DetailGrid columns={1}>
-                  <DetailField label="SHA-256" value={selectedCert.fingerprint_sha256} mono copyable fullWidth />
-                  <DetailField label="SHA-1" value={selectedCert.fingerprint_sha1} mono copyable fullWidth />
-                </DetailGrid>
-              </DetailSection>
-            </DetailContent>
-          </>
+            {/* Fingerprints */}
+            <CompactSection title="Fingerprints">
+              <div className="space-y-1.5">
+                <div className="text-xs">
+                  <span className="text-text-tertiary block mb-0.5">SHA-256:</span>
+                  <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
+                    {selectedCert.fingerprint_sha256 || '-'}
+                  </p>
+                </div>
+                <div className="text-xs">
+                  <span className="text-text-tertiary block mb-0.5">SHA-1:</span>
+                  <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
+                    {selectedCert.fingerprint_sha1 || '-'}
+                  </p>
+                </div>
+              </div>
+            </CompactSection>
+          </div>
         )}
       </PageLayout>
 

@@ -2,21 +2,22 @@
  * Users Page - User management with Pro Groups tab
  * 
  * Pro features (Groups) are dynamically added when Pro module is present
+ * Uses UnifiedManagementLayout for better mobile UX (full-screen detail view)
  */
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   User, Plus, Trash, LockKey, PencilSimple, Clock,
-  ShieldCheck, UserCircle, Eye, UsersThree
+  ShieldCheck, UserCircle, Eye, UsersThree, CheckCircle, XCircle
 } from '@phosphor-icons/react'
 import {
-  ListPageLayout, Badge, Button, Modal, Input, Select,
-  DetailHeader, DetailSection, DetailGrid, DetailField, HelpCard
+  UnifiedManagementLayout, Badge, Button, Modal, Input, Select, HelpCard,
+  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
 import { usersService, rolesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate, extractData } from '../lib/utils'
+import { formatDate, extractData, cn } from '../lib/utils'
 
 // Base tabs
 const BASE_TABS = [
@@ -263,94 +264,90 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
 
   // Render details panel
   const renderDetails = (user) => (
-    <div className="p-4 space-y-4">
-      <DetailHeader
+    <div className="p-3 space-y-3">
+      {/* Header */}
+      <CompactHeader
         icon={user.role === 'admin' ? ShieldCheck : User}
+        iconClass={user.role === 'admin' ? "bg-status-error/20" : "bg-accent-primary/20"}
         title={user.username}
         subtitle={user.email}
         badge={
-          <Badge 
-            variant={
-              user.role === 'admin' ? 'primary' :
-              user.role === 'operator' ? 'warning' : 'secondary'
-            }
-          >
+          <Badge variant={user.role === 'admin' ? 'primary' : user.role === 'operator' ? 'warning' : 'secondary'} size="sm">
             {user.role || 'viewer'}
           </Badge>
         }
-        stats={[
-          { icon: Clock, label: 'Last Login', value: user.last_login ? formatDate(user.last_login) : 'Never' },
-          { icon: LockKey, label: '2FA', value: user.two_factor_enabled ? 'Enabled' : 'Disabled' },
-        ]}
-        actions={[
-          ...(canWrite('users') ? [
-            { label: 'Edit', icon: PencilSimple, onClick: () => setShowEditModal(true) },
-            { label: 'Reset Password', icon: LockKey, onClick: () => handleResetPassword(user.id) }
-          ] : []),
-          ...(canDelete('users') ? [
-            { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(user.id) }
-          ] : [])
-        ]}
       />
 
-      <DetailSection title="Basic Information">
-        <DetailGrid>
-          <DetailField label="Username" value={user.username} />
-          <DetailField label="Email" value={user.email} copyable />
-          <DetailField label="Full Name" value={user.full_name} />
-          <DetailField 
-            label="Status" 
-            value={
-              <Badge variant={user.active ? 'success' : 'danger'}>
-                {user.active ? 'Active' : 'Inactive'}
-              </Badge>
-            }
-          />
-        </DetailGrid>
-      </DetailSection>
+      {/* Stats */}
+      <CompactStats stats={[
+        { icon: Clock, value: user.last_login ? formatDate(user.last_login, 'short') : 'Never logged in' },
+        { icon: LockKey, iconClass: user.two_factor_enabled ? "text-status-success" : "text-text-tertiary", value: user.two_factor_enabled ? '2FA On' : '2FA Off' },
+        { badge: user.active ? 'Active' : 'Inactive', badgeVariant: user.active ? 'success' : 'danger' }
+      ]} />
 
-      <DetailSection title="Role & Permissions">
-        <DetailGrid>
-          <DetailField 
-            label="Role" 
-            value={
-              <Badge variant={user.role === 'admin' ? 'primary' : user.role === 'operator' ? 'warning' : 'secondary'}>
-                {user.role || 'viewer'}
-              </Badge>
-            }
-          />
-          <DetailField 
-            label="Description" 
-            value={rolesData?.[user.role]?.description || 'Standard user permissions'}
-          />
-        </DetailGrid>
-      </DetailSection>
+      {/* Actions */}
+      <div className="flex gap-2">
+        {canWrite('users') && (
+          <>
+            <Button size="sm" variant="secondary" className="flex-1" onClick={() => setShowEditModal(true)}>
+              <PencilSimple size={14} /> Edit
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleResetPassword(user.id)}>
+              <LockKey size={14} />
+            </Button>
+          </>
+        )}
+        {canDelete('users') && (
+          <Button size="sm" variant="danger" onClick={() => handleDelete(user.id)}>
+            <Trash size={14} />
+          </Button>
+        )}
+      </div>
 
-      <DetailSection title="Security">
-        <DetailGrid>
-          <DetailField 
-            label="2FA Status" 
-            value={
-              <Badge variant={user.two_factor_enabled ? 'success' : 'secondary'}>
-                {user.two_factor_enabled ? 'Enabled' : 'Disabled'}
-              </Badge>
-            }
-          />
-          <DetailField 
-            label="Password Changed" 
-            value={user.password_changed_at ? formatDate(user.password_changed_at) : 'Never'}
-          />
-          <DetailField label="Login Count" value={user.login_count || 0} />
-          <DetailField label="Failed Logins" value={user.failed_login_count || 0} />
-        </DetailGrid>
-      </DetailSection>
+      {/* Basic Info */}
+      <CompactSection title="Basic Information">
+        <CompactGrid>
+          <CompactField label="Username" value={user.username} />
+          <CompactField label="Full Name" value={user.full_name} />
+          <CompactField label="Email" value={user.email} className="col-span-2" />
+        </CompactGrid>
+      </CompactSection>
 
-      <DetailSection title="Activity">
-        <DetailGrid>
-          <DetailField label="Last Login" value={user.last_login ? formatDate(user.last_login) : 'Never'} />
-          <DetailField label="Created" value={user.created_at ? formatDate(user.created_at) : '—'} />
-        </DetailGrid>
-      </DetailSection>
+      {/* Role */}
+      <CompactSection title="Role & Permissions">
+        <CompactGrid>
+          <div className="text-xs">
+            <span className="text-text-tertiary">Role:</span>
+            <Badge variant={user.role === 'admin' ? 'primary' : user.role === 'operator' ? 'warning' : 'secondary'} size="sm" className="ml-1">
+              {user.role || 'viewer'}
+            </Badge>
+          </div>
+          <CompactField label="Desc" value={rolesData?.[user.role]?.description || 'Standard permissions'} />
+        </CompactGrid>
+      </CompactSection>
+
+      {/* Security */}
+      <CompactSection title="Security">
+        <CompactGrid>
+          <div className="text-xs">
+            <span className="text-text-tertiary">2FA:</span>
+            <span className={cn("ml-1", user.two_factor_enabled ? "text-status-success" : "text-text-secondary")}>
+              {user.two_factor_enabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+          <CompactField label="Pwd Changed" value={user.password_changed_at ? formatDate(user.password_changed_at, 'short') : 'Never'} />
+          <CompactField label="Logins" value={user.login_count || 0} />
+          <CompactField label="Failed" value={user.failed_login_count || 0} />
+        </CompactGrid>
+      </CompactSection>
+
+      {/* Activity */}
+      <CompactSection title="Activity">
+        <CompactGrid>
+          <CompactField label="Last Login" value={user.last_login ? formatDate(user.last_login) : 'Never'} />
+          <CompactField label="Created" value={user.created_at ? formatDate(user.created_at, 'short') : '—'} />
+        </CompactGrid>
+      </CompactSection>
     </div>
   )
 
@@ -360,7 +357,7 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
       <HelpCard title="User Management" variant="info">
         Manage user accounts, assign roles, and control access permissions.
       </HelpCard>
-      <HelpCard title="Roles" variant="default">
+      <HelpCard title="Roles" variant="tip">
         <ul className="text-sm space-y-1">
           <li className="flex items-center gap-2">
             <ShieldCheck size={14} className="text-status-error" />
@@ -382,13 +379,29 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
     </div>
   )
 
+  // Compute stats from users data
+  const stats = useMemo(() => {
+    const activeCount = users.filter(u => u.active).length
+    const inactiveCount = users.filter(u => !u.active).length
+    const adminCount = users.filter(u => u.role === 'admin').length
+    const operatorCount = users.filter(u => u.role === 'operator').length
+    
+    return [
+      { label: 'Active', value: activeCount, icon: CheckCircle, variant: 'success' },
+      { label: 'Inactive', value: inactiveCount, icon: XCircle, variant: 'danger' },
+      { label: 'Admins', value: adminCount, icon: ShieldCheck, variant: 'primary' },
+      { label: 'Operators', value: operatorCount, icon: UserCircle, variant: 'warning' },
+    ]
+  }, [users])
+
   return (
     <>
-      <ListPageLayout
+      <UnifiedManagementLayout
         title="Users"
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={onTabChange}
+        stats={stats}
         data={users}
         columns={columns}
         loading={loading}
