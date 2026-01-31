@@ -65,3 +65,10 @@ pytest==9.0.2
 pytest-cov==7.0.0
 black==25.12.0
 flake8==7.3.0
+
+# WebSocket Support
+flask-socketio==5.3.7
+python-socketio==5.11.0
+gevent==24.11.1
+gevent-websocket==0.10.1
+

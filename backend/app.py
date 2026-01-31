@@ -23,6 +23,7 @@ from config.settings import get_config, BASE_DIR
 from config.https_manager import HTTPSManager
 from models import db, User, SystemConfig
 from middleware.auth_middleware import init_auth_middleware
+from websocket import socketio, init_websocket
 
 # Initialize cache globally
 cache = Cache()
@@ -101,11 +102,21 @@ def create_app(config_name=None):
         limiter.init_app(app)
         app.logger.info("✓ Rate limiting enabled")
     
-    # CORS - only HTTPS origins
+    # Initialize WebSocket support
+    init_websocket(app)
+    app.logger.info("✓ WebSocket support enabled")
+    
+    # CORS - only HTTPS origins (includes WebSocket)
     CORS(app, resources={
         r"/api/*": {
             "origins": config.CORS_ORIGINS,
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+            "allow_headers": ["Content-Type", "Authorization", "X-CSRF-Token"],
+            "supports_credentials": True
+        },
+        r"/socket.io/*": {
+            "origins": config.CORS_ORIGINS,
+            "methods": ["GET", "POST", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],
             "supports_credentials": True
         }
