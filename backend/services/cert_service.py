@@ -18,6 +18,17 @@ from services.trust_store import TrustStoreService
 from services.template_service import TemplateService
 from config.settings import Config
 
+# Import key decryption (optional - fallback if not available)
+try:
+    from security.encryption import decrypt_private_key, encrypt_private_key
+    HAS_ENCRYPTION = True
+except ImportError:
+    HAS_ENCRYPTION = False
+    def decrypt_private_key(data):
+        return data
+    def encrypt_private_key(data):
+        return data
+
 # RFC 5322 simplified email validation regex
 EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9.!#$%&\'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$')
 
@@ -100,7 +111,9 @@ class CertificateService:
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
         
-        ca_key_pem = base64.b64decode(ca.prv)
+        # Decrypt CA private key if encrypted
+        ca_prv_decrypted = decrypt_private_key(ca.prv)
+        ca_key_pem = base64.b64decode(ca_prv_decrypted)
         ca_private_key = serialization.load_pem_private_key(
             ca_key_pem, password=None, backend=default_backend()
         )
@@ -141,6 +154,12 @@ class CertificateService:
         # Increment CA serial
         ca.serial = (ca.serial or 0) + 1
         
+        # Encrypt private key if encryption is enabled and key is stored
+        prv_encoded = None
+        if private_key_location == 'stored':
+            prv_encoded = base64.b64encode(key_pem).decode('utf-8')
+            prv_encoded = encrypt_private_key(prv_encoded)
+        
         # Create certificate record
         import json
         certificate = Certificate(
@@ -148,7 +167,7 @@ class CertificateService:
             descr=descr,
             caref=caref,
             crt=base64.b64encode(cert_pem).decode('utf-8'),
-            prv=base64.b64encode(key_pem).decode('utf-8') if private_key_location == 'stored' else None,
+            prv=prv_encoded,
             cert_type=cert_type,
             subject=cert.subject.rfc4514_string(),
             issuer=cert.issuer.rfc4514_string(),

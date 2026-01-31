@@ -12,24 +12,39 @@ import csv
 import io
 import re
 
+# Import password policy
+try:
+    from security.password_policy import validate_password, get_password_strength, get_policy_requirements
+    HAS_PASSWORD_POLICY = True
+except ImportError:
+    HAS_PASSWORD_POLICY = False
+
 bp = Blueprint('users_v2', __name__)
 
 
-# Password strength requirements
-MIN_PASSWORD_LENGTH = 12
+# Legacy password validation (fallback if security module not available)
+MIN_PASSWORD_LENGTH = 8
 PASSWORD_REQUIREMENTS = """Password must:
-- Be at least 12 characters long
+- Be at least 8 characters long
 - Contain at least one uppercase letter
 - Contain at least one lowercase letter
 - Contain at least one number
 - Contain at least one special character (!@#$%^&*(),.?":{}|<>)"""
 
 
-def validate_password_strength(password):
+def validate_password_strength(password, username=None):
     """
     SECURITY: Validate password meets security requirements
     Returns (is_valid, error_message)
     """
+    # Use new security module if available
+    if HAS_PASSWORD_POLICY:
+        is_valid, errors = validate_password(password, username=username)
+        if not is_valid:
+            return False, errors[0] if errors else "Invalid password"
+        return True, None
+    
+    # Legacy validation
     if len(password) < MIN_PASSWORD_LENGTH:
         return False, f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
     if not re.search(r'[A-Z]', password):
@@ -44,6 +59,52 @@ def validate_password_strength(password):
 
 
 # Roles endpoint moved to api/v2/roles.py
+
+
+@bp.route('/api/v2/users/password-policy', methods=['GET'])
+def get_password_policy():
+    """
+    Get password policy requirements
+    
+    GET /api/v2/users/password-policy
+    
+    Returns password requirements for UI display
+    """
+    if HAS_PASSWORD_POLICY:
+        requirements = get_policy_requirements()
+    else:
+        requirements = {
+            'min_length': MIN_PASSWORD_LENGTH,
+            'max_length': 128,
+            'rules': PASSWORD_REQUIREMENTS.split('\n')[1:]  # Skip header
+        }
+    
+    return success_response(data=requirements)
+
+
+@bp.route('/api/v2/users/password-strength', methods=['POST'])
+def check_password_strength():
+    """
+    Check password strength (no auth required - used during registration/password change)
+    
+    POST /api/v2/users/password-strength
+    {"password": "test123"}
+    
+    Returns strength score and feedback
+    """
+    data = request.get_json() or {}
+    password = data.get('password', '')
+    
+    if HAS_PASSWORD_POLICY:
+        result = get_password_strength(password)
+    else:
+        # Basic fallback
+        length = len(password)
+        score = min(100, length * 10)
+        level = 'weak' if score < 40 else 'fair' if score < 60 else 'good' if score < 80 else 'strong'
+        result = {'score': score, 'level': level, 'feedback': []}
+    
+    return success_response(data=result)
 
 
 @bp.route('/api/v2/users', methods=['GET'])
@@ -123,8 +184,8 @@ def create_user():
     if not data.get('password'):
         return error_response('Password is required', 400)
     
-    # SECURITY: Validate password strength
-    is_valid, error_msg = validate_password_strength(data['password'])
+    # SECURITY: Validate password strength with username check
+    is_valid, error_msg = validate_password_strength(data['password'], username=data['username'])
     if not is_valid:
         return error_response(error_msg, 400)
     

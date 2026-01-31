@@ -329,3 +329,126 @@ def restore_backup():
         return error_response(str(e), 400)
     except Exception as e:
         return error_response(f"Restore failed: {str(e)}", 500)
+
+
+# ============================================================================
+# Security Management Endpoints
+# ============================================================================
+
+@bp.route('/api/v2/system/security/encryption-status', methods=['GET'])
+@require_auth(['admin:system'])
+def get_encryption_status():
+    """
+    Get private key encryption status
+    
+    Returns:
+    - enabled: bool - Whether encryption is configured
+    - encrypted_count: int - Number of encrypted keys
+    - unencrypted_count: int - Number of unencrypted keys
+    """
+    try:
+        from security.encryption import key_encryption
+        
+        # Count encrypted vs unencrypted
+        encrypted = 0
+        unencrypted = 0
+        
+        for ca in CA.query.filter(CA.prv.isnot(None)).all():
+            if key_encryption.is_encrypted(ca.prv):
+                encrypted += 1
+            else:
+                unencrypted += 1
+        
+        for cert in Certificate.query.filter(Certificate.prv.isnot(None)).all():
+            if key_encryption.is_encrypted(cert.prv):
+                encrypted += 1
+            else:
+                unencrypted += 1
+        
+        return success_response(data={
+            'enabled': key_encryption.is_enabled,
+            'encrypted_count': encrypted,
+            'unencrypted_count': unencrypted,
+            'total_keys': encrypted + unencrypted
+        })
+        
+    except ImportError:
+        return success_response(data={
+            'enabled': False,
+            'encrypted_count': 0,
+            'unencrypted_count': 0,
+            'total_keys': 0,
+            'error': 'Security module not available'
+        })
+    except Exception as e:
+        return error_response(f"Failed to get encryption status: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/security/encrypt-all-keys', methods=['POST'])
+@require_auth(['admin:system'])
+def encrypt_all_keys():
+    """
+    Encrypt all unencrypted private keys in the database
+    
+    POST body (optional):
+    - dry_run: bool (default: true) - If true, only count without modifying
+    """
+    try:
+        from security.encryption import encrypt_all_keys as do_encrypt
+        
+        data = request.get_json() or {}
+        dry_run = data.get('dry_run', True)
+        
+        encrypted, skipped, errors = do_encrypt(dry_run=dry_run)
+        
+        message = f"Encrypted {encrypted} keys, skipped {skipped} (already encrypted)"
+        if dry_run:
+            message = f"[DRY RUN] Would encrypt {encrypted} keys, {skipped} already encrypted"
+        
+        return success_response(
+            message=message,
+            data={
+                'dry_run': dry_run,
+                'encrypted': encrypted,
+                'skipped': skipped,
+                'errors': errors
+            }
+        )
+        
+    except ImportError:
+        return error_response("Security module not available", 500)
+    except Exception as e:
+        return error_response(f"Encryption failed: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/security/generate-key', methods=['GET'])
+@require_auth(['admin:system'])
+def generate_encryption_key():
+    """
+    Generate a new encryption key for KEY_ENCRYPTION_KEY env var
+    
+    The key should be stored securely in /etc/ucm/ucm.env
+    """
+    try:
+        from security.encryption import KeyEncryption
+        
+        key = KeyEncryption.generate_key()
+        
+        return success_response(
+            message="Add this key to /etc/ucm/ucm.env as KEY_ENCRYPTION_KEY",
+            data={
+                'key': key,
+                'env_line': f'KEY_ENCRYPTION_KEY={key}',
+                'instructions': [
+                    '1. Edit /etc/ucm/ucm.env',
+                    '2. Add: KEY_ENCRYPTION_KEY=' + key,
+                    '3. Restart UCM service: systemctl restart ucm',
+                    '4. Run encrypt-all-keys to encrypt existing keys'
+                ]
+            }
+        )
+        
+    except ImportError:
+        return error_response("Security module not available", 500)
+    except Exception as e:
+        return error_response(f"Key generation failed: {str(e)}", 500)

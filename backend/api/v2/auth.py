@@ -14,6 +14,13 @@ from models import User, db
 from datetime import datetime
 import hashlib
 
+# Import CSRF protection
+try:
+    from security.csrf import CSRFProtection
+    HAS_CSRF = True
+except ImportError:
+    HAS_CSRF = False
+
 bp = Blueprint('auth_v2', __name__)
 
 # Import limiter for rate limiting login attempts
@@ -130,6 +137,11 @@ def login():
         auth_manager = AuthManager()
         token_info = auth_manager.create_jwt(user.id)
         
+        # Generate CSRF token for JWT users too
+        csrf_token = None
+        if HAS_CSRF:
+            csrf_token = CSRFProtection.generate_token(user.id)
+        
         return success_response(
             data={
                 'token': token_info['token'],
@@ -138,7 +150,8 @@ def login():
                 'user': {
                     'id': user.id,
                     'username': user.username
-                }
+                },
+                'csrf_token': csrf_token
             },
             message='Login successful'
         )
@@ -157,12 +170,18 @@ def login():
         # Log successful login
         current_app.logger.info(f"✅ User {user.username} logged in successfully")
         
+        # Generate CSRF token
+        csrf_token = None
+        if HAS_CSRF:
+            csrf_token = CSRFProtection.generate_token(user.id)
+        
         return success_response(
             data={
                 'user': {
                     'id': user.id,
                     'username': user.username
-                }
+                },
+                'csrf_token': csrf_token
             },
             message='Login successful'
         )
@@ -209,6 +228,11 @@ def verify():
             }
         }), 200
     
+    # Generate fresh CSRF token on verify
+    csrf_token = None
+    if HAS_CSRF:
+        csrf_token = CSRFProtection.generate_token(g.user_id)
+    
     # If authenticated
     return success_response(
         data={
@@ -219,7 +243,8 @@ def verify():
             'user': {
                 'id': g.current_user.id,
                 'username': g.current_user.username
-            }
+            },
+            'csrf_token': csrf_token
         }
     )
 
