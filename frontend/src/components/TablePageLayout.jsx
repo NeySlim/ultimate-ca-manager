@@ -379,8 +379,8 @@ export function TablePageLayout({
           )}
         </div>
         
-        {/* Pagination - Fixed at bottom */}
-        {pagination && pagination.total > pagination.perPage && (
+        {/* Pagination - Always show if we have pagination config and items */}
+        {pagination && pagination.total > 0 && (
           <div className="border-t border-border bg-bg-secondary">
             <Pagination
               page={pagination.page}
