@@ -18,7 +18,7 @@ import { useMobile } from '../contexts/MobileContext'
 
 export function Sidebar({ activePage }) {
   const navigate = useNavigate()
-  const { currentTheme, setCurrentTheme, themes } = useTheme()
+  const { themeFamily, setThemeFamily, mode, setMode, themes, isLight } = useTheme()
   const { user, logout } = useAuth()
   const { isLargeScreen } = useMobile()
   
@@ -161,18 +161,47 @@ export function Sidebar({ activePage }) {
 
         <DropdownMenu.Portal>
           <DropdownMenu.Content 
-            className="min-w-[180px] bg-bg-secondary border border-border rounded-sm shadow-lg p-1 z-50"
+            className="min-w-[200px] bg-bg-secondary border border-border rounded-sm shadow-lg p-1 z-50"
             sideOffset={5}
             side="right"
           >
-            {Object.values(themes).map(theme => (
+            <DropdownMenu.Label className="px-3 py-1.5 text-xs text-text-tertiary uppercase tracking-wider">
+              Color Theme
+            </DropdownMenu.Label>
+            {themes.map(theme => (
               <DropdownMenu.Item
                 key={theme.id}
-                onClick={() => setCurrentTheme(theme.id)}
+                onClick={() => setThemeFamily(theme.id)}
                 className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
               >
+                <div 
+                  className="w-3 h-3 rounded-full border border-border"
+                  style={{ background: theme.accent }}
+                />
                 <span className="flex-1">{theme.name}</span>
-                {currentTheme === theme.id && (
+                {themeFamily === theme.id && (
+                  <Check size={16} weight="bold" className="text-accent-primary" />
+                )}
+              </DropdownMenu.Item>
+            ))}
+            
+            <DropdownMenu.Separator className="h-px bg-border my-1" />
+            
+            <DropdownMenu.Label className="px-3 py-1.5 text-xs text-text-tertiary uppercase tracking-wider">
+              Appearance
+            </DropdownMenu.Label>
+            {[
+              { id: 'system', label: 'Follow System' },
+              { id: 'dark', label: 'Dark' },
+              { id: 'light', label: 'Light' }
+            ].map(opt => (
+              <DropdownMenu.Item
+                key={opt.id}
+                onClick={() => setMode(opt.id)}
+                className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
+              >
+                <span className="flex-1">{opt.label}</span>
+                {mode === opt.id && (
                   <Check size={16} weight="bold" className="text-accent-primary" />
                 )}
               </DropdownMenu.Item>
