@@ -2,16 +2,18 @@
  * AppShell Component - Main application layout with mobile support
  */
 import { useState, useEffect } from 'react'
-import { Outlet, useLocation, Link } from 'react-router-dom'
+import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom'
 import { 
   List, X, MagnifyingGlass,
   House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
-  UploadSimple, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock
+  UploadSimple, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock,
+  UserCircle, Palette
 } from '@phosphor-icons/react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
+import { useTheme } from '../contexts/ThemeContext'
 
 // Mobile navigation items (grid menu)
 const mobileNavItems = [
@@ -38,8 +40,11 @@ const proNavItems = [
 
 export function AppShell() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { currentTheme, setCurrentTheme, themes } = useTheme()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isPro, setIsPro] = useState(false)
   
@@ -95,12 +100,28 @@ export function AppShell() {
           {/* Spacer */}
           <div className="flex-1" />
           
-          {/* Page title - RIGHT (near hamburger) */}
-          <span className="text-sm font-medium text-text-primary mr-2">
+          {/* Page title */}
+          <span className="text-sm font-medium text-text-primary">
             {activePage ? activePage.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Dashboard'}
           </span>
           
-          {/* Hamburger menu - RIGHT */}
+          {/* Theme button */}
+          <button
+            onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+            className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary ml-2"
+          >
+            <Palette size={18} />
+          </button>
+          
+          {/* Account button */}
+          <button
+            onClick={() => { setMobileMenuOpen(false); navigate('/account') }}
+            className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary"
+          >
+            <UserCircle size={18} />
+          </button>
+          
+          {/* Hamburger menu */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="w-9 h-9 flex items-center justify-center rounded-md text-text-secondary hover:bg-bg-tertiary shrink-0"
@@ -108,6 +129,35 @@ export function AppShell() {
             {mobileMenuOpen ? <X size={20} /> : <List size={20} />}
           </button>
         </div>
+      )}
+
+      {/* Theme selector popup (mobile) */}
+      {isMobile && themeMenuOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-40"
+            onClick={() => setThemeMenuOpen(false)}
+          />
+          <div className="fixed top-12 right-12 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl p-2 min-w-[140px]">
+            {Object.values(themes).map((theme) => (
+              <button
+                key={theme.id}
+                onClick={() => { setCurrentTheme(theme.id); setThemeMenuOpen(false) }}
+                className={cn(
+                  "w-full px-3 py-2 text-left text-sm rounded flex items-center gap-2",
+                  "hover:bg-bg-tertiary transition-colors",
+                  currentTheme === theme.id && "text-accent-primary bg-accent-primary/10"
+                )}
+              >
+                <div 
+                  className="w-3 h-3 rounded-full border border-border"
+                  style={{ background: theme.colors?.['accent-primary'] || '#888' }}
+                />
+                {theme.name}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Mobile Grid Menu Overlay */}
