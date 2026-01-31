@@ -293,7 +293,7 @@ export default function AuditLogsPage() {
       label: 'Resource',
       render: (value, row) => (
         <span className="text-sm text-text-secondary">
-          {value}{row.resource_id ? ` #${row.resource_id}` : ''}
+          {value}{row.resource_name ? `: ${row.resource_name}` : (row.resource_id ? ` #${row.resource_id}` : '')}
         </span>
       )
     },
@@ -610,7 +610,7 @@ export default function AuditLogsPage() {
             <DetailHeader
               icon={actionIcons[selectedLog.action] || actionIcons.default}
               title={selectedLog.action?.replace(/_/g, ' ') || 'Event'}
-              subtitle={`${selectedLog.resource_type || 'System'}${selectedLog.resource_id ? ` #${selectedLog.resource_id}` : ''}`}
+              subtitle={`${selectedLog.resource_type || 'System'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`}
               badge={
                 <Badge variant={selectedLog.success ? 'emerald' : 'red'} size="sm">
                   {selectedLog.success ? (
@@ -643,7 +643,7 @@ export default function AuditLogsPage() {
                 />
                 <DetailField 
                   label="Resource" 
-                  value={`${selectedLog.resource_type || '-'}${selectedLog.resource_id ? ` #${selectedLog.resource_id}` : ''}`} 
+                  value={`${selectedLog.resource_type || '-'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`} 
                 />
                 <DetailField 
                   label="IP Address" 
