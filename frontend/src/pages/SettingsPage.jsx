@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
-  Envelope, Download, Trash, HardDrives, Lock, Key 
+  Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop
 } from '@phosphor-icons/react'
 import {
   PageLayout, FocusItem, Button, Input, Select, Badge, Card,
@@ -19,10 +19,12 @@ import { settingsService, systemService, casService, certificatesService } from 
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
+import { useTheme } from '../contexts/ThemeContext'
 
 // Base settings categories (Community)
 const BASE_SETTINGS_CATEGORIES = [
   { id: 'general', label: 'General', icon: Gear, description: 'System name, URL, timezone' },
+  { id: 'appearance', label: 'Appearance', icon: Palette, description: 'Theme and display' },
   { id: 'email', label: 'Email', icon: EnvelopeSimple, description: 'SMTP configuration' },
   { id: 'security', label: 'Security', icon: ShieldCheck, description: 'Password, 2FA, sessions' },
   { id: 'backup', label: 'Backup', icon: Database, description: 'Backup & restore' },
@@ -30,6 +32,118 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'database', label: 'Database', icon: HardDrives, description: 'Database management' },
   { id: 'https', label: 'HTTPS', icon: Lock, description: 'Certificate management' },
 ]
+
+// Appearance Settings Component
+function AppearanceSettings() {
+  const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
+  
+  const modeOptions = [
+    { id: 'system', label: 'Follow System', icon: Desktop, description: 'Automatically switch based on your OS settings' },
+    { id: 'light', label: 'Light', icon: Sun, description: 'Always use light theme' },
+    { id: 'dark', label: 'Dark', icon: Moon, description: 'Always use dark theme' },
+  ]
+  
+  return (
+    <DetailContent>
+      <DetailHeader
+        icon={Palette}
+        title="Appearance"
+        subtitle="Customize the look and feel of UCM"
+      />
+      
+      <DetailSection title="Color Theme">
+        <p className="text-sm text-text-secondary mb-4">
+          Choose a color scheme that suits your preference
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {themes.map(theme => (
+            <button
+              key={theme.id}
+              onClick={() => setThemeFamily(theme.id)}
+              className={`
+                p-4 rounded-lg border-2 transition-all text-left
+                ${themeFamily === theme.id 
+                  ? 'border-accent-primary bg-accent-primary/10' 
+                  : 'border-border hover:border-text-tertiary bg-bg-tertiary/50'
+                }
+              `}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div 
+                  className="w-5 h-5 rounded-full shadow-inner"
+                  style={{ background: theme.accent }}
+                />
+                <span className="font-medium text-sm text-text-primary">{theme.name}</span>
+              </div>
+              <div className="flex gap-1">
+                {/* Preview colors */}
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.dark['bg-primary'] }} />
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.dark['bg-secondary'] }} />
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.light['bg-primary'] }} />
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.light['bg-secondary'] }} />
+              </div>
+            </button>
+          ))}
+        </div>
+      </DetailSection>
+      
+      <DetailSection title="Appearance Mode">
+        <p className="text-sm text-text-secondary mb-4">
+          Control how the interface brightness adapts
+        </p>
+        <div className="space-y-2">
+          {modeOptions.map(opt => {
+            const Icon = opt.icon
+            return (
+              <button
+                key={opt.id}
+                onClick={() => setMode(opt.id)}
+                className={`
+                  w-full p-4 rounded-lg border-2 transition-all text-left flex items-center gap-4
+                  ${mode === opt.id 
+                    ? 'border-accent-primary bg-accent-primary/10' 
+                    : 'border-border hover:border-text-tertiary bg-bg-tertiary/50'
+                  }
+                `}
+              >
+                <div className={`
+                  w-10 h-10 rounded-lg flex items-center justify-center
+                  ${mode === opt.id ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}
+                `}>
+                  <Icon size={20} weight={mode === opt.id ? 'fill' : 'regular'} />
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-text-primary">{opt.label}</div>
+                  <div className="text-xs text-text-tertiary">{opt.description}</div>
+                </div>
+                {mode === opt.id && (
+                  <div className="w-5 h-5 rounded-full bg-accent-primary flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </DetailSection>
+      
+      <DetailSection title="Preview">
+        <div className="p-4 rounded-lg bg-bg-tertiary border border-border">
+          <p className="text-sm text-text-secondary mb-2">Current settings:</p>
+          <p className="text-text-primary">
+            <span className="font-medium">{themes.find(t => t.id === themeFamily)?.name}</span>
+            {' · '}
+            <span className="text-text-secondary">
+              {mode === 'system' ? 'Following system preference' : mode === 'dark' ? 'Dark mode' : 'Light mode'}
+            </span>
+          </p>
+        </div>
+      </DetailSection>
+    </DetailContent>
+  )
+}
 
 export default function SettingsPage() {
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
@@ -419,6 +533,9 @@ export default function SettingsPage() {
             </DetailSection>
           </DetailContent>
         )
+
+      case 'appearance':
+        return <AppearanceSettings />
 
       case 'email':
         return (
