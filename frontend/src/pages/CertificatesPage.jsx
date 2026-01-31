@@ -43,25 +43,24 @@ export default function CertificatesPage() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [page, perPage])
 
-  // Reload when filters change
+  // Reset to page 1 when filters change
   useEffect(() => {
-    // For client-side filtering, we don't need to reload
-    // Just reset to page 1
-    setPage(1)
+    if (page !== 1) setPage(1)
   }, [filterStatus, filterCA, search])
 
   const loadData = async () => {
     try {
       setLoading(true)
       const [certsRes, casRes] = await Promise.all([
-        certificatesService.getAll(),
+        certificatesService.getAll({ page, per_page: perPage }),
         casService.getAll()
       ])
       const certs = certsRes.data || []
       setCertificates(certs)
-      setTotal(certs.length)
+      // Use API total if available, otherwise use array length
+      setTotal(certsRes.meta?.total || certsRes.pagination?.total || certs.length)
       setCas(casRes.data || [])
     } catch (error) {
       showError('Failed to load certificates')
@@ -150,9 +149,9 @@ export default function CertificatesPage() {
       { icon: CheckCircle, label: 'Valid', value: valid, color: 'text-emerald-500' },
       { icon: Warning, label: 'Expiring', value: expiring, color: 'text-amber-500' },
       { icon: X, label: 'Revoked', value: revoked, color: 'text-red-500' },
-      { icon: Certificate, label: 'Total', value: certificates.length, color: 'text-accent-primary' }
+      { icon: Certificate, label: 'Total', value: total, color: 'text-accent-primary' }
     ]
-  }, [certificates])
+  }, [certificates, total])
 
   // Table columns
   const columns = [
@@ -334,7 +333,7 @@ export default function CertificatesPage() {
         )}
         pagination={{
           page,
-          total: filteredCerts.length,
+          total,
           perPage,
           onChange: setPage,
           onPerPageChange: (v) => { setPerPage(v); setPage(1) }
