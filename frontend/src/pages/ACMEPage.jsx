@@ -121,15 +121,17 @@ export default function ACMEPage() {
 
   const selectAccount = async (account) => {
     try {
-      const [accountData, ordersData, challengesData] = await Promise.all([
+      const [accountResponse, ordersData, challengesData] = await Promise.all([
         acmeService.getAccountById(account.id),
         acmeService.getOrders(account.id),
         acmeService.getChallenges(account.id),
       ])
       
+      // Handle API response wrapper
+      const accountData = accountResponse.data || accountResponse
       setSelectedAccount(accountData)
-      setOrders(ordersData.orders || [])
-      setChallenges(challengesData.challenges || [])
+      setOrders(ordersData.data?.orders || ordersData.orders || [])
+      setChallenges(challengesData.data?.challenges || challengesData.challenges || [])
     } catch (error) {
       showError(error.message || 'Failed to load account details')
     }
@@ -582,7 +584,7 @@ export default function ACMEPage() {
                 <div className="space-y-3">
                   <CompactSection title="Account Information">
                     <CompactGrid>
-                      <CompactField label="Email" value={selectedAccount.email} />
+                      <CompactField label="Email" value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email || '-'} />
                       <div className="text-xs">
                         <span className="text-text-tertiary">Status:</span>
                         <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'} className="ml-1 inline-flex">
@@ -602,7 +604,7 @@ export default function ACMEPage() {
 
                   <CompactSection title="Terms of Service">
                     <div className="flex items-center gap-2 text-xs">
-                      {selectedAccount.tos_agreed ? (
+                      {selectedAccount.terms_of_service_agreed || selectedAccount.tos_agreed ? (
                         <>
                           <CheckCircle size={14} className="text-green-500" />
                           <span className="text-green-500">Agreed</span>
