@@ -132,7 +132,7 @@ export function Table({
                   )}
                 >
                 {selectable && (
-                  <td className="px-2 py-1.5">
+                  <td className="px-2 py-2">
                     <input
                       type="checkbox"
                       checked={selectedRows.has(index)}
@@ -148,7 +148,7 @@ export function Table({
                 {columns.map((col) => (
                   <td 
                     key={col.key} 
-                    className="px-3 py-1.5 text-sm text-text-primary whitespace-nowrap"
+                    className="px-3 py-2 text-sm text-text-primary whitespace-nowrap"
                   >
                     {col.render ? col.render(row[col.key], row) : row[col.key]}
                   </td>
