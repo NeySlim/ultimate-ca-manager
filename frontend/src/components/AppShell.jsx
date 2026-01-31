@@ -87,8 +87,8 @@ export function AppShell() {
             <MagnifyingGlass size={20} />
           </button>
           
-          {/* Logo - LEFT CENTER */}
-          <div className="shrink-0 opacity-60 scale-[0.5] origin-left -ml-1">
+          {/* Logo - LEFT */}
+          <div className="shrink-0 opacity-70 scale-75 origin-left">
             <Logo variant="compact" size="sm" />
           </div>
           
