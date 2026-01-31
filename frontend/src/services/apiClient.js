@@ -1,23 +1,61 @@
 /**
  * API Client - Centralized HTTP client with auth and error handling
+ * Includes CSRF token management for security
  */
 
 const API_BASE_URL = '/api/v2'
+
+// CSRF token storage key
+const CSRF_TOKEN_KEY = 'ucm_csrf_token'
 
 class APIClient {
   constructor() {
     this.baseURL = API_BASE_URL
   }
 
+  /**
+   * Get stored CSRF token
+   */
+  getCsrfToken() {
+    return sessionStorage.getItem(CSRF_TOKEN_KEY)
+  }
+
+  /**
+   * Store CSRF token (called after login/verify)
+   */
+  setCsrfToken(token) {
+    if (token) {
+      sessionStorage.setItem(CSRF_TOKEN_KEY, token)
+    }
+  }
+
+  /**
+   * Clear CSRF token (called on logout)
+   */
+  clearCsrfToken() {
+    sessionStorage.removeItem(CSRF_TOKEN_KEY)
+  }
+
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`
     
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    }
+
+    // Add CSRF token for state-changing methods
+    const method = options.method || 'GET'
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+      const csrfToken = this.getCsrfToken()
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken
+      }
+    }
+
     const config = {
-      method: options.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      method,
+      headers,
       credentials: 'include', // Important pour les cookies de session
       ...options,
     }
@@ -103,10 +141,18 @@ class APIClient {
   async upload(endpoint, formData, options = {}) {
     const url = `${this.baseURL}${endpoint}`
     
+    // Build headers with CSRF token
+    const headers = { ...options.headers }
+    const csrfToken = this.getCsrfToken()
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken
+    }
+    
     const config = {
       method: 'POST',
       body: formData,
       credentials: 'include',
+      headers,
       // Don't set Content-Type - browser will set it with boundary for FormData
       ...options,
     }
