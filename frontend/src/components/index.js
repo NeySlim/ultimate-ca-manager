@@ -77,6 +77,9 @@ export {
 
 // Certificate Details (reusable)
 export { CertificateDetails } from './CertificateDetails'
+export { CADetails } from './CADetails'
+export { CSRDetails } from './CSRDetails'
+export { TrustCertDetails } from './TrustCertDetails'
 
 // Data Table Components
 export { DataTable, SimpleTable, CardGrid } from './DataTable'

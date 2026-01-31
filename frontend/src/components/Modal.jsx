@@ -51,7 +51,7 @@ export function Modal({
             )}
           </div>
 
-          <div className="p-4 max-h-[70vh] overflow-y-auto">
+          <div className="max-h-[70vh] overflow-y-auto">
             {children}
           </div>
         </Dialog.Content>

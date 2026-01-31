@@ -354,16 +354,14 @@ export default function CertificatesPage() {
         size="lg"
       >
         {selectedCert && (
-          <div className="p-4 max-h-[80vh] overflow-y-auto">
-            <CertificateDetails
-              certificate={selectedCert}
-              onExport={handleExport}
-              onRevoke={() => handleRevoke(selectedCert.id)}
-              onDelete={() => handleDelete(selectedCert.id)}
-              canWrite={canWrite('certificates')}
-              canDelete={canDelete('certificates')}
-            />
-          </div>
+          <CertificateDetails
+            certificate={selectedCert}
+            onExport={handleExport}
+            onRevoke={() => handleRevoke(selectedCert.id)}
+            onDelete={() => handleDelete(selectedCert.id)}
+            canWrite={canWrite('certificates')}
+            canDelete={canDelete('certificates')}
+          />
         )}
       </Modal>
 

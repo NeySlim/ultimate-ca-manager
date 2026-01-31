@@ -9,7 +9,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   ListPageLayout, Badge, Button, Modal, Input, Select, HelpCard, LoadingSpinner,
-  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
+  CADetails
 } from '../components'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
@@ -238,92 +238,13 @@ export default function CAsPage() {
 
   // Render details panel
   const renderDetails = (ca) => (
-    <div className="p-3 space-y-3">
-      {/* Header */}
-      <CompactHeader
-        icon={ca.type === 'root' ? Crown : ShieldCheck}
-        iconClass={ca.type === 'root' ? "bg-amber-500/20" : "bg-accent-primary/20"}
-        title={ca.name || ca.common_name}
-        subtitle={ca.subject}
-        badge={
-          <Badge variant={ca.status === 'Active' ? 'success' : 'danger'} size="sm">
-            {ca.status}
-          </Badge>
-        }
-      />
-
-      {/* Stats */}
-      <CompactStats stats={[
-        { icon: Certificate, iconClass: "text-accent-primary", value: `${ca.certs || 0} certs` },
-        { icon: Key, value: ca.key_algorithm || 'RSA' },
-        { badge: ca.type, badgeVariant: ca.type === 'root' ? 'primary' : 'secondary' }
-      ]} />
-
-      {/* Actions */}
-      <div className="flex gap-2">
-        <Button size="sm" variant="secondary" className="flex-1" onClick={() => handleExport(ca, 'pem')}>
-          <Download size={14} /> Export
-        </Button>
-        {canDelete('cas') && (
-          <Button size="sm" variant="danger" onClick={() => handleDelete(ca.id)}>
-            <Trash size={14} />
-          </Button>
-        )}
-      </div>
-
-      {/* Subject */}
-      <CompactSection title="Subject">
-        <CompactGrid>
-          <CompactField label="CN" value={ca.common_name} />
-          <CompactField label="O" value={ca.organization} />
-          <CompactField label="C" value={ca.country} />
-          <CompactField label="ST" value={ca.state} />
-        </CompactGrid>
-      </CompactSection>
-
-      {/* Validity */}
-      <CompactSection title="Validity">
-        <CompactGrid>
-          <CompactField label="From" value={formatDate(ca.valid_from)} />
-          <CompactField label="Until" value={formatDate(ca.valid_to)} />
-        </CompactGrid>
-      </CompactSection>
-
-      {/* Technical */}
-      <CompactSection title="Technical">
-        <CompactGrid>
-          <CompactField label="Key" value={ca.key_algorithm || ca.key_type} />
-          <div className="text-xs">
-            <span className="text-text-tertiary">Private:</span>
-            <span className={cn("ml-1", ca.has_private_key ? "text-status-success" : "text-status-error")}>
-              {ca.has_private_key ? 'Yes' : 'No'}
-            </span>
-          </div>
-          <CompactField label="Signature" value={ca.signature_algorithm || ca.hash_algorithm} className="col-span-2" />
-        </CompactGrid>
-      </CompactSection>
-
-      {/* Serial */}
-      <CompactSection title="Serial Number">
-        <p className="font-mono text-xs text-text-primary break-all">{ca.serial === 0 ? '0' : (ca.serial || '—')}</p>
-      </CompactSection>
-
-      {/* DN */}
-      {ca.subject && (
-        <CompactSection title="Distinguished Names">
-          <div className="space-y-2">
-            <div>
-              <span className="text-[10px] text-text-tertiary block mb-0.5">Subject DN</span>
-              <p className="font-mono text-[11px] text-text-primary break-all">{ca.subject}</p>
-            </div>
-            <div className="border-t border-border pt-2">
-              <span className="text-[10px] text-text-tertiary block mb-0.5">Issuer DN</span>
-              <p className="font-mono text-[11px] text-text-primary break-all">{ca.issuer}</p>
-            </div>
-          </div>
-        </CompactSection>
-      )}
-    </div>
+    <CADetails
+      ca={ca}
+      onExport={() => handleExport(ca, 'pem')}
+      onDelete={() => handleDelete(ca.id)}
+      canWrite={canWrite('cas')}
+      canDelete={canDelete('cas')}
+    />
   )
 
   // Help content
