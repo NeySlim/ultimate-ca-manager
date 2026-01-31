@@ -452,3 +452,193 @@ def generate_encryption_key():
         return error_response("Security module not available", 500)
     except Exception as e:
         return error_response(f"Key generation failed: {str(e)}", 500)
+
+
+# ============ Audit Log Retention ============
+
+@bp.route('/api/v2/system/audit/retention', methods=['GET'])
+@require_auth(['read:settings'])
+def get_audit_retention():
+    """Get audit log retention settings and stats"""
+    try:
+        from services.retention_service import RetentionPolicy
+        return success_response(data=RetentionPolicy.get_stats())
+    except Exception as e:
+        return error_response(f"Failed to get retention settings: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/audit/retention', methods=['PUT'])
+@require_auth(['admin:system'])
+def update_audit_retention():
+    """Update audit log retention settings"""
+    try:
+        from services.retention_service import RetentionPolicy
+        data = request.get_json() or {}
+        
+        settings = RetentionPolicy.update_settings(**data)
+        return success_response(
+            message="Retention settings updated",
+            data=settings
+        )
+    except Exception as e:
+        return error_response(f"Failed to update settings: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/audit/cleanup', methods=['POST'])
+@require_auth(['admin:system'])
+def cleanup_audit_logs():
+    """Manually trigger audit log cleanup"""
+    try:
+        from services.retention_service import cleanup_audit_logs as do_cleanup
+        data = request.get_json() or {}
+        
+        result = do_cleanup(retention_days=data.get('retention_days'))
+        return success_response(
+            message=result.get('message', 'Cleanup complete'),
+            data=result
+        )
+    except Exception as e:
+        return error_response(f"Cleanup failed: {str(e)}", 500)
+
+
+# ============ Certificate Expiry Alerts ============
+
+@bp.route('/api/v2/system/alerts/expiry', methods=['GET'])
+@require_auth(['read:settings'])
+def get_expiry_alert_settings():
+    """Get certificate expiry alert settings"""
+    try:
+        from services.expiry_alert_service import ExpiryAlertSettings
+        return success_response(data=ExpiryAlertSettings.get_settings())
+    except Exception as e:
+        return error_response(f"Failed to get settings: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/alerts/expiry', methods=['PUT'])
+@require_auth(['admin:system'])
+def update_expiry_alert_settings():
+    """Update certificate expiry alert settings"""
+    try:
+        from services.expiry_alert_service import ExpiryAlertSettings
+        data = request.get_json() or {}
+        
+        settings = ExpiryAlertSettings.update_settings(**data)
+        return success_response(
+            message="Expiry alert settings updated",
+            data=settings
+        )
+    except Exception as e:
+        return error_response(f"Failed to update settings: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/alerts/expiry/check', methods=['POST'])
+@require_auth(['admin:system'])
+def trigger_expiry_check():
+    """Manually trigger expiry check and send alerts"""
+    try:
+        from services.expiry_alert_service import check_and_send_alerts
+        result = check_and_send_alerts()
+        return success_response(
+            message=f"Check complete: {result.get('alerts_sent', 0)} alerts sent",
+            data=result
+        )
+    except Exception as e:
+        return error_response(f"Expiry check failed: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/alerts/expiring-certs', methods=['GET'])
+@require_auth(['read:certificates'])
+def get_expiring_certificates():
+    """Get list of certificates expiring soon"""
+    try:
+        from services.expiry_alert_service import get_expiring_certificates as get_expiring
+        
+        days = request.args.get('days', 30, type=int)
+        include_revoked = request.args.get('include_revoked', 'false').lower() == 'true'
+        
+        certs = get_expiring(days=days, include_revoked=include_revoked)
+        return success_response(data=certs)
+    except Exception as e:
+        return error_response(f"Failed to get expiring certificates: {str(e)}", 500)
+
+
+# ============ Rate Limiting ============
+
+@bp.route('/api/v2/system/security/rate-limit', methods=['GET'])
+@require_auth(['read:settings'])
+def get_rate_limit_config():
+    """Get rate limiting configuration"""
+    try:
+        from security.rate_limiter import RateLimitConfig, get_rate_limiter
+        
+        config = RateLimitConfig.get_config()
+        stats = get_rate_limiter().get_stats()
+        
+        return success_response(data={
+            'config': config,
+            'stats': stats
+        })
+    except Exception as e:
+        return error_response(f"Failed to get rate limit config: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/security/rate-limit', methods=['PUT'])
+@require_auth(['admin:system'])
+def update_rate_limit_config():
+    """Update rate limiting configuration"""
+    try:
+        from security.rate_limiter import RateLimitConfig
+        data = request.get_json() or {}
+        
+        if 'enabled' in data:
+            RateLimitConfig.set_enabled(data['enabled'])
+        
+        if 'custom_limits' in data:
+            for path, limit in data['custom_limits'].items():
+                RateLimitConfig.set_custom_limit(path, limit['rpm'], limit.get('burst', limit['rpm'] // 3))
+        
+        if 'whitelist_add' in data:
+            for ip in data['whitelist_add']:
+                RateLimitConfig.add_whitelist(ip)
+        
+        if 'whitelist_remove' in data:
+            for ip in data['whitelist_remove']:
+                RateLimitConfig.remove_whitelist(ip)
+        
+        return success_response(
+            message="Rate limit config updated",
+            data=RateLimitConfig.get_config()
+        )
+    except Exception as e:
+        return error_response(f"Failed to update config: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/security/rate-limit/stats', methods=['GET'])
+@require_auth(['read:settings'])
+def get_rate_limit_stats():
+    """Get rate limiting statistics"""
+    try:
+        from security.rate_limiter import get_rate_limiter
+        return success_response(data=get_rate_limiter().get_stats())
+    except Exception as e:
+        return error_response(f"Failed to get stats: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/security/rate-limit/reset', methods=['POST'])
+@require_auth(['admin:system'])
+def reset_rate_limits():
+    """Reset rate limit counters"""
+    try:
+        from security.rate_limiter import get_rate_limiter
+        data = request.get_json() or {}
+        
+        limiter = get_rate_limiter()
+        ip = data.get('ip')  # Optional: clear specific IP only
+        
+        limiter.clear_bucket(ip)
+        if data.get('reset_stats', False):
+            limiter.reset_stats()
+        
+        return success_response(message="Rate limits reset")
+    except Exception as e:
+        return error_response(f"Failed to reset: {str(e)}", 500)

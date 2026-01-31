@@ -16,6 +16,13 @@ from .encryption import (
 )
 from .csrf import CSRFProtection, csrf_protect, init_csrf_middleware
 from .password_policy import PasswordPolicy, validate_password, get_password_strength, get_policy_requirements
+from .rate_limiter import (
+    RateLimitConfig,
+    RateLimiter,
+    get_rate_limiter,
+    init_rate_limiter,
+    rate_limit
+)
 
 __all__ = [
     'KeyEncryption',
@@ -29,5 +36,10 @@ __all__ = [
     'PasswordPolicy',
     'validate_password',
     'get_password_strength',
-    'get_policy_requirements'
+    'get_policy_requirements',
+    'RateLimitConfig',
+    'RateLimiter',
+    'get_rate_limiter',
+    'init_rate_limiter',
+    'rate_limit'
 ]
