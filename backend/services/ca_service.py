@@ -134,16 +134,8 @@ class CAService:
         db.session.commit()
         
         # Audit log
-        log = AuditLog(
-            username=username,
-            action='ca_created',
-            resource_type='ca',
-            resource_id=ca.refid,
-            details=f'Created CA: {descr}',
-            success=True
-        )
-        db.session.add(log)
-        db.session.commit()
+        from services.audit_service import AuditService
+        AuditService.log_ca('ca_created', ca, f'Created CA: {descr}')
         
         # Save certificate to file
         cert_path = Config.CA_DIR / f"{ca.refid}.crt"
@@ -212,16 +204,8 @@ class CAService:
         db.session.commit()
         
         # Audit log
-        log = AuditLog(
-            username=username,
-            action='ca_imported',
-            resource_type='ca',
-            resource_id=ca.refid,
-            details=f'Imported CA: {descr}',
-            success=True
-        )
-        db.session.add(log)
-        db.session.commit()
+        from services.audit_service import AuditService
+        AuditService.log_ca('ca_imported', ca, f'Imported CA: {descr}')
         
         # Save files
         cert_path = Config.CA_DIR / f"{ca.refid}.crt"
@@ -287,15 +271,8 @@ class CAService:
             key_path.unlink()
         
         # Audit log
-        log = AuditLog(
-            username=username,
-            action='ca_deleted',
-            resource_type='ca',
-            resource_id=ca.refid,
-            details=f'Deleted CA: {ca.descr}',
-            success=True
-        )
-        db.session.add(log)
+        from services.audit_service import AuditService
+        AuditService.log_ca('ca_deleted', ca, f'Deleted CA: {ca.descr}')
         
         # Delete from database
         db.session.delete(ca)

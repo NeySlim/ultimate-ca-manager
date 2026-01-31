@@ -196,15 +196,8 @@ class CRLService:
         db.session.add(crl_metadata)
         
         # Audit log
-        audit = AuditLog(
-            username=username,
-            action='generate_crl',
-            resource_type='crl',
-            resource_id=str(ca_id),
-            details=f"Generated CRL #{crl_number} for CA {ca.descr} with {len(revoked_certs)} revoked certificates",
-            success=True
-        )
-        db.session.add(audit)
+        from services.audit_service import AuditService
+        AuditService.log_ca('generate_crl', ca, f"Generated CRL #{crl_number} for CA {ca.descr} with {len(revoked_certs)} revoked certificates")
         
         db.session.commit()
         
