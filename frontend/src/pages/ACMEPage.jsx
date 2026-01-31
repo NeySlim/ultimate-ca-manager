@@ -473,7 +473,7 @@ export default function ACMEPage() {
             <FocusItem
               key={account.id}
               icon={Key}
-              title={account.email}
+              title={account.contact?.[0]?.replace('mailto:', '') || account.email || `Account #${account.id}`}
               subtitle={`Created ${account.created_at ? new Date(account.created_at).toLocaleDateString() : '-'}`}
               badge={
                 <Badge variant={account.status === 'valid' ? 'success' : 'secondary'} size="sm">
