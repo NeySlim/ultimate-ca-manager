@@ -106,10 +106,11 @@ export default function ACMEPage() {
   const loadAccounts = async () => {
     setLoading(true)
     try {
-      const data = await acmeService.getAccounts()
-      setAccounts(data.accounts || [])
-      if (data.accounts?.length > 0 && !selectedAccount) {
-        selectAccount(data.accounts[0])
+      const response = await acmeService.getAccounts()
+      const accountsList = response.data || response.accounts || []
+      setAccounts(accountsList)
+      if (accountsList.length > 0 && !selectedAccount) {
+        selectAccount(accountsList[0])
       }
     } catch (error) {
       showError(error.message || 'Failed to load ACME accounts')
