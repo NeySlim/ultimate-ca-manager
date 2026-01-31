@@ -35,6 +35,7 @@ import { Pagination } from './Pagination'
 import { LoadingSpinner } from './LoadingSpinner'
 import { EmptyState } from './EmptyState'
 import { Input } from './Input'
+import { Funnel } from '@phosphor-icons/react'
 
 // Simple native select for filters
 function FilterSelect({ value, onChange, options = [], placeholder, className }) {
@@ -124,6 +125,9 @@ export function TablePageLayout({
   compact = false,
 }) {
   const { isMobile } = useMobile()
+  
+  // Focus panel open state - closed by default on mobile
+  const [focusPanelOpen, setFocusPanelOpen] = useState(!isMobile)
   
   // Internal search state (if not controlled externally)
   const [internalSearch, setInternalSearch] = useState('')
@@ -316,6 +320,8 @@ export function TablePageLayout({
         </div>
       ) : undefined}
       focusFooter={focusFooter || `${filteredData.length} item(s)`}
+      focusOpen={focusPanelOpen}
+      onFocusClose={() => setFocusPanelOpen(false)}
       helpContent={null} // Help is in focus panel
     >
       {/* Main Content */}
@@ -331,6 +337,18 @@ export function TablePageLayout({
                   placeholder={searchPlaceholder}
                 />
               </div>
+            )}
+            {/* Mobile: Filter button to open focus panel */}
+            {isMobile && (
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={() => setFocusPanelOpen(true)}
+                className="shrink-0"
+              >
+                <Funnel size={14} />
+                Filters
+              </Button>
             )}
             {onRefresh && (
               <Button variant="secondary" size="sm" onClick={onRefresh}>
