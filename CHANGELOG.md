@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.1] - 2026-01-31
+
+### 🎨 Dual Theme System
+
+#### Added
+- **12 Theme Variants** - 6 color themes × Light/Dark modes
+  - Gray, Blue Ocean, Purple Night, Green Forest, Orange Sunset, Cyber Pink
+  - Each theme has carefully crafted light and dark variants
+- **Auto Dark Mode** - "Follow System" mode using `prefers-color-scheme`
+- **Settings > Appearance** - Visual theme selector with preview
+- **Mobile Grid Menu** - 4×4 icon grid with hamburger on right
+- **Mobile Header** - Search, theme, and account quick access icons
+
+#### Improved
+- **Responsive FocusPanel** - Adaptive width (320px → 500px on large screens)
+- **Sidebar Icons** - Larger icons on screens ≥1300px
+- **ACME Page** - Uses global DetailSection/DetailField components
+- **Groups Tab** - Now uses ListPageLayout like Users
+
+---
+
 ## [2.0.0] - 2026-01-29
 
 ### 🎨 Complete React Frontend Rewrite (UCM V4)
@@ -58,12 +79,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Styled Dialogs** - `showConfirm()`, `showPrompt()` replace native JS popups
 - **UI Consistency** - Standardized border-radius, padding, shadows across components
 - **HTTPS Cert Display** - Real certificate info with CA-Signed/Self-Signed badge
-- **Redis Support** - Optional distributed caching and rate limiting
-- **Pydantic Validation** - Request schema validation with clean error messages
-- **Structured Logging** - JSON logs with request context for observability
 
-#### Testing (129 total tests)
-- **Vitest** - 84 frontend unit tests (89% coverage)
+#### Testing (104 total tests)
+- **Vitest** - 39 frontend unit tests (components, services)
 - **Pytest** - 51 backend API tests (auth, CAs, certs, SCEP)
 - **Playwright** - 14 E2E tests (auth, certificates, settings)
 
@@ -77,11 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All API stubs replaced with real implementations
 - Dropdown component fixed (forwardRef + onSelect for Radix)
 - HTTPS cert info displays real data instead of "Self-Signed"
-
-#### Cleanup
-- Removed prototype files (PrototypeA/B/C/D.jsx)
-- Removed TestPage.jsx and App-test-success.jsx
-- Code reduced by ~890 lines while adding features
 
 ---
 
@@ -1175,3 +1188,43 @@ Major migration from Tailwind utility classes to custom CSS system.
 - SCEP configuration now persisted to database
 - Webhooks stored as JSON in SystemConfig
 - Improved backup file naming with timezone-aware dates
+
+## [2.0.0-pro] - 2026-01-29
+
+### Added - Pro Features
+- **User Groups** - Organize users with shared permissions
+  - Group creation and management
+  - Member assignment with roles
+  - Default groups: Administrators, Certificate Operators, Auditors
+
+- **Custom RBAC Roles** - Fine-grained access control
+  - Create roles with specific permissions
+  - Base role inheritance (admin, operator, viewer)
+  - Default roles: Certificate Manager, CA Administrator, Security Auditor
+
+- **SSO Integration** - Enterprise identity providers
+  - LDAP/Active Directory with group sync
+  - OAuth2/OIDC support
+  - SAML 2.0 federation
+  - Auto-provisioning users on first login
+  - Role mapping from SSO groups
+
+- **HSM Integration** - Hardware Security Modules
+  - PKCS#11 (local HSMs)
+  - AWS CloudHSM
+  - Azure Key Vault
+  - Google Cloud KMS
+  - Key generation and management
+  - Connection health monitoring
+
+### Changed
+- Added `accent-pro` theme variable for consistent Pro UI styling
+- Pro menu items in sidebar with distinctive purple accent
+- License detection for Pro feature visibility
+
+### Technical
+- 8 new database tables for Pro features
+- Auto-create Pro tables on startup
+- Graceful fallback when Pro modules not available
+- ~2,500 lines of Pro frontend code
+- ~1,000 lines of Pro backend code
