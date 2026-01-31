@@ -281,3 +281,75 @@ Pour toute question ou problème:
 **Dernière mise à jour**: 23 janvier 2026  
 **Version API**: v2.0.0  
 **Service systemd**: `ucm.service`
+
+## 🔌 WebSocket Real-Time Events
+
+### Connexion WebSocket
+```javascript
+const socket = io('https://your-server:8443', {
+  path: '/socket.io',
+  transports: ['websocket'],
+  query: { token: 'your-csrf-token' }
+});
+```
+
+### Endpoints WebSocket API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v2/websocket/status` | GET | Get WebSocket server status |
+| `/api/v2/websocket/clients` | GET | List connected clients (admin) |
+| `/api/v2/websocket/broadcast` | POST | Broadcast system alert |
+| `/api/v2/websocket/events` | GET | List all event types |
+
+### Event Types
+
+| Event | Description |
+|-------|-------------|
+| `certificate.issued` | New certificate created |
+| `certificate.revoked` | Certificate revoked |
+| `certificate.expiring` | Certificate expiration warning |
+| `ca.created` | New CA created |
+| `ca.updated` | CA modified |
+| `ca.revoked` | CA revoked |
+| `crl.regenerated` | CRL regenerated |
+| `user.login` | User logged in |
+| `user.logout` | User logged out |
+| `system.alert` | System alert |
+| `audit.critical` | Critical audit event |
+
+### Event Payload Format
+```json
+{
+  "type": "certificate.issued",
+  "data": {
+    "id": 123,
+    "cn": "example.com",
+    "ca_id": 5,
+    "issuer": "My Root CA",
+    "valid_to": "2027-01-31T00:00:00"
+  },
+  "timestamp": "2026-01-31T18:45:00Z"
+}
+```
+
+### Subscribe to Rooms
+```javascript
+// Subscribe to specific CA events
+socket.emit('subscribe', { rooms: ['ca:5'] });
+
+// Unsubscribe
+socket.emit('unsubscribe', { rooms: ['ca:5'] });
+```
+
+### Broadcast (Admin Only)
+```bash
+POST /api/v2/websocket/broadcast
+Content-Type: application/json
+
+{
+  "message": "System maintenance in 5 minutes",
+  "alert_type": "maintenance",
+  "severity": "warning"
+}
+```

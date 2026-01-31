@@ -346,6 +346,19 @@ def create_certificate():
         except Exception:
             pass  # Non-blocking
         
+        # WebSocket event
+        try:
+            from websocket.emitters import on_certificate_issued
+            on_certificate_issued(
+                cert_id=db_cert.id,
+                cn=data['cn'],
+                ca_id=ca.id,
+                issuer=ca.name,
+                valid_to=not_after.isoformat() if not_after else None
+            )
+        except Exception:
+            pass  # Non-blocking
+        
         return created_response(
             data=db_cert.to_dict(),
             message='Certificate created successfully'
@@ -563,6 +576,18 @@ def revoke_certificate(cert_id):
         try:
             from services.notification_service import NotificationService
             NotificationService.on_certificate_revoked(cert, reason, username)
+        except Exception:
+            pass  # Non-blocking
+        
+        # WebSocket event
+        try:
+            from websocket.emitters import on_certificate_revoked
+            on_certificate_revoked(
+                cert_id=cert.id,
+                cn=cert.descr or cert.refid,
+                reason=reason,
+                revoked_by=username
+            )
         except Exception:
             pass  # Non-blocking
         

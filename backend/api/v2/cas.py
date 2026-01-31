@@ -302,6 +302,18 @@ def create_ca():
         except Exception:
             pass  # Non-blocking
         
+        # WebSocket event
+        try:
+            from websocket.emitters import on_ca_created
+            on_ca_created(
+                ca_id=ca.id,
+                name=ca.name,
+                common_name=ca.dn_commonname,
+                created_by=username
+            )
+        except Exception:
+            pass  # Non-blocking
+        
         return created_response(
             data=ca.to_dict(),
             message='CA created successfully'

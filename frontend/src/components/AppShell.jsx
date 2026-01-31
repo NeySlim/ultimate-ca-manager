@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
+import { WebSocketIndicator } from './WebSocketIndicator'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
 import { useTheme } from '../contexts/ThemeContext'
@@ -112,6 +113,9 @@ export function AppShell() {
           >
             <Palette size={18} />
           </button>
+          
+          {/* WebSocket indicator */}
+          <WebSocketIndicator className="ml-1" />
           
           {/* Account button */}
           <button

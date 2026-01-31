@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.3] - 2026-01-31
+
+### 🔌 Phase 8: WebSocket Real-Time Events
+
+#### Added
+- **WebSocket Support** - Real-time bidirectional communication
+  - Flask-SocketIO with gevent async worker
+  - JWT authentication for WebSocket connections
+  - Auto-reconnection with exponential backoff
+
+- **Event Types** (26 events supported)
+  - Certificate: issued, revoked, expiring, renewed, deleted
+  - CA: created, updated, deleted, revoked
+  - CRL: regenerated, published
+  - User: login, logout, created, updated, deleted
+  - Group: created, updated, deleted
+  - System: alert, backup, restore
+  - Audit: critical
+  - Protocol: ACME order completed, SCEP enrollment
+
+- **WebSocket API Endpoints**
+  - `GET /api/v2/websocket/status` - Server status
+  - `GET /api/v2/websocket/clients` - Connected clients list
+  - `POST /api/v2/websocket/broadcast` - System alert broadcast
+  - `GET /api/v2/websocket/events` - Event types list
+
+- **Frontend Integration**
+  - `useWebSocket` hook with auto-connect on login
+  - `useAutoRefresh` hook for automatic data refresh
+  - `WebSocketIndicator` component in header/sidebar
+  - Toast notifications for real-time events
+
+#### Changed
+- Gunicorn worker class: `sync` → `geventwebsocket.gunicorn.workers.GeventWebSocketWorker`
+- Updated CORS config for WebSocket endpoints
+
+---
+
 ## [2.0.2] - 2026-01-31
 
 ### 🔒 Phase 4: Security Hardening

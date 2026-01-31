@@ -9,12 +9,16 @@ import os
 bind = f"0.0.0.0:{os.getenv('HTTPS_PORT', '8443')}"
 backlog = 2048
 
-# Worker processes
+# Worker processes - Use gevent for WebSocket support
 workers = int(os.getenv('GUNICORN_WORKERS', 4))
-worker_class = 'sync'
+worker_class = 'geventwebsocket.gunicorn.workers.GeventWebSocketWorker'
 worker_connections = 1000
 timeout = 120
 keepalive = 5
+
+# WebSocket support
+websocket_ping_interval = 25
+websocket_ping_timeout = 60
 
 # Security
 limit_request_line = 4094

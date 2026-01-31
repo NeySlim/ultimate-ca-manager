@@ -14,6 +14,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
+import { WebSocketIndicator } from './WebSocketIndicator'
 import { useMobile } from '../contexts/MobileContext'
 
 export function Sidebar({ activePage }) {
@@ -209,6 +210,9 @@ export function Sidebar({ activePage }) {
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
+
+      {/* WebSocket Indicator */}
+      <WebSocketIndicator className="mx-auto" />
 
       {/* User Menu */}
       <DropdownMenu.Root>

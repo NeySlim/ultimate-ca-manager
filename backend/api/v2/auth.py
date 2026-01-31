@@ -170,6 +170,17 @@ def login():
         # Log successful login
         current_app.logger.info(f"✅ User {user.username} logged in successfully")
         
+        # WebSocket event for login
+        try:
+            from websocket.emitters import on_user_login
+            on_user_login(
+                username=user.username,
+                ip_address=request.remote_addr or 'unknown',
+                method='password'
+            )
+        except Exception:
+            pass  # Non-blocking
+        
         # Generate CSRF token
         csrf_token = None
         if HAS_CSRF:
@@ -194,6 +205,14 @@ def logout():
     Logout endpoint
     Clears session (for session-based auth)
     """
+    # WebSocket event for logout
+    try:
+        from websocket.emitters import on_user_logout
+        username = session.get('username', 'unknown')
+        on_user_logout(username=username)
+    except Exception:
+        pass  # Non-blocking
+    
     session.clear()
     
     return success_response(message='Logout successful')
