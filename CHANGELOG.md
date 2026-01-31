@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.2] - 2026-01-31
+
+### 🔒 Phase 4: Security Hardening
+
+#### Added
+- **Private Key Encryption** - Fernet (AES-256-CBC + HMAC-SHA256) for CA/cert keys
+  - Environment variable: `KEY_ENCRYPTION_KEY`
+  - Migration endpoint: `POST /api/v2/system/security/encrypt-all-keys`
+  - Status check: `GET /api/v2/system/security/encryption-status`
+
+- **CSRF Protection** - Token-based protection for state-changing requests
+  - Token returned on login/verify responses
+  - Header: `X-CSRF-Token` required for POST/PUT/DELETE/PATCH
+  - Frontend integration: sessionStorage + automatic header injection
+
+- **Password Policy** - Enforced strong passwords
+  - Minimum 8 characters
+  - Requires: uppercase, lowercase, digit, special character
+  - Common password blacklist
+  - Sequential/repeated character detection
+  - API: `GET /api/v2/users/password-policy`, `POST /api/v2/users/password-strength`
+
+- **Rate Limiting** - Per-endpoint request throttling
+  - Auth endpoints: 10 req/min, burst 3
+  - Heavy operations: 30 req/min
+  - Standard API: 120 req/min
+  - Protocol endpoints (ACME/SCEP/OCSP): 300-500 req/min
+  - Config API: `GET/PUT /api/v2/system/security/rate-limit`
+
+- **Audit Log Retention** - Configurable retention policy
+  - Default: 90 days (configurable 7-1825 days)
+  - Automatic daily cleanup task
+  - Manual cleanup: `POST /api/v2/system/audit/cleanup`
+
+- **Certificate Expiry Alerts** - Email notifications before expiration
+  - Alert at: 30, 14, 7, 1 days before expiry
+  - Daily scheduled check
+  - Config API: `GET/PUT /api/v2/system/alerts/expiry`
+  - Expiring list: `GET /api/v2/system/alerts/expiring-certs`
+
+#### Added (Testing)
+- **E2E Test Suite** - Comprehensive automated tests (40 tests)
+  - Authentication, User Management, CA/Certificate lifecycle
+  - Security features, Pro features, System settings
+  - Protocol endpoints (ACME, SCEP, OCSP, CRL)
+  - Run: `python3 backend/tests/e2e_test_suite.py`
+
+---
+
 ## [2.0.1] - 2026-01-31
 
 ### 🎨 Dual Theme System
