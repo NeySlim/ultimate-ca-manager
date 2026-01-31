@@ -194,16 +194,8 @@ class CertificateService:
         db.session.commit()
         
         # Audit log
-        log = AuditLog(
-            username=username,
-            action='cert_created',
-            resource_type='certificate',
-            resource_id=certificate.refid,
-            details=f'Created certificate: {descr}',
-            success=True
-        )
-        db.session.add(log)
-        db.session.commit()
+        from services.audit_service import AuditService
+        AuditService.log_certificate('cert_created', certificate, f'Created certificate: {descr}')
         
         # Save files
         cert_path = Config.CERT_DIR / f"{certificate.refid}.crt"
@@ -273,16 +265,8 @@ class CertificateService:
         db.session.commit()
         
         # Audit log
-        log = AuditLog(
-            username=username,
-            action='csr_generated',
-            resource_type='certificate',
-            resource_id=certificate.refid,
-            details=f'Generated CSR: {descr}',
-            success=True
-        )
-        db.session.add(log)
-        db.session.commit()
+        from services.audit_service import AuditService
+        AuditService.log_csr('csr_generated', certificate, f'Generated CSR: {descr}')
         
         # Save files
         csr_path = Config.CERT_DIR / f"{certificate.refid}.csr"
@@ -377,17 +361,9 @@ class CertificateService:
         
         db.session.commit()
         
-        # Audit log
-        log = AuditLog(
-            username=username,
-            action='csr_signed',
-            resource_type='certificate',
-            resource_id=certificate.refid,
-            details=f'Signed CSR: {certificate.descr}',
-            success=True
-        )
-        db.session.add(log)
-        db.session.commit()
+        # Audit log with centralized service
+        from services.audit_service import AuditService
+        AuditService.log_certificate('csr_signed', certificate, f'Signed CSR: {certificate.descr}')
         
         # Save signed certificate
         cert_path = Config.CERT_DIR / f"{certificate.refid}.crt"
@@ -466,16 +442,8 @@ class CertificateService:
         db.session.commit()
         
         # Audit log
-        log = AuditLog(
-            username=username,
-            action='cert_imported',
-            resource_type='certificate',
-            resource_id=certificate.refid,
-            details=f'Imported certificate: {descr}',
-            success=True
-        )
-        db.session.add(log)
-        db.session.commit()
+        from services.audit_service import AuditService
+        AuditService.log_certificate('cert_imported', certificate, f'Imported certificate: {descr}')
         
         # Save files
         cert_path = Config.CERT_DIR / f"{certificate.refid}.crt"
@@ -521,16 +489,8 @@ class CertificateService:
         db.session.commit()
         
         # Audit log
-        log = AuditLog(
-            username=username,
-            action='cert_revoked',
-            resource_type='certificate',
-            resource_id=certificate.refid,
-            details=f'Revoked certificate: {certificate.descr} - Reason: {reason}',
-            success=True
-        )
-        db.session.add(log)
-        db.session.commit()
+        from services.audit_service import AuditService
+        AuditService.log_certificate('cert_revoked', certificate, f'Revoked certificate: {certificate.descr} - Reason: {reason}')
         
         # Auto-generate CRL if CA has CDP enabled
         ca = CA.query.filter_by(refid=certificate.caref).first()
@@ -540,16 +500,7 @@ class CertificateService:
                 CRLService.generate_crl(ca.id, username=username)
             except Exception as e:
                 # Log error but don't fail revocation
-                error_log = AuditLog(
-                    username=username,
-                    action='crl_auto_generation_failed',
-                    resource_type='crl',
-                    resource_id=str(ca.id),
-                    details=f'Failed to auto-generate CRL after revocation: {str(e)}',
-                    success=False
-                )
-                db.session.add(error_log)
-                db.session.commit()
+                AuditService.log_ca('crl_auto_generation_failed', ca, f'Failed to auto-generate CRL after revocation: {str(e)}', success=False)
         
         # Invalidate OCSP cache if CA has OCSP enabled
         if ca and ca.ocsp_enabled:
@@ -650,15 +601,8 @@ class CertificateService:
                 path.unlink()
         
         # Audit log
-        log = AuditLog(
-            username=username,
-            action='cert_deleted',
-            resource_type='certificate',
-            resource_id=certificate.refid,
-            details=f'Deleted certificate: {certificate.descr}',
-            success=True
-        )
-        db.session.add(log)
+        from services.audit_service import AuditService
+        AuditService.log_certificate('cert_deleted', certificate, f'Deleted certificate: {certificate.descr}')
         
         # Delete from database
         db.session.delete(certificate)
