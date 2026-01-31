@@ -42,14 +42,16 @@ def regenerate_crl(ca_id):
     ca = CA.query.get(ca_id)
     if not ca:
         return error_response('CA not found', 404)
+    
+    # Check if CA has private key
+    if not ca.has_private_key:
+        return error_response(f'CA "{ca.descr}" does not have a private key - cannot sign CRL', 400)
         
     try:
-        CRLService.generate_crl(ca.id, username=getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin') # TODO: get from g.user
-        
-        crl = CRL.query.filter_by(caref=ca.refid).first()
+        crl_metadata = CRLService.generate_crl(ca.id, username=getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin')
         
         return success_response(
-            data=crl.to_dict(),
+            data=crl_metadata.to_dict() if crl_metadata else None,
             message='CRL regenerated successfully'
         )
     except Exception as e:

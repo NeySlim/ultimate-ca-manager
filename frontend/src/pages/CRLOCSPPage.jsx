@@ -196,13 +196,16 @@ export default function CRLOCSPPage() {
           const crl = crls.find(c => c.caref === ca.refid)
           const isSelected = selectedCA?.id === ca.id
           const hasRevoked = crl && (crl.revoked_count || 0) > 0
+          const hasKey = ca.has_private_key !== false
           return (
             <FocusItem
               key={ca.id}
               icon={FileX}
               title={ca.descr}
-              subtitle={crl ? `Updated ${formatDate(crl.updated_at)}` : 'No CRL'}
-              badge={hasRevoked ? (
+              subtitle={!hasKey ? 'No private key' : (crl ? `Updated ${formatDate(crl.updated_at)}` : 'No CRL')}
+              badge={!hasKey ? (
+                <Badge variant="secondary" size="sm">Read-only</Badge>
+              ) : hasRevoked ? (
                 <Badge variant="danger" size="sm">{crl.revoked_count}</Badge>
               ) : crl ? (
                 <Badge variant="success" size="sm">0</Badge>
@@ -261,10 +264,10 @@ export default function CRLOCSPPage() {
             ]}
             actions={[
               { 
-                label: regenerating ? 'Regenerating...' : 'Regenerate CRL', 
+                label: regenerating ? 'Regenerating...' : (selectedCA.has_private_key === false ? 'No Private Key' : 'Regenerate CRL'), 
                 icon: ArrowsClockwise, 
                 onClick: handleRegenerateCRL,
-                disabled: regenerating
+                disabled: regenerating || selectedCA.has_private_key === false
               },
               { 
                 label: 'Download CRL', 
