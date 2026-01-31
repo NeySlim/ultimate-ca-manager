@@ -214,16 +214,16 @@ export default function ACMEPage() {
   // Note: Detail tabs content is now inline in the render below
 
   const configContent = (
-    <div className="space-y-6 p-6">
-      <HelpCard variant="info" title="About ACME Protocol">
+    <div className="space-y-4 p-4">
+      <HelpCard variant="info" title="About ACME Protocol" compact>
         ACME (Automatic Certificate Management Environment) enables automated certificate issuance. 
         Compatible with certbot, acme.sh, and other ACME clients.
       </HelpCard>
 
       {/* ACME Server Configuration */}
       <DetailSection title="ACME Server Configuration" icon={Globe}>
-        <div className="space-y-4">
-          <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+        <div className="space-y-3">
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
             <input
               type="checkbox"
               checked={acmeSettings.enabled || false}
@@ -263,12 +263,8 @@ export default function ACMEPage() {
 
       {/* Let's Encrypt Proxy */}
       <DetailSection title="Let's Encrypt Proxy" icon={ShieldCheck}>
-        <HelpCard variant="tip" title="What is LE Proxy?" className="mb-4" compact>
-          Proxy certificate requests to Let's Encrypt while maintaining local control and audit logging.
-        </HelpCard>
-
-        <div className="space-y-4">
-          <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+        <div className="space-y-3">
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
             <input
               type="checkbox"
               checked={acmeSettings.proxy_enabled || false}
@@ -292,12 +288,10 @@ export default function ACMEPage() {
               </DetailGrid>
               
               {acmeSettings.proxy_registered ? (
-                <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-emerald-500/20">
-                        <CheckCircle size={20} className="text-emerald-500" weight="fill" />
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={18} className="text-emerald-500" weight="fill" />
                       <div>
                         <p className="text-sm font-medium text-text-primary">Proxy Account Registered</p>
                         <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
@@ -309,13 +303,12 @@ export default function ACMEPage() {
                       onClick={handleUnregisterProxy}
                       className="text-red-500 hover:bg-red-500/10"
                     >
-                      <Trash size={16} />
-                      Unregister
+                      <Trash size={14} />
                     </Button>
                   </div>
                 </div>
               ) : (
-                <>
+                <div className="space-y-3">
                   <Input
                     label="Email Address"
                     type="email"
@@ -327,22 +320,23 @@ export default function ACMEPage() {
 
                   <Button 
                     variant="secondary" 
+                    size="sm"
                     onClick={handleRegisterProxy}
                     disabled={!proxyEmail}
                   >
-                    <Key size={16} />
+                    <Key size={14} />
                     Register Proxy Account
                   </Button>
-                </>
+                </div>
               )}
             </>
           )}
         </div>
       </DetailSection>
 
-      <div className="flex gap-3 pt-4 border-t border-border">
-        <Button onClick={handleSaveConfig} disabled={saving}>
-          <FloppyDisk size={16} />
+      <div className="flex gap-2 pt-3 border-t border-border">
+        <Button size="sm" onClick={handleSaveConfig} disabled={saving}>
+          <FloppyDisk size={14} />
           Save Configuration
         </Button>
       </div>
@@ -577,7 +571,7 @@ export default function ACMEPage() {
               {activeDetailTab === 'account' && (
                 <>
                   <DetailSection title="Account Information">
-                    <DetailGrid columns={2}>
+                    <DetailGrid>
                       <DetailField label="Email" value={selectedAccount.email} />
                       <DetailField 
                         label="Status" 

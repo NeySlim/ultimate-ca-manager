@@ -550,7 +550,7 @@ export default function SettingsPage() {
               ] : []}
             />
             <DetailSection title="SMTP Server">
-              <DetailGrid columns={2}>
+              <DetailGrid>
                 <div className="col-span-full md:col-span-1">
                   <Input
                     label="SMTP Host"
@@ -675,7 +675,7 @@ export default function SettingsPage() {
               </div>
             </DetailSection>
             <DetailSection title="Session & Rate Limits">
-              <DetailGrid columns={2}>
+              <DetailGrid>
                 <div className="col-span-full md:col-span-1">
                   <Input
                     label="Session Duration (hours)"
@@ -881,7 +881,7 @@ export default function SettingsPage() {
               subtitle="Database statistics and maintenance"
             />
             <DetailSection title="Database Statistics">
-              <DetailGrid columns={2}>
+              <DetailGrid>
                 <DetailField
                   label="Total Certificates"
                   value={dbStats?.certificates || '-'}
@@ -949,7 +949,7 @@ export default function SettingsPage() {
               )}
             />
             <DetailSection title="Current Certificate">
-              <DetailGrid columns={2}>
+              <DetailGrid>
                 <DetailField
                   label="Common Name"
                   value={httpsInfo?.common_name || window.location.hostname}

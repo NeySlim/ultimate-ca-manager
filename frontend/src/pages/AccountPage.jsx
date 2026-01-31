@@ -380,7 +380,7 @@ export default function AccountPage() {
             </div>
           </div>
         ) : (
-          <DetailGrid columns={2}>
+          <DetailGrid>
             <DetailField label="Username" value={accountData.username} />
             <DetailField label="Email" value={accountData.email} copyable />
             <DetailField label="Full Name" value={accountData.full_name || '—'} />
@@ -393,7 +393,7 @@ export default function AccountPage() {
       </DetailSection>
 
       <DetailSection title="Account Information">
-        <DetailGrid columns={2}>
+        <DetailGrid>
           <DetailField 
             label="Account Created" 
             value={accountData.created_at ? new Date(accountData.created_at).toLocaleDateString() : '—'} 
@@ -705,7 +705,7 @@ export default function AccountPage() {
       focusContent={focusContent}
       focusFooter={`${user?.username || 'User'} • ${user?.role || 'User'}`}
       helpContent={helpContent}
-      helpTitle="My Account - Aide"
+      
     >
       {/* Detail Header */}
       <div className="p-4 md:p-6">

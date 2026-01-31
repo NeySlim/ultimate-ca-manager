@@ -299,7 +299,7 @@ export default function TrustStorePage() {
         focusActions={focusActions}
         focusFooter={`${certificates.length} certificate(s)`}
         helpContent={helpContent}
-        helpTitle="Trust Store - Aide"
+        
       >
         {/* Main Content */}
         {!selectedCert ? (
@@ -339,7 +339,7 @@ export default function TrustStorePage() {
             <DetailContent>
               {/* Certificate Information */}
               <DetailSection title="Certificate Information">
-                <DetailGrid columns={2}>
+                <DetailGrid>
                   <DetailField label="Name" value={selectedCert.name} />
                   <DetailField label="Purpose" value={selectedCert.purpose?.replace('_', ' ')} />
                   <DetailField label="Subject" value={selectedCert.subject} mono copyable fullWidth />
