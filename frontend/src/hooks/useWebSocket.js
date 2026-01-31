@@ -87,9 +87,7 @@ export function useWebSocket(options = {}) {
     const socket = io(window.location.origin, {
       path: '/socket.io',
       transports: ['websocket', 'polling'],
-      query: {
-        token: csrfToken, // Use CSRF token for auth
-      },
+      withCredentials: true, // Send cookies for session auth
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
@@ -272,7 +270,7 @@ export function useWebSocket(options = {}) {
   
   // Auto-connect when authenticated
   useEffect(() => {
-    if (autoConnect && isAuthenticated && csrfToken) {
+    if (autoConnect && isAuthenticated) {
       connect();
     } else if (!isAuthenticated) {
       disconnect();
@@ -281,7 +279,7 @@ export function useWebSocket(options = {}) {
     return () => {
       disconnect();
     };
-  }, [autoConnect, isAuthenticated, csrfToken, connect, disconnect]);
+  }, [autoConnect, isAuthenticated, connect, disconnect]);
   
   return {
     // State
