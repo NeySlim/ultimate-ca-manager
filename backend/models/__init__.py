@@ -492,6 +492,159 @@ class Certificate(db.Model):
         return self.issuer
     
     @property
+    def country(self) -> str:
+        """Extract Country from subject"""
+        return self._extract_dn_field('C')
+    
+    @property
+    def state(self) -> str:
+        """Extract State from subject"""
+        return self._extract_dn_field('ST')
+    
+    @property
+    def locality(self) -> str:
+        """Extract Locality from subject"""
+        return self._extract_dn_field('L')
+    
+    @property
+    def email(self) -> str:
+        """Extract Email from subject"""
+        # Try emailAddress OID first, then 1.2.840.113549.1.9.1
+        email = self._extract_dn_field('emailAddress')
+        if not email:
+            email = self._extract_dn_field('1.2.840.113549.1.9.1')
+        return email
+    
+    def _extract_dn_field(self, field: str) -> str:
+        """Extract a field from subject DN"""
+        if not self.subject:
+            return ""
+        for part in self.subject.split(','):
+            part = part.strip()
+            if part.startswith(f'{field}='):
+                return part[len(field)+1:]
+        return ""
+    
+    @property
+    def key_algorithm(self) -> str:
+        """Get key algorithm name (RSA, EC, etc.)"""
+        key_info = self.key_type
+        if key_info and key_info != "N/A":
+            return key_info.split()[0]  # "RSA 2048" -> "RSA"
+        return "Unknown"
+    
+    @property
+    def key_size(self) -> int:
+        """Get key size in bits"""
+        key_info = self.key_type
+        if key_info and key_info != "N/A":
+            parts = key_info.split()
+            if len(parts) >= 2:
+                try:
+                    return int(parts[1])
+                except ValueError:
+                    pass
+        return 0
+    
+    @property
+    def signature_algorithm(self) -> str:
+        """Get signature algorithm from certificate"""
+        try:
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            import base64
+            
+            if not self.crt:
+                return "N/A"
+            
+            pem_data = base64.b64decode(self.crt).decode('utf-8')
+            cert = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
+            
+            # Get signature algorithm
+            sig_oid = cert.signature_algorithm_oid
+            # Map common OIDs to friendly names
+            sig_map = {
+                '1.2.840.113549.1.1.11': 'SHA256-RSA',
+                '1.2.840.113549.1.1.12': 'SHA384-RSA',
+                '1.2.840.113549.1.1.13': 'SHA512-RSA',
+                '1.2.840.113549.1.1.5': 'SHA1-RSA',
+                '1.2.840.10045.4.3.2': 'ECDSA-SHA256',
+                '1.2.840.10045.4.3.3': 'ECDSA-SHA384',
+                '1.2.840.10045.4.3.4': 'ECDSA-SHA512',
+            }
+            return sig_map.get(sig_oid.dotted_string, sig_oid._name or str(sig_oid))
+        except Exception:
+            return "N/A"
+    
+    @property
+    def thumbprint_sha1(self) -> str:
+        """Get SHA1 thumbprint/fingerprint"""
+        return self._get_thumbprint('sha1')
+    
+    @property
+    def thumbprint_sha256(self) -> str:
+        """Get SHA256 thumbprint/fingerprint"""
+        return self._get_thumbprint('sha256')
+    
+    def _get_thumbprint(self, algorithm: str) -> str:
+        """Calculate certificate thumbprint"""
+        try:
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives import hashes
+            import base64
+            
+            if not self.crt:
+                return ""
+            
+            pem_data = base64.b64decode(self.crt).decode('utf-8')
+            cert = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
+            
+            if algorithm == 'sha1':
+                digest = cert.fingerprint(hashes.SHA1())
+            else:
+                digest = cert.fingerprint(hashes.SHA256())
+            
+            return ':'.join(f'{b:02X}' for b in digest)
+        except Exception:
+            return ""
+    
+    @property
+    def days_remaining(self) -> int:
+        """Days until expiration"""
+        if not self.valid_to:
+            return -1
+        delta = self.valid_to - datetime.utcnow()
+        return max(0, delta.days)
+    
+    @property
+    def san_combined(self) -> str:
+        """Combined SAN string for display"""
+        sans = []
+        if self.san_dns:
+            try:
+                import json
+                dns_list = json.loads(self.san_dns) if self.san_dns.startswith('[') else [self.san_dns]
+                sans.extend([f"DNS:{d}" for d in dns_list])
+            except:
+                sans.append(f"DNS:{self.san_dns}")
+        if self.san_ip:
+            try:
+                import json
+                ip_list = json.loads(self.san_ip) if self.san_ip.startswith('[') else [self.san_ip]
+                sans.extend([f"IP:{ip}" for ip in ip_list])
+            except:
+                sans.append(f"IP:{self.san_ip}")
+        if self.san_email:
+            try:
+                import json
+                email_list = json.loads(self.san_email) if self.san_email.startswith('[') else [self.san_email]
+                sans.extend([f"Email:{e}" for e in email_list])
+            except:
+                sans.append(f"Email:{self.san_email}")
+        return ', '.join(sans) if sans else ""
+    
+    @property
     def not_valid_before(self) -> str:
         """Formatted valid from date"""
         if not self.valid_from:
@@ -550,11 +703,28 @@ class Certificate(db.Model):
             "ocsp_uri": self.ocsp_uri,
             # Computed properties for display
             "common_name": self.common_name,
+            "cn": self.common_name,  # Alias
             "organization": self.organization,
+            "country": self.country,
+            "state": self.state,
+            "locality": self.locality,
+            "email": self.email,
+            "organizational_unit": self.organizational_unit,
             "issuer_name": self.issuer_name,
             "not_valid_before": self.not_valid_before,
             "not_valid_after": self.not_valid_after,
             "status": status,
+            # Key and signature info
+            "key_type": self.key_type,
+            "key_algorithm": self.key_algorithm,
+            "key_size": self.key_size,
+            "signature_algorithm": self.signature_algorithm,
+            # Thumbprints
+            "thumbprint_sha1": self.thumbprint_sha1,
+            "thumbprint_sha256": self.thumbprint_sha256,
+            # Computed
+            "days_remaining": self.days_remaining,
+            "san_combined": self.san_combined,
             # PEM for display/copy
             "pem": self._decode_pem(self.crt),
         }

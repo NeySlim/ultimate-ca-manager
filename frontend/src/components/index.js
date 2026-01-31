@@ -75,6 +75,8 @@ export {
   CompactHeader
 } from './DetailCard'
 
+// Certificate Details (reusable)
+export { CertificateDetails } from './CertificateDetails'
 
 // Data Table Components
 export { DataTable, SimpleTable, CardGrid } from './DataTable'

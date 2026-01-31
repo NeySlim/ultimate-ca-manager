@@ -11,7 +11,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   TablePageLayout, Badge, Button, Modal, Select, Input, Textarea, HelpCard, Card,
-  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
+  CertificateDetails
 } from '../components'
 import { certificatesService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -354,101 +354,15 @@ export default function CertificatesPage() {
         size="lg"
       >
         {selectedCert && (
-          <div className="p-4 space-y-4">
-            {/* Header */}
-            <CompactHeader
-              icon={Certificate}
-              iconClass={selectedCert.revoked ? "bg-status-error/20" : "bg-accent-primary/20"}
-              title={selectedCert.cn || selectedCert.common_name || 'Certificate'}
-              subtitle={selectedCert.subject}
-              badge={
-                <Badge 
-                  variant={
-                    selectedCert.revoked ? 'danger' :
-                    selectedCert.status === 'valid' ? 'success' : 
-                    selectedCert.status === 'expiring' ? 'warning' : 'danger'
-                  }
-                  size="sm"
-                >
-                  {selectedCert.revoked ? 'Revoked' : selectedCert.status || 'Active'}
-                </Badge>
-              }
+          <div className="p-4 max-h-[80vh] overflow-y-auto">
+            <CertificateDetails
+              certificate={selectedCert}
+              onExport={handleExport}
+              onRevoke={() => handleRevoke(selectedCert.id)}
+              onDelete={() => handleDelete(selectedCert.id)}
+              canWrite={canWrite('certificates')}
+              canDelete={canDelete('certificates')}
             />
-
-            {/* Stats */}
-            <CompactStats stats={[
-              { icon: Clock, value: formatDate(selectedCert.valid_to, 'short') || 'N/A' },
-              { icon: Key, value: selectedCert.key_algorithm || selectedCert.key_type || 'RSA' },
-              { icon: Lock, iconClass: selectedCert.has_private_key ? "text-status-success" : "text-text-tertiary", value: selectedCert.has_private_key ? 'Has Key' : 'No Key' }
-            ]} />
-
-            {/* Actions */}
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onClick={() => handleExport('pem')}>
-                <Download size={14} /> PEM
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => handleExport('der')}>
-                <Download size={14} /> DER
-              </Button>
-              {canWrite('certificates') && !selectedCert.revoked && (
-                <Button size="sm" variant="danger" onClick={() => handleRevoke(selectedCert.id)}>
-                  <X size={14} /> Revoke
-                </Button>
-              )}
-              {canDelete('certificates') && (
-                <Button size="sm" variant="danger" onClick={() => handleDelete(selectedCert.id)}>
-                  <Trash size={14} />
-                </Button>
-              )}
-            </div>
-
-            {/* Subject */}
-            <CompactSection title="Subject Information">
-              <CompactGrid>
-                <CompactField label="CN" value={selectedCert.cn || selectedCert.common_name} />
-                <CompactField label="O" value={selectedCert.organization} />
-                <CompactField label="C" value={selectedCert.country} />
-                <CompactField label="ST" value={selectedCert.state} />
-                <CompactField label="L" value={selectedCert.locality} />
-                <CompactField label="Email" value={selectedCert.email} />
-              </CompactGrid>
-            </CompactSection>
-
-            {/* Validity */}
-            <CompactSection title="Validity Period">
-              <CompactGrid>
-                <CompactField label="From" value={formatDate(selectedCert.valid_from)} />
-                <CompactField label="Until" value={formatDate(selectedCert.valid_to)} />
-                <CompactField label="Serial" value={selectedCert.serial} className="col-span-2 font-mono text-[10px]" />
-              </CompactGrid>
-            </CompactSection>
-
-            {/* Technical */}
-            <CompactSection title="Technical Details">
-              <CompactGrid>
-                <CompactField label="Key" value={selectedCert.key_algorithm || selectedCert.key_type} />
-                <CompactField label="Size" value={selectedCert.key_size ? `${selectedCert.key_size} bits` : null} />
-                <CompactField label="Signature" value={selectedCert.signature_algorithm || selectedCert.hash_algorithm} className="col-span-2" />
-              </CompactGrid>
-            </CompactSection>
-
-            {/* SANs */}
-            {selectedCert.san && (
-              <CompactSection title="Subject Alternative Names">
-                <p className="font-mono text-xs text-text-primary break-all">{selectedCert.san}</p>
-              </CompactSection>
-            )}
-
-            {/* Issuer */}
-            <CompactSection title="Issuer">
-              <div className="space-y-1.5">
-                <div className="text-xs">
-                  <span className="text-text-tertiary">Issuer DN:</span>
-                  <p className="font-mono text-[10px] text-text-secondary break-all mt-0.5">{selectedCert.issuer || '—'}</p>
-                </div>
-                <CompactField label="CA Ref" value={selectedCert.caref} />
-              </div>
-            </CompactSection>
           </div>
         )}
       </Modal>
