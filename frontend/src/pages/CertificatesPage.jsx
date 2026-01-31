@@ -163,6 +163,12 @@ export default function CertificatesPage() {
         <div className="flex items-center gap-2">
           <Certificate size={16} className="text-accent-primary shrink-0" />
           <span className="font-medium truncate">{val}</span>
+          {row.source === 'acme' && (
+            <Badge variant="info" size="sm">ACME</Badge>
+          )}
+          {row.source === 'scep' && (
+            <Badge variant="warning" size="sm">SCEP</Badge>
+          )}
         </div>
       )
     },

@@ -356,6 +356,9 @@ class Certificate(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(80))
     
+    # Source tracking: 'manual', 'acme', 'scep', 'import', 'csr'
+    source = db.Column(db.String(20), default='manual')
+    
     # Template reference (optional - null if created without template)
     template_id = db.Column(db.Integer, db.ForeignKey("certificate_templates.id"), nullable=True)
     
@@ -535,6 +538,7 @@ class Certificate(db.Model):
             "imported_from": self.imported_from,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "created_by": self.created_by,
+            "source": self.source or 'manual',
             "has_private_key": self.has_private_key,
             "private_key_location": self.private_key_location,
             # Subject Alternative Names
