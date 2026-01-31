@@ -343,7 +343,7 @@ export default function SCEPPage() {
         </div>
       }
       helpContent={helpContent}
-      helpTitle="SCEP Protocol - Aide"
+      
     >
       {/* Main Content Area */}
       <div className="p-6">

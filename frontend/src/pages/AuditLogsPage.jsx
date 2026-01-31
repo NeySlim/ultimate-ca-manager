@@ -531,7 +531,7 @@ export default function AuditLogsPage() {
       focusActions={focusActions}
       focusFooter={`${total} log entries`}
       helpContent={helpContent}
-      helpTitle="Audit Logs - Aide"
+      
     >
       {/* Main Content */}
       <div className="p-6 space-y-4">
@@ -621,7 +621,7 @@ export default function AuditLogsPage() {
 
             {/* Event Details Section */}
             <DetailSection title="Event Details">
-              <DetailGrid columns={2}>
+              <DetailGrid>
                 <DetailField 
                   label="Timestamp" 
                   value={new Date(selectedLog.timestamp).toLocaleString()} 

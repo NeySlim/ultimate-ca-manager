@@ -143,14 +143,15 @@ export function DetailHeader({
 /**
  * DetailSection - Clean minimal section with card frame (Style B + frames)
  * Theme-aware styling
+ * @param {boolean} compact - Use compact layout with less padding
  */
-export function DetailSection({ title, description, children, className, noBorder = false }) {
+export function DetailSection({ title, description, children, className, noBorder = false, compact = false }) {
   const { isMobile } = useMobile()
   
   return (
-    <section className={cn("py-4 md:py-5", className)}>
+    <section className={cn(compact ? "py-1.5" : "py-2.5", className)}>
       {title && (
-        <div className="mb-3">
+        <div className="mb-2">
           <h2 className={cn(
             "font-semibold text-text-secondary tracking-wide",
             isMobile ? "text-xs" : "text-sm"
@@ -158,13 +159,14 @@ export function DetailSection({ title, description, children, className, noBorde
             {title}
           </h2>
           {description && (
-            <p className="text-xs text-text-tertiary mt-1">{description}</p>
+            <p className="text-xs text-text-tertiary mt-0.5">{description}</p>
           )}
         </div>
       )}
       {/* Content in a framed card - uses theme-aware class */}
       <div className={cn(
-        "rounded-lg p-4",
+        "rounded-lg",
+        compact ? "p-2" : "p-2.5",
         !noBorder && "detail-section-frame"
       )}>
         {children}
@@ -175,14 +177,23 @@ export function DetailSection({ title, description, children, className, noBorde
 
 /**
  * DetailGrid - Responsive grid for key-value pairs (Style B)
+ * Always uses 3 columns on desktop for better space utilization
+ * Use columns={1} for single-column content like URLs
  */
 export function DetailGrid({ children, columns = 2, className }) {
   const { isMobile } = useMobile()
   
+  // 1 column = single column, anything else = 3 columns on desktop
+  const gridClasses = isMobile 
+    ? "grid-cols-1" 
+    : columns === 1 
+      ? "grid-cols-1"
+      : "grid-cols-3"
+  
   return (
     <dl className={cn(
-      "grid gap-3",
-      isMobile ? "grid-cols-1" : columns === 2 ? "grid-cols-2" : columns === 3 ? "grid-cols-3" : "grid-cols-1",
+      "grid gap-1.5",
+      gridClasses,
       className
     )}>
       {children}
@@ -193,6 +204,7 @@ export function DetailGrid({ children, columns = 2, className }) {
 /**
  * DetailField - Single field in DetailGrid with subtle frame
  * Theme-aware styling
+ * @param {boolean} compact - Use compact layout with less padding
  */
 export function DetailField({ 
   label, 
@@ -200,6 +212,7 @@ export function DetailField({
   mono = false, 
   copyable = false,
   fullWidth = false,
+  compact = false,
   className 
 }) {
   const [copied, setCopied] = useState(false)
@@ -215,16 +228,20 @@ export function DetailField({
   
   return (
     <div className={cn(
-      "rounded-md p-3 detail-field-frame",
+      "rounded-md detail-field-frame",
+      compact ? "p-1.5" : "p-2",
       fullWidth && "col-span-full",
       className
     )}>
-      <dt className="text-[10px] md:text-xs text-text-tertiary uppercase tracking-wide mb-1">{label}</dt>
+      <dt className={cn(
+        "text-text-tertiary uppercase tracking-wide",
+        compact ? "text-[9px] mb-0.5" : "text-[10px] mb-0.5"
+      )}>{label}</dt>
       <dd 
         className={cn(
           mono 
-            ? "font-mono text-xs text-text-primary break-all" 
-            : "text-sm text-text-primary font-medium",
+            ? cn("font-mono text-text-primary break-all", compact ? "text-[11px]" : "text-xs")
+            : cn("text-text-primary font-medium", compact ? "text-xs" : "text-sm"),
           copyable && "cursor-pointer hover:text-accent-primary transition-colors flex items-center gap-2"
         )}
         onClick={copyable ? handleCopy : undefined}
@@ -251,16 +268,18 @@ export function DetailDivider({ className }) {
 /**
  * DetailContent - Main content wrapper with proper spacing
  */
-export function DetailContent({ children, className }) {
+export function DetailContent({ children, className, fullWidth = true }) {
   const { isMobile } = useMobile()
   
   return (
     <div className={cn(
       "flex-1 overflow-auto",
-      isMobile ? "p-4" : "p-6",
+      isMobile ? "p-4" : "p-4",
       className
     )}>
-      {children}
+      <div className={cn(!fullWidth && "max-w-5xl")}>
+        {children}
+      </div>
     </div>
   )
 }

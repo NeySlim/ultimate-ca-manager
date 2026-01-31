@@ -439,7 +439,7 @@ export default function ImportExportPage() {
       focusActions={null}
       focusFooter={null}
       helpContent={helpContent}
-      helpTitle="Import & Export - Aide"
+      
     >
       <DetailContent>
         {/* Import Certificate */}
@@ -497,7 +497,7 @@ export default function ImportExportPage() {
             </DetailSection>
             
             <DetailSection title="Options">
-              <DetailGrid columns={2}>
+              <DetailGrid>
                 <div className="col-span-full md:col-span-1">
                   <Input 
                     label="Display Name (optional)" 
@@ -585,7 +585,7 @@ export default function ImportExportPage() {
             </DetailSection>
             
             <DetailSection title="Options">
-              <DetailGrid columns={2}>
+              <DetailGrid>
                 <div className="col-span-full md:col-span-1">
                   <Input 
                     label="Display Name (optional)" 
@@ -619,7 +619,7 @@ export default function ImportExportPage() {
             />
             
             <DetailSection title="Available Formats">
-              <DetailGrid columns={3}>
+              <DetailGrid>
                 <DetailField label="PEM" value="Base64 encoded, widely compatible" />
                 <DetailField label="DER" value="Binary format, compact" />
                 <DetailField label="PKCS#12" value="Includes private keys (password protected)" />
@@ -646,7 +646,7 @@ export default function ImportExportPage() {
             />
             
             <DetailSection title="Available Formats">
-              <DetailGrid columns={2}>
+              <DetailGrid>
                 <DetailField label="PEM" value="Base64 encoded, widely compatible" />
                 <DetailField label="DER" value="Binary format, compact" />
               </DetailGrid>
@@ -678,7 +678,7 @@ export default function ImportExportPage() {
             />
             
             <DetailSection title="Connection Settings">
-              <DetailGrid columns={2}>
+              <DetailGrid>
                 <div className="col-span-full md:col-span-1">
                   <Input label="OpnSense Host" value={opnsenseHost} 
                     onChange={(e) => setOpnsenseHost(e.target.value)} 
@@ -693,7 +693,7 @@ export default function ImportExportPage() {
             </DetailSection>
             
             <DetailSection title="API Credentials">
-              <DetailGrid columns={2}>
+              <DetailGrid>
                 <div className="col-span-full md:col-span-1">
                   <Input label="API Key" value={opnsenseApiKey} 
                     onChange={(e) => setOpnsenseApiKey(e.target.value)} 

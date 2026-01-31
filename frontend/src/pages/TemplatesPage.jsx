@@ -350,7 +350,7 @@ export default function TemplatesPage() {
         focusActions={focusActions}
         focusFooter={`${filteredTemplates.length} template(s)`}
         helpContent={helpContent}
-        helpTitle="Templates - Aide"
+        
       >
         {/* Main Content - Template Details */}
         {!selectedTemplate ? (
@@ -442,7 +442,7 @@ export default function TemplatesPage() {
                     />
                   </div>
                 ) : (
-                  <DetailGrid columns={2}>
+                  <DetailGrid>
                     <DetailField label="Template Name" value={formData.name} />
                     <DetailField label="Type" value={formData.type === 'ca' ? 'Certificate Authority' : 'Certificate'} />
                     <DetailField label="Description" value={formData.description} fullWidth />
@@ -453,7 +453,7 @@ export default function TemplatesPage() {
               {/* Validity Period */}
               <DetailSection title="Validity Period">
                 {editing ? (
-                  <DetailGrid columns={2}>
+                  <DetailGrid>
                     <Input
                       label="Default Validity (days)"
                       type="number"
@@ -468,7 +468,7 @@ export default function TemplatesPage() {
                     />
                   </DetailGrid>
                 ) : (
-                  <DetailGrid columns={2}>
+                  <DetailGrid>
                     <DetailField label="Default Validity" value={`${formData.validity_days || 365} days`} />
                     <DetailField label="Max Validity" value={`${formData.max_validity_days || 3650} days`} />
                   </DetailGrid>
@@ -478,7 +478,7 @@ export default function TemplatesPage() {
               {/* Subject Template */}
               <DetailSection title="Subject Template">
                 {editing ? (
-                  <DetailGrid columns={2}>
+                  <DetailGrid>
                     <Input
                       label="Country (C)"
                       value={formData.subject?.C || ''}
@@ -505,7 +505,7 @@ export default function TemplatesPage() {
                     />
                   </DetailGrid>
                 ) : (
-                  <DetailGrid columns={2}>
+                  <DetailGrid>
                     <DetailField label="Country (C)" value={formData.subject?.C} />
                     <DetailField label="State (ST)" value={formData.subject?.ST} />
                     <DetailField label="Organization (O)" value={formData.subject?.O} />
@@ -516,7 +516,7 @@ export default function TemplatesPage() {
 
               {/* Usage Summary */}
               <DetailSection title="Usage Summary">
-                <DetailGrid columns={2}>
+                <DetailGrid>
                   <DetailField 
                     label="Key Usage"
                     value={formData.key_usage?.length > 0 ? formData.key_usage.join(', ') : 'None'}

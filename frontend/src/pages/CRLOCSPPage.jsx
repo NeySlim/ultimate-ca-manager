@@ -231,7 +231,7 @@ export default function CRLOCSPPage() {
       focusContent={focusContent}
       focusFooter={`${cas.length} CA(s)`}
       helpContent={helpContent}
-      helpTitle="CRL & OCSP - Aide"
+      
     >
       {/* Main Content */}
       {!selectedCA ? (
@@ -278,7 +278,7 @@ export default function CRLOCSPPage() {
 
           {/* CRL Configuration Section */}
           <DetailSection title="CRL Configuration">
-            <DetailGrid columns={2}>
+            <DetailGrid>
               <DetailField label="CA Name" value={selectedCA.descr} />
               <DetailField 
                 label="Status" 
@@ -303,7 +303,7 @@ export default function CRLOCSPPage() {
 
           {/* OCSP Configuration Section */}
           <DetailSection title="OCSP Configuration">
-            <DetailGrid columns={2}>
+            <DetailGrid>
               <DetailField 
                 label="OCSP Status" 
                 value={
