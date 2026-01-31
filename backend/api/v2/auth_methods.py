@@ -170,6 +170,7 @@ def login_password():
         action='login_success',
         resource_type='user',
         resource_id=user.id,
+        resource_name=username,
         details=f'Password login successful for {username}',
         success=True,
         username=username
@@ -386,6 +387,7 @@ def webauthn_verify():
             action='login_success',
             resource_type='user',
             resource_id=user.id,
+            resource_name=username,
             details=f'WebAuthn login successful for {username}',
             success=True,
             username=username

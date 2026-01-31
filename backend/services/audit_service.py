@@ -32,6 +32,7 @@ class AuditService:
         action: str,
         resource_type: Optional[str] = None,
         resource_id: Optional[str] = None,
+        resource_name: Optional[str] = None,
         details: Optional[str] = None,
         success: bool = True,
         username: Optional[str] = None,
@@ -44,6 +45,7 @@ class AuditService:
             action: Action type (e.g., 'login_success', 'cert_issue')
             resource_type: Type of resource (e.g., 'certificate', 'user')
             resource_id: ID of affected resource
+            resource_name: Human-readable name (e.g., cert CN, user name, CA name)
             details: Human-readable description
             success: Whether action succeeded
             username: Username (auto-detected if not provided)
@@ -75,6 +77,7 @@ class AuditService:
                 action=action,
                 resource_type=resource_type,
                 resource_id=str(resource_id) if resource_id else None,
+                resource_name=resource_name,
                 details=details,
                 ip_address=ip_address,
                 user_agent=user_agent,
