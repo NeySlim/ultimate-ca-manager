@@ -14,6 +14,15 @@ from cryptography.x509.oid import ExtensionOID
 from models import db, CA, Certificate, AuditLog
 from models.crl import CRLMetadata
 
+# Import key decryption (optional - fallback if not available)
+try:
+    from security.encryption import decrypt_private_key
+    HAS_ENCRYPTION = True
+except ImportError:
+    HAS_ENCRYPTION = False
+    def decrypt_private_key(data):
+        return data
+
 
 class CRLService:
     """Service for CRL generation and management"""
@@ -71,8 +80,9 @@ class CRLService:
         ca_cert_pem = base64.b64decode(ca.crt).decode('utf-8')
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem.encode(), default_backend())
         
-        # Load CA private key
-        ca_key_pem = base64.b64decode(ca.prv).decode('utf-8')
+        # Load CA private key (decrypt if encrypted)
+        ca_prv_decrypted = decrypt_private_key(ca.prv)
+        ca_key_pem = base64.b64decode(ca_prv_decrypted).decode('utf-8')
         ca_private_key = serialization.load_pem_private_key(
             ca_key_pem.encode(),
             password=None,

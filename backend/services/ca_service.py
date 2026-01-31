@@ -16,6 +16,17 @@ from models import db, CA, Certificate, AuditLog
 from services.trust_store import TrustStoreService
 from config.settings import Config
 
+# Import key encryption (optional - fallback if not available)
+try:
+    from security.encryption import decrypt_private_key, encrypt_private_key
+    HAS_ENCRYPTION = True
+except ImportError:
+    HAS_ENCRYPTION = False
+    def decrypt_private_key(data):
+        return data
+    def encrypt_private_key(data):
+        return data
+
 
 class CAService:
     """Service for Certificate Authority operations"""
@@ -68,10 +79,11 @@ class CAService:
             )
             issuer = parent_cert.subject
             
-            # Load parent CA private key
+            # Load parent CA private key (decrypt if encrypted)
             if not parent_ca.prv:
                 raise ValueError("Parent CA has no private key")
-            parent_key_pem = base64.b64decode(parent_ca.prv)
+            parent_prv_decrypted = decrypt_private_key(parent_ca.prv)
+            parent_key_pem = base64.b64decode(parent_prv_decrypted)
             issuer_private_key = serialization.load_pem_private_key(
                 parent_key_pem, password=None, backend=default_backend()
             )
@@ -93,12 +105,21 @@ class CAService:
         # Parse certificate for details
         cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
         
+        # Encrypt private key if encryption is enabled
+        prv_encoded = base64.b64encode(key_pem).decode('utf-8')
+        try:
+            from security.encryption import key_encryption
+            if key_encryption.is_enabled:
+                prv_encoded = key_encryption.encrypt(prv_encoded)
+        except ImportError:
+            pass  # Security module not available
+        
         # Create CA record
         ca = CA(
             refid=str(uuid.uuid4()),
             descr=descr,
             crt=base64.b64encode(cert_pem).decode('utf-8'),
-            prv=base64.b64encode(key_pem).decode('utf-8'),
+            prv=prv_encoded,
             serial=0,
             caref=caref,
             subject=cert.subject.rfc4514_string(),
@@ -377,7 +398,9 @@ class CAService:
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
         
-        ca_key_pem = base64.b64decode(ca.prv)
+        # Decrypt CA private key if encrypted
+        ca_prv_decrypted = decrypt_private_key(ca.prv)
+        ca_key_pem = base64.b64decode(ca_prv_decrypted)
         ca_private_key = serialization.load_pem_private_key(
             ca_key_pem, password=None, backend=default_backend()
         )
@@ -438,7 +461,9 @@ class CAService:
             if not ca.prv:
                 raise ValueError("CA has no private key")
             
-            key_pem = base64.b64decode(ca.prv)
+            # Decrypt private key if encrypted
+            prv_decrypted = decrypt_private_key(ca.prv)
+            key_pem = base64.b64decode(prv_decrypted)
             return TrustStoreService.export_pkcs12(
                 cert_pem, key_pem, password, ca.descr
             )
@@ -451,7 +476,9 @@ class CAService:
             result = cert_pem
             
             if include_key and ca.prv:
-                key_pem = base64.b64decode(ca.prv)
+                # Decrypt private key if encrypted
+                prv_decrypted = decrypt_private_key(ca.prv)
+                key_pem = base64.b64decode(prv_decrypted)
                 result += b'\n' + key_pem
             
             if include_chain:
