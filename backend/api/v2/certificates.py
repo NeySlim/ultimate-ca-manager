@@ -404,6 +404,7 @@ def delete_certificate(cert_id):
         action='certificate_deleted',
         resource_type='certificate',
         resource_id=cert_id,
+        resource_name=cert_name,
         details=f'Deleted certificate: {cert_name}',
         success=True
     )
@@ -863,6 +864,7 @@ def import_certificate():
                     action='ca_updated',
                     resource_type='ca',
                     resource_id=existing_ca.id,
+                    resource_name=existing_ca.descr,
                     details=f'Updated CA via import: {existing_ca.descr}',
                     success=True
                 )
@@ -895,6 +897,7 @@ def import_certificate():
                 action='ca_imported',
                 resource_type='ca',
                 resource_id=ca.id,
+                resource_name=ca.descr,
                 details=f'Imported CA (auto-detected): {ca.descr}',
                 success=True
             )
@@ -935,6 +938,7 @@ def import_certificate():
                 action='certificate_updated',
                 resource_type='certificate',
                 resource_id=existing_cert.id,
+                resource_name=existing_cert.descr,
                 details=f'Updated certificate via import: {existing_cert.descr}',
                 success=True
             )
@@ -979,6 +983,7 @@ def import_certificate():
             action='certificate_imported',
             resource_type='certificate',
             resource_id=certificate.id,
+            resource_name=certificate.descr,
             details=f'Imported certificate: {certificate.descr}',
             success=True
         )

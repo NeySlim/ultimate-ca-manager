@@ -405,6 +405,7 @@ def import_ca():
                 action='ca_updated',
                 resource_type='ca',
                 resource_id=existing_ca.id,
+                resource_name=existing_ca.descr,
                 details=f'Updated CA via import: {existing_ca.descr}',
                 success=True
             )
@@ -437,6 +438,7 @@ def import_ca():
             action='ca_imported',
             resource_type='ca',
             resource_id=ca.id,
+            resource_name=ca.descr,
             details=f'Imported CA: {ca.descr}',
             success=True
         )
@@ -563,6 +565,7 @@ def update_ca(ca_id):
             action='ca_updated',
             resource_type='ca',
             resource_id=ca_id,
+            resource_name=ca.descr,
             details=f'CA {ca.descr} settings updated',
             success=True
         )
@@ -595,6 +598,7 @@ def delete_ca(ca_id):
         action='ca_deleted',
         resource_type='ca',
         resource_id=ca_id,
+        resource_name=ca_name,
         details=f'Deleted CA: {ca_name}',
         success=True
     )

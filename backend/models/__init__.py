@@ -648,6 +648,7 @@ class AuditLog(db.Model):
     action = db.Column(db.String(100), nullable=False)  # create_ca, revoke_cert, etc.
     resource_type = db.Column(db.String(50))  # ca, certificate, user, etc.
     resource_id = db.Column(db.String(100))
+    resource_name = db.Column(db.String(255))  # Human-readable name (cert CN, user name, CA name)
     details = db.Column(db.Text)
     ip_address = db.Column(db.String(45))
     user_agent = db.Column(db.String(255))
@@ -662,6 +663,7 @@ class AuditLog(db.Model):
             "action": self.action,
             "resource_type": self.resource_type,
             "resource_id": self.resource_id,
+            "resource_name": self.resource_name,
             "details": self.details,
             "ip_address": self.ip_address,
             "user_agent": self.user_agent,

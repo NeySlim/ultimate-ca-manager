@@ -203,6 +203,7 @@ def import_csr():
             action='csr_imported',
             resource_type='csr',
             resource_id=cert.id,
+            resource_name=cert.descr,
             details=f'Imported CSR: {cert.descr}',
             success=True
         )
