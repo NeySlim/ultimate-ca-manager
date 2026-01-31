@@ -368,17 +368,17 @@ export function DataTable({
     default: {
       header: 'bg-bg-secondary',
       row: 'hover:bg-bg-tertiary/50',
-      cell: 'py-3 px-4',
+      cell: 'py-2 px-3 text-sm',
     },
     compact: {
       header: 'bg-bg-secondary',
       row: 'hover:bg-bg-tertiary/50',
-      cell: 'py-2 px-3 text-sm',
+      cell: 'py-1.5 px-3 text-sm',
     },
     striped: {
       header: 'bg-bg-secondary',
       row: 'even:bg-bg-tertiary/30 hover:bg-bg-tertiary/50',
-      cell: 'py-3 px-4',
+      cell: 'py-2 px-3 text-sm',
     }
   }
   
@@ -1070,8 +1070,8 @@ export function SimpleTable({
   variant = 'default'
 }) {
   const styles = {
-    default: { cell: 'py-3 px-4' },
-    compact: { cell: 'py-2 px-3 text-sm' },
+    default: { cell: 'py-2 px-3 text-sm' },
+    compact: { cell: 'py-1.5 px-3 text-sm' },
   }
   
   return (

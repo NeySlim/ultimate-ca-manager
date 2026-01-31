@@ -214,7 +214,7 @@ export function CertificateDetails({
   const sourceBadge = sourceConfig[cert.source] || null
   
   return (
-    <div className={cn("space-y-4", compact && "space-y-3")}>
+    <div className={cn("space-y-4 p-4", compact && "space-y-3 p-3")}>
       {/* Header */}
       <div className="flex items-start gap-3">
         <div className={cn(
@@ -359,36 +359,36 @@ export function CertificateDetails({
               {cert.pem}
             </pre>
             {!showFullPem && cert.pem.length > 500 && (
-              <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-bg-primary to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-bg-primary to-transparent pointer-events-none" />
             )}
-            <div className="flex gap-2 mt-2">
-              <Button 
-                type="button"
-                size="sm" 
-                variant="ghost" 
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setShowFullPem(!showFullPem)
-                }}
-              >
-                {showFullPem ? 'Show Less' : 'Show Full'}
-              </Button>
-              <Button 
-                type="button"
-                size="sm" 
-                variant="ghost"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  copyToClipboard(cert.pem, () => {
-                    setPemCopied(true)
-                    setTimeout(() => setPemCopied(false), 2000)
-                  })
-                }}
-              >
-                {pemCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
-                {pemCopied ? 'Copied!' : 'Copy PEM'}
-              </Button>
-            </div>
+          </div>
+          <div className="flex gap-2 mt-2">
+            <Button 
+              type="button"
+              size="sm" 
+              variant="ghost" 
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowFullPem(!showFullPem)
+              }}
+            >
+              {showFullPem ? 'Show Less' : 'Show Full'}
+            </Button>
+            <Button 
+              type="button"
+              size="sm" 
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation()
+                copyToClipboard(cert.pem, () => {
+                  setPemCopied(true)
+                  setTimeout(() => setPemCopied(false), 2000)
+                })
+              }}
+            >
+              {pemCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
+              {pemCopied ? 'Copied!' : 'Copy PEM'}
+            </Button>
           </div>
         </Section>
       )}
