@@ -141,9 +141,88 @@ curl -X PATCH https://localhost:8443/api/v2/acme/settings \
 - Refresh possible via `/api/v2/auth/refresh`
 - Logout invalide le token: `/api/v2/auth/logout`
 
+### CSRF Protection (v2.0.0)
+- Token CSRF retourné sur login/verify
+- Header requis: `X-CSRF-Token` pour POST/PUT/DELETE/PATCH
+- Stocké dans sessionStorage côté client
+
+### Password Policy (v2.0.0)
+- Minimum 8 caractères
+- Requiert: majuscule, minuscule, chiffre, caractère spécial
+- Blacklist de mots de passe courants
+- API: `GET /api/v2/users/password-policy`
+
+### Rate Limiting (v2.0.0)
+- Auth endpoints: 10 req/min
+- Heavy operations: 30 req/min
+- Standard endpoints: 120 req/min
+- Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`
+
+### Private Key Encryption (v2.0.0)
+- Chiffrement Fernet (AES-256-CBC + HMAC-SHA256)
+- Variable: `KEY_ENCRYPTION_KEY` dans `/etc/ucm/ucm.env`
+- Migration: `POST /api/v2/system/security/encrypt-all-keys`
+
 ### Permissions
 - Contrôle d'accès basé sur les rôles utilisateurs
 - Certains endpoints nécessitent des permissions admin
+
+## 🆕 Nouveaux Endpoints Sécurité (v2.0.0)
+
+### Audit Log Retention
+```bash
+# Obtenir config/stats retention
+GET /api/v2/system/audit/retention
+
+# Modifier retention (jours)
+PUT /api/v2/system/audit/retention
+{"retention_days": 90, "auto_cleanup": true}
+
+# Déclencher cleanup manuel
+POST /api/v2/system/audit/cleanup
+```
+
+### Certificate Expiry Alerts
+```bash
+# Obtenir config alertes
+GET /api/v2/system/alerts/expiry
+
+# Modifier alertes
+PUT /api/v2/system/alerts/expiry
+{"enabled": true, "alert_days": [30, 14, 7, 1]}
+
+# Lister certificats expirants
+GET /api/v2/system/alerts/expiring-certs?days=30
+
+# Déclencher vérification manuelle
+POST /api/v2/system/alerts/expiry/check
+```
+
+### Rate Limiting Config
+```bash
+# Obtenir config et stats
+GET /api/v2/system/security/rate-limit
+
+# Modifier config
+PUT /api/v2/system/security/rate-limit
+{"enabled": true, "whitelist_add": ["192.168.1.1"]}
+
+# Reset compteurs
+POST /api/v2/system/security/rate-limit/reset
+```
+
+### Encryption Management
+```bash
+# Statut chiffrement
+GET /api/v2/system/security/encryption-status
+
+# Générer nouvelle clé
+GET /api/v2/system/security/generate-key
+
+# Chiffrer toutes les clés existantes
+POST /api/v2/system/security/encrypt-all-keys
+{"dry_run": false}
+```
 
 ## 📖 Documentation détaillée par module
 
