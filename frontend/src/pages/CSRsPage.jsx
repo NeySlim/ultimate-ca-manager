@@ -9,7 +9,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   TablePageLayout, Badge, Button, Modal, Input, Select, HelpCard, FileUpload,
-  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
+  CSRDetails
 } from '../components'
 import { csrsService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -327,75 +327,14 @@ export default function CSRsPage() {
         size="lg"
       >
         {selectedCSR && (
-          <div className="p-4 space-y-4">
-            {/* Header */}
-            <CompactHeader
-              icon={FileText}
-              iconClass={selectedCSR.status === 'signed' ? "bg-status-success/20" : selectedCSR.status === 'rejected' ? "bg-status-error/20" : "bg-status-warning/20"}
-              title={selectedCSR.cn || selectedCSR.common_name || 'Unnamed CSR'}
-              subtitle={selectedCSR.subject}
-              badge={
-                <Badge variant={selectedCSR.status === 'signed' ? 'success' : selectedCSR.status === 'rejected' ? 'danger' : 'warning'} size="sm">
-                  {selectedCSR.status || 'pending'}
-                </Badge>
-              }
-            />
-
-            {/* Stats */}
-            <CompactStats stats={[
-              { icon: Clock, value: formatDate(selectedCSR.created_at, 'short') || 'N/A' },
-              { icon: Key, value: `${selectedCSR.key_algorithm || 'RSA'} ${selectedCSR.key_size || ''}` },
-            ]} />
-
-            {/* Actions */}
-            <div className="flex flex-wrap gap-2">
-              {canWrite('csrs') && (!selectedCSR.status || selectedCSR.status === 'pending') && (
-                <Button size="sm" variant="primary" onClick={() => openModal('sign')}>
-                  <SignIn size={14} /> Sign CSR
-                </Button>
-              )}
-              <Button size="sm" variant="secondary" onClick={() => handleDownload(selectedCSR.id)}>
-                <Download size={14} /> Download
-              </Button>
-              {canDelete('csrs') && (
-                <Button size="sm" variant="danger" onClick={() => handleDelete(selectedCSR.id)}>
-                  <Trash size={14} />
-                </Button>
-              )}
-            </div>
-
-            {/* Subject */}
-            <CompactSection title="Subject Information">
-              <CompactGrid>
-                <CompactField label="CN" value={selectedCSR.common_name} />
-                <CompactField label="O" value={selectedCSR.organization} />
-                <CompactField label="C" value={selectedCSR.country} />
-                <CompactField label="ST" value={selectedCSR.state} />
-                <CompactField label="L" value={selectedCSR.locality} />
-                <CompactField label="Email" value={selectedCSR.email} />
-              </CompactGrid>
-            </CompactSection>
-
-            {/* Key Info */}
-            <CompactSection title="Key Information">
-              <CompactGrid>
-                <CompactField label="Algorithm" value={selectedCSR.key_algorithm} />
-                <CompactField label="Size" value={selectedCSR.key_size ? `${selectedCSR.key_size} bits` : null} />
-                <CompactField label="Signature" value={selectedCSR.signature_algorithm} className="col-span-2" />
-              </CompactGrid>
-            </CompactSection>
-
-            {/* SANs */}
-            {selectedCSR.san && selectedCSR.san.length > 0 && (
-              <CompactSection title="Subject Alternative Names">
-                <div className="flex flex-wrap gap-1">
-                  {selectedCSR.san.map((name, i) => (
-                    <Badge key={i} variant="secondary" size="sm">{name}</Badge>
-                  ))}
-                </div>
-              </CompactSection>
-            )}
-          </div>
+          <CSRDetails
+            csr={selectedCSR}
+            onSign={() => openModal('sign')}
+            onDownload={() => handleDownload(selectedCSR.id)}
+            onDelete={() => handleDelete(selectedCSR.id)}
+            canWrite={canWrite('csrs')}
+            canDelete={canDelete('csrs')}
+          />
         )}
       </Modal>
 
