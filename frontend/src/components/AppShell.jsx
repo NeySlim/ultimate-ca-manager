@@ -41,7 +41,7 @@ const proNavItems = [
 export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { currentTheme, setCurrentTheme, themes } = useTheme()
+  const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
@@ -138,22 +138,47 @@ export function AppShell() {
             className="fixed inset-0 z-40"
             onClick={() => setThemeMenuOpen(false)}
           />
-          <div className="fixed top-12 right-12 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl p-2 min-w-[140px]">
-            {Object.values(themes).map((theme) => (
+          <div className="fixed top-12 right-3 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl p-2 min-w-[180px] max-h-[70vh] overflow-auto">
+            {/* Color Themes */}
+            <div className="px-2 py-1 text-[10px] text-text-tertiary uppercase tracking-wider">Color</div>
+            {themes.map((theme) => (
               <button
                 key={theme.id}
-                onClick={() => { setCurrentTheme(theme.id); setThemeMenuOpen(false) }}
+                onClick={() => { setThemeFamily(theme.id); setThemeMenuOpen(false) }}
                 className={cn(
                   "w-full px-3 py-2 text-left text-sm rounded flex items-center gap-2",
                   "hover:bg-bg-tertiary transition-colors",
-                  currentTheme === theme.id && "text-accent-primary bg-accent-primary/10"
+                  themeFamily === theme.id && "text-accent-primary bg-accent-primary/10"
                 )}
               >
                 <div 
                   className="w-3 h-3 rounded-full border border-border"
-                  style={{ background: theme.colors?.['accent-primary'] || '#888' }}
+                  style={{ background: theme.accent }}
                 />
                 {theme.name}
+              </button>
+            ))}
+            
+            {/* Separator */}
+            <div className="h-px bg-border my-2" />
+            
+            {/* Mode */}
+            <div className="px-2 py-1 text-[10px] text-text-tertiary uppercase tracking-wider">Appearance</div>
+            {[
+              { id: 'system', label: 'Follow System' },
+              { id: 'dark', label: 'Dark' },
+              { id: 'light', label: 'Light' }
+            ].map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => { setMode(opt.id); setThemeMenuOpen(false) }}
+                className={cn(
+                  "w-full px-3 py-2 text-left text-sm rounded",
+                  "hover:bg-bg-tertiary transition-colors",
+                  mode === opt.id && "text-accent-primary bg-accent-primary/10"
+                )}
+              >
+                {opt.label}
               </button>
             ))}
           </div>
