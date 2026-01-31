@@ -31,7 +31,8 @@
 - **HTTPS Only** - All traffic encrypted by default
 
 ### 🎨 Modern Interface
-- **7 Beautiful Themes** - Dark Gray, Light, Blue Ocean, Purple Night, Green Forest, Orange Sunset, Cyber Pink
+- **12 Theme Variants** - 6 color themes (Gray, Ocean, Purple, Forest, Sunset, Cyber) × Light/Dark modes
+- **Auto Dark Mode** - "Follow System" automatically switches based on OS preference
 - **React 18 + Radix UI** - Modern, accessible component library
 - **Split-View Layout** - Sidebar, explorer panel, details panel
 - **Responsive Design** - Mobile-first with adaptive layouts
@@ -77,7 +78,7 @@ See all features in action: **[View Full Gallery](docs/SCREENSHOTS.md)**
 </td>
 <td width="50%">
 <img src="docs/screenshots/blossom-dark.png" alt="Themes">
-<b>Beautiful Themes</b> - 8 professional themes
+<b>12 Theme Variants</b> - 6 colors × Light/Dark
 </td>
 </tr>
 </table>
