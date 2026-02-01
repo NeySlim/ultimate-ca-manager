@@ -436,6 +436,47 @@ tr.row-selected td:first-child {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
+/* ============================================
+   TABLE ROW HOVER (theme-aware)
+   ============================================ */
+.table-row-hover {
+  transition: background-color 0.15s ease-out;
+}
+.table-row-hover:hover {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 70%, transparent);
+}
+
+/* Mobile card hover */
+.mobile-card-hover {
+  transition: background-color 0.15s ease-out, transform 0.15s ease-out;
+}
+.mobile-card-hover:hover {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
+}
+.mobile-card-hover:active {
+  transform: scale(0.99);
+  background-color: var(--bg-tertiary);
+}
+
+/* Generic hover backgrounds with transparency (workaround for CSS variable + opacity) */
+.hover\:bg-bg-tertiary\/50:hover {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent) !important;
+}
+.hover\:bg-bg-tertiary\/60:hover {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 60%, transparent) !important;
+}
+.hover\:bg-bg-tertiary\/70:hover {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 70%, transparent) !important;
+}
+.hover\:bg-bg-tertiary\/80:hover {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 80%, transparent) !important;
+}
+
+/* Solid hover background */
+.hover\:bg-bg-tertiary:hover {
+  background-color: var(--bg-tertiary) !important;
+}
+
 /* Smooth transitions for all interactive elements */
 button, a, input, select, textarea {
   transition: all 0.15s ease-out;

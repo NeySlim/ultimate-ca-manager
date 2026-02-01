@@ -389,10 +389,8 @@ function DesktopTable({
                 key={row.id || idx}
                 onClick={() => onRowClick?.(row)}
                 className={cn(
-                  'group transition-all duration-150',
+                  'group transition-all duration-150 table-row-hover',
                   onRowClick && 'cursor-pointer',
-                  // Hover effect - uses theme color
-                  'hover:bg-bg-tertiary/70 hover:shadow-sm',
                   // Selected state - uses theme-aware CSS class
                   selectedId === row.id && 'row-selected'
                 )}>

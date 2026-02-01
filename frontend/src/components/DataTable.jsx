@@ -367,17 +367,17 @@ export function DataTable({
   const variantStyles = {
     default: {
       header: 'bg-bg-secondary',
-      row: 'hover:bg-bg-tertiary/50',
+      row: 'table-row-hover',
       cell: 'py-2 px-3 text-sm',
     },
     compact: {
       header: 'bg-bg-secondary',
-      row: 'hover:bg-bg-tertiary/50',
+      row: 'table-row-hover',
       cell: 'py-1.5 px-3 text-sm',
     },
     striped: {
       header: 'bg-bg-secondary',
-      row: 'even:bg-bg-tertiary/30 hover:bg-bg-tertiary/50',
+      row: 'even:bg-bg-tertiary/30 table-row-hover',
       cell: 'py-2 px-3 text-sm',
     }
   }
