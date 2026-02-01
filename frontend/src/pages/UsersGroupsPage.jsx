@@ -524,6 +524,9 @@ export default function UsersGroupsPage() {
         subtitle={`${currentData.length} ${activeTab}`}
         icon={activeTab === 'users' ? User : Users}
         stats={stats}
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
         helpContent={helpContent}
         helpTitle="User Management"
         splitView={true}
@@ -544,26 +547,6 @@ export default function UsersGroupsPage() {
         onSlideOverClose={() => { setSelectedUser(null); setSelectedGroup(null) }}
       >
         <div className="flex flex-col h-full min-h-0">
-          {/* Tabs */}
-          <div className="shrink-0 flex gap-1 mb-3 p-1 bg-bg-tertiary rounded-lg w-fit">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                  activeTab === tab.id
-                    ? "bg-bg-primary text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                )}
-              >
-                <tab.icon size={16} />
-                {tab.label}
-                <span className="text-xs opacity-60">({tab.count})</span>
-              </button>
-            ))}
-          </div>
-
           <ResponsiveDataTable
           data={currentData}
           columns={currentColumns}
@@ -706,7 +689,7 @@ function UserForm({ user, onSubmit, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
         label="Username"
         value={formData.username}
@@ -747,7 +730,7 @@ function UserForm({ user, onSubmit, onCancel }) {
           { value: 'viewer', label: 'Viewer' }
         ]}
       />
-      <div className="flex justify-end gap-3 pt-4">
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
@@ -793,7 +776,7 @@ function GroupForm({ group, onSubmit, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
         label="Group Name"
         value={formData.name}
@@ -807,7 +790,7 @@ function GroupForm({ group, onSubmit, onCancel }) {
         onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
         placeholder="Development team"
       />
-      <div className="flex justify-end gap-3 pt-4">
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
