@@ -7,14 +7,20 @@ import { cn } from '../lib/utils'
  * - sm: Content headers, inline actions, compact UI (default for most actions)
  * - default: Forms, modals, primary actions
  * - lg: Hero sections, prominent CTAs
+ * 
+ * Enhanced with visual effects:
+ * - Layered shadows
+ * - Gradient shine on hover
+ * - Smooth micro-interactions
  */
 export function Button({ children, variant = 'primary', size = 'default', loading = false, className, ...props }) {
   const variants = {
-    primary: 'text-white shadow-lg shadow-accent-primary/25 hover:shadow-xl hover:shadow-accent-primary/35',
-    secondary: 'bg-gradient-to-r from-bg-tertiary to-bg-secondary hover:from-bg-secondary hover:to-border/80 text-text-primary border border-border/40 shadow-md shadow-black/10',
-    danger: 'text-white shadow-lg shadow-accent-danger/25 hover:shadow-xl hover:shadow-accent-danger/35',
-    ghost: 'hover:bg-bg-tertiary/80 text-text-primary hover:text-text-primary',
-    outline: 'border border-border/60 bg-transparent text-text-primary hover:bg-bg-tertiary/60 hover:border-border shadow-sm',
+    primary: 'btn-gradient text-white',
+    secondary: 'btn-soft text-text-primary',
+    danger: 'btn-gradient danger text-white',
+    success: 'btn-gradient success text-white',
+    ghost: 'hover:bg-bg-tertiary/80 text-text-primary hover:text-text-primary transition-colors',
+    outline: 'border border-border bg-transparent text-text-primary hover:bg-bg-tertiary/60 hover:border-border-strong transition-all',
   }
   
   // Standardized sizes - sm is the default for content actions
@@ -25,26 +31,20 @@ export function Button({ children, variant = 'primary', size = 'default', loadin
     lg: 'px-4 py-2.5 text-sm gap-2',        // Prominent actions
   }
   
-  const gradientStyle = variant === 'primary' 
-    ? { background: 'var(--gradient-accent)' }
-    : variant === 'danger'
-    ? { background: 'linear-gradient(135deg, var(--accent-danger), color-mix(in srgb, var(--accent-danger) 80%, black))' }
-    : {}
+  // For non-gradient variants, add focus ring
+  const needsFocusRing = !['primary', 'danger', 'success'].includes(variant)
   
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center rounded-md font-medium',
-        'transition-all duration-200 ease-out',
+        'inline-flex items-center justify-center rounded-lg font-medium',
         'disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none',
-        'focus:outline-none focus:ring-2 focus:ring-accent-primary/40 focus:ring-offset-1 focus:ring-offset-bg-primary',
-        'hover:scale-[1.02] hover:-translate-y-px active:scale-[0.98] active:translate-y-0',
+        needsFocusRing && 'focus-ring',
         variants[variant],
         sizes[size],
         loading && 'pointer-events-none opacity-70',
         className
       )}
-      style={gradientStyle}
       disabled={loading || props.disabled}
       {...props}
     >

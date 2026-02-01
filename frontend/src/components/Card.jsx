@@ -4,22 +4,21 @@ export function Card({
   children, 
   className, 
   hover = true, 
-  variant = 'default',  // default, elevated, bordered
+  interactive = false, // clickable card with lift effect
+  variant = 'default',  // default, elevated, bordered, soft
   accent,  // left border color: 'primary', 'success', 'warning', 'danger', 'info'
   ...props 
 }) {
   const variants = {
-    default: cn(
-      'bg-bg-secondary border border-border/60 rounded-xl',
-      'shadow-sm shadow-black/5 dark:shadow-black/20',
-    ),
+    default: 'card-soft',
     elevated: cn(
       'bg-bg-secondary border border-border/40 rounded-xl',
-      'shadow-lg shadow-black/10 dark:shadow-black/30',
+      'elevation-2',
     ),
     bordered: cn(
       'bg-bg-secondary/50 border-2 border-border rounded-xl',
     ),
+    soft: 'card-soft',
   }
   
   const accentColors = {
@@ -34,9 +33,7 @@ export function Card({
   return (
     <div
       className={cn(
-        variants[variant],
-        'transition-all duration-200 ease-out',
-        hover && 'hover:shadow-md hover:shadow-black/10 dark:hover:shadow-black/30 hover:border-border',
+        interactive ? 'card-interactive' : variants[variant],
         accent && `border-l-4 ${accentColors[accent]}`,
         className
       )}
@@ -54,7 +51,7 @@ Card.Header = function CardHeader({ children, className, icon: Icon, title, subt
       <div className={cn('flex items-start justify-between gap-3 p-4 pb-3', className)}>
         <div className="flex items-center gap-3">
           {Icon && (
-            <div className="w-10 h-10 rounded-xl bg-accent-primary/10 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl status-primary-bg flex items-center justify-center shrink-0">
               <Icon size={20} className="text-accent-primary" weight="duotone" />
             </div>
           )}
