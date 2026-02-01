@@ -497,33 +497,34 @@ function PageHeader({
         </div>
       </div>
       
-      {/* TABS ROW (if provided) - underline style, theme-aware */}
+      {/* TABS ROW (if provided) - Settings style: rounded-t, underline, theme-aware */}
       {tabs && tabs.length > 0 && (
         <div className={cn(
-          'flex overflow-x-auto scrollbar-none border-b border-border -mb-px',
-          isMobile ? 'mt-3 -mx-4 px-4 gap-0' : 'mt-3 gap-0'
+          'flex overflow-x-auto scrollbar-none gap-1',
+          isMobile ? 'mt-3 -mx-4 px-4' : 'mt-3'
         )}>
           {tabs.map((tab) => {
             const TabIcon = tab.icon
+            const isActive = activeTab === tab.id
             return (
               <button
                 key={tab.id}
                 onClick={() => onTabChange?.(tab.id)}
                 className={cn(
-                  'shrink-0 font-medium transition-all border-b-2 -mb-px',
+                  'shrink-0 font-medium transition-all rounded-t-lg border-b-2 -mb-px',
                   isMobile ? 'px-4 py-2.5 text-sm' : 'px-3 py-2 text-sm',
                   'flex items-center gap-2',
-                  activeTab === tab.id
-                    ? 'border-accent-primary text-accent-primary'
-                    : 'border-transparent text-text-secondary hover:text-text-primary hover:border-border'
+                  isActive
+                    ? 'border-accent-primary text-accent-primary bg-bg-primary'
+                    : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50'
                 )}
               >
-                {TabIcon && <TabIcon size={16} weight={activeTab === tab.id ? "fill" : "regular"} />}
+                {TabIcon && <TabIcon size={16} weight={isActive ? "fill" : "regular"} />}
                 {tab.label}
                 {tab.count !== undefined && (
                   <span className={cn(
                     'ml-1 px-1.5 py-0.5 rounded text-xs',
-                    activeTab === tab.id
+                    isActive
                       ? 'bg-accent-primary/15 text-accent-primary'
                       : 'bg-bg-tertiary text-text-secondary'
                   )}>

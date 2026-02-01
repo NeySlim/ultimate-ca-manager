@@ -1,17 +1,18 @@
 /**
  * Trust Store Management Page
  * Manage trusted CA certificates for chain validation
+ * Uses ResponsiveLayout for unified UI
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   ShieldCheck, Plus, Trash, Download, Certificate, Clock,
-  MagnifyingGlass, Info
+  CheckCircle, Warning, PencilSimple
 } from '@phosphor-icons/react'
 import {
-  PageLayout, FocusItem, Button, Input, Card, Badge, 
-  Modal, Textarea, LoadingSpinner, EmptyState, HelpCard,
-  TrustCertDetails
+  Button, Input, Badge, Modal, Textarea, HelpCard,
+  CompactSection, CompactHeader, CompactField, CompactStats
 } from '../components'
+import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { truststoreService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
@@ -25,8 +26,6 @@ export default function TrustStorePage() {
   const [loading, setLoading] = useState(true)
   const [certificates, setCertificates] = useState([])
   const [selectedCert, setSelectedCert] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [purposeFilter, setPurposeFilter] = useState('all')
   
   // Add modal state
   const [addForm, setAddForm] = useState({
@@ -40,20 +39,14 @@ export default function TrustStorePage() {
 
   useEffect(() => {
     loadCertificates()
-  }, [searchQuery, purposeFilter])
+  }, [])
 
   const loadCertificates = async () => {
     setLoading(true)
     try {
-      const response = await truststoreService.getAll({
-        search: searchQuery || undefined,
-        purpose: purposeFilter !== 'all' ? purposeFilter : undefined
-      })
+      const response = await truststoreService.getAll()
       const certs = response.data || []
       setCertificates(certs)
-      if (certs.length > 0 && !selectedCert) {
-        setSelectedCert(certs[0])
-      }
     } catch (error) {
       showError(error.message || 'Failed to load trust store')
     } finally {
@@ -93,7 +86,7 @@ export default function TrustStorePage() {
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (cert) => {
     const confirmed = await showConfirm('Remove this certificate from the trust store?', {
       title: 'Remove Certificate',
       confirmText: 'Remove',
@@ -102,10 +95,10 @@ export default function TrustStorePage() {
     if (!confirmed) return
     
     try {
-      await truststoreService.delete(id)
+      await truststoreService.delete(cert.id)
       showSuccess('Certificate removed from trust store')
       loadCertificates()
-      if (selectedCert?.id === id) {
+      if (selectedCert?.id === cert.id) {
         setSelectedCert(null)
       }
     } catch (error) {
@@ -113,7 +106,7 @@ export default function TrustStorePage() {
     }
   }
 
-  const handleExport = async (cert) => {
+  const handleExport = (cert) => {
     if (!cert?.certificate_pem) return
     
     const blob = new Blob([cert.certificate_pem], { type: 'application/x-pem-file' })
@@ -125,222 +118,226 @@ export default function TrustStorePage() {
     URL.revokeObjectURL(url)
   }
 
-  const purposeOptions = [
-    { value: 'all', label: 'All Purposes' },
-    { value: 'root_ca', label: 'Root CA' },
-    { value: 'intermediate_ca', label: 'Intermediate CA' },
-    { value: 'client_auth', label: 'Client Auth' },
-    { value: 'code_signing', label: 'Code Signing' },
-    { value: 'system', label: 'System' },
-    { value: 'custom', label: 'Custom' },
+  // Stats
+  const stats = useMemo(() => {
+    const rootCAs = certificates.filter(c => c.purpose === 'root_ca').length
+    const intermediateCAs = certificates.filter(c => c.purpose === 'intermediate_ca').length
+    return [
+      { icon: ShieldCheck, label: 'Root CAs', value: rootCAs, variant: 'success' },
+      { icon: Certificate, label: 'Intermediate', value: intermediateCAs, variant: 'primary' },
+      { icon: CheckCircle, label: 'Total', value: certificates.length, variant: 'default' }
+    ]
+  }, [certificates])
+
+  // Columns
+  const columns = [
+    {
+      key: 'name',
+      header: 'Certificate',
+      sortable: true,
+      render: (val, row) => (
+        <div className="flex items-center gap-2">
+          <Certificate size={16} className="text-accent-primary shrink-0" />
+          <div className="min-w-0">
+            <div className="font-medium truncate">{val}</div>
+            {row.subject_cn && row.subject_cn !== val && (
+              <div className="text-xs text-text-secondary truncate">{row.subject_cn}</div>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'purpose',
+      header: 'Purpose',
+      render: (val) => {
+        const variants = {
+          root_ca: 'success',
+          intermediate_ca: 'primary',
+          client_auth: 'purple',
+          code_signing: 'warning',
+          system: 'secondary',
+          custom: 'default'
+        }
+        return <Badge variant={variants[val] || 'default'} size="sm">{val?.replace('_', ' ')}</Badge>
+      }
+    },
+    {
+      key: 'not_after',
+      header: 'Expires',
+      render: (val) => {
+        if (!val) return <span className="text-text-tertiary">—</span>
+        const date = new Date(val)
+        const isExpired = date < new Date()
+        return (
+          <span className={isExpired ? 'text-status-danger' : ''}>
+            {formatDate(val)}
+          </span>
+        )
+      }
+    }
   ]
 
-  const getPurposeBadge = (purpose) => {
-    const variants = {
-      root_ca: 'emerald',
-      intermediate_ca: 'blue',
-      client_auth: 'purple',
-      code_signing: 'orange',
-      system: 'secondary',
-      custom: 'default'
-    }
-    return <Badge variant={variants[purpose] || 'default'} size="sm">{purpose?.replace('_', ' ')}</Badge>
-  }
+  // Row actions
+  const rowActions = (row) => [
+    { label: 'Export', icon: Download, onClick: () => handleExport(row) },
+    ...(canDelete('truststore') ? [
+      { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }
+    ] : [])
+  ]
 
-  const purposeColors = {
-    root_ca: 'status-success-bg status-success-text',
-    intermediate_ca: 'status-primary-bg status-primary-text',
-    client_auth: 'status-purple-bg status-purple-text',
-    code_signing: 'status-warning-bg status-warning-text',
-    system: 'bg-bg-tertiary text-text-secondary',
-    custom: 'bg-bg-tertiary text-text-secondary'
-  }
+  // Detail panel content
+  const detailContent = selectedCert && (
+    <div className="p-3 space-y-3">
+      <CompactHeader
+        icon={Certificate}
+        iconClass="status-primary-bg"
+        title={selectedCert.name}
+        subtitle={selectedCert.subject_cn || selectedCert.description}
+        badge={
+          <Badge 
+            variant={selectedCert.purpose === 'root_ca' ? 'success' : 'primary'} 
+            size="sm"
+          >
+            {selectedCert.purpose?.replace('_', ' ')}
+          </Badge>
+        }
+      />
 
-  // Calculate stats by purpose
-  const rootCAs = certificates.filter(c => c.purpose === 'root_ca').length
-  const intermediateCAs = certificates.filter(c => c.purpose === 'intermediate_ca').length
+      <CompactStats stats={[
+        { icon: Clock, value: selectedCert.not_after ? formatDate(selectedCert.not_after) : 'No expiry' },
+        { icon: CheckCircle, value: selectedCert.issuer_cn || 'Self-signed' }
+      ]} />
 
-  // Help content for modal
-  const helpContent = (
-    <div className="space-y-4">
-      {/* Trust Store Overview */}
-      <Card className="p-4 space-y-3 stat-card-success">
-        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-          <ShieldCheck size={16} className="status-success-text" />
-          Trust Store Overview
-        </h3>
-        <div className="text-center p-4 bg-bg-tertiary rounded-lg">
-          <p className="text-3xl font-bold text-text-primary">{certificates.length}</p>
-          <p className="text-sm text-text-secondary">Trusted Certificates</p>
-        </div>
-      </Card>
-
-      {/* Certificate Breakdown */}
-      <Card className="p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-          <Info size={16} className="text-accent-primary" />
-          By Purpose
-        </h3>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between py-2 px-3 rounded-md bg-bg-tertiary/50">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full status-success-bg-solid" />
-              <span className="text-sm text-text-primary">Root CAs</span>
-            </div>
-            <Badge variant="success">{rootCAs}</Badge>
-          </div>
-          <div className="flex items-center justify-between py-2 px-3 rounded-md bg-bg-tertiary/50">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full status-primary-bg-solid" />
-              <span className="text-sm text-text-primary">Intermediate CAs</span>
-            </div>
-            <Badge variant="primary">{intermediateCAs}</Badge>
-          </div>
-        </div>
-      </Card>
-
-      {/* Help Cards */}
-      <div className="space-y-3">
-        <HelpCard variant="info" title="About Trust Store">
-          The Trust Store contains certificates that are explicitly trusted for validating 
-          certificate chains. Add Root and Intermediate CAs here for chain verification.
-        </HelpCard>
-        
-        <HelpCard variant="tip" title="Best Practices">
-          Only add certificates from trusted sources. Regularly review and remove 
-          expired or unnecessary certificates to maintain security.
-        </HelpCard>
-
-        <HelpCard variant="warning" title="Security Note">
-          Certificates in the Trust Store can validate any certificate chain. 
-          Be careful when adding third-party certificates.
-        </HelpCard>
-      </div>
-    </div>
-  )
-
-  // Focus panel content with search and filter
-  const focusContent = (
-    <div className="flex flex-col h-full">
-      {/* Search */}
-      <div className="p-2 border-b border-border shrink-0">
-        <div className="relative">
-          <MagnifyingGlass size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary" />
-          <input
-            type="text"
-            placeholder="Search..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-7 pr-2 py-1.5 text-xs bg-bg-tertiary border border-border rounded-md text-text-primary placeholder:text-text-secondary"
-          />
-        </div>
-      </div>
-
-      {/* Filter */}
-      <div className="p-2 border-b border-border shrink-0">
-        <select
-          value={purposeFilter}
-          onChange={(e) => setPurposeFilter(e.target.value)}
-          className="w-full px-2 py-1.5 text-xs bg-bg-tertiary border border-border rounded-md text-text-primary"
+      {/* Actions */}
+      <div className="flex gap-2">
+        <Button 
+          size="sm" 
+          variant="secondary"
+          className="flex-1"
+          onClick={() => handleExport(selectedCert)}
         >
-          {purposeOptions.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Certificate List */}
-      <div className="flex-1 overflow-auto p-2 space-y-1">
-        {certificates.length === 0 ? (
-          <EmptyState 
-            icon={ShieldCheck}
-            title="No certificates"
-            description="Add trusted certificates"
-          />
-        ) : (
-          certificates.map((cert) => (
-            <FocusItem
-              key={cert.id}
-              icon={Certificate}
-              title={cert.name}
-              subtitle={cert.not_after ? formatDate(cert.not_after) : 'No expiry'}
-              badge={getPurposeBadge(cert.purpose)}
-              selected={selectedCert?.id === cert.id}
-              onClick={() => handleSelectCert(cert)}
-            />
-          ))
+          <Download size={14} />
+          Export
+        </Button>
+        {canDelete('truststore') && (
+          <Button 
+            size="sm" 
+            variant="danger"
+            onClick={() => handleDelete(selectedCert)}
+          >
+            <Trash size={14} />
+          </Button>
         )}
       </div>
+
+      {/* Certificate Details */}
+      <CompactSection title="Certificate Info" icon={Certificate}>
+        <CompactField label="Subject" value={selectedCert.subject || selectedCert.subject_cn} />
+        <CompactField label="Issuer" value={selectedCert.issuer || selectedCert.issuer_cn} />
+        <CompactField label="Valid From" value={selectedCert.not_before ? formatDate(selectedCert.not_before) : '—'} />
+        <CompactField label="Valid To" value={selectedCert.not_after ? formatDate(selectedCert.not_after) : '—'} />
+        {selectedCert.fingerprint_sha256 && (
+          <CompactField 
+            label="SHA-256" 
+            value={selectedCert.fingerprint_sha256} 
+            mono 
+            copyable 
+          />
+        )}
+      </CompactSection>
+
+      {selectedCert.notes && (
+        <CompactSection title="Notes" icon={Warning}>
+          <p className="text-sm text-text-secondary">{selectedCert.notes}</p>
+        </CompactSection>
+      )}
     </div>
   )
 
-  // Focus panel actions
-  const focusActions = canWrite && (
-    <Button size="sm" onClick={() => openModal('add')} className="w-full">
-      <Plus size={14} />
-      Add Certificate
-    </Button>
+  // Help content
+  const helpContent = (
+    <div className="space-y-3">
+      <HelpCard variant="info" title="About Trust Store">
+        The Trust Store contains certificates that are explicitly trusted for validating 
+        certificate chains. Add Root and Intermediate CAs here for chain verification.
+      </HelpCard>
+      
+      <HelpCard variant="tip" title="Best Practices">
+        Only add certificates from trusted sources. Regularly review and remove 
+        expired or unnecessary certificates to maintain security.
+      </HelpCard>
+
+      <HelpCard variant="warning" title="Security Note">
+        Certificates in the Trust Store can validate any certificate chain. 
+        Be careful when adding third-party certificates.
+      </HelpCard>
+    </div>
   )
-
-  if (loading && certificates.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <LoadingSpinner />
-      </div>
-    )
-  }
-
-  // When no certificates exist, show single empty state (no focus panel)
-  const hasCertificates = certificates.length > 0
 
   return (
     <>
-      <PageLayout
+      <ResponsiveLayout
         title="Trust Store"
-        focusTitle="Certificates"
-        focusContent={hasCertificates ? focusContent : undefined}
-        focusActions={hasCertificates ? focusActions : undefined}
-        focusFooter={hasCertificates ? `${certificates.length} certificate(s)` : undefined}
+        subtitle={`${certificates.length} certificate${certificates.length !== 1 ? 's' : ''}`}
+        icon={ShieldCheck}
+        stats={stats}
         helpContent={helpContent}
-        
+        helpTitle="Trust Store Help"
+        splitView={true}
+        splitEmptyContent={
+          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
+              <Certificate size={24} className="text-text-tertiary" />
+            </div>
+            <p className="text-sm text-text-secondary">Select a certificate to view details</p>
+          </div>
+        }
+        slideOverOpen={!!selectedCert}
+        slideOverTitle={selectedCert?.name || 'Certificate Details'}
+        slideOverContent={detailContent}
+        onSlideOverClose={() => setSelectedCert(null)}
       >
-        {/* Main Content */}
-        {!hasCertificates ? (
-          <div className="flex items-center justify-center h-full">
-            <EmptyState 
-              icon={ShieldCheck}
-              title="No trusted certificates"
-              description="Add certificates to validate certificate chains"
-              action={canWrite('truststore') ? {
-                label: 'Add Certificate',
-                onClick: () => openModal('add')
-              } : null}
-            />
-          </div>
-        ) : !selectedCert ? (
-          <div className="flex items-center justify-center h-full">
-            <EmptyState 
-              icon={Certificate}
-              title="Select a certificate"
-              description="Choose a certificate to view details"
-            />
-          </div>
-        ) : (
-          <TrustCertDetails
-            cert={{
-              ...selectedCert,
-              valid_from: selectedCert.not_before,
-              valid_to: selectedCert.not_after,
-              thumbprint_sha256: selectedCert.fingerprint_sha256,
-              thumbprint_sha1: selectedCert.fingerprint_sha1
-            }}
-            onExport={() => handleExport(selectedCert)}
-            onDelete={() => handleDelete(selectedCert.id)}
-            canWrite={canWrite('truststore')}
-            canDelete={canDelete('truststore')}
-          />
-        )}
-      </PageLayout>
+        <ResponsiveDataTable
+          data={certificates}
+          columns={columns}
+          loading={loading}
+          onRowClick={handleSelectCert}
+          selectedId={selectedCert?.id}
+          rowActions={rowActions}
+          searchable
+          searchPlaceholder="Search certificates..."
+          searchKeys={['name', 'subject_cn', 'issuer_cn', 'purpose']}
+          toolbarFilters={[
+            {
+              key: 'purpose',
+              placeholder: 'All Purposes',
+              options: [
+                { value: 'root_ca', label: 'Root CA' },
+                { value: 'intermediate_ca', label: 'Intermediate' },
+                { value: 'client_auth', label: 'Client Auth' },
+                { value: 'code_signing', label: 'Code Signing' },
+                { value: 'custom', label: 'Custom' }
+              ]
+            }
+          ]}
+          toolbarActions={canWrite('truststore') && (
+            <Button onClick={() => openModal('add')}>
+              <Plus size={16} /> Add
+            </Button>
+          )}
+          sortable
+          defaultSort={{ key: 'name', direction: 'asc' }}
+          emptyIcon={ShieldCheck}
+          emptyTitle="No trusted certificates"
+          emptyDescription="Add certificates to validate certificate chains"
+          emptyAction={canWrite('truststore') && (
+            <Button onClick={() => openModal('add')}>
+              <Plus size={16} /> Add Certificate
+            </Button>
+          )}
+        />
+      </ResponsiveLayout>
 
       {/* Add Certificate Modal */}
       <Modal
@@ -348,12 +345,13 @@ export default function TrustStorePage() {
         onClose={() => closeModal('add')}
         title="Add Trusted Certificate"
       >
-        <div className="space-y-4">
+        <form className="p-4 space-y-4" onSubmit={(e) => { e.preventDefault(); handleAdd() }}>
           <Input
             label="Name"
             placeholder="e.g., DigiCert Global Root CA"
             value={addForm.name}
             onChange={(e) => setAddForm(prev => ({ ...prev, name: e.target.value }))}
+            required
           />
           <Input
             label="Description"
@@ -382,6 +380,7 @@ export default function TrustStorePage() {
             onChange={(e) => setAddForm(prev => ({ ...prev, certificate_pem: e.target.value }))}
             rows={8}
             className="font-mono text-xs"
+            required
           />
           <Input
             label="Notes"
@@ -389,15 +388,15 @@ export default function TrustStorePage() {
             value={addForm.notes}
             onChange={(e) => setAddForm(prev => ({ ...prev, notes: e.target.value }))}
           />
-          <div className="flex gap-2 justify-end pt-4 border-t border-border">
-            <Button size="sm" variant="ghost" onClick={() => closeModal('add')}>
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button type="button" variant="secondary" onClick={() => closeModal('add')}>
               Cancel
             </Button>
-            <Button size="sm" onClick={handleAdd} disabled={adding}>
+            <Button type="submit" disabled={adding}>
               {adding ? 'Adding...' : 'Add Certificate'}
             </Button>
           </div>
-        </div>
+        </form>
       </Modal>
     </>
   )
