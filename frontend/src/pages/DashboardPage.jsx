@@ -281,122 +281,123 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Main Content - 3 Column Layout */}
+        {/* Main Content - 2x2 Grid + Activity Column */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
           
-          {/* Recent Certificates & CAs */}
-          <Card variant="elevated" className="flex flex-col min-h-[320px] p-0">
-            <Card.Header 
-              icon={Certificate} 
-              title="Recent Certificates"
-              action={
-                <Button size="sm" variant="ghost" onClick={() => navigate('/certificates')}>
-                  View all <CaretRight size={12} />
-                </Button>
-              }
-            />
-            <Card.Body className="flex-1 overflow-y-auto space-y-1 !pt-0">
-              {recentCerts.length === 0 ? (
-                <EmptyWidget icon={Certificate} text="No certificates yet" />
-              ) : (
-                recentCerts.slice(0, 5).map((cert, i) => (
-                  <div 
-                    key={cert.id || i}
-                    onClick={() => navigate(`/certificates/${cert.id}`)}
-                    className="p-2.5 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-all border border-transparent hover:border-border/50 hover:shadow-sm group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
-                        {cert.common_name || cert.descr || cert.subject || 'Certificate'}
-                      </span>
-                      <Badge variant={cert.revoked ? 'danger' : 'success'} size="sm" dot>
-                        {cert.revoked ? 'Revoked' : 'Valid'}
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-text-tertiary mt-0.5">
-                      {formatRelativeTime(cert.created_at)}
-                    </div>
-                  </div>
-                ))
-              )}
-            </Card.Body>
+          {/* Left: 2x2 Grid for Certs, CAs, System, ACME */}
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
             
-            {/* Recent CAs Section */}
-            <Card.Footer>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg status-primary-bg flex items-center justify-center">
-                    <ShieldCheck size={12} weight="duotone" className="status-primary-text" />
-                  </div>
-                  <span className="text-xs font-semibold text-text-primary">Recent CAs</span>
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => navigate('/cas')}>
-                  <CaretRight size={12} />
-                </Button>
-              </div>
-              {recentCAs.length === 0 ? (
-                <p className="text-xs text-text-tertiary py-2">No CAs yet</p>
-              ) : (
-                <div className="space-y-1">
-                  {recentCAs.slice(0, 3).map((ca, i) => (
+            {/* Recent Certificates */}
+            <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
+              <Card.Header 
+                icon={Certificate} 
+                title="Recent Certificates"
+                action={
+                  <Button size="sm" variant="ghost" onClick={() => navigate('/certificates')}>
+                    View all <CaretRight size={12} />
+                  </Button>
+                }
+              />
+              <Card.Body className="flex-1 overflow-y-auto space-y-1 !pt-0">
+                {recentCerts.length === 0 ? (
+                  <EmptyWidget icon={Certificate} text="No certificates yet" />
+                ) : (
+                  recentCerts.slice(0, 4).map((cert, i) => (
+                    <div 
+                      key={cert.id || i}
+                      onClick={() => navigate(`/certificates/${cert.id}`)}
+                      className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-all group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
+                          {cert.common_name || cert.descr || cert.subject || 'Certificate'}
+                        </span>
+                        <Badge variant={cert.revoked ? 'danger' : 'success'} size="sm" dot>
+                          {cert.revoked ? 'Revoked' : 'Valid'}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-text-tertiary mt-0.5">
+                        {formatRelativeTime(cert.created_at)}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </Card.Body>
+            </Card>
+
+            {/* Recent CAs */}
+            <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
+              <Card.Header 
+                icon={ShieldCheck} 
+                title="Recent CAs"
+                action={
+                  <Button size="sm" variant="ghost" onClick={() => navigate('/cas')}>
+                    View all <CaretRight size={12} />
+                  </Button>
+                }
+              />
+              <Card.Body className="flex-1 overflow-y-auto space-y-1 !pt-0">
+                {recentCAs.length === 0 ? (
+                  <EmptyWidget icon={ShieldCheck} text="No CAs yet" />
+                ) : (
+                  recentCAs.slice(0, 4).map((ca, i) => (
                     <div 
                       key={ca.id || i}
                       onClick={() => navigate(`/cas/${ca.id}`)}
-                      className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-bg-secondary cursor-pointer transition-colors"
+                      className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group"
                     >
-                      <span className="text-xs text-text-primary truncate">{ca.dn_commonname || ca.descr || ca.name}</span>
-                      <Badge variant={ca.is_root ? 'purple' : 'info'} size="sm">
-                        {ca.is_root ? 'Root' : 'Intermediate'}
-                      </Badge>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
+                          {ca.dn_commonname || ca.descr || ca.name}
+                        </span>
+                        <Badge variant={ca.is_root ? 'purple' : 'info'} size="sm">
+                          {ca.is_root ? 'Root' : 'Intermediate'}
+                        </Badge>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </Card.Footer>
-          </Card>
+                  ))
+                )}
+              </Card.Body>
+            </Card>
 
-          {/* System Health & Services */}
-          <Card variant="elevated" className="flex flex-col min-h-[320px] p-0">
-            <Card.Header 
-              icon={Heartbeat} 
-              title="System Health"
-              action={
-                <Button size="sm" variant="ghost" onClick={() => navigate('/settings')}>
-                  <Gear size={14} />
-                </Button>
-              }
-            />
-            <Card.Body className="!pt-0">
-              {/* System Stats */}
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <SystemStat 
-                  icon={WifiHigh} 
-                  label="WebSocket" 
-                  value={isConnected ? 'Connected' : 'Disconnected'} 
-                  status={isConnected ? 'online' : 'offline'} 
-                />
-                <SystemStat 
-                  icon={Database} 
-                  label="Database" 
-                  value="Healthy" 
-                  status="online" 
-                />
-                <SystemStat 
-                  icon={Clock} 
-                  label="Last Update" 
-                  value={formatRelativeTime(lastUpdate)} 
-                  status="online" 
-                />
-                <SystemStat 
-                  icon={Lightning} 
-                  label="API" 
-                  value="Online" 
-                  status="online" 
-                />
-              </div>
-              
-              {/* Services Status */}
-              <div>
+            {/* System Health */}
+            <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
+              <Card.Header 
+                icon={Heartbeat} 
+                title="System Health"
+                action={
+                  <Button size="sm" variant="ghost" onClick={() => navigate('/settings')}>
+                    <Gear size={14} />
+                  </Button>
+                }
+              />
+              <Card.Body className="!pt-0">
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <SystemStat 
+                    icon={WifiHigh} 
+                    label="WebSocket" 
+                    value={isConnected ? 'Connected' : 'Disconnected'} 
+                    status={isConnected ? 'online' : 'offline'} 
+                  />
+                  <SystemStat 
+                    icon={Database} 
+                    label="Database" 
+                    value="Healthy" 
+                    status="online" 
+                  />
+                  <SystemStat 
+                    icon={Clock} 
+                    label="Last Update" 
+                    value={formatRelativeTime(lastUpdate)} 
+                    status="online" 
+                  />
+                  <SystemStat 
+                    icon={Lightning} 
+                    label="API" 
+                    value="Online" 
+                    status="online" 
+                  />
+                </div>
                 <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
                   Services
                 </div>
@@ -406,36 +407,47 @@ export default function DashboardPage() {
                   <ServiceBadge name="OCSP" status={systemStatus?.ocsp} />
                   <ServiceBadge name="CRL" status={systemStatus?.crl} />
                 </div>
-              </div>
-            </Card.Body>
-            
-            <Card.Footer>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg status-primary-bg flex items-center justify-center">
-                    <Globe size={12} weight="duotone" className="status-primary-text" />
+              </Card.Body>
+            </Card>
+
+            {/* ACME Accounts */}
+            <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
+              <Card.Header 
+                icon={Globe} 
+                title="ACME Accounts"
+                action={
+                  <Button size="sm" variant="ghost" onClick={() => navigate('/acme')}>
+                    View all <CaretRight size={12} />
+                  </Button>
+                }
+              />
+              <Card.Body className="flex-1 overflow-y-auto !pt-0">
+                {recentAcme.length === 0 ? (
+                  <EmptyWidget icon={Globe} text="No ACME accounts" />
+                ) : (
+                  <div className="space-y-1">
+                    {recentAcme.slice(0, 4).map((account, i) => (
+                      <div 
+                        key={account.id || i} 
+                        className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group"
+                        onClick={() => navigate('/acme')}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <User size={14} className="text-text-tertiary shrink-0" />
+                            <span className="text-sm text-text-primary truncate group-hover:text-accent-primary transition-colors">
+                              {account.email || account.contact}
+                            </span>
+                          </div>
+                          <Badge variant="secondary" size="sm">{account.orders_count || 0} orders</Badge>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <span className="text-xs font-semibold text-text-primary">ACME Accounts</span>
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => navigate('/acme')}>
-                  <CaretRight size={12} />
-                </Button>
-              </div>
-              {recentAcme.length === 0 ? (
-                <p className="text-xs text-text-tertiary py-2">No ACME accounts</p>
-              ) : (
-                <div className="space-y-1">
-                  {recentAcme.slice(0, 2).map((account, i) => (
-                    <div key={account.id || i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-bg-secondary transition-colors">
-                      <User size={12} className="text-text-tertiary" />
-                      <span className="text-xs text-text-primary truncate flex-1">{account.email || account.contact}</span>
-                      <Badge variant="secondary" size="sm">{account.orders_count || 0} orders</Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card.Footer>
-          </Card>
+                )}
+              </Card.Body>
+            </Card>
+          </div>
 
           {/* Recent Activity with Live Indicator */}
           <Card variant="elevated" className="flex flex-col min-h-[320px] p-0">
