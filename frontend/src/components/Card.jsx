@@ -48,11 +48,11 @@ export function Card({
 Card.Header = function CardHeader({ children, className, icon: Icon, title, subtitle, action }) {
   if (Icon || title) {
     return (
-      <div className={cn('flex items-start justify-between gap-3 p-4 pb-3', className)}>
+      <div className={cn('flex items-start justify-between gap-3 p-4 pb-3 border-b border-border/30', className)}>
         <div className="flex items-center gap-3">
           {Icon && (
-            <div className="w-10 h-10 rounded-xl status-primary-bg flex items-center justify-center shrink-0">
-              <Icon size={20} className="text-accent-primary" weight="duotone" />
+            <div className="w-9 h-9 rounded-lg status-primary-bg flex items-center justify-center shrink-0">
+              <Icon size={18} className="text-accent-primary" weight="duotone" />
             </div>
           )}
           <div>
@@ -64,11 +64,11 @@ Card.Header = function CardHeader({ children, className, icon: Icon, title, subt
       </div>
     )
   }
-  return <div className={cn('p-4 pb-3', className)}>{children}</div>
+  return <div className={cn('p-4 pb-3 border-b border-border/30', className)}>{children}</div>
 }
 
 Card.Body = function CardBody({ children, className }) {
-  return <div className={cn('px-4 pb-4', className)}>{children}</div>
+  return <div className={cn('px-4 py-3', className)}>{children}</div>
 }
 
 Card.Footer = function CardFooter({ children, className }) {

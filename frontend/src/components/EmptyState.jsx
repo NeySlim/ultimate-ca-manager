@@ -1,5 +1,5 @@
 /**
- * Empty State Component
+ * Empty State Component - Theme-aware with subtle visual polish
  */
 import { FileX } from '@phosphor-icons/react'
 import { Button } from './Button'
@@ -12,12 +12,16 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
-        <Icon size={32} className="text-text-secondary" weight="duotone" />
+      {/* Decorative background circle */}
+      <div className="relative mb-4">
+        <div className="absolute inset-0 w-20 h-20 rounded-full bg-bg-tertiary/50 -translate-x-2 -translate-y-2" />
+        <div className="relative w-16 h-16 rounded-2xl bg-bg-tertiary border border-border/50 flex items-center justify-center">
+          <Icon size={28} className="text-text-secondary" weight="duotone" />
+        </div>
       </div>
-      <h3 className="text-lg font-medium text-text-primary mb-1">{title}</h3>
+      <h3 className="text-base font-medium text-text-primary mb-1">{title}</h3>
       {description && (
-        <p className="text-sm text-text-secondary mb-4 max-w-sm">{description}</p>
+        <p className="text-sm text-text-tertiary mb-4 max-w-sm">{description}</p>
       )}
       {action && (
         <Button onClick={action.onClick} size="sm">

@@ -515,15 +515,30 @@ tr.row-selected td:first-child {
    TABLE ROW HOVER (theme-aware)
    ============================================ */
 .table-row-hover {
-  transition: background-color 0.15s ease-out;
+  transition: background-color var(--duration-fast) var(--ease-smooth);
 }
 .table-row-hover:hover {
-  background-color: color-mix(in srgb, var(--bg-tertiary) 70%, transparent);
+  background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
+}
+.table-row-hover.selected {
+  background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+/* First cell accent on hover */
+.table-row-hover td:first-child {
+  border-left: 2px solid transparent;
+  transition: border-color var(--duration-fast) var(--ease-smooth);
+}
+.table-row-hover:hover td:first-child {
+  border-left-color: var(--accent-primary);
+}
+.table-row-hover.selected td:first-child {
+  border-left-color: var(--accent-primary);
 }
 
 /* Mobile card hover */
 .mobile-card-hover {
-  transition: background-color 0.15s ease-out, transform 0.15s ease-out;
+  transition: background-color var(--duration-fast) var(--ease-smooth), transform var(--duration-fast) var(--ease-smooth);
 }
 .mobile-card-hover:hover {
   background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
@@ -554,13 +569,19 @@ tr.row-selected td:first-child {
 
 /* Smooth transitions for all interactive elements */
 button, a, input, select, textarea {
-  transition: all 0.15s ease-out;
+  transition: all var(--duration-fast) var(--ease-smooth);
 }
 
-/* Better focus styles */
+/* Better focus styles with subtle glow */
 :focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
+}
+
+/* Input focus glow (subtle) */
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 15%, transparent);
 }
 
 /* Force Tailwind to generate responsive grid classes */
