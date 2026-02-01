@@ -403,18 +403,25 @@ export default function CAsPage() {
             ) : (
               <div className="py-1">
                 {filteredTree.map((ca, idx) => (
-                  <TreeNode
-                    key={ca.id}
-                    ca={ca}
-                    level={0}
-                    selectedId={selectedCA?.id}
-                    expandedNodes={expandedNodes}
-                    onToggle={toggleNode}
-                    onSelect={loadCADetails}
-                    isOrphan={isOrphanIntermediate(ca)}
-                    isMobile={isMobile}
-                    isLast={idx === filteredTree.length - 1}
-                  />
+                  <div key={ca.id}>
+                    {/* Separator between CA families */}
+                    {idx > 0 && (
+                      <div className="my-2 mx-2 flex items-center gap-2">
+                        <div className="flex-1 h-px bg-border" />
+                      </div>
+                    )}
+                    <TreeNode
+                      ca={ca}
+                      level={0}
+                      selectedId={selectedCA?.id}
+                      expandedNodes={expandedNodes}
+                      onToggle={toggleNode}
+                      onSelect={loadCADetails}
+                      isOrphan={isOrphanIntermediate(ca)}
+                      isMobile={isMobile}
+                      isLast={idx === filteredTree.length - 1}
+                    />
+                  </div>
                 ))}
               </div>
             )}
@@ -578,6 +585,10 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
   const isExpanded = expandedNodes.has(ca.id)
   const isSelected = selectedId === ca.id
   const indent = isMobile ? 24 : 20
+  const rowHeight = isMobile ? 48 : 28
+  // Desktop: expand btn (16px) + gap (6px) + icon half (7px) = 29px from padding start
+  // Mobile: expand btn (24px) + gap (8px) + icon half (8px) = 40px from padding start
+  const iconCenterFromPadding = isMobile ? 40 : 29
   
   return (
     <div>
@@ -589,20 +600,19 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
           isSelected && 'bg-accent-primary/10',
           isMobile ? 'h-12 px-3 gap-2' : 'h-7 px-2 gap-1.5'
         )}
-        style={{ paddingLeft: `${12 + (level * indent)}px` }}
+        style={{ paddingLeft: `${(isMobile ? 12 : 8) + (level * indent)}px` }}
       >
-        {/* Simple L connector - part du centre de l'icône parent */}
+        {/* L connector - starts from center of parent icon */}
         {level > 0 && (
           <div 
-            className="absolute border-border/50"
+            className="absolute"
             style={{ 
-              left: `${12 + ((level - 1) * indent) + (isMobile ? 20 : 14)}px`,
+              left: `${(isMobile ? 12 : 8) + ((level - 1) * indent) + iconCenterFromPadding}px`,
               top: 0,
-              width: `${indent - 4}px`,
-              height: isMobile ? '24px' : '14px',
-              borderLeft: '1px solid',
-              borderBottom: '1px solid',
-              borderColor: 'inherit',
+              width: `${indent}px`,
+              height: `${rowHeight / 2}px`,
+              borderLeft: '1px solid var(--border)',
+              borderBottom: '1px solid var(--border)',
               borderBottomLeftRadius: '3px'
             }}
           />
