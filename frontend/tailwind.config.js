@@ -4,6 +4,12 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  safelist: [
+    'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4',
+    'lg:grid-cols-1', 'lg:grid-cols-2', 'lg:grid-cols-3', 'lg:grid-cols-4',
+    'xl:grid-cols-1', 'xl:grid-cols-2', 'xl:grid-cols-3', 'xl:grid-cols-4',
+    'lg:gap-4', 'lg:gap-6', 'lg:p-6', 'lg:space-y-6',
+  ],
   theme: {
     extend: {
       colors: {
@@ -26,6 +32,23 @@ export default {
       },
       animation: {
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'slide-in-right': 'slideInRight 0.2s ease-out',
+        'slide-up': 'slideUp 0.25s ease-out',
+        'fade-in': 'fadeIn 0.15s ease-out',
+      },
+      keyframes: {
+        slideInRight: {
+          '0%': { transform: 'translateX(100%)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(100%)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
       },
       borderRadius: {
         'sm': '0.125rem',  // 2px

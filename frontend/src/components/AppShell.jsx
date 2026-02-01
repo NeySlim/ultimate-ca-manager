@@ -81,7 +81,13 @@ export function AppShell() {
   const allNavItems = isPro ? [...mobileNavItems, ...proNavItems] : mobileNavItems
 
   return (
-    <div className="flex h-full w-full bg-bg-primary overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden justify-center items-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Window container with frame effect */}
+      <div className={cn(
+        "flex h-full w-full max-w-[1920px] overflow-hidden bg-bg-primary",
+        // Frame effect on large screens only
+        "2xl:h-[calc(100%-24px)] 2xl:my-3 2xl:mx-4 2xl:rounded-xl 2xl:shadow-2xl 2xl:border 2xl:border-white/10"
+      )}>
       {/* Mobile Header - Search left, Hamburger right */}
       {isMobile && (
         <div className="fixed top-0 left-0 right-0 h-12 bg-bg-secondary border-b border-border flex items-center px-3 z-40">
@@ -258,6 +264,7 @@ export function AppShell() {
         onOpenChange={setCommandPaletteOpen}
         isPro={isPro}
       />
+    </div>
     </div>
   )
 }

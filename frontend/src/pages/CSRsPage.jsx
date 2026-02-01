@@ -1,23 +1,26 @@
 /**
- * CSRs (Certificate Signing Requests) Page - Using TablePageLayout (Audit pattern)
+ * CSRs (Certificate Signing Requests) Page - Using ResponsiveLayout
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   FileText, Upload, SignIn, Trash, Download, 
   Clock, Key, UploadSimple, CheckCircle, Warning, X
 } from '@phosphor-icons/react'
 import {
-  TablePageLayout, Badge, Button, Modal, Input, Select, HelpCard, FileUpload,
-  CSRDetails
+  Badge, Button, Modal, Input, Select, HelpCard, FileUpload,
+  CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats
 } from '../components'
+import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { csrsService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
+import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
 import { VALIDITY } from '../constants/config'
 
 export default function CSRsPage() {
+  const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -35,7 +38,6 @@ export default function CSRsPage() {
   
   // Filters
   const [filterStatus, setFilterStatus] = useState('')
-  const [search, setSearch] = useState('')
   
   // Pagination
   const [page, setPage] = useState(1)
@@ -49,10 +51,6 @@ export default function CSRsPage() {
       setSearchParams(searchParams)
     }
   }, [])
-
-  useEffect(() => {
-    setPage(1)
-  }, [filterStatus, search])
 
   const loadData = async () => {
     try {
@@ -160,19 +158,19 @@ export default function CSRsPage() {
     const signed = csrs.filter(c => c.status === 'signed').length
     const rejected = csrs.filter(c => c.status === 'rejected').length
     return [
-      { icon: Warning, label: 'Pending', value: pending, color: 'text-amber-500' },
-      { icon: CheckCircle, label: 'Signed', value: signed, color: 'text-emerald-500' },
-      { icon: X, label: 'Rejected', value: rejected, color: 'text-red-500' },
-      { icon: FileText, label: 'Total', value: csrs.length, color: 'text-accent-primary' }
+      { icon: Warning, label: 'Pending', value: pending, variant: 'warning' },
+      { icon: CheckCircle, label: 'Signed', value: signed, variant: 'success' },
+      { icon: X, label: 'Rejected', value: rejected, variant: 'danger' },
+      { icon: FileText, label: 'Total', value: csrs.length, variant: 'primary' }
     ]
   }, [csrs])
 
   // Table columns
-  const columns = [
+  const columns = useMemo(() => [
     {
       key: 'cn',
-      label: 'Common Name',
-      sortable: true,
+      header: 'Common Name',
+      priority: 1,
       render: (val, row) => (
         <div className="flex items-center gap-2">
           <FileText size={16} className="text-accent-primary shrink-0" />
@@ -182,8 +180,8 @@ export default function CSRsPage() {
     },
     {
       key: 'status',
-      label: 'Status',
-      sortable: true,
+      header: 'Status',
+      priority: 2,
       render: (val) => (
         <Badge 
           variant={val === 'signed' ? 'success' : val === 'rejected' ? 'danger' : 'warning'}
@@ -195,8 +193,9 @@ export default function CSRsPage() {
     },
     {
       key: 'created_at',
-      label: 'Created',
-      sortable: true,
+      header: 'Created',
+      priority: 3,
+      hideOnMobile: true,
       render: (val) => (
         <span className="text-xs text-text-secondary whitespace-nowrap">
           {formatDate(val)}
@@ -205,17 +204,19 @@ export default function CSRsPage() {
     },
     {
       key: 'key_algorithm',
-      label: 'Key',
+      header: 'Key',
+      priority: 4,
+      hideOnMobile: true,
       render: (val, row) => (
         <span className="text-xs font-mono text-text-secondary">
           {val || 'RSA'} {row.key_size ? `(${row.key_size})` : ''}
         </span>
       )
     }
-  ]
+  ], [])
 
   // Filters config
-  const filters = [
+  const filters = useMemo(() => [
     {
       key: 'status',
       label: 'Status',
@@ -229,25 +230,20 @@ export default function CSRsPage() {
         { value: 'rejected', label: 'Rejected' }
       ]
     }
-  ]
+  ], [filterStatus])
 
-  // Quick filters
-  const quickFilters = [
-    {
-      icon: Warning,
-      title: 'Pending',
-      subtitle: 'Awaiting signature',
-      selected: filterStatus === 'pending',
-      onClick: () => setFilterStatus(filterStatus === 'pending' ? '' : 'pending')
-    },
-    {
-      icon: CheckCircle,
-      title: 'Signed',
-      subtitle: 'Certificates issued',
-      selected: filterStatus === 'signed',
-      onClick: () => setFilterStatus(filterStatus === 'signed' ? '' : 'signed')
-    }
-  ]
+  const activeFiltersCount = filterStatus ? 1 : 0
+
+  // Row actions
+  const rowActions = useCallback((row) => [
+    { label: 'Download', icon: Download, onClick: () => handleDownload(row.id) },
+    ...(canWrite('csrs') && (!row.status || row.status === 'pending') ? [
+      { label: 'Sign', icon: SignIn, onClick: () => { setSelectedCSR(row); openModal('sign') }}
+    ] : []),
+    ...(canDelete('csrs') ? [
+      { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
+    ] : [])
+  ], [canWrite, canDelete])
 
   // Help content
   const helpContent = (
@@ -273,70 +269,71 @@ export default function CSRsPage() {
     </div>
   )
 
-  const handleClearFilters = () => {
-    setFilterStatus('')
-    setSearch('')
-  }
-
   return (
     <>
-      <TablePageLayout
+      <ResponsiveLayout
         title="Certificate Signing Requests"
-        loading={loading}
-        data={filteredCSRs}
-        columns={columns}
-        searchable
-        searchPlaceholder="Search CSRs..."
-        searchKeys={['cn', 'common_name', 'subject', 'organization']}
-        externalSearch={search}
-        onSearch={setSearch}
-        onRowClick={loadCSRDetails}
-        filters={filters}
-        quickFilters={quickFilters}
-        onClearFilters={handleClearFilters}
+        icon={FileText}
         stats={stats}
+        filters={filters}
+        activeFilters={activeFiltersCount}
         helpContent={helpContent}
-        onRefresh={loadData}
-        emptyIcon={FileText}
-        emptyTitle="No CSRs"
-        emptyDescription="Upload a CSR to get started"
-        emptyAction={canWrite('csrs') && (
-          <Button onClick={() => openModal('upload')}>
-            <UploadSimple size={16} /> Upload CSR
-          </Button>
-        )}
-        actions={canWrite('csrs') && (
-          <Button size="sm" onClick={() => openModal('upload')} className="flex-1">
-            <UploadSimple size={14} /> Upload
-          </Button>
-        )}
-        pagination={{
-          page,
-          total: filteredCSRs.length,
-          perPage,
-          onChange: setPage,
-          onPerPageChange: (v) => { setPerPage(v); setPage(1) }
-        }}
-      />
-
-      {/* CSR Details Modal */}
-      <Modal
-        open={!!selectedCSR}
-        onOpenChange={() => setSelectedCSR(null)}
-        title="CSR Details"
-        size="lg"
-      >
-        {selectedCSR && (
-          <CSRDetails
+        slideOverOpen={!!selectedCSR}
+        onSlideOverClose={() => setSelectedCSR(null)}
+        slideOverTitle="CSR Details"
+        slideOverContent={selectedCSR && (
+          <CSRDetailsPanel 
             csr={selectedCSR}
+            canWrite={canWrite}
+            canDelete={canDelete}
             onSign={() => openModal('sign')}
             onDownload={() => handleDownload(selectedCSR.id)}
             onDelete={() => handleDelete(selectedCSR.id)}
-            canWrite={canWrite('csrs')}
-            canDelete={canDelete('csrs')}
           />
         )}
-      </Modal>
+        actions={
+          canWrite('csrs') && (
+            isMobile ? (
+              <Button size="lg" onClick={() => openModal('upload')} className="w-11 h-11 p-0">
+                <UploadSimple size={22} weight="bold" />
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => openModal('upload')}>
+                <UploadSimple size={14} weight="bold" />
+                Upload
+              </Button>
+            )
+          )
+        }
+      >
+        <ResponsiveDataTable
+          data={filteredCSRs}
+          columns={columns}
+          loading={loading}
+          selectedId={selectedCSR?.id}
+          onRowClick={(csr) => csr ? loadCSRDetails(csr) : setSelectedCSR(null)}
+          rowActions={rowActions}
+          searchable
+          searchPlaceholder="Search CSRs..."
+          searchKeys={['cn', 'common_name', 'subject', 'organization']}
+          sortable
+          pagination={{
+            page,
+            perPage,
+            total: filteredCSRs.length,
+            onChange: setPage,
+            onPerPageChange: setPerPage
+          }}
+          emptyIcon={FileText}
+          emptyTitle="No CSRs"
+          emptyDescription="Upload a CSR to get started"
+          emptyAction={canWrite('csrs') && (
+            <Button onClick={() => openModal('upload')}>
+              <UploadSimple size={16} /> Upload CSR
+            </Button>
+          )}
+        />
+      </ResponsiveLayout>
 
       {/* Upload CSR Modal */}
       <Modal
@@ -393,5 +390,96 @@ export default function CSRsPage() {
         </div>
       </Modal>
     </>
+  )
+}
+
+// =============================================================================
+// CSR DETAILS PANEL (for slide-over)
+// =============================================================================
+
+function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelete }) {
+  const statusVariant = csr.status === 'signed' ? 'success' : csr.status === 'rejected' ? 'danger' : 'warning'
+  
+  return (
+    <div className="p-3 space-y-3">
+      {/* Header */}
+      <CompactHeader
+        icon={FileText}
+        iconClass="bg-accent-primary/20"
+        title={csr.common_name || csr.cn || 'Unnamed CSR'}
+        subtitle={csr.organization}
+        badge={
+          <Badge variant={statusVariant} size="sm">
+            {csr.status || 'pending'}
+          </Badge>
+        }
+      />
+
+      {/* Stats */}
+      <CompactStats stats={[
+        { icon: Clock, value: csr.created_at ? formatDate(csr.created_at, 'short') : '—' },
+        { icon: Key, value: `${csr.key_algorithm || 'RSA'} ${csr.key_size || ''}` },
+      ]} />
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <Button size="sm" variant="secondary" className="flex-1" onClick={onDownload}>
+          <Download size={14} /> Download
+        </Button>
+        {canWrite('csrs') && (!csr.status || csr.status === 'pending') && (
+          <Button size="sm" onClick={onSign}>
+            <SignIn size={14} /> Sign
+          </Button>
+        )}
+        {canDelete('csrs') && (
+          <Button size="sm" variant="danger" onClick={onDelete}>
+            <Trash size={14} />
+          </Button>
+        )}
+      </div>
+
+      {/* Subject Information */}
+      <CompactSection title="Subject">
+        <CompactGrid>
+          <CompactField label="Common Name" value={csr.common_name || csr.cn} className="col-span-2" />
+          <CompactField label="Organization" value={csr.organization} />
+          <CompactField label="Org Unit" value={csr.organizational_unit} />
+          <CompactField label="Country" value={csr.country} />
+          <CompactField label="State" value={csr.state} />
+          <CompactField label="Locality" value={csr.locality} />
+          <CompactField label="Email" value={csr.email} />
+        </CompactGrid>
+      </CompactSection>
+
+      {/* Key Information */}
+      <CompactSection title="Key Information">
+        <CompactGrid>
+          <CompactField label="Algorithm" value={csr.key_algorithm || 'RSA'} />
+          <CompactField label="Key Size" value={csr.key_size} />
+          <CompactField label="Signature" value={csr.signature_algorithm} />
+        </CompactGrid>
+      </CompactSection>
+
+      {/* Extensions */}
+      {(csr.san || csr.subject_alternative_names) && (
+        <CompactSection title="Subject Alternative Names">
+          <div className="text-xs text-text-secondary space-y-1">
+            {(csr.san || csr.subject_alternative_names || []).map((san, i) => (
+              <div key={i} className="font-mono bg-bg-tertiary px-2 py-1 rounded">
+                {san}
+              </div>
+            ))}
+          </div>
+        </CompactSection>
+      )}
+
+      {/* Timestamps */}
+      <CompactSection title="Timeline">
+        <CompactGrid>
+          <CompactField label="Created" value={csr.created_at ? formatDate(csr.created_at) : '—'} />
+          {csr.signed_at && <CompactField label="Signed" value={formatDate(csr.signed_at)} />}
+        </CompactGrid>
+      </CompactSection>
+    </div>
   )
 }
