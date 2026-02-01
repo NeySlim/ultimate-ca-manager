@@ -1,30 +1,32 @@
 /**
- * Certificates Page - Using TablePageLayout (Audit pattern)
+ * CertificatesPage - FROM SCRATCH with ResponsiveLayout + ResponsiveDataTable
  * 
- * Pattern: Full-width table with filters in focus panel, details in modal
+ * DESKTOP: Dense table with hover rows, inline slide-over details
+ * MOBILE: Card-style list with full-screen details, swipe gestures
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
-  Certificate, Download, Trash, ArrowsClockwise, X, Key,
-  CheckCircle, Warning, Clock, ShieldCheck, Plus, UploadSimple,
-  CalendarBlank, User, Lock, Info
+  Certificate, Download, Trash, X, Plus, Info,
+  CheckCircle, Warning
 } from '@phosphor-icons/react'
 import {
-  TablePageLayout, Badge, Button, Modal, Select, Input, Textarea, HelpCard, Card,
+  ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, HelpCard,
   CertificateDetails
 } from '../components'
 import { certificatesService, casService } from '../services'
-import { useNotification } from '../contexts'
+import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate, extractCN, cn } from '../lib/utils'
+import { formatDate, extractCN } from '../lib/utils'
 
 export default function CertificatesPage() {
-  // Data state
+  const { isMobile } = useMobile()
+  
+  // Data
   const [certificates, setCertificates] = useState([])
   const [cas, setCas] = useState([])
   const [loading, setLoading] = useState(true)
   
-  // Selection & modals
+  // Selection
   const [selectedCert, setSelectedCert] = useState(null)
   const [showIssueModal, setShowIssueModal] = useState(false)
   
@@ -36,19 +38,14 @@ export default function CertificatesPage() {
   // Filters
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCA, setFilterCA] = useState('')
-  const [search, setSearch] = useState('')
   
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
 
+  // Load data
   useEffect(() => {
     loadData()
   }, [page, perPage])
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    if (page !== 1) setPage(1)
-  }, [filterStatus, filterCA, search])
 
   const loadData = async () => {
     try {
@@ -59,7 +56,6 @@ export default function CertificatesPage() {
       ])
       const certs = certsRes.data || []
       setCertificates(certs)
-      // Use API total if available, otherwise use array length
       setTotal(certsRes.meta?.total || certsRes.pagination?.total || certs.length)
       setCas(casRes.data || [])
     } catch (error) {
@@ -69,15 +65,21 @@ export default function CertificatesPage() {
     }
   }
 
-  const loadCertDetails = async (cert) => {
+  // Load cert details for slide-over
+  const handleSelectCert = useCallback(async (cert) => {
+    if (!cert) {
+      setSelectedCert(null)
+      return
+    }
     try {
       const res = await certificatesService.getById(cert.id)
       setSelectedCert(res.data || cert)
     } catch {
       setSelectedCert(cert)
     }
-  }
+  }, [])
 
+  // Export certificate
   const handleExport = async (format) => {
     if (!selectedCert) return
     try {
@@ -87,37 +89,50 @@ export default function CertificatesPage() {
       a.href = url
       a.download = `${selectedCert.common_name || 'certificate'}.${format}`
       a.click()
+      URL.revokeObjectURL(url)
       showSuccess('Certificate exported')
-    } catch (error) {
+    } catch {
       showError('Export failed')
     }
   }
 
+  // Revoke certificate
   const handleRevoke = async (id) => {
-    if (!confirm('Revoke this certificate?')) return
+    const confirmed = await showConfirm('Revoke this certificate? This action cannot be undone.', {
+      title: 'Revoke Certificate',
+      confirmText: 'Revoke',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     try {
       await certificatesService.revoke(id)
       showSuccess('Certificate revoked')
       loadData()
       setSelectedCert(null)
-    } catch (error) {
+    } catch {
       showError('Revoke failed')
     }
   }
 
+  // Delete certificate
   const handleDelete = async (id) => {
-    if (!confirm('Delete this certificate permanently?')) return
+    const confirmed = await showConfirm('Delete this certificate permanently?', {
+      title: 'Delete Certificate',
+      confirmText: 'Delete',
+      variant: 'danger'
+    })
+    if (!confirmed) return
     try {
       await certificatesService.delete(id)
       showSuccess('Certificate deleted')
       loadData()
       setSelectedCert(null)
-    } catch (error) {
+    } catch {
       showError('Delete failed')
     }
   }
 
-  // Filter and normalize data
+  // Normalize and filter data
   const filteredCerts = useMemo(() => {
     let result = certificates.map(cert => ({
       ...cert,
@@ -125,74 +140,54 @@ export default function CertificatesPage() {
       cn: extractCN(cert.subject) || cert.common_name || 'Certificate'
     }))
     
-    // Apply status filter
     if (filterStatus) {
       result = result.filter(c => c.status === filterStatus)
     }
     
-    // Apply CA filter  
     if (filterCA) {
       result = result.filter(c => String(c.ca_id) === filterCA || c.caref === filterCA)
     }
     
-    // Apply search (handled by TablePageLayout if not doing server-side)
-    
     return result
   }, [certificates, filterStatus, filterCA])
 
-  // Stats for focus panel
+  // Stats
   const stats = useMemo(() => {
     const valid = certificates.filter(c => !c.revoked && c.status === 'valid').length
     const expiring = certificates.filter(c => c.status === 'expiring').length
     const revoked = certificates.filter(c => c.revoked).length
     return [
-      { icon: CheckCircle, label: 'Valid', value: valid, color: 'text-emerald-500' },
-      { icon: Warning, label: 'Expiring', value: expiring, color: 'text-amber-500' },
-      { icon: X, label: 'Revoked', value: revoked, color: 'text-red-500' },
-      { icon: Certificate, label: 'Total', value: total, color: 'text-accent-primary' }
+      { icon: CheckCircle, label: 'Valid', value: valid, variant: 'success' },
+      { icon: Warning, label: 'Expiring', value: expiring, variant: 'warning' },
+      { icon: X, label: 'Revoked', value: revoked, variant: 'danger' },
+      { icon: Certificate, label: 'Total', value: total, variant: 'primary' }
     ]
   }, [certificates, total])
 
   // Table columns
-  const columns = [
+  const columns = useMemo(() => [
     {
       key: 'cn',
-      label: 'Common Name',
+      header: 'Common Name',
+      priority: 1,
       sortable: true,
       render: (val, row) => (
         <div className="flex items-center gap-2">
           <Certificate size={16} className="text-accent-primary shrink-0" />
           <span className="font-medium truncate">{val}</span>
-          {row.source === 'acme' && (
-            <Badge variant="info" size="sm">ACME</Badge>
-          )}
-          {row.source === 'scep' && (
-            <Badge variant="warning" size="sm">SCEP</Badge>
-          )}
+          {row.source === 'acme' && <Badge variant="info" size="sm">ACME</Badge>}
+          {row.source === 'scep' && <Badge variant="warning" size="sm">SCEP</Badge>}
         </div>
       )
     },
     {
-      key: 'issuer',
-      label: 'Issuer',
-      render: (val, row) => (
-        <span className="text-text-secondary truncate">
-          {extractCN(val) || row.issuer_name || '—'}
-        </span>
-      )
-    },
-    {
       key: 'status',
-      label: 'Status',
+      header: 'Status',
+      priority: 2,
       sortable: true,
       render: (val, row) => (
         <Badge 
-          variant={
-            row.revoked ? 'danger' :
-            val === 'valid' ? 'success' : 
-            val === 'expiring' ? 'warning' : 
-            'danger'
-          }
+          variant={row.revoked ? 'danger' : val === 'valid' ? 'success' : val === 'expiring' ? 'warning' : 'danger'}
           size="sm"
         >
           {row.revoked ? 'Revoked' : val || 'Unknown'}
@@ -200,8 +195,20 @@ export default function CertificatesPage() {
       )
     },
     {
+      key: 'issuer',
+      header: 'Issuer',
+      priority: 3,
+      hideOnMobile: true,
+      render: (val, row) => (
+        <span className="text-text-secondary truncate">
+          {extractCN(val) || row.issuer_name || '—'}
+        </span>
+      )
+    },
+    {
       key: 'valid_to',
-      label: 'Expires',
+      header: 'Expires',
+      hideOnMobile: true,
       sortable: true,
       render: (val) => (
         <span className="text-xs text-text-secondary whitespace-nowrap">
@@ -211,17 +218,46 @@ export default function CertificatesPage() {
     },
     {
       key: 'key_type',
-      label: 'Key',
+      header: 'Key',
+      hideOnMobile: true,
       render: (val, row) => (
         <span className="text-xs font-mono text-text-secondary">
           {row.key_algorithm || val || 'RSA'}
         </span>
       )
     }
-  ]
+  ], [])
 
-  // Filters config
-  const filters = [
+  // Row actions
+  const rowActions = useCallback((row) => [
+    { label: 'View Details', icon: Info, onClick: () => handleSelectCert(row) },
+    { label: 'Export PEM', icon: Download, onClick: () => handleExportRow(row, 'pem') },
+    ...(canWrite('certificates') && !row.revoked ? [
+      { label: 'Revoke', icon: X, variant: 'danger', onClick: () => handleRevoke(row.id) }
+    ] : []),
+    ...(canDelete('certificates') ? [
+      { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
+    ] : [])
+  ], [canWrite, canDelete])
+
+  // Export from row
+  const handleExportRow = async (cert, format) => {
+    try {
+      const blob = await certificatesService.export(cert.id, format)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${cert.common_name || cert.cn || 'certificate'}.${format}`
+      a.click()
+      URL.revokeObjectURL(url)
+      showSuccess('Certificate exported')
+    } catch {
+      showError('Export failed')
+    }
+  }
+
+  // Filters
+  const filters = useMemo(() => [
     {
       key: 'status',
       label: 'Status',
@@ -248,25 +284,9 @@ export default function CertificatesPage() {
         label: ca.descr || ca.common_name 
       }))
     }
-  ]
+  ], [filterStatus, filterCA, cas])
 
-  // Quick filters
-  const quickFilters = [
-    {
-      icon: Warning,
-      title: 'Expiring Soon',
-      subtitle: 'Within 30 days',
-      selected: filterStatus === 'expiring',
-      onClick: () => setFilterStatus(filterStatus === 'expiring' ? '' : 'expiring')
-    },
-    {
-      icon: X,
-      title: 'Revoked',
-      subtitle: 'Invalid certificates',
-      selected: filterStatus === 'revoked',
-      onClick: () => setFilterStatus(filterStatus === 'revoked' ? '' : 'revoked')
-    }
-  ]
+  const activeFilters = (filterStatus ? 1 : 0) + (filterCA ? 1 : 0)
 
   // Help content
   const helpContent = (
@@ -291,79 +311,82 @@ export default function CertificatesPage() {
         </div>
       </HelpCard>
       <HelpCard title="Export Formats" variant="tip">
-        PEM format is most common. Use DER for Java applications, PKCS#12 for Windows.
+        PEM format is most common. Use DER for Java apps, PKCS#12 for Windows.
       </HelpCard>
     </div>
   )
 
-  // Clear all filters
-  const handleClearFilters = () => {
-    setFilterStatus('')
-    setFilterCA('')
-    setSearch('')
-  }
+  // Slide-over content
+  const slideOverContent = selectedCert ? (
+    <CertificateDetails
+      certificate={selectedCert}
+      onExport={handleExport}
+      onRevoke={() => handleRevoke(selectedCert.id)}
+      onDelete={() => handleDelete(selectedCert.id)}
+      canWrite={canWrite('certificates')}
+      canDelete={canDelete('certificates')}
+    />
+  ) : null
 
   return (
     <>
-      <TablePageLayout
+      <ResponsiveLayout
         title="Certificates"
-        loading={loading}
-        data={filteredCerts}
-        columns={columns}
-        searchable
-        searchPlaceholder="Search certificates..."
-        searchKeys={['cn', 'common_name', 'subject', 'issuer', 'serial']}
-        externalSearch={search}
-        onSearch={setSearch}
-        onRowClick={loadCertDetails}
-        filters={filters}
-        quickFilters={quickFilters}
-        onClearFilters={handleClearFilters}
+        subtitle={`${total} certificate${total !== 1 ? 's' : ''}`}
+        icon={Certificate}
         stats={stats}
+        filters={filters}
+        activeFilters={activeFilters}
+        onClearFilters={() => { setFilterStatus(''); setFilterCA('') }}
         helpContent={helpContent}
-        onRefresh={loadData}
-        emptyIcon={Certificate}
-        emptyTitle="No certificates"
-        emptyDescription="Issue your first certificate to get started"
-        emptyAction={canWrite('certificates') && (
-          <Button onClick={() => setShowIssueModal(true)}>
-            <Plus size={16} /> Issue Certificate
-          </Button>
-        )}
+        helpTitle="Certificates Help"
+        slideOverOpen={!!selectedCert}
+        slideOverTitle={selectedCert?.cn || selectedCert?.common_name || 'Certificate Details'}
+        slideOverContent={slideOverContent}
+        slideOverWidth="wide"
+        onSlideOverClose={() => setSelectedCert(null)}
         actions={canWrite('certificates') && (
-          <>
-            <Button size="sm" onClick={() => setShowIssueModal(true)} className="flex-1">
-              <Plus size={14} /> Issue
+          isMobile ? (
+            <Button size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
+              <Plus size={22} weight="bold" />
             </Button>
-          </>
+          ) : (
+            <Button size="sm" onClick={() => setShowIssueModal(true)}>
+              <Plus size={14} weight="bold" />
+              Issue
+            </Button>
+          )
         )}
-        pagination={{
-          page,
-          total,
-          perPage,
-          onChange: setPage,
-          onPerPageChange: (v) => { setPerPage(v); setPage(1) }
-        }}
-      />
-
-      {/* Certificate Details Modal */}
-      <Modal
-        open={!!selectedCert}
-        onOpenChange={() => setSelectedCert(null)}
-        title="Certificate Details"
-        size="lg"
       >
-        {selectedCert && (
-          <CertificateDetails
-            certificate={selectedCert}
-            onExport={handleExport}
-            onRevoke={() => handleRevoke(selectedCert.id)}
-            onDelete={() => handleDelete(selectedCert.id)}
-            canWrite={canWrite('certificates')}
-            canDelete={canDelete('certificates')}
-          />
-        )}
-      </Modal>
+        <ResponsiveDataTable
+          data={filteredCerts}
+          columns={columns}
+          loading={loading}
+          onRowClick={handleSelectCert}
+          selectedId={selectedCert?.id}
+          rowActions={rowActions}
+          searchable
+          searchPlaceholder="Search certificates..."
+          searchKeys={['cn', 'common_name', 'subject', 'issuer', 'serial']}
+          sortable
+          defaultSort={{ key: 'cn', direction: 'asc' }}
+          pagination={{
+            page,
+            total,
+            perPage,
+            onChange: setPage,
+            onPerPageChange: (v) => { setPerPage(v); setPage(1) }
+          }}
+          emptyIcon={Certificate}
+          emptyTitle="No certificates"
+          emptyDescription="Issue your first certificate to get started"
+          emptyAction={canWrite('certificates') && (
+            <Button onClick={() => setShowIssueModal(true)}>
+              <Plus size={16} /> Issue Certificate
+            </Button>
+          )}
+        />
+      </ResponsiveLayout>
 
       {/* Issue Certificate Modal */}
       <Modal
@@ -372,37 +395,117 @@ export default function CertificatesPage() {
         title="Issue Certificate"
         size="lg"
       >
-        <div className="p-4 space-y-4">
-          <Select
-            label="Certificate Authority"
-            placeholder="Select a CA..."
-          >
-            <option value="">Select a CA...</option>
-            {cas.map(ca => (
-              <option key={ca.id} value={ca.id}>{ca.descr || ca.common_name}</option>
-            ))}
-          </Select>
-          <Input label="Common Name" placeholder="example.com" />
-          <Textarea 
-            label="Subject Alternative Names" 
-            placeholder="DNS:example.com, DNS:www.example.com" 
-            rows={3} 
-          />
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="secondary" onClick={() => setShowIssueModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => { 
-              showSuccess('Certificate issued'); 
-              setShowIssueModal(false); 
-              loadData() 
-            }}>
-              <Certificate size={16} />
-              Issue Certificate
-            </Button>
-          </div>
-        </div>
+        <IssueCertificateForm
+          cas={cas}
+          onSubmit={async (data) => {
+            try {
+              await certificatesService.create(data)
+              showSuccess('Certificate issued')
+              setShowIssueModal(false)
+              loadData()
+            } catch (error) {
+              showError(error.message || 'Failed to issue certificate')
+            }
+          }}
+          onCancel={() => setShowIssueModal(false)}
+        />
       </Modal>
     </>
+  )
+}
+
+// Issue Certificate Form
+function IssueCertificateForm({ cas, onSubmit, onCancel }) {
+  const [formData, setFormData] = useState({
+    ca_id: '',
+    common_name: '',
+    san: '',
+    key_type: 'rsa',
+    key_size: '2048',
+    validity_days: '365'
+  })
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSubmit(formData)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <Select
+        label="Certificate Authority"
+        value={formData.ca_id}
+        onChange={(e) => setFormData(prev => ({ ...prev, ca_id: e.target.value }))}
+        required
+      >
+        <option value="">Select a CA...</option>
+        {cas.map(ca => (
+          <option key={ca.id} value={ca.id}>{ca.descr || ca.common_name}</option>
+        ))}
+      </Select>
+      
+      <Input 
+        label="Common Name" 
+        placeholder="example.com"
+        value={formData.common_name}
+        onChange={(e) => setFormData(prev => ({ ...prev, common_name: e.target.value }))}
+        required
+      />
+      
+      <Textarea 
+        label="Subject Alternative Names" 
+        placeholder="DNS:example.com&#10;DNS:www.example.com&#10;IP:192.168.1.1" 
+        rows={3}
+        value={formData.san}
+        onChange={(e) => setFormData(prev => ({ ...prev, san: e.target.value }))}
+      />
+      
+      <div className="grid grid-cols-2 gap-4">
+        <Select
+          label="Key Type"
+          value={formData.key_type}
+          onChange={(e) => setFormData(prev => ({ ...prev, key_type: e.target.value }))}
+        >
+          <option value="rsa">RSA</option>
+          <option value="ecdsa">ECDSA</option>
+        </Select>
+        
+        <Select
+          label="Key Size"
+          value={formData.key_size}
+          onChange={(e) => setFormData(prev => ({ ...prev, key_size: e.target.value }))}
+        >
+          {formData.key_type === 'rsa' ? (
+            <>
+              <option value="2048">2048 bits</option>
+              <option value="4096">4096 bits</option>
+            </>
+          ) : (
+            <>
+              <option value="256">P-256</option>
+              <option value="384">P-384</option>
+            </>
+          )}
+        </Select>
+      </div>
+      
+      <Input 
+        label="Validity (days)" 
+        type="number"
+        placeholder="365"
+        value={formData.validity_days}
+        onChange={(e) => setFormData(prev => ({ ...prev, validity_days: e.target.value }))}
+      />
+      
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit">
+          <Certificate size={16} />
+          Issue Certificate
+        </Button>
+      </div>
+    </form>
   )
 }
