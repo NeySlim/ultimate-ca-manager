@@ -2,7 +2,7 @@
  * CSRDetails Component
  * 
  * Reusable component for displaying Certificate Signing Request details.
- * Can be used in modals, slide-overs, or standalone pages.
+ * Uses global Compact components for consistent styling.
  */
 import { useState } from 'react'
 import { 
@@ -20,12 +20,11 @@ import {
   Buildings,
   MapPin,
   Hash,
-  CaretDown,
-  CaretUp,
   ListBullets
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
+import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { cn } from '../lib/utils'
 
 // Format date helper
@@ -46,86 +45,6 @@ function formatDate(dateStr, format = 'full') {
   } catch {
     return dateStr
   }
-}
-
-// Copy to clipboard helper
-async function copyToClipboard(text, onSuccess) {
-  try {
-    await navigator.clipboard.writeText(text)
-    onSuccess?.()
-  } catch (err) {
-    console.error('Failed to copy:', err)
-  }
-}
-
-// Section component
-function Section({ title, children, collapsible = false, defaultOpen = true }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
-  
-  return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <button
-        type="button"
-        onClick={() => collapsible && setIsOpen(!isOpen)}
-        className={cn(
-          "w-full px-3 py-2 bg-bg-tertiary/50 flex items-center justify-between text-left",
-          collapsible && "cursor-pointer hover:bg-bg-tertiary"
-        )}
-        disabled={!collapsible}
-      >
-        <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-          {title}
-        </span>
-        {collapsible && (
-          isOpen ? <CaretUp size={14} className="text-text-tertiary" /> : <CaretDown size={14} className="text-text-tertiary" />
-        )}
-      </button>
-      {isOpen && (
-        <div className="p-3 space-y-2">
-          {children}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Field component
-function Field({ icon: Icon, label, value, mono = false, copyable = false, className }) {
-  const [copied, setCopied] = useState(false)
-  
-  if (!value && value !== 0) return null
-  
-  const handleCopy = (e) => {
-    e.stopPropagation()
-    copyToClipboard(String(value), () => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }
-  
-  return (
-    <div className={cn("flex items-start gap-2", className)}>
-      {Icon && <Icon size={14} className="text-text-tertiary mt-0.5 shrink-0" />}
-      <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-wider text-text-tertiary">{label}</div>
-        <div className={cn(
-          "text-xs text-text-primary break-all",
-          mono && "font-mono"
-        )}>
-          {value}
-          {copyable && (
-            <button 
-              type="button"
-              onClick={handleCopy}
-              className="ml-2 text-text-tertiary hover:text-text-primary inline-flex"
-            >
-              {copied ? <CheckCircle size={12} className="text-status-success" /> : <Copy size={12} />}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // Status configuration
@@ -220,61 +139,59 @@ export function CSRDetails({
       )}
       
       {/* Subject Information */}
-      <Section title="Subject">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-          <Field icon={Globe} label="Common Name" value={csr.common_name || csr.cn} />
-          <Field icon={Buildings} label="Organization" value={csr.organization || csr.o} />
-          <Field label="Organizational Unit" value={csr.organizational_unit || csr.ou} />
-          <Field icon={MapPin} label="Locality" value={csr.locality || csr.l} />
-          <Field label="State/Province" value={csr.state || csr.st} />
-          <Field label="Country" value={csr.country || csr.c} />
-          <Field icon={Envelope} label="Email" value={csr.email} />
-        </div>
-      </Section>
+      <CompactSection title="Subject">
+        <CompactGrid>
+          <CompactField icon={Globe} label="Common Name" value={csr.common_name || csr.cn} />
+          <CompactField icon={Buildings} label="Organization" value={csr.organization || csr.o} />
+          <CompactField label="Org Unit" value={csr.organizational_unit || csr.ou} />
+          <CompactField icon={MapPin} label="Locality" value={csr.locality || csr.l} />
+          <CompactField label="State" value={csr.state || csr.st} />
+          <CompactField label="Country" value={csr.country || csr.c} />
+          <CompactField icon={Envelope} label="Email" value={csr.email} colSpan={2} />
+        </CompactGrid>
+      </CompactSection>
       
       {/* Subject Alternative Names */}
       {(csr.san || csr.sans || csr.san_dns || csr.san_ip) && (
-        <Section title="Subject Alternative Names">
-          <div className="space-y-2">
+        <CompactSection title="Subject Alternative Names">
+          <CompactGrid cols={1}>
             {csr.san_dns && csr.san_dns.length > 0 && (
-              <Field 
+              <CompactField 
                 icon={Globe} 
                 label="DNS Names" 
                 value={Array.isArray(csr.san_dns) ? csr.san_dns.join(', ') : csr.san_dns} 
               />
             )}
             {csr.san_ip && csr.san_ip.length > 0 && (
-              <Field 
+              <CompactField 
                 icon={ListBullets} 
                 label="IP Addresses" 
                 value={Array.isArray(csr.san_ip) ? csr.san_ip.join(', ') : csr.san_ip} 
               />
             )}
             {csr.san && !csr.san_dns && !csr.san_ip && (
-              <Field icon={ListBullets} label="SANs" value={csr.san} />
+              <CompactField icon={ListBullets} label="SANs" value={csr.san} />
             )}
             {csr.sans && (
-              <Field icon={ListBullets} label="SANs" value={csr.sans} />
+              <CompactField icon={ListBullets} label="SANs" value={csr.sans} />
             )}
-          </div>
-        </Section>
+          </CompactGrid>
+        </CompactSection>
       )}
       
       {/* Technical Details */}
-      <Section title="Technical Details">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-          <Field icon={Key} label="Key Algorithm" value={csr.key_algorithm || csr.key_type} />
-          <Field label="Key Size" value={csr.key_size} />
-          <Field label="Signature Algorithm" value={csr.signature_algorithm} />
-          {csr.subject && (
-            <Field label="Subject DN" value={csr.subject} className="col-span-2" mono />
-          )}
-        </div>
-      </Section>
+      <CompactSection title="Technical Details">
+        <CompactGrid>
+          <CompactField icon={Key} label="Key Algorithm" value={csr.key_algorithm || csr.key_type} />
+          <CompactField label="Key Size" value={csr.key_size} />
+          <CompactField label="Sig Algo" value={csr.signature_algorithm} />
+          <CompactField label="Subject DN" value={csr.subject} mono colSpan={2} />
+        </CompactGrid>
+      </CompactSection>
       
       {/* PEM */}
       {showPem && csr.pem && (
-        <Section title="CSR PEM" collapsible defaultOpen={false}>
+        <CompactSection title="CSR PEM" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
               "text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
@@ -304,32 +221,27 @@ export function CSRDetails({
               variant="ghost"
               onClick={(e) => {
                 e.stopPropagation()
-                copyToClipboard(csr.pem, () => {
-                  setPemCopied(true)
-                  setTimeout(() => setPemCopied(false), 2000)
-                })
+                navigator.clipboard.writeText(csr.pem)
+                setPemCopied(true)
+                setTimeout(() => setPemCopied(false), 2000)
               }}
             >
               {pemCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
               {pemCopied ? 'Copied!' : 'Copy PEM'}
             </Button>
           </div>
-        </Section>
+        </CompactSection>
       )}
       
       {/* Metadata */}
-      <Section title="Metadata" collapsible defaultOpen={false}>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-          <Field icon={Calendar} label="Created At" value={formatDate(csr.created_at)} />
-          <Field label="Created By" value={csr.created_by} />
-          {csr.signed_at && (
-            <Field label="Signed At" value={formatDate(csr.signed_at)} />
-          )}
-          {csr.signed_by && (
-            <Field label="Signed By" value={csr.signed_by} />
-          )}
-        </div>
-      </Section>
+      <CompactSection title="Metadata" collapsible defaultOpen={false}>
+        <CompactGrid>
+          <CompactField icon={Calendar} label="Created At" value={formatDate(csr.created_at)} />
+          <CompactField label="Created By" value={csr.created_by} />
+          <CompactField label="Signed At" value={csr.signed_at ? formatDate(csr.signed_at) : null} />
+          <CompactField label="Signed By" value={csr.signed_by} />
+        </CompactGrid>
+      </CompactSection>
     </div>
   )
 }

@@ -2,7 +2,7 @@
  * CADetails Component
  * 
  * Reusable component for displaying Certificate Authority details.
- * Can be used in modals, slide-overs, or standalone pages.
+ * Uses global Compact components for consistent styling.
  */
 import { useState } from 'react'
 import { 
@@ -15,7 +15,6 @@ import {
   Trash,
   Copy,
   CheckCircle,
-  Warning,
   ShieldCheck,
   Globe,
   Envelope,
@@ -24,12 +23,11 @@ import {
   Hash,
   Fingerprint,
   TreeStructure,
-  CaretDown,
-  CaretUp,
   Link
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
+import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { cn } from '../lib/utils'
 
 // Format date helper
@@ -50,86 +48,6 @@ function formatDate(dateStr, format = 'full') {
   } catch {
     return dateStr
   }
-}
-
-// Copy to clipboard helper
-async function copyToClipboard(text, onSuccess) {
-  try {
-    await navigator.clipboard.writeText(text)
-    onSuccess?.()
-  } catch (err) {
-    console.error('Failed to copy:', err)
-  }
-}
-
-// Section component
-function Section({ title, children, collapsible = false, defaultOpen = true }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
-  
-  return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <button
-        type="button"
-        onClick={() => collapsible && setIsOpen(!isOpen)}
-        className={cn(
-          "w-full px-3 py-2 bg-bg-tertiary/50 flex items-center justify-between text-left",
-          collapsible && "cursor-pointer hover:bg-bg-tertiary"
-        )}
-        disabled={!collapsible}
-      >
-        <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-          {title}
-        </span>
-        {collapsible && (
-          isOpen ? <CaretUp size={14} className="text-text-tertiary" /> : <CaretDown size={14} className="text-text-tertiary" />
-        )}
-      </button>
-      {isOpen && (
-        <div className="p-3 space-y-2">
-          {children}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Field component
-function Field({ icon: Icon, label, value, mono = false, copyable = false, className }) {
-  const [copied, setCopied] = useState(false)
-  
-  if (!value && value !== 0) return null
-  
-  const handleCopy = (e) => {
-    e.stopPropagation()
-    copyToClipboard(String(value), () => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }
-  
-  return (
-    <div className={cn("flex items-start gap-2", className)}>
-      {Icon && <Icon size={14} className="text-text-tertiary mt-0.5 shrink-0" />}
-      <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-wider text-text-tertiary">{label}</div>
-        <div className={cn(
-          "text-xs text-text-primary break-all",
-          mono && "font-mono"
-        )}>
-          {value}
-          {copyable && (
-            <button 
-              type="button"
-              onClick={handleCopy}
-              className="ml-2 text-text-tertiary hover:text-text-primary inline-flex"
-            >
-              {copied ? <CheckCircle size={12} className="text-status-success" /> : <Copy size={12} />}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 export function CADetails({ 
@@ -243,70 +161,70 @@ export function CADetails({
       )}
       
       {/* Subject Information */}
-      <Section title="Subject">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-          <Field icon={Globe} label="Common Name" value={ca.common_name} />
-          <Field icon={Buildings} label="Organization" value={ca.organization} />
-          <Field label="Organizational Unit" value={ca.organizational_unit} />
-          <Field icon={MapPin} label="Locality" value={ca.locality} />
-          <Field label="State/Province" value={ca.state} />
-          <Field label="Country" value={ca.country} />
-          <Field icon={Envelope} label="Email" value={ca.email} />
-        </div>
-      </Section>
+      <CompactSection title="Subject">
+        <CompactGrid>
+          <CompactField icon={Globe} label="Common Name" value={ca.common_name} />
+          <CompactField icon={Buildings} label="Organization" value={ca.organization} />
+          <CompactField label="Org Unit" value={ca.organizational_unit} />
+          <CompactField icon={MapPin} label="Locality" value={ca.locality} />
+          <CompactField label="State" value={ca.state} />
+          <CompactField label="Country" value={ca.country} />
+          <CompactField icon={Envelope} label="Email" value={ca.email} colSpan={2} />
+        </CompactGrid>
+      </CompactSection>
       
       {/* Issuer (if intermediate) */}
       {!ca.is_root && ca.issuer && (
-        <Section title="Issuer">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-            <Field icon={TreeStructure} label="Issuer DN" value={ca.issuer} className="col-span-2" />
-          </div>
-        </Section>
+        <CompactSection title="Issuer">
+          <CompactGrid cols={1}>
+            <CompactField icon={TreeStructure} label="Issuer DN" value={ca.issuer} />
+          </CompactGrid>
+        </CompactSection>
       )}
       
       {/* Validity Period */}
-      <Section title="Validity">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-          <Field icon={Calendar} label="Valid From" value={formatDate(ca.valid_from)} />
-          <Field icon={Calendar} label="Valid Until" value={formatDate(ca.valid_to)} />
-        </div>
-      </Section>
+      <CompactSection title="Validity">
+        <CompactGrid>
+          <CompactField icon={Calendar} label="Valid From" value={formatDate(ca.valid_from)} />
+          <CompactField icon={Calendar} label="Valid Until" value={formatDate(ca.valid_to)} />
+        </CompactGrid>
+      </CompactSection>
       
       {/* Technical Details */}
-      <Section title="Technical Details">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-          <Field icon={Hash} label="Serial Number" value={ca.serial} mono copyable />
-          <Field icon={Key} label="Key Type" value={ca.key_type} />
-          <Field label="Signature Algorithm" value={ca.signature_algorithm || ca.hash_algorithm} />
-          <Field label="Subject DN" value={ca.subject} className="col-span-2" mono />
-        </div>
-      </Section>
+      <CompactSection title="Technical Details">
+        <CompactGrid>
+          <CompactField icon={Hash} label="Serial" value={ca.serial} mono copyable />
+          <CompactField icon={Key} label="Key Type" value={ca.key_type} />
+          <CompactField label="Sig Algo" value={ca.signature_algorithm || ca.hash_algorithm} />
+          <CompactField label="Subject DN" value={ca.subject} mono colSpan={2} />
+        </CompactGrid>
+      </CompactSection>
       
       {/* CRL/OCSP Configuration */}
       {(ca.cdp_enabled || ca.ocsp_enabled) && (
-        <Section title="Revocation Configuration">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+        <CompactSection title="Revocation Configuration">
+          <CompactGrid cols={1}>
             {ca.cdp_enabled && (
-              <Field icon={Link} label="CRL Distribution Point" value={ca.cdp_url} className="col-span-2" mono />
+              <CompactField icon={Link} label="CRL Distribution Point" value={ca.cdp_url} mono />
             )}
             {ca.ocsp_enabled && (
-              <Field icon={Link} label="OCSP URL" value={ca.ocsp_url} className="col-span-2" mono />
+              <CompactField icon={Link} label="OCSP URL" value={ca.ocsp_url} mono />
             )}
-          </div>
-        </Section>
+          </CompactGrid>
+        </CompactSection>
       )}
       
       {/* Fingerprints */}
-      <Section title="Fingerprints" collapsible defaultOpen={false}>
-        <div className="space-y-2">
-          <Field icon={Fingerprint} label="SHA-256" value={ca.thumbprint_sha256} mono copyable />
-          <Field icon={Fingerprint} label="SHA-1" value={ca.thumbprint_sha1} mono copyable />
-        </div>
-      </Section>
+      <CompactSection title="Fingerprints" collapsible defaultOpen={false}>
+        <CompactGrid cols={1}>
+          <CompactField icon={Fingerprint} label="SHA-256" value={ca.thumbprint_sha256} mono copyable />
+          <CompactField icon={Fingerprint} label="SHA-1" value={ca.thumbprint_sha1} mono copyable />
+        </CompactGrid>
+      </CompactSection>
       
       {/* PEM */}
       {showPem && ca.pem && (
-        <Section title="PEM Certificate" collapsible defaultOpen={false}>
+        <CompactSection title="PEM Certificate" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
               "text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
@@ -336,29 +254,26 @@ export function CADetails({
               variant="ghost"
               onClick={(e) => {
                 e.stopPropagation()
-                copyToClipboard(ca.pem, () => {
-                  setPemCopied(true)
-                  setTimeout(() => setPemCopied(false), 2000)
-                })
+                navigator.clipboard.writeText(ca.pem)
+                setPemCopied(true)
+                setTimeout(() => setPemCopied(false), 2000)
               }}
             >
               {pemCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
               {pemCopied ? 'Copied!' : 'Copy PEM'}
             </Button>
           </div>
-        </Section>
+        </CompactSection>
       )}
       
       {/* Metadata */}
-      <Section title="Metadata" collapsible defaultOpen={false}>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-          <Field label="Created At" value={formatDate(ca.created_at)} />
-          <Field label="Created By" value={ca.created_by} />
-          {ca.imported_from && (
-            <Field label="Imported From" value={ca.imported_from} className="col-span-2" />
-          )}
-        </div>
-      </Section>
+      <CompactSection title="Metadata" collapsible defaultOpen={false}>
+        <CompactGrid>
+          <CompactField label="Created At" value={formatDate(ca.created_at)} />
+          <CompactField label="Created By" value={ca.created_by} />
+          <CompactField label="Imported From" value={ca.imported_from} colSpan={2} />
+        </CompactGrid>
+      </CompactSection>
     </div>
   )
 }
