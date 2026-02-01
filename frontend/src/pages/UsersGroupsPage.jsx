@@ -543,27 +543,28 @@ export default function UsersGroupsPage() {
         slideOverWidth="lg"
         onSlideOverClose={() => { setSelectedUser(null); setSelectedGroup(null) }}
       >
-        {/* Tabs */}
-        <div className="flex gap-1 mb-4 p-1 bg-bg-tertiary rounded-lg w-fit">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
-                activeTab === tab.id
-                  ? "bg-bg-primary text-text-primary shadow-sm"
-                  : "text-text-secondary hover:text-text-primary"
-              )}
-            >
-              <tab.icon size={16} />
-              {tab.label}
-              <span className="text-xs opacity-60">({tab.count})</span>
-            </button>
-          ))}
-        </div>
+        <div className="flex flex-col h-full min-h-0">
+          {/* Tabs */}
+          <div className="shrink-0 flex gap-1 mb-3 p-1 bg-bg-tertiary rounded-lg w-fit">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors",
+                  activeTab === tab.id
+                    ? "bg-bg-primary text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                )}
+              >
+                <tab.icon size={16} />
+                {tab.label}
+                <span className="text-xs opacity-60">({tab.count})</span>
+              </button>
+            ))}
+          </div>
 
-        <ResponsiveDataTable
+          <ResponsiveDataTable
           data={currentData}
           columns={currentColumns}
           loading={loading}
@@ -626,6 +627,7 @@ export default function UsersGroupsPage() {
             </Button>
           )}
         />
+        </div>
       </ResponsiveLayout>
 
       {/* User Modal */}
