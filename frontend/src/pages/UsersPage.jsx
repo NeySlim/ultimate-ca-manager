@@ -628,7 +628,7 @@ function UserForm({ user, onSubmit, onCancel }) {
         <label htmlFor="active" className="text-sm text-text-primary">Active</label>
       </div>
       
-      <div className="flex justify-end gap-3 pt-4">
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
         <Button type="submit">{user ? 'Save Changes' : 'Create User'}</Button>
       </div>
