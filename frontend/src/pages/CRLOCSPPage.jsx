@@ -413,6 +413,15 @@ export default function CRLOCSPPage() {
       subtitle={`${crls.length} active CRLs`}
       stats={headerStats}
       helpContent={helpContent}
+      splitView={true}
+      splitEmptyContent={
+        <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
+            <FileX size={24} className="text-text-tertiary" />
+          </div>
+          <p className="text-sm text-text-secondary">Select a CA to manage CRLs</p>
+        </div>
+      }
       slideOverOpen={!!selectedCA}
       onSlideOverClose={() => { setSelectedCA(null); setSelectedCRL(null); }}
       slideOverTitle="CRL Details"
