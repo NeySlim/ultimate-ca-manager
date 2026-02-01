@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.5] - 2026-02-01
+
+### 🎨 Visual Refresh: "Soft Depth" Design
+
+#### Added
+- **Enhanced Badge Component**
+  - Icon support with `icon` prop
+  - Pulse animation for status dots (`pulse` prop)
+  - Richer color variants with better dark/light mode support
+
+- **Enhanced Card Component**
+  - Variants: `default`, `elevated`, `bordered`
+  - Accent colors for left border highlights
+  - Sub-components: `Card.Header`, `Card.Body`, `Card.Footer`
+
+- **CSS Utilities**
+  - `.depth-card` - Layered shadow for soft depth effect
+  - Improved focus states and transitions
+
+#### Changed
+- **Dashboard Visual Refresh**
+  - Stats cards with gradient backgrounds and colored icons
+  - System Health section with gradient status indicators
+  - Service badges with pulse animation for active services
+  - Activity feed with animated "Live" badge
+  - ACME Accounts section integrated in footer
+
+- **Settings Page** - Horizontal tabs layout (General, Appearance, Email, Security, SSO, Backup, Audit, Database, HTTPS)
+- **Import/Export Page** - Grouped horizontal tabs (IMPORT | EXPORT)
+- **Templates Page** - Added row actions (Duplicate, Export, Delete)
+- **Table Hover** - Subtle elevation effect on row hover
+
+#### Fixed
+- Groups pagination using ResponsiveDataTable
+- Templates/CRL pages now have search bars
+- EmptyState icon color for dark/light mode visibility
+
+---
+
 ## [2.0.4] - 2026-02-01
 
 ### 🎨 Phase 10: Responsive UI Architecture
