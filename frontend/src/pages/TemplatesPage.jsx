@@ -198,9 +198,20 @@ export default function TemplatesPage() {
     })
   }, [templates, searchQuery, filterType])
 
+  // Helper to determine template type
+  const getTemplateType = useCallback((t) => {
+    if (t.type) return t.type
+    // Infer from name or key_usage
+    const name = (t.name || '').toLowerCase()
+    if (name.includes('ca') || name.includes('authority') || t.is_ca || t.basic_constraints?.ca) {
+      return 'ca'
+    }
+    return 'certificate'
+  }, [])
+
   // Calculate stats
-  const certTemplates = templates.filter(t => t.type === 'certificate').length
-  const caTemplates = templates.filter(t => t.type === 'ca').length
+  const certTemplates = templates.filter(t => getTemplateType(t) === 'certificate').length
+  const caTemplates = templates.filter(t => getTemplateType(t) === 'ca').length
   const totalUsage = templates.reduce((sum, t) => sum + (t.usage_count || 0), 0)
 
   // Stats for header
@@ -227,11 +238,14 @@ export default function TemplatesPage() {
       key: 'type', 
       label: 'Type',
       width: '100px',
-      render: (v) => (
-        <Badge variant={v === 'ca' ? 'warning' : 'secondary'} size="sm">
-          {v === 'ca' ? 'CA' : 'Certificate'}
-        </Badge>
-      )
+      render: (v, row) => {
+        const type = getTemplateType(row)
+        return (
+          <Badge variant={type === 'ca' ? 'warning' : 'secondary'} size="sm">
+            {type === 'ca' ? 'CA' : 'Certificate'}
+          </Badge>
+        )
+      }
     },
     { 
       key: 'validity_days', 
@@ -245,7 +259,7 @@ export default function TemplatesPage() {
       width: '80px',
       render: (v) => <span className="text-text-secondary">{v || 0}x</span>
     }
-  ], [])
+  ], [getTemplateType])
 
   // Filters
   const filters = useMemo(() => [

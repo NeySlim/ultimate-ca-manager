@@ -528,6 +528,18 @@ export default function ImportExportPage() {
                 </div>
               </DetailGrid>
             </DetailSection>
+            
+            {/* Primary action button at bottom */}
+            <div className="pt-4 border-t border-border/50">
+              <Button
+                onClick={handleImportCertificate}
+                disabled={processing || (!selectedFile && !pemContent.trim())}
+                className="w-full md:w-auto"
+              >
+                <FileArrowUp size={18} />
+                {processing ? 'Importing...' : 'Import Certificate'}
+              </Button>
+            </div>
           </div>
         )}
 
@@ -605,6 +617,18 @@ export default function ImportExportPage() {
                 </div>
               </DetailGrid>
             </DetailSection>
+            
+            {/* Primary action button at bottom */}
+            <div className="pt-4 border-t border-border/50">
+              <Button
+                onClick={handleImportCA}
+                disabled={processing || (!selectedCAFile && !caPemContent.trim())}
+                className="w-full md:w-auto"
+              >
+                <FileArrowUp size={18} />
+                {processing ? 'Importing...' : 'Import CA'}
+              </Button>
+            </div>
           </div>
         )}
 
