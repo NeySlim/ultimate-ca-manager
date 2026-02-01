@@ -503,53 +503,52 @@ export default function DashboardPage() {
   )
 }
 
-// Enhanced Stat Card with live indicator - uses theme CSS classes
+// Enhanced Stat Card with live indicator and visual effects
 function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
-  // Map color names to CSS class-based styles (theme-aware)
-  const colors = {
-    blue: {
-      card: 'stat-card-primary',
-      icon: 'status-primary-bg status-primary-text',
-    },
-    purple: {
-      card: 'stat-card-primary', // Use primary for purple (theme respects accent)
-      icon: 'status-primary-bg status-primary-text',
-    },
-    yellow: {
-      card: 'stat-card-warning',
-      icon: 'status-warning-bg status-warning-text',
-    },
-    emerald: {
-      card: 'stat-card-success',
-      icon: 'status-success-bg status-success-text',
-    },
-    slate: {
-      card: 'bg-bg-secondary border-border/60 hover:border-border',
-      icon: 'bg-bg-tertiary text-text-secondary',
-    },
+  // Map color names to CSS variable for accent
+  const accentMap = {
+    blue: '--accent-primary',
+    purple: '--accent-primary',
+    yellow: '--accent-warning',
+    emerald: '--accent-success',
+    slate: '--text-tertiary',
   }
   
-  const style = colors[color] || colors.slate
+  const colorClasses = {
+    blue: 'primary',
+    purple: 'primary',
+    yellow: 'warning',
+    emerald: 'success',
+    slate: '',
+  }
+  
+  const iconStyles = {
+    blue: 'status-primary-bg status-primary-text',
+    purple: 'status-primary-bg status-primary-text',
+    yellow: 'status-warning-bg status-warning-text',
+    emerald: 'status-success-bg status-success-text',
+    slate: 'bg-bg-tertiary text-text-secondary',
+  }
+  
+  const variant = colorClasses[color] || ''
+  const accentVar = accentMap[color] || accentMap.slate
   
   return (
     <button 
       onClick={onClick}
-      className={`
-        relative p-4 rounded-xl border transition-all duration-200 text-left group
-        hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] shadow-sm
-        ${style.card}
-      `}
+      className={`stat-card-enhanced ${variant} relative p-4 text-left group`}
+      style={{ '--card-accent': `var(${accentVar})` }}
     >
-      {/* Live indicator - uses theme success color */}
+      {/* Live indicator */}
       {live && (
-        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
           <span className="text-[10px] status-success-text font-medium opacity-0 group-hover:opacity-100 transition-opacity">Live</span>
-          <div className="w-2 h-2 rounded-full status-success-bg-solid animate-pulse" />
+          <div className="w-2 h-2 rounded-full status-success-bg-solid animate-pulse-soft" />
         </div>
       )}
       
-      <div className="flex items-center gap-3">
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${style.icon}`}>
+      <div className="relative flex items-center gap-3">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${iconStyles[color] || iconStyles.slate}`}>
           <Icon size={24} weight="duotone" />
         </div>
         <div className="min-w-0">

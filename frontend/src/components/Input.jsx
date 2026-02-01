@@ -1,5 +1,5 @@
 /**
- * Input Component - Text input with label and error
+ * Input Component - Text input with label, error, and enhanced focus
  */
 import { forwardRef } from 'react'
 import { cn } from '../lib/utils'
@@ -13,9 +13,9 @@ export const Input = forwardRef(function Input({
   ...props 
 }, ref) {
   return (
-    <div className={cn("space-y-1", className)}>
+    <div className={cn("space-y-1.5", className)}>
       {label && (
-        <label className="block text-xs font-medium text-text-primary">
+        <label className="block text-xs font-medium text-text-secondary">
           {label}
           {props.required && <span className="status-danger-text ml-1">*</span>}
         </label>
@@ -23,22 +23,30 @@ export const Input = forwardRef(function Input({
       
       <div className="relative">
         {icon && (
-          <div className="absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary">
+          <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary">
             {icon}
           </div>
         )}
         <input
           ref={ref}
           className={cn(
-            "w-full px-2.5 py-1.5 bg-bg-secondary border rounded-md text-sm text-text-primary placeholder-text-secondary/60",
-            "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary focus:bg-bg-secondary",
+            "w-full px-3 py-2 bg-bg-tertiary border rounded-lg text-sm text-text-primary placeholder-text-tertiary",
+            "transition-all duration-150",
+            "hover:border-text-tertiary",
+            "focus:outline-none focus:border-accent-primary",
             "disabled:opacity-50 disabled:cursor-not-allowed",
-            "transition-all duration-200",
-            "hover:border-text-secondary/50",
-            error && "border-accent-danger focus:ring-accent-danger/50 focus:border-accent-danger",
-            !error && "border-border",
-            icon && "pl-8"
+            error ? "border-accent-danger" : "border-border",
+            icon && "pl-9"
           )}
+          style={{
+            '--focus-shadow': 'color-mix(in srgb, var(--accent-primary) 15%, transparent)'
+          }}
+          onFocus={(e) => {
+            e.target.style.boxShadow = '0 0 0 3px var(--focus-shadow), 0 1px 2px color-mix(in srgb, var(--accent-primary) 10%, transparent)';
+          }}
+          onBlur={(e) => {
+            e.target.style.boxShadow = '';
+          }}
           {...props}
         />
       </div>
@@ -48,7 +56,7 @@ export const Input = forwardRef(function Input({
       )}
       
       {helperText && !error && (
-        <p className="text-xs text-text-secondary">{helperText}</p>
+        <p className="text-xs text-text-tertiary">{helperText}</p>
       )}
     </div>
   )
