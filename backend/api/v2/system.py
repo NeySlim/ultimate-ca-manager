@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 bp = Blueprint('system_v2', __name__)
 
-@bp.route('/api/v2/system/db/stats', methods=['GET'])
+@bp.route('/api/v2/system/database/stats', methods=['GET'])
 @require_auth(['read:settings'])
 def get_db_stats():
     """Get database statistics"""
@@ -48,7 +48,7 @@ def get_db_stats():
     except Exception as e:
         return error_response(f"Failed to get stats: {str(e)}")
 
-@bp.route('/api/v2/system/db/optimize', methods=['POST'])
+@bp.route('/api/v2/system/database/optimize', methods=['POST'])
 @require_auth(['admin:system'])
 def optimize_db():
     """Run VACUUM and ANALYZE"""
@@ -59,7 +59,7 @@ def optimize_db():
     except Exception as e:
         return error_response(f"Optimization failed: {str(e)}")
 
-@bp.route('/api/v2/system/db/integrity-check', methods=['POST'])
+@bp.route('/api/v2/system/database/integrity-check', methods=['POST'])
 @require_auth(['admin:system'])
 def check_integrity():
     """Run PRAGMA integrity_check"""
@@ -71,6 +71,75 @@ def check_integrity():
             return error_response(f"Integrity check failed: {result}")
     except Exception as e:
         return error_response(f"Check failed: {str(e)}")
+
+@bp.route('/api/v2/system/database/export', methods=['GET'])
+@require_auth(['admin:system'])
+def export_db():
+    """Export database as SQL dump"""
+    try:
+        import io
+        db_path = current_app.config.get('SQLALCHEMY_DATABASE_URI', '').replace('sqlite:///', '')
+        
+        if not os.path.exists(db_path):
+            return error_response("Database not found")
+        
+        # Create SQL dump using sqlite3
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        sql_dump = io.StringIO()
+        for line in conn.iterdump():
+            sql_dump.write(f"{line}\n")
+        conn.close()
+        
+        from flask import Response
+        return Response(
+            sql_dump.getvalue(),
+            mimetype='application/sql',
+            headers={'Content-Disposition': f'attachment; filename=ucm_database_{datetime.now().strftime("%Y%m%d_%H%M%S")}.sql'}
+        )
+    except Exception as e:
+        return error_response(f"Export failed: {str(e)}")
+
+@bp.route('/api/v2/system/database/reset', methods=['POST'])
+@require_auth(['admin:system'])
+def reset_db():
+    """Reset database to initial state - DANGEROUS"""
+    try:
+        from services.audit_service import AuditService
+        from auth.unified import get_current_user
+        
+        current_user = get_current_user()
+        
+        # Log this critical action before reset
+        AuditService.log(
+            action='database_reset',
+            resource_type='system',
+            resource_id='database',
+            details={'initiated_by': current_user.get('username', 'unknown')},
+            user_id=current_user.get('id')
+        )
+        
+        # Drop all tables and recreate
+        db.drop_all()
+        db.create_all()
+        
+        # Create default admin user
+        from models import User
+        from werkzeug.security import generate_password_hash
+        
+        admin = User(
+            username='admin',
+            email='admin@localhost',
+            password_hash=generate_password_hash('changeme123'),
+            role='admin',
+            is_active=True
+        )
+        db.session.add(admin)
+        db.session.commit()
+        
+        return success_response(message="Database reset successfully. Default admin user created.")
+    except Exception as e:
+        return error_response(f"Reset failed: {str(e)}")
 
 @bp.route('/api/v2/system/https/cert-info', methods=['GET'])
 @require_auth(['read:settings'])
@@ -161,20 +230,6 @@ def apply_https_cert():
     # Logic to write cert.crt and cert.key to system location
     # and trigger restart
     return success_response(message="Certificate applied. Service restart required.")
-
-@bp.route('/api/v2/system/db/export', methods=['GET'])
-@require_auth(['admin:system'])
-def export_db():
-    """Export SQL dump"""
-    # Placeholder: Return a dummy file
-    return "SQL DUMP CONTENT", 200, {'Content-Type': 'application/sql', 'Content-Disposition': 'attachment; filename=dump.sql'}
-
-@bp.route('/api/v2/system/db/reset', methods=['POST'])
-@require_auth(['admin:system'])
-def reset_pki():
-    """Reset PKI Database"""
-    # Logic to drop tables or delete file
-    return success_response(message="PKI Database reset successfully. System restarting...")
 
 @bp.route('/api/v2/system/backup', methods=['POST'])
 @bp.route('/api/v2/system/backup/create', methods=['POST'])
