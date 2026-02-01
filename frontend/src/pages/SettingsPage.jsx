@@ -1,6 +1,6 @@
 /**
- * Settings Page - Uses PageLayout with FocusPanel for category navigation
- * Migrated to use DetailCard design system
+ * Settings Page - Horizontal tabs for desktop, scrollable for mobile
+ * Uses DetailCard design system
  * 
  * Pro features (SSO) are dynamically added when Pro module is present
  */
@@ -8,29 +8,30 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
-  Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop
+  Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop,
+  Question
 } from '@phosphor-icons/react'
 import {
-  PageLayout, FocusItem, Button, Input, Select, Badge, Card,
-  LoadingSpinner, FileUpload, Modal, HelpCard,
+  Button, Input, Select, Badge, Card,
+  LoadingSpinner, FileUpload, Modal, HelpCard, HelpModal,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
-import { useNotification } from '../contexts'
+import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate } from '../lib/utils'
+import { formatDate, cn } from '../lib/utils'
 import { useTheme } from '../contexts/ThemeContext'
 
 // Base settings categories (Community)
 const BASE_SETTINGS_CATEGORIES = [
-  { id: 'general', label: 'General', icon: Gear, description: 'System name, URL, timezone' },
-  { id: 'appearance', label: 'Appearance', icon: Palette, description: 'Theme and display' },
-  { id: 'email', label: 'Email', icon: EnvelopeSimple, description: 'SMTP configuration' },
-  { id: 'security', label: 'Security', icon: ShieldCheck, description: 'Password, 2FA, sessions' },
-  { id: 'backup', label: 'Backup', icon: Database, description: 'Backup & restore' },
-  { id: 'audit', label: 'Audit Log', icon: ListBullets, description: 'Logging settings' },
-  { id: 'database', label: 'Database', icon: HardDrives, description: 'Database management' },
-  { id: 'https', label: 'HTTPS', icon: Lock, description: 'Certificate management' },
+  { id: 'general', label: 'General', icon: Gear },
+  { id: 'appearance', label: 'Appearance', icon: Palette },
+  { id: 'email', label: 'Email', icon: EnvelopeSimple },
+  { id: 'security', label: 'Security', icon: ShieldCheck },
+  { id: 'backup', label: 'Backup', icon: Database },
+  { id: 'audit', label: 'Audit', icon: ListBullets },
+  { id: 'database', label: 'Database', icon: HardDrives },
+  { id: 'https', label: 'HTTPS', icon: Lock },
 ]
 
 // Appearance Settings Component
@@ -1099,22 +1100,8 @@ export default function SettingsPage() {
     </div>
   )
 
-  // Focus panel content (category list)
-  const focusContent = (
-    <div className="p-2 space-y-1.5">
-      {SETTINGS_CATEGORIES.map((category) => (
-        <FocusItem
-          key={category.id}
-          icon={category.icon}
-          title={category.label}
-          subtitle={category.description}
-          selected={selectedCategory === category.id}
-          onClick={() => handleCategoryChange(category.id)}
-          badge={category.pro ? <Badge variant="info" size="sm">Pro</Badge> : null}
-        />
-      ))}
-    </div>
-  )
+  const [helpOpen, setHelpOpen] = useState(false)
+  const { isMobile } = useMobile()
 
   if (loading) {
     return (
@@ -1126,17 +1113,70 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageLayout
-        title="Settings"
-        focusTitle="Settings"
-        focusContent={focusContent}
-        focusActions={null}
-        focusFooter={null}
-        helpContent={helpContent}
-        helpTitle="Settings - Help"
+      <div className="flex flex-col h-full w-full">
+        {/* Header with tabs */}
+        <div className="shrink-0 border-b border-border bg-bg-secondary">
+          {/* Title row */}
+          <div className="px-4 md:px-6 py-3 flex items-center justify-between">
+            <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
+            <button
+              onClick={() => setHelpOpen(true)}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all",
+                "bg-accent-primary/10 border border-accent-primary/30",
+                "text-accent-primary hover:bg-accent-primary/20",
+                "text-xs font-medium"
+              )}
+            >
+              <Question size={14} weight="bold" />
+              <span className="hidden sm:inline">Help</span>
+            </button>
+          </div>
+          
+          {/* Horizontal tabs */}
+          <div className="px-4 md:px-6 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-1 min-w-max pb-0">
+              {SETTINGS_CATEGORIES.map((category) => {
+                const Icon = category.icon
+                const isSelected = selectedCategory === category.id
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => handleCategoryChange(category.id)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-t-lg text-sm font-medium transition-all",
+                      "border-b-2 -mb-px",
+                      isSelected
+                        ? "border-accent-primary text-accent-primary bg-bg-primary"
+                        : "border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50"
+                    )}
+                  >
+                    <Icon size={16} weight={isSelected ? "fill" : "regular"} />
+                    <span className={isMobile ? "hidden" : ""}>{category.label}</span>
+                    {category.pro && <Badge variant="info" size="sm">Pro</Badge>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+        
+        {/* Content area */}
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-4xl mx-auto p-4 md:p-6">
+            {renderCategoryContent()}
+          </div>
+        </div>
+      </div>
+      
+      {/* Help Modal */}
+      <HelpModal
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        title="Settings Help"
       >
-        {renderCategoryContent()}
-      </PageLayout>
+        {helpContent}
+      </HelpModal>
 
       {/* Backup Password Modal */}
       <Modal

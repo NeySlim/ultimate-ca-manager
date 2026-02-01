@@ -554,12 +554,12 @@ export default function TemplatesPage() {
           data={filteredTemplates}
           columns={columns}
           keyField="id"
-          searchValue={searchQuery}
-          onSearchChange={setSearchQuery}
+          searchable
           searchPlaceholder="Search templates..."
+          searchKeys={['name', 'description']}
           selectedId={selectedTemplate?.id}
           onRowClick={selectTemplate}
-          renderMobileCard={renderMobileCard}
+          sortable
           emptyState={{
             icon: List,
             title: searchQuery ? 'No matches' : 'No templates',
