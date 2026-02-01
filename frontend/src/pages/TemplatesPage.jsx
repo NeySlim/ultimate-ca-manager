@@ -14,7 +14,7 @@ import {
   Button, Badge, Card,
   Input, Select, Textarea, Modal,
   LoadingSpinner, EmptyState, HelpCard,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
+  CompactHeader, CompactSection, CompactGrid, CompactField
 } from '../components'
 import { templatesService } from '../services'
 import { useNotification } from '../contexts'
@@ -368,56 +368,51 @@ export default function TemplatesPage() {
 
   // Template details slide-over content
   const templateDetailContent = selectedTemplate && (
-    <DetailContent className="p-0">
-      <DetailHeader
+    <div className="p-3 space-y-3">
+      <CompactHeader
         icon={FileText}
+        iconClass={selectedTemplate.type === 'ca' ? "bg-status-warning/20" : "bg-accent-primary/20"}
         title={editing ? formData.name : selectedTemplate.name}
         subtitle={`${selectedTemplate.usage_count || 0} certificates issued`}
         badge={
-          <Badge variant={selectedTemplate.type === 'ca' ? 'warning' : 'secondary'} size="lg">
-            {selectedTemplate.type === 'ca' ? 'CA Template' : 'Certificate Template'}
+          <Badge variant={selectedTemplate.type === 'ca' ? 'warning' : 'secondary'} size="sm">
+            {selectedTemplate.type === 'ca' ? 'CA' : 'Cert'}
           </Badge>
         }
-        stats={[
-          { icon: Calendar, label: 'Validity:', value: `${formData.validity_days || 365} days` },
-          { icon: Files, label: 'Used:', value: `${selectedTemplate.usage_count || 0} times` },
-        ]}
-        actions={[
-          ...(canWrite('templates') ? [
-            editing ? {
-              label: 'Save',
-              icon: FloppyDisk,
-              variant: 'primary',
-              onClick: handleSave,
-            } : {
-              label: 'Edit',
-              icon: PencilSimple,
-              onClick: () => setEditing(true),
-            }
-          ] : []),
-          {
-            label: 'Export',
-            icon: Download,
-            onClick: () => handleExportTemplate(selectedTemplate.id),
-          },
-          ...(canWrite('templates') ? [{
-            label: 'Duplicate',
-            icon: Copy,
-            onClick: () => handleDuplicate(selectedTemplate.id),
-          }] : []),
-          ...(canDelete('templates') ? [{
-            label: 'Delete',
-            icon: Trash,
-            variant: 'danger',
-            onClick: () => handleDelete(selectedTemplate.id),
-          }] : []),
-        ]}
       />
 
+      {/* Actions */}
+      <div className="flex flex-wrap gap-2">
+        {canWrite('templates') && (
+          editing ? (
+            <Button size="sm" variant="primary" onClick={handleSave}>
+              <FloppyDisk size={14} /> Save
+            </Button>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+              <PencilSimple size={14} /> Edit
+            </Button>
+          )
+        )}
+        <Button size="sm" variant="secondary" onClick={() => handleExportTemplate(selectedTemplate.id)}>
+          <Download size={14} />
+        </Button>
+        {canWrite('templates') && (
+          <Button size="sm" variant="secondary" onClick={() => handleDuplicate(selectedTemplate.id)}>
+            <Copy size={14} />
+          </Button>
+        )}
+        {canDelete('templates') && (
+          <Button size="sm" variant="danger" onClick={() => handleDelete(selectedTemplate.id)}>
+            <Trash size={14} />
+          </Button>
+        )}
+      </div>
+
       {/* Basic Information */}
-      <DetailSection title="Basic Information">
+      <CompactSection title="Basic Information">
         {editing ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <Input
               label="Template Name"
               value={formData.name || ''}
@@ -427,7 +422,7 @@ export default function TemplatesPage() {
               label="Description"
               value={formData.description || ''}
               onChange={(e) => updateFormData('description', e.target.value)}
-              rows={3}
+              rows={2}
             />
             <Select
               label="Type"
@@ -440,43 +435,43 @@ export default function TemplatesPage() {
             />
           </div>
         ) : (
-          <DetailGrid>
-            <DetailField label="Template Name" value={formData.name} />
-            <DetailField label="Type" value={formData.type === 'ca' ? 'Certificate Authority' : 'Certificate'} />
-            <DetailField label="Description" value={formData.description} fullWidth />
-          </DetailGrid>
+          <CompactGrid>
+            <CompactField label="Template Name" value={formData.name} />
+            <CompactField label="Type" value={formData.type === 'ca' ? 'Certificate Authority' : 'Certificate'} />
+            <CompactField label="Description" value={formData.description} />
+          </CompactGrid>
         )}
-      </DetailSection>
+      </CompactSection>
 
       {/* Validity Period */}
-      <DetailSection title="Validity Period">
+      <CompactSection title="Validity Period">
         {editing ? (
-          <DetailGrid>
+          <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Default Validity (days)"
+              label="Default (days)"
               type="number"
               value={formData.validity_days || 365}
               onChange={(e) => updateFormData('validity_days', parseInt(e.target.value))}
             />
             <Input
-              label="Max Validity (days)"
+              label="Max (days)"
               type="number"
               value={formData.max_validity_days || 3650}
               onChange={(e) => updateFormData('max_validity_days', parseInt(e.target.value))}
             />
-          </DetailGrid>
+          </div>
         ) : (
-          <DetailGrid>
-            <DetailField label="Default Validity" value={`${formData.validity_days || 365} days`} />
-            <DetailField label="Max Validity" value={`${formData.max_validity_days || 3650} days`} />
-          </DetailGrid>
+          <CompactGrid>
+            <CompactField label="Default Validity" value={`${formData.validity_days || 365} days`} />
+            <CompactField label="Max Validity" value={`${formData.max_validity_days || 3650} days`} />
+          </CompactGrid>
         )}
-      </DetailSection>
+      </CompactSection>
 
       {/* Subject Template */}
-      <DetailSection title="Subject Template">
+      <CompactSection title="Subject Template" collapsible>
         {editing ? (
-          <DetailGrid>
+          <div className="grid grid-cols-2 gap-3">
             <Input
               label="Country (C)"
               value={formData.subject?.C || ''}
@@ -501,31 +496,31 @@ export default function TemplatesPage() {
               onChange={(e) => updateSubject('CN', e.target.value)}
               placeholder="*.example.com"
             />
-          </DetailGrid>
+          </div>
         ) : (
-          <DetailGrid>
-            <DetailField label="Country (C)" value={formData.subject?.C} />
-            <DetailField label="State (ST)" value={formData.subject?.ST} />
-            <DetailField label="Organization (O)" value={formData.subject?.O} />
-            <DetailField label="Common Name (CN)" value={formData.subject?.CN} />
-          </DetailGrid>
+          <CompactGrid>
+            <CompactField label="Country (C)" value={formData.subject?.C} />
+            <CompactField label="State (ST)" value={formData.subject?.ST} />
+            <CompactField label="Organization (O)" value={formData.subject?.O} />
+            <CompactField label="Common Name (CN)" value={formData.subject?.CN} />
+          </CompactGrid>
         )}
-      </DetailSection>
+      </CompactSection>
 
       {/* Usage Summary */}
-      <DetailSection title="Usage Summary">
-        <DetailGrid>
-          <DetailField 
+      <CompactSection title="Usage Summary" collapsible defaultOpen={false}>
+        <CompactGrid cols={1}>
+          <CompactField 
             label="Key Usage"
             value={formData.key_usage?.length > 0 ? formData.key_usage.join(', ') : 'None'}
           />
-          <DetailField 
+          <CompactField 
             label="Extended Key Usage"
             value={formData.extended_key_usage?.length > 0 ? formData.extended_key_usage.join(', ') : 'None'}
           />
-        </DetailGrid>
-      </DetailSection>
-    </DetailContent>
+        </CompactGrid>
+      </CompactSection>
+    </div>
   )
 
   // Header actions

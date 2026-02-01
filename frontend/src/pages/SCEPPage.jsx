@@ -13,7 +13,7 @@ import {
   ResponsiveDataTable,
   Button, Input, Select, Card,
   Badge, LoadingSpinner, Modal, Textarea, EmptyState, StatusIndicator, HelpCard,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
+  CompactHeader, CompactSection, CompactGrid, CompactField, CompactStats
 } from '../components'
 import { scepService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -251,36 +251,47 @@ export default function SCEPPage() {
 
   // Request details slide-over content
   const requestDetailContent = selectedRequest && !showRejectModal && (
-    <DetailContent className="p-0">
-      <DetailHeader
+    <div className="p-3 space-y-3">
+      <CompactHeader
         icon={Robot}
+        iconClass={selectedRequest.status === 'approved' ? "bg-status-success/20" : selectedRequest.status === 'rejected' ? "bg-status-error/20" : "bg-status-warning/20"}
         title={`Request #${selectedRequest.id}`}
         subtitle={selectedRequest.subject || 'SCEP Enrollment Request'}
         badge={getStatusBadge(selectedRequest.status)}
-        stats={[
-          { icon: Clock, label: 'Requested:', value: formatDate(selectedRequest.created_at) }
-        ]}
-        actions={selectedRequest.status === 'pending' && hasPermission('write:scep') ? [
-          { label: 'Approve', icon: CheckCircle, variant: 'success', onClick: () => handleApprove(selectedRequest) },
-          { label: 'Reject', icon: XCircle, variant: 'danger', onClick: () => setShowRejectModal(true) }
-        ] : []}
       />
 
-      <DetailSection title="Request Details">
-        <DetailGrid>
-          <DetailField label="Transaction ID" value={selectedRequest.transaction_id} mono copyable />
-          <DetailField label="Subject" value={selectedRequest.subject || '-'} />
-          <DetailField label="Status" value={selectedRequest.status} />
-          <DetailField label="Created" value={formatDate(selectedRequest.created_at)} />
-        </DetailGrid>
-      </DetailSection>
+      <CompactStats stats={[
+        { icon: Clock, value: formatDate(selectedRequest.created_at) }
+      ]} />
+
+      {selectedRequest.status === 'pending' && hasPermission('write:scep') && (
+        <div className="flex gap-2">
+          <Button size="sm" variant="primary" className="flex-1" onClick={() => handleApprove(selectedRequest)}>
+            <CheckCircle size={14} /> Approve
+          </Button>
+          <Button size="sm" variant="danger" onClick={() => setShowRejectModal(true)}>
+            <XCircle size={14} /> Reject
+          </Button>
+        </div>
+      )}
+
+      <CompactSection title="Request Details">
+        <CompactGrid>
+          <CompactField label="Transaction ID" value={selectedRequest.transaction_id} mono copyable />
+          <CompactField label="Subject" value={selectedRequest.subject} />
+          <CompactField label="Status" value={selectedRequest.status} />
+          <CompactField label="Created" value={formatDate(selectedRequest.created_at)} />
+        </CompactGrid>
+      </CompactSection>
 
       {selectedRequest.csr_pem && (
-        <DetailSection title="CSR Content">
-          <DetailField label="CSR PEM" value={selectedRequest.csr_pem} mono fullWidth copyable />
-        </DetailSection>
+        <CompactSection title="CSR Content" collapsible defaultOpen={false}>
+          <pre className="text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
+            {selectedRequest.csr_pem}
+          </pre>
+        </CompactSection>
       )}
-    </DetailContent>
+    </div>
   )
 
   // Header actions
