@@ -5,14 +5,15 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   FileX, ShieldCheck, ArrowsClockwise, Download, Globe, Copy,
-  Database, Pulse, Calendar, Hash, CheckCircle, XCircle, Eye
+  Database, Pulse, Calendar, Hash, CheckCircle, XCircle, Eye,
+  Info, Link as LinkIcon
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
   ResponsiveDataTable,
   Button, Card, Badge, 
   LoadingSpinner, EmptyState, StatusIndicator, HelpCard,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
+  CompactSection, CompactGrid, CompactField
 } from '../components'
 import { casService, crlService, apiClient } from '../services'
 import { useNotification } from '../contexts'
@@ -298,63 +299,91 @@ export default function CRLOCSPPage() {
 
   // Detail slide-over content
   const detailContent = selectedCA && (
-    <DetailContent className="p-0">
-      <DetailHeader
-        icon={FileX}
-        title={selectedCA.descr || selectedCA.name}
-        subtitle="CRL & OCSP Configuration"
-        badge={
-          <Badge variant={selectedCRL ? 'success' : 'warning'} size="lg">
-            {selectedCRL ? 'Active' : 'Not Generated'}
-          </Badge>
-        }
-        stats={[
-          { icon: Hash, label: 'CRL #:', value: selectedCRL?.crl_number || '-' },
-          { icon: XCircle, label: 'Revoked:', value: selectedCRL?.revoked_count || 0 },
-          { icon: Calendar, label: 'Updated:', value: selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-' }
-        ]}
-        actions={[
-          ...(canWrite('certificates') && selectedCA.has_private_key !== false ? [{
-            label: regenerating ? 'Regenerating...' : 'Regenerate',
-            icon: ArrowsClockwise,
-            onClick: handleRegenerateCRL,
-            disabled: regenerating
-          }] : []),
-          ...(selectedCRL?.crl_pem ? [{
-            label: 'Download',
-            icon: Download,
-            onClick: handleDownloadCRL
-          }] : [])
-        ]}
-      />
+    <div className="p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg status-primary-bg flex items-center justify-center">
+            <FileX size={20} className="text-accent-primary" weight="duotone" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">{selectedCA.descr || selectedCA.name}</h3>
+            <p className="text-xs text-text-secondary">CRL & OCSP Configuration</p>
+          </div>
+        </div>
+        <Badge variant={selectedCRL ? 'success' : 'secondary'} size="sm">
+          {selectedCRL ? 'Active' : 'No CRL'}
+        </Badge>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
+          <Hash size={14} className="mx-auto text-text-tertiary mb-1" />
+          <div className="text-sm font-semibold text-text-primary">{selectedCRL?.crl_number || '-'}</div>
+          <div className="text-[10px] text-text-tertiary">CRL #</div>
+        </div>
+        <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
+          <XCircle size={14} className="mx-auto text-text-tertiary mb-1" />
+          <div className="text-sm font-semibold text-text-primary">{selectedCRL?.revoked_count || 0}</div>
+          <div className="text-[10px] text-text-tertiary">Revoked</div>
+        </div>
+        <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
+          <Calendar size={14} className="mx-auto text-text-tertiary mb-1" />
+          <div className="text-sm font-semibold text-text-primary">{selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-'}</div>
+          <div className="text-[10px] text-text-tertiary">Updated</div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        {canWrite('certificates') && selectedCA.has_private_key !== false && (
+          <Button 
+            size="sm" 
+            variant="primary" 
+            onClick={handleRegenerateCRL}
+            disabled={regenerating}
+            className="flex-1"
+          >
+            <ArrowsClockwise size={14} className={regenerating ? 'animate-spin' : ''} />
+            {regenerating ? 'Regenerating...' : 'Regenerate CRL'}
+          </Button>
+        )}
+        {selectedCRL?.crl_pem && (
+          <Button size="sm" variant="secondary" onClick={handleDownloadCRL}>
+            <Download size={14} />
+            Download
+          </Button>
+        )}
+      </div>
 
       {/* CRL Configuration */}
-      <DetailSection title="CRL Configuration">
-        <DetailGrid>
-          <DetailField label="CA Name" value={selectedCA.descr || selectedCA.name} />
-          <DetailField label="Status" value={selectedCRL ? 'Active' : 'Not Generated'} />
-          <DetailField label="CRL Number" value={selectedCRL?.crl_number || '-'} />
-          <DetailField label="Revoked Count" value={selectedCRL?.revoked_count || 0} />
-          <DetailField label="Last Updated" value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} />
-          <DetailField label="Next Update" value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'} />
-        </DetailGrid>
-      </DetailSection>
+      <CompactSection title="CRL Configuration" icon={Info}>
+        <CompactGrid cols={2}>
+          <CompactField label="CA Name" value={selectedCA.descr || selectedCA.name} />
+          <CompactField label="Status" value={selectedCRL ? 'Active' : 'Not Generated'} />
+          <CompactField label="CRL Number" value={selectedCRL?.crl_number || '-'} />
+          <CompactField label="Revoked Count" value={selectedCRL?.revoked_count || 0} />
+          <CompactField label="Last Updated" value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} />
+          <CompactField label="Next Update" value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'} />
+        </CompactGrid>
+      </CompactSection>
 
       {/* OCSP Configuration */}
-      <DetailSection title="OCSP Configuration">
-        <DetailGrid>
-          <DetailField 
+      <CompactSection title="OCSP Configuration" icon={Pulse}>
+        <CompactGrid cols={2}>
+          <CompactField 
             label="Status" 
             value={ocspStatus.enabled ? (ocspStatus.running ? 'Running' : 'Stopped') : 'Disabled'} 
           />
-          <DetailField label="Total Requests" value={ocspStats.total_requests} />
-          <DetailField label="Cache Hits" value={ocspStats.cache_hits} />
-          <DetailField label="Hit Rate" value={`${cacheHitRate}%`} />
-        </DetailGrid>
-      </DetailSection>
+          <CompactField label="Total Requests" value={ocspStats.total_requests} />
+          <CompactField label="Cache Hits" value={ocspStats.cache_hits} />
+          <CompactField label="Hit Rate" value={`${cacheHitRate}%`} />
+        </CompactGrid>
+      </CompactSection>
 
       {/* Distribution Points */}
-      <DetailSection title="Distribution Points">
+      <CompactSection title="Distribution Points" icon={LinkIcon}>
         <div className="space-y-3">
           <div>
             <p className="text-xs text-text-secondary mb-1">CDP (CRL Distribution Point)</p>
@@ -382,8 +411,8 @@ export default function CRLOCSPPage() {
             Include these URLs in CA settings for automatic revocation checking.
           </p>
         </div>
-      </DetailSection>
-    </DetailContent>
+      </CompactSection>
+    </div>
   )
 
   // Header actions
