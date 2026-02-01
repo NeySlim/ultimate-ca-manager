@@ -5,10 +5,78 @@
  */
 import { useState } from 'react'
 import { cn } from '../lib/utils'
-import { Copy, Check, CaretDown } from '@phosphor-icons/react'
+import { 
+  Copy, Check, CaretDown,
+  // Auto-icon mapping
+  Globe, MapPin, Buildings, Flag, Key, Lock, ShieldCheck, 
+  Hash, Calendar, Clock, Fingerprint, Envelope, User,
+  Certificate, FileText, Code, Database
+} from '@phosphor-icons/react'
 import { useMobile } from '../contexts'
 import { Badge } from './Badge'
 import { Button } from './Button'
+
+// Auto-icon mapping for common field labels
+const FIELD_ICONS = {
+  // Location
+  'country': Flag,
+  'state': MapPin,
+  'province': MapPin,
+  'locality': MapPin,
+  'city': MapPin,
+  'organization': Buildings,
+  'org': Buildings,
+  'org unit': Buildings,
+  'organizational unit': Buildings,
+  'ou': Buildings,
+  
+  // Certificate fields
+  'common name': Globe,
+  'cn': Globe,
+  'serial': Hash,
+  'serial number': Hash,
+  'key type': Key,
+  'key algorithm': Key,
+  'key size': Key,
+  'sig algo': ShieldCheck,
+  'signature algorithm': ShieldCheck,
+  'signature': ShieldCheck,
+  'cert type': Certificate,
+  'certificate type': Certificate,
+  'type': FileText,
+  
+  // Security
+  'fingerprint': Fingerprint,
+  'thumbprint': Fingerprint,
+  'sha-1': Fingerprint,
+  'sha-256': Fingerprint,
+  'sha1': Fingerprint,
+  'sha256': Fingerprint,
+  
+  // Time
+  'valid from': Calendar,
+  'valid until': Calendar,
+  'not before': Calendar,
+  'not after': Calendar,
+  'expires': Clock,
+  'expiry': Clock,
+  'created': Calendar,
+  'updated': Calendar,
+  
+  // Contact
+  'email': Envelope,
+  'user': User,
+  'username': User,
+  'created by': User,
+  
+  // Technical
+  'issuer': Certificate,
+  'ca': Certificate,
+  'ca reference': Database,
+  'caref': Database,
+  'reference id': Hash,
+  'refid': Hash,
+}
 
 /**
  * DetailHeader - Soft gradient card header with icon (Style A)
@@ -335,39 +403,55 @@ export function DetailTabs({ tabs, activeTab, onChange, className }) {
  * @param {boolean} collapsible - Allow expand/collapse
  * @param {boolean} defaultOpen - Initial state if collapsible
  */
-export function CompactSection({ title, children, className, collapsible = false, defaultOpen = true }) {
+export function CompactSection({ title, children, className, collapsible = false, defaultOpen = true, icon: Icon }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
   
   return (
-    <div className={cn("border border-border rounded-lg overflow-hidden", className)}>
+    <div className={cn(
+      "border border-border rounded-lg overflow-hidden",
+      className
+    )}>
       <button
         type="button"
         onClick={() => collapsible && setIsOpen(!isOpen)}
         className={cn(
-          "w-full px-3 py-1.5 bg-bg-tertiary/50 flex items-center justify-between text-left",
-          collapsible && "cursor-pointer hover:bg-bg-tertiary transition-colors",
+          "w-full px-3 py-2 flex items-center justify-between text-left",
+          "bg-bg-tertiary/40 border-b border-border/30",
+          collapsible && "cursor-pointer hover:bg-bg-tertiary/60 transition-colors",
           !collapsible && "cursor-default"
         )}
         disabled={!collapsible}
       >
-        <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-          {title}
-        </h4>
+        <div className="flex items-center gap-2">
+          {Icon && (
+            <div className="w-5 h-5 rounded bg-bg-tertiary flex items-center justify-center">
+              <Icon size={12} className="text-text-secondary" weight="bold" />
+            </div>
+          )}
+          <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+            {title}
+          </h4>
+        </div>
         {collapsible && (
           <CaretDown 
             size={14} 
             className={cn(
-              "text-text-tertiary transition-transform",
+              "text-text-tertiary transition-transform duration-200",
               isOpen && "rotate-180"
             )} 
           />
         )}
       </button>
-      {isOpen && (
-        <div className="p-3">
-          {children}
+      <div className={cn(
+        "grid transition-all duration-200 ease-out",
+        isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+      )}>
+        <div className="overflow-hidden">
+          <div className="p-3">
+            {children}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -389,14 +473,16 @@ export function CompactGrid({ children, cols = 2, className }) {
 
 /**
  * CompactField - Inline label:value for compact display
- * @param {icon} icon - Optional icon component
+ * @param {icon} icon - Optional icon component (or auto-detected from label)
+ * @param {boolean} autoIcon - Auto-detect icon from label (default: false)
  * @param {boolean} copyable - Show copy button
  * @param {boolean} mono - Use monospace font
  */
 export function CompactField({ 
   label, 
   value, 
-  icon: Icon,
+  icon: IconProp,
+  autoIcon = false,
   mono, 
   copyable,
   className, 
@@ -408,6 +494,13 @@ export function CompactField({
     return null // Don't render empty fields
   }
   
+  // Auto-detect icon from label if autoIcon is true and no icon provided
+  let Icon = IconProp
+  if (!Icon && autoIcon && label) {
+    const normalizedLabel = label.toLowerCase().trim()
+    Icon = FIELD_ICONS[normalizedLabel]
+  }
+  
   const handleCopy = () => {
     if (copyable && value) {
       navigator.clipboard.writeText(String(value))
@@ -416,15 +509,17 @@ export function CompactField({
     }
   }
   
-  // If icon provided, use vertical layout
+  // If icon provided/detected, use layout with subtle icon
   if (Icon) {
     return (
       <div className={cn(
-        "flex items-start gap-2 group",
+        "flex items-start gap-2 group p-1.5 -m-1.5 rounded-md transition-colors hover:bg-bg-tertiary/30",
         colSpan && `col-span-${colSpan}`,
         className
       )}>
-        <Icon size={14} className="text-text-tertiary mt-0.5 shrink-0" />
+        <div className="w-5 h-5 rounded bg-bg-tertiary/50 flex items-center justify-center shrink-0 mt-0.5">
+          <Icon size={11} className="text-text-tertiary" />
+        </div>
         <div className="min-w-0 flex-1">
           <div className="text-[10px] text-text-tertiary uppercase tracking-wider">{label}</div>
           <div className={cn(
@@ -442,7 +537,7 @@ export function CompactField({
             title="Copy"
           >
             {copied ? (
-              <Check size={14} className="text-status-success" />
+              <Check size={14} className="text-accent-success" />
             ) : (
               <Copy size={14} className="text-text-tertiary" />
             )}
@@ -452,7 +547,7 @@ export function CompactField({
     )
   }
   
-  // Standard inline layout
+  // Standard inline layout (no icon)
   return (
     <div 
       className={cn(

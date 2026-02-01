@@ -120,14 +120,14 @@ export function SlideOverPanel({
       {open && (
         <>
           {/* Header */}
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+          <div className="px-4 py-3 border-b border-border bg-bg-tertiary/30 flex items-center justify-between shrink-0">
             <h2 className="text-sm font-semibold text-text-primary truncate">
               {title}
             </h2>
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="p-1 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
+                className="p-1.5 rounded-md hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
                 aria-label="Close"
               >
                 <X size={16} />
