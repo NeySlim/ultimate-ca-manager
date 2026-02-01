@@ -90,12 +90,16 @@ export function ResponsiveLayout({
   // Resizable panel state
   const [panelWidth, setPanelWidth] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_PANEL_WIDTH
-    const saved = localStorage.getItem(PANEL_WIDTH_KEY)
-    if (saved) {
-      const parsed = parseInt(saved, 10)
-      if (parsed >= MIN_PANEL_WIDTH && parsed <= MAX_PANEL_WIDTH) {
-        return parsed
+    try {
+      const saved = localStorage.getItem(PANEL_WIDTH_KEY)
+      if (saved) {
+        const parsed = parseInt(saved, 10)
+        if (parsed >= MIN_PANEL_WIDTH && parsed <= MAX_PANEL_WIDTH) {
+          return parsed
+        }
       }
+    } catch {
+      // localStorage unavailable (Safari private mode, etc.)
     }
     return DEFAULT_PANEL_WIDTH
   })
@@ -129,7 +133,11 @@ export function ResponsiveLayout({
     
     const handleMouseUp = () => {
       setIsResizing(false)
-      localStorage.setItem(PANEL_WIDTH_KEY, widthRef.current.toString())
+      try {
+        localStorage.setItem(PANEL_WIDTH_KEY, widthRef.current.toString())
+      } catch {
+        // localStorage unavailable (Safari private mode, quota exceeded, etc.)
+      }
     }
     
     document.addEventListener('mousemove', handleMouseMove)

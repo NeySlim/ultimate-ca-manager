@@ -344,25 +344,37 @@ function DesktopSlideOver({
   // Load saved width from localStorage
   const [panelWidth, setPanelWidth] = useState(() => {
     if (typeof window === 'undefined') return DEFAULT_PANEL_WIDTH
-    const saved = localStorage.getItem(PANEL_WIDTH_KEY)
-    if (saved) {
-      const parsed = parseInt(saved, 10)
-      if (parsed >= MIN_PANEL_WIDTH && parsed <= MAX_PANEL_WIDTH) {
-        return parsed
+    try {
+      const saved = localStorage.getItem(PANEL_WIDTH_KEY)
+      if (saved) {
+        const parsed = parseInt(saved, 10)
+        if (parsed >= MIN_PANEL_WIDTH && parsed <= MAX_PANEL_WIDTH) {
+          return parsed
+        }
       }
+    } catch {
+      // localStorage unavailable (Safari private mode, etc.)
     }
     return DEFAULT_PANEL_WIDTH
   })
   
   const [isResizing, setIsResizing] = useState(false)
   const panelRef = useRef(null)
+  const widthRef = useRef(panelWidth)
   
-  // Handle resize
+  // Keep ref in sync
+  useEffect(() => {
+    widthRef.current = panelWidth
+  }, [panelWidth])
+  
+  // Handle resize start
   const handleMouseDown = useCallback((e) => {
     e.preventDefault()
+    e.stopPropagation()
     setIsResizing(true)
   }, [])
   
+  // Handle resize move and end
   useEffect(() => {
     if (!isResizing) return
     
@@ -372,12 +384,17 @@ function DesktopSlideOver({
       const newWidth = containerRect.right - e.clientX
       const clampedWidth = Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, newWidth))
       setPanelWidth(clampedWidth)
+      widthRef.current = clampedWidth
     }
     
     const handleMouseUp = () => {
       setIsResizing(false)
-      // Save to localStorage
-      localStorage.setItem(PANEL_WIDTH_KEY, panelWidth.toString())
+      // Save to localStorage using ref for current value
+      try {
+        localStorage.setItem(PANEL_WIDTH_KEY, widthRef.current.toString())
+      } catch {
+        // localStorage unavailable (Safari private mode, quota exceeded, etc.)
+      }
     }
     
     document.addEventListener('mousemove', handleMouseMove)
@@ -393,14 +410,7 @@ function DesktopSlideOver({
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
     }
-  }, [isResizing, panelWidth])
-  
-  // Save width when it changes (debounced)
-  useEffect(() => {
-    if (!isResizing && panelWidth !== DEFAULT_PANEL_WIDTH) {
-      localStorage.setItem(PANEL_WIDTH_KEY, panelWidth.toString())
-    }
-  }, [panelWidth, isResizing])
+  }, [isResizing])
   
   const activeFilterCount = filters?.filter(f => f.value && f.value !== '').length || 0
   
@@ -416,16 +426,18 @@ function DesktopSlideOver({
     >
       {open && (
         <>
-          {/* Resize Handle */}
+          {/* Resize Handle - wider hit area for easier grabbing */}
           <div
             className={cn(
-              "absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10",
-              "hover:bg-accent-primary/30 transition-colors",
-              isResizing && "bg-accent-primary/50"
+              "absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-10 resize-handle",
+              isResizing && "resizing"
             )}
             onMouseDown={handleMouseDown}
-            title="Drag to resize"
-          />
+            title="Drag to resize panel"
+          >
+            {/* Visual indicator line */}
+            <div className="absolute left-0 top-0 bottom-0 w-0.5 resize-handle-line" />
+          </div>
           
           {/* Panel Header */}
           <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0 bg-bg-tertiary/30">
