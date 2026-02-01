@@ -277,6 +277,26 @@ export default function TemplatesPage() {
     }
   ], [filterType])
 
+  // Row actions for table
+  const getRowActions = useCallback((template) => [
+    {
+      label: 'Duplicate',
+      icon: Copy,
+      onClick: () => handleDuplicate(template.id)
+    },
+    {
+      label: 'Export',
+      icon: Download,
+      onClick: () => handleExportTemplate(template.id)
+    },
+    ...(canDelete ? [{
+      label: 'Delete',
+      icon: Trash,
+      variant: 'danger',
+      onClick: () => handleDelete(template.id)
+    }] : [])
+  ], [canDelete])
+
   // Mobile card render
   const renderMobileCard = useCallback((template, isSelected) => (
     <div className={`p-4 ${isSelected ? 'mobile-row-selected' : ''}`}>
@@ -559,6 +579,7 @@ export default function TemplatesPage() {
           searchKeys={['name', 'description']}
           selectedId={selectedTemplate?.id}
           onRowClick={selectTemplate}
+          rowActions={getRowActions}
           sortable
           emptyState={{
             icon: List,
