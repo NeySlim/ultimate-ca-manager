@@ -322,8 +322,6 @@ export default function CAsPage() {
         title="Certificate Authorities"
         icon={ShieldCheck}
         stats={stats}
-        filters={filters}
-        activeFilters={activeFiltersCount}
         helpContent={helpContent}
         // Split view on xl+ screens - panel always visible
         splitView={true}
@@ -348,46 +346,67 @@ export default function CAsPage() {
             onDelete={() => handleDelete(selectedCA.id)}
           />
         )}
-        actions={
-          canWrite('cas') && (
-            isMobile ? (
-              <div className="flex gap-2">
-                <Button size="lg" onClick={() => openModal('create')} className="w-11 h-11 p-0">
-                  <Plus size={22} weight="bold" />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => openModal('create')}>
-                  <Plus size={14} weight="bold" />
-                  Create
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => openModal('import')}>
-                  <UploadSimple size={14} />
-                  Import
-                </Button>
-              </div>
-            )
-          )
-        }
       >
         {/* Tree View Content */}
         <div className="flex flex-col h-full">
-          {/* Search Bar */}
+          {/* Search Bar + Filters + Actions */}
           <div className="shrink-0 p-3 border-b border-border/50 bg-bg-secondary/30">
-            <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search CAs..."
-                className={cn(
-                  'w-full rounded-lg border border-border bg-bg-primary',
-                  'text-text-primary placeholder:text-text-tertiary',
-                  'focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary',
-                  isMobile ? 'h-11 px-4 text-base' : 'h-8 px-3 text-sm'
-                )}
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 min-w-0">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search CAs..."
+                  className={cn(
+                    'w-full rounded-lg border border-border bg-bg-primary',
+                    'text-text-primary placeholder:text-text-tertiary',
+                    'focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary',
+                    isMobile ? 'h-11 px-4 text-base' : 'h-8 px-3 text-sm'
+                  )}
+                />
+              </div>
+              {!isMobile && (
+                <>
+                  <select
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                    className="h-8 px-2 text-sm rounded-lg border border-border bg-bg-primary text-text-primary shrink-0"
+                  >
+                    <option value="">All Types</option>
+                    <option value="root">Root</option>
+                    <option value="intermediate">Intermediate</option>
+                  </select>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="h-8 px-2 text-sm rounded-lg border border-border bg-bg-primary text-text-primary shrink-0"
+                  >
+                    <option value="">All Status</option>
+                    <option value="valid">Valid</option>
+                    <option value="expiring">Expiring</option>
+                    <option value="expired">Expired</option>
+                  </select>
+                </>
+              )}
+              {canWrite('cas') && (
+                isMobile ? (
+                  <Button size="lg" onClick={() => openModal('create')} className="w-11 h-11 p-0 shrink-0">
+                    <Plus size={22} weight="bold" />
+                  </Button>
+                ) : (
+                  <>
+                    <Button size="sm" onClick={() => openModal('create')} className="shrink-0">
+                      <Plus size={14} weight="bold" />
+                      Create
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => openModal('import')} className="shrink-0">
+                      <UploadSimple size={14} />
+                      Import
+                    </Button>
+                  </>
+                )
+              )}
             </div>
           </div>
 
@@ -604,7 +623,6 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
   const isSelected = selectedId === ca.id
   const isRoot = level === 0
   const indent = 24 // indent per level for children
-  const rowHeight = isMobile ? 52 : 44
   
   // Format expiration
   const formatExpiry = (date) => {
@@ -620,11 +638,7 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
   }
   
   const expiry = formatExpiry(ca.valid_to || ca.not_after)
-  
-  // Padding for this row
   const rowPadding = isRoot ? 12 : 12 + (level * indent)
-  // Parent icon center position (for L connector)
-  const parentIconX = 12 + ((level - 1) * indent) + 24 + 8 + 16 // padding + expand + gap + iconHalf
   
   return (
     <div className="relative">
@@ -639,22 +653,29 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
         )}
         style={{ paddingLeft: rowPadding }}
       >
-        {/* L connector for children */}
+        {/* L connector: simple vertical + horizontal lines */}
         {!isRoot && (
-          <svg 
-            className="absolute top-0 left-0 pointer-events-none overflow-visible"
-            width={rowPadding + 10}
-            height={rowHeight / 2 + 2}
-          >
-            {/* L shape: vertical then horizontal with rounded corner */}
-            <path 
-              d={`M ${parentIconX} 0 L ${parentIconX} ${rowHeight / 2 - 6} Q ${parentIconX} ${rowHeight / 2} ${parentIconX + 6} ${rowHeight / 2} L ${rowPadding - 2} ${rowHeight / 2}`}
-              fill="none"
-              stroke="var(--border)" 
-              strokeWidth="2"
-              strokeLinecap="round"
+          <>
+            <div 
+              className="absolute bg-border"
+              style={{
+                left: rowPadding - indent + 46,
+                top: 0,
+                width: 2,
+                height: '50%'
+              }}
             />
-          </svg>
+            <div 
+              className="absolute bg-border"
+              style={{
+                left: rowPadding - indent + 46,
+                top: '50%',
+                width: indent - 20,
+                height: 2,
+                marginTop: -1
+              }}
+            />
+          </>
         )}
         
         {/* Left accent for selected */}

@@ -352,12 +352,7 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
         activeTab={activeTab}
         onTabChange={onTabChange}
         stats={stats}
-        // Desktop filters (same format as CertificatesPage)
-        filters={filters}
-        activeFilters={activeFiltersCount}
-        // Help
         helpContent={helpContent}
-        // Slide-over detail
         slideOverOpen={!!selectedUser}
         onSlideOverClose={() => setSelectedUser(null)}
         slideOverTitle="User Details"
@@ -372,21 +367,6 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
             onDelete={() => handleDelete(selectedUser.id)}
           />
         )}
-        // Header action button
-        actions={
-          canWrite('users') && (
-            isMobile ? (
-              <Button size="lg" onClick={() => setShowCreateModal(true)} className="w-11 h-11 p-0">
-                <Plus size={22} weight="bold" />
-              </Button>
-            ) : (
-              <Button size="sm" onClick={() => setShowCreateModal(true)}>
-                <Plus size={14} weight="bold" />
-                New User
-              </Button>
-            )
-          )
-        }
       >
         <ResponsiveDataTable
           data={filteredUsers}
@@ -398,6 +378,41 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
           searchable
           searchPlaceholder="Search users..."
           searchKeys={['username', 'email', 'full_name', 'role']}
+          toolbarFilters={[
+            {
+              key: 'role',
+              value: filterRole,
+              onChange: setFilterRole,
+              placeholder: 'All Roles',
+              options: [
+                { value: 'admin', label: 'Admin' },
+                { value: 'operator', label: 'Operator' },
+                { value: 'viewer', label: 'Viewer' }
+              ]
+            },
+            {
+              key: 'active',
+              value: filterActive,
+              onChange: setFilterActive,
+              placeholder: 'All Status',
+              options: [
+                { value: 'true', label: 'Active' },
+                { value: 'false', label: 'Inactive' }
+              ]
+            }
+          ]}
+          toolbarActions={canWrite('users') && (
+            isMobile ? (
+              <Button size="lg" onClick={() => setShowCreateModal(true)} className="w-11 h-11 p-0">
+                <Plus size={22} weight="bold" />
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => setShowCreateModal(true)}>
+                <Plus size={14} weight="bold" />
+                New User
+              </Button>
+            )
+          )}
           sortable
           emptyIcon={User}
           emptyTitle="No users"
