@@ -298,7 +298,7 @@ export default function DashboardPage() {
                   </Button>
                 }
               />
-              <Card.Body className="flex-1 overflow-y-auto space-y-1 !pt-0">
+              <Card.Body className="flex-1 overflow-y-auto space-y-0.5 !pt-0">
                 {recentCerts.length === 0 ? (
                   <EmptyWidget icon={Certificate} text="No certificates yet" />
                 ) : (
@@ -306,18 +306,23 @@ export default function DashboardPage() {
                     <div 
                       key={cert.id || i}
                       onClick={() => navigate(`/certificates/${cert.id}`)}
-                      className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-all group"
+                      className="p-2.5 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-all group flex items-center gap-3"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
-                          {cert.common_name || cert.descr || cert.subject || 'Certificate'}
-                        </span>
-                        <Badge variant={cert.revoked ? 'danger' : 'success'} size="sm" dot>
-                          {cert.revoked ? 'Revoked' : 'Valid'}
-                        </Badge>
+                      <div className="w-8 h-8 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary/10 transition-colors">
+                        <Certificate size={16} weight="duotone" className="text-text-tertiary group-hover:text-accent-primary transition-colors" />
                       </div>
-                      <div className="text-xs text-text-tertiary mt-0.5">
-                        {formatRelativeTime(cert.created_at)}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
+                            {cert.common_name || cert.descr || cert.subject || 'Certificate'}
+                          </span>
+                          <Badge variant={cert.revoked ? 'danger' : 'success'} size="sm" dot>
+                            {cert.revoked ? 'Revoked' : 'Valid'}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-text-tertiary mt-0.5">
+                          {formatRelativeTime(cert.created_at)}
+                        </div>
                       </div>
                     </div>
                   ))
@@ -336,7 +341,7 @@ export default function DashboardPage() {
                   </Button>
                 }
               />
-              <Card.Body className="flex-1 overflow-y-auto space-y-1 !pt-0">
+              <Card.Body className="flex-1 overflow-y-auto space-y-0.5 !pt-0">
                 {recentCAs.length === 0 ? (
                   <EmptyWidget icon={ShieldCheck} text="No CAs yet" />
                 ) : (
@@ -344,14 +349,17 @@ export default function DashboardPage() {
                     <div 
                       key={ca.id || i}
                       onClick={() => navigate(`/cas/${ca.id}`)}
-                      className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group"
+                      className="p-2.5 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-3"
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="w-8 h-8 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary/10 transition-colors">
+                        <ShieldCheck size={16} weight="duotone" className="text-text-tertiary group-hover:text-accent-primary transition-colors" />
+                      </div>
+                      <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                         <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
                           {ca.dn_commonname || ca.descr || ca.name}
                         </span>
                         <Badge variant={ca.is_root ? 'purple' : 'info'} size="sm">
-                          {ca.is_root ? 'Root' : 'Intermediate'}
+                          {ca.is_root ? 'Root' : 'Sub'}
                         </Badge>
                       </div>
                     </div>
@@ -425,20 +433,20 @@ export default function DashboardPage() {
                 {recentAcme.length === 0 ? (
                   <EmptyWidget icon={Globe} text="No ACME accounts" />
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {recentAcme.slice(0, 4).map((account, i) => (
                       <div 
                         key={account.id || i} 
-                        className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group"
+                        className="p-2.5 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-3"
                         onClick={() => navigate('/acme')}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <User size={14} className="text-text-tertiary shrink-0" />
-                            <span className="text-sm text-text-primary truncate group-hover:text-accent-primary transition-colors">
-                              {account.email || account.contact}
-                            </span>
-                          </div>
+                        <div className="w-8 h-8 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary/10 transition-colors">
+                          <User size={16} weight="duotone" className="text-text-tertiary group-hover:text-accent-primary transition-colors" />
+                        </div>
+                        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
+                            {account.email || account.contact}
+                          </span>
                           <Badge variant="secondary" size="sm">{account.orders_count || 0} orders</Badge>
                         </div>
                       </div>
@@ -515,9 +523,8 @@ export default function DashboardPage() {
   )
 }
 
-// Enhanced Stat Card with live indicator and visual effects
+// Enhanced Stat Card with live indicator and subtle polish
 function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
-  // Map color names to CSS variable for accent
   const accentMap = {
     blue: '--accent-primary',
     purple: '--accent-primary',
@@ -548,7 +555,7 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
   return (
     <button 
       onClick={onClick}
-      className={`stat-card-enhanced ${variant} relative p-4 text-left group`}
+      className={`stat-card-enhanced ${variant} relative p-4 text-left group transition-all duration-200`}
       style={{ '--card-accent': `var(${accentVar})` }}
     >
       {/* Live indicator */}
@@ -560,12 +567,12 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
       )}
       
       <div className="relative flex items-center gap-3">
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${iconStyles[color] || iconStyles.slate}`}>
-          <Icon size={24} weight="duotone" />
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${iconStyles[color] || iconStyles.slate}`}>
+          <Icon size={22} weight="duotone" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-2xl font-bold text-text-primary tracking-tight">{value}</p>
+            <p className="text-2xl font-bold text-text-primary tracking-tight tabular-nums">{value}</p>
             {badge && (
               <Badge variant="warning" size="sm" dot pulse>{badge}</Badge>
             )}
@@ -573,25 +580,31 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
           <p className="text-xs text-text-secondary font-medium">{label}</p>
         </div>
       </div>
+      
+      {/* Subtle hover arrow */}
+      <CaretRight 
+        size={14} 
+        className="absolute right-3 bottom-3 text-text-tertiary opacity-0 group-hover:opacity-60 transition-all duration-200 group-hover:translate-x-0.5" 
+      />
     </button>
   )
 }
 
-// System Stat mini card - uses theme CSS classes
+// System Stat mini card - polished with icon animation
 function SystemStat({ icon: Icon, label, value, status }) {
   return (
-    <div className={`px-3 py-2 rounded-lg border transition-all duration-200 ${
+    <div className={`px-3 py-2 rounded-lg border transition-all duration-200 group ${
       status === 'online' 
         ? 'stat-card-success' 
         : 'stat-card-danger'
     }`}>
       <div className="flex items-center gap-2">
-        <div className={`w-5 h-5 rounded flex items-center justify-center ${
+        <div className={`w-5 h-5 rounded flex items-center justify-center transition-transform duration-200 group-hover:scale-110 ${
           status === 'online' ? 'status-success-bg' : 'status-danger-bg'
         }`}>
           <Icon size={12} className={status === 'online' ? 'status-success-text' : 'status-danger-text'} weight="bold" />
         </div>
-        <span className="text-[10px] text-text-tertiary uppercase tracking-wide">{label}</span>
+        <span className="text-[10px] text-text-tertiary uppercase tracking-wide font-medium">{label}</span>
       </div>
       <p className={`text-xs font-semibold mt-1 ${
         status === 'online' ? 'status-success-text' : 'status-danger-text'
@@ -600,31 +613,31 @@ function SystemStat({ icon: Icon, label, value, status }) {
   )
 }
 
-// Service Badge Component - theme-aware
+// Service Badge Component - theme-aware with subtle animation
 function ServiceBadge({ name, status }) {
   const isOnline = status?.status === 'online' || status?.enabled
   return (
-    <div className={`px-3 py-2.5 rounded-lg border text-center transition-all duration-200 ${
+    <div className={`px-3 py-2.5 rounded-lg border text-center transition-all duration-200 group cursor-default ${
       isOnline 
         ? 'stat-card-success' 
         : 'bg-bg-tertiary border-border hover:border-text-tertiary/30'
     }`}>
       <div className="flex items-center justify-center gap-2">
-        <div className={`w-2 h-2 rounded-full ${isOnline ? 'status-success-bg-solid animate-pulse' : 'bg-text-tertiary'}`} />
+        <div className={`w-2 h-2 rounded-full transition-transform duration-300 group-hover:scale-125 ${isOnline ? 'status-success-bg-solid animate-pulse' : 'bg-text-tertiary'}`} />
         <span className={`text-xs font-semibold ${isOnline ? 'text-text-primary' : 'text-text-secondary'}`}>{name}</span>
       </div>
     </div>
   )
 }
 
-// Empty Widget Component
+// Empty Widget Component - polished empty state
 function EmptyWidget({ icon: Icon, text }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-text-tertiary py-8">
-      <div className="w-12 h-12 rounded-xl bg-bg-tertiary/50 flex items-center justify-center mb-3">
-        <Icon size={24} className="opacity-40" />
+      <div className="w-12 h-12 rounded-xl bg-bg-tertiary/50 flex items-center justify-center mb-3 border border-border/50">
+        <Icon size={24} className="opacity-50" />
       </div>
-      <p className="text-xs font-medium">{text}</p>
+      <p className="text-xs font-medium opacity-70">{text}</p>
     </div>
   )
 }
