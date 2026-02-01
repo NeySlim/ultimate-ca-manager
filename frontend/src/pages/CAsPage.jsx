@@ -320,9 +320,11 @@ export default function CAsPage() {
     <>
       <ResponsiveLayout
         title="Certificate Authorities"
+        subtitle={`${cas.length} CA${cas.length !== 1 ? 's' : ''}`}
         icon={ShieldCheck}
         stats={stats}
         helpContent={helpContent}
+        helpTitle="Certificate Authorities"
         // Split view on xl+ screens - panel always visible
         splitView={true}
         splitEmptyContent={

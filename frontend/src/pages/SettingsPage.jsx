@@ -1118,7 +1118,15 @@ export default function SettingsPage() {
         <div className="shrink-0 border-b border-border bg-bg-secondary">
           {/* Title row */}
           <div className="px-4 md:px-6 py-3 flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center shrink-0">
+                <Gear size={18} weight="bold" className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
+                <p className="text-sm text-text-secondary">System configuration</p>
+              </div>
+            </div>
             <button
               onClick={() => setHelpOpen(true)}
               className={cn(

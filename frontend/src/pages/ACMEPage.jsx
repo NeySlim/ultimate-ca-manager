@@ -642,7 +642,13 @@ export default function ACMEPage() {
     <>
       <ResponsiveLayout
         title="ACME Protocol"
+        subtitle={`${accounts.length} account${accounts.length !== 1 ? 's' : ''}`}
         icon={Lightning}
+        stats={[
+          { icon: Key, label: 'Accounts', value: accounts.length },
+          { icon: CheckCircle, label: 'Active', value: stats.active, variant: 'success' },
+          { icon: Globe, label: 'Orders', value: stats.orders, variant: 'primary' },
+        ]}
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={(tab) => {

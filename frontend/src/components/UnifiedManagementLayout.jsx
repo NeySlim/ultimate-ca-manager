@@ -41,6 +41,8 @@ import {
 export function UnifiedManagementLayout({
   // Page metadata
   title,
+  subtitle,              // e.g. "X items"
+  icon: Icon,            // Page icon (Phosphor icon component)
   
   // Tabs (optional)
   tabs,                 // [{ id, label, icon, pro }]
@@ -225,7 +227,15 @@ export function UnifiedManagementLayout({
           <div className="px-4 py-3 border-b border-border bg-bg-secondary shrink-0 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-semibold text-text-primary">{title}</h1>
+                {Icon && (
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center shrink-0">
+                    <Icon size={16} weight="bold" className="text-white" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h1 className="text-base font-semibold text-text-primary">{title}</h1>
+                  {subtitle && <p className="text-xs text-text-secondary">{subtitle}</p>}
+                </div>
                 {TabsHeader}
               </div>
               <HelpButton />
@@ -283,7 +293,15 @@ export function UnifiedManagementLayout({
         <div className="px-6 py-4 border-b border-border bg-bg-secondary shrink-0">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-4">
-              <h1 className="text-lg font-semibold text-text-primary">{title}</h1>
+              {Icon && (
+                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center shrink-0">
+                  <Icon size={18} weight="bold" className="text-white" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <h1 className="text-lg font-semibold text-text-primary">{title}</h1>
+                {subtitle && <p className="text-sm text-text-secondary">{subtitle}</p>}
+              </div>
               {TabsHeader}
             </div>
             <HelpButton />

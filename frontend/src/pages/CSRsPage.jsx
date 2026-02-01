@@ -273,6 +273,7 @@ export default function CSRsPage() {
     <>
       <ResponsiveLayout
         title="Certificate Signing Requests"
+        subtitle={`${csrs.length} request${csrs.length !== 1 ? 's' : ''}`}
         icon={FileText}
         stats={stats}
         helpContent={helpContent}
