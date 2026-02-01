@@ -218,7 +218,7 @@ export default function TemplatesPage() {
   const headerStats = useMemo(() => [
     { icon: Files, label: 'Total', value: templates.length },
     { icon: Certificate, label: 'Certificate', value: certTemplates, variant: 'info' },
-    { icon: ShieldCheck, label: 'CA', value: caTemplates, variant: 'warning' },
+    { icon: ShieldCheck, label: 'CA', value: caTemplates, variant: 'violet' },
     { icon: Database, label: 'Used', value: totalUsage }
   ], [templates.length, certTemplates, caTemplates, totalUsage])
 
@@ -241,7 +241,7 @@ export default function TemplatesPage() {
       render: (v, row) => {
         const type = getTemplateType(row)
         return (
-          <Badge variant={type === 'ca' ? 'warning' : 'secondary'} size="sm">
+          <Badge variant={type === 'ca' ? 'violet' : 'secondary'} size="sm">
             {type === 'ca' ? 'CA' : 'Certificate'}
           </Badge>
         )
@@ -308,7 +308,7 @@ export default function TemplatesPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-medium text-text-primary truncate">{template.name}</span>
-              <Badge variant={template.type === 'ca' ? 'warning' : 'secondary'} size="sm">
+              <Badge variant={template.type === 'ca' ? 'violet' : 'secondary'} size="sm">
                 {template.type === 'ca' ? 'CA' : 'Cert'}
               </Badge>
             </div>
@@ -371,11 +371,11 @@ export default function TemplatesPage() {
     <div className="p-3 space-y-3">
       <CompactHeader
         icon={FileText}
-        iconClass={selectedTemplate.type === 'ca' ? "bg-status-warning/20" : "bg-accent-primary/20"}
+        iconClass={selectedTemplate.type === 'ca' ? "bg-violet-500/20" : "bg-accent-primary/20"}
         title={editing ? formData.name : selectedTemplate.name}
         subtitle={`${selectedTemplate.usage_count || 0} certificates issued`}
         badge={
-          <Badge variant={selectedTemplate.type === 'ca' ? 'warning' : 'secondary'} size="sm">
+          <Badge variant={selectedTemplate.type === 'ca' ? 'violet' : 'secondary'} size="sm">
             {selectedTemplate.type === 'ca' ? 'CA' : 'Cert'}
           </Badge>
         }

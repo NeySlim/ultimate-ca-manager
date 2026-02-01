@@ -464,7 +464,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="text-center text-xs text-text-secondary pt-4 border-t border-border">
-          <p>Ultimate Certificate Manager v4</p>
+          <p>Ultimate Certificate Manager v2</p>
         </div>
       </Card>
     </div>

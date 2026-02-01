@@ -168,7 +168,7 @@ export default function CRLOCSPPage() {
       label: 'Status',
       width: '100px',
       render: (v, row) => (
-        <Badge variant={v ? 'success' : 'warning'} size="sm">
+        <Badge variant={v ? 'success' : 'secondary'} size="sm">
           {v ? 'Active' : 'No CRL'}
         </Badge>
       )
@@ -209,7 +209,7 @@ export default function CRLOCSPPage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-text-primary truncate">{ca.descr || ca.name}</span>
-                <Badge variant={ca.has_crl ? 'success' : 'warning'} size="sm">
+                <Badge variant={ca.has_crl ? 'success' : 'secondary'} size="sm">
                   {ca.has_crl ? 'Active' : 'No CRL'}
                 </Badge>
               </div>
