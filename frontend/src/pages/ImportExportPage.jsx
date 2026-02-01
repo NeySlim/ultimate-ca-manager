@@ -622,7 +622,7 @@ export default function ImportExportPage() {
             <div className="pt-4 border-t border-border/50">
               <Button
                 onClick={handleImportCA}
-                disabled={processing || (!selectedCAFile && !caPemContent.trim())}
+                disabled={processing || (!selectedFile && !pemContent.trim())}
                 className="w-full md:w-auto"
               >
                 <FileArrowUp size={18} />
