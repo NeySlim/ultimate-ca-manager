@@ -589,111 +589,83 @@ button, a, input, select, textarea {
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow), var(--shadow-inner-highlight);
+  box-shadow: var(--glass-shadow);
 }
 
-/* === SOFT CARDS (depth with inner highlight) === */
+/* === SOFT CARDS (subtle) === */
 .card-soft {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: var(--shadow-sm), var(--shadow-inner-highlight);
-  transition: 
-    box-shadow var(--duration-normal) var(--ease-smooth),
-    transform var(--duration-normal) var(--ease-smooth),
-    border-color var(--duration-fast) var(--ease-smooth);
+  transition: border-color var(--duration-fast) var(--ease-smooth);
 }
 
 .card-soft:hover {
-  box-shadow: var(--shadow-md), var(--shadow-inner-highlight);
   border-color: var(--border-strong);
 }
 
-/* === INTERACTIVE CARDS (clickable with lift) === */
+/* === INTERACTIVE CARDS (clickable) === */
 .card-interactive {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: var(--shadow-sm);
   cursor: pointer;
   transition: 
-    box-shadow var(--duration-normal) var(--ease-smooth),
-    transform var(--duration-normal) var(--ease-smooth),
-    border-color var(--duration-fast) var(--ease-smooth);
+    border-color var(--duration-fast) var(--ease-smooth),
+    background-color var(--duration-fast) var(--ease-smooth);
 }
 
 .card-interactive:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--accent-primary) 30%, var(--border));
+  border-color: color-mix(in srgb, var(--accent-primary) 40%, var(--border));
+  background: color-mix(in srgb, var(--bg-secondary) 95%, var(--accent-primary));
 }
 
 .card-interactive:active {
-  transform: translateY(0);
-  box-shadow: var(--shadow-sm);
+  background: var(--bg-tertiary);
 }
 
-/* === GRADIENT BUTTON === */
+/* === GRADIENT BUTTON (subtle) === */
 .btn-gradient {
-  background: var(--gradient-primary);
+  background: var(--accent-primary);
   border: none;
   border-radius: 8px;
   color: white;
   font-weight: 500;
-  box-shadow: var(--shadow-sm);
-  position: relative;
-  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   transition: 
-    box-shadow var(--duration-fast) var(--ease-smooth),
-    transform var(--duration-fast) var(--ease-smooth);
-}
-
-.btn-gradient::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--gradient-shine);
-  opacity: 0;
-  transition: opacity var(--duration-fast);
+    background-color var(--duration-fast) var(--ease-smooth),
+    box-shadow var(--duration-fast) var(--ease-smooth);
 }
 
 .btn-gradient:hover {
-  box-shadow: var(--shadow-md), var(--shadow-glow-primary);
-  transform: translateY(-1px);
-}
-
-.btn-gradient:hover::before {
-  opacity: 1;
+  background: color-mix(in srgb, var(--accent-primary) 90%, black);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
 
 .btn-gradient:active {
-  transform: translateY(0);
-  box-shadow: var(--shadow-xs);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
 }
 
-.btn-gradient.success { background: var(--gradient-success); }
-.btn-gradient.success:hover { box-shadow: var(--shadow-md), var(--shadow-glow-success); }
-.btn-gradient.danger { background: var(--gradient-danger); }
-.btn-gradient.danger:hover { box-shadow: var(--shadow-md), var(--shadow-glow-danger); }
+.btn-gradient.success { background: var(--accent-success); }
+.btn-gradient.success:hover { background: color-mix(in srgb, var(--accent-success) 90%, black); }
+.btn-gradient.danger { background: var(--accent-danger); }
+.btn-gradient.danger:hover { background: color-mix(in srgb, var(--accent-danger) 90%, black); }
 
 /* === SOFT BUTTON (subtle depth) === */
 .btn-soft {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: var(--shadow-xs), var(--shadow-inner-highlight);
   transition: all var(--duration-fast) var(--ease-smooth);
 }
 
 .btn-soft:hover {
   background: var(--bg-tertiary);
-  box-shadow: var(--shadow-sm), var(--shadow-inner-highlight);
   border-color: var(--border-strong);
 }
 
 .btn-soft:active {
-  box-shadow: var(--shadow-inner-sm);
-  transform: translateY(1px);
+  background: color-mix(in srgb, var(--bg-tertiary) 80%, var(--bg-primary));
 }
 
 /* === INPUT SOFT FOCUS === */
@@ -742,7 +714,7 @@ button, a, input, select, textarea {
   transform: scaleY(1);
 }
 
-/* === STAT CARD WITH ACCENT BAR AND GLOW === */
+/* === STAT CARD WITH ACCENT (subtle) === */
 .stat-card-enhanced {
   --card-accent: var(--accent-primary);
   position: relative;
@@ -750,10 +722,7 @@ button, a, input, select, textarea {
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  transition: 
-    box-shadow var(--duration-normal) var(--ease-smooth),
-    transform var(--duration-normal) var(--ease-smooth);
+  transition: border-color var(--duration-fast) var(--ease-smooth);
 }
 
 .stat-card-enhanced::before {
@@ -762,28 +731,12 @@ button, a, input, select, textarea {
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--card-accent), color-mix(in srgb, var(--card-accent) 30%, transparent));
-}
-
-.stat-card-enhanced::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 80px;
-  background: radial-gradient(
-    ellipse 100% 70% at 50% 0%,
-    color-mix(in srgb, var(--card-accent) 8%, transparent),
-    transparent
-  );
-  pointer-events: none;
+  height: 2px;
+  background: var(--card-accent);
 }
 
 .stat-card-enhanced:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--card-accent) 40%, var(--border));
 }
 
 .stat-card-enhanced.success { --card-accent: var(--accent-success); }
@@ -896,46 +849,54 @@ button, a, input, select, textarea {
   transition: transform var(--duration-normal) var(--ease-smooth);
 }
 .hover-lift-md:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
 }
 
 .hover-scale {
-  transition: transform var(--duration-fast) var(--ease-spring);
+  transition: transform var(--duration-fast) var(--ease-smooth);
 }
 .hover-scale:hover {
-  transform: scale(1.02);
+  transform: scale(1.01);
 }
 .hover-scale:active {
-  transform: scale(0.98);
-}
-
-.hover-glow {
-  transition: box-shadow var(--duration-normal) var(--ease-smooth);
-}
-.hover-glow:hover {
-  box-shadow: var(--shadow-glow-primary);
+  transform: scale(0.99);
 }
 
 .hover-border-accent {
   transition: border-color var(--duration-fast) var(--ease-smooth);
 }
 .hover-border-accent:hover {
-  border-color: color-mix(in srgb, var(--accent-primary) 50%, var(--border));
+  border-color: color-mix(in srgb, var(--accent-primary) 40%, var(--border));
 }
 
-/* === MODAL/DIALOG ENHANCEMENT === */
+/* === SUBTLE HOVER BACKGROUND === */
+.hover-bg-subtle {
+  transition: background-color var(--duration-fast) var(--ease-smooth);
+}
+.hover-bg-subtle:hover {
+  background: var(--bg-tertiary);
+}
+
+/* === SUBTLE ROW HIGHLIGHT === */
+.row-hover-subtle {
+  transition: background-color var(--duration-fast) var(--ease-smooth);
+}
+.row-hover-subtle:hover {
+  background: color-mix(in srgb, var(--bg-secondary) 50%, var(--bg-tertiary));
+}
+
+/* === MODAL/DIALOG (clean) === */
 .modal-enhanced {
   background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border);
   border-radius: 16px;
-  box-shadow: var(--shadow-xl);
-  animation: scale-in-center var(--duration-normal) var(--ease-smooth);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
 }
 
 .modal-backdrop {
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 /* === ACCESSIBILITY === */
