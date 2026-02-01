@@ -482,7 +482,7 @@ export default function TemplatesPage() {
         title="Import Template"
         size="md"
       >
-        <div className="space-y-4">
+        <div className="p-4 space-y-4">
           <p className="text-sm text-text-secondary">
             Import a certificate template from a JSON file or paste JSON content
           </p>
@@ -515,7 +515,7 @@ export default function TemplatesPage() {
             />
           </div>
           
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button variant="secondary" onClick={() => setShowImportModal(false)}>Cancel</Button>
             <Button onClick={handleImportTemplate} disabled={importing || (!importFile && !importJson.trim())}>
               {importing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
@@ -588,7 +588,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
       {/* Basic Info */}
       <div className="grid grid-cols-2 gap-4">
         <Input
@@ -636,7 +636,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
       {/* Subject Template */}
       <div className="border-t border-border pt-4">
         <h4 className="text-sm font-medium text-text-primary mb-3">Subject Template</h4>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <Input
             label="Country (C)"
             value={formData.subject.C}
@@ -664,7 +664,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
         </div>
       </div>
 
-      <div className="flex justify-end gap-3 pt-4 border-t border-border">
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
