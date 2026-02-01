@@ -337,6 +337,15 @@ export default function CertificatesPage() {
         stats={stats}
         helpContent={helpContent}
         helpTitle="Certificates Help"
+        splitView={true}
+        splitEmptyContent={
+          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
+              <Certificate size={24} className="text-text-tertiary" />
+            </div>
+            <p className="text-sm text-text-secondary">Select a certificate to view details</p>
+          </div>
+        }
         slideOverOpen={!!selectedCert}
         slideOverTitle={selectedCert?.cn || selectedCert?.common_name || 'Certificate Details'}
         slideOverContent={slideOverContent}
