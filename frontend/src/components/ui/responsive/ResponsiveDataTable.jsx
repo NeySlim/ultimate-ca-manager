@@ -392,13 +392,12 @@ function DesktopTable({
                   'group transition-all duration-150',
                   onRowClick && 'cursor-pointer',
                   // Hover effect - uses theme color
-                  'hover:bg-bg-tertiary',
+                  'hover:bg-bg-tertiary/70 hover:shadow-sm',
                   // Selected state - uses theme-aware CSS class
                   selectedId === row.id && 'row-selected'
-                )}
-              >
+                )}>
                 {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-3">
+                  <td key={col.key} className="px-4 py-3 transition-colors">
                     {col.render 
                       ? col.render(row[col.key], row)
                       : row[col.key] ?? '—'
