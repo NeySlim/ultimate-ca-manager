@@ -36,8 +36,9 @@ export function ResponsiveDataTable({
   sortable = false,
   defaultSort, // { key, direction: 'asc' | 'desc' }
   
-  // Pagination (external)
-  pagination, // { page, total, perPage, onChange, onPerPageChange }
+  // Pagination (external OR auto)
+  pagination, // { page, total, perPage, onChange, onPerPageChange } OR true for auto
+  defaultPerPage = 25, // default items per page for auto-pagination
   
   // Empty state (individual props OR object)
   emptyIcon: EmptyIconProp,
@@ -115,6 +116,58 @@ export function ResponsiveDataTable({
     })
   }, [filteredData, sort])
   
+  // ==========================================================================
+  // AUTO-PAGINATION: Internal state for client-side pagination
+  // ==========================================================================
+  const [internalPage, setInternalPage] = useState(1)
+  const [internalPerPage, setInternalPerPage] = useState(defaultPerPage)
+  
+  // Determine if we should use pagination (external, auto, or none)
+  const useAutoPagination = pagination === true || (pagination === undefined && sortedData.length > defaultPerPage)
+  const useExternalPagination = pagination && typeof pagination === 'object'
+  
+  // Reset internal page when data changes significantly
+  useEffect(() => {
+    if (useAutoPagination) {
+      const maxPage = Math.ceil(sortedData.length / internalPerPage)
+      if (internalPage > maxPage) {
+        setInternalPage(Math.max(1, maxPage))
+      }
+    }
+  }, [sortedData.length, internalPerPage, internalPage, useAutoPagination])
+  
+  // Paginated data (only for auto-pagination)
+  const paginatedData = useMemo(() => {
+    if (useExternalPagination) {
+      // External pagination: assume data is already sliced by parent/API
+      return sortedData
+    }
+    if (useAutoPagination) {
+      // Auto pagination: slice locally
+      const start = (internalPage - 1) * internalPerPage
+      return sortedData.slice(start, start + internalPerPage)
+    }
+    // No pagination: return all data
+    return sortedData
+  }, [sortedData, useAutoPagination, useExternalPagination, internalPage, internalPerPage])
+  
+  // Build pagination props for PaginationBar
+  const paginationProps = useMemo(() => {
+    if (useExternalPagination) {
+      return pagination
+    }
+    if (useAutoPagination) {
+      return {
+        page: internalPage,
+        total: sortedData.length,
+        perPage: internalPerPage,
+        onChange: setInternalPage,
+        onPerPageChange: (v) => { setInternalPerPage(v); setInternalPage(1) }
+      }
+    }
+    return null
+  }, [useExternalPagination, useAutoPagination, pagination, internalPage, internalPerPage, sortedData.length])
+  
   // Handle sort click
   const handleSort = useCallback((key) => {
     if (!sortable) return
@@ -180,7 +233,7 @@ export function ResponsiveDataTable({
       {/* TABLE / CARDS */}
       {isMobile ? (
         <MobileCardList
-          data={sortedData}
+          data={paginatedData}
           primaryCol={primaryCol}
           secondaryCol={secondaryCol}
           tertiaryCol={tertiaryCol}
@@ -191,7 +244,7 @@ export function ResponsiveDataTable({
         />
       ) : (
         <DesktopTable
-          data={sortedData}
+          data={paginatedData}
           columns={visibleColumns}
           selectedId={selectedId}
           onRowClick={onRowClick}
@@ -207,11 +260,10 @@ export function ResponsiveDataTable({
       )}
       
       {/* PAGINATION */}
-      {pagination && sortedData.length > 0 && (
+      {paginationProps && sortedData.length > 0 && (
         <PaginationBar
-          {...pagination}
+          {...paginationProps}
           isMobile={isMobile}
-          total={pagination.total}
         />
       )}
     </div>
