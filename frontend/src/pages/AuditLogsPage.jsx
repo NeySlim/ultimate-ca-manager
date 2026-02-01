@@ -665,8 +665,8 @@ export default function AuditLogsPage() {
       <Button variant="secondary" size="sm" onClick={loadLogs} className="hidden md:inline-flex">
         <ArrowsClockwise size={14} />
       </Button>
-      <Button variant="danger" size="sm" onClick={() => setShowCleanupModal(true)}>
-        <Trash size={14} />
+      <Button variant="secondary" size="sm" onClick={() => setShowCleanupModal(true)}>
+        <Trash size={14} className="text-status-error" />
         <span className="hidden md:inline">Cleanup</span>
       </Button>
       {/* Mobile: More filters */}
