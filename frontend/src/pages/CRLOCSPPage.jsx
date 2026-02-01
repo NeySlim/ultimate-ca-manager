@@ -1,21 +1,23 @@
 /**
- * CRL & OCSP Management Page
+ * CRL & OCSP Management Page - Migrated to ResponsiveLayout
  * Certificate Revocation Lists and OCSP responder management
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
-  FileX, ShieldCheck, ArrowsClockwise, Download, Globe,
-  Database, Pulse, Calendar, Hash, CheckCircle, XCircle
+  FileX, ShieldCheck, ArrowsClockwise, Download, Globe, Copy,
+  Database, Pulse, Calendar, Hash, CheckCircle, XCircle, Eye
 } from '@phosphor-icons/react'
 import {
-  PageLayout, FocusItem, Button, Card, Badge, 
+  ResponsiveLayout,
+  ResponsiveDataTable,
+  Button, Card, Badge, 
   LoadingSpinner, EmptyState, StatusIndicator, HelpCard,
-  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
 } from '../components'
 import { casService, crlService, apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate, cn } from '../lib/utils'
+import { formatDate } from '../lib/utils'
 
 // Extended CRL service methods
 const crlApi = {
@@ -26,7 +28,7 @@ const crlApi = {
 }
 
 export default function CRLOCSPPage() {
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showInfo } = useNotification()
   const { canWrite } = usePermission()
   
   const [loading, setLoading] = useState(true)
@@ -37,6 +39,7 @@ export default function CRLOCSPPage() {
   const [ocspStatus, setOcspStatus] = useState({ enabled: false, running: false })
   const [ocspStats, setOcspStats] = useState({ total_requests: 0, cache_hits: 0 })
   const [regenerating, setRegenerating] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     loadData()
@@ -52,22 +55,10 @@ export default function CRLOCSPPage() {
         crlApi.getOcspStats()
       ])
       
-      const casData = casRes.data || []
-      setCas(casData)
+      setCas(casRes.data || [])
       setCrls(crlsRes.data || [])
       setOcspStatus(ocspStatusRes.data || { enabled: false, running: false })
       setOcspStats(ocspStatsRes.data || { total_requests: 0, cache_hits: 0 })
-      
-      if (casData.length > 0 && !selectedCA) {
-        // Prefer CA with a CRL, fallback to first CA
-        const crlsData = crlsRes.data || []
-        const caWithCrl = casData.find(ca => 
-          crlsData.some(crl => crl.ca_id === ca.id || crl.caref === ca.refid)
-        )
-        const initialCA = caWithCrl || casData[0]
-        setSelectedCA(initialCA)
-        loadCRLForCA(initialCA.id)
-      }
     } catch (error) {
       showError(error.message || 'Failed to load CRL/OCSP data')
     } finally {
@@ -117,15 +108,132 @@ export default function CRLOCSPPage() {
     URL.revokeObjectURL(url)
   }
 
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text)
+    showInfo('Copied to clipboard')
+  }
+
   // Calculate stats
   const totalRevoked = crls.reduce((sum, crl) => sum + (crl.revoked_count || 0), 0)
   const cacheHitRate = ocspStats.total_requests > 0 
     ? Math.round((ocspStats.cache_hits / ocspStats.total_requests) * 100) 
     : 0
 
-  // Help content for modal
+  // Merge CAs with CRL info
+  const casWithCRL = useMemo(() => {
+    return cas.map(ca => {
+      const crl = crls.find(c => c.ca_id === ca.id || c.caref === ca.refid)
+      return {
+        ...ca,
+        crl_number: crl?.crl_number,
+        revoked_count: crl?.revoked_count || 0,
+        crl_updated: crl?.updated_at,
+        crl_next_update: crl?.next_update,
+        has_crl: !!crl
+      }
+    })
+  }, [cas, crls])
+
+  // Filter CAs
+  const filteredCAs = useMemo(() => {
+    if (!searchQuery) return casWithCRL
+    return casWithCRL.filter(ca => 
+      ca.descr?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ca.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  }, [casWithCRL, searchQuery])
+
+  // Header stats
+  const headerStats = useMemo(() => [
+    { icon: ShieldCheck, label: 'CAs', value: cas.length },
+    { icon: FileX, label: 'CRLs', value: crls.length, variant: 'info' },
+    { icon: XCircle, label: 'Revoked', value: totalRevoked, variant: 'danger' },
+    { icon: Pulse, label: 'OCSP', value: ocspStatus.running ? 'Online' : 'Offline', variant: ocspStatus.running ? 'success' : 'warning' }
+  ], [cas.length, crls.length, totalRevoked, ocspStatus.running])
+
+  // Table columns
+  const columns = useMemo(() => [
+    {
+      key: 'descr',
+      label: 'CA Name',
+      render: (v, row) => (
+        <div className="flex items-center gap-2">
+          <FileX size={14} className={row.has_crl ? 'text-emerald-500' : 'text-text-tertiary'} />
+          <span className="font-medium">{v || row.name}</span>
+        </div>
+      )
+    },
+    {
+      key: 'has_crl',
+      label: 'Status',
+      width: '100px',
+      render: (v, row) => (
+        <Badge variant={v ? 'success' : 'warning'} size="sm">
+          {v ? 'Active' : 'No CRL'}
+        </Badge>
+      )
+    },
+    {
+      key: 'revoked_count',
+      label: 'Revoked',
+      width: '80px',
+      render: (v) => (
+        <span className={v > 0 ? 'text-red-500 font-medium' : 'text-text-secondary'}>
+          {v || 0}
+        </span>
+      )
+    },
+    {
+      key: 'crl_updated',
+      label: 'Updated',
+      width: '120px',
+      render: (v) => (
+        <span className="text-text-secondary text-xs">
+          {v ? formatDate(v, 'short') : '-'}
+        </span>
+      )
+    }
+  ], [])
+
+  // Mobile card render
+  const renderMobileCard = useCallback((ca, isSelected) => {
+    return (
+      <div className={`p-4 ${isSelected ? 'mobile-row-selected' : ''}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              ca.has_crl ? 'bg-emerald-500/10' : 'bg-bg-tertiary'
+            }`}>
+              <FileX size={20} className={ca.has_crl ? 'text-emerald-500' : 'text-text-tertiary'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-text-primary truncate">{ca.descr || ca.name}</span>
+                <Badge variant={ca.has_crl ? 'success' : 'warning'} size="sm">
+                  {ca.has_crl ? 'Active' : 'No CRL'}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-text-secondary mt-0.5">
+                {ca.has_crl ? (
+                  <>
+                    <span>{ca.revoked_count || 0} revoked</span>
+                    <span>•</span>
+                    <span>CRL #{ca.crl_number || '-'}</span>
+                  </>
+                ) : (
+                  <span>{ca.has_private_key === false ? 'Read-only (no key)' : 'Not generated'}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }, [])
+
+  // Help content
   const helpContent = (
-    <div className="space-y-4">
+    <div className="p-4 space-y-4">
       {/* CRL Statistics */}
       <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
@@ -188,41 +296,106 @@ export default function CRLOCSPPage() {
     </div>
   )
 
-  // Focus panel content (CA list)
-  const focusContent = (
-    <div className="p-2 space-y-1.5">
-      {cas.length === 0 ? (
-        <EmptyState 
-          icon={FileX}
-          title="No CAs"
-          description="Create a CA first"
-        />
-      ) : (
-        cas.map((ca) => {
-          const crl = crls.find(c => c.caref === ca.refid)
-          const isSelected = selectedCA?.id === ca.id
-          const hasRevoked = crl && (crl.revoked_count || 0) > 0
-          const hasKey = ca.has_private_key !== false
-          return (
-            <FocusItem
-              key={ca.id}
-              icon={FileX}
-              title={ca.descr}
-              subtitle={!hasKey ? 'No private key' : (crl ? `Updated ${formatDate(crl.updated_at)}` : 'No CRL')}
-              badge={!hasKey ? (
-                <Badge variant="secondary" size="sm">Read-only</Badge>
-              ) : hasRevoked ? (
-                <Badge variant="danger" size="sm">{crl.revoked_count}</Badge>
-              ) : crl ? (
-                <Badge variant="success" size="sm">0</Badge>
-              ) : null}
-              selected={isSelected}
-              onClick={() => handleSelectCA(ca)}
-            />
-          )
-        })
-      )}
-    </div>
+  // Detail slide-over content
+  const detailContent = selectedCA && (
+    <DetailContent className="p-0">
+      <DetailHeader
+        icon={FileX}
+        title={selectedCA.descr || selectedCA.name}
+        subtitle="CRL & OCSP Configuration"
+        badge={
+          <Badge variant={selectedCRL ? 'success' : 'warning'} size="lg">
+            {selectedCRL ? 'Active' : 'Not Generated'}
+          </Badge>
+        }
+        stats={[
+          { icon: Hash, label: 'CRL #:', value: selectedCRL?.crl_number || '-' },
+          { icon: XCircle, label: 'Revoked:', value: selectedCRL?.revoked_count || 0 },
+          { icon: Calendar, label: 'Updated:', value: selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-' }
+        ]}
+        actions={[
+          ...(canWrite('certificates') && selectedCA.has_private_key !== false ? [{
+            label: regenerating ? 'Regenerating...' : 'Regenerate',
+            icon: ArrowsClockwise,
+            onClick: handleRegenerateCRL,
+            disabled: regenerating
+          }] : []),
+          ...(selectedCRL?.crl_pem ? [{
+            label: 'Download',
+            icon: Download,
+            onClick: handleDownloadCRL
+          }] : [])
+        ]}
+      />
+
+      {/* CRL Configuration */}
+      <DetailSection title="CRL Configuration">
+        <DetailGrid>
+          <DetailField label="CA Name" value={selectedCA.descr || selectedCA.name} />
+          <DetailField label="Status" value={selectedCRL ? 'Active' : 'Not Generated'} />
+          <DetailField label="CRL Number" value={selectedCRL?.crl_number || '-'} />
+          <DetailField label="Revoked Count" value={selectedCRL?.revoked_count || 0} />
+          <DetailField label="Last Updated" value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} />
+          <DetailField label="Next Update" value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'} />
+        </DetailGrid>
+      </DetailSection>
+
+      {/* OCSP Configuration */}
+      <DetailSection title="OCSP Configuration">
+        <DetailGrid>
+          <DetailField 
+            label="Status" 
+            value={ocspStatus.enabled ? (ocspStatus.running ? 'Running' : 'Stopped') : 'Disabled'} 
+          />
+          <DetailField label="Total Requests" value={ocspStats.total_requests} />
+          <DetailField label="Cache Hits" value={ocspStats.cache_hits} />
+          <DetailField label="Hit Rate" value={`${cacheHitRate}%`} />
+        </DetailGrid>
+      </DetailSection>
+
+      {/* Distribution Points */}
+      <DetailSection title="Distribution Points">
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs text-text-secondary mb-1">CDP (CRL Distribution Point)</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
+                {`${window.location.origin}/crl/${selectedCA.refid}.crl`}
+              </code>
+              <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/crl/${selectedCA.refid}.crl`)}>
+                <Copy size={14} />
+              </Button>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-text-secondary mb-1">AIA (OCSP Responder)</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
+                {`${window.location.origin}/ocsp/${selectedCA.refid}`}
+              </code>
+              <Button size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/ocsp/${selectedCA.refid}`)}>
+                <Copy size={14} />
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-text-tertiary">
+            Include these URLs in CA settings for automatic revocation checking.
+          </p>
+        </div>
+      </DetailSection>
+    </DetailContent>
+  )
+
+  // Header actions
+  const headerActions = (
+    <>
+      <Button variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
+        <ArrowsClockwise size={14} />
+      </Button>
+      <Button variant="secondary" size="lg" onClick={loadData} className="md:hidden h-11 w-11 p-0">
+        <ArrowsClockwise size={22} />
+      </Button>
+    </>
   )
 
   if (loading) {
@@ -234,121 +407,35 @@ export default function CRLOCSPPage() {
   }
 
   return (
-    <PageLayout
+    <ResponsiveLayout
       title="CRL & OCSP"
-      focusTitle="Certificate Authorities"
-      focusContent={focusContent}
-      focusFooter={`${cas.length} CA(s)`}
+      icon={FileX}
+      subtitle={`${crls.length} active CRLs`}
+      stats={headerStats}
       helpContent={helpContent}
-      
+      actions={headerActions}
+      slideOverOpen={!!selectedCA}
+      onSlideOverClose={() => { setSelectedCA(null); setSelectedCRL(null); }}
+      slideOverTitle="CRL Details"
+      slideOverContent={detailContent}
+      slideOverWidth="md"
     >
-      {/* Main Content */}
-      {!selectedCA ? (
-        <div className="flex items-center justify-center h-full">
-          <EmptyState 
-            icon={FileX}
-            title="Select a CA"
-            description="Choose a CA to view its CRL"
-          />
-        </div>
-      ) : (
-        <div className="p-3 space-y-3">
-          {/* Header */}
-          <CompactHeader
-            icon={FileX}
-            iconClass={selectedCRL ? "bg-status-success/20" : "bg-status-warning/20"}
-            title={selectedCA.descr}
-            subtitle="CRL & OCSP Configuration"
-            badge={
-              <Badge variant={selectedCRL ? 'success' : 'warning'} size="sm">
-                {selectedCRL ? 'Active' : 'Not Generated'}
-              </Badge>
-            }
-          />
-
-          {/* Stats */}
-          <CompactStats stats={[
-            { icon: Hash, value: `#${selectedCRL?.crl_number || '-'}` },
-            { icon: XCircle, value: `${selectedCRL?.revoked_count || 0} revoked` },
-            { icon: Calendar, value: selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-' }
-          ]} />
-
-          {/* Actions */}
-          <div className="flex gap-2">
-            <Button 
-              size="sm" 
-              variant="secondary" 
-              className="flex-1"
-              onClick={handleRegenerateCRL}
-              disabled={regenerating || selectedCA.has_private_key === false}
-            >
-              <ArrowsClockwise size={14} className={regenerating ? 'animate-spin' : ''} />
-              {regenerating ? 'Regenerating...' : (selectedCA.has_private_key === false ? 'No Key' : 'Regenerate')}
-            </Button>
-            <Button 
-              size="sm" 
-              variant="secondary"
-              onClick={handleDownloadCRL}
-              disabled={!selectedCRL?.crl_pem}
-            >
-              <Download size={14} />
-            </Button>
-          </div>
-
-          {/* CRL Config */}
-          <CompactSection title="CRL Configuration">
-            <CompactGrid>
-              <CompactField label="CA" value={selectedCA.descr} />
-              <div className="text-xs">
-                <span className="text-text-tertiary">Status:</span>
-                <StatusIndicator status={selectedCRL ? 'success' : 'warning'} className="ml-1 inline-flex">
-                  {selectedCRL ? 'Active' : 'Not Generated'}
-                </StatusIndicator>
-              </div>
-              <CompactField label="CRL #" value={selectedCRL?.crl_number || '-'} />
-              <CompactField label="Revoked" value={selectedCRL ? (selectedCRL.revoked_count || 0) : '-'} />
-              <CompactField label="Updated" value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-'} />
-              <CompactField label="Next Update" value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update, 'short') : '-'} />
-            </CompactGrid>
-          </CompactSection>
-
-          {/* OCSP Config */}
-          <CompactSection title="OCSP Configuration">
-            <CompactGrid>
-              <div className="text-xs">
-                <span className="text-text-tertiary">Status:</span>
-                <StatusIndicator status={ocspStatus.enabled && ocspStatus.running ? 'success' : 'warning'} className="ml-1 inline-flex">
-                  {ocspStatus.enabled ? (ocspStatus.running ? 'Running' : 'Stopped') : 'Disabled'}
-                </StatusIndicator>
-              </div>
-              <CompactField label="Requests" value={ocspStats.total_requests} />
-              <CompactField label="Cache Hits" value={ocspStats.cache_hits} />
-              <CompactField label="Hit Rate" value={`${cacheHitRate}%`} />
-            </CompactGrid>
-          </CompactSection>
-
-          {/* Distribution Points */}
-          <CompactSection title="Distribution Points">
-            <div className="space-y-2">
-              <div className="text-xs">
-                <span className="text-text-tertiary block mb-0.5">CDP (CRL):</span>
-                <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
-                  {`${window.location.origin}/crl/${selectedCA.refid}.crl`}
-                </p>
-              </div>
-              <div className="text-xs">
-                <span className="text-text-tertiary block mb-0.5">AIA (OCSP):</span>
-                <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
-                  {`${window.location.origin}/ocsp/${selectedCA.refid}`}
-                </p>
-              </div>
-              <p className="text-[10px] text-text-tertiary mt-2">
-                Include these URLs in CA settings for automatic revocation checking.
-              </p>
-            </div>
-          </CompactSection>
-        </div>
-      )}
-    </PageLayout>
+      <ResponsiveDataTable
+        data={filteredCAs}
+        columns={columns}
+        keyField="id"
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder="Search CAs..."
+        selectedId={selectedCA?.id}
+        onRowClick={handleSelectCA}
+        renderMobileCard={renderMobileCard}
+        emptyState={{
+          icon: FileX,
+          title: 'No Certificate Authorities',
+          description: 'Create a CA first to manage CRLs'
+        }}
+      />
+    </ResponsiveLayout>
   )
 }
