@@ -600,6 +600,27 @@ tr.row-selected td:first-child {
   );
 }
 
+/* Resize handle - theme aware */
+.resize-handle {
+  background-color: transparent;
+  transition: background-color 150ms ease;
+}
+.resize-handle:hover {
+  background-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+.resize-handle:active,
+.resize-handle.resizing {
+  background-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
+}
+.resize-handle-line {
+  background-color: var(--border);
+  transition: background-color 150ms ease;
+}
+.resize-handle:hover .resize-handle-line,
+.resize-handle.resizing .resize-handle-line {
+  background-color: var(--accent-primary);
+}
+
 /* Smooth transitions for all interactive elements */
 button, a, input, select, textarea {
   transition: all var(--duration-fast) var(--ease-smooth);

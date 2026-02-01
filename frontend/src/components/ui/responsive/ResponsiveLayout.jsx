@@ -24,6 +24,14 @@ import { useMobile } from '../../../contexts'
 import { cn } from '../../../lib/utils'
 
 // =============================================================================
+// PANEL WIDTH CONSTANTS
+// =============================================================================
+const PANEL_WIDTH_KEY = 'ucm-detail-panel-width'
+const MIN_PANEL_WIDTH = 280
+const MAX_PANEL_WIDTH = 600
+const DEFAULT_PANEL_WIDTH = 380
+
+// =============================================================================
 // MAIN LAYOUT COMPONENT
 // =============================================================================
 
@@ -78,6 +86,64 @@ export function ResponsiveLayout({
   // Local state for filter/help drawers (mobile only)
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
   const [helpDrawerOpen, setHelpDrawerOpen] = useState(false)
+  
+  // Resizable panel state
+  const [panelWidth, setPanelWidth] = useState(() => {
+    if (typeof window === 'undefined') return DEFAULT_PANEL_WIDTH
+    const saved = localStorage.getItem(PANEL_WIDTH_KEY)
+    if (saved) {
+      const parsed = parseInt(saved, 10)
+      if (parsed >= MIN_PANEL_WIDTH && parsed <= MAX_PANEL_WIDTH) {
+        return parsed
+      }
+    }
+    return DEFAULT_PANEL_WIDTH
+  })
+  const [isResizing, setIsResizing] = useState(false)
+  const panelRef = useRef(null)
+  const widthRef = useRef(panelWidth)
+  
+  // Keep ref in sync
+  useEffect(() => {
+    widthRef.current = panelWidth
+  }, [panelWidth])
+  
+  // Handle resize
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsResizing(true)
+  }, [])
+  
+  useEffect(() => {
+    if (!isResizing) return
+    
+    const handleMouseMove = (e) => {
+      if (!panelRef.current) return
+      const containerRect = panelRef.current.parentElement.getBoundingClientRect()
+      const newWidth = containerRect.right - e.clientX
+      const clampedWidth = Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, newWidth))
+      setPanelWidth(clampedWidth)
+      widthRef.current = clampedWidth
+    }
+    
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      localStorage.setItem(PANEL_WIDTH_KEY, widthRef.current.toString())
+    }
+    
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing])
   
   // Close slide-over on Escape (desktop)
   useEffect(() => {
@@ -138,17 +204,33 @@ export function ResponsiveLayout({
           )}
         </main>
         
-        {/* SPLIT VIEW PANEL (xl+ screens) - Always visible */}
+        {/* SPLIT VIEW PANEL (xl+ screens) - Always visible with resize */}
         {splitView && isLargeScreen && (
-          <aside className={cn(
-            'shrink-0 overflow-auto bg-bg-secondary/30',
-            slideOverWidth === 'narrow' ? 'w-80' : slideOverWidth === 'wide' ? 'w-[420px]' : 'w-96'
-          )}>
+          <aside 
+            ref={panelRef}
+            style={{ width: panelWidth }}
+            className={cn(
+              'shrink-0 overflow-hidden bg-bg-secondary/30 relative',
+              isResizing && 'select-none'
+            )}
+          >
+            {/* Resize Handle */}
+            <div
+              className={cn(
+                "absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-10 resize-handle",
+                isResizing && "resizing"
+              )}
+              onMouseDown={handleResizeStart}
+              title="Drag to resize panel"
+            >
+              <div className="absolute left-0 top-0 bottom-0 w-0.5 resize-handle-line" />
+            </div>
+            
             {slideOverOpen && slideOverContent ? (
-              <div className="h-full flex flex-col">
+              <div className="h-full flex flex-col overflow-hidden">
                 {/* Panel header */}
                 <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-text-primary">{slideOverTitle}</h3>
+                  <h3 className="text-sm font-semibold text-text-primary truncate">{slideOverTitle}</h3>
                   {onSlideOverClose && (
                     <button
                       onClick={onSlideOverClose}
