@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.4] - 2026-02-01
+
+### 🎨 Phase 10: Responsive UI Architecture
+
+#### Added
+- **ResponsiveLayout Component** - Unified layout for all pages
+  - Desktop: Dense interface with inline slide-over panels
+  - Mobile: Touch-friendly cards with 44px touch targets
+  - Automatic mode switching based on viewport
+  - Theme-aware hover and selection states
+
+- **ResponsiveDataTable Component** - Adaptive data display
+  - Desktop: Compact table with sortable columns
+  - Mobile: Card-style rows with swipe gestures
+  - Built-in search, pagination, and empty states
+  - Row selection with visual feedback
+
+- **Max-width Container** - 1920px centered layout
+  - Window frame effect on large screens
+  - Gradient background with subtle borders
+  - Consistent content width across all pages
+
+- **UI Enhancements**
+  - Inline filters in page headers (desktop)
+  - Filter/Help/Action buttons with proper sizing
+  - CSS animations: slideInRight, slideUp, fadeIn
+  - Theme-aware selection using CSS color-mix()
+
+#### Changed
+- Migrated CertificatesPage to ResponsiveLayout
+- Migrated UsersPage with Pro tabs dynamic loading
+- Migrated CSRsPage to ResponsiveLayout
+- Migrated CAsPage with hierarchical tree view
+- Migrated AuditLogsPage with date filters and export
+- AppShell max-width container with frame effect
+
+#### Mobile Improvements
+- Touch-friendly 44px minimum touch targets
+- Card-based layouts replace dense tables
+- Full-screen slide-over panels
+- Swipe-to-close gesture support
+- Large icons (20-22px) for better visibility
+
+---
+
 ## [2.0.3] - 2026-01-31
 
 ### 🔌 Phase 8: WebSocket Real-Time Events
