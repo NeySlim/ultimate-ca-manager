@@ -323,8 +323,14 @@ export function ResponsivePageLayout({
 }
 
 // =============================================================================
-// DESKTOP SLIDE-OVER (inline panel)
+// DESKTOP SLIDE-OVER (inline panel with resize)
 // =============================================================================
+
+// LocalStorage key for panel width
+const PANEL_WIDTH_KEY = 'ucm-detail-panel-width'
+const MIN_PANEL_WIDTH = 280
+const MAX_PANEL_WIDTH = 600
+const DEFAULT_PANEL_WIDTH = 380
 
 function DesktopSlideOver({ 
   open, 
@@ -335,23 +341,92 @@ function DesktopSlideOver({
   onClearFilters,
   children 
 }) {
-  const widthClasses = {
-    narrow: 'w-72 xl:w-80',
-    default: 'w-80 xl:w-96',
-    wide: 'w-96 xl:w-[420px] 2xl:w-[480px]'
-  }
+  // Load saved width from localStorage
+  const [panelWidth, setPanelWidth] = useState(() => {
+    if (typeof window === 'undefined') return DEFAULT_PANEL_WIDTH
+    const saved = localStorage.getItem(PANEL_WIDTH_KEY)
+    if (saved) {
+      const parsed = parseInt(saved, 10)
+      if (parsed >= MIN_PANEL_WIDTH && parsed <= MAX_PANEL_WIDTH) {
+        return parsed
+      }
+    }
+    return DEFAULT_PANEL_WIDTH
+  })
+  
+  const [isResizing, setIsResizing] = useState(false)
+  const panelRef = useRef(null)
+  
+  // Handle resize
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }, [])
+  
+  useEffect(() => {
+    if (!isResizing) return
+    
+    const handleMouseMove = (e) => {
+      if (!panelRef.current) return
+      const containerRect = panelRef.current.parentElement.getBoundingClientRect()
+      const newWidth = containerRect.right - e.clientX
+      const clampedWidth = Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, newWidth))
+      setPanelWidth(clampedWidth)
+    }
+    
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      // Save to localStorage
+      localStorage.setItem(PANEL_WIDTH_KEY, panelWidth.toString())
+    }
+    
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    
+    // Add cursor style to body during resize
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing, panelWidth])
+  
+  // Save width when it changes (debounced)
+  useEffect(() => {
+    if (!isResizing && panelWidth !== DEFAULT_PANEL_WIDTH) {
+      localStorage.setItem(PANEL_WIDTH_KEY, panelWidth.toString())
+    }
+  }, [panelWidth, isResizing])
   
   const activeFilterCount = filters?.filter(f => f.value && f.value !== '').length || 0
   
   return (
     <aside
+      ref={panelRef}
+      style={{ width: open ? panelWidth : 0 }}
       className={cn(
-        "border-l border-border bg-bg-secondary flex flex-col shrink-0 transition-all duration-200 ease-out overflow-hidden",
-        open ? widthClasses[width] : "w-0 border-l-0"
+        "border-l border-border bg-bg-secondary flex flex-col shrink-0 overflow-hidden relative",
+        open ? "transition-none" : "transition-all duration-200 ease-out border-l-0",
+        isResizing && "select-none"
       )}
     >
       {open && (
         <>
+          {/* Resize Handle */}
+          <div
+            className={cn(
+              "absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10",
+              "hover:bg-accent-primary/30 transition-colors",
+              isResizing && "bg-accent-primary/50"
+            )}
+            onMouseDown={handleMouseDown}
+            title="Drag to resize"
+          />
+          
           {/* Panel Header */}
           <div className="px-4 py-2.5 border-b border-border flex items-center justify-between shrink-0 bg-bg-tertiary/30">
             <h2 className="text-sm font-semibold text-text-primary">{title || 'Details'}</h2>
