@@ -362,36 +362,36 @@ function PageHeader({
     <header className={cn(
       'shrink-0 border-b border-border',
       isMobile 
-        ? 'px-4 py-3 bg-bg-secondary/50' 
-        : 'px-5 py-3 bg-bg-primary'
+        ? 'px-4 py-4 bg-bg-secondary' 
+        : 'px-6 py-4 bg-bg-secondary'
     )}>
       {/* TOP ROW: Title + Actions */}
       <div className="flex items-center justify-between gap-4">
         {/* Left: Icon + Title */}
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           {Icon && (
             <div className={cn(
-              'shrink-0 rounded-lg bg-accent-primary/10 flex items-center justify-center',
-              isMobile ? 'w-10 h-10' : 'w-8 h-8'
+              'shrink-0 rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center',
+              isMobile ? 'w-10 h-10' : 'w-9 h-9'
             )}>
               <Icon 
-                size={isMobile ? 22 : 16} 
-                weight="duotone" 
-                className="text-accent-primary" 
+                size={isMobile ? 22 : 18} 
+                weight="bold" 
+                className="text-white" 
               />
             </div>
           )}
           <div className="min-w-0">
             <h1 className={cn(
               'font-semibold text-text-primary truncate leading-tight',
-              isMobile ? 'text-lg' : 'text-sm'
+              isMobile ? 'text-lg' : 'text-lg'
             )}>
               {title}
             </h1>
             {subtitle && (
               <p className={cn(
                 'text-text-secondary truncate',
-                isMobile ? 'text-xs' : 'text-xs'
+                isMobile ? 'text-sm' : 'text-sm'
               )}>
                 {subtitle}
               </p>
