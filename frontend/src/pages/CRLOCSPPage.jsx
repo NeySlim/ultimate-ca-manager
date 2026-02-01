@@ -424,12 +424,12 @@ export default function CRLOCSPPage() {
         data={filteredCAs}
         columns={columns}
         keyField="id"
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
+        searchable
         searchPlaceholder="Search CAs..."
+        searchKeys={['name', 'common_name', 'cn']}
         selectedId={selectedCA?.id}
         onRowClick={handleSelectCA}
-        renderMobileCard={renderMobileCard}
+        sortable
         emptyState={{
           icon: FileX,
           title: 'No Certificate Authorities',

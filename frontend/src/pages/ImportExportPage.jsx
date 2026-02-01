@@ -1,22 +1,32 @@
 /**
- * Import/Export Page
- * Uses PageLayout for consistent UI structure
+ * Import/Export Page - Horizontal tabs for desktop
  * Uses DetailCard design system for content
  */
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   UploadSimple, Certificate, ShieldCheck, Flask, FloppyDisk, FileArrowUp, 
-  DownloadSimple, Database, CloudArrowUp, ArrowsLeftRight, CheckCircle, File
+  DownloadSimple, Database, CloudArrowUp, ArrowsLeftRight, CheckCircle, File,
+  Question
 } from '@phosphor-icons/react'
 import {
-  PageLayout, FocusItem, Button, ExportDropdown, Input, LoadingSpinner, 
-  Select, Card, Badge, HelpCard, DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
+  Button, ExportDropdown, Input, LoadingSpinner, 
+  Select, Card, Badge, HelpCard, HelpModal, DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
 } from '../components'
 import { opnsenseService, casService, certificatesService } from '../services'
-import { useNotification } from '../contexts'
+import { useNotification, useMobile } from '../contexts'
+import { cn } from '../lib/utils'
 
 const STORAGE_KEY = 'opnsense_config'
+
+// Tab definitions
+const IMPORT_EXPORT_TABS = [
+  { id: 'import-cert', label: 'Import Certificate', icon: Certificate, category: 'import' },
+  { id: 'import-ca', label: 'Import CA', icon: ShieldCheck, category: 'import' },
+  { id: 'import-opnsense', label: 'OpnSense', icon: CloudArrowUp, category: 'import' },
+  { id: 'export-certs', label: 'Export Certificates', icon: DownloadSimple, category: 'export' },
+  { id: 'export-cas', label: 'Export CAs', icon: DownloadSimple, category: 'export' },
+]
 
 export default function ImportExportPage() {
   const { showSuccess, showError } = useNotification()
@@ -320,15 +330,6 @@ export default function ImportExportPage() {
     }
   }
 
-  // Action definitions for focus panel
-  const actions = [
-    { id: 'import-cert', title: 'Import Certificate', subtitle: 'PEM, DER, PKCS#12', icon: Certificate, category: 'import' },
-    { id: 'import-ca', title: 'Import CA', subtitle: 'Certificate Authority', icon: ShieldCheck, category: 'import' },
-    { id: 'import-opnsense', title: 'Import from OpnSense', subtitle: 'API connection', icon: CloudArrowUp, category: 'import' },
-    { id: 'export-certs', title: 'Export Certificates', subtitle: 'Bulk export', icon: DownloadSimple, category: 'export' },
-    { id: 'export-cas', title: 'Export CAs', subtitle: 'With hierarchy', icon: DownloadSimple, category: 'export' },
-  ]
-
   // Help content for modal
   const helpContent = (
     <div className="space-y-4">
@@ -386,62 +387,98 @@ export default function ImportExportPage() {
     </div>
   )
 
-  // Focus panel content (operation category list)
-  const focusContent = (
-    <div className="p-2 space-y-4">
-      {/* Import Section */}
-      <div className="space-y-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-2 mb-2">
-          Import
-        </h3>
-        {actions.filter(a => a.category === 'import').map(action => (
-          <FocusItem
-            key={action.id}
-            icon={action.icon}
-            title={action.title}
-            subtitle={action.subtitle}
-            selected={selectedAction === action.id}
-            onClick={() => { 
-              setSelectedAction(action.id)
-              setSelectedFile(null)
-              setImportName('')
-              setImportPassword('')
-              setPemContent('')
-            }}
-          />
-        ))}
-      </div>
+  const [helpOpen, setHelpOpen] = useState(false)
+  const { isMobile } = useMobile()
 
-      {/* Export Section */}
-      <div className="space-y-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-text-secondary px-2 mb-2">
-          Export
-        </h3>
-        {actions.filter(a => a.category === 'export').map(action => (
-          <FocusItem
-            key={action.id}
-            icon={action.icon}
-            title={action.title}
-            subtitle={action.subtitle}
-            selected={selectedAction === action.id}
-            onClick={() => setSelectedAction(action.id)}
-          />
-        ))}
-      </div>
-    </div>
-  )
+  const handleTabChange = (tabId) => {
+    setSelectedAction(tabId)
+    setSelectedFile(null)
+    setImportName('')
+    setImportPassword('')
+    setPemContent('')
+  }
 
   return (
-    <PageLayout
-      title="Import & Export"
-      focusTitle="Operations"
-      focusContent={focusContent}
-      focusActions={null}
-      focusFooter={null}
-      helpContent={helpContent}
-      
-    >
-      <DetailContent>
+    <>
+      <div className="flex flex-col h-full w-full">
+        {/* Header with tabs */}
+        <div className="shrink-0 border-b border-border bg-bg-secondary">
+          {/* Title row */}
+          <div className="px-4 md:px-6 py-3 flex items-center justify-between">
+            <h1 className="text-lg font-semibold text-text-primary">Import & Export</h1>
+            <button
+              onClick={() => setHelpOpen(true)}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all",
+                "bg-accent-primary/10 border border-accent-primary/30",
+                "text-accent-primary hover:bg-accent-primary/20",
+                "text-xs font-medium"
+              )}
+            >
+              <Question size={14} weight="bold" />
+              <span className="hidden sm:inline">Help</span>
+            </button>
+          </div>
+          
+          {/* Horizontal tabs with category separators */}
+          <div className="px-4 md:px-6 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-1 min-w-max pb-0 items-center">
+              {/* Import tabs */}
+              <span className="text-[10px] uppercase tracking-wide text-text-tertiary mr-2 hidden md:inline">Import</span>
+              {IMPORT_EXPORT_TABS.filter(t => t.category === 'import').map((tab) => {
+                const Icon = tab.icon
+                const isSelected = selectedAction === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-t-lg text-sm font-medium transition-all",
+                      "border-b-2 -mb-px",
+                      isSelected
+                        ? "border-accent-primary text-accent-primary bg-bg-primary"
+                        : "border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50"
+                    )}
+                  >
+                    <Icon size={16} weight={isSelected ? "fill" : "regular"} />
+                    <span className={isMobile ? "hidden" : ""}>{tab.label}</span>
+                  </button>
+                )
+              })}
+              
+              {/* Separator */}
+              <div className="h-6 w-px bg-border mx-2" />
+              
+              {/* Export tabs */}
+              <span className="text-[10px] uppercase tracking-wide text-text-tertiary mr-2 hidden md:inline">Export</span>
+              {IMPORT_EXPORT_TABS.filter(t => t.category === 'export').map((tab) => {
+                const Icon = tab.icon
+                const isSelected = selectedAction === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-t-lg text-sm font-medium transition-all",
+                      "border-b-2 -mb-px",
+                      isSelected
+                        ? "border-accent-primary text-accent-primary bg-bg-primary"
+                        : "border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50"
+                    )}
+                  >
+                    <Icon size={16} weight={isSelected ? "fill" : "regular"} />
+                    <span className={isMobile ? "hidden" : ""}>{tab.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+        
+        {/* Content area */}
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-4xl mx-auto p-4 md:p-6">
+            <DetailContent>
         {/* Import Certificate */}
         {selectedAction === 'import-cert' && (
           <div className="max-w-3xl space-y-0">
@@ -744,7 +781,19 @@ export default function ImportExportPage() {
             )}
           </div>
         )}
-      </DetailContent>
-    </PageLayout>
+            </DetailContent>
+          </div>
+        </div>
+      </div>
+      
+      {/* Help Modal */}
+      <HelpModal
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        title="Import & Export Help"
+      >
+        {helpContent}
+      </HelpModal>
+    </>
   )
 }
