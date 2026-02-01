@@ -95,10 +95,10 @@ export function Pagination({
                   key={pageNum}
                   onClick={() => onChange(pageNum)}
                   className={cn(
-                    "min-w-[28px] h-7 rounded text-xs font-medium transition-colors",
+                    "min-w-[28px] h-7 rounded text-xs font-medium transition-all",
                     page === pageNum
                       ? "bg-accent-primary text-white"
-                      : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
+                      : "text-text-secondary bg-bg-tertiary/50 hover:bg-bg-tertiary hover:text-text-primary"
                   )}
                 >
                   {pageNum}

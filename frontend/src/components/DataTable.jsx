@@ -363,22 +363,25 @@ export function DataTable({
   // Get visible columns
   const displayColumns = columns.filter(c => visibleColumns.includes(c.key))
   
-  // Variant styles
+  // Variant styles - enhanced with subtle visual polish
   const variantStyles = {
     default: {
-      header: 'bg-bg-secondary',
+      header: 'bg-bg-tertiary/40',
+      headerCell: 'py-2.5 px-3 text-xs font-semibold text-text-secondary uppercase tracking-wider',
       row: 'table-row-hover',
-      cell: 'py-2 px-3 text-sm',
+      cell: 'py-2.5 px-3 text-sm',
     },
     compact: {
-      header: 'bg-bg-secondary',
+      header: 'bg-bg-tertiary/40',
+      headerCell: 'py-2 px-3 text-xs font-semibold text-text-secondary uppercase tracking-wider',
       row: 'table-row-hover',
       cell: 'py-1.5 px-3 text-sm',
     },
     striped: {
-      header: 'bg-bg-secondary',
-      row: 'even:bg-bg-tertiary/30 table-row-hover',
-      cell: 'py-2 px-3 text-sm',
+      header: 'bg-bg-tertiary/40',
+      headerCell: 'py-2.5 px-3 text-xs font-semibold text-text-secondary uppercase tracking-wider',
+      row: 'even:bg-bg-tertiary/20 table-row-hover',
+      cell: 'py-2.5 px-3 text-sm',
     }
   }
   
@@ -467,11 +470,11 @@ export function DataTable({
         <table className="w-full border-collapse">
           <thead className={cn(
             styles.header,
-            stickyHeader && "sticky top-0 z-10"
+            stickyHeader && "sticky top-0 z-10 backdrop-blur-sm"
           )}>
             <tr className="border-b border-border">
               {selectable && (
-                <th className="w-10 px-3 py-3">
+                <th className="w-10 px-3 py-2.5">
                   {multiSelect && (
                     <input
                       type="checkbox"
@@ -488,9 +491,8 @@ export function DataTable({
                 <th
                   key={column.key}
                   className={cn(
-                    "text-left text-xs font-semibold text-text-secondary uppercase tracking-wider",
-                    styles.cell,
-                    sortable && column.sortable !== false && "cursor-pointer select-none hover:text-text-primary",
+                    styles.headerCell,
+                    sortable && column.sortable !== false && "cursor-pointer select-none hover:text-text-primary transition-colors",
                     column.width && `w-[${column.width}]`,
                     column.align === 'center' && 'text-center',
                     column.align === 'right' && 'text-right'
@@ -546,7 +548,7 @@ export function DataTable({
                     className={cn(
                       "border-b border-border/50 transition-colors",
                       styles.row,
-                      isSelected && "bg-accent-primary/10",
+                      isSelected && "selected",
                       onRowClick && "cursor-pointer",
                       typeof rowClassName === 'function' ? rowClassName(row) : rowClassName
                     )}

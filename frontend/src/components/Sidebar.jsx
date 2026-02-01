@@ -93,19 +93,19 @@ export function Sidebar({ activePage }) {
             to={page.path}
             className={cn(
               buttonSize,
-              "rounded-sm flex items-center justify-center transition-all relative group",
+              "rounded-lg flex items-center justify-center transition-all relative group",
               isActive
-                ? "bg-bg-tertiary text-accent-primary" 
+                ? "bg-accent-primary/10 text-accent-primary border border-accent-primary/20" 
                 : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
             )}
             title={page.label}
           >
             <Icon size={iconSize} weight={isActive ? 'fill' : 'regular'} />
             {isActive && (
-              <div className="absolute left-0 w-0.5 h-8 bg-accent-primary rounded-r-sm" />
+              <div className="absolute left-0 w-0.5 h-6 bg-accent-primary rounded-r-full" />
             )}
             {/* Tooltip */}
-            <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-sm text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+            <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-md text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
               {page.label}
             </div>
           </Link>
