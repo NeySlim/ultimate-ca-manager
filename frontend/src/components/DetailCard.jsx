@@ -332,18 +332,42 @@ export function DetailTabs({ tabs, activeTab, onChange, className }) {
 /**
  * CompactSection - Bordered section with header
  * For use in slide-over detail panels
+ * @param {boolean} collapsible - Allow expand/collapse
+ * @param {boolean} defaultOpen - Initial state if collapsible
  */
-export function CompactSection({ title, children, className }) {
+export function CompactSection({ title, children, className, collapsible = false, defaultOpen = true }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen)
+  
   return (
     <div className={cn("border border-border rounded-lg overflow-hidden", className)}>
-      <div className="px-3 py-1.5 bg-bg-tertiary/50 border-b border-border">
+      <button
+        type="button"
+        onClick={() => collapsible && setIsOpen(!isOpen)}
+        className={cn(
+          "w-full px-3 py-1.5 bg-bg-tertiary/50 flex items-center justify-between text-left",
+          collapsible && "cursor-pointer hover:bg-bg-tertiary transition-colors",
+          !collapsible && "cursor-default"
+        )}
+        disabled={!collapsible}
+      >
         <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
           {title}
         </h4>
-      </div>
-      <div className="p-3">
-        {children}
-      </div>
+        {collapsible && (
+          <CaretDown 
+            size={14} 
+            className={cn(
+              "text-text-tertiary transition-transform",
+              isOpen && "rotate-180"
+            )} 
+          />
+        )}
+      </button>
+      {isOpen && (
+        <div className="p-3">
+          {children}
+        </div>
+      )}
     </div>
   )
 }
@@ -365,14 +389,92 @@ export function CompactGrid({ children, cols = 2, className }) {
 
 /**
  * CompactField - Inline label:value for compact display
+ * @param {icon} icon - Optional icon component
+ * @param {boolean} copyable - Show copy button
+ * @param {boolean} mono - Use monospace font
  */
-export function CompactField({ label, value, mono, className, colSpan }) {
+export function CompactField({ 
+  label, 
+  value, 
+  icon: Icon,
+  mono, 
+  copyable,
+  className, 
+  colSpan 
+}) {
+  const [copied, setCopied] = useState(false)
+  
+  if (value === undefined || value === null || value === '') {
+    return null // Don't render empty fields
+  }
+  
+  const handleCopy = () => {
+    if (copyable && value) {
+      navigator.clipboard.writeText(String(value))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+  
+  // If icon provided, use vertical layout
+  if (Icon) {
+    return (
+      <div className={cn(
+        "flex items-start gap-2 group",
+        colSpan && `col-span-${colSpan}`,
+        className
+      )}>
+        <Icon size={14} className="text-text-tertiary mt-0.5 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] text-text-tertiary uppercase tracking-wider">{label}</div>
+          <div className={cn(
+            "text-sm text-text-primary break-all",
+            mono && "font-mono text-xs"
+          )}>
+            {value}
+          </div>
+        </div>
+        {copyable && (
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-bg-tertiary rounded"
+            title="Copy"
+          >
+            {copied ? (
+              <Check size={14} className="text-status-success" />
+            ) : (
+              <Copy size={14} className="text-text-tertiary" />
+            )}
+          </button>
+        )}
+      </div>
+    )
+  }
+  
+  // Standard inline layout
   return (
-    <div className={cn(colSpan && `col-span-${colSpan}`, className)}>
+    <div 
+      className={cn(
+        colSpan && `col-span-${colSpan}`, 
+        copyable && "cursor-pointer group",
+        className
+      )}
+      onClick={copyable ? handleCopy : undefined}
+    >
       <span className="text-text-tertiary">{label}:</span>
-      <span className={cn("ml-1 text-text-primary", mono && "font-mono")}>
-        {value !== undefined && value !== null && value !== '' ? value : '—'}
+      <span className={cn("ml-1 text-text-primary", mono && "font-mono text-xs")}>
+        {value}
       </span>
+      {copyable && (
+        <span className="inline-flex ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {copied ? (
+            <Check size={12} className="text-status-success" />
+          ) : (
+            <Copy size={12} className="text-text-tertiary" />
+          )}
+        </span>
+      )}
     </div>
   )
 }

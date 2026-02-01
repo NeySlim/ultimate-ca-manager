@@ -3,6 +3,7 @@
  * 
  * Reusable component for displaying certificate details.
  * Can be used in modals, slide-overs, or standalone pages.
+ * Uses global Compact components for consistent styling.
  * 
  * Usage:
  *   <CertificateDetails 
@@ -34,12 +35,11 @@ import {
   MapPin,
   Hash,
   Fingerprint,
-  ArrowsClockwise,
-  CaretDown,
-  CaretUp
+  ArrowsClockwise
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
+import { CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats } from './DetailCard'
 import { cn } from '../lib/utils'
 
 // Status badge config
@@ -77,88 +77,6 @@ function formatDate(dateStr, format = 'full') {
   } catch {
     return dateStr
   }
-}
-
-// Copy to clipboard helper
-async function copyToClipboard(text, onSuccess) {
-  try {
-    await navigator.clipboard.writeText(text)
-    onSuccess?.()
-  } catch (err) {
-    console.error('Failed to copy:', err)
-  }
-}
-
-// Section component
-function Section({ title, children, collapsible = false, defaultOpen = true }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
-  
-  return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <button
-        onClick={() => collapsible && setIsOpen(!isOpen)}
-        className={cn(
-          "w-full px-3 py-2 bg-bg-tertiary/50 flex items-center justify-between text-left",
-          collapsible && "cursor-pointer hover:bg-bg-tertiary"
-        )}
-        disabled={!collapsible}
-      >
-        <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-          {title}
-        </span>
-        {collapsible && (
-          isOpen ? <CaretUp size={14} className="text-text-tertiary" /> : <CaretDown size={14} className="text-text-tertiary" />
-        )}
-      </button>
-      {isOpen && (
-        <div className="p-3 space-y-2">
-          {children}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Field component
-function Field({ icon: Icon, label, value, mono = false, copyable = false, className }) {
-  const [copied, setCopied] = useState(false)
-  
-  if (!value && value !== 0) return null
-  
-  const handleCopy = () => {
-    copyToClipboard(String(value), () => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }
-  
-  return (
-    <div className={cn("flex items-start gap-2 group", className)}>
-      {Icon && <Icon size={14} className="text-text-tertiary mt-0.5 shrink-0" />}
-      <div className="min-w-0 flex-1">
-        <div className="text-[10px] text-text-tertiary uppercase tracking-wider">{label}</div>
-        <div className={cn(
-          "text-sm text-text-primary break-all",
-          mono && "font-mono text-xs"
-        )}>
-          {value}
-        </div>
-      </div>
-      {copyable && (
-        <button
-          onClick={handleCopy}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-bg-tertiary rounded"
-          title="Copy"
-        >
-          {copied ? (
-            <CheckCircle size={14} className="text-status-success" />
-          ) : (
-            <Copy size={14} className="text-text-tertiary" />
-          )}
-        </button>
-      )}
-    </div>
-  )
 }
 
 // Expiry indicator
@@ -296,61 +214,65 @@ export function CertificateDetails({
       )}
       
       {/* Subject Information */}
-      <Section title="Subject">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-          <Field icon={Globe} label="Common Name" value={cert.cn || cert.common_name} />
-          <Field icon={Buildings} label="Organization" value={cert.organization} />
-          <Field label="Organizational Unit" value={cert.organizational_unit} />
-          <Field icon={MapPin} label="Locality" value={cert.locality} />
-          <Field label="State/Province" value={cert.state} />
-          <Field label="Country" value={cert.country} />
-          <Field icon={Envelope} label="Email" value={cert.email} />
-        </div>
-      </Section>
+      <CompactSection title="Subject">
+        <CompactGrid>
+          <CompactField icon={Globe} label="Common Name" value={cert.cn || cert.common_name} />
+          <CompactField icon={Buildings} label="Organization" value={cert.organization} />
+          <CompactField label="Org Unit" value={cert.organizational_unit} />
+          <CompactField icon={MapPin} label="Locality" value={cert.locality} />
+          <CompactField label="State" value={cert.state} />
+          <CompactField label="Country" value={cert.country} />
+          <CompactField icon={Envelope} label="Email" value={cert.email} colSpan={2} />
+        </CompactGrid>
+      </CompactSection>
       
       {/* Validity Period */}
-      <Section title="Validity">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-          <Field icon={Calendar} label="Valid From" value={formatDate(cert.valid_from)} />
-          <Field icon={Calendar} label="Valid Until" value={formatDate(cert.valid_to)} />
-        </div>
-      </Section>
+      <CompactSection title="Validity">
+        <CompactGrid>
+          <CompactField icon={Calendar} label="Valid From" value={formatDate(cert.valid_from)} />
+          <CompactField icon={Calendar} label="Valid Until" value={formatDate(cert.valid_to)} />
+        </CompactGrid>
+      </CompactSection>
       
       {/* Technical Details */}
-      <Section title="Technical Details">
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-          <Field icon={Hash} label="Serial Number" value={cert.serial_number} mono copyable />
-          <Field icon={Key} label="Key Type" value={cert.key_type} />
-          <Field label="Signature Algorithm" value={cert.signature_algorithm} />
-          <Field label="Certificate Type" value={cert.cert_type} />
-        </div>
-      </Section>
+      <CompactSection title="Technical Details">
+        <CompactGrid>
+          <CompactField icon={Hash} label="Serial" value={cert.serial_number} mono copyable />
+          <CompactField icon={Key} label="Key Type" value={cert.key_type} />
+          <CompactField label="Sig Algo" value={cert.signature_algorithm} />
+          <CompactField label="Cert Type" value={cert.cert_type} />
+        </CompactGrid>
+      </CompactSection>
       
       {/* SANs */}
       {cert.san_combined && (
-        <Section title="Subject Alternative Names">
+        <CompactSection title="Subject Alternative Names">
           <div className="text-xs font-mono text-text-primary break-all bg-bg-tertiary/30 p-2 rounded">
             {cert.san_combined}
           </div>
-        </Section>
+        </CompactSection>
       )}
       
       {/* Issuer */}
-      <Section title="Issuer">
-        <Field label="Issuer DN" value={cert.issuer} mono />
-        <Field label="Issuing CA" value={cert.issuer_name} />
-        {cert.caref && <Field label="CA Reference" value={cert.caref} mono copyable />}
-      </Section>
+      <CompactSection title="Issuer">
+        <CompactGrid cols={1}>
+          <CompactField label="Issuer DN" value={cert.issuer} mono />
+          <CompactField label="Issuing CA" value={cert.issuer_name} />
+          <CompactField label="CA Reference" value={cert.caref} mono copyable />
+        </CompactGrid>
+      </CompactSection>
       
       {/* Thumbprints */}
-      <Section title="Fingerprints" collapsible defaultOpen={false}>
-        <Field icon={Fingerprint} label="SHA-1" value={cert.thumbprint_sha1} mono copyable />
-        <Field icon={Fingerprint} label="SHA-256" value={cert.thumbprint_sha256} mono copyable />
-      </Section>
+      <CompactSection title="Fingerprints" collapsible defaultOpen={false}>
+        <CompactGrid cols={1}>
+          <CompactField icon={Fingerprint} label="SHA-1" value={cert.thumbprint_sha1} mono copyable />
+          <CompactField icon={Fingerprint} label="SHA-256" value={cert.thumbprint_sha256} mono copyable />
+        </CompactGrid>
+      </CompactSection>
       
       {/* PEM */}
       {showPem && cert.pem && (
-        <Section title="PEM Certificate" collapsible defaultOpen={false}>
+        <CompactSection title="PEM Certificate" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
               "text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
@@ -380,51 +302,44 @@ export function CertificateDetails({
               variant="ghost"
               onClick={(e) => {
                 e.stopPropagation()
-                copyToClipboard(cert.pem, () => {
-                  setPemCopied(true)
-                  setTimeout(() => setPemCopied(false), 2000)
-                })
+                navigator.clipboard.writeText(cert.pem)
+                setPemCopied(true)
+                setTimeout(() => setPemCopied(false), 2000)
               }}
             >
               {pemCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
               {pemCopied ? 'Copied!' : 'Copy PEM'}
             </Button>
           </div>
-        </Section>
+        </CompactSection>
       )}
       
       {/* Revocation info */}
       {cert.revoked && (
-        <Section title="Revocation Details">
+        <CompactSection title="Revocation Details">
           <div className="bg-status-error/10 border border-status-error/20 rounded-lg p-3">
             <div className="flex items-center gap-2 text-status-error mb-2">
               <X size={16} />
               <span className="font-medium">This certificate has been revoked</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-text-tertiary">Revoked At:</span>
-                <span className="ml-2 text-text-primary">{formatDate(cert.revoked_at)}</span>
-              </div>
-              <div>
-                <span className="text-text-tertiary">Reason:</span>
-                <span className="ml-2 text-text-primary">{cert.revoke_reason || 'Unspecified'}</span>
-              </div>
-            </div>
+            <CompactGrid>
+              <CompactField label="Revoked At" value={formatDate(cert.revoked_at)} />
+              <CompactField label="Reason" value={cert.revoke_reason || 'Unspecified'} />
+            </CompactGrid>
           </div>
-        </Section>
+        </CompactSection>
       )}
       
       {/* Metadata */}
-      <Section title="Metadata" collapsible defaultOpen={false}>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-          <Field label="Created" value={formatDate(cert.created_at)} />
-          <Field label="Created By" value={cert.created_by} />
-          <Field label="Source" value={cert.source} />
-          {cert.imported_from && <Field label="Imported From" value={cert.imported_from} />}
-          <Field label="Reference ID" value={cert.refid} mono copyable />
-        </div>
-      </Section>
+      <CompactSection title="Metadata" collapsible defaultOpen={false}>
+        <CompactGrid>
+          <CompactField label="Created" value={formatDate(cert.created_at)} />
+          <CompactField label="Created By" value={cert.created_by} />
+          <CompactField label="Source" value={cert.source} />
+          <CompactField label="Imported From" value={cert.imported_from} />
+          <CompactField label="Reference ID" value={cert.refid} mono copyable colSpan={2} />
+        </CompactGrid>
+      </CompactSection>
     </div>
   )
 }
