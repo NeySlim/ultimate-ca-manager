@@ -277,6 +277,12 @@ tr.row-selected td:first-child {
   border-left: 2px solid var(--accent-primary);
 }
 
+/* Mobile row selection */
+.mobile-row-selected {
+  background-color: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  border-left: 3px solid var(--accent-primary);
+}
+
 /* Hover lift effect */
 .hover-lift {
   @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg;

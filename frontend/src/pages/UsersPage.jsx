@@ -2,21 +2,23 @@
  * Users Page - User management with Pro Groups tab
  * 
  * Pro features (Groups) are dynamically added when Pro module is present
- * Uses UnifiedManagementLayout for better mobile UX (full-screen detail view)
+ * Uses ResponsiveLayout for unified mobile/desktop UX
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   User, Plus, Trash, LockKey, PencilSimple, Clock,
-  ShieldCheck, UserCircle, Eye, UsersThree, CheckCircle, XCircle
+  ShieldCheck, UserCircle, Eye, CheckCircle, XCircle, X
 } from '@phosphor-icons/react'
 import {
-  UnifiedManagementLayout, Badge, Button, Modal, Input, Select, HelpCard,
+  Badge, Button, Modal, Input, Select, HelpCard,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
+import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { usersService, rolesService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
+import { useMobile } from '../contexts/MobileContext'
 import { formatDate, extractData, cn } from '../lib/utils'
 
 // Base tabs
@@ -73,18 +75,20 @@ export default function UsersPage() {
   
   // Default: render Users tab
   return (
-    <div className="flex flex-col h-full w-full">
-      <UsersContent 
-        tabs={proTabs.length > 0 ? allTabs : null}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-      />
-    </div>
+    <UsersContent 
+      tabs={proTabs.length > 0 ? allTabs : null}
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+    />
   )
 }
 
-// Users content (extracted from original UsersPage)
+// =============================================================================
+// USERS CONTENT
+// =============================================================================
+
 function UsersContent({ tabs, activeTab, onTabChange }) {
+  const { isMobile } = useMobile()
   const [users, setUsers] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -93,6 +97,14 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
   const [rolesData, setRolesData] = useState(null)
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
+  
+  // Filters state
+  const [filterRole, setFilterRole] = useState('')
+  const [filterActive, setFilterActive] = useState('')
+  
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
 
   useEffect(() => {
     loadData()
@@ -177,11 +189,15 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
     }
   }
 
-  // Table filters
-  const tableFilters = useMemo(() => [
+  // Filter configuration (same format as CertificatesPage)
+  const filters = useMemo(() => [
     {
       key: 'role',
       label: 'Role',
+      type: 'select',
+      value: filterRole,
+      onChange: setFilterRole,
+      placeholder: 'All Roles',
       options: [
         { value: 'admin', label: 'Admin' },
         { value: 'operator', label: 'Operator' },
@@ -191,18 +207,34 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
     {
       key: 'active',
       label: 'Status',
+      type: 'select',
+      value: filterActive,
+      onChange: setFilterActive,
+      placeholder: 'All Status',
       options: [
-        { value: true, label: 'Active' },
-        { value: false, label: 'Inactive' }
+        { value: 'true', label: 'Active' },
+        { value: 'false', label: 'Inactive' }
       ]
     }
-  ], [])
+  ], [filterRole, filterActive])
+  
+  const activeFiltersCount = (filterRole ? 1 : 0) + (filterActive ? 1 : 0)
+
+  // Filter data
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      if (filterRole && user.role !== filterRole) return false
+      if (filterActive !== '' && String(user.active) !== filterActive) return false
+      return true
+    })
+  }, [users, filterRole, filterActive])
 
   // Table columns
-  const columns = [
+  const columns = useMemo(() => [
     {
       key: 'username',
       header: 'Username',
+      priority: 1,
       render: (val, row) => (
         <div className="flex items-center gap-2">
           <User size={16} className="text-accent-primary shrink-0" />
@@ -213,11 +245,14 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
     {
       key: 'email',
       header: 'Email',
+      priority: 3,
+      hideOnMobile: true,
       render: (val) => val || '—'
     },
     {
       key: 'role',
       header: 'Role',
+      priority: 2,
       render: (val) => (
         <Badge 
           variant={
@@ -234,6 +269,8 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
     {
       key: 'active',
       header: 'Status',
+      priority: 4,
+      hideOnMobile: true,
       render: (val) => (
         <Badge 
           variant={val ? 'success' : 'danger'}
@@ -246,13 +283,14 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
     {
       key: 'last_login',
       header: 'Last Login',
-      sortType: 'date',
+      priority: 5,
+      hideOnMobile: true,
       render: (val) => val ? formatDate(val) : 'Never'
     }
-  ]
+  ], [])
 
   // Row actions
-  const rowActions = (row) => [
+  const rowActions = useCallback((row) => [
     ...(canWrite('users') ? [
       { label: 'Edit', icon: PencilSimple, onClick: () => { setSelectedUser(row); setShowEditModal(true) }},
       { label: 'Reset Password', icon: LockKey, onClick: () => handleResetPassword(row.id) }
@@ -260,10 +298,161 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
     ...(canDelete('users') ? [
       { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
     ] : [])
-  ]
+  ], [canWrite, canDelete])
 
-  // Render details panel
-  const renderDetails = (user) => (
+  // Compute stats from users data
+  const stats = useMemo(() => {
+    const activeCount = users.filter(u => u.active).length
+    const inactiveCount = users.filter(u => !u.active).length
+    const adminCount = users.filter(u => u.role === 'admin').length
+    const operatorCount = users.filter(u => u.role === 'operator').length
+    
+    return [
+      { label: 'Active', value: activeCount, icon: CheckCircle, variant: 'success' },
+      { label: 'Inactive', value: inactiveCount, icon: XCircle, variant: 'danger' },
+      { label: 'Admins', value: adminCount, icon: ShieldCheck, variant: 'primary' },
+      { label: 'Operators', value: operatorCount, icon: UserCircle, variant: 'warning' },
+    ]
+  }, [users])
+
+  // Help content
+  const helpContent = (
+    <div className="space-y-4">
+      <HelpCard title="User Management" variant="info">
+        Manage user accounts, assign roles, and control access permissions.
+      </HelpCard>
+      <HelpCard title="Roles" variant="tip">
+        <ul className="text-sm space-y-1">
+          <li className="flex items-center gap-2">
+            <ShieldCheck size={14} className="text-status-error" />
+            <Badge variant="primary" size="sm">admin</Badge> - Full system access
+          </li>
+          <li className="flex items-center gap-2">
+            <UserCircle size={14} className="text-status-warning" />
+            <Badge variant="warning" size="sm">operator</Badge> - Manage CAs & certs
+          </li>
+          <li className="flex items-center gap-2">
+            <Eye size={14} className="text-status-info" />
+            <Badge variant="secondary" size="sm">viewer</Badge> - Read-only access
+          </li>
+        </ul>
+      </HelpCard>
+      <HelpCard title="Security Tips" variant="warning">
+        Enforce strong passwords, enable 2FA for admin accounts, and regularly review user access.
+      </HelpCard>
+    </div>
+  )
+
+  return (
+    <>
+      <ResponsiveLayout
+        title="Users"
+        icon={User}
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        stats={stats}
+        // Desktop filters (same format as CertificatesPage)
+        filters={filters}
+        activeFilters={activeFiltersCount}
+        // Help
+        helpContent={helpContent}
+        // Slide-over detail
+        slideOverOpen={!!selectedUser}
+        onSlideOverClose={() => setSelectedUser(null)}
+        slideOverTitle="User Details"
+        slideOverContent={selectedUser && (
+          <UserDetails 
+            user={selectedUser}
+            rolesData={rolesData}
+            canWrite={canWrite}
+            canDelete={canDelete}
+            onEdit={() => setShowEditModal(true)}
+            onResetPassword={() => handleResetPassword(selectedUser.id)}
+            onDelete={() => handleDelete(selectedUser.id)}
+          />
+        )}
+        // Header action button
+        actions={
+          canWrite('users') && (
+            isMobile ? (
+              <Button size="lg" onClick={() => setShowCreateModal(true)} className="w-11 h-11 p-0">
+                <Plus size={22} weight="bold" />
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => setShowCreateModal(true)}>
+                <Plus size={14} weight="bold" />
+                New User
+              </Button>
+            )
+          )
+        }
+      >
+        <ResponsiveDataTable
+          data={filteredUsers}
+          columns={columns}
+          loading={loading}
+          selectedId={selectedUser?.id}
+          onRowClick={(user) => user ? loadUserDetails(user) : setSelectedUser(null)}
+          rowActions={rowActions}
+          searchable
+          searchPlaceholder="Search users..."
+          searchKeys={['username', 'email', 'full_name', 'role']}
+          sortable
+          pagination={{
+            page,
+            perPage,
+            total: filteredUsers.length,
+            onChange: setPage,
+            onPerPageChange: setPerPage
+          }}
+          emptyIcon={User}
+          emptyTitle="No users"
+          emptyDescription="Create your first user to get started"
+          emptyAction={canWrite('users') && (
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus size={16} /> New User
+            </Button>
+          )}
+        />
+      </ResponsiveLayout>
+
+      {/* Create User Modal */}
+      <Modal
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+        title="Create New User"
+        size="md"
+      >
+        <UserForm
+          onSubmit={handleCreate}
+          onCancel={() => setShowCreateModal(false)}
+        />
+      </Modal>
+
+      {/* Edit User Modal */}
+      <Modal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        title="Edit User"
+        size="md"
+      >
+        <UserForm
+          user={selectedUser}
+          onSubmit={handleEdit}
+          onCancel={() => setShowEditModal(false)}
+        />
+      </Modal>
+    </>
+  )
+}
+
+// =============================================================================
+// USER DETAILS PANEL
+// =============================================================================
+
+function UserDetails({ user, rolesData, canWrite, canDelete, onEdit, onResetPassword, onDelete }) {
+  return (
     <div className="p-3 space-y-3">
       {/* Header */}
       <CompactHeader
@@ -289,16 +478,16 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
       <div className="flex gap-2">
         {canWrite('users') && (
           <>
-            <Button size="sm" variant="secondary" className="flex-1" onClick={() => setShowEditModal(true)}>
+            <Button size="sm" variant="secondary" className="flex-1" onClick={onEdit}>
               <PencilSimple size={14} /> Edit
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => handleResetPassword(user.id)}>
+            <Button size="sm" variant="secondary" onClick={onResetPassword}>
               <LockKey size={14} />
             </Button>
           </>
         )}
         {canDelete('users') && (
-          <Button size="sm" variant="danger" onClick={() => handleDelete(user.id)}>
+          <Button size="sm" variant="danger" onClick={onDelete}>
             <Trash size={14} />
           </Button>
         )}
@@ -350,119 +539,11 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
       </CompactSection>
     </div>
   )
-
-  // Help content
-  const helpContent = (
-    <div className="space-y-4">
-      <HelpCard title="User Management" variant="info">
-        Manage user accounts, assign roles, and control access permissions.
-      </HelpCard>
-      <HelpCard title="Roles" variant="tip">
-        <ul className="text-sm space-y-1">
-          <li className="flex items-center gap-2">
-            <ShieldCheck size={14} className="text-status-error" />
-            <Badge variant="primary" size="sm">admin</Badge> - Full system access
-          </li>
-          <li className="flex items-center gap-2">
-            <UserCircle size={14} className="text-status-warning" />
-            <Badge variant="warning" size="sm">operator</Badge> - Manage CAs & certs
-          </li>
-          <li className="flex items-center gap-2">
-            <Eye size={14} className="text-status-info" />
-            <Badge variant="secondary" size="sm">viewer</Badge> - Read-only access
-          </li>
-        </ul>
-      </HelpCard>
-      <HelpCard title="Security Tips" variant="warning">
-        Enforce strong passwords, enable 2FA for admin accounts, and regularly review user access.
-      </HelpCard>
-    </div>
-  )
-
-  // Compute stats from users data
-  const stats = useMemo(() => {
-    const activeCount = users.filter(u => u.active).length
-    const inactiveCount = users.filter(u => !u.active).length
-    const adminCount = users.filter(u => u.role === 'admin').length
-    const operatorCount = users.filter(u => u.role === 'operator').length
-    
-    return [
-      { label: 'Active', value: activeCount, icon: CheckCircle, variant: 'success' },
-      { label: 'Inactive', value: inactiveCount, icon: XCircle, variant: 'danger' },
-      { label: 'Admins', value: adminCount, icon: ShieldCheck, variant: 'primary' },
-      { label: 'Operators', value: operatorCount, icon: UserCircle, variant: 'warning' },
-    ]
-  }, [users])
-
-  return (
-    <>
-      <UnifiedManagementLayout
-        title="Users"
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-        stats={stats}
-        data={users}
-        columns={columns}
-        loading={loading}
-        selectedItem={selectedUser}
-        onSelectItem={(user) => user ? loadUserDetails(user) : setSelectedUser(null)}
-        renderDetails={renderDetails}
-        detailsTitle="User Details"
-        searchable
-        searchPlaceholder="Search users..."
-        searchKeys={['username', 'email', 'full_name', 'role']}
-        sortable
-        defaultSort={{ key: 'username', direction: 'asc' }}
-        paginated
-        pageSize={25}
-        rowActions={rowActions}
-        filters={tableFilters}
-        emptyIcon={User}
-        emptyTitle="No users"
-        emptyDescription="Create your first user to get started"
-        emptyAction={canWrite('users') && (
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus size={16} /> New User
-          </Button>
-        )}
-        helpContent={helpContent}
-        actions={canWrite('users') && (
-          <Button size="sm" onClick={() => setShowCreateModal(true)}>
-            <Plus size={16} /> New User
-          </Button>
-        )}
-      />
-
-      {/* Create User Modal */}
-      <Modal
-        open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title="Create New User"
-        size="md"
-      >
-        <UserForm
-          onSubmit={handleCreate}
-          onCancel={() => setShowCreateModal(false)}
-        />
-      </Modal>
-
-      {/* Edit User Modal */}
-      <Modal
-        open={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        title="Edit User"
-        size="md"
-      >
-        <UserForm
-          user={selectedUser}
-          onSubmit={handleEdit}
-          onCancel={() => setShowEditModal(false)}
-        />
-      </Modal>
-    </>
-  )
 }
+
+// =============================================================================
+// USER FORM
+// =============================================================================
 
 function UserForm({ user, onSubmit, onCancel }) {
   const [formData, setFormData] = useState({

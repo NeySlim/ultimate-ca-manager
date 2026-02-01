@@ -1,0 +1,835 @@
+/**
+ * ResponsiveLayout - SINGLE unified layout for all pages
+ * 
+ * ARCHITECTURE:
+ * ┌──────────────────────────────────────────────────┐
+ * │ HEADER (title, subtitle, tabs, actions)         │
+ * ├──────────────────────────────────────────────────┤
+ * │ STATS BAR (optional - quick stats)              │
+ * ├──────────────────────────────────────────────────┤
+ * │                                                  │
+ * │ CONTENT                      │ SLIDE-OVER       │
+ * │ (table/form/custom)          │ (details/edit)   │
+ * │                              │                   │
+ * │                              │ [Desktop: inline] │
+ * │                              │ [Mobile: overlay] │
+ * └──────────────────────────────────────────────────┘
+ * 
+ * DESKTOP: Dense, hover states, keyboard shortcuts, inline panels
+ * MOBILE: Touch targets 44px+, swipe gestures, full-screen panels
+ */
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { X, Funnel, ArrowLeft, Question, CaretDown } from '@phosphor-icons/react'
+import { useMobile } from '../../../contexts'
+import { cn } from '../../../lib/utils'
+
+// =============================================================================
+// MAIN LAYOUT COMPONENT
+// =============================================================================
+
+export function ResponsiveLayout({
+  // Header
+  title,
+  subtitle,
+  icon: Icon,
+  
+  // Tabs (optional)
+  tabs,
+  activeTab,
+  onTabChange,
+  
+  // Actions (top-right buttons)
+  actions,
+  
+  // Stats bar (optional - array of { icon, label, value, variant })
+  stats,
+  
+  // Filters (optional - for filter drawer/panel)
+  filters,
+  activeFilters = 0, // count of active filters
+  onClearFilters,
+  
+  // Help (optional - help content for help panel)
+  helpContent,
+  helpTitle = 'Help',
+  
+  // Slide-over panel
+  slideOverOpen = false,
+  slideOverTitle,
+  slideOverContent,
+  slideOverWidth = 'default', // 'narrow' | 'default' | 'wide'
+  onSlideOverClose,
+  
+  // Main content
+  children,
+  
+  // Loading state
+  loading = false,
+  
+  // Custom class
+  className
+}) {
+  const { isMobile, isDesktop, isTouch } = useMobile()
+  
+  // Local state for filter/help drawers (mobile only)
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
+  const [helpDrawerOpen, setHelpDrawerOpen] = useState(false)
+  
+  // Close slide-over on Escape (desktop)
+  useEffect(() => {
+    if (!isDesktop) return
+    
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && slideOverOpen) {
+        onSlideOverClose?.()
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isDesktop, slideOverOpen, onSlideOverClose])
+  
+  return (
+    <div className={cn(
+      'flex flex-col h-full w-full overflow-hidden',
+      className
+    )}>
+      {/* HEADER */}
+      <PageHeader
+        title={title}
+        subtitle={subtitle}
+        icon={Icon}
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        actions={actions}
+        filters={filters}
+        hasFilters={!!filters}
+        activeFilters={activeFilters}
+        onClearFilters={onClearFilters}
+        onOpenFilters={() => setFilterDrawerOpen(true)}
+        hasHelp={!!helpContent}
+        onOpenHelp={() => setHelpDrawerOpen(true)}
+        isMobile={isMobile}
+        isTouch={isTouch}
+      />
+      
+      {/* STATS BAR (if provided) */}
+      {stats && stats.length > 0 && (
+        <StatsBar stats={stats} isMobile={isMobile} />
+      )}
+      
+      {/* MAIN AREA - Content + SlideOver */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* CONTENT AREA - fills available space */}
+        <main className="flex-1 min-w-0 overflow-auto bg-bg-primary">
+          {loading ? (
+            <LoadingState />
+          ) : (
+            children
+          )}
+        </main>
+        
+        {/* SLIDE-OVER PANEL (Desktop: inline, Mobile: overlay) */}
+        {slideOverOpen && (
+          isDesktop ? (
+            <DesktopSlideOver
+              title={slideOverTitle}
+              width={slideOverWidth}
+              onClose={onSlideOverClose}
+            >
+              {slideOverContent}
+            </DesktopSlideOver>
+          ) : (
+            <MobileSlideOver
+              title={slideOverTitle}
+              onClose={onSlideOverClose}
+            >
+              {slideOverContent}
+            </MobileSlideOver>
+          )
+        )}
+      </div>
+      
+      {/* MOBILE FILTER DRAWER */}
+      {isMobile && filters && (
+        <MobileDrawer
+          open={filterDrawerOpen}
+          onClose={() => setFilterDrawerOpen(false)}
+          title="Filters"
+        >
+          <FilterContent 
+            filters={filters} 
+            onClearFilters={onClearFilters}
+            onClose={() => setFilterDrawerOpen(false)}
+          />
+        </MobileDrawer>
+      )}
+      
+      {/* HELP DRAWER - Mobile: bottom sheet, Desktop: slide-over */}
+      {helpContent && (
+        isMobile ? (
+          <MobileDrawer
+            open={helpDrawerOpen}
+            onClose={() => setHelpDrawerOpen(false)}
+            title={helpTitle}
+          >
+            {helpContent}
+          </MobileDrawer>
+        ) : helpDrawerOpen && (
+          <DesktopHelpPanel
+            title={helpTitle}
+            onClose={() => setHelpDrawerOpen(false)}
+          >
+            {helpContent}
+          </DesktopHelpPanel>
+        )
+      )}
+    </div>
+  )
+}
+
+// =============================================================================
+// PAGE HEADER
+// =============================================================================
+
+function PageHeader({
+  title,
+  subtitle,
+  icon: Icon,
+  tabs,
+  activeTab,
+  onTabChange,
+  actions,
+  filters,
+  hasFilters,
+  activeFilters,
+  onClearFilters,
+  onOpenFilters,
+  hasHelp,
+  onOpenHelp,
+  isMobile,
+  isTouch
+}) {
+  return (
+    <header className={cn(
+      'shrink-0 border-b border-border',
+      isMobile 
+        ? 'px-4 py-3 bg-bg-secondary/50' 
+        : 'px-5 py-3 bg-bg-primary'
+    )}>
+      {/* TOP ROW: Title + Actions */}
+      <div className="flex items-center justify-between gap-4">
+        {/* Left: Icon + Title */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          {Icon && (
+            <div className={cn(
+              'shrink-0 rounded-lg bg-accent-primary/10 flex items-center justify-center',
+              isMobile ? 'w-10 h-10' : 'w-8 h-8'
+            )}>
+              <Icon 
+                size={isMobile ? 22 : 16} 
+                weight="duotone" 
+                className="text-accent-primary" 
+              />
+            </div>
+          )}
+          <div className="min-w-0">
+            <h1 className={cn(
+              'font-semibold text-text-primary truncate leading-tight',
+              isMobile ? 'text-lg' : 'text-sm'
+            )}>
+              {title}
+            </h1>
+            {subtitle && (
+              <p className={cn(
+                'text-text-secondary truncate',
+                isMobile ? 'text-xs' : 'text-xs'
+              )}>
+                {subtitle}
+              </p>
+            )}
+          </div>
+        </div>
+        
+        {/* Right: Actions */}
+        <div className={cn(
+          'flex items-center shrink-0',
+          isMobile ? 'gap-2' : 'gap-2'
+        )}>
+          {/* Desktop: Inline filters */}
+          {!isMobile && hasFilters && filters && (
+            <div className="flex items-center gap-2">
+              {filters.slice(0, 3).map((filter) => (
+                <select
+                  key={filter.key}
+                  value={filter.value || ''}
+                  onChange={(e) => filter.onChange?.(e.target.value)}
+                  className={cn(
+                    'h-8 px-2 pr-7 rounded-md border border-border bg-bg-secondary',
+                    'text-xs text-text-primary',
+                    'focus:outline-none focus:ring-1 focus:ring-accent-primary',
+                    'appearance-none cursor-pointer',
+                    filter.value ? 'border-accent-primary/50' : ''
+                  )}
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 6px center'
+                  }}
+                >
+                  <option value="">{filter.placeholder || `All ${filter.label}`}</option>
+                  {filter.options?.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              ))}
+              {activeFilters > 0 && (
+                <button
+                  onClick={onClearFilters}
+                  className="text-xs text-accent-primary hover:underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+          
+          {/* Desktop: Help button */}
+          {!isMobile && hasHelp && (
+            <button
+              onClick={onOpenHelp}
+              className={cn(
+                'w-8 h-8 rounded-md flex items-center justify-center',
+                'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary',
+                'transition-colors'
+              )}
+              title="Help"
+            >
+              <Question size={18} />
+            </button>
+          )}
+          
+          {/* Mobile: Filter button */}
+          {isMobile && hasFilters && (
+            <button
+              onClick={onOpenFilters}
+              className={cn(
+                'relative flex items-center justify-center rounded-lg',
+                'bg-bg-tertiary hover:bg-bg-hover border border-border',
+                'h-11 w-11',
+                'transition-colors'
+              )}
+            >
+              <Funnel size={20} className="text-text-secondary" />
+              {activeFilters > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-primary text-white text-xs flex items-center justify-center">
+                  {activeFilters}
+                </span>
+              )}
+            </button>
+          )}
+          
+          {/* Mobile: Help button */}
+          {isMobile && hasHelp && (
+            <button
+              onClick={onOpenHelp}
+              className={cn(
+                'flex items-center justify-center rounded-lg',
+                'bg-bg-tertiary hover:bg-bg-hover border border-border',
+                'h-11 w-11',
+                'transition-colors'
+              )}
+            >
+              <Question size={20} className="text-text-secondary" />
+            </button>
+          )}
+          
+          {/* Custom actions */}
+          {actions}
+        </div>
+      </div>
+      
+      {/* TABS ROW (if provided) */}
+      {tabs && tabs.length > 0 && (
+        <div className={cn(
+          'flex gap-1 overflow-x-auto scrollbar-none',
+          isMobile ? 'mt-3 -mx-4 px-4' : 'mt-3'
+        )}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => onTabChange?.(tab.id)}
+              className={cn(
+                'shrink-0 rounded-lg font-medium transition-colors',
+                isMobile ? 'px-4 py-2.5 text-sm' : 'px-3 py-1.5 text-sm',
+                activeTab === tab.id
+                  ? 'bg-accent-primary text-white'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+              )}
+            >
+              {tab.label}
+              {tab.count !== undefined && (
+                <span className={cn(
+                  'ml-1.5 px-1.5 py-0.5 rounded text-xs',
+                  activeTab === tab.id
+                    ? 'bg-white/20'
+                    : 'bg-bg-tertiary'
+                )}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </header>
+  )
+}
+
+// =============================================================================
+// STATS BAR
+// =============================================================================
+
+function StatsBar({ stats, isMobile }) {
+  const variants = {
+    primary: 'text-accent-primary',
+    success: 'text-emerald-500',
+    warning: 'text-amber-500',
+    danger: 'text-red-500',
+    info: 'text-blue-500'
+  }
+  
+  if (isMobile) {
+    // Mobile: horizontal scroll with larger items
+    return (
+      <div className="shrink-0 border-b border-border bg-bg-secondary/30 flex overflow-x-auto scrollbar-none gap-4 px-4 py-2.5">
+        {stats.map((stat, i) => {
+          const Icon = stat.icon
+          const colorClass = variants[stat.variant] || variants.primary
+          
+          return (
+            <div key={i} className="flex items-center gap-2 shrink-0">
+              {Icon && (
+                <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', `${colorClass} bg-current/10`)}>
+                  <Icon size={16} weight="bold" className={colorClass} />
+                </div>
+              )}
+              <div>
+                <p className="font-bold text-base text-text-primary">{stat.value}</p>
+                <p className="text-xs text-text-secondary">{stat.label}</p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+  
+  // Desktop: compact inline stats
+  return (
+    <div className="shrink-0 border-b border-border bg-bg-secondary/20 flex items-center gap-5 px-5 py-1.5">
+      {stats.map((stat, i) => {
+        const Icon = stat.icon
+        const colorClass = variants[stat.variant] || variants.primary
+        
+        return (
+          <div key={i} className="flex items-center gap-1.5">
+            {Icon && <Icon size={14} weight="bold" className={colorClass} />}
+            <span className="font-semibold text-xs text-text-primary">{stat.value}</span>
+            <span className="text-xs text-text-secondary">{stat.label}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// =============================================================================
+// DESKTOP SLIDE-OVER (inline panel from right)
+// =============================================================================
+
+function DesktopSlideOver({ title, width, onClose, children }) {
+  // Width classes based on size
+  const widthClasses = {
+    narrow: 'w-80',
+    default: 'w-96', 
+    wide: 'w-[480px]'
+  }
+  const widthClass = widthClasses[width] || widthClasses.default
+  
+  return (
+    <aside className={cn(
+      'shrink-0 border-l border-border bg-bg-secondary/50',
+      'flex flex-col overflow-hidden shadow-lg',
+      'animate-slide-in-right',
+      widthClass
+    )}>
+      {/* Header */}
+      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-border bg-bg-primary">
+        <h2 className="font-semibold text-sm text-text-primary truncate">
+          {title}
+        </h2>
+        <button
+          onClick={onClose}
+          className={cn(
+            'w-8 h-8 rounded-lg flex items-center justify-center',
+            'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary',
+            'transition-colors'
+          )}
+        >
+          <X size={18} />
+        </button>
+      </div>
+      
+      {/* Content */}
+      <div className="flex-1 overflow-auto bg-bg-primary">
+        {children}
+      </div>
+    </aside>
+  )
+}
+
+// =============================================================================
+// MOBILE SLIDE-OVER (full-screen overlay with swipe-to-close)
+// =============================================================================
+
+function MobileSlideOver({ title, onClose, children }) {
+  const panelRef = useRef(null)
+  const [translateX, setTranslateX] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const startXRef = useRef(0)
+  
+  // Swipe gesture handling
+  const handleTouchStart = useCallback((e) => {
+    startXRef.current = e.touches[0].clientX
+    setIsDragging(true)
+  }, [])
+  
+  const handleTouchMove = useCallback((e) => {
+    if (!isDragging) return
+    const currentX = e.touches[0].clientX
+    const diff = currentX - startXRef.current
+    // Only allow swiping right (to close)
+    if (diff > 0) {
+      setTranslateX(diff)
+    }
+  }, [isDragging])
+  
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false)
+    // If swiped more than 100px, close
+    if (translateX > 100) {
+      onClose?.()
+    }
+    setTranslateX(0)
+  }, [translateX, onClose])
+  
+  // Prevent body scroll when open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [])
+  
+  return (
+    <div className="fixed inset-0 z-50">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/40 animate-fade-in"
+        onClick={onClose}
+      />
+      
+      {/* Panel */}
+      <div
+        ref={panelRef}
+        className={cn(
+          'absolute inset-y-0 right-0 w-full bg-bg-primary',
+          'flex flex-col animate-slide-in-right',
+          !isDragging && 'transition-transform'
+        )}
+        style={{
+          transform: `translateX(${translateX}px)`
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Header */}
+        <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border">
+          <button
+            onClick={onClose}
+            className={cn(
+              'w-11 h-11 rounded-lg flex items-center justify-center',
+              'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary',
+              'transition-colors'
+            )}
+          >
+            <ArrowLeft size={22} />
+          </button>
+          <h2 className="font-semibold text-lg text-text-primary truncate flex-1">
+            {title}
+          </h2>
+        </div>
+        
+        {/* Swipe indicator */}
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-16 bg-border rounded-r opacity-50" />
+        
+        {/* Content */}
+        <div className="flex-1 overflow-auto">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// MOBILE DRAWER (from bottom - for filters, help, etc.)
+// =============================================================================
+
+function MobileDrawer({ open, onClose, title, children }) {
+  const drawerRef = useRef(null)
+  const [translateY, setTranslateY] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const startYRef = useRef(0)
+  
+  // Swipe down to close
+  const handleTouchStart = useCallback((e) => {
+    startYRef.current = e.touches[0].clientY
+    setIsDragging(true)
+  }, [])
+  
+  const handleTouchMove = useCallback((e) => {
+    if (!isDragging) return
+    const currentY = e.touches[0].clientY
+    const diff = currentY - startYRef.current
+    // Only allow swiping down
+    if (diff > 0) {
+      setTranslateY(diff)
+    }
+  }, [isDragging])
+  
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false)
+    // If swiped more than 80px, close
+    if (translateY > 80) {
+      onClose?.()
+    }
+    setTranslateY(0)
+  }, [translateY, onClose])
+  
+  // Prevent body scroll when open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [open])
+  
+  if (!open) return null
+  
+  return (
+    <div className="fixed inset-0 z-50">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/40 animate-fade-in"
+        onClick={onClose}
+      />
+      
+      {/* Drawer */}
+      <div
+        ref={drawerRef}
+        className={cn(
+          'absolute inset-x-0 bottom-0 bg-bg-primary rounded-t-2xl',
+          'max-h-[80vh] flex flex-col animate-slide-up',
+          !isDragging && 'transition-transform'
+        )}
+        style={{
+          transform: `translateY(${translateY}px)`
+        }}
+      >
+        {/* Handle + Header */}
+        <div
+          className="shrink-0 pt-3 pb-2 px-4 cursor-grab"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Drag handle */}
+          <div className="w-10 h-1 rounded-full bg-border mx-auto mb-3" />
+          
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-lg text-text-primary">
+              {title}
+            </h2>
+            <button
+              onClick={onClose}
+              className="w-10 h-10 rounded-lg flex items-center justify-center text-text-secondary hover:bg-bg-tertiary"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 overflow-auto px-4 pb-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// DESKTOP HELP PANEL (slide-over from right)
+// =============================================================================
+
+function DesktopHelpPanel({ title, onClose, children }) {
+  // Close on Escape
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+  
+  return (
+    <div className="fixed inset-0 z-50">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/20 animate-fade-in"
+        onClick={onClose}
+      />
+      
+      {/* Panel */}
+      <aside className={cn(
+        'absolute top-4 right-4 bottom-4 w-80 bg-bg-primary rounded-xl',
+        'flex flex-col overflow-hidden shadow-2xl border border-border',
+        'animate-slide-in-right'
+      )}>
+        {/* Header */}
+        <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-border">
+          <h2 className="font-semibold text-sm text-text-primary">
+            {title}
+          </h2>
+          <button
+            onClick={onClose}
+            className={cn(
+              'w-7 h-7 rounded-md flex items-center justify-center',
+              'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary',
+              'transition-colors'
+            )}
+          >
+            <X size={16} />
+          </button>
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-4">
+          {children}
+        </div>
+      </aside>
+    </div>
+  )
+}
+
+// =============================================================================
+// FILTER CONTENT
+// =============================================================================
+
+function FilterContent({ filters, onClearFilters, onClose }) {
+  const hasActiveFilters = filters?.some(f => f.value)
+  
+  return (
+    <div className="space-y-4">
+      {/* Filter fields */}
+      {filters?.map((filter) => (
+        <div key={filter.key}>
+          <label className="block text-sm font-medium text-text-primary mb-1.5">
+            {filter.label}
+          </label>
+          {filter.type === 'select' ? (
+            <select
+              value={filter.value || ''}
+              onChange={(e) => filter.onChange?.(e.target.value)}
+              className={cn(
+                'w-full h-11 px-3 rounded-lg border border-border bg-bg-primary',
+                'text-text-primary text-sm',
+                'focus:outline-none focus:ring-2 focus:ring-accent-primary/50'
+              )}
+            >
+              <option value="">{filter.placeholder || 'All'}</option>
+              {filter.options?.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type={filter.type || 'text'}
+              value={filter.value || ''}
+              onChange={(e) => filter.onChange?.(e.target.value)}
+              placeholder={filter.placeholder}
+              className={cn(
+                'w-full h-11 px-3 rounded-lg border border-border bg-bg-primary',
+                'text-text-primary text-sm',
+                'focus:outline-none focus:ring-2 focus:ring-accent-primary/50'
+              )}
+            />
+          )}
+        </div>
+      ))}
+      
+      {/* Actions */}
+      <div className="flex gap-2 pt-2">
+        {hasActiveFilters && onClearFilters && (
+          <button
+            onClick={() => {
+              onClearFilters()
+              onClose?.()
+            }}
+            className={cn(
+              'flex-1 h-11 rounded-lg border border-border',
+              'text-text-secondary font-medium text-sm',
+              'hover:bg-bg-tertiary transition-colors'
+            )}
+          >
+            Clear Filters
+          </button>
+        )}
+        <button
+          onClick={onClose}
+          className={cn(
+            'flex-1 h-11 rounded-lg bg-accent-primary text-white',
+            'font-medium text-sm hover:bg-accent-primary/90 transition-colors'
+          )}
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
+// LOADING STATE
+// =============================================================================
+
+function LoadingState() {
+  return (
+    <div className="flex items-center justify-center h-full min-h-[200px]">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-2 border-accent-primary/30 border-t-accent-primary rounded-full animate-spin" />
+        <p className="text-sm text-text-secondary">Loading...</p>
+      </div>
+    </div>
+  )
+}
+
+export default ResponsiveLayout

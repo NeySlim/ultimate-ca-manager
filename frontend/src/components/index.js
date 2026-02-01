@@ -92,3 +92,24 @@ export { ManagementLayout } from './ManagementLayout'
 export { TablePageLayout } from './TablePageLayout'
 export { UnifiedManagementLayout } from './UnifiedManagementLayout'
 export { SlideOverPanel, useSlideOver } from './SlideOverPanel'
+
+// New Responsive Components (Phase 10 - Mobile/Desktop unified)
+export { 
+  SlideOver, 
+  SlideOverSection, 
+  SlideOverRow, 
+  SlideOverBadges,
+  SlideOverActions 
+} from './SlideOver'
+export { 
+  FilterPanel, 
+  FilterChips, 
+  FilterButton 
+} from './FilterPanel'
+export { 
+  ActionBar as ResponsiveActionBar, 
+  HeaderBar 
+} from './ActionBar'
+
+// NEW: Phase 10 FROM SCRATCH - Unified responsive components
+export { ResponsiveLayout, ResponsiveDataTable } from './ui/responsive'

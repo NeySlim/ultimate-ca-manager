@@ -1,8 +1,8 @@
 /**
- * Audit Logs Page
+ * Audit Logs Page - Migrated to ResponsiveLayout
  * View and filter audit logs with real-time updates
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   ClockCounterClockwise, 
   User, 
@@ -23,22 +23,18 @@ import {
   SignIn,
   SignOut,
   ListBullets,
-  Export
+  Export,
+  Calendar
 } from '@phosphor-icons/react';
 import { 
-  PageLayout,
-  FocusItem,
+  ResponsiveLayout,
+  ResponsiveDataTable,
   Card, 
   Button, 
   Badge, 
-  Table, 
-  SearchBar,
-  Select, 
   Input,
   Modal,
   LoadingSpinner,
-  EmptyState,
-  Pagination,
   HelpCard,
   DetailHeader,
   DetailSection,
@@ -106,9 +102,8 @@ export default function AuditLogsPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(50);
   const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   
-  // Filters
+  // Search & Filters
   const [search, setSearch] = useState('');
   const [filterUsername, setFilterUsername] = useState('');
   const [filterAction, setFilterAction] = useState('');
@@ -120,6 +115,10 @@ export default function AuditLogsPage() {
   const [showCleanupModal, setShowCleanupModal] = useState(false);
   const [cleanupDays, setCleanupDays] = useState(90);
   const [cleanupLoading, setCleanupLoading] = useState(false);
+  
+  // Slide-over states
+  const [showHelp, setShowHelp] = useState(false);
+  const [showDateFilters, setShowDateFilters] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -142,7 +141,6 @@ export default function AuditLogsPage() {
       
       setLogs(logsRes.data || []);
       setTotal(logsRes.meta?.total || 0);
-      setTotalPages(logsRes.meta?.total_pages || 0);
       setStats(statsRes.data || null);
       setActions(actionsRes.data || { actions: [], categories: {} });
     } catch (err) {
@@ -169,7 +167,6 @@ export default function AuditLogsPage() {
       const res = await auditService.getLogs(params);
       setLogs(res.data || []);
       setTotal(res.meta?.total || 0);
-      setTotalPages(res.meta?.total_pages || 0);
     } catch (err) {
       console.error('Failed to load logs:', err);
     }
@@ -215,7 +212,7 @@ export default function AuditLogsPage() {
     }
   };
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setSearch('');
     setFilterUsername('');
     setFilterAction('');
@@ -223,7 +220,7 @@ export default function AuditLogsPage() {
     setFilterDateFrom('');
     setFilterDateTo('');
     setPage(1);
-  };
+  }, []);
 
   // Format timestamp
   const formatTime = (timestamp) => {
@@ -250,11 +247,12 @@ export default function AuditLogsPage() {
   }, [logs]);
 
   // Table columns
-  const columns = [
+  const columns = useMemo(() => [
     {
       key: 'timestamp',
       label: 'Time',
       sortable: true,
+      width: '100px',
       render: (value) => (
         <span className="text-xs text-text-secondary whitespace-nowrap">
           {formatTime(value)}
@@ -264,6 +262,7 @@ export default function AuditLogsPage() {
     {
       key: 'username',
       label: 'User',
+      width: '120px',
       render: (value) => (
         <div className="flex items-center gap-1">
           <User size={12} className="text-text-secondary" />
@@ -292,7 +291,7 @@ export default function AuditLogsPage() {
       key: 'resource_type',
       label: 'Resource',
       render: (value, row) => (
-        <span className="text-sm text-text-secondary">
+        <span className="text-sm text-text-secondary truncate">
           {value}{row.resource_name ? `: ${row.resource_name}` : (row.resource_id ? ` #${row.resource_id}` : '')}
         </span>
       )
@@ -300,6 +299,7 @@ export default function AuditLogsPage() {
     {
       key: 'success',
       label: 'Status',
+      width: '80px',
       render: (value) => (
         value ? (
           <Badge variant="emerald" size="sm">
@@ -309,7 +309,7 @@ export default function AuditLogsPage() {
         ) : (
           <Badge variant="red" size="sm">
             <XCircle size={12} weight="fill" />
-            Failed
+            Fail
           </Badge>
         )
       )
@@ -317,15 +317,111 @@ export default function AuditLogsPage() {
     {
       key: 'ip_address',
       label: 'IP',
+      width: '120px',
       render: (value) => (
         <span className="text-xs text-text-secondary font-mono">{value || '-'}</span>
       )
     }
-  ];
+  ], []);
 
-  // Help content for modal
+  // Mobile card render
+  const renderMobileCard = useCallback((log, isSelected) => {
+    const Icon = actionIcons[log.action] || actionIcons.default;
+    const category = getActionCategory(log.action);
+    const color = categoryColors[category] || 'gray';
+    
+    return (
+      <div className={`p-4 ${isSelected ? 'mobile-row-selected' : ''}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className={`w-10 h-10 rounded-lg bg-bg-tertiary flex items-center justify-center`}>
+              <Icon size={20} className="text-text-secondary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-text-primary truncate">
+                  {log.action?.replace(/_/g, ' ')}
+                </span>
+                <Badge variant={log.success ? 'emerald' : 'red'} size="sm">
+                  {log.success ? 'OK' : 'Fail'}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-text-secondary mt-0.5">
+                <span>{log.username || 'system'}</span>
+                <span>•</span>
+                <span>{formatTime(log.timestamp)}</span>
+              </div>
+              {(log.resource_type || log.resource_name) && (
+                <div className="text-xs text-text-secondary mt-1 truncate">
+                  {log.resource_type}{log.resource_name ? `: ${log.resource_name}` : ''}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }, []);
+
+  // Stats for header
+  const headerStats = useMemo(() => {
+    if (!stats) return [];
+    return [
+      { icon: Database, label: 'Total', value: stats.total_logs || 0, variant: 'default' },
+      { icon: CheckCircle, label: 'Success', value: stats.success_count || 0, variant: 'success' },
+      { icon: XCircle, label: 'Failed', value: stats.failure_count || 0, variant: 'danger' },
+      { icon: Users, label: 'Users', value: stats.unique_users || 0, variant: 'info' }
+    ];
+  }, [stats]);
+
+  // Filters config for ResponsiveLayout
+  const filters = useMemo(() => [
+    {
+      key: 'action',
+      label: 'Action',
+      type: 'select',
+      value: filterAction,
+      onChange: (v) => { setFilterAction(v); setPage(1); },
+      placeholder: 'All Actions',
+      options: (actions.actions || []).map(a => ({ value: a, label: a.replace(/_/g, ' ') }))
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      value: filterSuccess,
+      onChange: (v) => { setFilterSuccess(v); setPage(1); },
+      placeholder: 'All Status',
+      options: [
+        { value: 'true', label: 'Success' },
+        { value: 'false', label: 'Failed' }
+      ]
+    },
+    {
+      key: 'username',
+      label: 'User',
+      type: 'select',
+      value: filterUsername,
+      onChange: (v) => { setFilterUsername(v); setPage(1); },
+      placeholder: 'All Users',
+      options: uniqueUsernames.map(u => ({ value: u, label: u }))
+    }
+  ], [filterAction, filterSuccess, filterUsername, actions.actions, uniqueUsernames]);
+
+  // Count active filters
+  const activeFilters = useMemo(() => {
+    let count = 0;
+    if (filterAction) count++;
+    if (filterSuccess) count++;
+    if (filterUsername) count++;
+    if (filterDateFrom) count++;
+    if (filterDateTo) count++;
+    return count;
+  }, [filterAction, filterSuccess, filterUsername, filterDateFrom, filterDateTo]);
+
+  // Help content
   const helpContent = (
-    <div className="space-y-4">
+    <div className="p-4 space-y-4">
       {/* Statistics */}
       {stats && (
         <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
@@ -379,138 +475,218 @@ export default function AuditLogsPage() {
     </div>
   );
 
-  // Focus panel content - Filters
-  const focusContent = (
-    <div className="p-3 space-y-4">
-      {/* Date Range Filter */}
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          Date Range
-        </h4>
-        <div className="space-y-2">
+  // Date range filter slide-over content
+  const dateFilterContent = (
+    <div className="p-4 space-y-4">
+      <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+        <Calendar size={16} />
+        Date Range Filter
+      </h3>
+      
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-1">From Date</label>
           <Input
             type="date"
             value={filterDateFrom}
             onChange={(e) => { setFilterDateFrom(e.target.value); setPage(1); }}
-            placeholder="From"
             className="w-full"
           />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-1">To Date</label>
           <Input
             type="date"
             value={filterDateTo}
             onChange={(e) => { setFilterDateTo(e.target.value); setPage(1); }}
-            placeholder="To"
             className="w-full"
           />
         </div>
       </div>
 
-      {/* Action Type Filter */}
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          Action Type
-        </h4>
-        <Select
-          value={filterAction}
-          onChange={(v) => { setFilterAction(v); setPage(1); }}
-          placeholder="All Actions"
-          className="w-full"
-        >
-          <option value="">All Actions</option>
-          {(actions.actions || []).map(action => (
-            <option key={action} value={action}>{action.replace(/_/g, ' ')}</option>
-          ))}
-        </Select>
-      </div>
-
-      {/* User Filter */}
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          User
-        </h4>
-        <Select
-          value={filterUsername}
-          onChange={(v) => { setFilterUsername(v); setPage(1); }}
-          placeholder="All Users"
-          className="w-full"
-        >
-          <option value="">All Users</option>
-          {uniqueUsernames.map(name => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </Select>
-      </div>
-
-      {/* Status Filter */}
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          Status
-        </h4>
-        <Select
-          value={filterSuccess}
-          onChange={(v) => { setFilterSuccess(v); setPage(1); }}
-          placeholder="All Status"
-          className="w-full"
-        >
-          <option value="">All Status</option>
-          <option value="true">Success</option>
-          <option value="false">Failed</option>
-        </Select>
-      </div>
-
       {/* Quick Filters */}
-      <div className="space-y-2">
+      <div className="space-y-2 pt-4 border-t border-border">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
           Quick Filters
         </h4>
-        <div className="space-y-1">
-          <FocusItem 
-            icon={XCircle}
-            title="Failed Logins"
-            subtitle="Security events"
-            selected={filterAction === 'login_failure'}
-            onClick={() => { setFilterAction('login_failure'); setPage(1); }}
-          />
-          <FocusItem 
-            icon={Warning}
-            title="All Failures"
-            subtitle="Error events"
-            selected={filterSuccess === 'false' && !filterAction}
-            onClick={() => { setFilterSuccess('false'); setFilterAction(''); setPage(1); }}
-          />
+        <div className="space-y-2">
+          <Button 
+            variant={filterAction === 'login_failure' ? 'primary' : 'ghost'} 
+            size="sm" 
+            className="w-full justify-start"
+            onClick={() => { setFilterAction('login_failure'); setShowDateFilters(false); setPage(1); }}
+          >
+            <XCircle size={14} />
+            Failed Logins
+          </Button>
+          <Button 
+            variant={filterSuccess === 'false' && !filterAction ? 'primary' : 'ghost'} 
+            size="sm" 
+            className="w-full justify-start"
+            onClick={() => { setFilterSuccess('false'); setFilterAction(''); setShowDateFilters(false); setPage(1); }}
+          >
+            <Warning size={14} />
+            All Failures
+          </Button>
         </div>
       </div>
 
       {/* Clear Filters */}
-      {(search || filterUsername || filterAction || filterSuccess || filterDateFrom || filterDateTo) && (
-        <Button variant="ghost" size="sm" className="w-full" onClick={clearFilters}>
+      {activeFilters > 0 && (
+        <Button 
+          variant="secondary" 
+          size="sm" 
+          className="w-full" 
+          onClick={() => { clearFilters(); setShowDateFilters(false); }}
+        >
           <ArrowsClockwise size={14} />
           Clear All Filters
         </Button>
       )}
+
+      {/* Export Section */}
+      <div className="space-y-2 pt-4 border-t border-border">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+          Export Logs
+        </h4>
+        <div className="flex gap-2">
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={() => handleExport('json')}
+            className="flex-1"
+          >
+            <Export size={14} />
+            JSON
+          </Button>
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={() => handleExport('csv')}
+            className="flex-1"
+          >
+            <Export size={14} />
+            CSV
+          </Button>
+        </div>
+      </div>
     </div>
   );
 
-  // Focus panel actions - Export buttons
-  const focusActions = (
+  // Log detail slide-over content
+  const logDetailContent = selectedLog && (
+    <DetailContent className="p-0">
+      {/* Header with action type, icon, and status badge */}
+      <DetailHeader
+        icon={actionIcons[selectedLog.action] || actionIcons.default}
+        title={selectedLog.action?.replace(/_/g, ' ') || 'Event'}
+        subtitle={`${selectedLog.resource_type || 'System'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`}
+        badge={
+          <Badge variant={selectedLog.success ? 'emerald' : 'red'} size="sm">
+            {selectedLog.success ? (
+              <><CheckCircle size={12} weight="fill" /> Success</>
+            ) : (
+              <><XCircle size={12} weight="fill" /> Failed</>
+            )}
+          </Badge>
+        }
+        stats={[
+          { icon: User, label: 'User:', value: selectedLog.username || 'system' },
+          { icon: ClockCounterClockwise, label: 'Time:', value: formatTime(selectedLog.timestamp) }
+        ]}
+      />
+
+      {/* Event Details Section */}
+      <DetailSection title="Event Details">
+        <DetailGrid>
+          <DetailField 
+            label="Timestamp" 
+            value={new Date(selectedLog.timestamp).toLocaleString()} 
+          />
+          <DetailField 
+            label="User" 
+            value={selectedLog.username || 'system'} 
+          />
+          <DetailField 
+            label="Action" 
+            value={selectedLog.action?.replace(/_/g, ' ')} 
+          />
+          <DetailField 
+            label="Resource" 
+            value={`${selectedLog.resource_type || '-'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`} 
+          />
+          <DetailField 
+            label="IP Address" 
+            value={selectedLog.ip_address} 
+            mono 
+            copyable 
+          />
+          <DetailField 
+            label="Status" 
+            value={selectedLog.success ? 'Success' : 'Failed'} 
+          />
+        </DetailGrid>
+      </DetailSection>
+
+      {/* Details Section - if present */}
+      {selectedLog.details && (
+        <DetailSection title="Details">
+          <DetailField 
+            label="Event Details" 
+            value={selectedLog.details} 
+            mono 
+            fullWidth 
+            copyable
+          />
+        </DetailSection>
+      )}
+
+      {/* User Agent Section - if present */}
+      {selectedLog.user_agent && (
+        <DetailSection title="Client Information">
+          <DetailField 
+            label="User Agent" 
+            value={selectedLog.user_agent} 
+            mono 
+            fullWidth 
+            copyable
+          />
+        </DetailSection>
+      )}
+    </DetailContent>
+  );
+
+  // Header actions
+  const headerActions = (
     <>
+      {/* Desktop: Date filter button */}
       <Button 
         variant="secondary" 
         size="sm" 
-        onClick={() => handleExport('json')}
-        className="flex-1"
+        onClick={() => setShowDateFilters(true)}
+        className="hidden md:inline-flex"
       >
-        <Export size={14} />
-        JSON
+        <Calendar size={14} />
+        Date
+        {(filterDateFrom || filterDateTo) && (
+          <Badge variant="primary" size="sm" className="ml-1">1</Badge>
+        )}
       </Button>
+      <Button variant="secondary" size="sm" onClick={loadLogs} className="hidden md:inline-flex">
+        <ArrowsClockwise size={14} />
+      </Button>
+      <Button variant="danger" size="sm" onClick={() => setShowCleanupModal(true)}>
+        <Trash size={14} />
+        <span className="hidden md:inline">Cleanup</span>
+      </Button>
+      {/* Mobile: More filters */}
       <Button 
         variant="secondary" 
-        size="sm" 
-        onClick={() => handleExport('csv')}
-        className="flex-1"
+        size="lg" 
+        onClick={() => setShowDateFilters(true)}
+        className="md:hidden h-11 w-11 p-0"
       >
-        <Export size={14} />
-        CSV
+        <FunnelSimple size={22} />
       </Button>
     </>
   );
@@ -524,168 +700,46 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <PageLayout
-      title="Audit Logs"
-      focusTitle="Filters"
-      focusContent={focusContent}
-      focusActions={focusActions}
-      focusFooter={`${total} log entries`}
-      helpContent={helpContent}
-      
-    >
-      {/* Main Content */}
-      <div className="flex flex-col h-full">
-        {/* Header - Search Bar and Refresh */}
-        <div className="p-4 border-b border-border space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <SearchBar
-                value={search}
-                onChange={setSearch}
-                placeholder="Search logs..."
-              />
-            </div>
-            <Button variant="secondary" size="sm" onClick={loadLogs}>
-              <ArrowsClockwise size={14} />
-              Refresh
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => setShowCleanupModal(true)}>
-              <Trash size={14} />
-              Cleanup
-            </Button>
-          </div>
-
-          {/* Results info */}
-          <div className="text-xs text-text-secondary">
-            Showing {logs.length} of {total} entries
-            {(search || filterUsername || filterAction || filterSuccess || filterDateFrom || filterDateTo) && (
-              <span className="ml-1">(filtered)</span>
-            )}
-          </div>
-        </div>
-
-        {/* Logs Table - Scrollable */}
-        <div className="flex-1 overflow-auto">
-          {logs.length === 0 ? (
-            <div className="p-6">
-              <EmptyState
-                icon={ClockCounterClockwise}
-                title="No audit logs found"
-                description={search || filterAction ? "Try adjusting your filters" : "Activity will appear here"}
-              />
-            </div>
-          ) : (
-            <Table
-              data={logs}
-              columns={columns}
-              onRowClick={setSelectedLog}
-            />
-          )}
-        </div>
-        
-        {/* Pagination - Always show if we have items */}
-        {total > 0 && (
-          <div className="border-t border-border bg-bg-secondary">
-            <Pagination
-              page={page}
-              total={total}
-              perPage={perPage}
-              onChange={setPage}
-              onPerPageChange={(newPerPage) => { setPerPage(newPerPage); setPage(1); }}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Log Detail Modal */}
-      <Modal
-        open={!!selectedLog}
-        onOpenChange={() => setSelectedLog(null)}
-        title="Log Details"
-        size="md"
+    <>
+      <ResponsiveLayout
+        title="Audit Logs"
+        icon={ClockCounterClockwise}
+        subtitle={`${total} log entries`}
+        stats={headerStats}
+        filters={filters}
+        activeFilters={activeFilters}
+        helpContent={helpContent}
+        actions={headerActions}
+        slideOverOpen={!!selectedLog || showDateFilters}
+        onSlideOverClose={() => { setSelectedLog(null); setShowDateFilters(false); }}
+        slideOverTitle={selectedLog ? 'Log Details' : 'Filters & Export'}
+        slideOverContent={selectedLog ? logDetailContent : dateFilterContent}
+        slideOverWidth={selectedLog ? 'md' : 'sm'}
       >
-        {selectedLog && (
-          <DetailContent className="p-0">
-            {/* Header with action type, icon, and status badge */}
-            <DetailHeader
-              icon={actionIcons[selectedLog.action] || actionIcons.default}
-              title={selectedLog.action?.replace(/_/g, ' ') || 'Event'}
-              subtitle={`${selectedLog.resource_type || 'System'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`}
-              badge={
-                <Badge variant={selectedLog.success ? 'emerald' : 'red'} size="sm">
-                  {selectedLog.success ? (
-                    <><CheckCircle size={12} weight="fill" /> Success</>
-                  ) : (
-                    <><XCircle size={12} weight="fill" /> Failed</>
-                  )}
-                </Badge>
-              }
-              stats={[
-                { icon: User, label: 'User:', value: selectedLog.username || 'system' },
-                { icon: ClockCounterClockwise, label: 'Time:', value: formatTime(selectedLog.timestamp) }
-              ]}
-            />
-
-            {/* Event Details Section */}
-            <DetailSection title="Event Details">
-              <DetailGrid>
-                <DetailField 
-                  label="Timestamp" 
-                  value={new Date(selectedLog.timestamp).toLocaleString()} 
-                />
-                <DetailField 
-                  label="User" 
-                  value={selectedLog.username || 'system'} 
-                />
-                <DetailField 
-                  label="Action" 
-                  value={selectedLog.action?.replace(/_/g, ' ')} 
-                />
-                <DetailField 
-                  label="Resource" 
-                  value={`${selectedLog.resource_type || '-'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`} 
-                />
-                <DetailField 
-                  label="IP Address" 
-                  value={selectedLog.ip_address} 
-                  mono 
-                  copyable 
-                />
-                <DetailField 
-                  label="Status" 
-                  value={selectedLog.success ? 'Success' : 'Failed'} 
-                />
-              </DetailGrid>
-            </DetailSection>
-
-            {/* Details Section - if present */}
-            {selectedLog.details && (
-              <DetailSection title="Details">
-                <DetailField 
-                  label="Event Details" 
-                  value={selectedLog.details} 
-                  mono 
-                  fullWidth 
-                  copyable
-                />
-              </DetailSection>
-            )}
-
-            {/* User Agent Section - if present */}
-            {selectedLog.user_agent && (
-              <DetailSection title="Client Information">
-                <DetailField 
-                  label="User Agent" 
-                  value={selectedLog.user_agent} 
-                  mono 
-                  fullWidth 
-                  copyable
-                />
-              </DetailSection>
-            )}
-          </DetailContent>
-        )}
-      </Modal>
+        <ResponsiveDataTable
+          data={logs}
+          columns={columns}
+          keyField="id"
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search logs..."
+          selectedId={selectedLog?.id}
+          onRowClick={setSelectedLog}
+          renderMobileCard={renderMobileCard}
+          pagination={{
+            page,
+            perPage,
+            total,
+            onPageChange: setPage,
+            onPerPageChange: (newPerPage) => { setPerPage(newPerPage); setPage(1); }
+          }}
+          emptyState={{
+            icon: ClockCounterClockwise,
+            title: 'No audit logs found',
+            description: search || activeFilters > 0 ? 'Try adjusting your filters' : 'Activity will appear here'
+          }}
+        />
+      </ResponsiveLayout>
 
       {/* Cleanup Modal */}
       <Modal
@@ -729,6 +783,6 @@ export default function AuditLogsPage() {
           </div>
         </div>
       </Modal>
-    </PageLayout>
+    </>
   );
 }

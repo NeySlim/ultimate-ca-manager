@@ -1,23 +1,26 @@
 /**
- * CAs (Certificate Authorities) Page - Using ListPageLayout for consistent UI
+ * CAs (Certificate Authorities) Page - Using ResponsiveLayout
  */
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   ShieldCheck, Crown, Key, Download, Trash, PencilSimple,
-  Certificate, UploadSimple, Clock, Plus, Warning
+  Certificate, UploadSimple, Clock, Plus, Warning, CaretRight, CaretDown
 } from '@phosphor-icons/react'
 import {
-  ListPageLayout, Badge, Button, Modal, Input, Select, HelpCard, LoadingSpinner,
-  CADetails
+  Badge, Button, Modal, Input, Select, HelpCard, LoadingSpinner,
+  CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats
 } from '../components'
+import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
+import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
 
 export default function CAsPage() {
-  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
+  const { isMobile } = useMobile()
+  const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
   
@@ -31,6 +34,14 @@ export default function CAsPage() {
   const [importPassword, setImportPassword] = useState('')
   const [importing, setImporting] = useState(false)
   const importFileRef = useRef(null)
+  
+  // Filter state
+  const [filterType, setFilterType] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  // Tree expanded state
+  const [expandedNodes, setExpandedNodes] = useState(new Set())
 
   useEffect(() => {
     loadCAs()
@@ -53,6 +64,14 @@ export default function CAsPage() {
       }
     }
   }, [cas, searchParams])
+
+  // Expand all root nodes by default
+  useEffect(() => {
+    if (cas.length > 0 && expandedNodes.size === 0) {
+      const rootIds = cas.filter(c => !c.parent_id || c.type === 'root').map(c => c.id)
+      setExpandedNodes(new Set(rootIds))
+    }
+  }, [cas])
 
   const loadCAs = async () => {
     setLoading(true)
@@ -141,111 +160,129 @@ export default function CAsPage() {
     }
   }
 
-  // Check if intermediate CA is orphan (no parent found in our list)
-  const isOrphanIntermediate = (ca) => {
-    if (ca.type !== 'intermediate') return false
-    if (!ca.parent_id) return true // No parent_id means orphan
-    // Check if parent exists in our CA list
-    return !cas.some(c => c.id === ca.parent_id)
+  const handleCreateCA = async (e) => {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    const data = {
+      commonName: formData.get('commonName'),
+      organization: formData.get('organization'),
+      country: formData.get('country'),
+      state: formData.get('state'),
+      locality: formData.get('locality'),
+      keyAlgo: formData.get('keyAlgo'),
+      keySize: parseInt(formData.get('keySize')),
+      validityYears: parseInt(formData.get('validityYears')),
+      type: formData.get('type'),
+      parentCAId: formData.get('type') === 'intermediate' ? formData.get('parentCAId') : null
+    }
+    
+    try {
+      await casService.create(data)
+      showSuccess('CA created successfully')
+      closeModal('create')
+      loadCAs()
+    } catch (error) {
+      showError(error.message || 'Failed to create CA')
+    }
   }
 
-  // Table filters
-  const tableFilters = useMemo(() => [
+  // Check if intermediate CA is orphan
+  const isOrphanIntermediate = useCallback((ca) => {
+    if (ca.type !== 'intermediate') return false
+    if (!ca.parent_id) return true
+    return !cas.some(c => c.id === ca.parent_id)
+  }, [cas])
+
+  // Build tree structure
+  const treeData = useMemo(() => {
+    const rootCAs = cas.filter(ca => !ca.parent_id || ca.type === 'root' || isOrphanIntermediate(ca))
+    
+    const buildTree = (parentId) => {
+      return cas
+        .filter(ca => ca.parent_id === parentId && ca.type !== 'root')
+        .map(ca => ({
+          ...ca,
+          children: buildTree(ca.id)
+        }))
+    }
+    
+    return rootCAs.map(ca => ({
+      ...ca,
+      children: buildTree(ca.id)
+    }))
+  }, [cas, isOrphanIntermediate])
+
+  // Filter tree
+  const filteredTree = useMemo(() => {
+    let result = treeData
+    
+    // Apply search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const matches = (ca) => 
+        (ca.name || '').toLowerCase().includes(query) ||
+        (ca.common_name || '').toLowerCase().includes(query) ||
+        (ca.subject || '').toLowerCase().includes(query)
+      
+      const filterTree = (nodes) => nodes.filter(node => {
+        if (matches(node)) return true
+        if (node.children?.length) {
+          node.children = filterTree(node.children)
+          return node.children.length > 0
+        }
+        return false
+      })
+      result = filterTree([...result])
+    }
+    
+    // Apply type filter
+    if (filterType) {
+      const filterByType = (nodes) => nodes.filter(node => {
+        if (node.type === filterType) return true
+        if (node.children?.length) {
+          node.children = filterByType(node.children)
+          return node.children.length > 0
+        }
+        return false
+      })
+      result = filterByType([...result])
+    }
+    
+    return result
+  }, [treeData, searchQuery, filterType])
+
+  // Stats
+  const stats = useMemo(() => {
+    const rootCount = cas.filter(c => c.type === 'root').length
+    const intermediateCount = cas.filter(c => c.type === 'intermediate').length
+    const activeCount = cas.filter(c => c.status === 'Active').length
+    const expiredCount = cas.filter(c => c.status === 'Expired').length
+    
+    return [
+      { icon: Crown, label: 'Root', value: rootCount, variant: 'warning' },
+      { icon: ShieldCheck, label: 'Intermediate', value: intermediateCount, variant: 'primary' },
+      { icon: Certificate, label: 'Active', value: activeCount, variant: 'success' },
+      { icon: Clock, label: 'Expired', value: expiredCount, variant: 'danger' }
+    ]
+  }, [cas])
+
+  // Filters config
+  const filters = useMemo(() => [
     {
       key: 'type',
       label: 'Type',
+      type: 'select',
+      value: filterType,
+      onChange: setFilterType,
+      placeholder: 'All Types',
       options: [
         { value: 'root', label: 'Root CA' },
         { value: 'intermediate', label: 'Intermediate' }
       ]
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      options: [
-        { value: 'Active', label: 'Active' },
-        { value: 'Expired', label: 'Expired' },
-        { value: 'Revoked', label: 'Revoked' }
-      ]
     }
-  ], [])
+  ], [filterType])
 
-  // Table columns
-  const columns = [
-    {
-      key: 'name',
-      header: 'Name',
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          {row.type === 'root' ? (
-            <Crown size={16} weight="duotone" className="text-yellow-500 shrink-0" />
-          ) : (
-            <ShieldCheck size={16} weight="duotone" className="text-blue-500 shrink-0" />
-          )}
-          <span className="font-medium truncate">{val || row.common_name || 'CA'}</span>
-          {isOrphanIntermediate(row) && (
-            <Badge variant="warning" size="sm" className="ml-1">
-              <Warning size={12} className="mr-0.5" /> orphan
-            </Badge>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'type',
-      header: 'Type',
-      render: (val) => (
-        <Badge variant={val === 'root' ? 'primary' : 'secondary'} size="sm">
-          {val || 'unknown'}
-        </Badge>
-      )
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (val) => (
-        <Badge 
-          variant={val === 'Active' ? 'success' : val === 'Expired' ? 'danger' : 'warning'}
-          size="sm"
-        >
-          {val || 'Unknown'}
-        </Badge>
-      )
-    },
-    {
-      key: 'certs',
-      header: 'Certificates',
-      render: (val) => val || 0
-    },
-    {
-      key: 'valid_to',
-      header: 'Expires',
-      sortType: 'date',
-      render: (val) => formatDate(val)
-    }
-  ]
-
-  // Row actions
-  const rowActions = (row) => [
-    { label: 'Export PEM', icon: Download, onClick: () => handleExport(row, 'pem') },
-    ...(canWrite('cas') ? [
-      { label: 'Edit', icon: PencilSimple, onClick: () => {} }
-    ] : []),
-    ...(canDelete('cas') ? [
-      { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
-    ] : [])
-  ]
-
-  // Render details panel
-  const renderDetails = (ca) => (
-    <CADetails
-      ca={ca}
-      onExport={() => handleExport(ca, 'pem')}
-      onDelete={() => handleDelete(ca.id)}
-      canWrite={canWrite('cas')}
-      canDelete={canDelete('cas')}
-    />
-  )
+  const activeFiltersCount = (filterType ? 1 : 0)
 
   // Help content
   const helpContent = (
@@ -266,83 +303,132 @@ export default function CAsPage() {
     </div>
   )
 
+  // Toggle tree node
+  const toggleNode = (id) => {
+    setExpandedNodes(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
   return (
     <>
-      <ListPageLayout
+      <ResponsiveLayout
         title="Certificate Authorities"
-        data={cas}
-        columns={columns}
-        loading={loading}
-        selectedItem={selectedCA}
-        onSelectItem={(ca) => ca ? loadCADetails(ca) : setSelectedCA(null)}
-        renderDetails={renderDetails}
-        detailsTitle="CA Details"
-        searchable
-        searchPlaceholder="Search CAs..."
-        searchKeys={['name', 'common_name', 'subject']}
-        sortable
-        defaultSort={{ key: 'type', direction: 'asc' }}
-        paginated
-        pageSize={25}
-        rowActions={rowActions}
-        filters={tableFilters}
-        hierarchical
-        parentKey="parent_id"
-        defaultExpanded={true}
-        emptyIcon={ShieldCheck}
-        emptyTitle="No Certificate Authorities"
-        emptyDescription="Create your first CA to get started"
-        emptyAction={canWrite('cas') && (
-          <Button onClick={() => openModal('create')}>
-            <Plus size={16} /> Create CA
-          </Button>
-        )}
+        icon={ShieldCheck}
+        stats={stats}
+        filters={filters}
+        activeFilters={activeFiltersCount}
         helpContent={helpContent}
-        actions={canWrite('cas') && (
-          <>
-            <Button size="sm" onClick={() => openModal('create')}>
-              <Plus size={16} /> Create
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => openModal('import')}>
-              <UploadSimple size={16} /> Import
-            </Button>
-          </>
+        slideOverOpen={!!selectedCA}
+        onSlideOverClose={() => setSelectedCA(null)}
+        slideOverTitle="CA Details"
+        slideOverWidth="wide"
+        slideOverContent={selectedCA && (
+          <CADetailsPanel 
+            ca={selectedCA}
+            canWrite={canWrite}
+            canDelete={canDelete}
+            onExport={(format) => handleExport(selectedCA, format)}
+            onDelete={() => handleDelete(selectedCA.id)}
+          />
         )}
-      />
+        actions={
+          canWrite('cas') && (
+            isMobile ? (
+              <div className="flex gap-2">
+                <Button size="lg" onClick={() => openModal('create')} className="w-11 h-11 p-0">
+                  <Plus size={22} weight="bold" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => openModal('create')}>
+                  <Plus size={14} weight="bold" />
+                  Create
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => openModal('import')}>
+                  <UploadSimple size={14} />
+                  Import
+                </Button>
+              </div>
+            )
+          )
+        }
+      >
+        {/* Tree View Content */}
+        <div className="flex flex-col h-full">
+          {/* Search Bar */}
+          <div className="shrink-0 p-3 border-b border-border/50 bg-bg-secondary/30">
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search CAs..."
+                className={cn(
+                  'w-full rounded-lg border border-border bg-bg-primary',
+                  'text-text-primary placeholder:text-text-tertiary',
+                  'focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary',
+                  isMobile ? 'h-11 px-4 text-base' : 'h-8 px-3 text-sm'
+                )}
+              />
+            </div>
+          </div>
+
+          {/* Tree List */}
+          <div className="flex-1 overflow-auto">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <LoadingSpinner />
+              </div>
+            ) : filteredTree.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 px-4">
+                <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
+                  <ShieldCheck size={32} className="text-text-secondary" />
+                </div>
+                <h3 className="text-lg font-medium text-text-primary mb-1">No Certificate Authorities</h3>
+                <p className="text-sm text-text-secondary text-center mb-4">Create your first CA to get started</p>
+                {canWrite('cas') && (
+                  <Button onClick={() => openModal('create')}>
+                    <Plus size={16} /> Create CA
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="py-2">
+                {filteredTree.map(ca => (
+                  <TreeNode
+                    key={ca.id}
+                    ca={ca}
+                    level={0}
+                    selectedId={selectedCA?.id}
+                    expandedNodes={expandedNodes}
+                    onToggle={toggleNode}
+                    onSelect={loadCADetails}
+                    isOrphan={isOrphanIntermediate(ca)}
+                    isMobile={isMobile}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </ResponsiveLayout>
 
       {/* Create CA Modal */}
       <Modal
         open={modals.create}
-        onClose={() => closeModal('create')}
+        onOpenChange={() => closeModal('create')}
         title="Create Certificate Authority"
         size="lg"
       >
-        <form onSubmit={async (e) => {
-          e.preventDefault()
-          const formData = new FormData(e.target)
-          const data = {
-            commonName: formData.get('commonName'),
-            organization: formData.get('organization'),
-            country: formData.get('country'),
-            state: formData.get('state'),
-            locality: formData.get('locality'),
-            keyAlgo: formData.get('keyAlgo'),
-            keySize: parseInt(formData.get('keySize')),
-            validityYears: parseInt(formData.get('validityYears')),
-            type: formData.get('type'),
-            parentCAId: formData.get('type') === 'intermediate' ? formData.get('parentCAId') : null
-          }
-          
-          try {
-            await casService.create(data)
-            showSuccess('CA created successfully')
-            closeModal('create')
-            loadCAs()
-          } catch (error) {
-            showError(error.message || 'Failed to create CA')
-          }
-        }} className="space-y-6">
-          
+        <form onSubmit={handleCreateCA} className="space-y-6 p-4">
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">Subject Information</h3>
             <Input name="commonName" label="Common Name (CN)" placeholder="My Certificate Authority" required />
@@ -414,7 +500,7 @@ export default function CAsPage() {
                 label="Parent CA"
                 options={cas.map(ca => ({
                   value: ca.id.toString(),
-                  label: ca.name || ca.descr
+                  label: ca.name || ca.descr || ca.common_name
                 }))}
                 required
               />
@@ -433,11 +519,11 @@ export default function CAsPage() {
       {/* Import CA Modal */}
       <Modal
         open={modals.import}
-        onClose={() => closeModal('import')}
+        onOpenChange={() => closeModal('import')}
         title="Import CA"
         size="md"
       >
-        <div className="space-y-4">
+        <div className="space-y-4 p-4">
           <p className="text-sm text-text-secondary">
             Import an existing CA certificate. Supports PEM, DER, and PKCS#12 formats.
           </p>
@@ -479,5 +565,190 @@ export default function CAsPage() {
         </div>
       </Modal>
     </>
+  )
+}
+
+// =============================================================================
+// TREE NODE COMPONENT
+// =============================================================================
+
+function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, isOrphan, isMobile }) {
+  const hasChildren = ca.children && ca.children.length > 0
+  const isExpanded = expandedNodes.has(ca.id)
+  const isSelected = selectedId === ca.id
+  
+  return (
+    <div>
+      <div
+        onClick={() => onSelect(ca)}
+        className={cn(
+          'flex items-center gap-2 cursor-pointer transition-all duration-150',
+          'hover:bg-bg-tertiary',
+          isSelected && 'bg-accent-primary/10 border-l-2 border-l-accent-primary',
+          !isSelected && 'border-l-2 border-l-transparent',
+          isMobile ? 'py-3 px-4' : 'py-2 px-3'
+        )}
+        style={{ paddingLeft: `${(level * 20) + (isMobile ? 16 : 12)}px` }}
+      >
+        {/* Expand/Collapse Button */}
+        {hasChildren ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggle(ca.id)
+            }}
+            className={cn(
+              'shrink-0 rounded transition-colors',
+              'hover:bg-bg-hover',
+              isMobile ? 'w-8 h-8' : 'w-6 h-6',
+              'flex items-center justify-center'
+            )}
+          >
+            {isExpanded ? (
+              <CaretDown size={isMobile ? 16 : 14} className="text-text-secondary" />
+            ) : (
+              <CaretRight size={isMobile ? 16 : 14} className="text-text-secondary" />
+            )}
+          </button>
+        ) : (
+          <div className={cn(isMobile ? 'w-8' : 'w-6')} />
+        )}
+        
+        {/* CA Icon */}
+        {ca.type === 'root' ? (
+          <Crown size={isMobile ? 20 : 16} weight="duotone" className="text-yellow-500 shrink-0" />
+        ) : (
+          <ShieldCheck size={isMobile ? 20 : 16} weight="duotone" className="text-blue-500 shrink-0" />
+        )}
+        
+        {/* Name */}
+        <span className={cn(
+          'flex-1 truncate font-medium',
+          isMobile ? 'text-base' : 'text-sm',
+          isSelected ? 'text-accent-primary' : 'text-text-primary'
+        )}>
+          {ca.name || ca.common_name || 'CA'}
+        </span>
+        
+        {/* Badges */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isOrphan && (
+            <Badge variant="warning" size="sm">
+              <Warning size={10} /> orphan
+            </Badge>
+          )}
+          <Badge 
+            variant={ca.status === 'Active' ? 'success' : ca.status === 'Expired' ? 'danger' : 'warning'}
+            size="sm"
+          >
+            {ca.status || 'Unknown'}
+          </Badge>
+        </div>
+      </div>
+      
+      {/* Children */}
+      {hasChildren && isExpanded && (
+        <div>
+          {ca.children.map(child => (
+            <TreeNode
+              key={child.id}
+              ca={child}
+              level={level + 1}
+              selectedId={selectedId}
+              expandedNodes={expandedNodes}
+              onToggle={onToggle}
+              onSelect={onSelect}
+              isOrphan={false}
+              isMobile={isMobile}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// =============================================================================
+// CA DETAILS PANEL
+// =============================================================================
+
+function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete }) {
+  return (
+    <div className="p-3 space-y-3">
+      {/* Header */}
+      <CompactHeader
+        icon={ca.type === 'root' ? Crown : ShieldCheck}
+        iconClass={ca.type === 'root' ? "bg-yellow-500/20" : "bg-blue-500/20"}
+        title={ca.name || ca.common_name || 'CA'}
+        subtitle={ca.subject}
+        badge={
+          <Badge variant={ca.type === 'root' ? 'warning' : 'primary'} size="sm">
+            {ca.type || 'unknown'}
+          </Badge>
+        }
+      />
+
+      {/* Stats */}
+      <CompactStats stats={[
+        { icon: Certificate, value: `${ca.certs || 0} certificates` },
+        { icon: Clock, value: ca.valid_to ? formatDate(ca.valid_to, 'short') : '—' },
+        { badge: ca.status, badgeVariant: ca.status === 'Active' ? 'success' : 'danger' }
+      ]} />
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <Button size="sm" variant="secondary" className="flex-1" onClick={() => onExport('pem')}>
+          <Download size={14} /> Export
+        </Button>
+        {canDelete('cas') && (
+          <Button size="sm" variant="danger" onClick={onDelete}>
+            <Trash size={14} />
+          </Button>
+        )}
+      </div>
+
+      {/* Subject Info */}
+      <CompactSection title="Subject">
+        <CompactGrid>
+          <CompactField label="Common Name" value={ca.common_name} className="col-span-2" />
+          <CompactField label="Organization" value={ca.organization} />
+          <CompactField label="Country" value={ca.country} />
+          <CompactField label="State" value={ca.state} />
+          <CompactField label="Locality" value={ca.locality} />
+        </CompactGrid>
+      </CompactSection>
+
+      {/* Key Info */}
+      <CompactSection title="Key Information">
+        <CompactGrid>
+          <CompactField label="Algorithm" value={ca.key_algorithm || 'RSA'} />
+          <CompactField label="Key Size" value={ca.key_size} />
+          <CompactField label="Signature" value={ca.signature_algorithm} />
+        </CompactGrid>
+      </CompactSection>
+
+      {/* Validity */}
+      <CompactSection title="Validity">
+        <CompactGrid>
+          <CompactField label="Not Before" value={ca.valid_from ? formatDate(ca.valid_from) : '—'} />
+          <CompactField label="Not After" value={ca.valid_to ? formatDate(ca.valid_to) : '—'} />
+          <CompactField label="Serial" value={ca.serial_number} className="col-span-2 font-mono text-xs" />
+        </CompactGrid>
+      </CompactSection>
+
+      {/* Fingerprints */}
+      {(ca.thumbprint_sha1 || ca.thumbprint_sha256) && (
+        <CompactSection title="Fingerprints">
+          <CompactGrid>
+            {ca.thumbprint_sha1 && (
+              <CompactField label="SHA-1" value={ca.thumbprint_sha1} className="col-span-2 font-mono text-xs break-all" />
+            )}
+            {ca.thumbprint_sha256 && (
+              <CompactField label="SHA-256" value={ca.thumbprint_sha256} className="col-span-2 font-mono text-xs break-all" />
+            )}
+          </CompactGrid>
+        </CompactSection>
+      )}
+    </div>
   )
 }
