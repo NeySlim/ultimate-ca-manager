@@ -409,22 +409,29 @@ export function CompactSection({ title, children, className, collapsible = false
   return (
     <div className={cn(
       "border border-border rounded-lg overflow-hidden",
+      "shadow-[0_1px_2px_rgba(0,0,0,0.04)]",
+      "transition-shadow duration-200",
+      "hover:shadow-[0_2px_4px_rgba(0,0,0,0.06)]",
       className
     )}>
       <button
         type="button"
         onClick={() => collapsible && setIsOpen(!isOpen)}
         className={cn(
-          "w-full px-3 py-2 flex items-center justify-between text-left",
-          "bg-bg-tertiary/40 border-b border-border/30",
-          collapsible && "cursor-pointer hover:bg-bg-tertiary/60 transition-colors",
+          "w-full px-3 py-2 flex items-center justify-between text-left relative",
+          "bg-gradient-to-r from-bg-tertiary/50 to-bg-tertiary/30",
+          "border-b border-border/30",
+          collapsible && "cursor-pointer hover:from-bg-tertiary/60 hover:to-bg-tertiary/40 transition-all",
           !collapsible && "cursor-default"
         )}
         disabled={!collapsible}
       >
+        {/* Subtle accent line on left */}
+        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-accent-primary/40 via-accent-primary/20 to-transparent" />
+        
         <div className="flex items-center gap-2">
           {Icon && (
-            <div className="w-5 h-5 rounded bg-bg-tertiary flex items-center justify-center">
+            <div className="w-5 h-5 rounded bg-gradient-to-br from-bg-tertiary to-bg-tertiary/60 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
               <Icon size={12} className="text-text-secondary" weight="bold" />
             </div>
           )}
@@ -436,8 +443,8 @@ export function CompactSection({ title, children, className, collapsible = false
           <CaretDown 
             size={14} 
             className={cn(
-              "text-text-tertiary transition-transform duration-200",
-              isOpen && "rotate-180"
+              "text-text-tertiary transition-all duration-200",
+              isOpen && "rotate-180 scale-90"
             )} 
           />
         )}
@@ -513,11 +520,12 @@ export function CompactField({
   if (Icon) {
     return (
       <div className={cn(
-        "flex items-start gap-2 group p-1.5 -m-1.5 rounded-md transition-colors hover:bg-bg-tertiary/30",
+        "flex items-start gap-2 group p-1.5 -m-1.5 rounded-md transition-all duration-150",
+        "hover:bg-bg-tertiary/30 hover:shadow-[0_1px_2px_rgba(0,0,0,0.04)]",
         colSpan && `col-span-${colSpan}`,
         className
       )}>
-        <div className="w-5 h-5 rounded bg-bg-tertiary/50 flex items-center justify-center shrink-0 mt-0.5">
+        <div className="w-5 h-5 rounded bg-gradient-to-br from-bg-tertiary/60 to-bg-tertiary/40 flex items-center justify-center shrink-0 mt-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           <Icon size={11} className="text-text-tertiary" />
         </div>
         <div className="min-w-0 flex-1">
