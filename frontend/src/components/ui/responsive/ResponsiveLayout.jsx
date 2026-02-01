@@ -60,6 +60,10 @@ export function ResponsiveLayout({
   slideOverWidth = 'default', // 'narrow' | 'default' | 'wide'
   onSlideOverClose,
   
+  // Split view (xl+ screens) - panel always visible
+  splitView = false, // Enable permanent split view on large screens
+  splitEmptyContent, // Content to show when nothing selected in split view
+  
   // Main content
   children,
   
@@ -69,7 +73,7 @@ export function ResponsiveLayout({
   // Custom class
   className
 }) {
-  const { isMobile, isDesktop, isTouch } = useMobile()
+  const { isMobile, isDesktop, isTouch, isLargeScreen } = useMobile()
   
   // Local state for filter/help drawers (mobile only)
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
@@ -119,10 +123,14 @@ export function ResponsiveLayout({
         <StatsBar stats={stats} isMobile={isMobile} />
       )}
       
-      {/* MAIN AREA - Content + SlideOver */}
+      {/* MAIN AREA - Content + SlideOver/SplitPanel */}
       <div className="flex-1 flex overflow-hidden">
         {/* CONTENT AREA - fills available space */}
-        <main className="flex-1 min-w-0 overflow-auto bg-bg-primary">
+        <main className={cn(
+          'min-w-0 overflow-auto bg-bg-primary',
+          // In split view mode on large screens, content takes remaining space
+          splitView && isLargeScreen ? 'flex-1 border-r border-border' : 'flex-1'
+        )}>
           {loading ? (
             <LoadingState />
           ) : (
@@ -130,8 +138,47 @@ export function ResponsiveLayout({
           )}
         </main>
         
-        {/* SLIDE-OVER PANEL (Desktop: inline, Mobile: overlay) */}
-        {slideOverOpen && (
+        {/* SPLIT VIEW PANEL (xl+ screens) - Always visible */}
+        {splitView && isLargeScreen && (
+          <aside className={cn(
+            'shrink-0 overflow-auto bg-bg-secondary/30',
+            slideOverWidth === 'narrow' ? 'w-80' : slideOverWidth === 'wide' ? 'w-[420px]' : 'w-96'
+          )}>
+            {slideOverOpen && slideOverContent ? (
+              <div className="h-full flex flex-col">
+                {/* Panel header */}
+                <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-text-primary">{slideOverTitle}</h3>
+                  {onSlideOverClose && (
+                    <button
+                      onClick={onSlideOverClose}
+                      className="p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+                {/* Panel content */}
+                <div className="flex-1 overflow-auto">
+                  {slideOverContent}
+                </div>
+              </div>
+            ) : (
+              // Empty state when nothing selected
+              splitEmptyContent || (
+                <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+                  <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
+                    <Question size={24} className="text-text-tertiary" />
+                  </div>
+                  <p className="text-sm text-text-secondary">Select an item to view details</p>
+                </div>
+              )
+            )}
+          </aside>
+        )}
+        
+        {/* SLIDE-OVER PANEL (non-split mode) - Desktop: inline, Mobile: overlay */}
+        {!splitView && slideOverOpen && (
           isDesktop ? (
             <DesktopSlideOver
               title={slideOverTitle}
@@ -148,6 +195,16 @@ export function ResponsiveLayout({
               {slideOverContent}
             </MobileSlideOver>
           )
+        )}
+        
+        {/* Mobile slide-over (in split mode, mobile still uses overlay) */}
+        {splitView && !isLargeScreen && slideOverOpen && (
+          <MobileSlideOver
+            title={slideOverTitle}
+            onClose={onSlideOverClose}
+          >
+            {slideOverContent}
+          </MobileSlideOver>
         )}
       </div>
       

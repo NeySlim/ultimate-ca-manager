@@ -325,6 +325,16 @@ export default function CAsPage() {
         filters={filters}
         activeFilters={activeFiltersCount}
         helpContent={helpContent}
+        // Split view on xl+ screens - panel always visible
+        splitView={true}
+        splitEmptyContent={
+          <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+            <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
+              <ShieldCheck size={24} className="text-text-tertiary" />
+            </div>
+            <p className="text-sm text-text-secondary">Select a CA to view details</p>
+          </div>
+        }
         slideOverOpen={!!selectedCA}
         onSlideOverClose={() => setSelectedCA(null)}
         slideOverTitle="CA Details"
@@ -401,16 +411,23 @@ export default function CAsPage() {
                 )}
               </div>
             ) : (
-              <div className="py-1">
-                {filteredTree.map((ca, idx) => (
-                  <div key={ca.id}>
-                    {/* Separator between CA families */}
-                    {idx > 0 && (
-                      <div className="my-2 mx-2 flex items-center gap-2">
-                        <div className="flex-1 h-px bg-border" />
-                      </div>
-                    )}
+              <div className="p-3">
+                {/* Table Header - Desktop */}
+                {!isMobile && (
+                  <div className="flex items-center gap-3 px-3 py-2 mb-2 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider border-b border-border/50">
+                    <div className="flex-1 min-w-0">Certificate Authority</div>
+                    <div className="w-20 text-center">Type</div>
+                    <div className="w-16 text-center">Certs</div>
+                    <div className="w-20 text-center">Expires</div>
+                    <div className="w-16 text-center">Status</div>
+                  </div>
+                )}
+                
+                {/* Single card with all CAs */}
+                <div className="rounded-xl border border-border/60 bg-bg-secondary/30 overflow-hidden divide-y divide-border/40">
+                  {filteredTree.map((ca, idx) => (
                     <TreeNode
+                      key={ca.id}
                       ca={ca}
                       level={0}
                       selectedId={selectedCA?.id}
@@ -420,9 +437,10 @@ export default function CAsPage() {
                       isOrphan={isOrphanIntermediate(ca)}
                       isMobile={isMobile}
                       isLast={idx === filteredTree.length - 1}
+                      isFirst={idx === 0}
                     />
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -577,115 +595,217 @@ export default function CAsPage() {
 }
 
 // =============================================================================
-// TREE NODE COMPONENT
+// TREE NODE COMPONENT - Styled with visual hierarchy
 // =============================================================================
 
-function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, isOrphan, isMobile, isLast = false }) {
+function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, isOrphan, isMobile, isLast = false, isFirst = false }) {
   const hasChildren = ca.children && ca.children.length > 0
   const isExpanded = expandedNodes.has(ca.id)
   const isSelected = selectedId === ca.id
-  const indent = isMobile ? 24 : 20
-  const rowHeight = isMobile ? 48 : 28
-  // Desktop: expand btn (16px) + gap (6px) + icon half (7px) = 29px from padding start
-  // Mobile: expand btn (24px) + gap (8px) + icon half (8px) = 40px from padding start
-  const iconCenterFromPadding = isMobile ? 40 : 29
+  const isRoot = level === 0
+  const indent = 24 // indent per level for children
+  const rowHeight = isMobile ? 52 : 44
+  
+  // Format expiration
+  const formatExpiry = (date) => {
+    if (!date) return null
+    const d = new Date(date)
+    const now = new Date()
+    const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24))
+    if (diffDays < 0) return { text: 'Expired', variant: 'danger', urgent: true }
+    if (diffDays < 30) return { text: `${diffDays}d left`, variant: 'warning', urgent: true }
+    if (diffDays < 365) return { text: `${Math.floor(diffDays / 30)}mo`, variant: 'default', urgent: false }
+    const formatted = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+    return { text: formatted, variant: 'default', urgent: false }
+  }
+  
+  const expiry = formatExpiry(ca.valid_to || ca.not_after)
+  
+  // Padding for this row
+  const rowPadding = isRoot ? 12 : 12 + (level * indent)
+  // Parent icon center position (for L connector)
+  const parentIconX = 12 + ((level - 1) * indent) + 24 + 8 + 16 // padding + expand + gap + iconHalf
   
   return (
-    <div>
+    <div className="relative">
+      {/* Row */}
       <div
         onClick={() => onSelect(ca)}
         className={cn(
-          'relative flex items-center cursor-pointer transition-colors',
-          'hover:bg-bg-tertiary/60',
-          isSelected && 'bg-accent-primary/10',
-          isMobile ? 'h-12 px-3 gap-2' : 'h-7 px-2 gap-1.5'
+          'relative flex items-center gap-3 cursor-pointer transition-all duration-150',
+          'hover:bg-bg-tertiary/50',
+          isSelected && 'bg-accent-primary/8 hover:bg-accent-primary/12',
+          isMobile ? 'py-3 px-3' : 'py-2 px-3'
         )}
-        style={{ paddingLeft: `${(isMobile ? 12 : 8) + (level * indent)}px` }}
+        style={{ paddingLeft: rowPadding }}
       >
-        {/* L connector - starts from center of parent icon */}
-        {level > 0 && (
-          <div 
-            className="absolute"
-            style={{ 
-              left: `${(isMobile ? 12 : 8) + ((level - 1) * indent) + iconCenterFromPadding}px`,
-              top: 0,
-              width: `${indent}px`,
-              height: `${rowHeight / 2}px`,
-              borderLeft: '1px solid var(--border)',
-              borderBottom: '1px solid var(--border)',
-              borderBottomLeftRadius: '3px'
-            }}
-          />
-        )}
-        
-        {/* Expand/Collapse */}
-        {hasChildren ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); onToggle(ca.id) }}
-            className={cn(
-              'shrink-0 flex items-center justify-center text-text-tertiary hover:text-text-primary',
-              isMobile ? 'w-6 h-6' : 'w-4 h-4'
-            )}
+        {/* L connector for children */}
+        {!isRoot && (
+          <svg 
+            className="absolute top-0 left-0 pointer-events-none overflow-visible"
+            width={rowPadding + 10}
+            height={rowHeight / 2 + 2}
           >
-            {isExpanded ? <CaretDown size={isMobile ? 14 : 10} weight="bold" /> : <CaretRight size={isMobile ? 14 : 10} weight="bold" />}
-          </button>
-        ) : (
-          <div className={cn(isMobile ? 'w-6' : 'w-4')} />
+            {/* L shape: vertical then horizontal with rounded corner */}
+            <path 
+              d={`M ${parentIconX} 0 L ${parentIconX} ${rowHeight / 2 - 6} Q ${parentIconX} ${rowHeight / 2} ${parentIconX + 6} ${rowHeight / 2} L ${rowPadding - 2} ${rowHeight / 2}`}
+              fill="none"
+              stroke="var(--border)" 
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
         )}
         
-        {/* Icon */}
-        {ca.type === 'root' ? (
-          <Crown size={isMobile ? 16 : 14} weight="duotone" className="text-amber-500 shrink-0" />
-        ) : (
-          <ShieldCheck size={isMobile ? 16 : 14} weight="duotone" className="text-blue-500 shrink-0" />
-        )}
-        
-        {/* Name */}
-        <span className={cn(
-          'flex-1 truncate',
-          isMobile ? 'text-sm' : 'text-xs',
-          isSelected ? 'text-accent-primary font-medium' : 'text-text-primary'
-        )}>
-          {ca.name || ca.common_name || 'CA'}
-        </span>
-        
-        {/* Cert count */}
-        {ca.certs > 0 && (
-          <span className={cn(
-            'text-text-tertiary',
-            isMobile ? 'text-xs' : 'text-[10px]'
-          )}>
-            {ca.certs}
-          </span>
-        )}
-        
-        {/* Status dot */}
-        <span className={cn(
-          'shrink-0 rounded-full',
-          isMobile ? 'w-2 h-2' : 'w-1.5 h-1.5',
-          ca.status === 'Active' ? 'bg-emerald-500' : ca.status === 'Expired' ? 'bg-red-500' : 'bg-amber-500'
-        )} />
-        
+        {/* Left accent for selected */}
         {isSelected && (
-          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-accent-primary" />
+          <div className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-accent-primary" />
+        )}
+        
+        {/* Expand button + Icon */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Expand/Collapse */}
+          {hasChildren ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggle(ca.id) }}
+              className={cn(
+                'w-6 h-6 rounded-md flex items-center justify-center transition-colors',
+                'text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary',
+                isExpanded && 'bg-bg-tertiary/50'
+              )}
+            >
+              {isExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
+            </button>
+          ) : (
+            <div className="w-6" />
+          )}
+          
+          {/* Icon with background */}
+          <div className={cn(
+            'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+            ca.type === 'root' 
+              ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/20'
+              : 'bg-gradient-to-br from-blue-500/20 to-cyan-500/10 border border-blue-500/20'
+          )}>
+            {ca.type === 'root' ? (
+              <Crown size={16} weight="duotone" className="text-amber-500" />
+            ) : (
+              <ShieldCheck size={16} weight="duotone" className="text-blue-500" />
+            )}
+          </div>
+        </div>
+        
+        {/* Name & Subject */}
+        <div className="flex-1 min-w-0">
+          <div className={cn(
+            'font-medium truncate',
+            isMobile ? 'text-sm' : 'text-xs',
+            isSelected ? 'text-accent-primary' : 'text-text-primary'
+          )}>
+            {ca.name || ca.common_name || 'Unnamed CA'}
+          </div>
+          {!isMobile && ca.subject && (
+            <div className="text-[10px] text-text-tertiary truncate mt-0.5">
+              {ca.subject.split(',')[0]}
+            </div>
+          )}
+        </div>
+        
+        {/* Desktop: Metadata columns */}
+        {!isMobile && (
+          <>
+            {/* Type badge */}
+            <div className="w-20 flex justify-center">
+              <span className={cn(
+                'px-2 py-0.5 rounded-md text-[10px] font-semibold',
+                ca.type === 'root' 
+                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                  : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+              )}>
+                {ca.type === 'root' ? 'Root' : 'Intermediate'}
+              </span>
+            </div>
+            
+            {/* Certs count */}
+            <div className="w-16 flex justify-center">
+              {ca.certs > 0 ? (
+                <span className="flex items-center gap-1 text-[11px] text-text-secondary">
+                  <Certificate size={12} weight="duotone" className="text-text-tertiary" />
+                  <span className="font-medium">{ca.certs}</span>
+                </span>
+              ) : (
+                <span className="text-[11px] text-text-tertiary">—</span>
+              )}
+            </div>
+            
+            {/* Expiry */}
+            <div className="w-20 flex justify-center">
+              {expiry ? (
+                <span className={cn(
+                  'text-[11px] font-medium',
+                  expiry.variant === 'danger' ? 'text-red-500' : 
+                  expiry.variant === 'warning' ? 'text-amber-500' : 'text-text-secondary'
+                )}>
+                  {expiry.text}
+                </span>
+              ) : (
+                <span className="text-[11px] text-text-tertiary">—</span>
+              )}
+            </div>
+            
+            {/* Status */}
+            <div className="w-16 flex justify-center">
+              <span className={cn(
+                'px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1',
+                ca.status === 'Active' 
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  : ca.status === 'Expired'
+                    ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                    : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+              )}>
+                <span className={cn(
+                  'w-1.5 h-1.5 rounded-full',
+                  ca.status === 'Active' ? 'bg-emerald-500' : ca.status === 'Expired' ? 'bg-red-500' : 'bg-amber-500'
+                )} />
+                {ca.status || '?'}
+              </span>
+            </div>
+          </>
+        )}
+        
+        {/* Mobile: Compact badges */}
+        {isMobile && (
+          <div className="flex items-center gap-2">
+            {ca.certs > 0 && (
+              <span className="text-xs text-text-tertiary">{ca.certs}</span>
+            )}
+            <span className={cn(
+              'w-2.5 h-2.5 rounded-full shrink-0',
+              ca.status === 'Active' ? 'bg-emerald-500' : ca.status === 'Expired' ? 'bg-red-500' : 'bg-amber-500'
+            )} />
+          </div>
         )}
       </div>
       
       {/* Children */}
-      {hasChildren && isExpanded && ca.children.map((child, idx) => (
-        <TreeNode
-          key={child.id}
-          ca={child}
-          level={level + 1}
-          selectedId={selectedId}
-          expandedNodes={expandedNodes}
-          onToggle={onToggle}
-          onSelect={onSelect}
-          isOrphan={false}
-          isMobile={isMobile}
-          isLast={idx === ca.children.length - 1}
-        />
-      ))}
+      {hasChildren && isExpanded && (
+        <div className={cn(isRoot && 'pb-1')}>
+          {ca.children.map((child, idx) => (
+            <TreeNode
+              key={child.id}
+              ca={child}
+              level={level + 1}
+              selectedId={selectedId}
+              expandedNodes={expandedNodes}
+              onToggle={onToggle}
+              onSelect={onSelect}
+              isOrphan={false}
+              isMobile={isMobile}
+              isLast={idx === ca.children.length - 1}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
