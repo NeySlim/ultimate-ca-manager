@@ -314,7 +314,6 @@ export default function SCEPPage() {
         onTabChange={setActiveTab}
         stats={activeTab === 'requests' ? headerStats : undefined}
         helpContent={helpContent}
-        actions={headerActions}
         slideOverOpen={!!selectedRequest && !showRejectModal}
         onSlideOverClose={() => setSelectedRequest(null)}
         slideOverTitle="Request Details"
@@ -327,9 +326,20 @@ export default function SCEPPage() {
             data={requests}
             columns={requestColumns}
             keyField="id"
-            searchValue={searchQuery}
+            searchable
+            externalSearch={searchQuery}
             onSearchChange={setSearchQuery}
             searchPlaceholder="Search requests..."
+            toolbarActions={
+              <>
+                <Button variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
+                  <ArrowsClockwise size={14} />
+                </Button>
+                <Button variant="secondary" size="lg" onClick={loadData} className="md:hidden h-11 w-11 p-0">
+                  <ArrowsClockwise size={22} />
+                </Button>
+              </>
+            }
             selectedId={selectedRequest?.id}
             onRowClick={setSelectedRequest}
             renderMobileCard={renderMobileCard}

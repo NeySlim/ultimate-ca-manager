@@ -560,10 +560,7 @@ export default function TemplatesPage() {
         icon={List}
         subtitle={`${templates.length} templates`}
         stats={headerStats}
-        filters={filters}
-        activeFilters={filterType ? 1 : 0}
         helpContent={helpContent}
-        actions={headerActions}
         slideOverOpen={!!selectedTemplate}
         onSlideOverClose={() => { setSelectedTemplate(null); setEditing(false); }}
         slideOverTitle={editing ? 'Edit Template' : 'Template Details'}
@@ -577,6 +574,33 @@ export default function TemplatesPage() {
           searchable
           searchPlaceholder="Search templates..."
           searchKeys={['name', 'description']}
+          toolbarFilters={[
+            {
+              key: 'type',
+              value: filterType,
+              onChange: setFilterType,
+              placeholder: 'All Types',
+              options: [
+                { value: 'certificate', label: 'Certificate' },
+                { value: 'ca', label: 'CA' }
+              ]
+            }
+          ]}
+          toolbarActions={canWrite('templates') && (
+            <>
+              <Button size="sm" onClick={handleCreate} className="hidden md:inline-flex">
+                <Plus size={14} />
+                New
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => openModal('import')} className="hidden md:inline-flex">
+                <FileArrowUp size={14} />
+              </Button>
+              {/* Mobile */}
+              <Button size="lg" onClick={handleCreate} className="md:hidden h-11 w-11 p-0">
+                <Plus size={22} />
+              </Button>
+            </>
+          )}
           selectedId={selectedTemplate?.id}
           onRowClick={selectTemplate}
           rowActions={getRowActions}
