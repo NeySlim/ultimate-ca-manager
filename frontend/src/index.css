@@ -567,6 +567,39 @@ tr.row-selected td:first-child {
   background-color: var(--bg-tertiary) !important;
 }
 
+/* Theme-aware background with opacity */
+.bg-tertiary-40 {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 40%, transparent);
+}
+.bg-tertiary-50 {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
+}
+.bg-tertiary-60 {
+  background-color: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
+}
+
+/* Theme-aware accent with opacity */
+.bg-accent-25 {
+  background-color: color-mix(in srgb, var(--accent-primary) 25%, transparent);
+}
+.text-accent-70 {
+  color: color-mix(in srgb, var(--accent-primary) 70%, transparent);
+}
+
+/* CompactSection header gradient - theme aware */
+.section-header-gradient {
+  background: linear-gradient(to right, 
+    color-mix(in srgb, var(--bg-tertiary) 40%, transparent), 
+    transparent
+  );
+}
+.section-header-gradient:hover {
+  background: linear-gradient(to right, 
+    color-mix(in srgb, var(--bg-tertiary) 60%, transparent), 
+    transparent
+  );
+}
+
 /* Smooth transitions for all interactive elements */
 button, a, input, select, textarea {
   transition: all var(--duration-fast) var(--ease-smooth);

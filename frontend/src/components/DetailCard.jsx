@@ -417,20 +417,20 @@ export function CompactSection({ title, children, className, collapsible = false
         onClick={() => collapsible && setIsOpen(!isOpen)}
         className={cn(
           "w-full px-3 py-2 flex items-center justify-between text-left relative",
-          "bg-gradient-to-r from-bg-tertiary/40 to-transparent",
+          "section-header-gradient",
           "border-b border-border/30",
-          collapsible && "cursor-pointer hover:from-bg-tertiary/60 transition-all",
+          collapsible && "cursor-pointer transition-all",
           !collapsible && "cursor-default"
         )}
         disabled={!collapsible}
       >
         {/* Subtle accent line on left - uses theme accent */}
-        <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-accent-primary/25" />
+        <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-accent-25" />
         
         <div className="flex items-center gap-2">
           {Icon && (
-            <div className="w-5 h-5 rounded bg-bg-tertiary/60 flex items-center justify-center">
-              <Icon size={12} className="text-accent-primary/70" weight="bold" />
+            <div className="w-5 h-5 rounded bg-tertiary-60 flex items-center justify-center">
+              <Icon size={12} className="text-accent-70" weight="bold" />
             </div>
           )}
           <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
