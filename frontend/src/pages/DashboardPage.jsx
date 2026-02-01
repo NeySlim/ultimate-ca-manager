@@ -285,19 +285,17 @@ export default function DashboardPage() {
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
           
           {/* Recent Certificates & CAs */}
-          <Card className="flex flex-col min-h-[320px]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <Certificate size={14} weight="duotone" className="text-blue-400" />
-                </div>
-                <h2 className="text-sm font-semibold text-text-primary">Recent Certificates</h2>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => navigate('/certificates')}>
-                <CaretRight size={12} />
-              </Button>
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-1">
+          <Card variant="elevated" className="flex flex-col min-h-[320px] p-0">
+            <Card.Header 
+              icon={Certificate} 
+              title="Recent Certificates"
+              action={
+                <Button size="sm" variant="ghost" onClick={() => navigate('/certificates')}>
+                  View all <CaretRight size={12} />
+                </Button>
+              }
+            />
+            <Card.Body className="flex-1 overflow-y-auto space-y-1 !pt-0">
               {recentCerts.length === 0 ? (
                 <EmptyWidget icon={Certificate} text="No certificates yet" />
               ) : (
@@ -305,13 +303,13 @@ export default function DashboardPage() {
                   <div 
                     key={cert.id || i}
                     onClick={() => navigate(`/certificates/${cert.id}`)}
-                    className="p-2 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors border border-transparent hover:border-border"
+                    className="p-2.5 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-all border border-transparent hover:border-border/50 hover:shadow-sm group"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-text-primary truncate">
+                      <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
                         {cert.common_name || cert.descr || cert.subject || 'Certificate'}
                       </span>
-                      <Badge variant={cert.revoked ? 'danger' : 'emerald'} size="sm">
+                      <Badge variant={cert.revoked ? 'danger' : 'success'} size="sm" dot>
                         {cert.revoked ? 'Revoked' : 'Valid'}
                       </Badge>
                     </div>
@@ -321,19 +319,19 @@ export default function DashboardPage() {
                   </div>
                 ))
               )}
-            </div>
+            </Card.Body>
             
             {/* Recent CAs Section */}
-            <div className="border-t border-border mt-3 pt-3">
+            <Card.Footer>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded bg-purple-500/10 flex items-center justify-center">
-                    <ShieldCheck size={12} weight="duotone" className="text-purple-400" />
+                  <div className="w-6 h-6 rounded-lg bg-purple-500/15 flex items-center justify-center">
+                    <ShieldCheck size={12} weight="duotone" className="text-purple-500 dark:text-purple-400" />
                   </div>
-                  <span className="text-xs font-medium text-text-secondary">Recent CAs</span>
+                  <span className="text-xs font-semibold text-text-primary">Recent CAs</span>
                 </div>
                 <Button size="sm" variant="ghost" onClick={() => navigate('/cas')}>
-                  <CaretRight size={10} />
+                  <CaretRight size={12} />
                 </Button>
               </div>
               {recentCAs.length === 0 ? (
@@ -344,159 +342,159 @@ export default function DashboardPage() {
                     <div 
                       key={ca.id || i}
                       onClick={() => navigate(`/cas/${ca.id}`)}
-                      className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-bg-tertiary/50 cursor-pointer"
+                      className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-bg-secondary cursor-pointer transition-colors"
                     >
                       <span className="text-xs text-text-primary truncate">{ca.dn_commonname || ca.descr || ca.name}</span>
-                      <Badge variant={ca.is_root ? 'purple' : 'blue'} size="sm">
-                        {ca.is_root ? 'Root' : 'Int'}
+                      <Badge variant={ca.is_root ? 'purple' : 'info'} size="sm">
+                        {ca.is_root ? 'Root' : 'Intermediate'}
                       </Badge>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </Card.Footer>
           </Card>
 
           {/* System Health & Services */}
-          <Card className="flex flex-col min-h-[320px]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                  <Heartbeat size={14} weight="duotone" className="text-emerald-400" />
-                </div>
-                <h2 className="text-sm font-semibold text-text-primary">System Health</h2>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => navigate('/settings')}>
-                <Gear size={12} />
-              </Button>
-            </div>
-            
-            {/* System Stats */}
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <SystemStat 
-                icon={WifiHigh} 
-                label="WebSocket" 
-                value={isConnected ? 'Connected' : 'Disconnected'} 
-                status={isConnected ? 'online' : 'offline'} 
-              />
-              <SystemStat 
-                icon={Database} 
-                label="Database" 
-                value="Healthy" 
-                status="online" 
-              />
-              <SystemStat 
-                icon={Clock} 
-                label="Last Update" 
-                value={formatRelativeTime(lastUpdate)} 
-                status="online" 
-              />
-              <SystemStat 
-                icon={Lightning} 
-                label="API" 
-                value="Online" 
-                status="online" 
-              />
-            </div>
-            
-            {/* Services Status */}
-            <div className="flex-1">
-              <div className="text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
-                Services
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <ServiceBadge name="ACME" status={systemStatus?.acme} />
-                <ServiceBadge name="SCEP" status={systemStatus?.scep} />
-                <ServiceBadge name="OCSP" status={systemStatus?.ocsp} />
-                <ServiceBadge name="CRL" status={systemStatus?.crl} />
+          <Card variant="elevated" className="flex flex-col min-h-[320px] p-0">
+            <Card.Header 
+              icon={Heartbeat} 
+              title="System Health"
+              action={
+                <Button size="sm" variant="ghost" onClick={() => navigate('/settings')}>
+                  <Gear size={14} />
+                </Button>
+              }
+            />
+            <Card.Body className="!pt-0">
+              {/* System Stats */}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <SystemStat 
+                  icon={WifiHigh} 
+                  label="WebSocket" 
+                  value={isConnected ? 'Connected' : 'Disconnected'} 
+                  status={isConnected ? 'online' : 'offline'} 
+                />
+                <SystemStat 
+                  icon={Database} 
+                  label="Database" 
+                  value="Healthy" 
+                  status="online" 
+                />
+                <SystemStat 
+                  icon={Clock} 
+                  label="Last Update" 
+                  value={formatRelativeTime(lastUpdate)} 
+                  status="online" 
+                />
+                <SystemStat 
+                  icon={Lightning} 
+                  label="API" 
+                  value="Online" 
+                  status="online" 
+                />
               </div>
               
-              {/* ACME Quick Stats */}
-              <div className="mt-3 pt-3 border-t border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-text-secondary">ACME Accounts</span>
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/acme')}>
-                    <CaretRight size={10} />
-                  </Button>
+              {/* Services Status */}
+              <div>
+                <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+                  Services
                 </div>
-                {recentAcme.length === 0 ? (
-                  <p className="text-xs text-text-tertiary py-2">No ACME accounts</p>
-                ) : (
-                  <div className="space-y-1">
-                    {recentAcme.slice(0, 2).map((account, i) => (
-                      <div key={account.id || i} className="flex items-center gap-2 py-1.5">
-                        <User size={12} className="text-text-tertiary" />
-                        <span className="text-xs text-text-primary truncate flex-1">{account.email || account.contact}</span>
-                        <span className="text-[10px] text-text-tertiary">{account.orders_count || 0} orders</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <ServiceBadge name="ACME" status={systemStatus?.acme} />
+                  <ServiceBadge name="SCEP" status={systemStatus?.scep} />
+                  <ServiceBadge name="OCSP" status={systemStatus?.ocsp} />
+                  <ServiceBadge name="CRL" status={systemStatus?.crl} />
+                </div>
               </div>
-            </div>
+            </Card.Body>
+            
+            <Card.Footer>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-blue-500/15 flex items-center justify-center">
+                    <Globe size={12} weight="duotone" className="text-blue-500 dark:text-blue-400" />
+                  </div>
+                  <span className="text-xs font-semibold text-text-primary">ACME Accounts</span>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => navigate('/acme')}>
+                  <CaretRight size={12} />
+                </Button>
+              </div>
+              {recentAcme.length === 0 ? (
+                <p className="text-xs text-text-tertiary py-2">No ACME accounts</p>
+              ) : (
+                <div className="space-y-1">
+                  {recentAcme.slice(0, 2).map((account, i) => (
+                    <div key={account.id || i} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-bg-secondary transition-colors">
+                      <User size={12} className="text-text-tertiary" />
+                      <span className="text-xs text-text-primary truncate flex-1">{account.email || account.contact}</span>
+                      <Badge variant="secondary" size="sm">{account.orders_count || 0} orders</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card.Footer>
           </Card>
 
           {/* Recent Activity with Live Indicator */}
-          <Card className="flex flex-col min-h-[320px]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-accent-primary/10 flex items-center justify-center">
-                  <ClockCounterClockwise size={14} weight="duotone" className="text-accent-primary" />
+          <Card variant="elevated" className="flex flex-col min-h-[320px] p-0">
+            <Card.Header 
+              icon={ClockCounterClockwise} 
+              title="Recent Activity"
+              subtitle={isConnected ? "Live updates" : undefined}
+              action={
+                <div className="flex items-center gap-2">
+                  {isConnected && (
+                    <Badge variant="success" size="sm" dot pulse>Live</Badge>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => navigate('/audit')}>
+                    View all <CaretRight size={12} />
+                  </Button>
                 </div>
-                <h2 className="text-sm font-semibold text-text-primary">Recent Activity</h2>
-                {/* Live pulse indicator */}
-                {isConnected && (
-                  <div className="flex items-center gap-1 ml-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] text-emerald-500 font-medium">LIVE</span>
-                  </div>
-                )}
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => navigate('/audit')}>
-                View All
-                <CaretRight size={12} />
-              </Button>
-            </div>
-            
-            {activityLog.length === 0 ? (
-              <EmptyWidget icon={ClockCounterClockwise} text="No recent activity" />
-            ) : (
-              <div className="flex-1 overflow-y-auto space-y-0.5">
-                {activityLog.map((activity, i) => {
-                  const Icon = actionIcons[activity.action] || actionIcons.default
-                  const isError = activity.action === 'login_failed' || activity.action === 'revoke'
-                  const isSuccess = activity.action === 'login_success' || activity.action === 'create'
-                  return (
-                    <div 
-                      key={activity.id || i}
-                      className="flex items-start gap-2 py-2 px-2 rounded-lg hover:bg-bg-tertiary/30 transition-colors"
-                    >
-                      <div className={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                        isError 
-                          ? 'bg-red-500/10 text-red-400' 
-                          : isSuccess 
-                            ? 'bg-emerald-500/10 text-emerald-400'
-                            : 'bg-accent-primary/10 text-accent-primary'
-                      }`}>
-                        <Icon size={12} weight="bold" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-text-primary leading-tight truncate">
-                          {activity.message || `${activity.action} ${activity.resource_type || ''}`}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] text-text-secondary">{activity.user || 'System'}</span>
-                          <span className="text-text-tertiary text-[10px]">•</span>
-                          <span className="text-[10px] text-text-tertiary">
-                            {formatRelativeTime(activity.timestamp)}
-                          </span>
+              }
+            />
+            <Card.Body className="flex-1 overflow-y-auto !pt-0">
+              {activityLog.length === 0 ? (
+                <EmptyWidget icon={ClockCounterClockwise} text="No recent activity" />
+              ) : (
+                <div className="space-y-0.5">
+                  {activityLog.map((activity, i) => {
+                    const Icon = actionIcons[activity.action] || actionIcons.default
+                    const isError = activity.action === 'login_failed' || activity.action === 'revoke'
+                    const isSuccess = activity.action === 'login_success' || activity.action === 'create'
+                    return (
+                      <div 
+                        key={activity.id || i}
+                        className="flex items-start gap-2.5 py-2 px-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors"
+                      >
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                          isError 
+                            ? 'bg-red-500/15 text-red-500 dark:text-red-400' 
+                            : isSuccess 
+                              ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400'
+                              : 'bg-accent-primary/15 text-accent-primary'
+                        }`}>
+                          <Icon size={14} weight="bold" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-text-primary leading-tight">
+                            {activity.message || `${activity.action} ${activity.resource_type || ''}`}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] text-text-secondary font-medium">{activity.user || 'System'}</span>
+                            <span className="text-text-tertiary text-[10px]">•</span>
+                            <span className="text-[10px] text-text-tertiary">
+                              {formatRelativeTime(activity.timestamp)}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )
+                    )
                 })}
-              </div>
-            )}
+                </div>
+              )}
+            </Card.Body>
           </Card>
         </div>
 
@@ -508,36 +506,64 @@ export default function DashboardPage() {
 // Enhanced Stat Card with live indicator
 function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
   const colors = {
-    blue: 'text-blue-400 bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/15 hover:border-blue-500/30',
-    purple: 'text-purple-400 bg-purple-500/10 border-purple-500/20 hover:bg-purple-500/15 hover:border-purple-500/30',
-    yellow: 'text-amber-400 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15 hover:border-amber-500/30',
-    orange: 'text-orange-400 bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/15 hover:border-orange-500/30',
-    emerald: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/15 hover:border-emerald-500/30',
-    slate: 'text-text-secondary bg-bg-tertiary border-border hover:bg-bg-tertiary/80',
+    blue: {
+      card: 'bg-gradient-to-br from-blue-500/5 to-blue-500/10 border-blue-500/20 hover:border-blue-500/40 shadow-sm shadow-blue-500/5',
+      icon: 'bg-blue-500/15 text-blue-500 dark:text-blue-400',
+      ring: 'ring-blue-500/20'
+    },
+    purple: {
+      card: 'bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-purple-500/20 hover:border-purple-500/40 shadow-sm shadow-purple-500/5',
+      icon: 'bg-purple-500/15 text-purple-500 dark:text-purple-400',
+      ring: 'ring-purple-500/20'
+    },
+    yellow: {
+      card: 'bg-gradient-to-br from-amber-500/5 to-amber-500/10 border-amber-500/20 hover:border-amber-500/40 shadow-sm shadow-amber-500/5',
+      icon: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+      ring: 'ring-amber-500/20'
+    },
+    emerald: {
+      card: 'bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-emerald-500/20 hover:border-emerald-500/40 shadow-sm shadow-emerald-500/5',
+      icon: 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400',
+      ring: 'ring-emerald-500/20'
+    },
+    slate: {
+      card: 'bg-bg-secondary border-border/60 hover:border-border shadow-sm',
+      icon: 'bg-bg-tertiary text-text-secondary',
+      ring: 'ring-border/50'
+    },
   }
+  
+  const style = colors[color] || colors.slate
   
   return (
     <button 
       onClick={onClick}
-      className={`relative p-4 rounded-xl border transition-all hover:scale-[1.02] active:scale-[0.98] text-left ${colors[color]}`}
+      className={`
+        relative p-4 rounded-xl border transition-all duration-200 text-left group
+        hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]
+        ${style.card}
+      `}
     >
-      {/* Live indicator dot */}
+      {/* Live indicator */}
       {live && (
-        <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+          <span className="text-[10px] text-emerald-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">Live</span>
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50" />
+        </div>
       )}
       
       <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-xl bg-current/10 flex items-center justify-center flex-shrink-0">
-          <Icon size={22} weight="duotone" />
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${style.icon}`}>
+          <Icon size={24} weight="duotone" />
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-2xl font-bold text-text-primary">{value}</p>
+            <p className="text-2xl font-bold text-text-primary tracking-tight">{value}</p>
             {badge && (
-              <Badge variant="yellow" size="sm">{badge}</Badge>
+              <Badge variant="warning" size="sm" dot pulse>{badge}</Badge>
             )}
           </div>
-          <p className="text-xs text-text-secondary">{label}</p>
+          <p className="text-xs text-text-secondary font-medium">{label}</p>
         </div>
       </div>
     </button>
@@ -547,17 +573,21 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
 // System Stat mini card
 function SystemStat({ icon: Icon, label, value, status }) {
   return (
-    <div className={`px-3 py-2 rounded-lg border ${
+    <div className={`px-3 py-2 rounded-lg border transition-all duration-200 ${
       status === 'online' 
-        ? 'bg-emerald-500/5 border-emerald-500/20' 
-        : 'bg-red-500/5 border-red-500/20'
+        ? 'bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-emerald-500/20 hover:border-emerald-500/40' 
+        : 'bg-gradient-to-br from-red-500/5 to-red-500/10 border-red-500/20 hover:border-red-500/40'
     }`}>
       <div className="flex items-center gap-2">
-        <Icon size={14} className={status === 'online' ? 'text-emerald-400' : 'text-red-400'} />
-        <span className="text-[10px] text-text-tertiary uppercase">{label}</span>
+        <div className={`w-5 h-5 rounded flex items-center justify-center ${
+          status === 'online' ? 'bg-emerald-500/15' : 'bg-red-500/15'
+        }`}>
+          <Icon size={12} className={status === 'online' ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'} weight="bold" />
+        </div>
+        <span className="text-[10px] text-text-tertiary uppercase tracking-wide">{label}</span>
       </div>
-      <p className={`text-xs font-medium mt-0.5 ${
-        status === 'online' ? 'text-emerald-400' : 'text-red-400'
+      <p className={`text-xs font-semibold mt-1 ${
+        status === 'online' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
       }`}>{value}</p>
     </div>
   )
@@ -567,14 +597,14 @@ function SystemStat({ icon: Icon, label, value, status }) {
 function ServiceBadge({ name, status }) {
   const isOnline = status?.status === 'online' || status?.enabled
   return (
-    <div className={`px-3 py-2.5 rounded-lg border text-center transition-colors ${
+    <div className={`px-3 py-2.5 rounded-lg border text-center transition-all duration-200 ${
       isOnline 
-        ? 'bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/15' 
-        : 'bg-bg-tertiary border-border hover:bg-bg-tertiary/80'
+        ? 'bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-emerald-500/20 hover:border-emerald-500/40 hover:shadow-sm hover:shadow-emerald-500/10' 
+        : 'bg-bg-tertiary border-border hover:border-text-tertiary/30'
     }`}>
-      <div className="flex items-center justify-center gap-1.5">
-        <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-text-tertiary'}`} />
-        <span className="text-xs font-medium text-text-primary">{name}</span>
+      <div className="flex items-center justify-center gap-2">
+        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-text-tertiary'}`} />
+        <span className={`text-xs font-semibold ${isOnline ? 'text-text-primary' : 'text-text-secondary'}`}>{name}</span>
       </div>
     </div>
   )
@@ -584,8 +614,10 @@ function ServiceBadge({ name, status }) {
 function EmptyWidget({ icon: Icon, text }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-text-tertiary py-8">
-      <Icon size={28} className="opacity-30 mb-2" />
-      <p className="text-xs">{text}</p>
+      <div className="w-12 h-12 rounded-xl bg-bg-tertiary/50 flex items-center justify-center mb-3">
+        <Icon size={24} className="opacity-40" />
+      </div>
+      <p className="text-xs font-medium">{text}</p>
     </div>
   )
 }
