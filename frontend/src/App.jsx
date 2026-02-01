@@ -19,14 +19,22 @@ const AccountPage = lazy(() => import('./pages/AccountPage'))
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'))
 const CRLOCSPPage = lazy(() => import('./pages/CRLOCSPPage'))
 const TrustStorePage = lazy(() => import('./pages/TrustStorePage'))
+const PrototypeDesign = lazy(() => import('./pages/PrototypeDesign'))
 
-// Pro pages - lazy load with graceful fallback (will fail silently in Community)
+// Pro pages - lazy load with graceful fallback
+const GroupsPage = lazy(() => 
+  import('./pro/pages/GroupsPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
+)
 const RBACPage = lazy(() => 
   import('./pro/pages/RBACPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
+)
+const SSOPage = lazy(() => 
+  import('./pro/pages/SSOPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
 )
 const HSMPage = lazy(() => 
   import('./pro/pages/HSMPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
 )
+const TableDemo = lazy(() => import('./pages/TableDemo'))
 
 // Loading fallback for lazy components
 function PageLoader() {
@@ -74,12 +82,14 @@ function AppRoutes() {
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
           <Route path="/crl-ocsp" element={<ProtectedRoute><CRLOCSPPage /></ProtectedRoute>} />
           <Route path="/truststore" element={<ProtectedRoute><TrustStorePage /></ProtectedRoute>} />
+          <Route path="/prototype" element={<ProtectedRoute><PrototypeDesign /></ProtectedRoute>} />
           
-          {/* Pro Routes - redirect integrated pages, lazy load standalone */}
+          {/* Pro Routes */}
           <Route path="/groups" element={<Navigate to="/users?tab=groups" replace />} />
           <Route path="/rbac" element={<ProtectedRoute><RBACPage /></ProtectedRoute>} />
           <Route path="/sso" element={<Navigate to="/settings?tab=sso" replace />} />
           <Route path="/hsm" element={<ProtectedRoute><HSMPage /></ProtectedRoute>} />
+          <Route path="/table-demo" element={<ProtectedRoute><TableDemo /></ProtectedRoute>} />
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />

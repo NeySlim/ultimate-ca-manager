@@ -104,7 +104,7 @@ export function ContentHeader({
                           className={cn(
                             "w-full px-3 py-2.5 text-left text-sm flex items-center gap-2",
                             "hover:bg-bg-tertiary transition-colors",
-                            action.variant === 'danger' && "text-red-500",
+                            action.variant === 'danger' && "status-danger-text",
                             action.disabled && "opacity-50 cursor-not-allowed"
                           )}
                         >
@@ -248,7 +248,7 @@ export function DataField({
         title={copyable ? (copied ? "Copié!" : "Cliquer pour copier") : undefined}
       >
         {value || <span className="text-text-tertiary">-</span>}
-        {copied && <span className="ml-2 text-xs text-emerald-500">✓</span>}
+        {copied && <span className="ml-2 text-xs status-success-text">✓</span>}
       </div>
     </div>
   )
@@ -266,18 +266,18 @@ export function InfoCard({
 }) {
   const variants = {
     default: 'bg-bg-tertiary border-border',
-    info: 'bg-blue-500/10 border-blue-500/30',
-    success: 'bg-emerald-500/10 border-emerald-500/30',
-    warning: 'bg-amber-500/10 border-amber-500/30',
-    danger: 'bg-red-500/10 border-red-500/30',
+    info: 'status-primary-bg status-primary-border',
+    success: 'status-success-bg status-success-border',
+    warning: 'status-warning-bg status-warning-border',
+    danger: 'status-danger-bg status-danger-border',
   }
   
   const iconColors = {
     default: 'text-text-secondary',
-    info: 'text-blue-500',
-    success: 'text-emerald-500',
-    warning: 'text-amber-500',
-    danger: 'text-red-500',
+    info: 'status-primary-text',
+    success: 'status-success-text',
+    warning: 'status-warning-text',
+    danger: 'status-danger-text',
   }
   
   return (

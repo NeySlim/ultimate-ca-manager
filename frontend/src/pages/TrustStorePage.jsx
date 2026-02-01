@@ -148,12 +148,12 @@ export default function TrustStorePage() {
   }
 
   const purposeColors = {
-    root_ca: 'bg-emerald-500/15 text-emerald-500',
-    intermediate_ca: 'bg-blue-500/15 text-blue-500',
-    client_auth: 'bg-purple-500/15 text-purple-500',
-    code_signing: 'bg-orange-500/15 text-orange-500',
-    system: 'bg-gray-500/15 text-gray-400',
-    custom: 'bg-gray-500/15 text-gray-400'
+    root_ca: 'status-success-bg status-success-text',
+    intermediate_ca: 'status-primary-bg status-primary-text',
+    client_auth: 'status-purple-bg status-purple-text',
+    code_signing: 'status-warning-bg status-warning-text',
+    system: 'bg-bg-tertiary text-text-secondary',
+    custom: 'bg-bg-tertiary text-text-secondary'
   }
 
   // Calculate stats by purpose
@@ -164,9 +164,9 @@ export default function TrustStorePage() {
   const helpContent = (
     <div className="space-y-4">
       {/* Trust Store Overview */}
-      <Card className="p-4 space-y-3 bg-gradient-to-br from-emerald-500/5 to-transparent">
+      <Card className="p-4 space-y-3 stat-card-success">
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-          <ShieldCheck size={16} className="text-emerald-500" />
+          <ShieldCheck size={16} className="status-success-text" />
           Trust Store Overview
         </h3>
         <div className="text-center p-4 bg-bg-tertiary rounded-lg">
@@ -184,17 +184,17 @@ export default function TrustStorePage() {
         <div className="space-y-2">
           <div className="flex items-center justify-between py-2 px-3 rounded-md bg-bg-tertiary/50">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-emerald-500" />
+              <div className="w-3 h-3 rounded-full status-success-bg-solid" />
               <span className="text-sm text-text-primary">Root CAs</span>
             </div>
-            <Badge variant="emerald">{rootCAs}</Badge>
+            <Badge variant="success">{rootCAs}</Badge>
           </div>
           <div className="flex items-center justify-between py-2 px-3 rounded-md bg-bg-tertiary/50">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-blue-500" />
+              <div className="w-3 h-3 rounded-full status-primary-bg-solid" />
               <span className="text-sm text-text-primary">Intermediate CAs</span>
             </div>
-            <Badge variant="blue">{intermediateCAs}</Badge>
+            <Badge variant="primary">{intermediateCAs}</Badge>
           </div>
         </div>
       </Card>

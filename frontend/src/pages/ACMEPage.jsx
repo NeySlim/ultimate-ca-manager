@@ -292,10 +292,10 @@ export default function ACMEPage() {
               </DetailGrid>
               
               {acmeSettings.proxy_registered ? (
-                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <div className="p-3 rounded-lg status-success-bg status-success-border border">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <CheckCircle size={18} className="text-emerald-500" weight="fill" />
+                      <CheckCircle size={18} className="status-success-text" weight="fill" />
                       <div>
                         <p className="text-sm font-medium text-text-primary">Proxy Account Registered</p>
                         <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
@@ -305,7 +305,7 @@ export default function ACMEPage() {
                       variant="ghost" 
                       size="sm"
                       onClick={handleUnregisterProxy}
-                      className="text-red-500 hover:bg-red-500/10"
+                      className="status-danger-text hover:status-danger-bg"
                     >
                       <Trash size={14} />
                     </Button>
@@ -393,7 +393,7 @@ export default function ACMEPage() {
       </Card>
 
       {/* Server Status */}
-      <Card className={`p-4 space-y-3 bg-gradient-to-br ${acmeSettings.enabled ? 'from-emerald-500/10' : 'from-amber-500/10'}`}>
+      <Card className={`p-4 space-y-3 ${acmeSettings.enabled ? 'stat-card-success' : 'stat-card-warning'}`}>
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Lightning size={16} className="text-accent-primary" />
           Server Status
@@ -606,13 +606,13 @@ export default function ACMEPage() {
                     <div className="flex items-center gap-2 text-xs">
                       {selectedAccount.terms_of_service_agreed || selectedAccount.tos_agreed ? (
                         <>
-                          <CheckCircle size={14} className="text-green-500" />
-                          <span className="text-green-500">Agreed</span>
+                          <CheckCircle size={14} className="status-success-text" />
+                          <span className="status-success-text">Agreed</span>
                         </>
                       ) : (
                         <>
-                          <XCircle size={14} className="text-red-500" />
-                          <span className="text-red-500">Not Agreed</span>
+                          <XCircle size={14} className="status-danger-text" />
+                          <span className="status-danger-text">Not Agreed</span>
                         </>
                       )}
                     </div>

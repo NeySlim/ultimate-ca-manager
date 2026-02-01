@@ -471,7 +471,7 @@ function RowActionMenu({ row, idx, actions, isOpen, onToggle, menuRef }) {
                   'w-full flex items-center gap-2.5 px-3 py-2 text-sm',
                   'transition-all duration-150',
                   action.variant === 'danger'
-                    ? 'text-red-500 hover:bg-red-500/10'
+                    ? 'status-danger-text hover:status-danger-bg'
                     : 'text-text-primary hover:bg-accent-primary/5 hover:text-accent-primary'
                 )}
               >
@@ -623,7 +623,7 @@ function MobileCardRow({
                   'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium',
                   'border border-border transition-colors',
                   action.variant === 'danger'
-                    ? 'text-red-500 hover:bg-red-500/10'
+                    ? 'status-danger-text hover:status-danger-bg'
                     : 'text-text-primary hover:bg-bg-tertiary'
                 )}
               >

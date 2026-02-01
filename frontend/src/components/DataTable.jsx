@@ -913,7 +913,7 @@ function RowActionsMenu({ actions }) {
                 disabled={action.disabled}
                 className={cn(
                   "w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-bg-tertiary transition-colors",
-                  action.variant === 'danger' && "text-red-500 hover:bg-red-500/10",
+                  action.variant === 'danger' && "status-danger-text hover:status-danger-bg",
                   action.disabled && "opacity-50 cursor-not-allowed"
                 )}
               >

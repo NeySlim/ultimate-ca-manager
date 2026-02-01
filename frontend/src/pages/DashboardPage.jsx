@@ -175,7 +175,7 @@ export default function DashboardPage() {
       <div className="p-4 space-y-4 max-w-[1800px] mx-auto min-h-full flex flex-col">
         
         {/* Hero Header */}
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-accent-primary/10 via-purple-500/10 to-accent-primary/5 border border-accent-primary/20 p-4">
+        <div className="relative overflow-hidden rounded-xl hero-gradient border border-accent-primary/20 p-4">
           <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-accent-primary/5 blur-2xl" />
           
           <div className="relative flex flex-wrap items-center gap-4">
@@ -185,12 +185,12 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-text-secondary">{getGreeting()} 👋</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <Badge variant="purple" size="sm">Pro</Badge>
+                  <Badge variant="primary" size="sm">Pro</Badge>
                   <span className="text-xs text-text-tertiary">v2.0.3</span>
                   {/* Live Indicator */}
                   <div className="flex items-center gap-1 ml-2">
-                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-text-tertiary'}`} />
-                    <span className={`text-xs ${isConnected ? 'text-emerald-500' : 'text-text-tertiary'}`}>
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'status-success-bg-solid animate-pulse' : 'bg-text-tertiary'}`} />
+                    <span className={`text-xs ${isConnected ? 'status-success-text' : 'text-text-tertiary'}`}>
                       {isConnected ? 'Live' : 'Offline'}
                     </span>
                   </div>
@@ -266,18 +266,18 @@ export default function DashboardPage() {
         {expiringCount > 0 && (
           <div 
             onClick={() => navigate('/certificates?filter=expiring')}
-            className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 cursor-pointer hover:bg-amber-500/15 transition-colors"
+            className="flex items-center gap-3 p-3 rounded-lg stat-card-warning cursor-pointer border transition-colors"
           >
-            <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-              <Warning size={18} weight="fill" className="text-amber-500" />
+            <div className="w-8 h-8 rounded-lg status-warning-bg flex items-center justify-center">
+              <Warning size={18} weight="fill" className="status-warning-text" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-amber-500">
+              <p className="text-sm font-medium status-warning-text">
                 {expiringCount} certificate{expiringCount > 1 ? 's' : ''} expiring soon
               </p>
               <p className="text-xs text-text-secondary">Click to view and renew</p>
             </div>
-            <CaretRight size={16} className="text-amber-500" />
+            <CaretRight size={16} className="status-warning-text" />
           </div>
         )}
 
@@ -325,8 +325,8 @@ export default function DashboardPage() {
             <Card.Footer>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-purple-500/15 flex items-center justify-center">
-                    <ShieldCheck size={12} weight="duotone" className="text-purple-500 dark:text-purple-400" />
+                  <div className="w-6 h-6 rounded-lg status-primary-bg flex items-center justify-center">
+                    <ShieldCheck size={12} weight="duotone" className="status-primary-text" />
                   </div>
                   <span className="text-xs font-semibold text-text-primary">Recent CAs</span>
                 </div>
@@ -412,8 +412,8 @@ export default function DashboardPage() {
             <Card.Footer>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-blue-500/15 flex items-center justify-center">
-                    <Globe size={12} weight="duotone" className="text-blue-500 dark:text-blue-400" />
+                  <div className="w-6 h-6 rounded-lg status-primary-bg flex items-center justify-center">
+                    <Globe size={12} weight="duotone" className="status-primary-text" />
                   </div>
                   <span className="text-xs font-semibold text-text-primary">ACME Accounts</span>
                 </div>
@@ -470,10 +470,10 @@ export default function DashboardPage() {
                       >
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                           isError 
-                            ? 'bg-red-500/15 text-red-500 dark:text-red-400' 
+                            ? 'status-danger-bg status-danger-text' 
                             : isSuccess 
-                              ? 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400'
-                              : 'bg-accent-primary/15 text-accent-primary'
+                              ? 'status-success-bg status-success-text'
+                              : 'status-primary-bg status-primary-text'
                         }`}>
                           <Icon size={14} weight="bold" />
                         </div>
@@ -503,33 +503,29 @@ export default function DashboardPage() {
   )
 }
 
-// Enhanced Stat Card with live indicator
+// Enhanced Stat Card with live indicator - uses theme CSS classes
 function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
+  // Map color names to CSS class-based styles (theme-aware)
   const colors = {
     blue: {
-      card: 'bg-gradient-to-br from-blue-500/5 to-blue-500/10 border-blue-500/20 hover:border-blue-500/40 shadow-sm shadow-blue-500/5',
-      icon: 'bg-blue-500/15 text-blue-500 dark:text-blue-400',
-      ring: 'ring-blue-500/20'
+      card: 'stat-card-primary',
+      icon: 'status-primary-bg status-primary-text',
     },
     purple: {
-      card: 'bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-purple-500/20 hover:border-purple-500/40 shadow-sm shadow-purple-500/5',
-      icon: 'bg-purple-500/15 text-purple-500 dark:text-purple-400',
-      ring: 'ring-purple-500/20'
+      card: 'stat-card-primary', // Use primary for purple (theme respects accent)
+      icon: 'status-primary-bg status-primary-text',
     },
     yellow: {
-      card: 'bg-gradient-to-br from-amber-500/5 to-amber-500/10 border-amber-500/20 hover:border-amber-500/40 shadow-sm shadow-amber-500/5',
-      icon: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-      ring: 'ring-amber-500/20'
+      card: 'stat-card-warning',
+      icon: 'status-warning-bg status-warning-text',
     },
     emerald: {
-      card: 'bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-emerald-500/20 hover:border-emerald-500/40 shadow-sm shadow-emerald-500/5',
-      icon: 'bg-emerald-500/15 text-emerald-500 dark:text-emerald-400',
-      ring: 'ring-emerald-500/20'
+      card: 'stat-card-success',
+      icon: 'status-success-bg status-success-text',
     },
     slate: {
-      card: 'bg-bg-secondary border-border/60 hover:border-border shadow-sm',
+      card: 'bg-bg-secondary border-border/60 hover:border-border',
       icon: 'bg-bg-tertiary text-text-secondary',
-      ring: 'ring-border/50'
     },
   }
   
@@ -540,15 +536,15 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
       onClick={onClick}
       className={`
         relative p-4 rounded-xl border transition-all duration-200 text-left group
-        hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]
+        hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] shadow-sm
         ${style.card}
       `}
     >
-      {/* Live indicator */}
+      {/* Live indicator - uses theme success color */}
       {live && (
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
-          <span className="text-[10px] text-emerald-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">Live</span>
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50" />
+          <span className="text-[10px] status-success-text font-medium opacity-0 group-hover:opacity-100 transition-opacity">Live</span>
+          <div className="w-2 h-2 rounded-full status-success-bg-solid animate-pulse" />
         </div>
       )}
       
@@ -570,40 +566,40 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
   )
 }
 
-// System Stat mini card
+// System Stat mini card - uses theme CSS classes
 function SystemStat({ icon: Icon, label, value, status }) {
   return (
     <div className={`px-3 py-2 rounded-lg border transition-all duration-200 ${
       status === 'online' 
-        ? 'bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-emerald-500/20 hover:border-emerald-500/40' 
-        : 'bg-gradient-to-br from-red-500/5 to-red-500/10 border-red-500/20 hover:border-red-500/40'
+        ? 'stat-card-success' 
+        : 'stat-card-danger'
     }`}>
       <div className="flex items-center gap-2">
         <div className={`w-5 h-5 rounded flex items-center justify-center ${
-          status === 'online' ? 'bg-emerald-500/15' : 'bg-red-500/15'
+          status === 'online' ? 'status-success-bg' : 'status-danger-bg'
         }`}>
-          <Icon size={12} className={status === 'online' ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'} weight="bold" />
+          <Icon size={12} className={status === 'online' ? 'status-success-text' : 'status-danger-text'} weight="bold" />
         </div>
         <span className="text-[10px] text-text-tertiary uppercase tracking-wide">{label}</span>
       </div>
       <p className={`text-xs font-semibold mt-1 ${
-        status === 'online' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+        status === 'online' ? 'status-success-text' : 'status-danger-text'
       }`}>{value}</p>
     </div>
   )
 }
 
-// Service Badge Component
+// Service Badge Component - theme-aware
 function ServiceBadge({ name, status }) {
   const isOnline = status?.status === 'online' || status?.enabled
   return (
     <div className={`px-3 py-2.5 rounded-lg border text-center transition-all duration-200 ${
       isOnline 
-        ? 'bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-emerald-500/20 hover:border-emerald-500/40 hover:shadow-sm hover:shadow-emerald-500/10' 
+        ? 'stat-card-success' 
         : 'bg-bg-tertiary border-border hover:border-text-tertiary/30'
     }`}>
       <div className="flex items-center justify-center gap-2">
-        <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-text-tertiary'}`} />
+        <div className={`w-2 h-2 rounded-full ${isOnline ? 'status-success-bg-solid animate-pulse' : 'bg-text-tertiary'}`} />
         <span className={`text-xs font-semibold ${isOnline ? 'text-text-primary' : 'text-text-secondary'}`}>{name}</span>
       </div>
     </div>

@@ -31,7 +31,7 @@ export function SelectComponent({
             "disabled:opacity-50 disabled:cursor-not-allowed",
             "transition-all duration-200",
             "hover:border-text-secondary/50 hover:bg-bg-tertiary",
-            error ? "border-red-500" : "border-border",
+            error ? "border-accent-danger" : "border-border",
             value ? "text-text-primary" : "text-text-secondary/60"
           )}
         >
@@ -66,7 +66,7 @@ export function SelectComponent({
       </Select.Root>
 
       {error && (
-        <p className="text-xs text-red-500">{error}</p>
+        <p className="text-xs status-danger-text">{error}</p>
       )}
     </div>
   )

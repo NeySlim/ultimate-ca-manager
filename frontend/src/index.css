@@ -219,7 +219,8 @@ html, body, #root {
   
   /* Better focus styles for accessibility */
   :focus-visible {
-    @apply outline-none ring-2 ring-blue-500/50 ring-offset-2 ring-offset-bg-primary;
+    @apply outline-none ring-2 ring-offset-2 ring-offset-bg-primary;
+    --tw-ring-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
   }
   
   /* Smooth scrolling */
@@ -263,10 +264,127 @@ html, body, #root {
   border: 1px solid rgba(48, 54, 61, 0.5);
 }
 
+/* Hero gradient - theme-aware */
+.hero-gradient {
+  background: linear-gradient(to right, 
+    color-mix(in srgb, var(--accent-primary) 10%, transparent),
+    color-mix(in srgb, var(--accent-primary) 5%, transparent)
+  );
+}
+
 /* Gradient text utility */
 .gradient-text {
-  @apply bg-gradient-to-r from-accent-primary to-blue-400 bg-clip-text text-transparent;
+  background: linear-gradient(to right, var(--accent-primary), var(--logo-gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
+
+/* ============================================
+   STATUS COLOR UTILITIES (theme-aware)
+   Use these instead of hardcoded colors
+   ============================================ */
+
+/* Success (green) */
+.status-success-bg { background-color: color-mix(in srgb, var(--accent-success) 15%, transparent); }
+.status-success-bg-solid { background-color: var(--accent-success); }
+.status-success-text { color: var(--accent-success); }
+.status-success-border { border-color: color-mix(in srgb, var(--accent-success) 30%, transparent); }
+.status-success-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-success) 30%, transparent); }
+
+/* Warning (amber/yellow) */
+.status-warning-bg { background-color: color-mix(in srgb, var(--accent-warning) 15%, transparent); }
+.status-warning-bg-solid { background-color: var(--accent-warning); }
+.status-warning-text { color: var(--accent-warning); }
+.status-warning-border { border-color: color-mix(in srgb, var(--accent-warning) 30%, transparent); }
+.status-warning-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-warning) 30%, transparent); }
+
+/* Danger (red) */
+.status-danger-bg { background-color: color-mix(in srgb, var(--accent-danger) 15%, transparent); }
+.status-danger-bg-solid { background-color: var(--accent-danger); }
+.status-danger-text { color: var(--accent-danger); }
+.status-danger-border { border-color: color-mix(in srgb, var(--accent-danger) 30%, transparent); }
+.status-danger-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-danger) 30%, transparent); }
+
+/* Primary (blue) */
+.status-primary-bg { background-color: color-mix(in srgb, var(--accent-primary) 15%, transparent); }
+.status-primary-bg-solid { background-color: var(--accent-primary); }
+.status-primary-text { color: var(--accent-primary); }
+.status-primary-border { border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent); }
+.status-primary-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-primary) 30%, transparent); }
+
+/* Status card styles */
+.stat-card-success {
+  background: linear-gradient(to bottom right, 
+    color-mix(in srgb, var(--accent-success) 5%, transparent),
+    color-mix(in srgb, var(--accent-success) 10%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--accent-success) 20%, transparent);
+}
+.stat-card-success:hover {
+  border-color: color-mix(in srgb, var(--accent-success) 40%, transparent);
+}
+
+.stat-card-warning {
+  background: linear-gradient(to bottom right, 
+    color-mix(in srgb, var(--accent-warning) 5%, transparent),
+    color-mix(in srgb, var(--accent-warning) 10%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--accent-warning) 20%, transparent);
+}
+.stat-card-warning:hover {
+  border-color: color-mix(in srgb, var(--accent-warning) 40%, transparent);
+}
+
+.stat-card-danger {
+  background: linear-gradient(to bottom right, 
+    color-mix(in srgb, var(--accent-danger) 5%, transparent),
+    color-mix(in srgb, var(--accent-danger) 10%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--accent-danger) 20%, transparent);
+}
+.stat-card-danger:hover {
+  border-color: color-mix(in srgb, var(--accent-danger) 40%, transparent);
+}
+
+.stat-card-primary {
+  background: linear-gradient(to bottom right, 
+    color-mix(in srgb, var(--accent-primary) 5%, transparent),
+    color-mix(in srgb, var(--accent-primary) 10%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+}
+.stat-card-primary:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 40%, transparent);
+}
+
+/* Purple (HSM/special) */
+.status-purple-bg { background-color: color-mix(in srgb, var(--accent-pro) 15%, transparent); }
+.status-purple-bg-solid { background-color: var(--accent-pro); }
+.status-purple-text { color: var(--accent-pro); }
+.status-purple-border { border-color: color-mix(in srgb, var(--accent-pro) 30%, transparent); }
+
+/* Orange (expiring soon) */
+.status-orange-bg { background-color: color-mix(in srgb, var(--accent-warning) 20%, transparent); }
+.status-orange-text { color: color-mix(in srgb, var(--accent-warning) 80%, var(--accent-danger)); }
+
+/* Yellow (root CA / pending) */
+.status-yellow-bg { background-color: color-mix(in srgb, var(--accent-warning) 20%, transparent); }
+.status-yellow-text { color: var(--accent-warning); }
+.status-yellow-border { border-color: color-mix(in srgb, var(--accent-warning) 30%, transparent); }
+
+/* Border left accent for Card */
+.border-l-accent-success { border-left-color: var(--accent-success); }
+.border-l-accent-warning { border-left-color: var(--accent-warning); }
+.border-l-accent-danger { border-left-color: var(--accent-danger); }
+.border-l-accent-primary { border-left-color: var(--accent-primary); }
+.border-l-accent-purple { border-left-color: var(--accent-pro); }
+
+/* Combined bg+text utility classes */
+.status-success-badge { @apply status-success-bg status-success-text status-success-border border; }
+.status-warning-badge { @apply status-warning-bg status-warning-text status-warning-border border; }
+.status-danger-badge { @apply status-danger-bg status-danger-text status-danger-border border; }
+.status-primary-badge { @apply status-primary-bg status-primary-text status-primary-border border; }
 
 /* Subtle depth effect for cards */
 .depth-card {

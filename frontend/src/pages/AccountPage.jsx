@@ -591,8 +591,8 @@ export default function AccountPage() {
             </div>
           )}
 
-          <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-            <p className="text-sm text-amber-500 font-medium">⚠️ API Key Security</p>
+          <div className="p-4 status-warning-bg status-warning-border border rounded-lg">
+            <p className="text-sm status-warning-text font-medium">⚠️ API Key Security</p>
             <p className="text-xs text-text-secondary mt-1">
               API keys provide full access to your account. Keep them secure and never share them.
             </p>
@@ -624,7 +624,7 @@ export default function AccountPage() {
       </Card>
 
       {/* Security Status */}
-      <Card className={`p-4 space-y-3 bg-gradient-to-br ${accountData.two_factor_enabled ? 'from-emerald-500/10' : 'from-amber-500/10'}`}>
+      <Card className={`p-4 space-y-3 ${accountData.two_factor_enabled ? 'stat-card-success' : 'stat-card-warning'}`}>
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <LockKey size={16} className="text-accent-primary" />
           Security Status

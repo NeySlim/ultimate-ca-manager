@@ -938,7 +938,7 @@ export default function SettingsPage() {
             </DetailSection>
 
             <DetailSection title="Danger Zone" className="mt-4">
-              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <div className="p-4 status-danger-bg status-danger-border border rounded-lg">
                 <h4 className="text-sm font-semibold text-red-400 mb-2">⚠️ Database Reset</h4>
                 <p className="text-xs text-text-secondary mb-3">
                   Reset database to initial state. This will DELETE ALL certificates, CAs, users, and settings.
@@ -1219,9 +1219,9 @@ export default function SettingsPage() {
         title="Restore from Backup"
       >
         <div className="space-y-4">
-          <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-            <p className="text-sm text-yellow-500 font-medium">⚠️ Warning</p>
-            <p className="text-xs text-yellow-500/80">
+          <div className="p-3 status-warning-bg status-warning-border border rounded-lg">
+            <p className="text-sm status-warning-text font-medium">⚠️ Warning</p>
+            <p className="text-xs status-warning-text opacity-80">
               This will REPLACE ALL current data with the backup contents.
               This action cannot be undone.
             </p>

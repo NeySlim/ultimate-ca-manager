@@ -113,7 +113,7 @@ export function FileUpload({
       </div>
 
       {error && (
-        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-500">
+        <div className="p-3 status-danger-bg status-danger-border border rounded-lg text-sm status-danger-text">
           {error}
         </div>
       )}
@@ -134,7 +134,7 @@ export function FileUpload({
               </div>
               <button
                 onClick={() => removeFile(index)}
-                className="text-text-secondary hover:text-red-500 transition-colors flex-shrink-0"
+                className="text-text-secondary hover:status-danger-text transition-colors flex-shrink-0"
               >
                 <X size={16} />
               </button>

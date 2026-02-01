@@ -230,7 +230,7 @@ export function AppShell() {
                         {item.label}
                       </span>
                       {item.pro && (
-                        <span className="text-[8px] px-1 py-0.5 bg-amber-500/20 text-amber-500 rounded">
+                        <span className="text-[8px] px-1 py-0.5 status-warning-bg status-warning-text rounded">
                           PRO
                         </span>
                       )}

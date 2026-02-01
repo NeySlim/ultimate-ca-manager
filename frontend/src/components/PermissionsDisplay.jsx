@@ -17,9 +17,9 @@ export function PermissionsDisplay({ role, permissions = [], description }) {
         {description && (
           <p className="text-xs text-text-secondary">{description}</p>
         )}
-        <div className="flex items-center gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-          <ShieldCheck size={20} className="text-blue-500" weight="fill" />
-          <span className="text-sm font-semibold text-blue-500">Full Access</span>
+        <div className="flex items-center gap-2 p-3 status-primary-bg status-primary-border border rounded-lg">
+          <ShieldCheck size={20} className="status-primary-text" weight="fill" />
+          <span className="text-sm font-semibold status-primary-text">Full Access</span>
         </div>
       </div>
     )
@@ -57,10 +57,10 @@ export function PermissionsDisplay({ role, permissions = [], description }) {
       <div className="space-y-2">
         {/* Read permissions */}
         {grouped.read.length > 0 && (
-          <div className="p-3 bg-green-500/5 border border-green-500/10 rounded-lg">
+          <div className="p-3 stat-card-success border rounded-lg">
             <div className="flex items-center gap-2 mb-2">
-              <LockOpen size={16} className="text-green-500" />
-              <span className="text-xs font-semibold text-green-500 uppercase">Read Access</span>
+              <LockOpen size={16} className="status-success-text" />
+              <span className="text-xs font-semibold status-success-text uppercase">Read Access</span>
             </div>
             <div className="flex flex-wrap gap-1">
               {grouped.read.map((resource, idx) => (
@@ -74,10 +74,10 @@ export function PermissionsDisplay({ role, permissions = [], description }) {
 
         {/* Write permissions */}
         {grouped.write.length > 0 && (
-          <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-lg">
+          <div className="p-3 stat-card-primary border rounded-lg">
             <div className="flex items-center gap-2 mb-2">
-              <Lock size={16} className="text-blue-500" />
-              <span className="text-xs font-semibold text-blue-500 uppercase">Write Access</span>
+              <Lock size={16} className="status-primary-text" />
+              <span className="text-xs font-semibold status-primary-text uppercase">Write Access</span>
             </div>
             <div className="flex flex-wrap gap-1">
               {grouped.write.map((resource, idx) => (
@@ -91,10 +91,10 @@ export function PermissionsDisplay({ role, permissions = [], description }) {
 
         {/* Delete permissions */}
         {grouped.delete.length > 0 && (
-          <div className="p-3 bg-orange-500/5 border border-orange-500/10 rounded-lg">
+          <div className="p-3 stat-card-warning border rounded-lg">
             <div className="flex items-center gap-2 mb-2">
-              <Lock size={16} className="text-orange-500" />
-              <span className="text-xs font-semibold text-orange-500 uppercase">Delete Access</span>
+              <Lock size={16} className="status-warning-text" />
+              <span className="text-xs font-semibold status-warning-text uppercase">Delete Access</span>
             </div>
             <div className="flex flex-wrap gap-1">
               {grouped.delete.map((resource, idx) => (

@@ -12,7 +12,7 @@ export function Button({ children, variant = 'primary', size = 'default', loadin
   const variants = {
     primary: 'text-white shadow-lg shadow-accent-primary/25 hover:shadow-xl hover:shadow-accent-primary/35',
     secondary: 'bg-gradient-to-r from-bg-tertiary to-bg-secondary hover:from-bg-secondary hover:to-border/80 text-text-primary border border-border/40 shadow-md shadow-black/10',
-    danger: 'text-white shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/35',
+    danger: 'text-white shadow-lg shadow-accent-danger/25 hover:shadow-xl hover:shadow-accent-danger/35',
     ghost: 'hover:bg-bg-tertiary/80 text-text-primary hover:text-text-primary',
     outline: 'border border-border/60 bg-transparent text-text-primary hover:bg-bg-tertiary/60 hover:border-border shadow-sm',
   }
@@ -28,7 +28,7 @@ export function Button({ children, variant = 'primary', size = 'default', loadin
   const gradientStyle = variant === 'primary' 
     ? { background: 'var(--gradient-accent)' }
     : variant === 'danger'
-    ? { background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)' }
+    ? { background: 'linear-gradient(135deg, var(--accent-danger), color-mix(in srgb, var(--accent-danger) 80%, black))' }
     : {}
   
   return (

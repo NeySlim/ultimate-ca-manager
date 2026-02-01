@@ -11,13 +11,13 @@ import { cn } from '../lib/utils';
 const stateConfig = {
   [ConnectionState.CONNECTED]: {
     icon: WifiHigh,
-    color: 'text-green-500',
+    color: 'status-success-text',
     label: 'Real-time updates active',
     pulse: false,
   },
   [ConnectionState.CONNECTING]: {
     icon: CircleNotch,
-    color: 'text-yellow-500',
+    color: 'status-warning-text',
     label: 'Connecting...',
     pulse: true,
   },
@@ -29,7 +29,7 @@ const stateConfig = {
   },
   [ConnectionState.ERROR]: {
     icon: WifiSlash,
-    color: 'text-red-500',
+    color: 'status-danger-text',
     label: 'Connection error',
     pulse: false,
   },
