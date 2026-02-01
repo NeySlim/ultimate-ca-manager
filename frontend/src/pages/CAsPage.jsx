@@ -402,7 +402,7 @@ export default function CAsPage() {
               </div>
             ) : (
               <div className="py-2">
-                {filteredTree.map(ca => (
+                {filteredTree.map((ca, idx) => (
                   <TreeNode
                     key={ca.id}
                     ca={ca}
@@ -413,6 +413,8 @@ export default function CAsPage() {
                     onSelect={loadCADetails}
                     isOrphan={isOrphanIntermediate(ca)}
                     isMobile={isMobile}
+                    isLast={idx === filteredTree.length - 1}
+                    parentLines={[]}
                   />
                 ))}
               </div>
@@ -572,23 +574,60 @@ export default function CAsPage() {
 // TREE NODE COMPONENT
 // =============================================================================
 
-function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, isOrphan, isMobile }) {
+function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, isOrphan, isMobile, isLast = false, parentLines = [] }) {
   const hasChildren = ca.children && ca.children.length > 0
   const isExpanded = expandedNodes.has(ca.id)
   const isSelected = selectedId === ca.id
+  const indent = isMobile ? 28 : 24
   
   return (
-    <div>
+    <div className="relative">
+      {/* Tree Lines */}
+      {level > 0 && (
+        <>
+          {/* Vertical lines from ancestors */}
+          {parentLines.map((showLine, idx) => showLine && (
+            <div
+              key={idx}
+              className="absolute border-l-2 border-border/40"
+              style={{
+                left: `${(idx + 1) * indent + (isMobile ? 20 : 16)}px`,
+                top: 0,
+                bottom: 0
+              }}
+            />
+          ))}
+          {/* L-connector for current node */}
+          <div
+            className="absolute border-l-2 border-b-2 border-border/40 rounded-bl-lg"
+            style={{
+              left: `${level * indent + (isMobile ? 20 : 16)}px`,
+              top: 0,
+              width: isMobile ? 16 : 14,
+              height: isMobile ? '28px' : '24px'
+            }}
+          />
+          {/* Horizontal extension to icon */}
+          <div
+            className="absolute border-b-2 border-border/40"
+            style={{
+              left: `${level * indent + (isMobile ? 36 : 30)}px`,
+              top: isMobile ? '28px' : '24px',
+              width: isMobile ? 8 : 6
+            }}
+          />
+        </>
+      )}
+      
       <div
         onClick={() => onSelect(ca)}
         className={cn(
-          'flex items-center gap-2 cursor-pointer transition-all duration-150',
-          'hover:bg-bg-tertiary',
-          isSelected && 'bg-accent-primary/10 border-l-2 border-l-accent-primary',
-          !isSelected && 'border-l-2 border-l-transparent',
-          isMobile ? 'py-3 px-4' : 'py-2 px-3'
+          'relative flex items-center gap-2.5 cursor-pointer transition-all duration-150',
+          'hover:bg-bg-tertiary/80',
+          isSelected && 'bg-accent-primary/10',
+          isMobile ? 'py-3.5 px-4' : 'py-2.5 px-3'
         )}
-        style={{ paddingLeft: `${(level * 20) + (isMobile ? 16 : 12)}px` }}
+        style={{ paddingLeft: `${(level * indent) + (isMobile ? 16 : 12)}px` }}
       >
         {/* Expand/Collapse Button */}
         {hasChildren ? (
@@ -598,58 +637,103 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
               onToggle(ca.id)
             }}
             className={cn(
-              'shrink-0 rounded transition-colors',
-              'hover:bg-bg-hover',
+              'shrink-0 rounded-md transition-all duration-150',
+              'hover:bg-bg-hover hover:scale-110',
               isMobile ? 'w-8 h-8' : 'w-6 h-6',
-              'flex items-center justify-center'
+              'flex items-center justify-center',
+              'bg-bg-tertiary/50 border border-border/30'
             )}
           >
             {isExpanded ? (
-              <CaretDown size={isMobile ? 16 : 14} className="text-text-secondary" />
+              <CaretDown size={isMobile ? 14 : 12} weight="bold" className="text-text-secondary" />
             ) : (
-              <CaretRight size={isMobile ? 16 : 14} className="text-text-secondary" />
+              <CaretRight size={isMobile ? 14 : 12} weight="bold" className="text-text-secondary" />
             )}
           </button>
         ) : (
           <div className={cn(isMobile ? 'w-8' : 'w-6')} />
         )}
         
-        {/* CA Icon */}
-        {ca.type === 'root' ? (
-          <Crown size={isMobile ? 20 : 16} weight="duotone" className="status-warning-text shrink-0" />
-        ) : (
-          <ShieldCheck size={isMobile ? 20 : 16} weight="duotone" className="status-primary-text shrink-0" />
-        )}
-        
-        {/* Name */}
-        <span className={cn(
-          'flex-1 truncate font-medium',
-          isMobile ? 'text-base' : 'text-sm',
-          isSelected ? 'text-accent-primary' : 'text-text-primary'
+        {/* CA Icon with background */}
+        <div className={cn(
+          'shrink-0 flex items-center justify-center rounded-lg shadow-sm',
+          isMobile ? 'w-10 h-10' : 'w-8 h-8',
+          ca.type === 'root' 
+            ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/30 border border-amber-500/30' 
+            : 'bg-gradient-to-br from-blue-500/20 to-cyan-500/30 border border-blue-500/30'
         )}>
-          {ca.name || ca.common_name || 'CA'}
-        </span>
+          {ca.type === 'root' ? (
+            <Crown size={isMobile ? 20 : 16} weight="duotone" className="text-amber-500" />
+          ) : (
+            <ShieldCheck size={isMobile ? 20 : 16} weight="duotone" className="text-blue-500" />
+          )}
+        </div>
         
-        {/* Badges */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Name & Info */}
+        <div className="flex-1 min-w-0">
+          <div className={cn(
+            'truncate font-medium',
+            isMobile ? 'text-base' : 'text-sm',
+            isSelected ? 'text-accent-primary' : 'text-text-primary'
+          )}>
+            {ca.name || ca.common_name || 'CA'}
+          </div>
+          {ca.organization && (
+            <div className={cn(
+              'text-text-tertiary truncate',
+              isMobile ? 'text-sm' : 'text-xs'
+            )}>
+              {ca.organization}
+            </div>
+          )}
+        </div>
+        
+        {/* Badges & Info */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Cert count */}
+          {ca.certs > 0 && (
+            <span className={cn(
+              'flex items-center gap-1 px-2 py-0.5 rounded-md bg-bg-tertiary/50 text-text-secondary',
+              isMobile ? 'text-sm' : 'text-xs'
+            )}>
+              <Certificate size={isMobile ? 14 : 12} />
+              {ca.certs}
+            </span>
+          )}
+          
           {isOrphan && (
             <Badge variant="warning" size="sm">
               <Warning size={10} /> orphan
             </Badge>
           )}
-          <Badge 
-            variant={ca.status === 'Active' ? 'success' : ca.status === 'Expired' ? 'danger' : 'warning'}
-            size="sm"
-          >
+          
+          {/* Status badge with dot */}
+          <div className={cn(
+            'flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium',
+            ca.status === 'Active' 
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+              : ca.status === 'Expired' 
+                ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+          )}>
+            <span className={cn(
+              'w-1.5 h-1.5 rounded-full animate-pulse',
+              ca.status === 'Active' ? 'bg-emerald-500' : ca.status === 'Expired' ? 'bg-red-500' : 'bg-amber-500'
+            )} />
             {ca.status || 'Unknown'}
-          </Badge>
+          </div>
         </div>
+        
+        {/* Selection indicator */}
+        {isSelected && (
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-accent-primary rounded-r" />
+        )}
       </div>
       
       {/* Children */}
       {hasChildren && isExpanded && (
         <div>
-          {ca.children.map(child => (
+          {ca.children.map((child, idx) => (
             <TreeNode
               key={child.id}
               ca={child}
@@ -660,6 +744,8 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
               onSelect={onSelect}
               isOrphan={false}
               isMobile={isMobile}
+              isLast={idx === ca.children.length - 1}
+              parentLines={[...parentLines, !isLast]}
             />
           ))}
         </div>
