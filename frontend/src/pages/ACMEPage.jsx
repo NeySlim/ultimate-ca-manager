@@ -1,74 +1,103 @@
 /**
- * ACME Page - Using PageLayout
+ * ACME Page - Refactored with ResponsiveLayout
  * ACME Protocol management for automated certificate issuance
+ * 
+ * Layout:
+ * - Horizontal tabs: Configuration | Accounts
+ * - Desktop: Split view with accounts list + detail panel
+ * - Mobile: Full-screen navigation
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
-  Globe, Lightning, MagnifyingGlass, Database
+  Globe, Lightning, MagnifyingGlass, Database, Gear, ListBullets,
+  ArrowsClockwise, Copy, Question
 } from '@phosphor-icons/react'
 import {
-  PageLayout, FocusItem, Table, Button, Badge, Card,
-  Input, Modal, Tabs, Select, HelpCard,
+  ResponsiveLayout,
+  ResponsiveDataTable,
+  Button, Badge, Card, Input, Modal, Select, HelpCard,
   LoadingSpinner, EmptyState, StatusIndicator,
-  ContentHeader, ContentBody, ResponsiveContentSection as ContentSection, 
-  DataGrid, DataField, TabsResponsive, DetailTabs,
-  DetailSection, DetailGrid, DetailField,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
 import { acmeService, casService } from '../services'
 import { useNotification } from '../contexts'
+import { formatDate } from '../lib/utils'
 
 export default function ACMEPage() {
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
   
+  // Data states
   const [accounts, setAccounts] = useState([])
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [orders, setOrders] = useState([])
   const [challenges, setChallenges] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showCreateModal, setShowCreateModal] = useState(false)
   const [acmeSettings, setAcmeSettings] = useState({})
   const [cas, setCas] = useState([])
-  const [proxyEmail, setProxyEmail] = useState('')
+  
+  // UI states
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [activeTab, setActiveTab] = useState('config')
+  const [activeDetailTab, setActiveDetailTab] = useState('account')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [proxyEmail, setProxyEmail] = useState('')
 
   useEffect(() => {
-    loadAccounts()
-    loadAcmeSettings()
-    loadCAs()
+    loadData()
   }, [])
 
-  const loadCAs = async () => {
+  const loadData = async () => {
+    setLoading(true)
     try {
-      const data = await casService.getAll()
-      setCas(data.data || data.cas || [])
+      const [accountsRes, settingsRes, casRes] = await Promise.all([
+        acmeService.getAccounts(),
+        acmeService.getSettings(),
+        casService.getAll()
+      ])
+      setAccounts(accountsRes.data || accountsRes.accounts || [])
+      setAcmeSettings(settingsRes.data || settingsRes || {})
+      setCas(casRes.data || casRes.cas || [])
     } catch (error) {
-      // Silent fail
+      showError('Failed to load ACME data')
+    } finally {
+      setLoading(false)
     }
   }
 
-  const loadAcmeSettings = async () => {
+  // Select an account and load its details
+  const selectAccount = useCallback(async (account) => {
     try {
-      const response = await acmeService.getSettings()
-      setAcmeSettings(response.data || response || {})
+      const [accountRes, ordersRes, challengesRes] = await Promise.all([
+        acmeService.getAccountById(account.id),
+        acmeService.getOrders(account.id),
+        acmeService.getChallenges(account.id),
+      ])
+      setSelectedAccount(accountRes.data || accountRes)
+      setOrders(ordersRes.data?.orders || ordersRes.orders || [])
+      setChallenges(challengesRes.data?.challenges || challengesRes.challenges || [])
+      setActiveDetailTab('account')
     } catch (error) {
-      // Silent fail
+      showError('Failed to load account details')
     }
-  }
+  }, [showError])
 
+  // Settings handlers
   const handleSaveConfig = async () => {
     setSaving(true)
     try {
       await acmeService.updateSettings(acmeSettings)
-      showSuccess('ACME settings saved successfully')
+      showSuccess('ACME settings saved')
     } catch (error) {
-      showError(error.message || 'Failed to save ACME settings')
+      showError(error.message || 'Failed to save settings')
     } finally {
       setSaving(false)
     }
+  }
+
+  const updateSetting = (key, value) => {
+    setAcmeSettings(prev => ({ ...prev, [key]: value }))
   }
 
   const handleRegisterProxy = async () => {
@@ -78,295 +107,151 @@ export default function ACMEPage() {
     }
     try {
       await acmeService.registerProxy(proxyEmail)
-      showSuccess('Proxy account registered successfully')
+      showSuccess('Proxy account registered')
       setProxyEmail('')
-      loadAcmeSettings()
+      loadData()
     } catch (error) {
-      showError(error.message || 'Failed to register proxy account')
+      showError(error.message || 'Failed to register proxy')
     }
   }
 
   const handleUnregisterProxy = async () => {
-    const confirmed = await showConfirm('Are you sure you want to unregister the proxy account?')
+    const confirmed = await showConfirm('Unregister Let\'s Encrypt proxy account?')
     if (!confirmed) return
-    
     try {
       await acmeService.unregisterProxy()
       showSuccess('Proxy account unregistered')
-      loadAcmeSettings()
+      loadData()
     } catch (error) {
-      showError(error.message || 'Failed to unregister proxy account')
+      showError(error.message || 'Failed to unregister')
     }
   }
 
-  const updateAcmeSetting = (key, value) => {
-    setAcmeSettings(prev => ({ ...prev, [key]: value }))
-  }
-
-  const loadAccounts = async () => {
-    setLoading(true)
+  // Account handlers
+  const handleCreate = async (data) => {
     try {
-      const response = await acmeService.getAccounts()
-      const accountsList = response.data || response.accounts || []
-      setAccounts(accountsList)
-      if (accountsList.length > 0 && !selectedAccount) {
-        selectAccount(accountsList[0])
-      }
-    } catch (error) {
-      showError(error.message || 'Failed to load ACME accounts')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const selectAccount = async (account) => {
-    try {
-      const [accountResponse, ordersData, challengesData] = await Promise.all([
-        acmeService.getAccountById(account.id),
-        acmeService.getOrders(account.id),
-        acmeService.getChallenges(account.id),
-      ])
-      
-      // Handle API response wrapper
-      const accountData = accountResponse.data || accountResponse
-      setSelectedAccount(accountData)
-      setOrders(ordersData.data?.orders || ordersData.orders || [])
-      setChallenges(challengesData.data?.challenges || challengesData.challenges || [])
-    } catch (error) {
-      showError(error.message || 'Failed to load account details')
-    }
-  }
-
-  const handleCreate = async (accountData) => {
-    try {
-      const created = await acmeService.createAccount(accountData)
-      showSuccess('ACME account created successfully')
+      const created = await acmeService.createAccount(data)
+      showSuccess('ACME account created')
       setShowCreateModal(false)
-      loadAccounts()
+      loadData()
       selectAccount(created)
     } catch (error) {
-      showError(error.message || 'Failed to create ACME account')
+      showError(error.message || 'Failed to create account')
     }
   }
 
   const handleDeactivate = async (id) => {
-    const confirmed = await showConfirm('Are you sure you want to deactivate this ACME account?', {
+    const confirmed = await showConfirm('Deactivate this ACME account?', {
       title: 'Deactivate Account',
       confirmText: 'Deactivate',
       variant: 'danger'
     })
     if (!confirmed) return
-    
     try {
       await acmeService.deactivateAccount(id)
-      showSuccess('ACME account deactivated')
-      loadAccounts()
+      showSuccess('Account deactivated')
+      setSelectedAccount(null)
+      loadData()
     } catch (error) {
-      showError(error.message || 'Failed to deactivate account')
+      showError(error.message || 'Failed to deactivate')
     }
   }
 
   const handleDelete = async (id) => {
-    const confirmed = await showConfirm('Are you sure you want to delete this ACME account?', {
+    const confirmed = await showConfirm('Delete this ACME account?', {
       title: 'Delete Account',
       confirmText: 'Delete',
       variant: 'danger'
     })
     if (!confirmed) return
-    
     try {
       await acmeService.deleteAccount(id)
-      showSuccess('ACME account deleted')
+      showSuccess('Account deleted')
       setSelectedAccount(null)
-      loadAccounts()
+      loadData()
     } catch (error) {
-      showError(error.message || 'Failed to delete account')
+      showError(error.message || 'Failed to delete')
     }
   }
 
-  const orderColumns = [
-    { key: 'domain', label: 'Domain' },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (val) => <Badge variant={val === 'valid' ? 'success' : 'warning'}>{val}</Badge>
-    },
-    { key: 'created_at', label: 'Created', render: (val) => val ? new Date(val).toLocaleString() : '-' },
-  ]
+  // Computed stats
+  const stats = useMemo(() => ({
+    total: accounts.length,
+    active: accounts.filter(a => a.status === 'valid').length,
+    orders: orders.length,
+    pending: challenges.filter(c => c.status === 'pending').length
+  }), [accounts, orders, challenges])
 
-  const challengeColumns = [
-    { key: 'type', label: 'Type', render: (val) => <Badge variant="secondary">{val}</Badge> },
-    { key: 'domain', label: 'Domain' },
+  // Filtered accounts
+  const filteredAccounts = useMemo(() => {
+    if (!searchQuery) return accounts
+    const q = searchQuery.toLowerCase()
+    return accounts.filter(a => 
+      a.email?.toLowerCase().includes(q) ||
+      a.contact?.[0]?.toLowerCase().includes(q)
+    )
+  }, [accounts, searchQuery])
+
+  // Table columns for accounts
+  const accountColumns = useMemo(() => [
+    {
+      key: 'email',
+      label: 'Email',
+      render: (_, row) => (
+        <span className="font-medium text-text-primary">
+          {row.contact?.[0]?.replace('mailto:', '') || row.email || `Account #${row.id}`}
+        </span>
+      )
+    },
     {
       key: 'status',
       label: 'Status',
       render: (val) => (
-        <Badge variant={
-          val === 'valid' ? 'success' :
-          val === 'pending' ? 'warning' :
-          'danger'
-        }>
+        <Badge variant={val === 'valid' ? 'success' : 'secondary'} size="sm">
+          {val === 'valid' && <CheckCircle size={10} weight="fill" />}
           {val}
         </Badge>
       )
     },
-    { key: 'validated_at', label: 'Validated', render: (val) => val ? new Date(val).toLocaleString() : '-' },
+    {
+      key: 'created_at',
+      label: 'Created',
+      render: (val) => formatDate(val)
+    }
+  ], [])
+
+  // Main tabs
+  const tabs = [
+    { id: 'config', label: 'Configuration', icon: Gear },
+    { id: 'accounts', label: 'Accounts', icon: Key, count: accounts.length }
   ]
 
-  const [activeDetailTab, setActiveDetailTab] = useState('account')
+  // Detail tabs (when account selected)
+  const detailTabs = [
+    { id: 'account', label: 'Details', icon: Key },
+    { id: 'orders', label: 'Orders', icon: Globe, count: orders.length },
+    { id: 'challenges', label: 'Challenges', icon: ShieldCheck, count: challenges.length }
+  ]
 
-  // Note: Detail tabs content is now inline in the render below
-
-  const configContent = (
-    <div className="space-y-4 p-4">
-      <HelpCard variant="info" title="About ACME Protocol" compact>
-        ACME (Automatic Certificate Management Environment) enables automated certificate issuance. 
-        Compatible with certbot, acme.sh, and other ACME clients.
-      </HelpCard>
-
-      {/* ACME Server Configuration */}
-      <DetailSection title="ACME Server Configuration" icon={Globe}>
-        <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
-            <input
-              type="checkbox"
-              checked={acmeSettings.enabled || false}
-              onChange={(e) => updateAcmeSetting('enabled', e.target.checked)}
-              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
-            />
-            <div>
-              <p className="text-sm text-text-primary font-medium">Enable ACME Server</p>
-              <p className="text-xs text-text-secondary">Allow automated certificate issuance via ACME protocol</p>
-            </div>
-          </label>
-
-          <Select
-            label="Default CA for ACME"
-            value={acmeSettings.issuing_ca_id?.toString() || undefined}
-            onChange={(val) => updateAcmeSetting('issuing_ca_id', val ? parseInt(val) : null)}
-            disabled={!acmeSettings.enabled}
-            placeholder="Select a CA..."
-            options={cas.map(ca => ({ value: ca.id.toString(), label: ca.name || ca.common_name || ca.descr }))}
-          />
-        </div>
-      </DetailSection>
-
-      {/* ACME Endpoints */}
-      <DetailSection title="ACME Endpoints" icon={Lightning}>
-        <DetailGrid columns={1}>
-          <DetailField 
-            label="ACME Directory URL" 
-            value={`${window.location.origin}/acme/directory`}
-            mono
-            copyable
-            fullWidth
-            helperText="Use this URL with ACME clients like certbot or acme.sh"
-          />
-        </DetailGrid>
-      </DetailSection>
-
-      {/* Let's Encrypt Proxy */}
-      <DetailSection title="Let's Encrypt Proxy" icon={ShieldCheck}>
-        <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
-            <input
-              type="checkbox"
-              checked={acmeSettings.proxy_enabled || false}
-              onChange={(e) => updateAcmeSetting('proxy_enabled', e.target.checked)}
-              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
-            />
-            <span className="text-sm font-medium text-text-primary">Enable Let's Encrypt Proxy</span>
-          </label>
-
-          {acmeSettings.proxy_enabled && (
-            <>
-              <DetailGrid columns={1}>
-                <DetailField 
-                  label="Proxy Endpoint URL" 
-                  value={`${window.location.origin}/api/v2/acme/proxy`}
-                  mono
-                  copyable
-                  fullWidth
-                  helperText="External ACME clients can use this URL to proxy requests to Let's Encrypt"
-                />
-              </DetailGrid>
-              
-              {acmeSettings.proxy_registered ? (
-                <div className="p-3 rounded-lg status-success-bg status-success-border border">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle size={18} className="status-success-text" weight="fill" />
-                      <div>
-                        <p className="text-sm font-medium text-text-primary">Proxy Account Registered</p>
-                        <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={handleUnregisterProxy}
-                      className="status-danger-text hover:status-danger-bg"
-                    >
-                      <Trash size={14} />
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <Input
-                    label="Email Address"
-                    type="email"
-                    value={proxyEmail}
-                    onChange={(e) => setProxyEmail(e.target.value)}
-                    placeholder="admin@example.com"
-                    helperText="Email for Let's Encrypt account registration"
-                  />
-
-                  <Button 
-                    variant="secondary" 
-                    size="sm"
-                    onClick={handleRegisterProxy}
-                    disabled={!proxyEmail}
-                  >
-                    <Key size={14} />
-                    Register Proxy Account
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </DetailSection>
-
-      <div className="flex gap-2 pt-3 border-t border-border">
-        <Button size="sm" onClick={handleSaveConfig} disabled={saving}>
-          <FloppyDisk size={14} />
-          Save Configuration
+  // Header actions
+  const headerActions = (
+    <>
+      <Button variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
+        <ArrowsClockwise size={14} />
+        Refresh
+      </Button>
+      {activeTab === 'accounts' && (
+        <Button size="sm" onClick={() => setShowCreateModal(true)}>
+          <Plus size={14} />
+          <span className="hidden sm:inline">New Account</span>
         </Button>
-      </div>
-    </div>
+      )}
+    </>
   )
 
-  // Stats computed from accounts
-  const stats = {
-    total: accounts.length,
-    active: accounts.filter(a => a.status === 'valid').length,
-    orders: orders.length,
-    challenges: challenges.filter(c => c.status === 'pending').length
-  }
-
-  // Filtered accounts
-  const filteredAccounts = accounts.filter(account => {
-    const matchesSearch = !searchTerm || 
-      account.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || account.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
-
-  // Help content for modal
+  // Help content
   const helpContent = (
-    <div className="space-y-4">
-      {/* ACME Statistics */}
+    <div className="p-4 space-y-4">
       <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Database size={16} className="text-accent-primary" />
@@ -375,10 +260,10 @@ export default function ACMEPage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
             <p className="text-2xl font-bold text-text-primary">{stats.total}</p>
-            <p className="text-xs text-text-secondary">Total Accounts</p>
+            <p className="text-xs text-text-secondary">Accounts</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-status-success">{stats.active}</p>
+            <p className="text-2xl font-bold status-success-text">{stats.active}</p>
             <p className="text-xs text-text-secondary">Active</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
@@ -386,13 +271,12 @@ export default function ACMEPage() {
             <p className="text-xs text-text-secondary">Orders</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-status-warning">{stats.challenges}</p>
+            <p className="text-2xl font-bold status-warning-text">{stats.pending}</p>
             <p className="text-xs text-text-secondary">Pending</p>
           </div>
         </div>
       </Card>
 
-      {/* Server Status */}
       <Card className={`p-4 space-y-3 ${acmeSettings.enabled ? 'stat-card-success' : 'stat-card-warning'}`}>
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Lightning size={16} className="text-accent-primary" />
@@ -408,93 +292,342 @@ export default function ACMEPage() {
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-secondary">LE Proxy</span>
             <StatusIndicator status={acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'success' : 'warning') : 'inactive'}>
-              {acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'Active' : 'Not Registered') : 'Disabled'}
+              {acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'Active' : 'Setup Required') : 'Disabled'}
             </StatusIndicator>
           </div>
         </div>
       </Card>
 
-      {/* Help Cards */}
       <div className="space-y-3">
         <HelpCard variant="info" title="About ACME">
-          ACME (Automatic Certificate Management Environment) is a protocol for automating 
-          certificate issuance and renewal. It powers services like Let's Encrypt.
+          ACME (Automatic Certificate Management Environment) enables automated certificate 
+          issuance. Compatible with certbot, acme.sh, and other ACME clients.
         </HelpCard>
         
-        <HelpCard variant="tip" title="Let's Encrypt Integration">
-          Enable the LE Proxy to forward certificate requests to Let's Encrypt while 
-          maintaining centralized audit logging and management control.
+        <HelpCard variant="tip" title="Let's Encrypt Proxy">
+          Enable the LE Proxy to forward requests to Let's Encrypt while maintaining 
+          centralized audit logging and control.
         </HelpCard>
 
         <HelpCard variant="warning" title="Account Security">
-          ACME accounts contain private keys. Keep accounts secure and deactivate 
-          or delete unused accounts to minimize security exposure.
+          ACME accounts contain private keys. Deactivate or delete unused accounts 
+          to minimize security exposure.
         </HelpCard>
       </div>
     </div>
   )
 
-  // Focus panel content (account list with search/filter)
-  const focusContent = (
-    <div className="flex flex-col h-full">
-      {/* Search and Filter */}
-      <div className="p-3 space-y-2 border-b border-border">
-        <div className="relative">
-          <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
-          <input
-            type="text"
-            placeholder="Search accounts..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border border-border bg-bg-tertiary focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/20"
-          />
-        </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full px-2.5 py-1.5 text-sm rounded-md border border-border bg-bg-tertiary"
+  // Account detail content for slide-over
+  const accountDetailContent = selectedAccount && (
+    <div className="p-3 space-y-3">
+      <CompactHeader
+        icon={Key}
+        iconClass={selectedAccount.status === 'valid' ? "bg-status-success/20" : "bg-bg-tertiary"}
+        title={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email || 'Account'}
+        subtitle={`ID: ${selectedAccount.account_id?.substring(0, 24)}...`}
+        badge={
+          <Badge variant={selectedAccount.status === 'valid' ? 'success' : 'secondary'} size="sm">
+            {selectedAccount.status === 'valid' && <CheckCircle size={10} weight="fill" />}
+            {selectedAccount.status}
+          </Badge>
+        }
+      />
+
+      <CompactStats stats={[
+        { icon: Key, value: selectedAccount.key_type || 'RSA-2048' },
+        { icon: Globe, value: `${orders.length} orders` },
+        { icon: ShieldCheck, value: `${challenges.length} challenges` },
+      ]} />
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <Button 
+          size="sm" 
+          variant="secondary"
+          className="flex-1"
+          onClick={() => handleDeactivate(selectedAccount.id)}
+          disabled={selectedAccount.status !== 'valid'}
         >
-          <option value="all">All Status</option>
-          <option value="valid">Valid</option>
-          <option value="deactivated">Deactivated</option>
-        </select>
+          <XCircle size={14} />
+          Deactivate
+        </Button>
+        <Button 
+          size="sm" 
+          variant="danger"
+          onClick={() => handleDelete(selectedAccount.id)}
+        >
+          <Trash size={14} />
+        </Button>
       </div>
 
-      {/* Account List */}
-      <div className="flex-1 overflow-auto p-2 space-y-1.5">
-        {filteredAccounts.length === 0 ? (
-          <EmptyState 
-            icon={Key}
-            title="No Accounts"
-            description={searchTerm ? "No matching accounts found" : "Create your first ACME account"}
-          />
-        ) : (
-          filteredAccounts.map((account) => (
-            <FocusItem
-              key={account.id}
-              icon={Key}
-              title={account.contact?.[0]?.replace('mailto:', '') || account.email || `Account #${account.id}`}
-              subtitle={`Created ${account.created_at ? new Date(account.created_at).toLocaleDateString() : '-'}`}
-              badge={
-                <Badge variant={account.status === 'valid' ? 'success' : 'secondary'} size="sm">
-                  {account.status}
-                </Badge>
-              }
-              selected={selectedAccount?.id === account.id}
-              onClick={() => selectAccount(account)}
+      {/* Detail Tabs */}
+      <div className="flex gap-1 border-b border-border">
+        {detailTabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveDetailTab(tab.id)}
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+              activeDetailTab === tab.id
+                ? 'border-accent-primary text-accent-primary'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            <tab.icon size={14} />
+            {tab.label}
+            {tab.count > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-bg-tertiary">
+                {tab.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      {activeDetailTab === 'account' && (
+        <div className="space-y-3">
+          <CompactSection title="Account Information">
+            <CompactGrid>
+              <CompactField label="Email" value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} />
+              <CompactField label="Status">
+                <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'}>
+                  {selectedAccount.status}
+                </StatusIndicator>
+              </CompactField>
+              <CompactField label="Key Type" value={selectedAccount.key_type || 'RSA-2048'} />
+              <CompactField label="Created" value={formatDate(selectedAccount.created_at)} />
+            </CompactGrid>
+          </CompactSection>
+
+          <CompactSection title="Account ID" collapsible defaultOpen={false}>
+            <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-2 rounded">
+              {selectedAccount.account_id}
+            </p>
+          </CompactSection>
+
+          <CompactSection title="Terms of Service">
+            <div className="flex items-center gap-2 text-xs">
+              {selectedAccount.terms_of_service_agreed || selectedAccount.tos_agreed ? (
+                <>
+                  <CheckCircle size={14} className="status-success-text" weight="fill" />
+                  <span className="status-success-text">Accepted</span>
+                </>
+              ) : (
+                <>
+                  <XCircle size={14} className="status-danger-text" weight="fill" />
+                  <span className="status-danger-text">Not Accepted</span>
+                </>
+              )}
+            </div>
+          </CompactSection>
+        </div>
+      )}
+
+      {activeDetailTab === 'orders' && (
+        <CompactSection title={`${orders.length} Orders`}>
+          {orders.length === 0 ? (
+            <p className="text-xs text-text-tertiary py-4 text-center">No certificate orders</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {orders.map((order, i) => (
+                <div key={i} className="flex items-center justify-between p-2 bg-bg-tertiary/30 rounded text-xs">
+                  <span className="text-text-primary truncate flex-1">{order.domain || order.identifier}</span>
+                  <Badge variant={order.status === 'valid' ? 'success' : 'warning'} size="sm">
+                    {order.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </CompactSection>
+      )}
+
+      {activeDetailTab === 'challenges' && (
+        <CompactSection title={`${challenges.length} Challenges`}>
+          {challenges.length === 0 ? (
+            <p className="text-xs text-text-tertiary py-4 text-center">No active challenges</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {challenges.map((ch, i) => (
+                <div key={i} className="p-2 bg-bg-tertiary/30 rounded text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="secondary" size="sm">{ch.type}</Badge>
+                    <Badge 
+                      variant={ch.status === 'valid' ? 'success' : ch.status === 'pending' ? 'warning' : 'danger'} 
+                      size="sm"
+                    >
+                      {ch.status}
+                    </Badge>
+                  </div>
+                  <p className="text-text-secondary truncate">{ch.domain}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </CompactSection>
+      )}
+    </div>
+  )
+
+  // Configuration content
+  const configContent = (
+    <div className="p-4 space-y-4">
+      <HelpCard variant="info" title="About ACME Protocol" compact>
+        ACME enables automated certificate issuance. Configure the server below, then use 
+        the directory URL with any ACME client (certbot, acme.sh, etc.).
+      </HelpCard>
+
+      {/* ACME Server */}
+      <CompactSection title="ACME Server" icon={Globe}>
+        <div className="space-y-3">
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+            <input
+              type="checkbox"
+              checked={acmeSettings.enabled || false}
+              onChange={(e) => updateSetting('enabled', e.target.checked)}
+              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
             />
-          ))
-        )}
+            <div>
+              <p className="text-sm text-text-primary font-medium">Enable ACME Server</p>
+              <p className="text-xs text-text-secondary">Allow automated certificate issuance via ACME</p>
+            </div>
+          </label>
+
+          <Select
+            label="Default Issuing CA"
+            value={acmeSettings.issuing_ca_id?.toString() || ''}
+            onChange={(val) => updateSetting('issuing_ca_id', val ? parseInt(val) : null)}
+            disabled={!acmeSettings.enabled}
+            placeholder="Select a CA..."
+            options={cas.map(ca => ({ 
+              value: ca.id.toString(), 
+              label: ca.name || ca.common_name 
+            }))}
+          />
+        </div>
+      </CompactSection>
+
+      {/* ACME Endpoints */}
+      <CompactSection title="ACME Endpoints" icon={Lightning}>
+        <CompactGrid columns={1}>
+          <CompactField 
+            label="Directory URL" 
+            value={`${window.location.origin}/acme/directory`}
+            mono
+            copyable
+          />
+        </CompactGrid>
+        <p className="text-xs text-text-tertiary mt-2">
+          Use this URL with certbot: <code className="bg-bg-tertiary px-1 rounded">--server {window.location.origin}/acme/directory</code>
+        </p>
+      </CompactSection>
+
+      {/* Let's Encrypt Proxy */}
+      <CompactSection title="Let's Encrypt Proxy" icon={ShieldCheck}>
+        <div className="space-y-3">
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+            <input
+              type="checkbox"
+              checked={acmeSettings.proxy_enabled || false}
+              onChange={(e) => updateSetting('proxy_enabled', e.target.checked)}
+              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
+            />
+            <div>
+              <p className="text-sm text-text-primary font-medium">Enable Let's Encrypt Proxy</p>
+              <p className="text-xs text-text-secondary">Forward requests to Let's Encrypt with audit logging</p>
+            </div>
+          </label>
+
+          {acmeSettings.proxy_enabled && (
+            <>
+              <CompactGrid columns={1}>
+                <CompactField 
+                  label="Proxy Endpoint" 
+                  value={`${window.location.origin}/api/v2/acme/proxy`}
+                  mono
+                  copyable
+                />
+              </CompactGrid>
+              
+              {acmeSettings.proxy_registered ? (
+                <div className="p-3 rounded-lg status-success-bg status-success-border border">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={18} className="status-success-text" weight="fill" />
+                      <div>
+                        <p className="text-sm font-medium text-text-primary">Proxy Registered</p>
+                        <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={handleUnregisterProxy}
+                      className="status-danger-text hover:status-danger-bg"
+                    >
+                      <Trash size={14} />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 p-3 bg-bg-tertiary/30 rounded-lg">
+                  <Input
+                    label="Email Address"
+                    type="email"
+                    value={proxyEmail}
+                    onChange={(e) => setProxyEmail(e.target.value)}
+                    placeholder="admin@example.com"
+                    helperText="Required for Let's Encrypt account registration"
+                  />
+                  <Button 
+                    variant="secondary" 
+                    size="sm"
+                    onClick={handleRegisterProxy}
+                    disabled={!proxyEmail}
+                  >
+                    <Key size={14} />
+                    Register Account
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </CompactSection>
+
+      {/* Save Button */}
+      <div className="flex gap-2 pt-3 border-t border-border">
+        <Button onClick={handleSaveConfig} disabled={saving}>
+          <FloppyDisk size={14} />
+          {saving ? 'Saving...' : 'Save Configuration'}
+        </Button>
       </div>
     </div>
   )
 
-  // Focus actions (create button)
-  const focusActions = (
-    <Button onClick={() => setShowCreateModal(true)} size="sm" className="w-full">
-      <Plus size={14} />
-      Create Account
-    </Button>
+  // Accounts content with table
+  const accountsContent = (
+    <ResponsiveDataTable
+      data={filteredAccounts}
+      columns={accountColumns}
+      searchable
+      searchPlaceholder="Search accounts..."
+      onSearch={setSearchQuery}
+      onRowClick={selectAccount}
+      selectedRow={selectedAccount}
+      getRowId={(row) => row.id}
+      emptyState={{
+        icon: Key,
+        title: 'No ACME Accounts',
+        description: searchQuery ? 'No accounts match your search' : 'Create your first ACME account to get started',
+        action: !searchQuery && (
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus size={14} />
+            Create Account
+          </Button>
+        )
+      }}
+    />
   )
 
   if (loading) {
@@ -507,156 +640,30 @@ export default function ACMEPage() {
 
   return (
     <>
-      <PageLayout
+      <ResponsiveLayout
         title="ACME Protocol"
-        focusTitle="Accounts"
-        focusContent={focusContent}
-        focusActions={focusActions}
-        focusFooter={`${filteredAccounts.length} of ${accounts.length} account(s)`}
+        icon={Lightning}
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab)
+          if (tab === 'config') {
+            setSelectedAccount(null)
+          }
+        }}
+        actions={headerActions}
         helpContent={helpContent}
+        helpTitle="ACME Help"
         
+        // Split view for accounts tab
+        splitView={activeTab === 'accounts'}
+        slideOverOpen={!!selectedAccount}
+        slideOverTitle={selectedAccount?.email || 'Account Details'}
+        slideOverContent={accountDetailContent}
+        onSlideOverClose={() => setSelectedAccount(null)}
       >
-        {/* Main Content */}
-        {!selectedAccount ? (
-          configContent
-        ) : (
-          <div className="p-3 space-y-3">
-            {/* Header */}
-            <CompactHeader
-              icon={Globe}
-              iconClass={selectedAccount.status === 'valid' ? "bg-status-success/20" : "bg-bg-tertiary"}
-              title={selectedAccount.email}
-              subtitle={`Account ID: ${selectedAccount.account_id?.substring(0, 20)}...`}
-              badge={
-                <Badge 
-                  variant={selectedAccount.status === 'valid' ? 'success' : 'secondary'} 
-                  size="sm"
-                >
-                  {selectedAccount.status === 'valid' && <CheckCircle size={12} weight="fill" />}
-                  {selectedAccount.status}
-                </Badge>
-              }
-            />
-
-            {/* Stats */}
-            <CompactStats stats={[
-              { icon: Key, value: selectedAccount.key_type || 'RSA-2048' },
-              { icon: Lightning, value: `${orders.length} orders` },
-              { icon: ShieldCheck, value: `${challenges.length} challenges` },
-            ]} />
-
-            {/* Actions */}
-            <div className="flex gap-2">
-              <Button 
-                size="sm" 
-                variant="secondary"
-                className="flex-1"
-                onClick={() => handleDeactivate(selectedAccount.id)}
-                disabled={selectedAccount.status !== 'valid'}
-              >
-                <XCircle size={14} />
-                Deactivate
-              </Button>
-              <Button 
-                size="sm" 
-                variant="danger"
-                onClick={() => handleDelete(selectedAccount.id)}
-              >
-                <Trash size={14} />
-              </Button>
-            </div>
-
-            {/* Tabs Navigation */}
-            <DetailTabs
-              tabs={[
-                { id: 'account', label: 'Account', icon: Key, count: null },
-                { id: 'orders', label: 'Orders', icon: Globe, count: orders.length },
-                { id: 'challenges', label: 'Challenges', icon: ShieldCheck, count: challenges.length },
-              ]}
-              activeTab={activeDetailTab}
-              onChange={setActiveDetailTab}
-            />
-
-            {/* Tab Content */}
-            <div className="min-h-0">
-              {/* Account Tab */}
-              {activeDetailTab === 'account' && (
-                <div className="space-y-3">
-                  <CompactSection title="Account Information">
-                    <CompactGrid>
-                      <CompactField label="Email" value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email || '-'} />
-                      <div className="text-xs">
-                        <span className="text-text-tertiary">Status:</span>
-                        <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'} className="ml-1 inline-flex">
-                          {selectedAccount.status}
-                        </StatusIndicator>
-                      </div>
-                      <CompactField label="Key Type" value={selectedAccount.key_type || 'RSA-2048'} />
-                      <CompactField label="Created" value={selectedAccount.created_at ? new Date(selectedAccount.created_at).toLocaleDateString() : '-'} />
-                    </CompactGrid>
-                    <div className="mt-2 text-xs">
-                      <span className="text-text-tertiary block mb-0.5">Account ID:</span>
-                      <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
-                        {selectedAccount.account_id || '-'}
-                      </p>
-                    </div>
-                  </CompactSection>
-
-                  <CompactSection title="Terms of Service">
-                    <div className="flex items-center gap-2 text-xs">
-                      {selectedAccount.terms_of_service_agreed || selectedAccount.tos_agreed ? (
-                        <>
-                          <CheckCircle size={14} className="status-success-text" />
-                          <span className="status-success-text">Agreed</span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle size={14} className="status-danger-text" />
-                          <span className="status-danger-text">Not Agreed</span>
-                        </>
-                      )}
-                    </div>
-                  </CompactSection>
-                </div>
-              )}
-
-              {/* Orders Tab */}
-              {activeDetailTab === 'orders' && (
-                <CompactSection title={`${orders.length} Active Orders`}>
-                  {orders.length === 0 ? (
-                    <p className="text-xs text-text-tertiary py-4 text-center">No pending certificate orders</p>
-                  ) : (
-                    <div className="max-h-48 overflow-y-auto">
-                      <Table
-                        columns={orderColumns}
-                        data={orders}
-                        compact
-                      />
-                    </div>
-                  )}
-                </CompactSection>
-              )}
-
-              {/* Challenges Tab */}
-              {activeDetailTab === 'challenges' && (
-                <CompactSection title={`${challenges.length} Challenges`}>
-                  {challenges.length === 0 ? (
-                    <p className="text-xs text-text-tertiary py-4 text-center">No active ACME challenges</p>
-                  ) : (
-                    <div className="max-h-48 overflow-y-auto">
-                      <Table
-                        columns={challengeColumns}
-                        data={challenges}
-                        compact
-                      />
-                    </div>
-                  )}
-                </CompactSection>
-              )}
-            </div>
-          </div>
-        )}
-      </PageLayout>
+        {activeTab === 'config' ? configContent : accountsContent}
+      </ResponsiveLayout>
 
       {/* Create Account Modal */}
       <Modal
@@ -664,7 +671,7 @@ export default function ACMEPage() {
         onClose={() => setShowCreateModal(false)}
         title="Create ACME Account"
       >
-        <CreateACMEAccountForm
+        <CreateAccountForm
           onSubmit={handleCreate}
           onCancel={() => setShowCreateModal(false)}
         />
@@ -673,7 +680,8 @@ export default function ACMEPage() {
   )
 }
 
-function CreateACMEAccountForm({ onSubmit, onCancel }) {
+// Create Account Form Component
+function CreateAccountForm({ onSubmit, onCancel }) {
   const { showWarning } = useNotification()
   const [formData, setFormData] = useState({
     email: '',
@@ -701,6 +709,18 @@ function CreateACMEAccountForm({ onSubmit, onCancel }) {
         helperText="Contact email for certificate expiry notifications"
       />
       
+      <Select
+        label="Key Type"
+        value={formData.key_type}
+        onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
+        options={[
+          { value: 'RSA-2048', label: 'RSA 2048-bit' },
+          { value: 'RSA-4096', label: 'RSA 4096-bit' },
+          { value: 'EC-P256', label: 'ECDSA P-256' },
+          { value: 'EC-P384', label: 'ECDSA P-384' },
+        ]}
+      />
+      
       <label className="flex items-start gap-2 cursor-pointer">
         <input
           type="checkbox"
@@ -713,9 +733,14 @@ function CreateACMEAccountForm({ onSubmit, onCancel }) {
         </span>
       </label>
       
-      <div className="flex gap-3 pt-4">
-        <Button type="submit">Create Account</Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
+      <div className="flex gap-3 pt-4 border-t border-border">
+        <Button type="submit">
+          <Plus size={14} />
+          Create Account
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
       </div>
     </form>
   )
