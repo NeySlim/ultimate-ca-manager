@@ -36,11 +36,11 @@ import {
   Modal,
   LoadingSpinner,
   HelpCard,
-  DetailHeader,
-  DetailSection,
-  DetailGrid,
-  DetailField,
-  DetailContent
+  CompactHeader,
+  CompactSection,
+  CompactGrid,
+  CompactField,
+  CompactStats
 } from '../components';
 import { useNotification } from '../contexts';
 import auditService from '../services/audit.service';
@@ -575,10 +575,10 @@ export default function AuditLogsPage() {
 
   // Log detail slide-over content
   const logDetailContent = selectedLog && (
-    <DetailContent className="p-0">
-      {/* Header with action type, icon, and status badge */}
-      <DetailHeader
+    <div className="p-3 space-y-3">
+      <CompactHeader
         icon={actionIcons[selectedLog.action] || actionIcons.default}
+        iconClass={selectedLog.success ? "bg-status-success/20" : "bg-status-error/20"}
         title={selectedLog.action?.replace(/_/g, ' ') || 'Event'}
         subtitle={`${selectedLog.resource_type || 'System'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`}
         badge={
@@ -590,70 +590,60 @@ export default function AuditLogsPage() {
             )}
           </Badge>
         }
-        stats={[
-          { icon: User, label: 'User:', value: selectedLog.username || 'system' },
-          { icon: ClockCounterClockwise, label: 'Time:', value: formatTime(selectedLog.timestamp) }
-        ]}
       />
 
-      {/* Event Details Section */}
-      <DetailSection title="Event Details">
-        <DetailGrid>
-          <DetailField 
+      <CompactStats stats={[
+        { icon: User, value: selectedLog.username || 'system' },
+        { icon: ClockCounterClockwise, value: formatTime(selectedLog.timestamp) }
+      ]} />
+
+      <CompactSection title="Event Details">
+        <CompactGrid>
+          <CompactField 
             label="Timestamp" 
             value={new Date(selectedLog.timestamp).toLocaleString()} 
           />
-          <DetailField 
+          <CompactField 
             label="User" 
             value={selectedLog.username || 'system'} 
           />
-          <DetailField 
+          <CompactField 
             label="Action" 
             value={selectedLog.action?.replace(/_/g, ' ')} 
           />
-          <DetailField 
+          <CompactField 
             label="Resource" 
             value={`${selectedLog.resource_type || '-'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`} 
           />
-          <DetailField 
+          <CompactField 
             label="IP Address" 
             value={selectedLog.ip_address} 
             mono 
             copyable 
           />
-          <DetailField 
+          <CompactField 
             label="Status" 
             value={selectedLog.success ? 'Success' : 'Failed'} 
           />
-        </DetailGrid>
-      </DetailSection>
+        </CompactGrid>
+      </CompactSection>
 
-      {/* Details Section - if present */}
       {selectedLog.details && (
-        <DetailSection title="Details">
-          <DetailField 
-            label="Event Details" 
-            value={selectedLog.details} 
-            mono 
-            fullWidth 
-            copyable
-          />
-        </DetailSection>
+        <CompactSection title="Details" collapsible>
+          <pre className="text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
+            {selectedLog.details}
+          </pre>
+        </CompactSection>
       )}
 
-      {/* User Agent Section - if present */}
       {selectedLog.user_agent && (
-        <DetailSection title="Client Information">
-          <DetailField 
-            label="User Agent" 
-            value={selectedLog.user_agent} 
-            mono 
-            fullWidth 
-            copyable
-          />
-        </DetailSection>
+        <CompactSection title="Client Information" collapsible defaultOpen={false}>
+          <pre className="text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto whitespace-pre-wrap">
+            {selectedLog.user_agent}
+          </pre>
+        </CompactSection>
       )}
-    </DetailContent>
+    </div>
   );
 
   // Header actions
