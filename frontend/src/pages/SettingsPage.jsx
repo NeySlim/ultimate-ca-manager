@@ -207,6 +207,7 @@ export default function SettingsPage() {
     loadHttpsInfo()
     loadCAs()
     loadCertificates()
+    loadDbStats()
   }, [])
 
   const loadSettings = async () => {
@@ -245,6 +246,21 @@ export default function SettingsPage() {
       setHttpsInfo(data.data || {})
     } catch (error) {
       console.error('Failed to load HTTPS cert info:', error)
+    }
+  }
+
+  const loadDbStats = async () => {
+    try {
+      const data = await systemService.getDatabaseStats()
+      const stats = data.data || {}
+      setDbStats({
+        certificates: stats.counts?.certificates || 0,
+        cas: stats.counts?.cas || 0,
+        size: stats.size_mb ? `${stats.size_mb} MB` : '-',
+        last_optimized: stats.last_vacuum || 'Never'
+      })
+    } catch (error) {
+      console.error('Failed to load database stats:', error)
     }
   }
 
