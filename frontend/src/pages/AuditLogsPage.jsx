@@ -706,10 +706,7 @@ export default function AuditLogsPage() {
         icon={ClockCounterClockwise}
         subtitle={`${total} log entries`}
         stats={headerStats}
-        filters={filters}
-        activeFilters={activeFilters}
         helpContent={helpContent}
-        actions={headerActions}
         slideOverOpen={!!selectedLog || showDateFilters}
         onSlideOverClose={() => { setSelectedLog(null); setShowDateFilters(false); }}
         slideOverTitle={selectedLog ? 'Log Details' : 'Filters & Export'}
@@ -720,9 +717,37 @@ export default function AuditLogsPage() {
           data={logs}
           columns={columns}
           keyField="id"
-          searchValue={search}
+          searchable
+          externalSearch={search}
           onSearchChange={setSearch}
           searchPlaceholder="Search logs..."
+          toolbarFilters={[
+            {
+              key: 'action',
+              value: filterAction,
+              onChange: (v) => { setFilterAction(v); setPage(1); },
+              placeholder: 'All Actions',
+              options: (actions.actions || []).map(a => ({ value: a, label: a.replace(/_/g, ' ') }))
+            },
+            {
+              key: 'status',
+              value: filterSuccess,
+              onChange: (v) => { setFilterSuccess(v); setPage(1); },
+              placeholder: 'All Status',
+              options: [
+                { value: 'true', label: 'Success' },
+                { value: 'false', label: 'Failed' }
+              ]
+            },
+            {
+              key: 'username',
+              value: filterUsername,
+              onChange: (v) => { setFilterUsername(v); setPage(1); },
+              placeholder: 'All Users',
+              options: uniqueUsernames.map(u => ({ value: u, label: u }))
+            }
+          ]}
+          toolbarActions={headerActions}
           selectedId={selectedLog?.id}
           onRowClick={setSelectedLog}
           renderMobileCard={renderMobileCard}

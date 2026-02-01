@@ -32,6 +32,10 @@ export function ResponsiveDataTable({
   externalSearch, // controlled search
   onSearchChange,
   
+  // Toolbar (filters + actions next to search)
+  toolbarFilters, // Array of { key, value, onChange, placeholder, options: [{value, label}] }
+  toolbarActions, // ReactNode - buttons to show on right side of toolbar
+  
   // Sorting
   sortable = false,
   defaultSort, // { key, direction: 'asc' | 'desc' }
@@ -220,13 +224,16 @@ export function ResponsiveDataTable({
   
   return (
     <div className={cn('flex flex-col h-full', className)}>
-      {/* SEARCH BAR */}
-      {searchable && (
+      {/* SEARCH BAR + TOOLBAR */}
+      {(searchable || toolbarFilters || toolbarActions) && (
         <SearchBar
           value={searchValue}
           onChange={setSearchValue}
           placeholder={searchPlaceholder}
           isMobile={isMobile}
+          searchable={searchable}
+          filters={toolbarFilters}
+          actions={toolbarActions}
         />
       )}
       
@@ -271,51 +278,82 @@ export function ResponsiveDataTable({
 }
 
 // =============================================================================
-// SEARCH BAR
+// SEARCH BAR + TOOLBAR
 // =============================================================================
 
-function SearchBar({ value, onChange, placeholder, isMobile }) {
+function SearchBar({ value, onChange, placeholder, isMobile, searchable = true, filters, actions }) {
   return (
     <div className={cn(
       'shrink-0 border-b border-border/50 bg-bg-secondary/30',
       isMobile ? 'px-4 py-3' : 'px-4 py-2.5'
     )}>
-      <div className="relative group">
-        <MagnifyingGlass 
-          size={isMobile ? 20 : 16} 
-          className={cn(
-            "absolute left-3 top-1/2 -translate-y-1/2",
-            "text-text-tertiary group-focus-within:text-accent-primary transition-colors"
-          )}
-        />
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={cn(
-            'w-full rounded-lg border border-border bg-bg-primary',
-            'text-text-primary placeholder:text-text-tertiary',
-            'transition-all duration-200',
-            'focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary',
-            'hover:border-border-hover',
-            isMobile 
-              ? 'h-11 pl-10 pr-4 text-base' 
-              : 'h-8 pl-9 pr-3 text-sm'
-          )}
-        />
-        {value && (
-          <button
-            onClick={() => onChange('')}
-            className={cn(
-              'absolute right-2 top-1/2 -translate-y-1/2 rounded-md',
-              'text-text-tertiary hover:text-text-primary hover:bg-bg-hover',
-              'transition-all duration-150',
-              isMobile ? 'p-2' : 'p-1'
+      <div className="flex items-center gap-2">
+        {/* Search input */}
+        {searchable && (
+          <div className="relative group flex-1 min-w-0">
+            <MagnifyingGlass 
+              size={isMobile ? 20 : 16} 
+              className={cn(
+                "absolute left-3 top-1/2 -translate-y-1/2",
+                "text-text-tertiary group-focus-within:text-accent-primary transition-colors"
+              )}
+            />
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              className={cn(
+                'w-full rounded-lg border border-border bg-bg-primary',
+                'text-text-primary placeholder:text-text-tertiary',
+                'transition-all duration-200',
+                'focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary',
+                'hover:border-border-hover',
+                isMobile 
+                  ? 'h-11 pl-10 pr-4 text-base' 
+                  : 'h-8 pl-9 pr-3 text-sm'
+              )}
+            />
+            {value && (
+              <button
+                onClick={() => onChange('')}
+                className={cn(
+                  'absolute right-2 top-1/2 -translate-y-1/2 rounded-md',
+                  'text-text-tertiary hover:text-text-primary hover:bg-bg-hover',
+                  'transition-all duration-150',
+                  isMobile ? 'p-2' : 'p-1'
+                )}
+              >
+                <X size={isMobile ? 18 : 14} weight="bold" />
+              </button>
             )}
-          >
-            <X size={isMobile ? 18 : 14} weight="bold" />
-          </button>
+          </div>
+        )}
+        
+        {/* Filters (desktop only) */}
+        {!isMobile && filters && filters.length > 0 && (
+          <>
+            {filters.map((filter) => (
+              <select
+                key={filter.key}
+                value={filter.value || ''}
+                onChange={(e) => filter.onChange?.(e.target.value)}
+                className="h-8 px-2 text-sm rounded-lg border border-border bg-bg-primary text-text-primary shrink-0"
+              >
+                <option value="">{filter.placeholder || `All`}</option>
+                {filter.options?.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            ))}
+          </>
+        )}
+        
+        {/* Actions */}
+        {actions && (
+          <div className="flex items-center gap-2 shrink-0">
+            {actions}
+          </div>
         )}
       </div>
     </div>

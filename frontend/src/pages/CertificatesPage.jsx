@@ -335,9 +335,6 @@ export default function CertificatesPage() {
         subtitle={`${total} certificate${total !== 1 ? 's' : ''}`}
         icon={Certificate}
         stats={stats}
-        filters={filters}
-        activeFilters={activeFilters}
-        onClearFilters={() => { setFilterStatus(''); setFilterCA('') }}
         helpContent={helpContent}
         helpTitle="Certificates Help"
         slideOverOpen={!!selectedCert}
@@ -345,18 +342,6 @@ export default function CertificatesPage() {
         slideOverContent={slideOverContent}
         slideOverWidth="wide"
         onSlideOverClose={() => setSelectedCert(null)}
-        actions={canWrite('certificates') && (
-          isMobile ? (
-            <Button size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
-              <Plus size={22} weight="bold" />
-            </Button>
-          ) : (
-            <Button size="sm" onClick={() => setShowIssueModal(true)}>
-              <Plus size={14} weight="bold" />
-              Issue
-            </Button>
-          )
-        )}
       >
         <ResponsiveDataTable
           data={filteredCerts}
@@ -368,6 +353,42 @@ export default function CertificatesPage() {
           searchable
           searchPlaceholder="Search certificates..."
           searchKeys={['cn', 'common_name', 'subject', 'issuer', 'serial']}
+          toolbarFilters={[
+            {
+              key: 'status',
+              value: filterStatus,
+              onChange: setFilterStatus,
+              placeholder: 'All Status',
+              options: [
+                { value: 'valid', label: 'Valid' },
+                { value: 'expiring', label: 'Expiring' },
+                { value: 'expired', label: 'Expired' },
+                { value: 'revoked', label: 'Revoked' }
+              ]
+            },
+            {
+              key: 'ca',
+              value: filterCA,
+              onChange: setFilterCA,
+              placeholder: 'All CAs',
+              options: cas.map(ca => ({ 
+                value: String(ca.id), 
+                label: ca.descr || ca.common_name 
+              }))
+            }
+          ]}
+          toolbarActions={canWrite('certificates') && (
+            isMobile ? (
+              <Button size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
+                <Plus size={22} weight="bold" />
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => setShowIssueModal(true)}>
+                <Plus size={14} weight="bold" />
+                Issue
+              </Button>
+            )
+          )}
           sortable
           defaultSort={{ key: 'cn', direction: 'asc' }}
           pagination={{
