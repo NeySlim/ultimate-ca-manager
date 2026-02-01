@@ -92,10 +92,14 @@ export function UnifiedManagementLayout({
   helpContent,
   helpTitle,
   
+  // Split view (xl+ screens) - panel always visible
+  splitView = false,
+  splitEmptyContent, // Content to show when nothing selected
+  
   // Styling
   className
 }) {
-  const { isMobile } = useMobile()
+  const { isMobile, isLargeScreen } = useMobile()
   const [helpOpen, setHelpOpen] = useState(false)
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
   
@@ -312,36 +316,81 @@ export function UnifiedManagementLayout({
       </div>
       
       {/* Slide-over Panel */}
-      <div 
-        className={cn(
-          "border-l border-border bg-bg-secondary flex flex-col shrink-0 transition-all duration-300 overflow-hidden",
-          selectedItem 
-            ? "w-96 xl:w-[420px] 2xl:w-[480px]" 
-            : "w-0 border-l-0"
-        )}
-      >
-        {selectedItem && (
-          <>
-            {/* Panel Header */}
-            <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
-              <h2 className="text-sm font-semibold text-text-primary">
-                {detailsTitle || 'Details'}
-              </h2>
-              <button
-                onClick={handleDesktopClose}
-                className="p-1 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            
-            {/* Panel Content */}
-            <div className="flex-1 overflow-auto">
-              {renderDetails?.(selectedItem)}
-            </div>
-          </>
-        )}
-      </div>
+      {(splitView && isLargeScreen) ? (
+        // Split view mode - always visible panel (but hidden when no data)
+        data.length > 0 ? (
+          <div 
+            className={cn(
+              "border-l border-border bg-bg-secondary/30 flex flex-col shrink-0 overflow-hidden",
+              "w-96 xl:w-[420px] 2xl:w-[480px]"
+            )}
+          >
+            {selectedItem ? (
+              <>
+                {/* Panel Header */}
+                <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+                  <h2 className="text-sm font-semibold text-text-primary">
+                    {detailsTitle || 'Details'}
+                  </h2>
+                  <button
+                    onClick={handleDesktopClose}
+                    className="p-1 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                
+                {/* Panel Content */}
+                <div className="flex-1 overflow-auto">
+                  {renderDetails?.(selectedItem)}
+                </div>
+              </>
+            ) : (
+              // Empty state when nothing selected
+              splitEmptyContent || (
+                <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+                  <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
+                    <Question size={24} className="text-text-tertiary" />
+                  </div>
+                  <p className="text-sm text-text-secondary">Select an item to view details</p>
+                </div>
+              )
+            )}
+          </div>
+        ) : null // No panel when data is empty
+      ) : (
+        // Standard slide-over panel (collapses when nothing selected)
+        <div 
+          className={cn(
+            "border-l border-border bg-bg-secondary flex flex-col shrink-0 transition-all duration-300 overflow-hidden",
+            selectedItem 
+              ? "w-96 xl:w-[420px] 2xl:w-[480px]" 
+              : "w-0 border-l-0"
+          )}
+        >
+          {selectedItem && (
+            <>
+              {/* Panel Header */}
+              <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
+                <h2 className="text-sm font-semibold text-text-primary">
+                  {detailsTitle || 'Details'}
+                </h2>
+                <button
+                  onClick={handleDesktopClose}
+                  className="p-1 rounded hover:bg-bg-tertiary text-text-tertiary hover:text-text-primary transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              
+              {/* Panel Content */}
+              <div className="flex-1 overflow-auto">
+                {renderDetails?.(selectedItem)}
+              </div>
+            </>
+          )}
+        </div>
+      )}
       
       {/* Help Modal */}
       <HelpModal
