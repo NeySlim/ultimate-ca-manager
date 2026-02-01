@@ -290,19 +290,34 @@ export default function TrustStorePage() {
     )
   }
 
+  // When no certificates exist, show single empty state (no focus panel)
+  const hasCertificates = certificates.length > 0
+
   return (
     <>
       <PageLayout
         title="Trust Store"
         focusTitle="Certificates"
-        focusContent={focusContent}
-        focusActions={focusActions}
-        focusFooter={`${certificates.length} certificate(s)`}
+        focusContent={hasCertificates ? focusContent : undefined}
+        focusActions={hasCertificates ? focusActions : undefined}
+        focusFooter={hasCertificates ? `${certificates.length} certificate(s)` : undefined}
         helpContent={helpContent}
         
       >
         {/* Main Content */}
-        {!selectedCert ? (
+        {!hasCertificates ? (
+          <div className="flex items-center justify-center h-full">
+            <EmptyState 
+              icon={ShieldCheck}
+              title="No trusted certificates"
+              description="Add certificates to validate certificate chains"
+              action={canWrite('truststore') ? {
+                label: 'Add Certificate',
+                onClick: () => openModal('add')
+              } : null}
+            />
+          </div>
+        ) : !selectedCert ? (
           <div className="flex items-center justify-center h-full">
             <EmptyState 
               icon={Certificate}
