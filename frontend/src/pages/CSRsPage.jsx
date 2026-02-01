@@ -317,13 +317,6 @@ export default function CSRsPage() {
           searchPlaceholder="Search CSRs..."
           searchKeys={['cn', 'common_name', 'subject', 'organization']}
           sortable
-          pagination={{
-            page,
-            perPage,
-            total: filteredCSRs.length,
-            onChange: setPage,
-            onPerPageChange: setPerPage
-          }}
           emptyIcon={FileText}
           emptyTitle="No CSRs"
           emptyDescription="Upload a CSR to get started"

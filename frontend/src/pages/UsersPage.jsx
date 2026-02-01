@@ -399,13 +399,6 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
           searchPlaceholder="Search users..."
           searchKeys={['username', 'email', 'full_name', 'role']}
           sortable
-          pagination={{
-            page,
-            perPage,
-            total: filteredUsers.length,
-            onChange: setPage,
-            onPerPageChange: setPerPage
-          }}
           emptyIcon={User}
           emptyTitle="No users"
           emptyDescription="Create your first user to get started"
