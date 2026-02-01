@@ -252,8 +252,8 @@ export function FocusItem({
       className={cn(
         "p-3 rounded-lg cursor-pointer transition-all duration-200",
         selected 
-          ? "bg-accent-primary/10 border border-accent-primary/40 shadow-sm" 
-          : "hover:bg-bg-tertiary border border-transparent hover:border-border",
+          ? "bg-accent-primary/15 border-2 border-accent-primary/50 shadow-sm" 
+          : "hover:bg-bg-tertiary border-2 border-transparent hover:border-border/50",
         className
       )}
     >
@@ -261,14 +261,17 @@ export function FocusItem({
         {Icon && (
           <div className={cn(
             "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5",
-            selected ? "bg-accent-primary/20" : "bg-bg-tertiary"
+            selected ? "bg-accent-primary/25" : "bg-bg-tertiary"
           )}>
-            <Icon size={16} className={selected ? "text-accent-primary" : "text-text-tertiary"} />
+            <Icon size={16} className={selected ? "text-accent-primary" : "text-text-tertiary"} weight={selected ? "fill" : "regular"} />
           </div>
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-text-primary truncate">
+            <span className={cn(
+              "text-sm font-medium truncate",
+              selected ? "text-accent-primary" : "text-text-primary"
+            )}>
               {title}
             </span>
             {badge}

@@ -39,11 +39,12 @@ export function ResponsiveDataTable({
   // Pagination (external)
   pagination, // { page, total, perPage, onChange, onPerPageChange }
   
-  // Empty state
-  emptyIcon: EmptyIcon,
-  emptyTitle = 'No data',
-  emptyDescription,
-  emptyAction,
+  // Empty state (individual props OR object)
+  emptyIcon: EmptyIconProp,
+  emptyTitle: emptyTitleProp = 'No data',
+  emptyDescription: emptyDescriptionProp,
+  emptyAction: emptyActionProp,
+  emptyState, // { icon, title, description, action } - alternative format
   
   // Loading
   loading = false,
@@ -52,6 +53,12 @@ export function ResponsiveDataTable({
   className
 }) {
   const { isMobile, isDesktop, isTouch } = useMobile()
+  
+  // Support both individual props and emptyState object
+  const EmptyIcon = emptyState?.icon || EmptyIconProp
+  const emptyTitle = emptyState?.title || emptyTitleProp
+  const emptyDescription = emptyState?.description || emptyDescriptionProp
+  const emptyAction = emptyState?.action || emptyActionProp
   
   // Local search state (if not controlled)
   const [localSearch, setLocalSearch] = useState('')
@@ -300,7 +307,7 @@ function DesktopTable({
                 )}
               >
                 <div className="flex items-center gap-1.5">
-                  {col.header}
+                  {col.header || col.label}
                   {sort?.key === col.key && (
                     sort.direction === 'asc' 
                       ? <CaretUp size={12} weight="bold" className="text-accent-primary" />
