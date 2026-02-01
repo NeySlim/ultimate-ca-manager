@@ -497,37 +497,42 @@ function PageHeader({
         </div>
       </div>
       
-      {/* TABS ROW (if provided) */}
+      {/* TABS ROW (if provided) - underline style, theme-aware */}
       {tabs && tabs.length > 0 && (
         <div className={cn(
-          'flex gap-1 overflow-x-auto scrollbar-none',
-          isMobile ? 'mt-3 -mx-4 px-4' : 'mt-3'
+          'flex overflow-x-auto scrollbar-none border-b border-border -mb-px',
+          isMobile ? 'mt-3 -mx-4 px-4 gap-0' : 'mt-3 gap-0'
         )}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onTabChange?.(tab.id)}
-              className={cn(
-                'shrink-0 rounded-lg font-medium transition-colors',
-                isMobile ? 'px-4 py-2.5 text-sm' : 'px-3 py-1.5 text-sm',
-                activeTab === tab.id
-                  ? 'bg-accent-primary text-white'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
-              )}
-            >
-              {tab.label}
-              {tab.count !== undefined && (
-                <span className={cn(
-                  'ml-1.5 px-1.5 py-0.5 rounded text-xs',
+          {tabs.map((tab) => {
+            const TabIcon = tab.icon
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onTabChange?.(tab.id)}
+                className={cn(
+                  'shrink-0 font-medium transition-all border-b-2 -mb-px',
+                  isMobile ? 'px-4 py-2.5 text-sm' : 'px-3 py-2 text-sm',
+                  'flex items-center gap-2',
                   activeTab === tab.id
-                    ? 'bg-white/20'
-                    : 'bg-bg-tertiary'
-                )}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
+                    ? 'border-accent-primary text-accent-primary'
+                    : 'border-transparent text-text-secondary hover:text-text-primary hover:border-border'
+                )}
+              >
+                {TabIcon && <TabIcon size={16} weight={activeTab === tab.id ? "fill" : "regular"} />}
+                {tab.label}
+                {tab.count !== undefined && (
+                  <span className={cn(
+                    'ml-1 px-1.5 py-0.5 rounded text-xs',
+                    activeTab === tab.id
+                      ? 'bg-accent-primary/15 text-accent-primary'
+                      : 'bg-bg-tertiary text-text-secondary'
+                  )}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
       )}
     </header>
