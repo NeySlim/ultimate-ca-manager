@@ -413,7 +413,6 @@ export default function CRLOCSPPage() {
       subtitle={`${crls.length} active CRLs`}
       stats={headerStats}
       helpContent={helpContent}
-      actions={headerActions}
       slideOverOpen={!!selectedCA}
       onSlideOverClose={() => { setSelectedCA(null); setSelectedCRL(null); }}
       slideOverTitle="CRL Details"
@@ -427,6 +426,16 @@ export default function CRLOCSPPage() {
         searchable
         searchPlaceholder="Search CAs..."
         searchKeys={['name', 'common_name', 'cn']}
+        toolbarActions={
+          <>
+            <Button variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
+              <ArrowsClockwise size={14} />
+            </Button>
+            <Button variant="secondary" size="lg" onClick={loadData} className="md:hidden h-11 w-11 p-0">
+              <ArrowsClockwise size={22} />
+            </Button>
+          </>
+        }
         selectedId={selectedCA?.id}
         onRowClick={handleSelectCA}
         sortable

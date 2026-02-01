@@ -224,10 +224,7 @@ export function UnifiedManagementLayout({
                 <h1 className="text-base font-semibold text-text-primary">{title}</h1>
                 {TabsHeader}
               </div>
-              <div className="flex items-center gap-2">
-                {actions}
-                <HelpButton />
-              </div>
+              <HelpButton />
             </div>
             <StatsBar />
           </div>
@@ -244,6 +241,8 @@ export function UnifiedManagementLayout({
               searchable={searchable}
               searchPlaceholder={searchPlaceholder}
               searchKeys={searchKeys}
+              toolbarFilters={filters}
+              toolbarActions={actions}
               sortable={sortable}
               defaultSort={defaultSort}
               emptyIcon={emptyIcon}
@@ -283,10 +282,7 @@ export function UnifiedManagementLayout({
               <h1 className="text-lg font-semibold text-text-primary">{title}</h1>
               {TabsHeader}
             </div>
-            <div className="flex items-center gap-3">
-              {actions}
-              <HelpButton />
-            </div>
+            <HelpButton />
           </div>
           <StatsBar />
         </div>
@@ -303,6 +299,8 @@ export function UnifiedManagementLayout({
             searchable={searchable}
             searchPlaceholder={searchPlaceholder}
             searchKeys={searchKeys}
+            toolbarFilters={filters}
+            toolbarActions={actions}
             sortable={sortable}
             defaultSort={defaultSort}
             emptyIcon={emptyIcon}
