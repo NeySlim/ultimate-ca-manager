@@ -275,8 +275,6 @@ export default function CSRsPage() {
         title="Certificate Signing Requests"
         icon={FileText}
         stats={stats}
-        filters={filters}
-        activeFilters={activeFiltersCount}
         helpContent={helpContent}
         slideOverOpen={!!selectedCSR}
         onSlideOverClose={() => setSelectedCSR(null)}
@@ -291,20 +289,6 @@ export default function CSRsPage() {
             onDelete={() => handleDelete(selectedCSR.id)}
           />
         )}
-        actions={
-          canWrite('csrs') && (
-            isMobile ? (
-              <Button size="lg" onClick={() => openModal('upload')} className="w-11 h-11 p-0">
-                <UploadSimple size={22} weight="bold" />
-              </Button>
-            ) : (
-              <Button size="sm" onClick={() => openModal('upload')}>
-                <UploadSimple size={14} weight="bold" />
-                Upload
-              </Button>
-            )
-          )
-        }
       >
         <ResponsiveDataTable
           data={filteredCSRs}
@@ -316,6 +300,31 @@ export default function CSRsPage() {
           searchable
           searchPlaceholder="Search CSRs..."
           searchKeys={['cn', 'common_name', 'subject', 'organization']}
+          toolbarFilters={[
+            {
+              key: 'status',
+              value: filterStatus,
+              onChange: setFilterStatus,
+              placeholder: 'All Status',
+              options: [
+                { value: 'pending', label: 'Pending' },
+                { value: 'signed', label: 'Signed' },
+                { value: 'rejected', label: 'Rejected' }
+              ]
+            }
+          ]}
+          toolbarActions={canWrite('csrs') && (
+            isMobile ? (
+              <Button size="lg" onClick={() => openModal('upload')} className="w-11 h-11 p-0">
+                <UploadSimple size={22} weight="bold" />
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => openModal('upload')}>
+                <UploadSimple size={14} weight="bold" />
+                Upload
+              </Button>
+            )
+          )}
           sortable
           emptyIcon={FileText}
           emptyTitle="No CSRs"
