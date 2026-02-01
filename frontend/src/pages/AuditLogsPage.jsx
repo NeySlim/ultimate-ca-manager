@@ -435,11 +435,11 @@ export default function AuditLogsPage() {
               <p className="text-xs text-text-secondary">Total Events</p>
             </div>
             <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-              <p className="text-2xl font-bold text-emerald-500">{stats.success_count || 0}</p>
+              <p className="text-2xl font-bold status-success-text">{stats.success_count || 0}</p>
               <p className="text-xs text-text-secondary">Successful</p>
             </div>
             <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-              <p className="text-2xl font-bold text-red-500">{stats.failure_count || 0}</p>
+              <p className="text-2xl font-bold status-danger-text">{stats.failure_count || 0}</p>
               <p className="text-xs text-text-secondary">Failed</p>
             </div>
             <div className="text-center p-3 bg-bg-tertiary rounded-lg">

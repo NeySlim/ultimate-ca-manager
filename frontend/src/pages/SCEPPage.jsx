@@ -211,11 +211,11 @@ export default function SCEPPage() {
         </h3>
         <div className="grid grid-cols-2 gap-3">
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-yellow-500">{stats.pending}</p>
+            <p className="text-2xl font-bold status-warning-text">{stats.pending}</p>
             <p className="text-xs text-text-secondary">Pending</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-green-500">{stats.approved}</p>
+            <p className="text-2xl font-bold status-success-text">{stats.approved}</p>
             <p className="text-xs text-text-secondary">Approved</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
@@ -351,9 +351,9 @@ export default function SCEPPage() {
             <Card className="p-4">
               <div className="flex items-start gap-4">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                  config.enabled ? 'bg-green-500/15' : 'bg-bg-tertiary'
+                  config.enabled ? 'status-success-bg' : 'bg-bg-tertiary'
                 }`}>
-                  <Plugs size={24} className={config.enabled ? 'text-green-500' : 'text-text-tertiary'} weight="duotone" />
+                  <Plugs size={24} className={config.enabled ? 'status-success-text' : 'text-text-tertiary'} weight="duotone" />
                 </div>
                 <div className="flex-1">
                   <label className="flex items-center gap-3 cursor-pointer">
@@ -425,7 +425,7 @@ export default function SCEPPage() {
                   </div>
                 </label>
                 {config.auto_approve && (
-                  <div className="mt-2 flex items-start gap-2 text-yellow-500 text-xs">
+                  <div className="mt-2 flex items-start gap-2 status-warning-text text-xs">
                     <Warning size={14} className="flex-shrink-0 mt-0.5" />
                     <span>Auto-approve enabled. Ensure challenge passwords are securely distributed.</span>
                   </div>
@@ -460,11 +460,11 @@ export default function SCEPPage() {
         {activeTab === 'challenge' && (
           <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
             {!config.enabled && (
-              <Card className="p-4 border-yellow-500/30 bg-yellow-500/5">
+              <Card className="p-4 status-warning-border status-warning-bg border">
                 <div className="flex items-start gap-3">
-                  <Warning size={20} className="text-yellow-500 flex-shrink-0 mt-0.5" />
+                  <Warning size={20} className="status-warning-text flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-yellow-500">SCEP is disabled</p>
+                    <p className="text-sm font-medium status-warning-text">SCEP is disabled</p>
                     <p className="text-xs text-text-secondary">Enable SCEP in Configuration tab to use challenge passwords.</p>
                   </div>
                 </div>
@@ -564,7 +564,7 @@ export default function SCEPPage() {
               <div className="grid grid-cols-2 gap-2">
                 {['GetCACaps', 'GetCACert', 'GetCACertChain', 'PKIOperation'].map(op => (
                   <div key={op} className="flex items-center gap-2 p-2 bg-bg-tertiary rounded">
-                    <CheckCircle size={14} className="text-green-500" />
+                    <CheckCircle size={14} className="status-success-text" />
                     <span className="text-sm text-text-primary">{op}</span>
                   </div>
                 ))}
@@ -599,11 +599,11 @@ crypto ca enroll UCM-CA`}
         size="md"
       >
         <div className="space-y-4">
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+          <div className="p-3 status-danger-bg status-danger-border border rounded-lg">
             <p className="text-sm text-text-primary">
               Reject enrollment request from:
             </p>
-            <p className="text-sm font-mono text-red-400 mt-1">
+            <p className="text-sm font-mono status-danger-text mt-1">
               {selectedRequest?.subject || selectedRequest?.transaction_id}
             </p>
           </div>

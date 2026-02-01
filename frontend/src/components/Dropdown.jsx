@@ -67,7 +67,7 @@ export function Dropdown({ trigger, items, onSelect, disabled = false, size = 'd
                 className={cn(
                   "flex items-center gap-2 px-2.5 py-1.5 text-xs rounded cursor-pointer outline-none transition-colors",
                   item.danger 
-                    ? "text-red-500 hover:bg-red-500/10" 
+                    ? "status-danger-text hover:status-danger-bg" 
                     : "text-text-primary hover:bg-bg-tertiary",
                   item.disabled && "opacity-50 cursor-not-allowed"
                 )}

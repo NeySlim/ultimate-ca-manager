@@ -13,18 +13,36 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Background colors
         'bg-primary': 'var(--bg-primary)',
         'bg-secondary': 'var(--bg-secondary)',
         'bg-tertiary': 'var(--bg-tertiary)',
+        'bg-hover': 'var(--bg-tertiary)',
+        
+        // Text colors  
         'text-primary': 'var(--text-primary)',
         'text-secondary': 'var(--text-secondary)',
         'text-tertiary': 'var(--text-tertiary)',
+        
+        // Accent colors with RGB for opacity support
         'accent-primary': 'var(--accent-primary)',
+        'accent-pro': 'var(--accent-pro)',
+        
+        // Status colors - these map to theme variables
+        'status-success': 'var(--accent-success)',
+        'status-warning': 'var(--accent-warning)', 
+        'status-danger': 'var(--accent-danger)',
+        'status-error': 'var(--accent-danger)',
+        'status-info': 'var(--accent-primary)',
+        
+        // Legacy mappings (for compatibility)
         'accent-success': 'var(--accent-success)',
         'accent-warning': 'var(--accent-warning)',
         'accent-danger': 'var(--accent-danger)',
-        'accent-pro': 'var(--accent-pro)',
+        
+        // Border
         'border': 'var(--border)',
+        'border-hover': 'var(--text-tertiary)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

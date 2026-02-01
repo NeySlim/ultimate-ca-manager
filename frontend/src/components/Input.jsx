@@ -17,7 +17,7 @@ export const Input = forwardRef(function Input({
       {label && (
         <label className="block text-xs font-medium text-text-primary">
           {label}
-          {props.required && <span className="text-red-500 ml-1">*</span>}
+          {props.required && <span className="status-danger-text ml-1">*</span>}
         </label>
       )}
       
@@ -35,7 +35,7 @@ export const Input = forwardRef(function Input({
             "disabled:opacity-50 disabled:cursor-not-allowed",
             "transition-all duration-200",
             "hover:border-text-secondary/50",
-            error && "border-red-500 focus:ring-red-500/50 focus:border-red-500",
+            error && "border-accent-danger focus:ring-accent-danger/50 focus:border-accent-danger",
             !error && "border-border",
             icon && "pl-8"
           )}
@@ -44,7 +44,7 @@ export const Input = forwardRef(function Input({
       </div>
 
       {error && (
-        <p className="text-xs text-red-500">{error}</p>
+        <p className="text-xs status-danger-text">{error}</p>
       )}
       
       {helperText && !error && (

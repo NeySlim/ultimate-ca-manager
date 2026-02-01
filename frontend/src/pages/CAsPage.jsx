@@ -616,9 +616,9 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
         
         {/* CA Icon */}
         {ca.type === 'root' ? (
-          <Crown size={isMobile ? 20 : 16} weight="duotone" className="text-yellow-500 shrink-0" />
+          <Crown size={isMobile ? 20 : 16} weight="duotone" className="status-warning-text shrink-0" />
         ) : (
-          <ShieldCheck size={isMobile ? 20 : 16} weight="duotone" className="text-blue-500 shrink-0" />
+          <ShieldCheck size={isMobile ? 20 : 16} weight="duotone" className="status-primary-text shrink-0" />
         )}
         
         {/* Name */}
@@ -678,7 +678,7 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete }) {
       {/* Header */}
       <CompactHeader
         icon={ca.type === 'root' ? Crown : ShieldCheck}
-        iconClass={ca.type === 'root' ? "bg-yellow-500/20" : "bg-blue-500/20"}
+        iconClass={ca.type === 'root' ? "status-warning-bg" : "status-primary-bg"}
         title={ca.name || ca.common_name || 'CA'}
         subtitle={ca.subject}
         badge={

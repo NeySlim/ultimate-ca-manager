@@ -345,7 +345,7 @@ export default function ImportExportPage() {
             <p className="text-xs text-text-secondary">Available CAs</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-emerald-500">✓</p>
+            <p className="text-2xl font-bold status-success-text">✓</p>
             <p className="text-xs text-text-secondary">Ready</p>
           </div>
         </div>
@@ -770,10 +770,10 @@ export default function ImportExportPage() {
 
             {testResult && (
               <DetailSection title="Connection Status">
-                <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                  <CheckCircle size={24} className="text-green-500" weight="fill" />
+                <div className="flex items-center gap-3 p-3 status-success-bg status-success-border border rounded-lg">
+                  <CheckCircle size={24} className="status-success-text" weight="fill" />
                   <div>
-                    <h4 className="text-sm font-semibold text-green-400">Connection Successful</h4>
+                    <h4 className="text-sm font-semibold status-success-text">Connection Successful</h4>
                     <p className="text-xs text-text-secondary">Found {testResult.cas} CAs and {testResult.certificates} certificates ready to import</p>
                   </div>
                 </div>

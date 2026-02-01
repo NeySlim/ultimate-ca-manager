@@ -158,7 +158,7 @@ export default function CRLOCSPPage() {
       label: 'CA Name',
       render: (v, row) => (
         <div className="flex items-center gap-2">
-          <FileX size={14} className={row.has_crl ? 'text-emerald-500' : 'text-text-tertiary'} />
+          <FileX size={14} className={row.has_crl ? 'status-success-text' : 'text-text-tertiary'} />
           <span className="font-medium">{v || row.name}</span>
         </div>
       )
@@ -178,7 +178,7 @@ export default function CRLOCSPPage() {
       label: 'Revoked',
       width: '80px',
       render: (v) => (
-        <span className={v > 0 ? 'text-red-500 font-medium' : 'text-text-secondary'}>
+        <span className={v > 0 ? 'status-danger-text font-medium' : 'text-text-secondary'}>
           {v || 0}
         </span>
       )
@@ -202,9 +202,9 @@ export default function CRLOCSPPage() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              ca.has_crl ? 'bg-emerald-500/10' : 'bg-bg-tertiary'
+              ca.has_crl ? 'status-success-bg' : 'bg-bg-tertiary'
             }`}>
-              <FileX size={20} className={ca.has_crl ? 'text-emerald-500' : 'text-text-tertiary'} />
+              <FileX size={20} className={ca.has_crl ? 'status-success-text' : 'text-text-tertiary'} />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
@@ -253,7 +253,7 @@ export default function CRLOCSPPage() {
       </Card>
 
       {/* OCSP Status */}
-      <Card className={`p-4 space-y-3 bg-gradient-to-br ${ocspStatus.enabled ? 'from-emerald-500/10' : 'from-amber-500/10'}`}>
+      <Card className={`p-4 space-y-3 ${ocspStatus.enabled ? 'stat-card-success' : 'stat-card-warning'}`}>
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Pulse size={16} className="text-accent-primary" />
           OCSP Responder

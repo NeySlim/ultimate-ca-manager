@@ -81,20 +81,20 @@ export function NotificationProvider({ children }) {
 
   const getIcon = (type) => {
     switch (type) {
-      case 'success': return <CheckCircle size={20} weight="fill" className="text-green-500" />
-      case 'error': return <XCircle size={20} weight="fill" className="text-red-500" />
-      case 'warning': return <Warning size={20} weight="fill" className="text-orange-500" />
-      case 'info': return <Info size={20} weight="fill" className="text-blue-500" />
+      case 'success': return <CheckCircle size={20} weight="fill" className="status-success-text" />
+      case 'error': return <XCircle size={20} weight="fill" className="status-danger-text" />
+      case 'warning': return <Warning size={20} weight="fill" className="status-warning-text" />
+      case 'info': return <Info size={20} weight="fill" className="status-primary-text" />
       default: return <Info size={20} weight="fill" />
     }
   }
 
   const getColors = (type) => {
     switch (type) {
-      case 'success': return 'border-green-500/20 bg-green-500/10'
-      case 'error': return 'border-red-500/20 bg-red-500/10'
-      case 'warning': return 'border-orange-500/20 bg-orange-500/10'
-      case 'info': return 'border-blue-500/20 bg-blue-500/10'
+      case 'success': return 'status-success-border status-success-bg border'
+      case 'error': return 'status-danger-border status-danger-bg border'
+      case 'warning': return 'status-warning-border status-warning-bg border'
+      case 'info': return 'status-primary-border status-primary-bg border'
       default: return 'border-border bg-bg-secondary'
     }
   }

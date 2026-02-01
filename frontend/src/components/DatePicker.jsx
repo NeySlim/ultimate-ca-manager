@@ -19,7 +19,7 @@ export function DatePicker({
       {label && (
         <label className="block text-sm font-medium text-text-primary">
           {label}
-          {props.required && <span className="text-red-500 ml-1">*</span>}
+          {props.required && <span className="status-danger-text ml-1">*</span>}
         </label>
       )}
       
@@ -39,7 +39,7 @@ export function DatePicker({
             "focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             "transition-all",
-            error ? "border-red-500 focus:ring-red-500" : "border-border",
+            error ? "border-accent-danger focus:ring-accent-danger" : "border-border",
             "[color-scheme:dark]" // Makes the date picker dark mode friendly
           )}
           {...props}
@@ -47,7 +47,7 @@ export function DatePicker({
       </div>
 
       {error && (
-        <p className="text-xs text-red-500">{error}</p>
+        <p className="text-xs status-danger-text">{error}</p>
       )}
     </div>
   )

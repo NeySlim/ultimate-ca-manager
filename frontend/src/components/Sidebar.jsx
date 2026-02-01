@@ -251,7 +251,7 @@ export function Sidebar({ activePage }) {
 
             <DropdownMenu.Item
               onClick={handleLogout}
-              className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-red-500/10 text-red-500 transition-colors"
+              className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:status-danger-bg status-danger-text transition-colors"
             >
               <SignOut size={16} />
               <span>Sign Out</span>

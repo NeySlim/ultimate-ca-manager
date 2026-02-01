@@ -107,9 +107,9 @@ export const expiryColumn = (key = 'valid_to', label = 'Expires') => ({
     const daysUntil = Math.ceil((date - now) / (1000 * 60 * 60 * 24))
     
     let colorClass = 'text-text-primary'
-    if (daysUntil < 0) colorClass = 'text-red-500'
-    else if (daysUntil < 7) colorClass = 'text-red-500'
-    else if (daysUntil < 30) colorClass = 'text-orange-500'
+    if (daysUntil < 0) colorClass = 'status-danger-text'
+    else if (daysUntil < 7) colorClass = 'status-danger-text'
+    else if (daysUntil < 30) colorClass = 'status-orange-text'
     
     return <span className={colorClass}>{formatDate(val)}</span>
   }

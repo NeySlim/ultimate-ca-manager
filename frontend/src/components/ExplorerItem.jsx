@@ -66,16 +66,16 @@ export function ExplorerSection({ title, children, className }) {
  */
 export function ExplorerStat({ icon: Icon, label, value, color = 'primary', className }) {
   const colors = {
-    primary: 'from-accent-primary/10 to-accent-primary/5 border-accent-primary/20 text-accent-primary',
-    success: 'from-green-500/10 to-green-500/5 border-green-500/20 text-green-500',
-    warning: 'from-yellow-500/10 to-yellow-500/5 border-yellow-500/20 text-yellow-500',
-    danger: 'from-red-500/10 to-red-500/5 border-red-500/20 text-red-500',
-    info: 'from-blue-500/10 to-blue-500/5 border-blue-500/20 text-blue-500',
+    primary: 'stat-card-primary status-primary-text',
+    success: 'stat-card-success status-success-text',
+    warning: 'stat-card-warning status-warning-text',
+    danger: 'stat-card-danger status-danger-text',
+    info: 'stat-card-primary status-primary-text',
   }
   
   return (
     <div className={cn(
-      'p-3 bg-gradient-to-br border rounded-lg',
+      'p-3 border rounded-lg',
       colors[color],
       className
     )}>

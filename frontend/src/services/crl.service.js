@@ -12,6 +12,10 @@ export const crlService = {
     return apiClient.get(`/crl/${id}`)
   },
 
+  async getForCA(caId) {
+    return apiClient.get(`/crl/${caId}`)
+  },
+
   async generate(caId) {
     return apiClient.post('/crl/generate', { ca_id: caId })
   },

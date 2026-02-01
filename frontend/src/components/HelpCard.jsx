@@ -14,9 +14,9 @@ const variants = {
   },
   tip: {
     icon: Lightbulb,
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/5',
-    border: 'border-amber-500/20',
+    color: 'status-warning-text',
+    bg: 'status-warning-bg',
+    border: 'status-warning-border',
   },
   warning: {
     icon: Warning,
@@ -26,9 +26,9 @@ const variants = {
   },
   help: {
     icon: Question,
-    color: 'text-purple-400',
-    bg: 'bg-purple-500/5',
-    border: 'border-purple-500/20',
+    color: 'status-purple-text',
+    bg: 'status-purple-bg',
+    border: 'status-purple-border',
   },
   success: {
     icon: CheckCircle,

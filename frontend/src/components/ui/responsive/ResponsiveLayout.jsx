@@ -394,10 +394,10 @@ function PageHeader({
 function StatsBar({ stats, isMobile }) {
   const variants = {
     primary: 'text-accent-primary',
-    success: 'text-emerald-500',
-    warning: 'text-amber-500',
-    danger: 'text-red-500',
-    info: 'text-blue-500'
+    success: 'status-success-text',
+    warning: 'status-warning-text',
+    danger: 'status-danger-text',
+    info: 'status-primary-text'
   }
   
   if (isMobile) {

@@ -19,7 +19,7 @@ export function Textarea({
         <div className="flex items-center justify-between">
           <label className="block text-sm font-medium text-text-primary">
             {label}
-            {props.required && <span className="text-red-500 ml-1">*</span>}
+            {props.required && <span className="status-danger-text ml-1">*</span>}
           </label>
           {showCount && maxLength && (
             <span className="text-xs text-text-secondary">
@@ -36,7 +36,7 @@ export function Textarea({
           "disabled:opacity-50 disabled:cursor-not-allowed",
           "transition-all duration-200 resize-y",
           "hover:border-text-secondary/50 hover:bg-bg-tertiary",
-          error && "border-red-500 focus:ring-red-500/50",
+          error && "border-accent-danger focus:ring-accent-danger/50",
           !error && "border-border"
         )}
         value={value}
@@ -45,7 +45,7 @@ export function Textarea({
       />
 
       {error && (
-        <p className="text-xs text-red-500">{error}</p>
+        <p className="text-xs status-danger-text">{error}</p>
       )}
       
       {helperText && !error && (

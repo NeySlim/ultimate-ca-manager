@@ -89,7 +89,7 @@ export function DetailHeader({
                           className={cn(
                             "w-full px-3 py-2 text-left text-sm flex items-center gap-2",
                             "hover:bg-bg-tertiary transition-colors",
-                            action.variant === 'danger' && "text-red-500",
+                            action.variant === 'danger' && "status-danger-text",
                             action.disabled && "opacity-50"
                           )}
                         >
@@ -250,7 +250,7 @@ export function DetailField({
         {value !== undefined && value !== null && value !== '' ? value : <span className="text-text-tertiary">—</span>}
         {copyable && (
           copied 
-            ? <Check size={14} className="text-emerald-500" /> 
+            ? <Check size={14} className="status-success-text" /> 
             : <Copy size={14} className="text-text-tertiary opacity-30" />
         )}
       </dd>
