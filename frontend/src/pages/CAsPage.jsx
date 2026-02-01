@@ -552,7 +552,7 @@ export default function CAsPage() {
             )}
           </div>
 
-          <div className="flex gap-3 justify-end pt-4 border-t border-border">
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button type="button" variant="secondary" onClick={() => closeModal('create')}>
               Cancel
             </Button>
@@ -600,7 +600,7 @@ export default function CAsPage() {
             placeholder="Enter password if needed"
           />
           
-          <div className="flex gap-3 justify-end pt-4 border-t border-border">
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button variant="secondary" onClick={() => closeModal('import')}>Cancel</Button>
             <Button onClick={handleImportCA} disabled={importing || !importFile}>
               {importing ? <LoadingSpinner size="sm" /> : <UploadSimple size={16} />}

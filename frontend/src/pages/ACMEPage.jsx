@@ -699,7 +699,7 @@ function CreateAccountForm({ onSubmit, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
         label="Email Address"
         type="email"
@@ -733,13 +733,13 @@ function CreateAccountForm({ onSubmit, onCancel }) {
         </span>
       </label>
       
-      <div className="flex gap-3 pt-4 border-t border-border">
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
         <Button type="submit">
           <Plus size={14} />
           Create Account
-        </Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
         </Button>
       </div>
     </form>

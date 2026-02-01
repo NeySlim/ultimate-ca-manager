@@ -945,7 +945,7 @@ function ChangePasswordForm({ onSubmit, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
         label="Current Password"
         type="password"
@@ -968,9 +968,9 @@ function ChangePasswordForm({ onSubmit, onCancel }) {
         required
       />
       
-      <div className="flex gap-3 pt-4">
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
         <Button type="submit">Change Password</Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
     </form>
   )
@@ -988,7 +988,7 @@ function CreateApiKeyForm({ onSubmit, onCancel }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
         label="Key Name"
         value={formData.name}
@@ -1007,9 +1007,9 @@ function CreateApiKeyForm({ onSubmit, onCancel }) {
         helperText="Key will expire after this many days (1-365)"
       />
       
-      <div className="flex gap-3 pt-4">
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
         <Button type="submit">Create Key</Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
     </form>
   )

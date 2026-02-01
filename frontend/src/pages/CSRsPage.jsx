@@ -392,7 +392,7 @@ export default function CSRsPage() {
             max="3650"
           />
 
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button variant="secondary" onClick={() => closeModal('sign')}>Cancel</Button>
             <Button onClick={handleSign} disabled={!signCA}>
               <SignIn size={16} /> Sign CSR
