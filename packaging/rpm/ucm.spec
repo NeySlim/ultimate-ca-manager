@@ -58,10 +58,10 @@ cp -r scripts %{buildroot}%{ucm_home}/
 # Remove .env files (configuration created by postinst)
 find %{buildroot}%{ucm_home} -name ".env*" -delete
 
-# Install root files
+# Install root files (requirements from backend, gunicorn/wsgi from root)
 install -m 644 backend/requirements.txt %{buildroot}%{ucm_home}/
-install -m 644 backend/gunicorn.conf.py %{buildroot}%{ucm_home}/
-install -m 755 backend/wsgi.py %{buildroot}%{ucm_home}/
+install -m 644 gunicorn.conf.py %{buildroot}%{ucm_home}/
+install -m 755 wsgi.py %{buildroot}%{ucm_home}/
 
 # Install systemd service
 install -m 644 packaging/rpm/ucm.service %{buildroot}%{_unitdir}/%{name}.service
@@ -201,10 +201,12 @@ if [ ! -f "%{ucm_data}/ucm.db" ]; then
     echo "Initializing database..."
     cd %{ucm_home}/backend
     set -a; [ -f "$ENV_FILE" ] && . "$ENV_FILE"; set +a
-    ../venv/bin/python init_db.py
-    chown %{name}:%{name} %{ucm_data}/ucm.db
+    sudo -u %{name} ../venv/bin/python init_db.py
     echo "✓ Database initialized"
 fi
+
+# Clean up any stale lock files
+rm -f %{ucm_data}/.db_init.lock 2>/dev/null || true
 
 systemctl daemon-reload >/dev/null 2>&1 || true
 %systemd_post %{name}.service
