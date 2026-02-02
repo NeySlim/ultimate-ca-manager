@@ -18,7 +18,7 @@ NC='\033[0m'
 # Banner
 echo -e "${GREEN}╔════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║  Ultimate CA Manager - Docker         ║${NC}"
-echo -e "${GREEN}║  Version 1.8.0-beta                    ║${NC}"
+echo -e "${GREEN}║  Version 2.0.0                         ║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -274,9 +274,9 @@ elif [ -f "$CERT_PATH" ] && [ -f "$KEY_PATH" ]; then
 else
     echo -e "${YELLOW}   Generating self-signed certificate...${NC}"
     
-    # Get container's hostname and IP
+    # Get container's hostname and IP (IPv4 only for certificate)
     CONTAINER_HOSTNAME=$(hostname)
-    CONTAINER_IP=$(hostname -i 2>/dev/null || echo "127.0.0.1")
+    CONTAINER_IP=$(hostname -i 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || echo "127.0.0.1")
     
     # Create OpenSSL config for SAN (Chrome/Edge compatibility)
     cat > /tmp/openssl.cnf <<EOF

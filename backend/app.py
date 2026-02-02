@@ -742,8 +742,10 @@ def init_database(app):
     # Generate self-signed HTTPS certificate if none exists
     try:
         from pathlib import Path
-        https_cert_path = Path('/opt/ucm/data/https_cert.pem')
-        https_key_path = Path('/opt/ucm/data/https_key.pem')
+        import os
+        data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
+        https_cert_path = Path(data_dir) / 'https_cert.pem'
+        https_key_path = Path(data_dir) / 'https_key.pem'
         
         if not https_cert_path.exists() or not https_key_path.exists():
             app.logger.info("No HTTPS certificate found, generating self-signed certificate...")
