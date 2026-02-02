@@ -126,6 +126,186 @@ paths:
           $ref: '#/components/responses/Unauthorized'
 
   # ===================
+  # WEBAUTHN / PASSKEYS
+  # ===================
+  /auth/webauthn/register/options:
+    post:
+      tags: [Auth]
+      summary: Get WebAuthn registration options
+      description: Generate registration challenge for a new passkey
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: WebAuthn registration options (PublicKeyCredentialCreationOptions)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  challenge:
+                    type: string
+                    description: Base64url-encoded challenge
+                  rp:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      displayName:
+                        type: string
+                  pubKeyCredParams:
+                    type: array
+                    items:
+                      type: object
+                  authenticatorSelection:
+                    type: object
+                  timeout:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/webauthn/register/verify:
+    post:
+      tags: [Auth]
+      summary: Verify WebAuthn registration
+      description: Complete passkey registration with attestation response
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, rawId, response, type, name]
+              properties:
+                id:
+                  type: string
+                  description: Credential ID (base64url)
+                rawId:
+                  type: string
+                  description: Raw credential ID (base64url)
+                response:
+                  type: object
+                  properties:
+                    clientDataJSON:
+                      type: string
+                    attestationObject:
+                      type: string
+                type:
+                  type: string
+                  enum: [public-key]
+                name:
+                  type: string
+                  description: User-friendly name for the passkey
+      responses:
+        '200':
+          description: Passkey registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  passkey_id:
+                    type: integer
+                  message:
+                    type: string
+        '400':
+          description: Registration failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/webauthn/authenticate/options:
+    post:
+      tags: [Auth]
+      summary: Get WebAuthn authentication options
+      description: Generate authentication challenge for passkey login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+      responses:
+        '200':
+          description: WebAuthn authentication options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  challenge:
+                    type: string
+                  rpId:
+                    type: string
+                  allowCredentials:
+                    type: array
+                    items:
+                      type: object
+                  timeout:
+                    type: integer
+        '404':
+          description: No passkeys found for user
+
+  /auth/webauthn/authenticate/verify:
+    post:
+      tags: [Auth]
+      summary: Verify WebAuthn authentication
+      description: Complete passkey login with assertion response
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, rawId, response, type, username]
+              properties:
+                id:
+                  type: string
+                rawId:
+                  type: string
+                response:
+                  type: object
+                  properties:
+                    clientDataJSON:
+                      type: string
+                    authenticatorData:
+                      type: string
+                    signature:
+                      type: string
+                type:
+                  type: string
+                  enum: [public-key]
+                username:
+                  type: string
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ===================
   # DASHBOARD
   # ===================
   /dashboard/stats:
@@ -335,6 +515,37 @@ paths:
             application/x-pem-file:
               schema:
                 type: string
+
+  /certificates/stats:
+    get:
+      tags: [Certificates]
+      summary: Get certificate statistics
+      description: Returns counts of certificates by status (valid, expiring, expired, revoked)
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Certificate statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: integer
+                    description: Number of currently valid certificates
+                  expiring:
+                    type: integer
+                    description: Certificates expiring within 30 days
+                  expired:
+                    type: integer
+                    description: Expired certificates
+                  revoked:
+                    type: integer
+                    description: Revoked certificates
+                  total:
+                    type: integer
+                    description: Total certificate count
 
   # ===================
   # CAS
@@ -871,6 +1082,84 @@ paths:
       responses:
         '201':
           description: Certificate added
+
+  /truststore/stats:
+    get:
+      tags: [Truststore]
+      summary: Get truststore statistics
+      description: Returns counts of certificates by type
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Truststore statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  root:
+                    type: integer
+                    description: Root CA certificates
+                  intermediate:
+                    type: integer
+                    description: Intermediate CA certificates
+                  expired:
+                    type: integer
+                    description: Expired certificates
+                  total:
+                    type: integer
+                    description: Total count
+
+  /truststore/import:
+    post:
+      tags: [Truststore]
+      summary: Import certificate file
+      description: Upload PEM or DER certificate file
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Import result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported:
+                    type: integer
+                  skipped:
+                    type: integer
+
+  /truststore/sync:
+    post:
+      tags: [Truststore]
+      summary: Import system CA bundle
+      description: Import certificates from system CA certificates bundle
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported:
+                    type: integer
+                  skipped:
+                    type: integer
 
   # ===================
   # PRO: GROUPS
