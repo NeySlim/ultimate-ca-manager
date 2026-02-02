@@ -2,11 +2,7 @@ Source: ucm
 Section: admin
 Priority: optional
 Maintainer: UCM Development Team <dev@ucm-project.org>
-Build-Depends: debhelper (>= 13),
-               dh-python,
-               python3-all,
-               python3-setuptools,
-               python3-pip
+Build-Depends: debhelper (>= 13)
 Standards-Version: 4.6.0
 Homepage: https://github.com/NeySlim/ultimate-ca-manager
 Vcs-Browser: https://github.com/NeySlim/ultimate-ca-manager

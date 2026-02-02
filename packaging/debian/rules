@@ -1,23 +1,32 @@
 #!/usr/bin/make -f
 
 # UCM Debian Build Rules
+# UCM is not a standard Python package - it's a web application
 
 export DH_VERBOSE=1
-export PYBUILD_NAME=ucm
-export PYBUILD_DISABLE=test
 
 %:
-	dh $@ --with python3 --buildsystem=pybuild
+	dh $@
+
+override_dh_auto_build:
+	# No build step needed - UCM is a web application
+	@echo "Skipping build - UCM is a pre-built web application"
+
+override_dh_auto_clean:
+	# Nothing to clean
+	@echo "Nothing to clean"
+
+override_dh_auto_test:
+	# Skip tests during package build
+	@echo "Skipping tests"
 
 override_dh_auto_install:
-	# Install Python application
-	dh_auto_install
-	
 	# Create directory structure
 	install -d debian/ucm/opt/ucm
 	install -d debian/ucm/opt/ucm/backend
 	install -d debian/ucm/opt/ucm/frontend
 	install -d debian/ucm/var/lib/ucm
+	install -d debian/ucm/var/lib/ucm/data
 	install -d debian/ucm/etc/ucm
 	install -d debian/ucm/var/log/ucm
 	install -d debian/ucm/usr/share/doc/ucm
@@ -26,6 +35,10 @@ override_dh_auto_install:
 	cp -r backend/* debian/ucm/opt/ucm/backend/
 	cp -r frontend/* debian/ucm/opt/ucm/frontend/
 	
+	# Copy root files
+	cp wsgi.py debian/ucm/opt/ucm/ || true
+	cp gunicorn.conf.py debian/ucm/opt/ucm/ || true
+	
 	# Remove .env files (configuration is created by postinst)
 	rm -f debian/ucm/opt/ucm/.env* debian/ucm/opt/ucm/backend/.env* 2>/dev/null || true
 	
@@ -33,12 +46,12 @@ override_dh_auto_install:
 	install -m 755 packaging/debian/start-ucm.sh debian/ucm/opt/ucm/start-ucm.sh
 	
 	# Install requirements.txt
-	install -m 644 requirements.txt debian/ucm/opt/ucm/requirements.txt
+	install -m 644 backend/requirements.txt debian/ucm/opt/ucm/requirements.txt
 	
 	# Copy documentation
 	cp README.md debian/ucm/usr/share/doc/ucm/
-	cp DOCKER_QUICKSTART.md debian/ucm/usr/share/doc/ucm/ || true
-	cp LICENSE debian/ucm/usr/share/doc/ucm/ || true
+	cp DOCKER_QUICKSTART.md debian/ucm/usr/share/doc/ucm/ 2>/dev/null || true
+	cp LICENSE debian/ucm/usr/share/doc/ucm/ 2>/dev/null || true
 	
 	# Install systemd service
 	install -d debian/ucm/lib/systemd/system
@@ -47,7 +60,7 @@ override_dh_auto_install:
 	# Set permissions
 	find debian/ucm/opt/ucm -type f -exec chmod 644 {} \;
 	find debian/ucm/opt/ucm -type d -exec chmod 755 {} \;
-	chmod +x debian/ucm/opt/ucm/backend/app.py || true
+	chmod +x debian/ucm/opt/ucm/start-ucm.sh || true
 
 override_dh_installinit:
 	dh_installinit --name=ucm
