@@ -43,6 +43,7 @@ export default function UsersGroupsPage() {
   // Modals
   const [showUserModal, setShowUserModal] = useState(false)
   const [showGroupModal, setShowGroupModal] = useState(false)
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [editingGroup, setEditingGroup] = useState(null)
   
@@ -201,6 +202,48 @@ export default function UsersGroupsPage() {
       showError(error.message || 'Failed to delete group')
     }
   }
+
+  const handleAddMember = async (userId) => {
+    if (!selectedGroup) return
+    try {
+      await groupsService.addMember(selectedGroup.id, userId)
+      showSuccess('Member added')
+      setShowAddMemberModal(false)
+      loadData()
+      // Refresh selected group
+      const updated = await groupsService.getById(selectedGroup.id)
+      setSelectedGroup(updated.data)
+    } catch (error) {
+      showError(error.message || 'Failed to add member')
+    }
+  }
+
+  const handleRemoveMember = async (userId) => {
+    if (!selectedGroup) return
+    const confirmed = await showConfirm('Remove this member from the group?', {
+      title: 'Remove Member',
+      confirmText: 'Remove',
+      variant: 'danger'
+    })
+    if (!confirmed) return
+    try {
+      await groupsService.removeMember(selectedGroup.id, userId)
+      showSuccess('Member removed')
+      loadData()
+      // Refresh selected group
+      const updated = await groupsService.getById(selectedGroup.id)
+      setSelectedGroup(updated.data)
+    } catch (error) {
+      showError(error.message || 'Failed to remove member')
+    }
+  }
+
+  // Users available to add (not already members)
+  const availableUsersForGroup = useMemo(() => {
+    if (!selectedGroup) return []
+    const memberIds = (selectedGroup.members || []).map(m => m.id || m.user_id)
+    return users.filter(u => !memberIds.includes(u.id))
+  }, [selectedGroup, users])
 
   // ============= FILTERED DATA =============
   
@@ -468,18 +511,59 @@ export default function UsersGroupsPage() {
         </CompactGrid>
       </CompactSection>
 
-      {selectedGroup.members?.length > 0 && (
-        <CompactSection title="Members">
-          <div className="space-y-2">
-            {selectedGroup.members.map(member => (
-              <div key={member.id || member.username} className="flex items-center gap-2 text-sm">
-                <User size={14} className="text-text-secondary" />
-                <span>{member.username || member}</span>
-              </div>
-            ))}
-          </div>
-        </CompactSection>
-      )}
+      <CompactSection title="Members">
+        <div className="space-y-3">
+          {/* Add Member Button */}
+          {canWrite('users') && availableUsersForGroup.length > 0 && (
+            <div className="flex justify-end">
+              <Button size="sm" onClick={() => setShowAddMemberModal(true)}>
+                <Plus size={14} /> Add Member
+              </Button>
+            </div>
+          )}
+
+          {/* Members List */}
+          {(selectedGroup.members?.length || 0) === 0 ? (
+            <p className="text-sm text-text-tertiary text-center py-4">
+              No members in this group
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {selectedGroup.members.map(member => (
+                <div
+                  key={member.id || member.user_id || member.username}
+                  className="flex items-center justify-between px-3 py-2.5 bg-bg-tertiary/50 border border-border rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center">
+                      <User size={16} className="text-accent-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-text-primary">
+                        {member.username}
+                      </p>
+                      {member.email && (
+                        <p className="text-xs text-text-tertiary">
+                          {member.email}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {canWrite('users') && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleRemoveMember(member.id || member.user_id)}
+                    >
+                      <Trash size={14} className="text-status-danger" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </CompactSection>
     </div>
   )
 
@@ -639,6 +723,38 @@ export default function UsersGroupsPage() {
           onSubmit={editingGroup ? handleUpdateGroup : handleCreateGroup}
           onCancel={() => { setShowGroupModal(false); setEditingGroup(null) }}
         />
+      </Modal>
+
+      {/* Add Member Modal */}
+      <Modal
+        open={showAddMemberModal}
+        onOpenChange={setShowAddMemberModal}
+        title="Add Member"
+        size="sm"
+      >
+        <div className="p-4 space-y-2 max-h-80 overflow-auto">
+          {availableUsersForGroup.length === 0 ? (
+            <p className="text-sm text-text-tertiary text-center py-4">
+              All users are already members of this group
+            </p>
+          ) : (
+            availableUsersForGroup.map(user => (
+              <button
+                key={user.id}
+                onClick={() => handleAddMember(user.id)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-bg-tertiary transition-colors text-left"
+              >
+                <div className="w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center">
+                  <User size={16} className="text-accent-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-text-primary">{user.username}</p>
+                  <p className="text-xs text-text-tertiary">{user.email}</p>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
       </Modal>
     </>
   )
