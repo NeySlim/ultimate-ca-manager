@@ -26,6 +26,7 @@ export default function CertificatesPage() {
   const [certificates, setCertificates] = useState([])
   const [cas, setCas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [certStats, setCertStats] = useState({ valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 })
   
   // Selection
   const [selectedCert, setSelectedCert] = useState(null)
@@ -54,14 +55,16 @@ export default function CertificatesPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [certsRes, casRes] = await Promise.all([
+      const [certsRes, casRes, statsRes] = await Promise.all([
         certificatesService.getAll({ page, per_page: perPage }),
-        casService.getAll()
+        casService.getAll(),
+        certificatesService.getStats()
       ])
       const certs = certsRes.data || []
       setCertificates(certs)
       setTotal(certsRes.meta?.total || certsRes.pagination?.total || certs.length)
       setCas(casRes.data || [])
+      setCertStats(statsRes.data || { valid: 0, expiring: 0, expired: 0, revoked: 0, total: 0 })
     } catch (error) {
       showError(error.message || ERRORS.LOAD_FAILED.CERTIFICATES)
     } finally {
@@ -179,20 +182,14 @@ export default function CertificatesPage() {
     return result
   }, [certificates, filterStatus, filterCA])
 
-  // Stats
-  const stats = useMemo(() => {
-    const valid = certificates.filter(c => !c.revoked && c.status === 'valid').length
-    const expiring = certificates.filter(c => c.status === 'expiring').length
-    const expired = certificates.filter(c => !c.revoked && c.status === 'expired').length
-    const revoked = certificates.filter(c => c.revoked).length
-    return [
-      { icon: CheckCircle, label: 'Valid', value: valid, variant: 'success' },
-      { icon: Warning, label: 'Expiring', value: expiring, variant: 'warning' },
-      { icon: Clock, label: 'Expired', value: expired, variant: 'neutral' },
-      { icon: X, label: 'Revoked', value: revoked, variant: 'danger' },
-      { icon: Certificate, label: 'Total', value: total, variant: 'primary' }
-    ]
-  }, [certificates, total])
+  // Stats - from backend API for accurate counts
+  const stats = useMemo(() => [
+    { icon: CheckCircle, label: 'Valid', value: certStats.valid, variant: 'success' },
+    { icon: Warning, label: 'Expiring', value: certStats.expiring, variant: 'warning' },
+    { icon: Clock, label: 'Expired', value: certStats.expired, variant: 'neutral' },
+    { icon: X, label: 'Revoked', value: certStats.revoked, variant: 'danger' },
+    { icon: Certificate, label: 'Total', value: certStats.total, variant: 'primary' }
+  ], [certStats])
 
   // Table columns
   const columns = useMemo(() => [
