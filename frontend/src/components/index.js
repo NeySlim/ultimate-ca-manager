@@ -21,6 +21,7 @@ export { TreeView } from './TreeView'
 export { SearchBar } from './SearchBar'
 export { Modal } from './Modal'
 export { Form } from './Form'
+export { FormModal, ConfirmModal } from './FormModal'
 export { Input } from './Input'
 export { SelectComponent as Select } from './Select'
 export { Textarea } from './Textarea'
@@ -113,3 +114,4 @@ export {
 
 // NEW: Phase 10 FROM SCRATCH - Unified responsive components
 export { ResponsiveLayout, ResponsiveDataTable } from './ui/responsive'
+export { UnifiedPageHeader } from './ui/UnifiedPageHeader'

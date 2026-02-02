@@ -8,13 +8,13 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
-  Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop,
-  Question
+  Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop
 } from '@phosphor-icons/react'
 import {
   Button, Input, Select, Badge, Card,
   LoadingSpinner, FileUpload, Modal, HelpCard, HelpModal,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
+  UnifiedPageHeader
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
@@ -1111,63 +1111,29 @@ export default function SettingsPage() {
     )
   }
 
+  // Transform categories to tabs format
+  const tabs = SETTINGS_CATEGORIES.map(cat => ({
+    id: cat.id,
+    label: cat.label,
+    icon: cat.icon,
+    badge: cat.pro ? { label: 'Pro', variant: 'info' } : undefined
+  }))
+
   return (
     <>
       <div className="flex flex-col h-full w-full">
-        {/* Header with tabs */}
-        <div className="shrink-0 border-b border-border bg-bg-secondary">
-          {/* Title row */}
-          <div className="px-4 md:px-6 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center shrink-0">
-                <Gear size={18} weight="bold" className="text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
-                <p className="text-sm text-text-secondary">System configuration</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setHelpOpen(true)}
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all",
-                "bg-accent-primary/10 border border-accent-primary/30",
-                "text-accent-primary hover:bg-accent-primary/20",
-                "text-xs font-medium"
-              )}
-            >
-              <Question size={14} weight="bold" />
-              <span className="hidden sm:inline">Help</span>
-            </button>
-          </div>
-          
-          {/* Horizontal tabs */}
-          <div className="px-4 md:px-6 overflow-x-auto scrollbar-hide">
-            <div className="flex gap-1 min-w-max pb-0">
-              {SETTINGS_CATEGORIES.map((category) => {
-                const Icon = category.icon
-                const isSelected = selectedCategory === category.id
-                return (
-                  <button
-                    key={category.id}
-                    onClick={() => handleCategoryChange(category.id)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded-t-lg text-sm font-medium transition-all",
-                      "border-b-2 -mb-px",
-                      isSelected
-                        ? "border-accent-primary text-accent-primary bg-bg-primary"
-                        : "border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50"
-                    )}
-                  >
-                    <Icon size={16} weight={isSelected ? "fill" : "regular"} />
-                    <span className={isMobile ? "hidden" : ""}>{category.label}</span>
-                    {category.pro && <Badge variant="info" size="sm">Pro</Badge>}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
+        {/* Header with tabs - using UnifiedPageHeader */}
+        <UnifiedPageHeader
+          icon={Gear}
+          title="Settings"
+          subtitle="System configuration"
+          tabs={tabs}
+          activeTab={selectedCategory}
+          onTabChange={handleCategoryChange}
+          showHelp={true}
+          onHelpClick={() => setHelpOpen(true)}
+          isMobile={isMobile}
+        />
         
         {/* Content area */}
         <div className="flex-1 overflow-auto">

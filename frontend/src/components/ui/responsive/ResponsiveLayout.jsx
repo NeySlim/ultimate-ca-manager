@@ -19,9 +19,10 @@
  * MOBILE: Touch targets 44px+, swipe gestures, full-screen panels
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Funnel, ArrowLeft, Question, CaretDown } from '@phosphor-icons/react'
+import { X, ArrowLeft, CaretDown } from '@phosphor-icons/react'
 import { useMobile } from '../../../contexts'
 import { cn } from '../../../lib/utils'
+import { UnifiedPageHeader } from '../UnifiedPageHeader'
 
 // =============================================================================
 // PANEL WIDTH CONSTANTS
@@ -172,24 +173,22 @@ export function ResponsiveLayout({
       'flex flex-col h-full w-full overflow-hidden',
       className
     )}>
-      {/* HEADER */}
-      <PageHeader
+      {/* HEADER - Using UnifiedPageHeader for consistency */}
+      <UnifiedPageHeader
         title={title}
         subtitle={subtitle}
         icon={Icon}
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={onTabChange}
-        actions={actions}
         filters={filters}
-        hasFilters={!!filters}
         activeFilters={activeFilters}
         onClearFilters={onClearFilters}
         onOpenFilters={() => setFilterDrawerOpen(true)}
-        hasHelp={!!helpContent}
-        onOpenHelp={() => setHelpDrawerOpen(true)}
+        actions={actions}
+        showHelp={!!helpContent}
+        onHelpClick={() => setHelpDrawerOpen(true)}
         isMobile={isMobile}
-        isTouch={isTouch}
       />
       
       {/* STATS BAR (if provided) */}
@@ -333,216 +332,6 @@ export function ResponsiveLayout({
         )
       )}
     </div>
-  )
-}
-
-// =============================================================================
-// PAGE HEADER
-// =============================================================================
-
-function PageHeader({
-  title,
-  subtitle,
-  icon: Icon,
-  tabs,
-  activeTab,
-  onTabChange,
-  actions,
-  filters,
-  hasFilters,
-  activeFilters,
-  onClearFilters,
-  onOpenFilters,
-  hasHelp,
-  onOpenHelp,
-  isMobile,
-  isTouch
-}) {
-  const hasTabs = tabs && tabs.length > 0
-  
-  return (
-    <header className={cn(
-      'shrink-0',
-      // Only add border-b if no tabs (tabs create their own visual separation)
-      !hasTabs && 'border-b border-border',
-      isMobile 
-        ? 'px-4 py-4 bg-bg-secondary' 
-        : 'px-6 py-4 bg-bg-secondary'
-    )}>
-      {/* TOP ROW: Title + Actions */}
-      <div className="flex items-center justify-between gap-4">
-        {/* Left: Icon + Title */}
-        <div className="flex items-center gap-3 min-w-0">
-          {Icon && (
-            <div className={cn(
-              'shrink-0 rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center',
-              isMobile ? 'w-10 h-10' : 'w-9 h-9'
-            )}>
-              <Icon 
-                size={isMobile ? 22 : 18} 
-                weight="bold" 
-                className="text-white" 
-              />
-            </div>
-          )}
-          <div className="min-w-0">
-            <h1 className={cn(
-              'font-semibold text-text-primary truncate leading-tight',
-              isMobile ? 'text-lg' : 'text-lg'
-            )}>
-              {title}
-            </h1>
-            {subtitle && (
-              <p className={cn(
-                'text-text-secondary truncate',
-                isMobile ? 'text-sm' : 'text-sm'
-              )}>
-                {subtitle}
-              </p>
-            )}
-          </div>
-        </div>
-        
-        {/* Right: Actions */}
-        <div className={cn(
-          'flex items-center shrink-0',
-          isMobile ? 'gap-2' : 'gap-2'
-        )}>
-          {/* Desktop: Inline filters */}
-          {!isMobile && hasFilters && filters && (
-            <div className="flex items-center gap-2">
-              {filters.slice(0, 3).map((filter) => (
-                <select
-                  key={filter.key}
-                  value={filter.value || ''}
-                  onChange={(e) => filter.onChange?.(e.target.value)}
-                  className={cn(
-                    'h-8 px-2 pr-7 rounded-md border border-border bg-bg-secondary',
-                    'text-xs text-text-primary',
-                    'focus:outline-none focus:ring-1 focus:ring-accent-primary',
-                    'appearance-none cursor-pointer',
-                    filter.value ? 'border-accent-primary/50' : ''
-                  )}
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 6px center'
-                  }}
-                >
-                  <option value="">{filter.placeholder || `All ${filter.label}`}</option>
-                  {filter.options?.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              ))}
-              {activeFilters > 0 && (
-                <button
-                  onClick={onClearFilters}
-                  className="text-xs text-accent-primary hover:underline"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          )}
-          
-          {/* Desktop: Help button */}
-          {!isMobile && hasHelp && (
-            <button
-              onClick={onOpenHelp}
-              className={cn(
-                'w-8 h-8 rounded-md flex items-center justify-center',
-                'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary',
-                'transition-colors'
-              )}
-              title="Help"
-            >
-              <Question size={18} />
-            </button>
-          )}
-          
-          {/* Mobile: Filter button */}
-          {isMobile && hasFilters && (
-            <button
-              onClick={onOpenFilters}
-              className={cn(
-                'relative flex items-center justify-center rounded-lg',
-                'bg-bg-tertiary hover:bg-bg-hover border border-border',
-                'h-11 w-11',
-                'transition-colors'
-              )}
-            >
-              <Funnel size={20} className="text-text-secondary" />
-              {activeFilters > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-primary text-white text-xs flex items-center justify-center">
-                  {activeFilters}
-                </span>
-              )}
-            </button>
-          )}
-          
-          {/* Mobile: Help button */}
-          {isMobile && hasHelp && (
-            <button
-              onClick={onOpenHelp}
-              className={cn(
-                'flex items-center justify-center rounded-lg',
-                'bg-bg-tertiary hover:bg-bg-hover border border-border',
-                'h-11 w-11',
-                'transition-colors'
-              )}
-            >
-              <Question size={20} className="text-text-secondary" />
-            </button>
-          )}
-          
-          {/* Custom actions */}
-          {actions}
-        </div>
-      </div>
-      
-      {/* TABS ROW (if provided) - Settings style: integrated with content */}
-      {hasTabs && (
-        <div className={cn(
-          'overflow-x-auto scrollbar-hide',
-          isMobile ? 'mt-3 -mx-4 px-4' : 'mt-3'
-        )}>
-          <div className="flex gap-1 min-w-max">
-            {tabs.map((tab) => {
-              const TabIcon = tab.icon
-              const isActive = activeTab === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => onTabChange?.(tab.id)}
-                  className={cn(
-                    'shrink-0 font-medium transition-all rounded-t-lg border-b-2 -mb-px',
-                    isMobile ? 'px-4 py-2.5 text-sm' : 'px-3 py-2 text-sm',
-                    'flex items-center gap-2',
-                    isActive
-                      ? 'border-accent-primary text-accent-primary bg-bg-primary'
-                      : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50'
-                  )}
-                >
-                  {TabIcon && <TabIcon size={16} weight={isActive ? "fill" : "regular"} />}
-                  {tab.label}
-                  {tab.count !== undefined && (
-                    <span className={cn(
-                      'ml-1 px-1.5 py-0.5 rounded text-xs',
-                      isActive
-                        ? 'bg-accent-primary/15 text-accent-primary'
-                        : 'bg-bg-tertiary text-text-secondary'
-                    )}>
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-    </header>
   )
 }
 
