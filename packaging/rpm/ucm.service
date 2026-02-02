@@ -7,54 +7,34 @@ After=network.target
 Type=exec
 User=ucm
 Group=ucm
-WorkingDirectory=/usr/share/ucm/backend
+WorkingDirectory=/opt/ucm/backend
 
-# Environment - load from /etc/ucm/ucm.env
+# Environment
 EnvironmentFile=/etc/ucm/ucm.env
-
-# Explicit environment variables for the application
-Environment="DATA_DIR=/var/lib/ucm"
-Environment="CONFIG_DIR=/etc/ucm"
-Environment="LOG_DIR=/var/log/ucm"
-Environment="UCM_PACKAGED=1"
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/ucm /var/log/ucm
-ReadOnlyPaths=/etc/ucm
 ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictRealtime=true
-RestrictNamespaces=true
-LockPersonality=true
-MemoryDenyWriteExecute=false
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 
 # Resource limits
 LimitNOFILE=65536
-LimitNPROC=512
 
 # Startup
-ExecStart=/usr/share/ucm/venv/bin/gunicorn \
-    --config /usr/share/ucm/backend/gunicorn.conf.py \
+ExecStart=/opt/ucm/venv/bin/gunicorn \
+    --config /opt/ucm/gunicorn.conf.py \
     --bind 0.0.0.0:8443 \
-    --certfile /var/lib/ucm/https_cert.pem \
-    --keyfile /var/lib/ucm/https_key.pem \
+    --certfile /opt/ucm/data/https_cert.pem \
+    --keyfile /opt/ucm/data/https_key.pem \
     --access-logfile /var/log/ucm/access.log \
     --error-logfile /var/log/ucm/error.log \
     wsgi:app
 
-# Restart policy
 Restart=always
 RestartSec=10s
-
-# Graceful shutdown
-KillMode=mixed
-KillSignal=SIGTERM
-TimeoutStopSec=30s
 
 [Install]
 WantedBy=multi-user.target
