@@ -610,7 +610,7 @@ function UserForm({ user, onSubmit, onCancel }) {
       <Select
         label="Role"
         options={[
-          { value: 'admin', label: 'Administrator' },
+          { value: 'admin', label: 'Admin' },
           { value: 'operator', label: 'Operator' },
           { value: 'viewer', label: 'Viewer' },
         ]}

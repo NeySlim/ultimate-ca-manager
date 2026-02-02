@@ -8,13 +8,13 @@ import {
   ShieldCheck, Certificate, ClockCounterClockwise, 
   Plus, ArrowsClockwise, ListChecks, Gear, CaretRight, 
   User, Globe, SignIn, SignOut, Trash, PencilSimple, 
-  UploadSimple, Key, Warning, WifiHigh,
-  Heartbeat, Database, Clock, Lightning
+  UploadSimple, Key, Warning
 } from '@phosphor-icons/react'
 import { Card, Button, Badge, LoadingSpinner, Logo } from '../components'
 import { dashboardService, certificatesService, acmeService } from '../services'
 import { useNotification } from '../contexts'
 import { useWebSocket, EventType } from '../hooks'
+import { formatRelativeTime } from '../lib/ui'
 
 // Action icons mapping
 const actionIcons = {
@@ -29,20 +29,6 @@ const actionIcons = {
   import: UploadSimple,
   sign: Key,
   default: ClockCounterClockwise
-}
-
-// Format relative time
-const formatRelativeTime = (timestamp) => {
-  if (!timestamp) return ''
-  const date = new Date(timestamp)
-  const now = new Date()
-  const diff = (now - date) / 1000
-  
-  if (diff < 60) return 'Just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 export default function DashboardPage() {
