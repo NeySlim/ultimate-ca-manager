@@ -19,7 +19,7 @@
  * MOBILE: Touch targets 44px+, swipe gestures, full-screen panels
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, ArrowLeft, CaretDown } from '@phosphor-icons/react'
+import { X, ArrowLeft, CaretDown, Question } from '@phosphor-icons/react'
 import { useMobile } from '../../../contexts'
 import { cn } from '../../../lib/utils'
 import { UnifiedPageHeader } from '../UnifiedPageHeader'
