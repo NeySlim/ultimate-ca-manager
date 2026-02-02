@@ -163,11 +163,12 @@ def upload_csr():
         subject_str = ", ".join(subject_parts) if subject_parts else "Unknown"
         
         # Create Certificate record with CSR (pending)
+        # Store CSR as base64-encoded PEM (consistent with other storage)
         new_cert = Certificate(
             refid=str(uuid.uuid4()),
             descr=name or cn or 'Uploaded CSR',
             subject=subject_str,
-            csr=csr_pem.decode('utf-8'),
+            csr=base64.b64encode(csr_pem).decode('utf-8'),
             crt=None,  # Not signed yet
             prv=None,  # External CSR, no private key
             source='upload',
@@ -333,3 +334,69 @@ def delete_csr(csr_id):
             return error_response("CSR not found", 404)
     except Exception as e:
         return error_response(str(e), 500)
+
+
+@bp.route('/api/v2/csrs/<int:csr_id>/sign', methods=['POST'])
+@require_auth(['write:csrs', 'write:certificates'])
+def sign_csr(csr_id):
+    """
+    Sign a CSR with a CA to issue a certificate
+    
+    JSON body:
+        ca_id: ID of the CA to sign with
+        validity_days: Number of days the certificate should be valid (default: 365)
+    """
+    from flask import g
+    from services.audit_service import AuditService
+    from models import CA
+    
+    cert = Certificate.query.get(csr_id)
+    if not cert:
+        return error_response('CSR not found', 404)
+    
+    if not cert.csr:
+        return error_response('No CSR data found', 400)
+    
+    if cert.crt:
+        return error_response('CSR already signed', 400)
+    
+    data = request.get_json() or {}
+    ca_id = data.get('ca_id')
+    validity_days = data.get('validity_days', 365)
+    
+    if not ca_id:
+        return error_response('CA ID required', 400)
+    
+    # Get the CA from CA table (not Certificate table)
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    if not ca.crt or not ca.prv:
+        return error_response('CA is not valid for signing', 400)
+    
+    try:
+        # Sign the CSR - use CA refid
+        signed_cert = CertificateService.sign_csr(
+            cert_id=csr_id,
+            caref=ca.refid,
+            validity_days=validity_days
+        )
+        
+        # Audit log
+        AuditService.log_action('certificate', 'sign', csr_id, {
+            'ca_id': ca_id,
+            'ca_name': ca.descr,
+            'validity_days': validity_days,
+            'subject': cert.subject
+        })
+        
+        return success_response(
+            data=signed_cert.to_dict(),
+            message='CSR signed successfully'
+        )
+    except Exception as e:
+        import traceback
+        print(f"CSR Sign Error: {str(e)}")
+        print(traceback.format_exc())
+        return error_response(f"Failed to sign CSR: {str(e)}", 500)

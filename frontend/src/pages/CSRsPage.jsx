@@ -138,25 +138,27 @@ export default function CSRsPage() {
     }
   }
 
-  // Filter data
+  // Filter data - normalize status to lowercase
   const filteredCSRs = useMemo(() => {
     let result = csrs.map(csr => ({
       ...csr,
-      cn: csr.common_name || csr.subject || 'Unnamed CSR'
+      cn: csr.common_name || csr.subject || 'Unnamed CSR',
+      normalizedStatus: (csr.status || 'pending').toLowerCase()
     }))
     
     if (filterStatus) {
-      result = result.filter(c => c.status === filterStatus)
+      result = result.filter(c => c.normalizedStatus === filterStatus)
     }
     
     return result
   }, [csrs, filterStatus])
 
-  // Stats
+  // Stats - normalize status to lowercase for comparison
   const stats = useMemo(() => {
-    const pending = csrs.filter(c => c.status === 'pending' || !c.status).length
-    const signed = csrs.filter(c => c.status === 'signed').length
-    const rejected = csrs.filter(c => c.status === 'rejected').length
+    const getStatus = (c) => (c.status || 'pending').toLowerCase()
+    const pending = csrs.filter(c => getStatus(c) === 'pending').length
+    const signed = csrs.filter(c => getStatus(c) === 'signed').length
+    const rejected = csrs.filter(c => getStatus(c) === 'rejected').length
     return [
       { icon: Warning, label: 'Pending', value: pending, variant: 'warning' },
       { icon: CheckCircle, label: 'Signed', value: signed, variant: 'success' },
@@ -234,16 +236,19 @@ export default function CSRsPage() {
 
   const activeFiltersCount = filterStatus ? 1 : 0
 
-  // Row actions
-  const rowActions = useCallback((row) => [
-    { label: 'Download', icon: Download, onClick: () => handleDownload(row.id) },
-    ...(canWrite('csrs') && (!row.status || row.status === 'pending') ? [
-      { label: 'Sign', icon: SignIn, onClick: () => { setSelectedCSR(row); openModal('sign') }}
-    ] : []),
-    ...(canDelete('csrs') ? [
-      { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
-    ] : [])
-  ], [canWrite, canDelete])
+  // Row actions - normalize status to lowercase
+  const rowActions = useCallback((row) => {
+    const status = (row.status || 'pending').toLowerCase()
+    return [
+      { label: 'Download', icon: Download, onClick: () => handleDownload(row.id) },
+      ...(canWrite('csrs') && status === 'pending' ? [
+        { label: 'Sign', icon: SignIn, onClick: () => { setSelectedCSR(row); openModal('sign') }}
+      ] : []),
+      ...(canDelete('csrs') ? [
+        { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
+      ] : [])
+    ]
+  }, [canWrite, canDelete])
 
   // Help content
   const helpContent = (
@@ -410,7 +415,13 @@ export default function CSRsPage() {
 // =============================================================================
 
 function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelete }) {
-  const statusVariant = csr.status === 'signed' ? 'success' : csr.status === 'rejected' ? 'danger' : 'warning'
+  // CSR is pending if it has CSR data (csr_pem or csr) but no certificate (pem or crt) yet
+  // Backend getById returns "valid" for all certs, so we check pem field instead
+  const hasCSR = csr.csr_pem || csr.csr
+  const hasCert = csr.pem || csr.crt
+  const isPending = hasCSR && !hasCert
+  const csrStatus = isPending ? 'pending' : 'signed'
+  const statusVariant = isPending ? 'warning' : 'success'
   
   return (
     <div className="p-3 space-y-3">
@@ -422,7 +433,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
         subtitle={csr.organization}
         badge={
           <Badge variant={statusVariant} size="sm">
-            {csr.status || 'pending'}
+            {csrStatus}
           </Badge>
         }
       />
@@ -438,7 +449,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
         <Button size="sm" variant="secondary" className="flex-1" onClick={onDownload}>
           <Download size={14} /> Download
         </Button>
-        {canWrite('csrs') && (!csr.status || csr.status === 'pending') && (
+        {canWrite('csrs') && isPending && (
           <Button size="sm" onClick={onSign}>
             <SignIn size={14} /> Sign
           </Button>

@@ -331,8 +331,14 @@ class CertificateService:
             ca_key_pem, password=None, backend=default_backend()
         )
         
-        # Load CSR
-        csr_pem = base64.b64decode(certificate.csr)
+        # Load CSR - handle both raw PEM and base64-encoded PEM
+        csr_data = certificate.csr
+        if csr_data.startswith('-----BEGIN'):
+            # Raw PEM format
+            csr_pem = csr_data.encode('utf-8')
+        else:
+            # Base64 encoded PEM
+            csr_pem = base64.b64decode(csr_data)
         
         # Sign CSR
         cert_pem = TrustStoreService.sign_csr(
