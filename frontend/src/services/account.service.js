@@ -61,8 +61,9 @@ export const accountService = {
     return apiClient.post('/webauthn/register/options')
   },
 
-  async completeWebAuthnRegistration(credential, name) {
-    return apiClient.post('/webauthn/credentials', { credential, name })
+  async completeWebAuthnRegistration(data) {
+    // data should contain { credential, name }
+    return apiClient.post('/webauthn/register/verify', data)
   },
 
   async deleteWebAuthnCredential(credentialId) {

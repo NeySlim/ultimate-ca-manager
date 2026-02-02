@@ -4,12 +4,13 @@
 import { CaretLeft, CaretRight, CaretDoubleLeft, CaretDoubleRight } from '@phosphor-icons/react'
 import { Button } from './Button'
 import { cn } from '../lib/utils'
+import { FilterSelect } from './ui/Select'
 
 const PAGE_SIZE_OPTIONS = [
-  { value: 10, label: '10' },
-  { value: 20, label: '20' },
-  { value: 50, label: '50' },
-  { value: 100, label: '100' },
+  { value: '10', label: '10' },
+  { value: '20', label: '20' },
+  { value: '50', label: '50' },
+  { value: '100', label: '100' },
 ]
 
 export function Pagination({ 
@@ -25,11 +26,6 @@ export function Pagination({
   const start = total > 0 ? (page - 1) * perPage + 1 : 0
   const end = Math.min(page * perPage, total)
 
-  const handlePerPageChange = (e) => {
-    const value = parseInt(e.target.value, 10)
-    onPerPageChange?.(value)
-  }
-
   return (
     <div className="flex items-center justify-between px-4 py-2.5 text-sm">
       {showInfo && (
@@ -44,15 +40,13 @@ export function Pagination({
         {showPerPageSelector && onPerPageChange && (
           <div className="flex items-center gap-1.5">
             <span className="text-text-tertiary text-xs">Rows:</span>
-            <select
-              value={perPage}
-              onChange={handlePerPageChange}
-              className="select-native select-native-sm"
-            >
-              {PAGE_SIZE_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+            <FilterSelect
+              value={String(perPage)}
+              onChange={(val) => onPerPageChange(Number(val))}
+              options={PAGE_SIZE_OPTIONS}
+              placeholder={String(perPage)}
+              size="sm"
+            />
           </div>
         )}
 

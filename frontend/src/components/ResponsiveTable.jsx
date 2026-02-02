@@ -40,6 +40,7 @@ import { LoadingSpinner } from './LoadingSpinner'
 import { EmptyState } from './EmptyState'
 import { SearchBar } from './SearchBar'
 import { Badge } from './Badge'
+import { FilterSelect } from './ui/Select'
 import { 
   CaretUp, CaretDown, CaretLeft, CaretRight,
   DotsThreeVertical, MagnifyingGlass
@@ -527,15 +528,13 @@ function DesktopPagination({
         
         <div className="flex items-center gap-2">
           <span className="text-text-tertiary">Per page:</span>
-          <select
-            value={pageSize}
-            onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            className="select-native select-native-sm h-7"
-          >
-            {pageSizeOptions.map(size => (
-              <option key={size} value={size}>{size}</option>
-            ))}
-          </select>
+          <FilterSelect
+            value={String(pageSize)}
+            onChange={(val) => onPageSizeChange(Number(val))}
+            options={pageSizeOptions.map(size => ({ value: String(size), label: String(size) }))}
+            placeholder={String(pageSize)}
+            size="sm"
+          />
         </div>
       </div>
       

@@ -19,6 +19,7 @@ from webauthn.helpers.structs import (
     PublicKeyCredentialDescriptor,
     AuthenticatorSelectionCriteria,
     UserVerificationRequirement,
+    AuthenticatorTransport,
     AuthenticatorAttachment,
     ResidentKeyRequirement,
 )
@@ -31,22 +32,32 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def base64url_decode(data: str) -> bytes:
+    """Decode base64url string with proper padding"""
+    padding = '=' * (4 - len(data) % 4)
+    if padding == '====':
+        padding = ''
+    return base64.urlsafe_b64decode(data + padding)
+
+
+def base64url_encode(data: bytes) -> str:
+    """Encode bytes to base64url without padding"""
+    return base64.urlsafe_b64encode(data).decode('utf-8').rstrip('=')
+
+
+def get_rp_id(hostname: str) -> str:
+    """Extract RP ID from hostname (remove port)"""
+    if ':' in hostname:
+        return hostname.split(':')[0]
+    return hostname
+
+
 class WebAuthnService:
     """Service for WebAuthn/FIDO2 operations"""
     
     # Configuration
     RP_NAME = "Ultimate CA Manager"
-    RP_ID = None  # Will be set from request hostname
     CHALLENGE_TIMEOUT_MINUTES = 5
-    
-    @staticmethod
-    def set_rp_id(hostname: str):
-        """Set Relying Party ID from hostname"""
-        # Remove port if present
-        if ':' in hostname:
-            hostname = hostname.split(':')[0]
-        WebAuthnService.RP_ID = hostname
-        logger.info(f"WebAuthn RP ID set to: {hostname}")
     
     @staticmethod
     def generate_registration_options(user: User, hostname: str) -> dict:
@@ -60,13 +71,20 @@ class WebAuthnService:
         Returns:
             Registration options dictionary
         """
-        WebAuthnService.set_rp_id(hostname)
+        rp_id = get_rp_id(hostname)
         
         # Generate challenge (as random bytes)
         challenge_bytes = secrets.token_bytes(32)
-        challenge_b64 = base64.urlsafe_b64encode(challenge_bytes).decode('utf-8').rstrip('=')
+        challenge_b64 = base64url_encode(challenge_bytes)
         
-        # Store challenge in database (as base64url string for easy comparison)
+        # Clean up old unused challenges for this user
+        WebAuthnChallenge.query.filter(
+            WebAuthnChallenge.user_id == user.id,
+            WebAuthnChallenge.challenge_type == 'registration',
+            (WebAuthnChallenge.used == True) | (WebAuthnChallenge.expires_at < datetime.utcnow())
+        ).delete()
+        
+        # Store challenge in database
         challenge_record = WebAuthnChallenge(
             user_id=user.id,
             challenge=challenge_b64,
@@ -76,27 +94,34 @@ class WebAuthnService:
         db.session.add(challenge_record)
         db.session.commit()
         
-        logger.info(f"Generated challenge (b64): {challenge_b64[:20]}...")
-        
         # Get existing credentials to exclude
         existing_creds = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
-        exclude_credentials = [
-            PublicKeyCredentialDescriptor(id=cred.credential_id)
-            for cred in existing_creds
-        ]
+        exclude_credentials = []
+        for cred in existing_creds:
+            transports = []
+            if cred.transports:
+                try:
+                    transport_list = json.loads(cred.transports)
+                    transports = [AuthenticatorTransport(t) for t in transport_list if t]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            exclude_credentials.append(
+                PublicKeyCredentialDescriptor(id=cred.credential_id, transports=transports or None)
+            )
         
         # Generate registration options
         options = generate_registration_options(
-            rp_id=WebAuthnService.RP_ID,
+            rp_id=rp_id,
             rp_name=WebAuthnService.RP_NAME,
             user_id=str(user.id).encode('utf-8'),
             user_name=user.username,
             user_display_name=user.full_name or user.username,
-            challenge=challenge_bytes,  # Pass raw bytes
-            exclude_credentials=exclude_credentials,
+            challenge=challenge_bytes,
+            exclude_credentials=exclude_credentials if exclude_credentials else None,
             authenticator_selection=AuthenticatorSelectionCriteria(
+                authenticator_attachment=AuthenticatorAttachment.CROSS_PLATFORM,  # Force USB/NFC key
                 user_verification=UserVerificationRequirement.PREFERRED,
-                resident_key=ResidentKeyRequirement.PREFERRED,
+                resident_key=ResidentKeyRequirement.REQUIRED,
             ),
             supported_pub_key_algs=[
                 COSEAlgorithmIdentifier.ECDSA_SHA_256,
@@ -110,71 +135,43 @@ class WebAuthnService:
     def verify_registration(user_id: int, credential_data: dict, hostname: str, credential_name: str = None) -> Tuple[bool, str, Optional[WebAuthnCredential]]:
         """
         Verify registration response and create credential
-        
-        Args:
-            user_id: User ID
-            credential_data: Registration response from client
-            hostname: Request hostname
-            credential_name: Optional friendly name for credential
-            
-        Returns:
-            (success, message, WebAuthnCredential)
         """
-        WebAuthnService.set_rp_id(hostname)
+        rp_id = get_rp_id(hostname)
         
         try:
-            logger.info(f"Verifying registration for user {user_id}")
-            logger.info(f"Credential data keys: {list(credential_data.keys())}")
-            logger.info(f"Response keys: {list(credential_data.get('response', {}).keys())}")
-            
-            # Get and verify challenge
-            client_data_b64 = credential_data['response']['clientDataJSON']
-            logger.info(f"clientDataJSON length: {len(client_data_b64)}, sample: {client_data_b64[:50]}...")
-            
-            # Add padding if needed (base64url to base64)
-            padding = '=' * (4 - len(client_data_b64) % 4)
-            if padding != '====':
-                client_data_b64 += padding
-            
-            challenge_str = base64.urlsafe_b64decode(client_data_b64).decode('utf-8')
-            logger.info(f"Decoded clientDataJSON successfully")
-            
-            challenge_json = json.loads(challenge_str)
+            # Decode clientDataJSON to get challenge
+            client_data_json = base64url_decode(credential_data['response']['clientDataJSON']).decode('utf-8')
+            challenge_json = json.loads(client_data_json)
             challenge = challenge_json['challenge']
-            logger.info(f"Challenge from client: {challenge[:20]}...")
             
+            # Find challenge record
             challenge_record = WebAuthnChallenge.query.filter_by(
                 challenge=challenge,
                 user_id=user_id,
-                challenge_type='registration'
+                challenge_type='registration',
+                used=False
             ).first()
             
-            if not challenge_record:
-                logger.error(f"No challenge record found for: {challenge[:20]}...")
-                # Debug: show all challenges for this user
-                all_challenges = WebAuthnChallenge.query.filter_by(user_id=user_id, challenge_type='registration').all()
-                logger.error(f"Found {len(all_challenges)} registration challenges for user {user_id}")
-                for c in all_challenges[:3]:
-                    logger.error(f"  - {c.challenge[:20]}... (valid: {c.is_valid()})")
+            if not challenge_record or not challenge_record.is_valid():
+                logger.error(f"Challenge not found or invalid for user {user_id}")
                 return False, "Invalid or expired challenge", None
             
-            if not challenge_record.is_valid():
-                logger.error(f"Challenge expired or already used")
-                return False, "Invalid or expired challenge", None
-            
-            logger.info(f"Challenge verified successfully")
-            
-            # Verify registration response with the ORIGINAL challenge from database
+            # Verify registration response
             verification = verify_registration_response(
                 credential=credential_data,
-                expected_challenge=base64.urlsafe_b64decode(challenge_record.challenge + '==='),  # Add padding and decode
-                expected_rp_id=WebAuthnService.RP_ID,
+                expected_challenge=base64url_decode(challenge_record.challenge),
+                expected_rp_id=rp_id,
                 expected_origin=f"https://{hostname}",
             )
             
-            # Mark challenge as used
-            challenge_record.used = True
-            db.session.commit()
+            # Mark challenge as used and delete it
+            db.session.delete(challenge_record)
+            
+            # Extract transports from response
+            transports = credential_data.get('response', {}).get('transports', [])
+            if not transports:
+                # Try to get from authenticator response
+                transports = getattr(credential_data.get('response', {}), 'transports', [])
             
             # Create credential record
             credential = WebAuthnCredential(
@@ -184,8 +181,8 @@ class WebAuthnService:
                 sign_count=verification.sign_count,
                 name=credential_name or "Security Key",
                 aaguid=str(verification.aaguid) if verification.aaguid else None,
-                transports=json.dumps(credential_data.get('response', {}).get('transports', [])),
-                is_backup_eligible=verification.credential_backed_up if hasattr(verification, 'credential_backed_up') else False,
+                transports=json.dumps(transports) if transports else '[]',
+                is_backup_eligible=getattr(verification, 'credential_backed_up', False),
                 user_verified=True,
                 enabled=True
             )
@@ -193,35 +190,35 @@ class WebAuthnService:
             db.session.add(credential)
             db.session.commit()
             
-            logger.info(f"WebAuthn credential registered: user_id={user_id}, name={credential_name}")
+            logger.info(f"WebAuthn credential registered: user_id={user_id}, cred_id={verification.credential_id.hex()[:16]}...")
             return True, "Credential registered successfully", credential
             
         except Exception as e:
             db.session.rollback()
-            logger.error(f"WebAuthn registration error: {str(e)}")
+            logger.error(f"WebAuthn registration error: {str(e)}", exc_info=True)
             return False, f"Registration failed: {str(e)}", None
     
     @staticmethod
     def generate_authentication_options(username: str, hostname: str) -> Tuple[Optional[dict], Optional[int]]:
         """
         Generate options for authenticating with WebAuthn
-        
-        Args:
-            username: Username to authenticate (or None for usernameless)
-            hostname: Request hostname
-            
-        Returns:
-            (options dict, user_id) or (None, None) if user not found
         """
-        WebAuthnService.set_rp_id(hostname)
+        rp_id = get_rp_id(hostname)
         
         user = User.query.filter_by(username=username).first()
         if not user:
             return None, None
         
-        # Generate challenge (as random bytes)
+        # Generate challenge
         challenge_bytes = secrets.token_bytes(32)
-        challenge_b64 = base64.urlsafe_b64encode(challenge_bytes).decode('utf-8').rstrip('=')
+        challenge_b64 = base64url_encode(challenge_bytes)
+        
+        # Clean up old challenges
+        WebAuthnChallenge.query.filter(
+            WebAuthnChallenge.user_id == user.id,
+            WebAuthnChallenge.challenge_type == 'authentication',
+            (WebAuthnChallenge.used == True) | (WebAuthnChallenge.expires_at < datetime.utcnow())
+        ).delete()
         
         # Store challenge
         challenge_record = WebAuthnChallenge(
@@ -233,23 +230,29 @@ class WebAuthnService:
         db.session.add(challenge_record)
         db.session.commit()
         
-        logger.info(f"Generated auth challenge (b64): {challenge_b64[:20]}...")
-        
-        # Get user's credentials
+        # Get user's credentials with transports
         credentials = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
         
         if not credentials:
             return None, None
         
-        allow_credentials = [
-            PublicKeyCredentialDescriptor(id=cred.credential_id)
-            for cred in credentials
-        ]
+        allow_credentials = []
+        for cred in credentials:
+            transports = []
+            if cred.transports:
+                try:
+                    transport_list = json.loads(cred.transports)
+                    transports = [AuthenticatorTransport(t) for t in transport_list if t]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            allow_credentials.append(
+                PublicKeyCredentialDescriptor(id=cred.credential_id, transports=transports or None)
+            )
         
         # Generate authentication options
         options = generate_authentication_options(
-            rp_id=WebAuthnService.RP_ID,
-            challenge=challenge_bytes,  # Pass raw bytes
+            rp_id=rp_id,
+            challenge=challenge_bytes,
             allow_credentials=allow_credentials,
             user_verification=UserVerificationRequirement.PREFERRED,
         )
@@ -260,20 +263,12 @@ class WebAuthnService:
     def verify_authentication(user_id: int, credential_data: dict, hostname: str) -> Tuple[bool, str, Optional[User]]:
         """
         Verify authentication response
-        
-        Args:
-            user_id: User ID
-            credential_data: Authentication response from client
-            hostname: Request hostname
-            
-        Returns:
-            (success, message, User)
         """
-        WebAuthnService.set_rp_id(hostname)
+        rp_id = get_rp_id(hostname)
         
         try:
-            # Get credential ID
-            cred_id = base64.urlsafe_b64decode(credential_data['id'] + '==')
+            # Decode credential ID
+            cred_id = base64url_decode(credential_data['id'])
             
             # Find credential
             credential = WebAuthnCredential.query.filter_by(
@@ -283,59 +278,52 @@ class WebAuthnService:
             ).first()
             
             if not credential:
+                logger.warning(f"Credential not found: {cred_id.hex()[:16]}... for user {user_id}")
                 return False, "Credential not found", None
             
-            # Get and verify challenge
-            challenge_str = base64.urlsafe_b64decode(
-                credential_data['response']['clientDataJSON'] + '=='
-            ).decode('utf-8')
-            
-            challenge_json = json.loads(challenge_str)
+            # Decode clientDataJSON to get challenge
+            client_data_json = base64url_decode(credential_data['response']['clientDataJSON']).decode('utf-8')
+            challenge_json = json.loads(client_data_json)
             challenge = challenge_json['challenge']
             
+            # Find challenge record
             challenge_record = WebAuthnChallenge.query.filter_by(
                 challenge=challenge,
                 user_id=user_id,
-                challenge_type='authentication'
+                challenge_type='authentication',
+                used=False
             ).first()
             
             if not challenge_record or not challenge_record.is_valid():
                 return False, "Invalid or expired challenge", None
             
-            # Verify authentication response with ORIGINAL challenge from database
-            # For authenticators that don't support sign_count (always return 0),
-            # pass 0 as current count to bypass the monotonic counter check
-            current_sign_count = 0 if credential.sign_count > 0 else credential.sign_count
-            
+            # Verify authentication response
+            # Note: Some authenticators always return sign_count=0, so we pass 0 to skip check
             verification = verify_authentication_response(
                 credential=credential_data,
-                expected_challenge=base64.urlsafe_b64decode(challenge_record.challenge + '==='),  # Add padding and decode
-                expected_rp_id=WebAuthnService.RP_ID,
+                expected_challenge=base64url_decode(challenge_record.challenge),
+                expected_rp_id=rp_id,
                 expected_origin=f"https://{hostname}",
                 credential_public_key=credential.public_key,
-                credential_current_sign_count=current_sign_count,
+                credential_current_sign_count=0,  # Skip sign count check for compatibility
             )
             
-            # Update sign count and last used
-            logger.info(f"WebAuthn: authenticator sign_count={verification.new_sign_count}, stored={credential.sign_count}")
-            
-            # Always increment our own counter (some authenticators like Bitwarden always return 0)
+            # Update credential
             credential.sign_count = max(verification.new_sign_count, credential.sign_count + 1)
             credential.last_used_at = datetime.utcnow()
             
-            # Mark challenge as used
-            challenge_record.used = True
-            
+            # Delete used challenge
+            db.session.delete(challenge_record)
             db.session.commit()
             
             user = User.query.get(user_id)
-            logger.info(f"WebAuthn authentication successful: user={user.username}")
+            logger.info(f"WebAuthn auth successful: user={user.username}")
             
             return True, "Authentication successful", user
             
         except Exception as e:
             db.session.rollback()
-            logger.error(f"WebAuthn authentication error: {str(e)}")
+            logger.error(f"WebAuthn auth error: {str(e)}", exc_info=True)
             return False, f"Authentication failed: {str(e)}", None
     
     @staticmethod

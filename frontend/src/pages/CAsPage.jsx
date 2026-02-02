@@ -9,7 +9,8 @@ import {
 } from '@phosphor-icons/react'
 import {
   Badge, Button, Modal, Input, Select, HelpCard, LoadingSpinner,
-  CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats
+  CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats,
+  FilterSelect
 } from '../components'
 import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
@@ -375,25 +376,27 @@ export default function CAsPage() {
               </div>
               {!isMobile && (
                 <>
-                  <select
+                  <FilterSelect
                     value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                    className={cn('select-native h-8', filterType && 'active')}
-                  >
-                    <option value="">{LABELS.FILTERS.ALL_TYPES}</option>
-                    <option value="root">Root</option>
-                    <option value="intermediate">Intermediate</option>
-                  </select>
-                  <select
+                    onChange={setFilterType}
+                    placeholder={LABELS.FILTERS.ALL_TYPES}
+                    options={[
+                      { value: 'root', label: 'Root' },
+                      { value: 'intermediate', label: 'Intermediate' },
+                    ]}
+                    size="sm"
+                  />
+                  <FilterSelect
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className={cn('select-native h-8', filterStatus && 'active')}
-                  >
-                    <option value="">{LABELS.FILTERS.ALL_STATUS}</option>
-                    <option value="valid">Valid</option>
-                    <option value="expiring">Expiring</option>
-                    <option value="expired">Expired</option>
-                  </select>
+                    onChange={setFilterStatus}
+                    placeholder={LABELS.FILTERS.ALL_STATUS}
+                    options={[
+                      { value: 'valid', label: 'Valid' },
+                      { value: 'expiring', label: 'Expiring' },
+                      { value: 'expired', label: 'Expired' },
+                    ]}
+                    size="sm"
+                  />
                 </>
               )}
               {canWrite('cas') && (

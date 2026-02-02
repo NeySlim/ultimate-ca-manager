@@ -22,6 +22,7 @@ import {
 import { useMobile } from '../contexts'
 import { Button } from './Button'
 import { Badge } from './Badge'
+import { FilterSelect } from './ui/Select'
 
 // ============================================
 // DataTable - Main component
@@ -691,17 +692,14 @@ function TableToolbar({
         {filters.length > 0 && (
           <div className="flex items-center gap-2">
             {filters.map(filter => (
-              <select
+              <FilterSelect
                 key={filter.key}
-                value={activeFilters[filter.key] || 'all'}
-                onChange={(e) => onFilterChange(filter.key, e.target.value)}
-                className={cn('select-native', activeFilters[filter.key] && activeFilters[filter.key] !== 'all' && 'active')}
-              >
-                <option value="all">{filter.label}: All</option>
-                {filter.options.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+                value={activeFilters[filter.key] === 'all' ? '' : (activeFilters[filter.key] || '')}
+                onChange={(val) => onFilterChange(filter.key, val || 'all')}
+                placeholder={`${filter.label}: All`}
+                options={filter.options}
+                size="sm"
+              />
             ))}
             {activeFilterCount > 0 && (
               <button
@@ -796,15 +794,13 @@ function TablePagination({
       {/* Page size selector */}
       <div className="flex items-center gap-2">
         <span className="text-sm text-text-secondary">Rows:</span>
-        <select
-          value={pageSize}
-          onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className="select-native select-native-sm"
-        >
-          {pageSizeOptions.map(size => (
-            <option key={size} value={size}>{size}</option>
-          ))}
-        </select>
+        <FilterSelect
+          value={String(pageSize)}
+          onChange={(val) => onPageSizeChange(Number(val))}
+          options={pageSizeOptions.map(size => ({ value: String(size), label: String(size) }))}
+          placeholder={String(pageSize)}
+          size="sm"
+        />
       </div>
       
       {/* Page navigation */}

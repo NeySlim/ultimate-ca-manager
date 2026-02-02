@@ -11,7 +11,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   Button, Input, Badge, Modal, Textarea, HelpCard,
-  CompactSection, CompactGrid, CompactField
+  CompactSection, CompactGrid, CompactField, FormSelect
 } from '../components'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { truststoreService } from '../services'
@@ -500,20 +500,19 @@ export default function TrustStorePage() {
             value={addForm.description}
             onChange={(e) => setAddForm(prev => ({ ...prev, description: e.target.value }))}
           />
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">Purpose</label>
-            <select
-              value={addForm.purpose}
-              onChange={(e) => setAddForm(prev => ({ ...prev, purpose: e.target.value }))}
-              className="select-native select-native-lg w-full"
-            >
-              <option value="root_ca">Root CA</option>
-              <option value="intermediate_ca">Intermediate CA</option>
-              <option value="client_auth">Client Authentication</option>
-              <option value="code_signing">Code Signing</option>
-              <option value="custom">Custom</option>
-            </select>
-          </div>
+          <FormSelect
+            label="Purpose"
+            value={addForm.purpose}
+            onChange={(val) => setAddForm(prev => ({ ...prev, purpose: val }))}
+            options={[
+              { value: 'root_ca', label: 'Root CA' },
+              { value: 'intermediate_ca', label: 'Intermediate CA' },
+              { value: 'client_auth', label: 'Client Authentication' },
+              { value: 'code_signing', label: 'Code Signing' },
+              { value: 'custom', label: 'Custom' },
+            ]}
+            size="lg"
+          />
           <Textarea
             label="Certificate (PEM)"
             placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
@@ -570,20 +569,19 @@ export default function TrustStorePage() {
             value={importForm.name}
             onChange={(e) => setImportForm(prev => ({ ...prev, name: e.target.value }))}
           />
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">Purpose</label>
-            <select
-              value={importForm.purpose}
-              onChange={(e) => setImportForm(prev => ({ ...prev, purpose: e.target.value }))}
-              className="select-native select-native-lg w-full"
-            >
-              <option value="root_ca">Root CA</option>
-              <option value="intermediate_ca">Intermediate CA</option>
-              <option value="client_auth">Client Authentication</option>
-              <option value="code_signing">Code Signing</option>
-              <option value="custom">Custom</option>
-            </select>
-          </div>
+          <FormSelect
+            label="Purpose"
+            value={importForm.purpose}
+            onChange={(val) => setImportForm(prev => ({ ...prev, purpose: val }))}
+            options={[
+              { value: 'root_ca', label: 'Root CA' },
+              { value: 'intermediate_ca', label: 'Intermediate CA' },
+              { value: 'client_auth', label: 'Client Authentication' },
+              { value: 'code_signing', label: 'Code Signing' },
+              { value: 'custom', label: 'Custom' },
+            ]}
+            size="lg"
+          />
           <Input
             label="Description"
             placeholder="Optional description"

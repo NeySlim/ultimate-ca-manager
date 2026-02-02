@@ -13,6 +13,7 @@
 import { cn } from '../../lib/utils'
 import { Question, Funnel } from '@phosphor-icons/react'
 import { Badge } from '../Badge'
+import { FilterSelect } from './Select'
 
 export function UnifiedPageHeader({
   // Title section
@@ -80,20 +81,14 @@ export function UnifiedPageHeader({
           {!isMobile && hasFilters && (
             <div className="flex items-center gap-2">
               {filters.slice(0, 3).map((filter) => (
-                <select
+                <FilterSelect
                   key={filter.key}
                   value={filter.value || ''}
-                  onChange={(e) => filter.onChange?.(e.target.value)}
-                  className={cn(
-                    'select-native h-8',
-                    filter.value && 'active'
-                  )}
-                >
-                  <option value="">{filter.placeholder || `All ${filter.label}`}</option>
-                  {filter.options?.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+                  onChange={filter.onChange}
+                  placeholder={filter.placeholder || `All ${filter.label}`}
+                  options={filter.options || []}
+                  size="sm"
+                />
               ))}
               {activeFilters > 0 && (
                 <button
