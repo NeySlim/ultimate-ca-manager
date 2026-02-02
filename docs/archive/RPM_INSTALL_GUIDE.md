@@ -49,7 +49,7 @@ sudo dnf install rpm-build python3-devel python3-pip openssl-devel
 
 ```bash
 # Clone repository
-git clone https://github.com/kerberosmansour/ultimate-ca-manager.git
+git clone https://github.com/NeySlim/ultimate-ca-manager.git
 cd ultimate-ca-manager
 
 # Build RPM
@@ -501,7 +501,7 @@ server {
 
 - **Documentation**: See `/usr/share/doc/ucm/` after installation
 - **Logs**: `/var/log/ucm/`
-- **Issues**: https://github.com/kerberosmansour/ultimate-ca-manager/issues
+- **Issues**: https://github.com/NeySlim/ultimate-ca-manager/issues
 
 ---
 

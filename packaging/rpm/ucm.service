@@ -1,6 +1,6 @@
 [Unit]
 Description=Ultimate CA Manager - PKI Management Platform
-Documentation=https://github.com/kerberosmansour/ultimate-ca-manager
+Documentation=https://github.com/NeySlim/ultimate-ca-manager
 After=network.target
 
 [Service]
@@ -33,9 +33,9 @@ LimitNPROC=512
 # Startup
 ExecStart=/usr/share/ucm/venv/bin/gunicorn \
     --config /usr/share/ucm/gunicorn.conf.py \
-    --bind 0.0.0.0:${HTTPS_PORT:-8443} \
-    --certfile ${HTTPS_CERT_PATH:-/etc/ucm/https_cert.pem} \
-    --keyfile ${HTTPS_KEY_PATH:-/etc/ucm/https_key.pem} \
+    --bind 0.0.0.0:8443 \
+    --certfile /etc/ucm/https_cert.pem \
+    --keyfile /etc/ucm/https_key.pem \
     --access-logfile /var/log/ucm/access.log \
     --error-logfile /var/log/ucm/error.log \
     wsgi:app
