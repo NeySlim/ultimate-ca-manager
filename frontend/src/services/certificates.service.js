@@ -16,6 +16,10 @@ export const certificatesService = {
     return apiClient.get(`/certificates${query}`)
   },
 
+  async getStats() {
+    return apiClient.get('/certificates/stats')
+  },
+
   async getById(id) {
     return apiClient.get(`/certificates/${id}`)
   },
