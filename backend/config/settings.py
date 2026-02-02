@@ -1,6 +1,13 @@
 """
 Ultimate CA Manager - Configuration Management
 Handles all application settings with web UI configuration support
+
+Directory Structure by Installation Type:
+- Development: BASE_DIR/data (writable by developer)
+- Docker: /app/data (writable by ucm user, uid 1000)
+- Debian/RPM: /var/lib/ucm (writable by ucm user)
+- Config: /etc/ucm (readable by ucm user)
+- Logs: /var/log/ucm (writable by ucm user)
 """
 import os
 import subprocess
@@ -9,25 +16,65 @@ from typing import Optional
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# Base directory
+# =============================================================================
+# PATH CONFIGURATION
+# =============================================================================
+
+# Base directory (where code lives)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = BASE_DIR / "backend"
-# In /opt/ucm: data is at same level as backend/, not inside it
-DATA_DIR = BASE_DIR / "data"
 
-# Ensure data directories exist
-DATA_DIR.mkdir(exist_ok=True)
-# Don't create subdirectories at module import time (permission issues)
-# They will be created on-demand when needed
+# Load environment from multiple locations (in order of priority)
+# 1. /etc/ucm/ucm.env (package installations)
+# 2. BASE_DIR/.env (development/Docker)
+_env_paths = [
+    Path("/etc/ucm/ucm.env"),
+    BASE_DIR / ".env",
+]
+for _env_path in _env_paths:
+    if _env_path.exists():
+        load_dotenv(_env_path)
+        break
 
-# Load environment variables
-load_dotenv(BASE_DIR / ".env")
+# DATA_DIR: Where writable data lives (database, certs, keys)
+# - Package installations: /var/lib/ucm (set by systemd EnvironmentFile)
+# - Docker: /app/data (set in docker-compose)
+# - Development: BASE_DIR/data (default)
+DATA_DIR = Path(os.environ.get("DATA_DIR", str(BASE_DIR / "data")))
 
+# CONFIG_DIR: Where configuration lives (read-only after install)
+CONFIG_DIR = Path(os.environ.get("CONFIG_DIR", "/etc/ucm"))
+
+# LOG_DIR: Where logs live
+LOG_DIR = Path(os.environ.get("LOG_DIR", "/var/log/ucm"))
+
+# Create directories only in development mode (packages create them)
+if not Path("/etc/ucm").exists():  # Development mode
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# =============================================================================
+# ENVIRONMENT DETECTION
+# =============================================================================
 
 def is_docker():
     """Detect if running in Docker container"""
     return os.path.exists('/.dockerenv') or os.environ.get('UCM_DOCKER') == '1'
 
+
+def is_packaged():
+    """Detect if running from package installation (Debian/RPM)"""
+    return Path("/etc/ucm").exists() or os.environ.get("UCM_PACKAGED") == "1"
+
+
+def is_development():
+    """Detect if running in development mode"""
+    return not is_docker() and not is_packaged()
+
+
+# =============================================================================
+# SERVICE MANAGEMENT
+# =============================================================================
 
 def restart_ucm_service():
     """
@@ -279,10 +326,10 @@ class Config:
     RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
     RATE_LIMIT_PER_HOUR = int(os.getenv("RATE_LIMIT_PER_HOUR", "1000"))
     
-    # Logging
+    # Logging - use LOG_DIR for packaged installations
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-    LOG_FILE = DATA_DIR / "ucm.log"
-    AUDIT_LOG_FILE = DATA_DIR / "audit.log"
+    LOG_FILE = LOG_DIR / "ucm.log" if is_packaged() else DATA_DIR / "ucm.log"
+    AUDIT_LOG_FILE = LOG_DIR / "audit.log" if is_packaged() else DATA_DIR / "audit.log"
     
     # CORS
     CORS_ORIGINS = ["https://localhost:8443", "https://127.0.0.1:8443"]
@@ -293,13 +340,29 @@ class Config:
     FQDN = get_system_fqdn()
     HTTP_PORT = int(os.getenv("HTTP_PORT", "80"))  # For redirect URL construction
     
-    # File paths
+    # File paths - all under DATA_DIR for proper permissions
     CA_DIR = DATA_DIR / "ca"
     CERT_DIR = DATA_DIR / "certs"
     PRIVATE_DIR = DATA_DIR / "private"
     CRL_DIR = DATA_DIR / "crl"
     SCEP_DIR = DATA_DIR / "scep"
     BACKUP_DIR = DATA_DIR / "backups"
+    
+    @classmethod
+    def ensure_directories(cls):
+        """Create required directories with proper permissions.
+        Called at app startup, not module import time."""
+        dirs = [
+            cls.CA_DIR,
+            cls.CERT_DIR,
+            cls.PRIVATE_DIR,
+            cls.CRL_DIR,
+            cls.SCEP_DIR,
+            cls.BACKUP_DIR,
+            DATA_DIR / "sessions",
+        ]
+        for d in dirs:
+            d.mkdir(parents=True, exist_ok=True)
     
     @classmethod
     def get_db_setting(cls, key: str, default=None):
