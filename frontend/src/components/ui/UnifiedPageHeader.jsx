@@ -47,7 +47,7 @@ export function UnifiedPageHeader({
 
   return (
     <div className={cn(
-      'shrink-0 border-b border-border bg-bg-secondary',
+      'shrink-0 border-b border-border/60 bg-bg-secondary shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)]',
       className
     )}>
       {/* Title row */}
@@ -58,7 +58,7 @@ export function UnifiedPageHeader({
         {/* Left: Icon + Title */}
         <div className="flex items-center gap-3 min-w-0">
           {Icon && (
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center shrink-0 shadow-sm">
               <Icon size={18} weight="bold" className="text-white" />
             </div>
           )}
@@ -86,7 +86,8 @@ export function UnifiedPageHeader({
                   onChange={(e) => filter.onChange?.(e.target.value)}
                   className={cn(
                     'h-8 px-2 pr-7 rounded-md border border-border bg-bg-secondary',
-                    'text-xs text-text-primary',
+                    'text-xs text-text-primary transition-all duration-200',
+                    'hover:border-text-tertiary',
                     'focus:outline-none focus:ring-1 focus:ring-accent-primary',
                     'appearance-none cursor-pointer',
                     filter.value ? 'border-accent-primary/50' : ''
