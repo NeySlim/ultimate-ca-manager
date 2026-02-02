@@ -8,7 +8,7 @@ import {
   ShieldCheck, Certificate, ClockCounterClockwise, 
   Plus, ArrowsClockwise, ListChecks, Gear, CaretRight, 
   User, Globe, SignIn, SignOut, Trash, PencilSimple, 
-  UploadSimple, Key, Warning
+  UploadSimple, Key, Warning, WifiHigh, Heartbeat, Database
 } from '@phosphor-icons/react'
 import { Card, Button, Badge, LoadingSpinner, Logo } from '../components'
 import { dashboardService, certificatesService, acmeService } from '../services'
