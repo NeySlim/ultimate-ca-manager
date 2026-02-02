@@ -389,7 +389,7 @@ function DesktopTable({
                 key={col.key}
                 onClick={() => sortable && col.sortable !== false && onSort(col.key)}
                 className={cn(
-                  'text-left px-4 py-2 text-xs font-semibold text-text-secondary uppercase tracking-wider',
+                  'text-left px-4 py-1.5 text-xs font-semibold text-text-secondary uppercase tracking-wider',
                   'transition-colors duration-150',
                   sortable && col.sortable !== false && 'cursor-pointer hover:text-text-primary hover:bg-bg-tertiary/50',
                   sort?.key === col.key && 'text-accent-primary',
@@ -433,7 +433,7 @@ function DesktopTable({
                   selectedId === row.id && 'row-selected'
                 )}>
                 {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-2 transition-colors">
+                  <td key={col.key} className="px-4 py-1.5 transition-colors">
                     {col.render 
                       ? col.render(row[col.key], row)
                       : row[col.key] ?? '—'
@@ -441,7 +441,7 @@ function DesktopTable({
                   </td>
                 ))}
                 {rowActions && (
-                  <td className="px-2 py-2 relative">
+                  <td className="px-2 py-1.5 relative">
                     <RowActionMenu
                       row={row}
                       idx={idx}
