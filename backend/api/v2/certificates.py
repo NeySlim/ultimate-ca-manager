@@ -602,6 +602,121 @@ def revoke_certificate(cert_id):
         return error_response(f'Failed to revoke certificate: {str(e)}', 500)
 
 
+@bp.route('/api/v2/certificates/<int:cert_id>/key', methods=['POST'])
+@require_auth(['write:certificates'])
+def upload_private_key(cert_id):
+    """
+    Upload/attach a private key to an existing certificate
+    
+    Request body:
+    - key: Private key in PEM format (raw or base64 encoded)
+    - passphrase: Optional passphrase if key is encrypted
+    """
+    from models import Certificate, db
+    from services.audit_service import AuditService
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.x509 import load_pem_x509_certificate
+    import base64
+    
+    cert = Certificate.query.get(cert_id)
+    if not cert:
+        return error_response('Certificate not found', 404)
+    
+    if cert.has_private_key:
+        return error_response('Certificate already has a private key', 400)
+    
+    data = request.json
+    if not data or not data.get('key'):
+        return error_response('Private key is required', 400)
+    
+    key_data = data['key'].strip()
+    passphrase = data.get('passphrase')
+    
+    try:
+        # Decode key if base64 encoded
+        if not key_data.startswith('-----BEGIN'):
+            try:
+                key_data = base64.b64decode(key_data).decode('utf-8')
+            except Exception:
+                return error_response('Invalid key format - must be PEM or base64-encoded PEM', 400)
+        
+        # Validate key format
+        if 'PRIVATE KEY' not in key_data:
+            return error_response('Invalid private key format', 400)
+        
+        # Try to load the key to validate it
+        key_bytes = key_data.encode('utf-8')
+        password = passphrase.encode('utf-8') if passphrase else None
+        
+        try:
+            private_key = serialization.load_pem_private_key(
+                key_bytes,
+                password=password,
+                backend=default_backend()
+            )
+        except Exception as e:
+            if 'password' in str(e).lower() or 'decrypt' in str(e).lower():
+                return error_response('Private key is encrypted - please provide passphrase', 400)
+            return error_response(f'Invalid private key: {str(e)}', 400)
+        
+        # Verify key matches certificate public key
+        if cert.crt:
+            try:
+                cert_pem = base64.b64decode(cert.crt)
+                certificate = load_pem_x509_certificate(cert_pem, default_backend())
+                cert_public_key = certificate.public_key()
+                key_public_key = private_key.public_key()
+                
+                # Compare public key bytes
+                cert_pub_bytes = cert_public_key.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                )
+                key_pub_bytes = key_public_key.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                )
+                
+                if cert_pub_bytes != key_pub_bytes:
+                    return error_response('Private key does not match certificate public key', 400)
+            except Exception as e:
+                return error_response(f'Failed to verify key matches certificate: {str(e)}', 400)
+        
+        # Store key (decrypt if needed, re-encode without password)
+        unencrypted_key = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        
+        # Encrypt with our key encryption if configured
+        from security.encryption import encrypt_private_key
+        key_encoded = base64.b64encode(unencrypted_key).decode('utf-8')
+        cert.prv = encrypt_private_key(key_encoded)
+        
+        db.session.commit()
+        
+        # Audit log
+        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+        AuditService.log_action(
+            action='certificate_key_uploaded',
+            resource_type='certificate',
+            resource_id=cert_id,
+            resource_name=cert.descr or f'Certificate #{cert_id}',
+            details=f'Private key uploaded by {username}',
+            success=True
+        )
+        
+        return success_response(
+            data=cert.to_dict(),
+            message='Private key uploaded successfully'
+        )
+        
+    except Exception as e:
+        return error_response(f'Failed to upload private key: {str(e)}', 500)
+
+
 @bp.route('/api/v2/certificates/<int:cert_id>/renew', methods=['POST'])
 @require_auth(['write:certificates'])
 def renew_certificate(cert_id):

@@ -388,6 +388,100 @@ def delete_csr(csr_id):
         return error_response(str(e), 500)
 
 
+@bp.route('/api/v2/csrs/<int:csr_id>/key', methods=['POST'])
+@require_auth(['write:csrs'])
+def upload_csr_private_key(csr_id):
+    """
+    Upload/attach a private key to an existing CSR
+    
+    Request body:
+    - key: Private key in PEM format (raw or base64 encoded)
+    - passphrase: Optional passphrase if key is encrypted
+    """
+    from flask import g
+    from services.audit_service import AuditService
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.backends import default_backend
+    from security.encryption import encrypt_private_key
+    
+    csr = Certificate.query.get(csr_id)
+    if not csr:
+        return error_response('CSR not found', 404)
+    
+    # Verify it's a CSR (has csr but no crt)
+    if not csr.csr or csr.crt:
+        return error_response('Not a pending CSR', 400)
+    
+    if csr.has_private_key:
+        return error_response('CSR already has a private key', 400)
+    
+    data = request.json
+    if not data or not data.get('key'):
+        return error_response('Private key is required', 400)
+    
+    key_data = data['key'].strip()
+    passphrase = data.get('passphrase')
+    
+    try:
+        # Decode key if base64 encoded
+        if not key_data.startswith('-----BEGIN'):
+            try:
+                key_data = base64.b64decode(key_data).decode('utf-8')
+            except Exception:
+                return error_response('Invalid key format - must be PEM or base64-encoded PEM', 400)
+        
+        # Validate key format
+        if 'PRIVATE KEY' not in key_data:
+            return error_response('Invalid private key format', 400)
+        
+        # Try to load the key to validate it
+        key_bytes = key_data.encode('utf-8')
+        password = passphrase.encode('utf-8') if passphrase else None
+        
+        try:
+            private_key = serialization.load_pem_private_key(
+                key_bytes,
+                password=password,
+                backend=default_backend()
+            )
+        except Exception as e:
+            if 'password' in str(e).lower() or 'decrypt' in str(e).lower():
+                return error_response('Private key is encrypted - please provide passphrase', 400)
+            return error_response(f'Invalid private key: {str(e)}', 400)
+        
+        # Store key (decrypt if needed, re-encode without password)
+        unencrypted_key = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        
+        # Encrypt with our key encryption if configured
+        key_encoded = base64.b64encode(unencrypted_key).decode('utf-8')
+        csr.prv = encrypt_private_key(key_encoded)
+        
+        db.session.commit()
+        
+        # Audit log
+        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+        AuditService.log_action(
+            action='csr_key_uploaded',
+            resource_type='csr',
+            resource_id=csr_id,
+            resource_name=csr.descr or f'CSR #{csr_id}',
+            details=f'Private key uploaded by {username}',
+            success=True
+        )
+        
+        return success_response(
+            data=csr.to_dict(),
+            message='Private key uploaded successfully'
+        )
+        
+    except Exception as e:
+        return error_response(f'Failed to upload private key: {str(e)}', 500)
+
+
 @bp.route('/api/v2/csrs/<int:csr_id>/sign', methods=['POST'])
 @require_auth(['write:csrs', 'write:certificates'])
 def sign_csr(csr_id):
