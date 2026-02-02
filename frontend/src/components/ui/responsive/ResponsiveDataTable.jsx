@@ -389,9 +389,9 @@ function DesktopTable({
                 key={col.key}
                 onClick={() => sortable && col.sortable !== false && onSort(col.key)}
                 className={cn(
-                  'text-left px-4 py-1.5 text-xs font-semibold text-text-secondary uppercase tracking-wider',
-                  'transition-colors duration-150',
-                  sortable && col.sortable !== false && 'cursor-pointer hover:text-text-primary hover:bg-bg-tertiary/50',
+                  'text-left px-4 py-1.5 text-[11px] font-medium text-text-tertiary tracking-wide',
+                  'transition-colors duration-200',
+                  sortable && col.sortable !== false && 'cursor-pointer hover:text-text-secondary',
                   sort?.key === col.key && 'text-accent-primary',
                   col.width && `w-[${col.width}]`
                 )}
@@ -400,8 +400,8 @@ function DesktopTable({
                   {col.header || col.label}
                   {sort?.key === col.key && (
                     sort.direction === 'asc' 
-                      ? <CaretUp size={12} weight="bold" className="text-accent-primary" />
-                      : <CaretDown size={12} weight="bold" className="text-accent-primary" />
+                      ? <CaretUp size={10} weight="bold" className="text-accent-primary" />
+                      : <CaretDown size={10} weight="bold" className="text-accent-primary" />
                   )}
                 </div>
               </th>
@@ -427,13 +427,13 @@ function DesktopTable({
                 key={row.id || idx}
                 onClick={() => onRowClick?.(row)}
                 className={cn(
-                  'group transition-all duration-150 table-row-hover',
+                  'group transition-all duration-200 table-row-hover',
                   onRowClick && 'cursor-pointer',
                   // Selected state - uses theme-aware CSS class
                   selectedId === row.id && 'row-selected'
                 )}>
                 {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-1.5 transition-colors">
+                  <td key={col.key} className="px-4 py-1.5 transition-colors duration-200">
                     {col.render 
                       ? col.render(row[col.key], row)
                       : row[col.key] ?? '—'
