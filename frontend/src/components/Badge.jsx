@@ -12,23 +12,23 @@ export function Badge({
 }) {
   // Theme-aware variants using CSS classes defined in index.css
   const variants = {
-    default: 'bg-bg-tertiary/80 text-text-primary border-border/50',
-    primary: 'status-primary-bg status-primary-text status-primary-border',
-    secondary: 'bg-bg-tertiary/60 text-text-secondary border-border/40',
-    success: 'status-success-bg status-success-text status-success-border',
-    warning: 'status-warning-bg status-warning-text status-warning-border',
-    danger: 'status-danger-bg status-danger-text status-danger-border',
-    info: 'status-primary-bg status-primary-text status-primary-border',
+    default: 'bg-bg-tertiary/80 text-text-primary border-transparent',
+    primary: 'status-primary-bg status-primary-text border-transparent',
+    secondary: 'bg-bg-tertiary/60 text-text-secondary border-transparent',
+    success: 'status-success-bg status-success-text border-transparent',
+    warning: 'status-warning-bg status-warning-text border-transparent',
+    danger: 'status-danger-bg status-danger-text border-transparent',
+    info: 'status-primary-bg status-primary-text border-transparent',
     outline: 'bg-transparent text-text-primary border-border hover:bg-bg-tertiary/50',
     // Named color variants (still theme-aware through CSS)
-    emerald: 'status-success-bg status-success-text status-success-border',
-    red: 'status-danger-bg status-danger-text status-danger-border',
-    blue: 'status-primary-bg status-primary-text status-primary-border',
-    yellow: 'status-warning-bg status-warning-text status-warning-border',
-    purple: 'status-primary-bg status-primary-text status-primary-border',
-    orange: 'status-warning-bg status-warning-text status-warning-border',
-    cyan: 'status-primary-bg status-primary-text status-primary-border',
-    gray: 'bg-bg-tertiary/60 text-text-secondary border-border/40',
+    emerald: 'status-success-bg status-success-text border-transparent',
+    red: 'status-danger-bg status-danger-text border-transparent',
+    blue: 'status-primary-bg status-primary-text border-transparent',
+    yellow: 'status-warning-bg status-warning-text border-transparent',
+    purple: 'status-primary-bg status-primary-text border-transparent',
+    orange: 'status-warning-bg status-warning-text border-transparent',
+    cyan: 'status-primary-bg status-primary-text border-transparent',
+    gray: 'bg-bg-tertiary/60 text-text-secondary border-transparent',
   }
   
   const dotColors = {
@@ -40,10 +40,11 @@ export function Badge({
     info: 'status-primary-bg-solid',
   }
   
+  // Sizes: sm is pill-shaped, others are rounded
   const sizes = {
-    sm: 'px-1.5 py-0.5 text-[10px] gap-1',
-    default: 'px-2 py-0.5 text-xs gap-1.5',
-    lg: 'px-3 py-1 text-sm gap-2',
+    sm: 'px-2 py-px text-[10px] gap-1 rounded-full',
+    default: 'px-2.5 py-0.5 text-xs gap-1.5 rounded-md',
+    lg: 'px-3 py-1 text-sm gap-2 rounded-md',
   }
   
   const iconSizes = {
@@ -55,8 +56,8 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-md font-medium border',
-        'transition-all duration-200',
+        'inline-flex items-center font-semibold border',
+        'transition-all duration-200 whitespace-nowrap',
         sizes[size],
         variants[variant],
         className
