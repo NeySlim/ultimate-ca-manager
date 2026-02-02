@@ -5,10 +5,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
-  ShieldCheck, Certificate, ClockCounterClockwise, 
+  ShieldCheck, Certificate, ClockCounterClockwise, Clock,
   Plus, ArrowsClockwise, ListChecks, Gear, CaretRight, 
   User, Globe, SignIn, SignOut, Trash, PencilSimple, 
-  UploadSimple, Key, Warning, WifiHigh, Heartbeat, Database
+  UploadSimple, Key, Warning, WifiHigh, Heartbeat, Database, Lightning
 } from '@phosphor-icons/react'
 import { Card, Button, Badge, LoadingSpinner, Logo } from '../components'
 import { dashboardService, certificatesService, acmeService } from '../services'
