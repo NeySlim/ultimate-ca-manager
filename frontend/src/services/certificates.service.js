@@ -51,5 +51,12 @@ export const certificatesService = {
   async import(formData) {
     // FormData for file upload
     return apiClient.upload('/certificates/import', formData)
+  },
+
+  async uploadKey(id, keyPem, passphrase = null) {
+    return apiClient.post(`/certificates/${id}/key`, { 
+      key: keyPem,
+      passphrase 
+    })
   }
 }
