@@ -1,11 +1,12 @@
 /**
- * CSRs (Certificate Signing Requests) Page - Using ResponsiveLayout
+ * CSRs (Certificate Signing Requests) Page - With Pending/History Tabs
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   FileText, Upload, SignIn, Trash, Download, 
-  Clock, Key, UploadSimple, CheckCircle, Warning, X
+  Clock, Key, UploadSimple, CheckCircle, Warning, X,
+  ClockCounterClockwise, Certificate, Stamp
 } from '@phosphor-icons/react'
 import {
   Badge, Button, Modal, Input, Select, HelpCard, FileUpload,
@@ -19,6 +20,12 @@ import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
 import { VALIDITY } from '../constants/config'
 
+// Tab definitions
+const TABS = [
+  { id: 'pending', label: 'Pending', icon: Warning },
+  { id: 'history', label: 'History', icon: ClockCounterClockwise }
+]
+
 export default function CSRsPage() {
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm } = useNotification()
@@ -26,8 +33,12 @@ export default function CSRsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { modals, open: openModal, close: closeModal } = useModals(['upload', 'sign'])
   
+  // Tab state
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'pending')
+  
   // Data state
-  const [csrs, setCSRs] = useState([])
+  const [pendingCSRs, setPendingCSRs] = useState([])
+  const [historyCSRs, setHistoryCSRs] = useState([])
   const [loading, setLoading] = useState(true)
   const [cas, setCAs] = useState([])
   
@@ -35,13 +46,13 @@ export default function CSRsPage() {
   const [selectedCSR, setSelectedCSR] = useState(null)
   const [signCA, setSignCA] = useState('')
   const [validityDays, setValidityDays] = useState(VALIDITY.DEFAULT_DAYS)
-  
-  // Filters
-  const [filterStatus, setFilterStatus] = useState('')
-  
-  // Pagination
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
+
+  // Handle tab change
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId)
+    setSelectedCSR(null)
+    setSearchParams({ tab: tabId })
+  }
 
   useEffect(() => {
     loadData()
@@ -55,11 +66,13 @@ export default function CSRsPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [csrsRes, casRes] = await Promise.all([
+      const [pendingRes, historyRes, casRes] = await Promise.all([
         csrsService.getAll(),
+        csrsService.getHistory(),
         casService.getAll()
       ])
-      setCSRs(csrsRes.data || [])
+      setPendingCSRs(pendingRes.data || [])
+      setHistoryCSRs(historyRes.data || [])
       setCAs(casRes.data || casRes.cas || [])
     } catch (error) {
       showError('Failed to load CSRs')
@@ -72,7 +85,7 @@ export default function CSRsPage() {
     try {
       const response = await csrsService.getById(csr.id)
       const data = extractData(response)
-      setSelectedCSR({ ...data })
+      setSelectedCSR({ ...data, ...csr }) // Merge to keep signed_by info
     } catch {
       setSelectedCSR(csr)
     }
@@ -124,131 +137,146 @@ export default function CSRsPage() {
     }
   }
 
-  const handleDownload = async (id) => {
+  const handleDownload = async (id, filename) => {
     try {
       const blob = await csrsService.download(id)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `csr.pem`
+      a.download = filename || 'csr.pem'
       a.click()
-      showSuccess('CSR downloaded')
+      showSuccess('Downloaded successfully')
     } catch (error) {
-      showError(error.message || 'Failed to download CSR')
+      showError(error.message || 'Failed to download')
     }
   }
 
-  // Filter data - normalize status to lowercase
-  const filteredCSRs = useMemo(() => {
-    let result = csrs.map(csr => ({
-      ...csr,
-      cn: csr.common_name || csr.subject || 'Unnamed CSR',
-      normalizedStatus: (csr.status || 'pending').toLowerCase()
-    }))
-    
-    if (filterStatus) {
-      result = result.filter(c => c.normalizedStatus === filterStatus)
-    }
-    
-    return result
-  }, [csrs, filterStatus])
+  // Current data based on tab
+  const currentData = activeTab === 'pending' ? pendingCSRs : historyCSRs
 
-  // Stats - normalize status to lowercase for comparison
-  const stats = useMemo(() => {
-    const getStatus = (c) => (c.status || 'pending').toLowerCase()
-    const pending = csrs.filter(c => getStatus(c) === 'pending').length
-    const signed = csrs.filter(c => getStatus(c) === 'signed').length
-    const rejected = csrs.filter(c => getStatus(c) === 'rejected').length
-    return [
-      { icon: Warning, label: 'Pending', value: pending, variant: 'warning' },
-      { icon: CheckCircle, label: 'Signed', value: signed, variant: 'success' },
-      { icon: X, label: 'Rejected', value: rejected, variant: 'danger' },
-      { icon: FileText, label: 'Total', value: csrs.length, variant: 'primary' }
-    ]
-  }, [csrs])
+  // Stats
+  const stats = useMemo(() => [
+    { icon: Warning, label: 'Pending', value: pendingCSRs.length, variant: 'warning' },
+    { icon: CheckCircle, label: 'Signed', value: historyCSRs.length, variant: 'success' },
+    { icon: FileText, label: 'Total', value: pendingCSRs.length + historyCSRs.length, variant: 'primary' }
+  ], [pendingCSRs, historyCSRs])
 
-  // Table columns
-  const columns = useMemo(() => [
+  // Pending table columns
+  const pendingColumns = useMemo(() => [
     {
       key: 'cn',
       header: 'Common Name',
       priority: 1,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <FileText size={16} className="text-accent-primary shrink-0" />
-          <span className="font-medium truncate">{val}</span>
+          <FileText size={16} className="text-accent-warning shrink-0" />
+          <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
         </div>
       )
     },
     {
-      key: 'status',
-      header: 'Status',
-      priority: 2,
-      render: (val) => (
-        <Badge 
-          variant={val === 'signed' ? 'success' : val === 'rejected' ? 'danger' : 'warning'}
-          size="sm"
-        >
-          {val || 'pending'}
-        </Badge>
-      )
+      key: 'organization',
+      header: 'Organization',
+      priority: 3,
+      hideOnMobile: true,
+      render: (val) => <span className="text-sm text-text-secondary">{val || '—'}</span>
     },
     {
       key: 'created_at',
       header: 'Created',
-      priority: 3,
-      hideOnMobile: true,
+      priority: 2,
       render: (val) => (
         <span className="text-xs text-text-secondary whitespace-nowrap">
-          {formatDate(val)}
+          {formatDate(val, 'short')}
         </span>
       )
     },
     {
-      key: 'key_algorithm',
+      key: 'key_type',
       header: 'Key',
       priority: 4,
       hideOnMobile: true,
       render: (val, row) => (
         <span className="text-xs font-mono text-text-secondary">
-          {val || 'RSA'} {row.key_size ? `(${row.key_size})` : ''}
+          {row.key_algorithm || 'RSA'} {row.key_size ? `(${row.key_size})` : ''}
         </span>
       )
     }
   ], [])
 
-  // Filters config
-  const filters = useMemo(() => [
+  // History table columns
+  const historyColumns = useMemo(() => [
     {
-      key: 'status',
-      label: 'Status',
-      type: 'select',
-      value: filterStatus,
-      onChange: setFilterStatus,
-      placeholder: 'All Status',
-      options: [
-        { value: 'pending', label: 'Pending' },
-        { value: 'signed', label: 'Signed' },
-        { value: 'rejected', label: 'Rejected' }
-      ]
+      key: 'cn',
+      header: 'Common Name',
+      priority: 1,
+      render: (val, row) => (
+        <div className="flex items-center gap-2">
+          <Certificate size={16} className="text-accent-success shrink-0" />
+          <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
+          {row.source === 'acme' && (
+            <Badge variant="info" size="sm">ACME</Badge>
+          )}
+          {row.source === 'scep' && (
+            <Badge variant="purple" size="sm">SCEP</Badge>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'signed_by',
+      header: 'Signed By',
+      priority: 2,
+      render: (val, row) => (
+        <div className="flex items-center gap-1.5">
+          <Stamp size={14} className="text-accent-primary" />
+          <span className="text-sm text-text-primary truncate">{val || row.issuer_name || '—'}</span>
+        </div>
+      )
+    },
+    {
+      key: 'signed_at',
+      header: 'Signed',
+      priority: 3,
+      render: (val, row) => (
+        <span className="text-xs text-text-secondary whitespace-nowrap">
+          {formatDate(val || row.valid_from, 'short')}
+        </span>
+      )
+    },
+    {
+      key: 'valid_to',
+      header: 'Expires',
+      priority: 4,
+      hideOnMobile: true,
+      render: (val, row) => {
+        const days = row.days_remaining
+        const variant = days < 0 ? 'danger' : days < 30 ? 'warning' : 'success'
+        return (
+          <Badge variant={variant} size="sm">
+            {days < 0 ? 'Expired' : `${days}d`}
+          </Badge>
+        )
+      }
     }
-  ], [filterStatus])
+  ], [])
 
-  const activeFiltersCount = filterStatus ? 1 : 0
+  // Row actions for pending
+  const pendingRowActions = useCallback((row) => [
+    { label: 'Download CSR', icon: Download, onClick: () => handleDownload(row.id, `${row.cn || 'csr'}.pem`) },
+    ...(canWrite('csrs') ? [
+      { label: 'Sign', icon: SignIn, onClick: () => { setSelectedCSR(row); openModal('sign') }}
+    ] : []),
+    ...(canDelete('csrs') ? [
+      { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
+    ] : [])
+  ], [canWrite, canDelete])
 
-  // Row actions - normalize status to lowercase
-  const rowActions = useCallback((row) => {
-    const status = (row.status || 'pending').toLowerCase()
-    return [
-      { label: 'Download', icon: Download, onClick: () => handleDownload(row.id) },
-      ...(canWrite('csrs') && status === 'pending' ? [
-        { label: 'Sign', icon: SignIn, onClick: () => { setSelectedCSR(row); openModal('sign') }}
-      ] : []),
-      ...(canDelete('csrs') ? [
-        { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
-      ] : [])
-    ]
-  }, [canWrite, canDelete])
+  // Row actions for history
+  const historyRowActions = useCallback((row) => [
+    { label: 'Download Certificate', icon: Download, onClick: () => handleDownload(row.id, `${row.cn || 'cert'}.pem`) },
+    { label: 'View in Certificates', icon: Certificate, onClick: () => window.location.href = `/certificates?id=${row.id}` }
+  ], [])
 
   // Help content
   const helpContent = (
@@ -256,32 +284,41 @@ export default function CSRsPage() {
       <HelpCard title="About CSRs" variant="info">
         A Certificate Signing Request contains the public key and identity information needed to issue a certificate.
       </HelpCard>
-      <HelpCard title="Status Legend" variant="info">
+      <HelpCard title="Tabs" variant="info">
         <div className="space-y-1 mt-2">
           <div className="flex items-center gap-2">
             <Badge variant="warning" size="sm">Pending</Badge>
-            <span className="text-xs">Awaiting signature</span>
+            <span className="text-xs">CSRs awaiting signature</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="success" size="sm">Signed</Badge>
-            <span className="text-xs">Certificate issued</span>
+            <Badge variant="success" size="sm">History</Badge>
+            <span className="text-xs">Previously signed CSRs</span>
           </div>
         </div>
       </HelpCard>
       <HelpCard title="Workflow" variant="tip">
-        1. Upload CSR → 2. Review details → 3. Sign with CA → 4. Download certificate
+        1. Upload CSR → 2. Review details → 3. Sign with CA → 4. Certificate appears in History
       </HelpCard>
     </div>
   )
+
+  // Tabs with counts
+  const tabsWithCounts = TABS.map(tab => ({
+    ...tab,
+    count: tab.id === 'pending' ? pendingCSRs.length : historyCSRs.length
+  }))
 
   return (
     <>
       <ResponsiveLayout
         title="Certificate Signing Requests"
-        subtitle={`${csrs.length} request${csrs.length !== 1 ? 's' : ''}`}
+        subtitle={`${pendingCSRs.length} pending, ${historyCSRs.length} signed`}
         icon={FileText}
         stats={stats}
         helpContent={helpContent}
+        tabs={tabsWithCounts}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -293,42 +330,39 @@ export default function CSRsPage() {
         }
         slideOverOpen={!!selectedCSR}
         onSlideOverClose={() => setSelectedCSR(null)}
-        slideOverTitle="CSR Details"
+        slideOverTitle={activeTab === 'pending' ? 'CSR Details' : 'Certificate Details'}
         slideOverContent={selectedCSR && (
-          <CSRDetailsPanel 
-            csr={selectedCSR}
-            canWrite={canWrite}
-            canDelete={canDelete}
-            onSign={() => openModal('sign')}
-            onDownload={() => handleDownload(selectedCSR.id)}
-            onDelete={() => handleDelete(selectedCSR.id)}
-          />
+          activeTab === 'pending' ? (
+            <CSRDetailsPanel 
+              csr={selectedCSR}
+              canWrite={canWrite}
+              canDelete={canDelete}
+              onSign={() => openModal('sign')}
+              onDownload={() => handleDownload(selectedCSR.id, `${selectedCSR.cn || 'csr'}.pem`)}
+              onDelete={() => handleDelete(selectedCSR.id)}
+            />
+          ) : (
+            <SignedCSRDetailsPanel 
+              cert={selectedCSR}
+              onDownload={() => handleDownload(selectedCSR.id, `${selectedCSR.cn || 'cert'}.pem`)}
+            />
+          )
         )}
       >
         <ResponsiveDataTable
-          data={filteredCSRs}
-          columns={columns}
+          data={currentData.map(item => ({
+            ...item,
+            cn: item.common_name || item.cn || item.subject || 'Unnamed'
+          }))}
+          columns={activeTab === 'pending' ? pendingColumns : historyColumns}
           loading={loading}
           selectedId={selectedCSR?.id}
-          onRowClick={(csr) => csr ? loadCSRDetails(csr) : setSelectedCSR(null)}
-          rowActions={rowActions}
+          onRowClick={(item) => item ? loadCSRDetails(item) : setSelectedCSR(null)}
+          rowActions={activeTab === 'pending' ? pendingRowActions : historyRowActions}
           searchable
-          searchPlaceholder="Search CSRs..."
-          searchKeys={['cn', 'common_name', 'subject', 'organization']}
-          toolbarFilters={[
-            {
-              key: 'status',
-              value: filterStatus,
-              onChange: setFilterStatus,
-              placeholder: 'All Status',
-              options: [
-                { value: 'pending', label: 'Pending' },
-                { value: 'signed', label: 'Signed' },
-                { value: 'rejected', label: 'Rejected' }
-              ]
-            }
-          ]}
-          toolbarActions={canWrite('csrs') && (
+          searchPlaceholder={activeTab === 'pending' ? 'Search pending CSRs...' : 'Search signed certificates...'}
+          searchKeys={['cn', 'common_name', 'subject', 'organization', 'signed_by']}
+          toolbarActions={activeTab === 'pending' && canWrite('csrs') && (
             isMobile ? (
               <Button size="lg" onClick={() => openModal('upload')} className="w-11 h-11 p-0">
                 <UploadSimple size={22} weight="bold" />
@@ -341,10 +375,12 @@ export default function CSRsPage() {
             )
           )}
           sortable
-          emptyIcon={FileText}
-          emptyTitle="No CSRs"
-          emptyDescription="Upload a CSR to get started"
-          emptyAction={canWrite('csrs') && (
+          emptyIcon={activeTab === 'pending' ? Warning : CheckCircle}
+          emptyTitle={activeTab === 'pending' ? 'No Pending CSRs' : 'No Signed Certificates'}
+          emptyDescription={activeTab === 'pending' 
+            ? 'Upload a CSR to get started' 
+            : 'Sign a CSR to see it here'}
+          emptyAction={activeTab === 'pending' && canWrite('csrs') && (
             <Button onClick={() => openModal('upload')}>
               <UploadSimple size={16} /> Upload CSR
             </Button>
@@ -411,31 +447,19 @@ export default function CSRsPage() {
 }
 
 // =============================================================================
-// CSR DETAILS PANEL (for slide-over)
+// CSR DETAILS PANEL (for pending CSRs)
 // =============================================================================
 
 function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelete }) {
-  // CSR is pending if it has CSR data (csr_pem or csr) but no certificate (pem or crt) yet
-  // Backend getById returns "valid" for all certs, so we check pem field instead
-  const hasCSR = csr.csr_pem || csr.csr
-  const hasCert = csr.pem || csr.crt
-  const isPending = hasCSR && !hasCert
-  const csrStatus = isPending ? 'pending' : 'signed'
-  const statusVariant = isPending ? 'warning' : 'success'
-  
   return (
     <div className="p-3 space-y-3">
       {/* Header */}
       <CompactHeader
         icon={FileText}
-        iconClass="bg-accent-primary/20"
+        iconClass="bg-accent-warning/20"
         title={csr.common_name || csr.cn || 'Unnamed CSR'}
         subtitle={csr.organization}
-        badge={
-          <Badge variant={statusVariant} size="sm">
-            {csrStatus}
-          </Badge>
-        }
+        badge={<Badge variant="warning" size="sm">Pending</Badge>}
       />
 
       {/* Stats */}
@@ -449,7 +473,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
         <Button size="sm" variant="secondary" className="flex-1" onClick={onDownload}>
           <Download size={14} /> Download
         </Button>
-        {canWrite('csrs') && isPending && (
+        {canWrite('csrs') && (
           <Button size="sm" onClick={onSign}>
             <SignIn size={14} /> Sign
           </Button>
@@ -483,11 +507,11 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
         </CompactGrid>
       </CompactSection>
 
-      {/* Extensions */}
-      {(csr.san || csr.subject_alternative_names) && (
+      {/* SANs */}
+      {(csr.sans?.length > 0 || csr.san_dns?.length > 0) && (
         <CompactSection title="Subject Alternative Names">
           <div className="text-xs text-text-secondary space-y-1">
-            {(csr.san || csr.subject_alternative_names || []).map((san, i) => (
+            {(csr.sans || csr.san_dns || []).map((san, i) => (
               <div key={i} className="font-mono bg-bg-tertiary px-2 py-1 rounded">
                 {san}
               </div>
@@ -496,11 +520,106 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
         </CompactSection>
       )}
 
-      {/* Timestamps */}
+      {/* Timeline */}
       <CompactSection title="Timeline">
         <CompactGrid>
           <CompactField label="Created" value={csr.created_at ? formatDate(csr.created_at) : '—'} />
-          {csr.signed_at && <CompactField label="Signed" value={formatDate(csr.signed_at)} />}
+          <CompactField label="Requester" value={csr.requester || csr.created_by} />
+        </CompactGrid>
+      </CompactSection>
+    </div>
+  )
+}
+
+// =============================================================================
+// SIGNED CSR DETAILS PANEL (for history)
+// =============================================================================
+
+function SignedCSRDetailsPanel({ cert, onDownload }) {
+  const daysRemaining = cert.days_remaining || 0
+  const expiryVariant = daysRemaining < 0 ? 'danger' : daysRemaining < 30 ? 'warning' : 'success'
+  const isAcme = cert.source === 'acme'
+  const isScep = cert.source === 'scep'
+  
+  return (
+    <div className="p-3 space-y-3">
+      {/* Header */}
+      <CompactHeader
+        icon={Certificate}
+        iconClass="bg-accent-success/20"
+        title={cert.common_name || cert.cn || 'Unnamed Certificate'}
+        subtitle={cert.organization}
+        badge={
+          <div className="flex gap-1">
+            <Badge variant="success" size="sm">Signed</Badge>
+            {isAcme && <Badge variant="info" size="sm">ACME</Badge>}
+            {isScep && <Badge variant="purple" size="sm">SCEP</Badge>}
+          </div>
+        }
+      />
+
+      {/* Stats */}
+      <CompactStats stats={[
+        { icon: Stamp, value: cert.signed_by || cert.issuer_name || '—' },
+        { icon: Clock, value: `${daysRemaining}d remaining` },
+      ]} />
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <Button size="sm" variant="secondary" className="flex-1" onClick={onDownload}>
+          <Download size={14} /> Download
+        </Button>
+        <Button 
+          size="sm" 
+          variant="secondary"
+          onClick={() => window.location.href = `/certificates?id=${cert.id}`}
+        >
+          <Certificate size={14} /> View Certificate
+        </Button>
+      </div>
+
+      {/* Signing Information */}
+      <CompactSection title="Signing Details">
+        <CompactGrid>
+          <CompactField label="Signed By" value={cert.signed_by || cert.issuer_name} className="col-span-2" />
+          <CompactField label="Signed" value={cert.signed_at ? formatDate(cert.signed_at) : formatDate(cert.valid_from)} />
+          <CompactField label="Expires" value={cert.valid_to ? formatDate(cert.valid_to) : '—'} />
+          <CompactField 
+            label="Status" 
+            value={
+              <Badge variant={expiryVariant} size="sm">
+                {daysRemaining < 0 ? 'Expired' : `${daysRemaining} days left`}
+              </Badge>
+            } 
+          />
+        </CompactGrid>
+      </CompactSection>
+
+      {/* Subject Information */}
+      <CompactSection title="Subject">
+        <CompactGrid>
+          <CompactField label="Common Name" value={cert.common_name || cert.cn} className="col-span-2" />
+          <CompactField label="Organization" value={cert.organization} />
+          <CompactField label="Org Unit" value={cert.organizational_unit} />
+          <CompactField label="Country" value={cert.country} />
+          <CompactField label="State" value={cert.state} />
+        </CompactGrid>
+      </CompactSection>
+
+      {/* Key Information */}
+      <CompactSection title="Key Information">
+        <CompactGrid>
+          <CompactField label="Algorithm" value={cert.key_algorithm || 'RSA'} />
+          <CompactField label="Key Size" value={cert.key_size} />
+          <CompactField label="Serial" value={cert.serial_number} className="col-span-2" />
+        </CompactGrid>
+      </CompactSection>
+
+      {/* Timeline */}
+      <CompactSection title="Timeline">
+        <CompactGrid>
+          <CompactField label="CSR Created" value={cert.created_at ? formatDate(cert.created_at) : '—'} />
+          <CompactField label="Certificate Issued" value={cert.valid_from ? formatDate(cert.valid_from) : '—'} />
         </CompactGrid>
       </CompactSection>
     </div>

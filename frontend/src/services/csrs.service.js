@@ -13,6 +13,15 @@ export const csrsService = {
     return apiClient.get(`/csrs${query}`)
   },
 
+  async getHistory(filters = {}) {
+    const params = new URLSearchParams()
+    if (filters.page) params.append('page', filters.page)
+    if (filters.per_page) params.append('per_page', filters.per_page)
+    
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return apiClient.get(`/csrs/history${query}`)
+  },
+
   async getById(id) {
     return apiClient.get(`/csrs/${id}`)
   },
