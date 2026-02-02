@@ -30,10 +30,6 @@ export default function TrustStorePage() {
   const [selectedCert, setSelectedCert] = useState(null)
   const [syncing, setSyncing] = useState(false)
   
-  // Pagination state
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(25)
-  
   // Add modal state
   const [addForm, setAddForm] = useState({
     name: '',
@@ -395,13 +391,7 @@ export default function TrustStorePage() {
           )}
           sortable
           defaultSort={{ key: 'name', direction: 'asc' }}
-          pagination={{
-            page,
-            total: certificates.length,
-            perPage,
-            onChange: setPage,
-            onPerPageChange: (v) => { setPerPage(v); setPage(1) }
-          }}
+          pagination={true}
           emptyIcon={ShieldCheck}
           emptyTitle="No trusted certificates"
           emptyDescription="Add certificates to validate certificate chains"
