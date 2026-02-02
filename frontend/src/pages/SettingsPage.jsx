@@ -20,6 +20,7 @@ import { settingsService, systemService, casService, certificatesService } from 
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
+import { ERRORS, SUCCESS, LABELS } from '../lib/messages'
 import { useTheme } from '../contexts/ThemeContext'
 
 // Base settings categories (Community)
@@ -217,7 +218,7 @@ export default function SettingsPage() {
       const response = await settingsService.getAll()
       setSettings(response.data || response || {})
     } catch (error) {
-      showError(error.message || 'Failed to load settings')
+      showError(error.message || ERRORS.LOAD_FAILED.SETTINGS)
     } finally {
       setLoading(false)
     }
@@ -283,9 +284,9 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       await settingsService.updateBulk(settings)
-      showSuccess('Settings saved successfully')
+      showSuccess(SUCCESS.UPDATE.SETTINGS)
     } catch (error) {
-      showError(error.message || 'Failed to save settings')
+      showError(error.message || ERRORS.UPDATE_FAILED.SETTINGS)
     } finally {
       setSaving(false)
     }
@@ -294,9 +295,9 @@ export default function SettingsPage() {
   const handleTestEmail = async () => {
     try {
       await settingsService.testEmail(settings.admin_email)
-      showSuccess('Test email sent successfully')
+      showSuccess(SUCCESS.EMAIL.TEST_SENT)
     } catch (error) {
-      showError(error.message || 'Failed to send test email')
+      showError(error.message || ERRORS.EMAIL.TEST_FAILED)
     }
   }
 
@@ -317,13 +318,13 @@ export default function SettingsPage() {
         a.download = response.data.filename
         a.click()
         URL.revokeObjectURL(url)
-        showSuccess('Backup created and downloaded successfully')
+        showSuccess(SUCCESS.BACKUP.CREATED)
         setShowBackupModal(false)
         setBackupPassword('')
         loadBackups()
       }
     } catch (error) {
-      showError(error.message || 'Failed to create backup')
+      showError(error.message || ERRORS.BACKUP.CREATE_FAILED)
     } finally {
       setBackupLoading(false)
     }
@@ -338,9 +339,9 @@ export default function SettingsPage() {
       a.download = filename
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess('Backup downloaded successfully')
+      showSuccess(SUCCESS.BACKUP.DOWNLOADED)
     } catch (error) {
-      showError(error.message || 'Failed to download backup')
+      showError(error.message || ERRORS.BACKUP.DOWNLOAD_FAILED)
     }
   }
 
@@ -354,10 +355,10 @@ export default function SettingsPage() {
     
     try {
       await systemService.deleteBackup(filename)
-      showSuccess('Backup deleted successfully')
+      showSuccess(SUCCESS.BACKUP.DELETED)
       loadBackups()
     } catch (error) {
-      showError(error.message || 'Failed to delete backup')
+      showError(error.message || ERRORS.DELETE_FAILED.BACKUP)
     }
   }
 
@@ -380,7 +381,7 @@ export default function SettingsPage() {
       setRestoreFile(null)
       setTimeout(() => window.location.reload(), 2000)
     } catch (error) {
-      showError(error.message || 'Failed to restore backup')
+      showError(error.message || ERRORS.BACKUP.RESTORE_FAILED)
     } finally {
       setBackupLoading(false)
     }
@@ -389,9 +390,9 @@ export default function SettingsPage() {
   const handleOptimizeDb = async () => {
     try {
       await systemService.optimizeDatabase()
-      showSuccess('Database optimized successfully')
+      showSuccess(SUCCESS.DATABASE.OPTIMIZED)
     } catch (error) {
-      showError(error.message || 'Failed to optimize database')
+      showError(error.message || ERRORS.DATABASE.OPTIMIZE_FAILED)
     }
   }
 
@@ -399,12 +400,12 @@ export default function SettingsPage() {
     try {
       const result = await systemService.integrityCheck()
       if (result.passed) {
-        showSuccess('Database integrity check passed')
+        showSuccess(SUCCESS.DATABASE.INTEGRITY_PASSED)
       } else {
         showError(`Integrity check found ${result.errors} errors`)
       }
     } catch (error) {
-      showError(error.message || 'Failed to check database integrity')
+      showError(error.message || ERRORS.DATABASE.INTEGRITY_FAILED)
     }
   }
 
@@ -416,9 +417,9 @@ export default function SettingsPage() {
       a.href = url
       a.download = `ucm-database-${new Date().toISOString().split('T')[0]}.sql`
       a.click()
-      showSuccess('Database exported successfully')
+      showSuccess(SUCCESS.EXPORT.DATABASE)
     } catch (error) {
-      showError(error.message || 'Failed to export database')
+      showError(error.message || ERRORS.DATABASE.EXPORT_FAILED)
     }
   }
 
@@ -441,10 +442,10 @@ export default function SettingsPage() {
 
     try {
       await systemService.resetDatabase()
-      showSuccess('Database reset successfully. Page will reload.')
+      showSuccess(SUCCESS.DATABASE.RESET)
       setTimeout(() => window.location.reload(), 2000)
     } catch (error) {
-      showError(error.message || 'Failed to reset database')
+      showError(error.message || ERRORS.DATABASE.RESET_FAILED)
     }
   }
 
@@ -464,10 +465,10 @@ export default function SettingsPage() {
       await systemService.applyHttpsCert({
         cert_id: selectedHttpsCert
       })
-      showSuccess('HTTPS certificate applied. Server will restart.')
+      showSuccess(SUCCESS.HTTPS.APPLIED)
       setTimeout(() => window.location.reload(), 3000)
     } catch (error) {
-      showError(error.message || 'Failed to apply certificate')
+      showError(error.message || ERRORS.HTTPS.APPLY_FAILED)
     }
   }
 
@@ -483,10 +484,10 @@ export default function SettingsPage() {
         common_name: window.location.hostname,
         validity_days: 365
       })
-      showSuccess('HTTPS certificate regenerated. Server will restart.')
+      showSuccess(SUCCESS.HTTPS.REGENERATED)
       setTimeout(() => window.location.reload(), 3000)
     } catch (error) {
-      showError(error.message || 'Failed to regenerate HTTPS certificate')
+      showError(error.message || ERRORS.HTTPS.REGENERATE_FAILED)
     }
   }
 

@@ -11,6 +11,7 @@ import {
 } from '../components'
 import { accountService } from '../services'
 import { useAuth, useNotification } from '../contexts'
+import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 
 export default function AccountPage() {
   const { user } = useAuth()
@@ -52,7 +53,7 @@ export default function AccountPage() {
       const response = await accountService.getProfile()
       setAccountData(response.data || response)
     } catch (error) {
-      showError(error.message || 'Failed to load account')
+      showError(error.message || ERRORS.LOAD_FAILED.GENERIC)
     } finally {
       setLoading(false)
     }
@@ -88,21 +89,21 @@ export default function AccountPage() {
   const handleUpdateProfile = async () => {
     try {
       await accountService.updateProfile(accountData)
-      showSuccess('Profile updated successfully')
+      showSuccess(SUCCESS.UPDATE.USER)
       setEditing(false)
       loadAccount()
     } catch (error) {
-      showError(error.message || 'Failed to update profile')
+      showError(error.message || ERRORS.UPDATE_FAILED.USER)
     }
   }
 
   const handleChangePassword = async (passwordData) => {
     try {
       await accountService.changePassword(passwordData)
-      showSuccess('Password changed successfully')
+      showSuccess(SUCCESS.OTHER.PASSWORD_CHANGED)
       setShowPasswordModal(false)
     } catch (error) {
-      showError(error.message || 'Failed to change password')
+      showError(error.message || ERRORS.UPDATE_FAILED.GENERIC)
     }
   }
 
@@ -113,12 +114,12 @@ export default function AccountPage() {
       setShowApiKeyModal(false)
       loadApiKeys()
     } catch (error) {
-      showError(error.message || 'Failed to create API key')
+      showError(error.message || ERRORS.CREATE_FAILED.GENERIC)
     }
   }
 
   const handleDeleteApiKey = async (keyId) => {
-    const confirmed = await showConfirm('Are you sure you want to delete this API key?', {
+    const confirmed = await showConfirm(CONFIRM.DELETE.GENERIC, {
       title: 'Delete API Key',
       confirmText: 'Delete',
       variant: 'danger'
@@ -127,10 +128,10 @@ export default function AccountPage() {
     
     try {
       await accountService.deleteApiKey(keyId)
-      showSuccess('API key deleted')
+      showSuccess(SUCCESS.DELETE.GENERIC)
       loadApiKeys()
     } catch (error) {
-      showError(error.message || 'Failed to delete API key')
+      showError(error.message || ERRORS.DELETE_FAILED.GENERIC)
     }
   }
 
@@ -145,7 +146,7 @@ export default function AccountPage() {
         })
         if (!code) return
         await accountService.disable2FA(code)
-        showSuccess('Two-factor authentication disabled')
+        showSuccess(SUCCESS.OTHER.TWO_FACTOR_DISABLED)
         loadAccount()
       } else {
         // Enable 2FA - show QR modal
@@ -155,27 +156,27 @@ export default function AccountPage() {
         setShow2FAModal(true)
       }
     } catch (error) {
-      showError(error.message || 'Failed to toggle 2FA')
+      showError(error.message || ERRORS.UPDATE_FAILED.GENERIC)
     }
   }
 
   const handleConfirm2FA = async () => {
     try {
       await accountService.confirm2FA(confirmCode)
-      showSuccess('2FA enabled successfully! Save your backup codes.')
+      showSuccess(SUCCESS.OTHER.TWO_FACTOR_ENABLED)
       setShow2FAModal(false)
       setQrData(null)
       setConfirmCode('')
       loadAccount()
     } catch (error) {
-      showError(error.message || 'Invalid code. Please try again.')
+      showError(error.message || ERRORS.VALIDATION.REQUIRED_FIELD)
     }
   }
 
   // ============ WebAuthn Handlers ============
   const handleRegisterWebAuthn = async () => {
     if (!webauthnName.trim()) {
-      showError('Please enter a name for the security key')
+      showError(ERRORS.VALIDATION.REQUIRED_FIELD)
       return
     }
     
@@ -229,7 +230,7 @@ export default function AccountPage() {
       // Step 4: Send to server
       await accountService.completeWebAuthnRegistration(credentialData, webauthnName)
       
-      showSuccess('Security key registered successfully!')
+      showSuccess(SUCCESS.CREATE.GENERIC)
       setShowWebAuthnModal(false)
       setWebauthnName('')
       loadAccount()
@@ -237,9 +238,9 @@ export default function AccountPage() {
     } catch (error) {
       console.error('WebAuthn registration failed:', error)
       if (error.name === 'NotAllowedError') {
-        showError('Security key registration was cancelled or timed out')
+        showError(ERRORS.AUTH.CANCELLED)
       } else {
-        showError(error.message || 'Failed to register security key')
+        showError(error.message || ERRORS.CREATE_FAILED.GENERIC)
       }
     } finally {
       setWebauthnRegistering(false)
@@ -247,7 +248,7 @@ export default function AccountPage() {
   }
   
   const handleDeleteWebAuthn = async (credentialId) => {
-    const confirmed = await showConfirm('Delete this security key?', {
+    const confirmed = await showConfirm(CONFIRM.DELETE.GENERIC, {
       title: 'Delete Security Key',
       confirmText: 'Delete',
       variant: 'danger'
@@ -255,18 +256,18 @@ export default function AccountPage() {
     if (!confirmed) return
     try {
       await accountService.deleteWebAuthnCredential(credentialId)
-      showSuccess('Security key deleted')
+      showSuccess(SUCCESS.DELETE.GENERIC)
       loadAccount()
       loadWebAuthnCredentials()
     } catch (error) {
-      showError(error.message || 'Failed to delete security key')
+      showError(error.message || ERRORS.DELETE_FAILED.GENERIC)
     }
   }
 
   // ============ mTLS Handlers ============
   const handleCreateMTLS = async () => {
     if (!mtlsFormData.cn.trim()) {
-      showError('Please enter a Common Name (CN)')
+      showError(ERRORS.VALIDATION.REQUIRED_FIELD)
       return
     }
     
@@ -278,7 +279,7 @@ export default function AccountPage() {
         self_signed: false
       })
       
-      showSuccess('Certificate created! Download it now.')
+      showSuccess(SUCCESS.CREATE.CERTIFICATE)
       
       // Auto-download the certificate and key
       if (response.cert_pem) {
@@ -293,12 +294,12 @@ export default function AccountPage() {
       loadAccount()
       loadMTLSCertificates()
     } catch (error) {
-      showError(error.message || 'Failed to create certificate')
+      showError(error.message || ERRORS.CREATE_FAILED.CERTIFICATE)
     }
   }
   
   const handleDeleteMTLS = async (certId) => {
-    const confirmed = await showConfirm('Delete this certificate?', {
+    const confirmed = await showConfirm(CONFIRM.DELETE.CERTIFICATE, {
       title: 'Delete Certificate',
       confirmText: 'Delete',
       variant: 'danger'
@@ -306,11 +307,11 @@ export default function AccountPage() {
     if (!confirmed) return
     try {
       await accountService.deleteMTLSCertificate(certId)
-      showSuccess('Certificate deleted')
+      showSuccess(SUCCESS.DELETE.CERTIFICATE)
       loadAccount()
       loadMTLSCertificates()
     } catch (error) {
-      showError(error.message || 'Failed to delete certificate')
+      showError(error.message || ERRORS.DELETE_FAILED.CERTIFICATE)
     }
   }
   

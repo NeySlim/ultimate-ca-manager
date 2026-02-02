@@ -17,6 +17,7 @@ import {
 } from '../components'
 import { scepService, casService } from '../services'
 import { useNotification } from '../contexts'
+import { ERRORS, SUCCESS } from '../lib/messages'
 import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
 
@@ -70,7 +71,7 @@ export default function SCEPPage() {
       )
       setCas(casWithChallenges)
     } catch (error) {
-      showError('Failed to load SCEP data')
+      showError(error.message || ERRORS.LOAD_FAILED.SCEP)
     } finally {
       setLoading(false)
     }
@@ -80,9 +81,9 @@ export default function SCEPPage() {
     setSaving(true)
     try {
       await scepService.updateConfig(config)
-      showSuccess('SCEP configuration saved')
+      showSuccess(SUCCESS.UPDATE.SETTINGS)
     } catch (error) {
-      showError(error.message || 'Failed to save configuration')
+      showError(error.message || ERRORS.UPDATE_FAILED.SETTINGS)
     } finally {
       setSaving(false)
     }
@@ -94,7 +95,7 @@ export default function SCEPPage() {
       showSuccess('Request approved - Certificate issued')
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to approve request')
+      showError(error.message || ERRORS.UPDATE_FAILED.GENERIC)
     }
   }
 
@@ -108,7 +109,7 @@ export default function SCEPPage() {
       setSelectedRequest(null)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to reject request')
+      showError(error.message || ERRORS.UPDATE_FAILED.GENERIC)
     }
   }
 
@@ -118,7 +119,7 @@ export default function SCEPPage() {
       showSuccess('Challenge password regenerated')
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to regenerate challenge')
+      showError(error.message || ERRORS.UPDATE_FAILED.GENERIC)
     }
   }
 

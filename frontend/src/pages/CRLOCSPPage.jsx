@@ -19,6 +19,7 @@ import { casService, crlService, apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
+import { ERRORS, SUCCESS, LABELS } from '../lib/messages'
 
 // Extended CRL service methods
 const crlApi = {
@@ -61,7 +62,7 @@ export default function CRLOCSPPage() {
       setOcspStatus(ocspStatusRes.data || { enabled: false, running: false })
       setOcspStats(ocspStatsRes.data || { total_requests: 0, cache_hits: 0 })
     } catch (error) {
-      showError(error.message || 'Failed to load CRL/OCSP data')
+      showError(error.message || ERRORS.LOAD_FAILED.CRL)
     } finally {
       setLoading(false)
     }
@@ -87,11 +88,11 @@ export default function CRLOCSPPage() {
     setRegenerating(true)
     try {
       await crlApi.regenerate(selectedCA.id)
-      showSuccess('CRL regenerated successfully')
+      showSuccess(SUCCESS.CRL.GENERATED)
       loadCRLForCA(selectedCA.id)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to regenerate CRL')
+      showError(error.message || ERRORS.LOAD_FAILED.CRL)
     } finally {
       setRegenerating(false)
     }

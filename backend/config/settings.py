@@ -136,7 +136,7 @@ class Config:
     
     # Application
     APP_NAME = os.getenv("APP_NAME", "Ultimate CA Manager")
-    APP_VERSION = os.getenv("APP_VERSION", "1.11.0")
+    APP_VERSION = os.getenv("APP_VERSION", "2.0.6")
     
     # SECRET_KEY and JWT_SECRET_KEY validation - deferred to runtime
     _secret_key = os.getenv("SECRET_KEY")

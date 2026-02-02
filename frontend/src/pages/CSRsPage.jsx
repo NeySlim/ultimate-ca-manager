@@ -20,6 +20,7 @@ import { usePermission, useModals } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
 import { VALIDITY } from '../constants/config'
+import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 
 // Tab definitions
 const TABS = [
@@ -85,7 +86,7 @@ export default function CSRsPage() {
       setHistoryCSRs(historyRes.data || [])
       setCAs(casRes.data || casRes.cas || [])
     } catch (error) {
-      showError('Failed to load CSRs')
+      showError(error.message || ERRORS.LOAD_FAILED.CSRS)
     } finally {
       setLoading(false)
     }
@@ -106,7 +107,7 @@ export default function CSRsPage() {
       const file = files[0]
       const text = await file.text()
       await csrsService.upload(text)
-      showSuccess('CSR uploaded successfully')
+      showSuccess(SUCCESS.CREATE.CSR)
       closeModal('upload')
       loadData()
     } catch (error) {
@@ -125,7 +126,7 @@ export default function CSRsPage() {
     }
     try {
       await csrsService.upload(pastedPEM.trim())
-      showSuccess('CSR uploaded successfully')
+      showSuccess(SUCCESS.CREATE.CSR)
       closeModal('upload')
       setPastedPEM('')
       setUploadMode('file')
@@ -142,7 +143,7 @@ export default function CSRsPage() {
     }
     try {
       await csrsService.sign(selectedCSR.id, signCA, validityDays)
-      showSuccess('CSR signed successfully')
+      showSuccess(SUCCESS.OTHER.SIGNED)
       closeModal('sign')
       loadData()
       setSelectedCSR(null)
@@ -152,15 +153,15 @@ export default function CSRsPage() {
   }
 
   const handleDelete = async (id) => {
-    const confirmed = await showConfirm('Are you sure you want to delete this CSR?', {
-      title: 'Delete CSR',
+    const confirmed = await showConfirm(CONFIRM.DELETE.CSR, {
+      title: CONFIRM.DELETE.TITLE,
       confirmText: 'Delete',
       variant: 'danger'
     })
     if (!confirmed) return
     try {
       await csrsService.delete(id)
-      showSuccess('CSR deleted successfully')
+      showSuccess(SUCCESS.DELETE.CSR)
       loadData()
       setSelectedCSR(null)
     } catch (error) {
@@ -179,7 +180,7 @@ export default function CSRsPage() {
     }
     try {
       await csrsService.uploadKey(selectedCSR.id, keyPem.trim(), keyPassphrase || null)
-      showSuccess('Private key uploaded successfully')
+      showSuccess(SUCCESS.OTHER.KEY_UPLOADED)
       setShowKeyModal(false)
       setKeyPem('')
       setKeyPassphrase('')

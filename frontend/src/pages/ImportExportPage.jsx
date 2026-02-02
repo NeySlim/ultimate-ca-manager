@@ -16,6 +16,7 @@ import {
 import { opnsenseService, casService, certificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { cn } from '../lib/utils'
+import { ERRORS, SUCCESS, LABELS } from '../lib/messages'
 
 const STORAGE_KEY = 'opnsense_config'
 
@@ -98,7 +99,7 @@ export default function ImportExportPage() {
       formData.append('format', 'auto')
       
       const result = await certificatesService.import(formData)
-      showSuccess(result.message || 'Certificate imported successfully')
+      showSuccess(result.message || SUCCESS.IMPORT.CERTIFICATE)
       setSelectedFile(null)
       setImportName('')
       setImportPassword('')
@@ -115,7 +116,7 @@ export default function ImportExportPage() {
         }
       }
     } catch (error) {
-      showError(error.message || 'Failed to import certificate')
+      showError(error.message || ERRORS.IMPORT_FAILED.GENERIC)
     } finally {
       setProcessing(false)
     }
@@ -139,7 +140,7 @@ export default function ImportExportPage() {
       formData.append('format', 'auto')
       
       const result = await casService.import(formData)
-      showSuccess(result.message || 'CA imported successfully')
+      showSuccess(result.message || SUCCESS.IMPORT.CA)
       setSelectedFile(null)
       setImportName('')
       setImportPassword('')
@@ -151,7 +152,7 @@ export default function ImportExportPage() {
         navigate(`/cas?selected=${result.data.id}`)
       }
     } catch (error) {
-      showError(error.message || 'Failed to import CA')
+      showError(error.message || ERRORS.IMPORT_FAILED.GENERIC)
     } finally {
       setProcessing(false)
     }
@@ -169,7 +170,7 @@ export default function ImportExportPage() {
       api_secret: opnsenseApiSecret
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
-    showSuccess('Configuration saved')
+    showSuccess(SUCCESS.UPDATE.SETTINGS)
   }
 
   const handleExportAllCerts = async (format) => {
@@ -207,7 +208,7 @@ export default function ImportExportPage() {
       
       showSuccess(`Exported ${certs.length} certificates`)
     } catch (err) {
-      showError('Failed to export certificates')
+      showError(ERRORS.EXPORT_FAILED.GENERIC)
     } finally {
       setProcessing(false)
     }
@@ -248,7 +249,7 @@ export default function ImportExportPage() {
       
       showSuccess(`Exported ${cas.length} CAs`)
     } catch (err) {
-      showError('Failed to export CAs')
+      showError(ERRORS.EXPORT_FAILED.GENERIC)
     } finally {
       setProcessing(false)
     }
@@ -274,12 +275,12 @@ export default function ImportExportPage() {
         setTestItems(result.items || []) // Store items for import
         showSuccess(`Found ${result.stats.certificates} certificates and ${result.stats.cas} CAs`)
       } else {
-        showError(result.error || 'Connection failed')
+        showError(result.error || ERRORS.LOAD_FAILED.GENERIC)
         setTestResult(null)
         setTestItems([])
       }
     } catch (error) {
-      showError(error.message || 'Failed to test connection')
+      showError(error.message || ERRORS.LOAD_FAILED.GENERIC)
       setTestResult(null)
       setTestItems([])
     } finally {
@@ -321,10 +322,10 @@ export default function ImportExportPage() {
         setTestResult(null)
         setTestItems([])
       } else {
-        showError(result.error || 'Import failed')
+        showError(result.error || ERRORS.IMPORT_FAILED.GENERIC)
       }
     } catch (error) {
-      showError(error.message || 'Failed to import')
+      showError(error.message || ERRORS.IMPORT_FAILED.GENERIC)
     } finally {
       setProcessing(false)
     }
