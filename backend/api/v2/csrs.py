@@ -51,6 +51,58 @@ def list_csrs():
         }
     )
 
+
+@bp.route('/api/v2/csrs/history', methods=['GET'])
+@require_auth(['read:csrs'])
+def list_csrs_history():
+    """List all signed CSRs (Certificates that had a CSR and now have crt)"""
+    from models import CA
+    
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    
+    # Filter for certificates that have both CSR and signed certificate
+    query = Certificate.query.filter(
+        Certificate.csr.isnot(None),
+        Certificate.crt.isnot(None)
+    ).order_by(Certificate.created_at.desc())
+    
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    # Build CA lookup for names
+    cas = {ca.refid: ca for ca in CA.query.all()}
+    
+    data = []
+    for cert in pagination.items:
+        item = cert.to_dict()
+        item['status'] = 'Signed'
+        item['cn'] = cert.common_name
+        item['department'] = cert.organizational_unit
+        item['sans'] = cert.san_dns_list
+        item['key_type'] = cert.key_type
+        item['requester'] = cert.created_by
+        
+        # Add CA info
+        if cert.caref and cert.caref in cas:
+            ca = cas[cert.caref]
+            item['signed_by'] = ca.descr
+            item['signed_by_id'] = ca.id
+        else:
+            item['signed_by'] = cert.issuer_name or 'Unknown CA'
+            
+        item['signed_at'] = cert.valid_from
+        data.append(item)
+    
+    return success_response(
+        data=data,
+        meta={
+            'total': pagination.total,
+            'page': page,
+            'per_page': per_page,
+            'pages': pagination.pages
+        }
+    )
+
 @bp.route('/api/v2/csrs/<int:csr_id>', methods=['GET'])
 @require_auth(['read:csrs'])
 def get_csr(csr_id):
