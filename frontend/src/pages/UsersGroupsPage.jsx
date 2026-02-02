@@ -13,7 +13,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select,
-  HelpCard, LoadingSpinner,
+  HelpCard, LoadingSpinner, MemberTransferModal,
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { usersService, groupsService, rolesService } from '../services'
@@ -43,9 +43,10 @@ export default function UsersGroupsPage() {
   // Modals
   const [showUserModal, setShowUserModal] = useState(false)
   const [showGroupModal, setShowGroupModal] = useState(false)
-  const [showAddMemberModal, setShowAddMemberModal] = useState(false)
+  const [showMemberModal, setShowMemberModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [editingGroup, setEditingGroup] = useState(null)
+  const [savingMembers, setSavingMembers] = useState(false)
   
   // Pagination
   const [page, setPage] = useState(1)
@@ -203,47 +204,39 @@ export default function UsersGroupsPage() {
     }
   }
 
-  const handleAddMember = async (userId) => {
+  // Save members from the transfer modal
+  const handleSaveMembers = async (newMemberIds) => {
     if (!selectedGroup) return
+    
+    setSavingMembers(true)
     try {
-      await groupsService.addMember(selectedGroup.id, userId)
-      showSuccess('Member added')
-      setShowAddMemberModal(false)
+      const currentIds = new Set((selectedGroup.members || []).map(m => m.id || m.user_id))
+      const newIds = new Set(newMemberIds)
+      
+      // Find members to add
+      const toAdd = newMemberIds.filter(id => !currentIds.has(id))
+      // Find members to remove
+      const toRemove = [...currentIds].filter(id => !newIds.has(id))
+      
+      // Execute all changes
+      await Promise.all([
+        ...toAdd.map(userId => groupsService.addMember(selectedGroup.id, userId)),
+        ...toRemove.map(userId => groupsService.removeMember(selectedGroup.id, userId))
+      ])
+      
+      showSuccess(`Members updated: ${toAdd.length} added, ${toRemove.length} removed`)
+      setShowMemberModal(false)
       loadData()
+      
       // Refresh selected group
       const updated = await groupsService.getById(selectedGroup.id)
       setSelectedGroup(updated.data)
     } catch (error) {
-      showError(error.message || 'Failed to add member')
+      showError(error.message || 'Failed to update members')
+    } finally {
+      setSavingMembers(false)
     }
   }
-
-  const handleRemoveMember = async (userId) => {
-    if (!selectedGroup) return
-    const confirmed = await showConfirm('Remove this member from the group?', {
-      title: 'Remove Member',
-      confirmText: 'Remove',
-      variant: 'danger'
-    })
-    if (!confirmed) return
-    try {
-      await groupsService.removeMember(selectedGroup.id, userId)
-      showSuccess('Member removed')
-      loadData()
-      // Refresh selected group
-      const updated = await groupsService.getById(selectedGroup.id)
-      setSelectedGroup(updated.data)
-    } catch (error) {
-      showError(error.message || 'Failed to remove member')
-    }
-  }
-
-  // Users available to add (not already members)
-  const availableUsersForGroup = useMemo(() => {
-    if (!selectedGroup) return []
-    const memberIds = (selectedGroup.members || []).map(m => m.id || m.user_id)
-    return users.filter(u => !memberIds.includes(u.id))
-  }, [selectedGroup, users])
 
   // ============= FILTERED DATA =============
   
@@ -513,53 +506,50 @@ export default function UsersGroupsPage() {
 
       <CompactSection title="Members">
         <div className="space-y-3">
-          {/* Add Member Button */}
-          {canWrite('users') && availableUsersForGroup.length > 0 && (
+          {/* Manage Members Button */}
+          {canWrite('users') && (
             <div className="flex justify-end">
-              <Button size="sm" onClick={() => setShowAddMemberModal(true)}>
-                <Plus size={14} /> Add Member
+              <Button size="sm" onClick={() => setShowMemberModal(true)}>
+                <Users size={14} /> Manage Members
               </Button>
             </div>
           )}
 
-          {/* Members List */}
+          {/* Members Preview */}
           {(selectedGroup.members?.length || 0) === 0 ? (
             <p className="text-sm text-text-tertiary text-center py-4">
               No members in this group
             </p>
           ) : (
             <div className="space-y-2">
-              {selectedGroup.members.map(member => (
+              {selectedGroup.members.slice(0, 5).map(member => (
                 <div
                   key={member.id || member.user_id || member.username}
-                  className="flex items-center justify-between px-3 py-2.5 bg-bg-tertiary/50 border border-border rounded-lg"
+                  className="flex items-center gap-3 px-3 py-2 bg-bg-tertiary/50 border border-border rounded-lg"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center">
-                      <User size={16} className="text-accent-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">
-                        {member.username}
-                      </p>
-                      {member.email && (
-                        <p className="text-xs text-text-tertiary">
-                          {member.email}
-                        </p>
-                      )}
-                    </div>
+                  <div className="w-7 h-7 rounded-full bg-accent-primary/20 flex items-center justify-center">
+                    <User size={14} className="text-accent-primary" />
                   </div>
-                  {canWrite('users') && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleRemoveMember(member.id || member.user_id)}
-                    >
-                      <Trash size={14} className="text-status-danger" />
-                    </Button>
-                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">
+                      {member.username}
+                    </p>
+                    {member.email && (
+                      <p className="text-xs text-text-tertiary truncate">
+                        {member.email}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ))}
+              {selectedGroup.members.length > 5 && (
+                <button
+                  onClick={() => setShowMemberModal(true)}
+                  className="w-full text-sm text-accent-primary hover:text-accent-primary/80 py-2"
+                >
+                  + {selectedGroup.members.length - 5} more members
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -725,37 +715,18 @@ export default function UsersGroupsPage() {
         />
       </Modal>
 
-      {/* Add Member Modal */}
-      <Modal
-        open={showAddMemberModal}
-        onOpenChange={setShowAddMemberModal}
-        title="Add Member"
-        size="sm"
-      >
-        <div className="p-4 space-y-2 max-h-80 overflow-auto">
-          {availableUsersForGroup.length === 0 ? (
-            <p className="text-sm text-text-tertiary text-center py-4">
-              All users are already members of this group
-            </p>
-          ) : (
-            availableUsersForGroup.map(user => (
-              <button
-                key={user.id}
-                onClick={() => handleAddMember(user.id)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-bg-tertiary transition-colors text-left"
-              >
-                <div className="w-8 h-8 rounded-full bg-accent-primary/20 flex items-center justify-center">
-                  <User size={16} className="text-accent-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-text-primary">{user.username}</p>
-                  <p className="text-xs text-text-tertiary">{user.email}</p>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
-      </Modal>
+      {/* Member Transfer Modal */}
+      {selectedGroup && (
+        <MemberTransferModal
+          open={showMemberModal}
+          onClose={() => setShowMemberModal(false)}
+          title={`Manage Members - ${selectedGroup.name}`}
+          allUsers={users}
+          currentMembers={selectedGroup.members || []}
+          onSave={handleSaveMembers}
+          loading={savingMembers}
+        />
+      )}
     </>
   )
 }
