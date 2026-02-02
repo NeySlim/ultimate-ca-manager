@@ -161,6 +161,9 @@ class Config:
     HTTPS_KEY_PATH = Path(os.getenv("HTTPS_KEY_PATH", _https_key_default))
     HTTPS_AUTO_GENERATE = os.getenv("HTTPS_AUTO_GENERATE", "true").lower() == "true"
     
+    # File Upload Limits (security)
+    MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10MB max for certificate uploads
+    
     # Database
     # Respect package installation DATABASE_PATH or fallback to DATA_DIR
     _db_default = str(DATA_DIR / "ucm.db")
