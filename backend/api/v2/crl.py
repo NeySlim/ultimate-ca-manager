@@ -8,7 +8,6 @@ from utils.response import success_response, error_response
 from models import db, CA, AuditLog
 from models.crl import CRLMetadata
 from services.crl_service import CRLService
-import datetime
 
 bp = Blueprint('crl_v2', __name__)
 
