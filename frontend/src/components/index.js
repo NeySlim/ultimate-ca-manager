@@ -42,6 +42,7 @@ export { Logo } from './Logo'
 export { PermissionsDisplay } from './PermissionsDisplay'
 export { ErrorBoundary } from './ErrorBoundary'
 export { ExplorerItem, ExplorerSection, ExplorerStat, ExplorerInfo } from './ExplorerItem'
+export { KeyIndicator } from './ui/KeyIndicator'
 
 // Hooks
 export { useAutoPageSize } from '../hooks/useAutoPageSize'
