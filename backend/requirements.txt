@@ -1,5 +1,5 @@
 # Ultimate CA Manager - Backend Dependencies
-# Updated: 2026-01-29 - Compatible with Python 3.13
+# Updated: 2026-02-02 - Compatible with Python 3.13
 
 # Flask Core
 Flask==3.1.2
@@ -60,6 +60,13 @@ python-jose>=3.3.0
 # HSM/PKCS#11 Support
 PyKCS11>=1.5.12
 
+# ============ HIGH AVAILABILITY ============
+# PostgreSQL support (optional, install with: pip install psycopg2-binary)
+# psycopg2-binary>=2.9.9
+
+# Redis session store (optional, install with: pip install redis)
+# redis>=5.0.0
+
 # Development & Testing
 pytest==9.0.2
 pytest-cov==7.0.0
@@ -71,4 +78,3 @@ flask-socketio==5.3.7
 python-socketio==5.11.0
 gevent==24.11.1
 gevent-websocket==0.10.1
-
