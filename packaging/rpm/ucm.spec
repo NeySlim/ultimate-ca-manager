@@ -88,7 +88,7 @@ fi
 
 %post
 # Generate secrets if not present
-ENV_FILE="%{_sysconfdir}/%{name}/.env"
+ENV_FILE="%{_sysconfdir}/%{name}/ucm.env"
 
 if [ ! -f "$ENV_FILE" ]; then
     echo "Generating initial configuration..."
@@ -101,15 +101,21 @@ if [ ! -f "$ENV_FILE" ]; then
     # Get FQDN
     FQDN=$(hostname -f 2>/dev/null || hostname)
     
-    # Create .env file
+    # Create ucm.env file (not .env to avoid dotfile issues)
     cat > "$ENV_FILE" << EOF
 # UCM Configuration - Generated on $(date)
 # IMPORTANT: Review and customize these settings!
 
-# Core Settings
+# Installation Type
+UCM_PACKAGED=1
+
+# Directory Configuration
 BASE_DIR=%{_datadir}/%{name}
 DATA_DIR=%{_sharedstatedir}/%{name}
+CONFIG_DIR=%{_sysconfdir}/%{name}
 LOG_DIR=%{_localstatedir}/log/%{name}
+
+# Network
 FQDN=${FQDN}
 HTTPS_PORT=8443
 HTTP_PORT=8080
@@ -118,7 +124,7 @@ HTTP_PORT=8080
 SECRET_KEY=${SECRET_KEY}
 JWT_SECRET_KEY=${JWT_SECRET}
 
-# Database
+# Database (in DATA_DIR, writable)
 DATABASE_PATH=%{_sharedstatedir}/%{name}/ucm.db
 SQLALCHEMY_DATABASE_URI=sqlite:///%{_sharedstatedir}/%{name}/ucm.db
 
@@ -127,10 +133,10 @@ INITIAL_ADMIN_USERNAME=admin
 INITIAL_ADMIN_PASSWORD=${ADMIN_PASSWORD}
 INITIAL_ADMIN_EMAIL=admin@${FQDN}
 
-# HTTPS
+# HTTPS Certificates (in DATA_DIR, writable by ucm user)
 HTTPS_AUTO_GENERATE=true
-HTTPS_CERT_PATH=%{_sysconfdir}/%{name}/https_cert.pem
-HTTPS_KEY_PATH=%{_sysconfdir}/%{name}/https_key.pem
+HTTPS_CERT_PATH=%{_sharedstatedir}/%{name}/https_cert.pem
+HTTPS_KEY_PATH=%{_sharedstatedir}/%{name}/https_key.pem
 
 # Features
 SCEP_ENABLED=true
@@ -163,11 +169,11 @@ chown -R %{name}:%{name} %{_sharedstatedir}/%{name}
 chown -R %{name}:%{name} %{_localstatedir}/log/%{name}
 chown -R %{name}:%{name} %{_sysconfdir}/%{name}
 chmod 700 %{_sharedstatedir}/%{name}/{cas,certs,backups}
-chmod 600 %{_sysconfdir}/%{name}/.env 2>/dev/null || true
+chmod 600 %{_sysconfdir}/%{name}/ucm.env 2>/dev/null || true
 
-# Generate self-signed HTTPS certificate compatible with modern browsers
-CERT_PATH="%{_sysconfdir}/%{name}/https_cert.pem"
-KEY_PATH="%{_sysconfdir}/%{name}/https_key.pem"
+# Generate self-signed HTTPS certificate in DATA_DIR (writable by ucm user)
+CERT_PATH="%{_sharedstatedir}/%{name}/https_cert.pem"
+KEY_PATH="%{_sharedstatedir}/%{name}/https_key.pem"
 
 if [ ! -f "$CERT_PATH" ]; then
     echo "Generating HTTPS certificate..."
@@ -233,19 +239,19 @@ if [ ! -d "$VENV_DIR" ]; then
     cd %{_datadir}/%{name}
     python3 -m venv venv
     venv/bin/pip install --quiet --upgrade pip
-    venv/bin/pip install --quiet -r requirements.txt
+    venv/bin/pip install --quiet -r backend/requirements.txt
     echo "✓ Virtual environment created"
 fi
 
 # Initialize database if it doesn't exist
 if [ ! -f "%{_sharedstatedir}/%{name}/ucm.db" ]; then
     echo "Initializing database..."
-    cd %{_datadir}/%{name}
+    cd %{_datadir}/%{name}/backend
     # Load environment variables
     set -a
     [ -f "$ENV_FILE" ] && . "$ENV_FILE"
     set +a
-    venv/bin/python backend/init_db.py
+    ../venv/bin/python init_db.py
     echo "✓ Database initialized"
 fi
 
