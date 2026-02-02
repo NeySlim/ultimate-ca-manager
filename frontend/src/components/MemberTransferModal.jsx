@@ -11,7 +11,7 @@
  * - Search/filter in each list
  * - Bulk add/remove with arrow buttons
  */
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { 
   User, MagnifyingGlass, Plus, Minus, CaretRight, CaretLeft,
   CaretDoubleRight, CaretDoubleLeft, CheckSquare, Square
@@ -29,9 +29,9 @@ export function MemberTransferModal({
   onSave,
   loading = false,
 }) {
-  // Local state for pending changes
+  // Local state for pending changes - store user IDs
   const [members, setMembers] = useState(() => 
-    currentMembers.map(m => m.id || m.user_id)
+    currentMembers.map(m => m.user_id)
   )
   
   // Search states
@@ -42,14 +42,14 @@ export function MemberTransferModal({
   const [selectedAvailable, setSelectedAvailable] = useState(new Set())
   const [selectedMembers, setSelectedMembers] = useState(new Set())
   
-  // Drag state
-  const [draggedUser, setDraggedUser] = useState(null)
+  // Drag state - use ref for persistence across renders
+  const draggedUserRef = useRef(null)
   const [dragOver, setDragOver] = useState(null) // 'available' | 'members'
 
-  // Reset state when modal opens
-  useState(() => {
+  // Reset state when modal opens or currentMembers changes
+  useEffect(() => {
     if (open) {
-      setMembers(currentMembers.map(m => m.id || m.user_id))
+      setMembers(currentMembers.map(m => m.user_id))
       setSelectedAvailable(new Set())
       setSelectedMembers(new Set())
       setSearchAvailable('')
@@ -108,7 +108,7 @@ export function MemberTransferModal({
   }, [])
 
   const addSelected = useCallback(() => {
-    setMembers(prev => [...prev, ...selectedAvailable])
+    setMembers(prev => [...prev, ...Array.from(selectedAvailable)])
     setSelectedAvailable(new Set())
   }, [selectedAvailable])
 
@@ -150,8 +150,9 @@ export function MemberTransferModal({
 
   // Drag handlers
   const handleDragStart = (e, user, from) => {
-    setDraggedUser({ user, from })
+    draggedUserRef.current = { user, from }
     e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', user.id.toString())
   }
 
   const handleDragOver = (e, target) => {
@@ -168,9 +169,9 @@ export function MemberTransferModal({
     e.preventDefault()
     setDragOver(null)
     
-    if (!draggedUser) return
+    if (!draggedUserRef.current) return
     
-    const { user, from } = draggedUser
+    const { user, from } = draggedUserRef.current
     
     if (from === 'available' && target === 'members') {
       addUser(user.id)
@@ -178,7 +179,7 @@ export function MemberTransferModal({
       removeUser(user.id)
     }
     
-    setDraggedUser(null)
+    draggedUserRef.current = null
   }
 
   // Save handler
@@ -188,7 +189,7 @@ export function MemberTransferModal({
 
   // Check if there are changes
   const hasChanges = useMemo(() => {
-    const originalSet = new Set(currentMembers.map(m => m.id || m.user_id))
+    const originalSet = new Set(currentMembers.map(m => m.user_id))
     const newSet = new Set(members)
     if (originalSet.size !== newSet.size) return true
     for (const id of originalSet) {
