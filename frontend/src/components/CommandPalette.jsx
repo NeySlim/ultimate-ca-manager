@@ -126,6 +126,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
         <Dialog.Content 
           className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg bg-bg-secondary border border-border rounded-lg shadow-2xl z-50 overflow-hidden"
           onKeyDown={handleKeyDown}
+          aria-describedby={undefined}
         >
           {/* Search Input */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border">

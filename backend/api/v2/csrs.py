@@ -112,6 +112,89 @@ def create_csr():
     except Exception as e:
         return error_response(f"Failed to create CSR: {str(e)}", 500)
 
+
+@bp.route('/api/v2/csrs/upload', methods=['POST'])
+@require_auth(['write:csrs'])
+def upload_csr():
+    """
+    Upload CSR from JSON body with PEM content
+    
+    JSON body:
+        pem: PEM-encoded CSR content
+        name: Optional display name
+    """
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+    from flask import g
+    
+    data = request.get_json()
+    if not data or not data.get('pem'):
+        return error_response('PEM content required', 400)
+    
+    csr_pem = data['pem'].encode('utf-8') if isinstance(data['pem'], str) else data['pem']
+    name = data.get('name', '')
+    
+    try:
+        # Parse CSR
+        csr = x509.load_pem_x509_csr(csr_pem, default_backend())
+        
+        # Extract subject info
+        subject = csr.subject
+        cn = None
+        org = None
+        ou = None
+        
+        for attr in subject:
+            if attr.oid == x509.oid.NameOID.COMMON_NAME:
+                cn = attr.value
+            elif attr.oid == x509.oid.NameOID.ORGANIZATION_NAME:
+                org = attr.value
+            elif attr.oid == x509.oid.NameOID.ORGANIZATIONAL_UNIT_NAME:
+                ou = attr.value
+        
+        # Build subject string
+        subject_parts = []
+        if cn:
+            subject_parts.append(f"CN={cn}")
+        if org:
+            subject_parts.append(f"O={org}")
+        if ou:
+            subject_parts.append(f"OU={ou}")
+        subject_str = ", ".join(subject_parts) if subject_parts else "Unknown"
+        
+        # Create Certificate record with CSR (pending)
+        new_cert = Certificate(
+            refid=str(uuid.uuid4()),
+            descr=name or cn or 'Uploaded CSR',
+            subject=subject_str,
+            csr=csr_pem.decode('utf-8'),
+            crt=None,  # Not signed yet
+            prv=None,  # External CSR, no private key
+            source='upload',
+            created_by=getattr(g, 'username', 'system')
+        )
+        
+        db.session.add(new_cert)
+        db.session.commit()
+        
+        # Audit log
+        from services.audit_service import AuditService
+        AuditService.log_action('csr', 'upload', new_cert.id, {'subject': subject_str})
+        
+        # Return CSR-friendly format
+        result = new_cert.to_dict()
+        result['status'] = 'Pending'
+        result['cn'] = cn
+        result['department'] = ou
+        
+        return created_response(
+            data=result,
+            message='CSR uploaded successfully'
+        )
+    except Exception as e:
+        return error_response(f"Failed to upload CSR: {str(e)}", 500)
+
+
 @bp.route('/api/v2/csrs/import', methods=['POST'])
 @require_auth(['write:csrs'])
 def import_csr():
