@@ -295,10 +295,14 @@ html, body, #root {
   input, textarea, select {
     background-color: var(--bg-secondary) !important;
     color: var(--text-primary);
+    transition: 
+      background-color var(--duration-normal) var(--ease-smooth),
+      border-color var(--duration-normal) var(--ease-smooth),
+      box-shadow var(--duration-normal) var(--ease-smooth);
   }
   
   input:hover, textarea:hover, select:hover {
-    background-color: var(--bg-secondary) !important;
+    background-color: color-mix(in srgb, var(--bg-secondary) 90%, var(--bg-tertiary)) !important;
   }
   
   /* Better focus styles for accessibility */
@@ -470,6 +474,17 @@ html, body, #root {
 .status-danger-badge { @apply status-danger-bg status-danger-text status-danger-border border; }
 .status-primary-badge { @apply status-primary-bg status-primary-text status-primary-border border; }
 
+/* Badge with subtle shadow and hover */
+.badge-enhanced {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: 
+    box-shadow var(--duration-normal) var(--ease-smooth),
+    transform var(--duration-fast) var(--ease-smooth);
+}
+.badge-enhanced:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 /* Subtle depth effect for cards */
 .depth-card {
   box-shadow: 
@@ -524,10 +539,15 @@ tr.row-selected td:first-child {
    TABLE ROW HOVER (theme-aware)
    ============================================ */
 .table-row-hover {
-  transition: background-color var(--duration-fast) var(--ease-smooth);
+  transition: 
+    background-color var(--duration-normal) var(--ease-smooth),
+    box-shadow var(--duration-normal) var(--ease-smooth);
 }
 .table-row-hover:hover {
   background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
+  box-shadow: 
+    inset 0 1px 0 color-mix(in srgb, var(--bg-tertiary) 80%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--bg-tertiary) 80%, transparent);
 }
 .table-row-hover.selected {
   background-color: color-mix(in srgb, var(--accent-primary) 10%, transparent);
@@ -681,11 +701,15 @@ input:focus, select:focus, textarea:focus {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 12px;
-  transition: border-color var(--duration-fast) var(--ease-smooth);
+  box-shadow: var(--shadow-xs);
+  transition: 
+    border-color var(--duration-normal) var(--ease-smooth),
+    box-shadow var(--duration-normal) var(--ease-smooth);
 }
 
 .card-soft:hover {
   border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
 }
 
 /* === INTERACTIVE CARDS (clickable) === */
@@ -694,62 +718,120 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid var(--border);
   border-radius: 12px;
   cursor: pointer;
+  box-shadow: var(--shadow-xs);
   transition: 
-    border-color var(--duration-fast) var(--ease-smooth),
-    background-color var(--duration-fast) var(--ease-smooth);
+    border-color var(--duration-normal) var(--ease-smooth),
+    background-color var(--duration-normal) var(--ease-smooth),
+    box-shadow var(--duration-normal) var(--ease-smooth),
+    transform var(--duration-fast) var(--ease-smooth);
 }
 
 .card-interactive:hover {
   border-color: color-mix(in srgb, var(--accent-primary) 40%, var(--border));
   background: color-mix(in srgb, var(--bg-secondary) 95%, var(--accent-primary));
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .card-interactive:active {
   background: var(--bg-tertiary);
+  transform: translateY(0);
+  box-shadow: var(--shadow-xs);
 }
 
 /* === GRADIENT BUTTON (subtle) === */
 .btn-gradient {
-  background: var(--accent-primary);
+  background: var(--gradient-primary);
   border: none;
   border-radius: 8px;
   color: white;
   font-weight: 500;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 
+    0 1px 2px rgba(0,0,0,0.1),
+    0 2px 4px rgba(0,0,0,0.08);
   transition: 
-    background-color var(--duration-fast) var(--ease-smooth),
-    box-shadow var(--duration-fast) var(--ease-smooth);
+    box-shadow var(--duration-normal) var(--ease-smooth),
+    transform var(--duration-fast) var(--ease-smooth);
+}
+
+/* Shine effect overlay */
+.btn-gradient::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: left 0.5s var(--ease-smooth);
+}
+
+.btn-gradient:hover::before {
+  left: 100%;
 }
 
 .btn-gradient:hover {
-  background: color-mix(in srgb, var(--accent-primary) 90%, black);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  box-shadow: 
+    0 4px 8px rgba(0,0,0,0.15),
+    0 8px 16px rgba(0,0,0,0.1),
+    var(--shadow-glow-primary);
+  transform: translateY(-1px);
 }
 
 .btn-gradient:active {
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+  transform: translateY(0);
+  box-shadow: 
+    inset 0 2px 4px rgba(0,0,0,0.2),
+    0 1px 2px rgba(0,0,0,0.1);
 }
 
-.btn-gradient.success { background: var(--accent-success); }
-.btn-gradient.success:hover { background: color-mix(in srgb, var(--accent-success) 90%, black); }
-.btn-gradient.danger { background: var(--accent-danger); }
-.btn-gradient.danger:hover { background: color-mix(in srgb, var(--accent-danger) 90%, black); }
+.btn-gradient.success { 
+  background: var(--gradient-success); 
+}
+.btn-gradient.success:hover { 
+  box-shadow: 
+    0 4px 8px rgba(0,0,0,0.15),
+    0 8px 16px rgba(0,0,0,0.1),
+    var(--shadow-glow-success);
+}
+.btn-gradient.danger { 
+  background: var(--gradient-danger); 
+}
+.btn-gradient.danger:hover { 
+  box-shadow: 
+    0 4px 8px rgba(0,0,0,0.15),
+    0 8px 16px rgba(0,0,0,0.1),
+    var(--shadow-glow-danger);
+}
 
 /* === SOFT BUTTON (subtle depth) === */
 .btn-soft {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 8px;
-  transition: all var(--duration-fast) var(--ease-smooth);
+  position: relative;
+  box-shadow: var(--shadow-xs);
+  transition: all var(--duration-normal) var(--ease-smooth);
 }
 
 .btn-soft:hover {
   background: var(--bg-tertiary);
   border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 .btn-soft:active {
+  transform: translateY(0);
   background: color-mix(in srgb, var(--bg-tertiary) 80%, var(--bg-primary));
+  box-shadow: var(--shadow-inner-sm);
 }
 
 /* === INPUT SOFT FOCUS === */
@@ -758,20 +840,23 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid var(--border);
   border-radius: 8px;
   transition: 
-    border-color var(--duration-fast) var(--ease-smooth),
-    box-shadow var(--duration-fast) var(--ease-smooth);
+    border-color var(--duration-normal) var(--ease-smooth),
+    box-shadow var(--duration-normal) var(--ease-smooth),
+    background-color var(--duration-normal) var(--ease-smooth);
 }
 
 .input-soft-focus:hover {
   border-color: var(--text-tertiary);
+  background: color-mix(in srgb, var(--bg-tertiary) 80%, var(--bg-secondary));
 }
 
 .input-soft-focus:focus {
   outline: none;
   border-color: var(--accent-primary);
+  background: var(--bg-secondary);
   box-shadow: 
     0 0 0 3px color-mix(in srgb, var(--accent-primary) 15%, transparent),
-    0 1px 2px color-mix(in srgb, var(--accent-primary) 10%, transparent);
+    0 2px 4px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 /* === TABLE ROW WITH LEFT ACCENT === */
@@ -974,13 +1059,16 @@ input:focus, select:focus, textarea:focus {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+  box-shadow: 
+    0 8px 32px rgba(0,0,0,0.2),
+    0 16px 48px rgba(0,0,0,0.15),
+    var(--shadow-inner-highlight);
 }
 
 .modal-backdrop {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 /* === ACCESSIBILITY === */
