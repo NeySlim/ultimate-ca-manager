@@ -355,9 +355,10 @@ function StatsBar({ stats, isMobile }) {
         {stats.map((stat, i) => {
           const Icon = stat.icon
           const colorClass = variants[stat.variant] || variants.primary
+          const displayLabel = stat.shortLabel || stat.label
           
           return (
-            <div key={i} className="flex items-center gap-2 shrink-0">
+            <div key={i} className="flex items-center gap-2 shrink-0 whitespace-nowrap">
               {Icon && (
                 <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', `${colorClass} bg-current/10`)}>
                   <Icon size={16} weight="bold" className={colorClass} />
@@ -365,7 +366,7 @@ function StatsBar({ stats, isMobile }) {
               )}
               <div>
                 <p className="font-bold text-base text-text-primary">{stat.value}</p>
-                <p className="text-xs text-text-secondary">{stat.label}</p>
+                <p className="text-xs text-text-secondary whitespace-nowrap">{displayLabel}</p>
               </div>
             </div>
           )

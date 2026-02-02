@@ -185,9 +185,9 @@ export default function CertificatesPage() {
   // Stats - from backend API for accurate counts
   const stats = useMemo(() => [
     { icon: CheckCircle, label: 'Valid', value: certStats.valid, variant: 'success' },
-    { icon: Warning, label: 'Expiring', value: certStats.expiring, variant: 'warning' },
+    { icon: Warning, label: 'Expiring', shortLabel: 'Exp.', value: certStats.expiring, variant: 'warning' },
     { icon: Clock, label: 'Expired', value: certStats.expired, variant: 'neutral' },
-    { icon: X, label: 'Revoked', value: certStats.revoked, variant: 'danger' },
+    { icon: X, label: 'Revoked', shortLabel: 'Rev.', value: certStats.revoked, variant: 'danger' },
     { icon: Certificate, label: 'Total', value: certStats.total, variant: 'primary' }
   ], [certStats])
 
