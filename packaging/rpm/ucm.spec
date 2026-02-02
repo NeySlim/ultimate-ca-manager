@@ -4,7 +4,7 @@ Release:        %{?_release}%{!?_release:1}%{?dist}
 Summary:        Ultimate CA Manager - Complete PKI Management Platform
 
 License:        Proprietary
-URL:            https://github.com/kerberosmansour/ultimate-ca-manager
+URL:            https://github.com/NeySlim/ultimate-ca-manager
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch
