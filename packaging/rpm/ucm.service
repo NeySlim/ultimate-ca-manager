@@ -7,17 +7,24 @@ After=network.target
 Type=exec
 User=ucm
 Group=ucm
-WorkingDirectory=/usr/share/ucm
+WorkingDirectory=/usr/share/ucm/backend
 
-# Environment
-EnvironmentFile=/etc/ucm/.env
+# Environment - load from /etc/ucm/ucm.env
+EnvironmentFile=/etc/ucm/ucm.env
+
+# Explicit environment variables for the application
+Environment="DATA_DIR=/var/lib/ucm"
+Environment="CONFIG_DIR=/etc/ucm"
+Environment="LOG_DIR=/var/log/ucm"
+Environment="UCM_PACKAGED=1"
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/ucm /var/log/ucm /etc/ucm
+ReadWritePaths=/var/lib/ucm /var/log/ucm
+ReadOnlyPaths=/etc/ucm
 ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictRealtime=true
@@ -32,10 +39,10 @@ LimitNPROC=512
 
 # Startup
 ExecStart=/usr/share/ucm/venv/bin/gunicorn \
-    --config /usr/share/ucm/gunicorn.conf.py \
+    --config /usr/share/ucm/backend/gunicorn.conf.py \
     --bind 0.0.0.0:8443 \
-    --certfile /etc/ucm/https_cert.pem \
-    --keyfile /etc/ucm/https_key.pem \
+    --certfile /var/lib/ucm/https_cert.pem \
+    --keyfile /var/lib/ucm/https_key.pem \
     --access-logfile /var/log/ucm/access.log \
     --error-logfile /var/log/ucm/error.log \
     wsgi:app
