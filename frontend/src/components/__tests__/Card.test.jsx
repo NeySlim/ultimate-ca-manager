@@ -9,9 +9,8 @@ describe('Card Component', () => {
   })
 
   it('applies custom className', () => {
-    render(<Card className="custom-class">Content</Card>)
-    const content = screen.getByText('Content')
-    const card = content.closest('[class*="bg-gradient"]')
+    const { container } = render(<Card className="custom-class">Content</Card>)
+    const card = container.firstChild
     expect(card.className).toContain('custom-class')
   })
 
@@ -23,24 +22,28 @@ describe('Card Component', () => {
     expect(handleClick).toHaveBeenCalledTimes(1)
   })
 
-  it('renders with hover effect by default', () => {
-    render(<Card>Content</Card>)
-    const content = screen.getByText('Content')
-    const card = content.closest('[class*="bg-gradient"]')
-    expect(card.className).toContain('hover:')
+  it('renders with default variant (card-soft)', () => {
+    const { container } = render(<Card>Content</Card>)
+    const card = container.firstChild
+    expect(card.className).toContain('card-soft')
   })
 
-  it('disables hover effect when hover=false', () => {
-    render(<Card hover={false}>Content</Card>)
-    const content = screen.getByText('Content')
-    const card = content.closest('[class*="bg-gradient"]')
-    expect(card.className).not.toContain('hover:-translate')
+  it('renders with elevated variant', () => {
+    const { container } = render(<Card variant="elevated">Content</Card>)
+    const card = container.firstChild
+    expect(card.className).toContain('elevation-2')
   })
 
-  it('applies glow effect when glow=true', () => {
-    render(<Card glow={true}>Glowing</Card>)
-    const content = screen.getByText('Glowing')
-    const card = content.closest('[class*="bg-gradient"]')
-    expect(card.className).toContain('ring-')
+  it('applies accent border', () => {
+    const { container } = render(<Card accent="primary">Accented</Card>)
+    const card = container.firstChild
+    expect(card.className).toContain('border-l-4')
+    expect(card.className).toContain('border-l-accent-primary')
+  })
+
+  it('renders interactive card', () => {
+    const { container } = render(<Card interactive>Interactive</Card>)
+    const card = container.firstChild
+    expect(card.className).toContain('card-interactive')
   })
 })
