@@ -20,6 +20,7 @@ import { usersService, groupsService, rolesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
+import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 
 export default function UsersGroupsPage() {
   const { isMobile } = useMobile()
@@ -82,7 +83,7 @@ export default function UsersGroupsPage() {
       setGroups(groupsRes.data || [])
       setRoles(rolesRes.data || [])
     } catch (error) {
-      showError('Failed to load data')
+      showError(ERRORS.LOAD_FAILED.GENERIC)
     } finally {
       setLoading(false)
     }
@@ -93,19 +94,19 @@ export default function UsersGroupsPage() {
   const handleCreateUser = async (data) => {
     try {
       await usersService.create(data)
-      showSuccess('User created')
+      showSuccess(SUCCESS.CREATE.USER)
       setShowUserModal(false)
       setEditingUser(null)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to create user')
+      showError(error.message || ERRORS.CREATE_FAILED.USER)
     }
   }
 
   const handleUpdateUser = async (data) => {
     try {
       await usersService.update(editingUser.id, data)
-      showSuccess('User updated')
+      showSuccess(SUCCESS.UPDATE.USER)
       setShowUserModal(false)
       setEditingUser(null)
       loadData()
@@ -113,24 +114,24 @@ export default function UsersGroupsPage() {
         setSelectedUser({ ...selectedUser, ...data })
       }
     } catch (error) {
-      showError(error.message || 'Failed to update user')
+      showError(error.message || ERRORS.UPDATE_FAILED.USER)
     }
   }
 
   const handleDeleteUser = async (user) => {
     const confirmed = await showConfirm(`Delete user "${user.username}"?`, {
-      title: 'Delete User',
+      title: CONFIRM.DELETE.TITLE,
       confirmText: 'Delete',
       variant: 'danger'
     })
     if (!confirmed) return
     try {
       await usersService.delete(user.id)
-      showSuccess('User deleted')
+      showSuccess(SUCCESS.DELETE.USER)
       if (selectedUser?.id === user.id) setSelectedUser(null)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to delete user')
+      showError(error.message || ERRORS.DELETE_FAILED.USER)
     }
   }
 
@@ -143,13 +144,13 @@ export default function UsersGroupsPage() {
         setSelectedUser({ ...selectedUser, active: !user.active })
       }
     } catch (error) {
-      showError(error.message || 'Failed to update user')
+      showError(error.message || ERRORS.UPDATE_FAILED.USER)
     }
   }
 
   const handleResetPassword = async (user) => {
     const confirmed = await showConfirm(`Reset password for "${user.username}"?`, {
-      title: 'Reset Password',
+      title: CONFIRM.RESET_PASSWORD.TITLE,
       confirmText: 'Reset'
     })
     if (!confirmed) return
@@ -166,41 +167,41 @@ export default function UsersGroupsPage() {
   const handleCreateGroup = async (data) => {
     try {
       await groupsService.create(data)
-      showSuccess('Group created')
+      showSuccess(SUCCESS.CREATE.GROUP)
       setShowGroupModal(false)
       setEditingGroup(null)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to create group')
+      showError(error.message || ERRORS.CREATE_FAILED.GROUP)
     }
   }
 
   const handleUpdateGroup = async (data) => {
     try {
       await groupsService.update(editingGroup.id, data)
-      showSuccess('Group updated')
+      showSuccess(SUCCESS.UPDATE.GROUP)
       setShowGroupModal(false)
       setEditingGroup(null)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to update group')
+      showError(error.message || ERRORS.UPDATE_FAILED.GROUP)
     }
   }
 
   const handleDeleteGroup = async (group) => {
     const confirmed = await showConfirm(`Delete group "${group.name}"?`, {
-      title: 'Delete Group',
+      title: CONFIRM.DELETE.TITLE,
       confirmText: 'Delete',
       variant: 'danger'
     })
     if (!confirmed) return
     try {
       await groupsService.delete(group.id)
-      showSuccess('Group deleted')
+      showSuccess(SUCCESS.DELETE.GROUP)
       if (selectedGroup?.id === group.id) setSelectedGroup(null)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to delete group')
+      showError(error.message || ERRORS.DELETE_FAILED.GROUP)
     }
   }
 
@@ -232,7 +233,7 @@ export default function UsersGroupsPage() {
       const updated = await groupsService.getById(selectedGroup.id)
       setSelectedGroup(updated.data)
     } catch (error) {
-      showError(error.message || 'Failed to update members')
+      showError(error.message || ERRORS.UPDATE_FAILED.GROUP)
     } finally {
       setSavingMembers(false)
     }
@@ -357,11 +358,14 @@ export default function UsersGroupsPage() {
       header: 'Members',
       priority: 3,
       sortable: true,
-      render: (val, row) => (
-        <Badge variant="outline" size="sm">
-          {row.members?.length || val || 0} members
-        </Badge>
-      )
+      render: (val, row) => {
+        const count = row.members?.length || val || 0
+        return (
+          <Badge variant="outline" size="sm">
+            {count} {count === 1 ? 'member' : 'members'}
+          </Badge>
+        )
+      }
     }
   ], [])
 
@@ -393,15 +397,15 @@ export default function UsersGroupsPage() {
       <HelpCard title="Roles" variant="tip">
         <div className="space-y-1 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="primary" size="sm">Admin</Badge>
+            <Badge variant="primary" size="sm">{LABELS.ROLES.ADMIN}</Badge>
             <span className="text-xs">Full access</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" size="sm">Operator</Badge>
+            <Badge variant="secondary" size="sm">{LABELS.ROLES.OPERATOR}</Badge>
             <span className="text-xs">Manage certificates</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" size="sm">Viewer</Badge>
+            <Badge variant="outline" size="sm">{LABELS.ROLES.VIEWER}</Badge>
             <span className="text-xs">Read-only access</span>
           </div>
         </div>
@@ -479,7 +483,7 @@ export default function UsersGroupsPage() {
         icon={Users}
         iconClass="bg-accent-primary/20"
         title={selectedGroup.name}
-        subtitle={`${selectedGroup.members?.length || 0} members`}
+        subtitle={`${selectedGroup.members?.length || 0} ${(selectedGroup.members?.length || 0) === 1 ? 'member' : 'members'}`}
       />
 
       {/* Actions */}
@@ -643,20 +647,20 @@ export default function UsersGroupsPage() {
               key: 'role',
               value: filterRole,
               onChange: setFilterRole,
-              placeholder: 'All Roles',
+              placeholder: LABELS.FILTERS.ALL_ROLES,
               options: [
-                { value: 'admin', label: 'Admin' },
-                { value: 'operator', label: 'Operator' },
-                { value: 'viewer', label: 'Viewer' }
+                { value: 'admin', label: LABELS.ROLES.ADMIN },
+                { value: 'operator', label: LABELS.ROLES.OPERATOR },
+                { value: 'viewer', label: LABELS.ROLES.VIEWER }
               ]
             },
             {
               key: 'status',
               value: filterStatus,
               onChange: setFilterStatus,
-              placeholder: 'All Status',
+              placeholder: LABELS.FILTERS.ALL_STATUS,
               options: [
-                { value: 'active', label: 'Active' },
+                { value: 'active', label: LABELS.STATUS.ACTIVE },
                 { value: 'disabled', label: 'Disabled' }
               ]
             }
@@ -819,9 +823,9 @@ function UserForm({ user, onSubmit, onCancel }) {
         value={formData.role}
         onChange={(val) => setFormData(p => ({ ...p, role: val }))}
         options={[
-          { value: 'admin', label: 'Administrator' },
-          { value: 'operator', label: 'Operator' },
-          { value: 'viewer', label: 'Viewer' }
+          { value: 'admin', label: LABELS.ROLES.ADMIN },
+          { value: 'operator', label: LABELS.ROLES.OPERATOR },
+          { value: 'viewer', label: LABELS.ROLES.VIEWER }
         ]}
       />
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
