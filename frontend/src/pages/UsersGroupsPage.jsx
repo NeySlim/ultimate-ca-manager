@@ -565,13 +565,20 @@ export default function UsersGroupsPage() {
   const currentSelected = activeTab === 'users' ? selectedUser : selectedGroup
   const currentDetailContent = activeTab === 'users' ? userDetailContent : groupDetailContent
   
-  const handleSelect = (item) => {
+  const handleSelect = async (item) => {
     if (activeTab === 'users') {
       setSelectedUser(item)
       setSelectedGroup(null)
     } else {
-      setSelectedGroup(item)
+      // Load full group details with members
+      setSelectedGroup(item) // Show immediately
       setSelectedUser(null)
+      try {
+        const res = await groupsService.getById(item.id)
+        setSelectedGroup(res.data) // Update with members
+      } catch (error) {
+        console.error('Failed to load group details:', error)
+      }
     }
   }
 
