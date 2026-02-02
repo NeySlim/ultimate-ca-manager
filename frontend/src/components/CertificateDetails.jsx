@@ -35,7 +35,8 @@ import {
   MapPin,
   Hash,
   Fingerprint,
-  ArrowsClockwise
+  ArrowsClockwise,
+  UploadSimple
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
@@ -115,6 +116,7 @@ export function CertificateDetails({
   onRevoke,
   onDelete,
   onRenew,
+  onUploadKey,
   canWrite = false,
   canDelete = false,
   compact = false,
@@ -168,7 +170,18 @@ export function CertificateDetails({
         <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
           <Lock size={16} className={cn("mx-auto mb-1", cert.has_private_key ? "text-status-success" : "text-text-tertiary")} />
           <div className="text-xs font-medium text-text-primary">{cert.has_private_key ? 'Has Key' : 'No Key'}</div>
-          <div className="text-[10px] text-text-tertiary">{cert.private_key_location || '—'}</div>
+          {cert.has_private_key ? (
+            <div className="text-[10px] text-text-tertiary">{cert.private_key_location || '—'}</div>
+          ) : onUploadKey && canWrite ? (
+            <button 
+              onClick={onUploadKey}
+              className="text-[10px] text-accent-primary hover:underline cursor-pointer"
+            >
+              Upload Key
+            </button>
+          ) : (
+            <div className="text-[10px] text-text-tertiary">—</div>
+          )}
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
           <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
@@ -195,6 +208,11 @@ export function CertificateDetails({
               )}
             </>
           )}
+          {onUploadKey && canWrite && !cert.has_private_key && (
+            <Button size="sm" variant="secondary" onClick={onUploadKey}>
+              <UploadSimple size={14} /> Upload Key
+            </Button>
+          )}
           {onRenew && canWrite && !cert.revoked && (
             <Button size="sm" variant="secondary" onClick={onRenew}>
               <ArrowsClockwise size={14} /> Renew
@@ -218,10 +236,10 @@ export function CertificateDetails({
         <CompactGrid>
           <CompactField icon={Globe} label="Common Name" value={cert.cn || cert.common_name} />
           <CompactField icon={Buildings} label="Organization" value={cert.organization} />
-          <CompactField label="Org Unit" value={cert.organizational_unit} />
+          <CompactField autoIcon label="Org Unit" value={cert.organizational_unit} />
           <CompactField icon={MapPin} label="Locality" value={cert.locality} />
-          <CompactField label="State" value={cert.state} />
-          <CompactField label="Country" value={cert.country} />
+          <CompactField autoIcon label="State" value={cert.state} />
+          <CompactField autoIcon label="Country" value={cert.country} />
           <CompactField icon={Envelope} label="Email" value={cert.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
@@ -238,16 +256,16 @@ export function CertificateDetails({
       <CompactSection title="Technical Details">
         <CompactGrid>
           <CompactField icon={Hash} label="Serial" value={cert.serial_number} mono copyable />
-          <CompactField icon={Key} label="Key Type" value={cert.key_type} />
-          <CompactField label="Sig Algo" value={cert.signature_algorithm} />
-          <CompactField label="Cert Type" value={cert.cert_type} />
+          <CompactField autoIcon label="Key Type" value={cert.key_type} />
+          <CompactField autoIcon label="Sig Algo" value={cert.signature_algorithm} />
+          <CompactField autoIcon label="Cert Type" value={cert.cert_type} />
         </CompactGrid>
       </CompactSection>
       
       {/* SANs */}
       {cert.san_combined && (
         <CompactSection title="Subject Alternative Names">
-          <div className="text-xs font-mono text-text-primary break-all bg-bg-tertiary/30 p-2 rounded">
+          <div className="text-xs font-mono text-text-primary break-all bg-bg-tertiary/30 p-2 rounded border border-border/50">
             {cert.san_combined}
           </div>
         </CompactSection>
@@ -256,17 +274,17 @@ export function CertificateDetails({
       {/* Issuer */}
       <CompactSection title="Issuer">
         <CompactGrid cols={1}>
-          <CompactField label="Issuer DN" value={cert.issuer} mono />
-          <CompactField label="Issuing CA" value={cert.issuer_name} />
-          <CompactField label="CA Reference" value={cert.caref} mono copyable />
+          <CompactField autoIcon label="Issuer" value={cert.issuer} mono />
+          <CompactField autoIcon label="CA" value={cert.issuer_name} />
+          <CompactField autoIcon label="CA Reference" value={cert.caref} mono copyable />
         </CompactGrid>
       </CompactSection>
       
       {/* Thumbprints */}
       <CompactSection title="Fingerprints" collapsible defaultOpen={false}>
         <CompactGrid cols={1}>
-          <CompactField icon={Fingerprint} label="SHA-1" value={cert.thumbprint_sha1} mono copyable />
-          <CompactField icon={Fingerprint} label="SHA-256" value={cert.thumbprint_sha256} mono copyable />
+          <CompactField autoIcon label="SHA-1" value={cert.thumbprint_sha1} mono copyable />
+          <CompactField autoIcon label="SHA-256" value={cert.thumbprint_sha256} mono copyable />
         </CompactGrid>
       </CompactSection>
       
@@ -275,7 +293,7 @@ export function CertificateDetails({
         <CompactSection title="PEM Certificate" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
-              "text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
+              "text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto border border-border/30",
               !showFullPem && "max-h-24 overflow-hidden"
             )}>
               {cert.pem}

@@ -52,6 +52,13 @@ export const csrsService = {
     return apiClient.delete(`/csrs/${id}`)
   },
 
+  async uploadKey(id, keyPem, passphrase = null) {
+    return apiClient.post(`/csrs/${id}/key`, { 
+      key: keyPem,
+      passphrase 
+    })
+  },
+
   async download(id) {
     return apiClient.get(`/csrs/${id}/download`, {
       responseType: 'blob'

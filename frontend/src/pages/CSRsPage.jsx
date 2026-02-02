@@ -51,6 +51,11 @@ export default function CSRsPage() {
   // Upload modal
   const [uploadMode, setUploadMode] = useState('file') // 'file' or 'paste'
   const [pastedPEM, setPastedPEM] = useState('')
+  
+  // Key upload modal
+  const [showKeyModal, setShowKeyModal] = useState(false)
+  const [keyPem, setKeyPem] = useState('')
+  const [keyPassphrase, setKeyPassphrase] = useState('')
 
   // Handle tab change
   const handleTabChange = (tabId) => {
@@ -163,6 +168,30 @@ export default function CSRsPage() {
     }
   }
 
+  const handleUploadKey = async () => {
+    if (!keyPem.trim()) {
+      showError('Please provide a private key')
+      return
+    }
+    if (!keyPem.includes('PRIVATE KEY')) {
+      showError('Invalid private key format - must be PEM format')
+      return
+    }
+    try {
+      await csrsService.uploadKey(selectedCSR.id, keyPem.trim(), keyPassphrase || null)
+      showSuccess('Private key uploaded successfully')
+      setShowKeyModal(false)
+      setKeyPem('')
+      setKeyPassphrase('')
+      loadData()
+      // Refresh selected CSR
+      const updated = await csrsService.getById(selectedCSR.id)
+      setSelectedCSR(updated.data || updated)
+    } catch (error) {
+      showError(error.message || 'Failed to upload private key')
+    }
+  }
+
   const handleDownload = async (id, filename) => {
     try {
       const blob = await csrsService.download(id)
@@ -197,6 +226,7 @@ export default function CSRsPage() {
         <div className="flex items-center gap-2">
           <FileText size={16} className="text-accent-warning shrink-0" />
           <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
+          <KeyIndicator hasKey={row.has_private_key} size={14} />
         </div>
       )
     },
@@ -367,6 +397,7 @@ export default function CSRsPage() {
               onSign={() => openModal('sign')}
               onDownload={() => handleDownload(selectedCSR.id, `${selectedCSR.cn || 'csr'}.pem`)}
               onDelete={() => handleDelete(selectedCSR.id)}
+              onUploadKey={() => setShowKeyModal(true)}
             />
           ) : (
             <SignedCSRDetailsPanel 
@@ -522,6 +553,44 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
           </div>
         </div>
       </Modal>
+
+      {/* Upload Private Key Modal */}
+      <Modal
+        open={showKeyModal}
+        onOpenChange={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}
+        title="Upload Private Key"
+      >
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-text-secondary">
+            Upload a private key for <strong>{selectedCSR?.common_name || selectedCSR?.cn}</strong>
+          </p>
+          <Textarea
+            label="Private Key (PEM)"
+            value={keyPem}
+            onChange={(e) => setKeyPem(e.target.value)}
+            placeholder="-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQE...
+-----END PRIVATE KEY-----"
+            rows={8}
+            className="font-mono text-xs"
+          />
+          <Input
+            label="Passphrase (if encrypted)"
+            type="password"
+            value={keyPassphrase}
+            onChange={(e) => setKeyPassphrase(e.target.value)}
+            placeholder="Leave empty if key is not encrypted"
+          />
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
+            <Button variant="secondary" onClick={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}>
+              Cancel
+            </Button>
+            <Button onClick={handleUploadKey} disabled={!keyPem.trim()}>
+              <UploadSimple size={16} /> Upload Key
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }
@@ -530,7 +599,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
 // CSR DETAILS PANEL (for pending CSRs)
 // =============================================================================
 
-function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelete }) {
+function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelete, onUploadKey }) {
   return (
     <div className="p-3 space-y-3">
       {/* Header */}
@@ -539,7 +608,12 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
         iconClass="bg-accent-warning/20"
         title={csr.common_name || csr.cn || 'Unnamed CSR'}
         subtitle={csr.organization}
-        badge={<Badge variant="warning" size="sm">Pending</Badge>}
+        badge={
+          <div className="flex gap-1">
+            <Badge variant="warning" size="sm">Pending</Badge>
+            {csr.has_private_key && <Badge variant="success" size="sm">Has Key</Badge>}
+          </div>
+        }
       />
 
       {/* Stats */}
@@ -549,10 +623,15 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
       ]} />
 
       {/* Actions */}
-      <div className="flex gap-2">
-        <Button size="sm" variant="secondary" className="flex-1" onClick={onDownload}>
+      <div className="flex gap-2 flex-wrap">
+        <Button size="sm" variant="secondary" onClick={onDownload}>
           <Download size={14} /> Download
         </Button>
+        {canWrite('csrs') && !csr.has_private_key && (
+          <Button size="sm" variant="secondary" onClick={onUploadKey}>
+            <UploadSimple size={14} /> Upload Key
+          </Button>
+        )}
         {canWrite('csrs') && (
           <Button size="sm" onClick={onSign}>
             <SignIn size={14} /> Sign

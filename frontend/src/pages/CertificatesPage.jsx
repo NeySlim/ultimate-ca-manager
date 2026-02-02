@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Certificate, Download, Trash, X, Plus, Info,
-  CheckCircle, Warning
+  CheckCircle, Warning, UploadSimple
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, HelpCard,
@@ -29,6 +29,9 @@ export default function CertificatesPage() {
   // Selection
   const [selectedCert, setSelectedCert] = useState(null)
   const [showIssueModal, setShowIssueModal] = useState(false)
+  const [showKeyModal, setShowKeyModal] = useState(false)
+  const [keyPem, setKeyPem] = useState('')
+  const [keyPassphrase, setKeyPassphrase] = useState('')
   
   // Pagination
   const [page, setPage] = useState(1)
@@ -129,6 +132,30 @@ export default function CertificatesPage() {
       setSelectedCert(null)
     } catch {
       showError('Delete failed')
+    }
+  }
+
+  const handleUploadKey = async () => {
+    if (!keyPem.trim()) {
+      showError('Please provide a private key')
+      return
+    }
+    if (!keyPem.includes('PRIVATE KEY')) {
+      showError('Invalid private key format - must be PEM format')
+      return
+    }
+    try {
+      await certificatesService.uploadKey(selectedCert.id, keyPem.trim(), keyPassphrase || null)
+      showSuccess('Private key uploaded successfully')
+      setShowKeyModal(false)
+      setKeyPem('')
+      setKeyPassphrase('')
+      loadData()
+      // Refresh selected cert
+      const updated = await certificatesService.getById(selectedCert.id)
+      setSelectedCert(updated.data || updated)
+    } catch (error) {
+      showError(error.message || 'Failed to upload private key')
     }
   }
 
@@ -324,6 +351,7 @@ export default function CertificatesPage() {
       onExport={handleExport}
       onRevoke={() => handleRevoke(selectedCert.id)}
       onDelete={() => handleDelete(selectedCert.id)}
+      onUploadKey={() => setShowKeyModal(true)}
       canWrite={canWrite('certificates')}
       canDelete={canDelete('certificates')}
     />
@@ -440,6 +468,44 @@ export default function CertificatesPage() {
           }}
           onCancel={() => setShowIssueModal(false)}
         />
+      </Modal>
+
+      {/* Upload Private Key Modal */}
+      <Modal
+        open={showKeyModal}
+        onOpenChange={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}
+        title="Upload Private Key"
+      >
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-text-secondary">
+            Upload a private key for <strong>{selectedCert?.cn || selectedCert?.common_name}</strong>
+          </p>
+          <Textarea
+            label="Private Key (PEM)"
+            value={keyPem}
+            onChange={(e) => setKeyPem(e.target.value)}
+            placeholder="-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQE...
+-----END PRIVATE KEY-----"
+            rows={8}
+            className="font-mono text-xs"
+          />
+          <Input
+            label="Passphrase (if encrypted)"
+            type="password"
+            value={keyPassphrase}
+            onChange={(e) => setKeyPassphrase(e.target.value)}
+            placeholder="Leave empty if key is not encrypted"
+          />
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
+            <Button variant="secondary" onClick={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}>
+              Cancel
+            </Button>
+            <Button onClick={handleUploadKey} disabled={!keyPem.trim()}>
+              <UploadSimple size={16} /> Upload Key
+            </Button>
+          </div>
+        </div>
       </Modal>
     </>
   )
