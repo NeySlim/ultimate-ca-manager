@@ -23,6 +23,7 @@ import {
 import { acmeService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { formatDate } from '../lib/utils'
+import { ERRORS, SUCCESS } from '../lib/messages'
 
 export default function ACMEPage() {
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
@@ -60,7 +61,7 @@ export default function ACMEPage() {
       setAcmeSettings(settingsRes.data || settingsRes || {})
       setCas(casRes.data || casRes.cas || [])
     } catch (error) {
-      showError('Failed to load ACME data')
+      showError(error.message || ERRORS.LOAD_FAILED.ACME)
     } finally {
       setLoading(false)
     }
@@ -79,7 +80,7 @@ export default function ACMEPage() {
       setChallenges(challengesRes.data?.challenges || challengesRes.challenges || [])
       setActiveDetailTab('account')
     } catch (error) {
-      showError('Failed to load account details')
+      showError(error.message || ERRORS.LOAD_FAILED.GENERIC)
     }
   }, [showError])
 
@@ -88,9 +89,9 @@ export default function ACMEPage() {
     setSaving(true)
     try {
       await acmeService.updateSettings(acmeSettings)
-      showSuccess('ACME settings saved')
+      showSuccess(SUCCESS.UPDATE.SETTINGS)
     } catch (error) {
-      showError(error.message || 'Failed to save settings')
+      showError(error.message || ERRORS.UPDATE_FAILED.SETTINGS)
     } finally {
       setSaving(false)
     }
@@ -102,16 +103,16 @@ export default function ACMEPage() {
 
   const handleRegisterProxy = async () => {
     if (!proxyEmail) {
-      showError('Email is required')
+      showError(ERRORS.VALIDATION.REQUIRED_FIELD)
       return
     }
     try {
       await acmeService.registerProxy(proxyEmail)
-      showSuccess('Proxy account registered')
+      showSuccess('Proxy account registered successfully')
       setProxyEmail('')
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to register proxy')
+      showError(error.message || 'Failed to register proxy account')
     }
   }
 
@@ -120,10 +121,10 @@ export default function ACMEPage() {
     if (!confirmed) return
     try {
       await acmeService.unregisterProxy()
-      showSuccess('Proxy account unregistered')
+      showSuccess('Proxy account unregistered successfully')
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to unregister')
+      showError(error.message || 'Failed to unregister proxy account')
     }
   }
 
@@ -131,12 +132,12 @@ export default function ACMEPage() {
   const handleCreate = async (data) => {
     try {
       const created = await acmeService.createAccount(data)
-      showSuccess('ACME account created')
+      showSuccess('ACME account created successfully')
       setShowCreateModal(false)
       loadData()
       selectAccount(created)
     } catch (error) {
-      showError(error.message || 'Failed to create account')
+      showError(error.message || 'Failed to create ACME account')
     }
   }
 
@@ -149,11 +150,11 @@ export default function ACMEPage() {
     if (!confirmed) return
     try {
       await acmeService.deactivateAccount(id)
-      showSuccess('Account deactivated')
+      showSuccess('Account deactivated successfully')
       setSelectedAccount(null)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to deactivate')
+      showError(error.message || 'Failed to deactivate account')
     }
   }
 
@@ -166,11 +167,11 @@ export default function ACMEPage() {
     if (!confirmed) return
     try {
       await acmeService.deleteAccount(id)
-      showSuccess('Account deleted')
+      showSuccess(SUCCESS.DELETE.GENERIC || 'Account deleted successfully')
       setSelectedAccount(null)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to delete')
+      showError(error.message || ERRORS.DELETE_FAILED.GENERIC)
     }
   }
 

@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.6] - 2026-02-02
+
+### 🔒 Security & Code Quality
+
+#### Security
+- Added `MAX_CONTENT_LENGTH = 10MB` file upload limit
+- Security review completed: CSRF, rate limiting, encryption verified
+
+#### Added
+- **Centralized i18n System** (`lib/messages.js`)
+  - All user-facing strings centralized for i18n preparation
+  - Constants: `ERRORS`, `SUCCESS`, `BUTTONS`, `LABELS`, `CONFIRM`, `TITLES`, `EMPTY_STATES`
+  - Ready for multi-language support
+
+- **Private Key Indicator**
+  - Golden key icon for certificates/CSRs with private key
+  - Grey crossed key for those without
+  - Theme-aware colors
+
+- **Key Upload Feature**
+  - Upload private key to existing certificates/CSRs
+  - Key validation and certificate matching
+  - Passphrase support for encrypted keys
+
+- **CSR History Tab**
+  - View signed CSRs with certificate details
+  - ACME/SCEP badges on history items
+
+- **CSR Paste PEM Upload**
+  - File upload or paste PEM directly
+  - Tabs interface in upload modal
+
+#### Changed
+- All pages migrated to use `messages.js` constants
+- Standardized role labels: "Administrator" → "Admin" everywhere
+- Modals fullscreen on mobile, centered on desktop
+
+#### Fixed
+- Removed dead code (unused imports, duplicate functions)
+- `formatRelativeTime` consolidated to `lib/ui.js`
+
+---
+
 ## [2.0.5] - 2026-02-01
 
 ### 🎨 Visual Refresh: "Soft Depth" Design

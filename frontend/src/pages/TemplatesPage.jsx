@@ -19,6 +19,7 @@ import { templatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
+import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 
 export default function TemplatesPage() {
   const { isMobile } = useMobile()
@@ -61,7 +62,7 @@ export default function TemplatesPage() {
       const res = await templatesService.getAll()
       setTemplates(res.data || [])
     } catch (error) {
-      showError('Failed to load templates')
+      showError(ERRORS.LOAD_FAILED.TEMPLATES)
     } finally {
       setLoading(false)
     }
@@ -82,20 +83,20 @@ export default function TemplatesPage() {
   const handleCreateTemplate = async (data) => {
     try {
       const created = await templatesService.create(data)
-      showSuccess('Template created')
+      showSuccess(SUCCESS.CREATE.TEMPLATE)
       setShowTemplateModal(false)
       setEditingTemplate(null)
       loadData()
       setSelectedTemplate(created)
     } catch (error) {
-      showError(error.message || 'Failed to create template')
+      showError(error.message || ERRORS.CREATE_FAILED.TEMPLATE)
     }
   }
 
   const handleUpdateTemplate = async (data) => {
     try {
       await templatesService.update(editingTemplate.id, data)
-      showSuccess('Template updated')
+      showSuccess(SUCCESS.UPDATE.TEMPLATE)
       setShowTemplateModal(false)
       setEditingTemplate(null)
       loadData()
@@ -103,35 +104,35 @@ export default function TemplatesPage() {
         setSelectedTemplate({ ...selectedTemplate, ...data })
       }
     } catch (error) {
-      showError(error.message || 'Failed to update template')
+      showError(error.message || ERRORS.UPDATE_FAILED.TEMPLATE)
     }
   }
 
   const handleDeleteTemplate = async (template) => {
-    const confirmed = await showConfirm(`Delete template "${template.name}"?`, {
-      title: 'Delete Template',
+    const confirmed = await showConfirm(CONFIRM.DELETE.TEMPLATE, {
+      title: CONFIRM.DELETE.TITLE,
       confirmText: 'Delete',
       variant: 'danger'
     })
     if (!confirmed) return
     try {
       await templatesService.delete(template.id)
-      showSuccess('Template deleted')
+      showSuccess(SUCCESS.DELETE.TEMPLATE)
       if (selectedTemplate?.id === template.id) setSelectedTemplate(null)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to delete template')
+      showError(error.message || ERRORS.DELETE_FAILED.TEMPLATE)
     }
   }
 
   const handleDuplicateTemplate = async (template) => {
     try {
       const duplicated = await templatesService.duplicate(template.id)
-      showSuccess('Template duplicated')
+      showSuccess(SUCCESS.DUPLICATE.TEMPLATE)
       loadData()
       setSelectedTemplate(duplicated)
     } catch (error) {
-      showError(error.message || 'Failed to duplicate template')
+      showError(error.message || ERRORS.DUPLICATE_FAILED.TEMPLATE)
     }
   }
 
@@ -145,9 +146,9 @@ export default function TemplatesPage() {
       a.download = `${template.name || 'template'}.json`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess('Template exported')
+      showSuccess(SUCCESS.EXPORT.TEMPLATE)
     } catch (error) {
-      showError(error.message || 'Failed to export template')
+      showError(error.message || ERRORS.EXPORT_FAILED.TEMPLATE)
     }
   }
 
@@ -163,13 +164,13 @@ export default function TemplatesPage() {
         templateData = JSON.parse(importJson)
       }
       await templatesService.create(templateData)
-      showSuccess('Template imported')
+      showSuccess(SUCCESS.IMPORT.TEMPLATE)
       setShowImportModal(false)
       setImportFile(null)
       setImportJson('')
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to import template')
+      showError(error.message || ERRORS.IMPORT_FAILED.TEMPLATE)
     } finally {
       setImporting(false)
     }
@@ -416,7 +417,7 @@ export default function TemplatesPage() {
               key: 'type',
               value: filterType,
               onChange: setFilterType,
-              placeholder: 'All Types',
+              placeholder: LABELS.FILTERS.ALL_TYPES,
               options: [
                 { value: 'certificate', label: 'Certificate' },
                 { value: 'ca', label: 'CA' }

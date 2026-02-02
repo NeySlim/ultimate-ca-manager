@@ -14,6 +14,7 @@ import {
 import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
+import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 import { usePermission, useModals } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
@@ -80,7 +81,7 @@ export default function CAsPage() {
       const casList = casData.data || []
       setCAs(casList)
     } catch (error) {
-      showError(error.message || 'Failed to load CAs')
+      showError(error.message || ERRORS.LOAD_FAILED.CAS)
     } finally {
       setLoading(false)
     }
@@ -96,7 +97,7 @@ export default function CAsPage() {
   }
 
   const handleDelete = async (id) => {
-    const confirmed = await showConfirm('Are you sure you want to delete this CA? This action cannot be undone.', {
+    const confirmed = await showConfirm(CONFIRM.DELETE.CA, {
       title: 'Delete Certificate Authority',
       confirmText: 'Delete CA',
       variant: 'danger'
@@ -105,7 +106,7 @@ export default function CAsPage() {
     
     try {
       await casService.delete(id)
-      showSuccess('CA deleted successfully')
+      showSuccess(SUCCESS.DELETE.CA)
       loadCAs()
       setSelectedCA(null)
     } catch (error) {
@@ -154,7 +155,7 @@ export default function CAsPage() {
       a.download = `${ca.name || ca.common_name || 'ca'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess('CA exported successfully')
+      showSuccess(SUCCESS.EXPORT.CA)
     } catch (error) {
       showError(error.message || 'Failed to export CA')
     }
@@ -178,7 +179,7 @@ export default function CAsPage() {
     
     try {
       await casService.create(data)
-      showSuccess('CA created successfully')
+      showSuccess(SUCCESS.CREATE.CA)
       closeModal('create')
       loadCAs()
     } catch (error) {
@@ -274,7 +275,7 @@ export default function CAsPage() {
       type: 'select',
       value: filterType,
       onChange: setFilterType,
-      placeholder: 'All Types',
+      placeholder: LABELS.FILTERS.ALL_TYPES,
       options: [
         { value: 'root', label: 'Root CA' },
         { value: 'intermediate', label: 'Intermediate' }
@@ -375,7 +376,7 @@ export default function CAsPage() {
                     onChange={(e) => setFilterType(e.target.value)}
                     className="h-8 px-2 text-sm rounded-lg border border-border bg-bg-primary text-text-primary shrink-0"
                   >
-                    <option value="">All Types</option>
+                    <option value="">{LABELS.FILTERS.ALL_TYPES}</option>
                     <option value="root">Root</option>
                     <option value="intermediate">Intermediate</option>
                   </select>
@@ -384,7 +385,7 @@ export default function CAsPage() {
                     onChange={(e) => setFilterStatus(e.target.value)}
                     className="h-8 px-2 text-sm rounded-lg border border-border bg-bg-primary text-text-primary shrink-0"
                   >
-                    <option value="">All Status</option>
+                    <option value="">{LABELS.FILTERS.ALL_STATUS}</option>
                     <option value="valid">Valid</option>
                     <option value="expiring">Expiring</option>
                     <option value="expired">Expired</option>

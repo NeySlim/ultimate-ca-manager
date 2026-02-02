@@ -44,6 +44,7 @@ import {
 } from '../components';
 import { useNotification } from '../contexts';
 import auditService from '../services/audit.service';
+import { ERRORS, SUCCESS, LABELS } from '../lib/messages';
 
 // Action icons mapping
 const actionIcons = {
@@ -145,7 +146,7 @@ export default function AuditLogsPage() {
       setActions(actionsRes.data || { actions: [], categories: {} });
     } catch (err) {
       console.error('Failed to load audit data:', err);
-      showError('Failed to load audit logs');
+      showError(err.message || ERRORS.LOAD_FAILED.AUDIT_LOGS);
     } finally {
       setLoading(false);
     }
@@ -382,7 +383,7 @@ export default function AuditLogsPage() {
       type: 'select',
       value: filterAction,
       onChange: (v) => { setFilterAction(v); setPage(1); },
-      placeholder: 'All Actions',
+      placeholder: LABELS.FILTERS.ALL_ACTIONS,
       options: (actions.actions || []).map(a => ({ value: a, label: a.replace(/_/g, ' ') }))
     },
     {
@@ -391,7 +392,7 @@ export default function AuditLogsPage() {
       type: 'select',
       value: filterSuccess,
       onChange: (v) => { setFilterSuccess(v); setPage(1); },
-      placeholder: 'All Status',
+      placeholder: LABELS.FILTERS.ALL_STATUS,
       options: [
         { value: 'true', label: 'Success' },
         { value: 'false', label: 'Failed' }
@@ -403,7 +404,7 @@ export default function AuditLogsPage() {
       type: 'select',
       value: filterUsername,
       onChange: (v) => { setFilterUsername(v); setPage(1); },
-      placeholder: 'All Users',
+      placeholder: LABELS.FILTERS.ALL_USERS,
       options: uniqueUsernames.map(u => ({ value: u, label: u }))
     }
   ], [filterAction, filterSuccess, filterUsername, actions.actions, uniqueUsernames]);
@@ -725,14 +726,14 @@ export default function AuditLogsPage() {
               key: 'action',
               value: filterAction,
               onChange: (v) => { setFilterAction(v); setPage(1); },
-              placeholder: 'All Actions',
+              placeholder: LABELS.FILTERS.ALL_ACTIONS,
               options: (actions.actions || []).map(a => ({ value: a, label: a.replace(/_/g, ' ') }))
             },
             {
               key: 'status',
               value: filterSuccess,
               onChange: (v) => { setFilterSuccess(v); setPage(1); },
-              placeholder: 'All Status',
+              placeholder: LABELS.FILTERS.ALL_STATUS,
               options: [
                 { value: 'true', label: 'Success' },
                 { value: 'false', label: 'Failed' }
@@ -742,7 +743,7 @@ export default function AuditLogsPage() {
               key: 'username',
               value: filterUsername,
               onChange: (v) => { setFilterUsername(v); setPage(1); },
-              placeholder: 'All Users',
+              placeholder: LABELS.FILTERS.ALL_USERS,
               options: uniqueUsernames.map(u => ({ value: u, label: u }))
             }
           ]}

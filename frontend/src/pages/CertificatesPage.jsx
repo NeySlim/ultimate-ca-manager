@@ -15,6 +15,7 @@ import {
 } from '../components'
 import { certificatesService, casService } from '../services'
 import { useNotification, useMobile } from '../contexts'
+import { ERRORS, SUCCESS, LABELS, CONFIRM, BUTTONS } from '../lib/messages'
 import { usePermission } from '../hooks'
 import { formatDate, extractCN } from '../lib/utils'
 
@@ -62,7 +63,7 @@ export default function CertificatesPage() {
       setTotal(certsRes.meta?.total || certsRes.pagination?.total || certs.length)
       setCas(casRes.data || [])
     } catch (error) {
-      showError('Failed to load certificates')
+      showError(error.message || ERRORS.LOAD_FAILED.CERTIFICATES)
     } finally {
       setLoading(false)
     }
@@ -93,15 +94,15 @@ export default function CertificatesPage() {
       a.download = `${selectedCert.common_name || 'certificate'}.${format}`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess('Certificate exported')
+      showSuccess(SUCCESS.EXPORT.CERTIFICATE)
     } catch {
-      showError('Export failed')
+      showError(ERRORS.EXPORT_FAILED.CERTIFICATE)
     }
   }
 
   // Revoke certificate
   const handleRevoke = async (id) => {
-    const confirmed = await showConfirm('Revoke this certificate? This action cannot be undone.', {
+    const confirmed = await showConfirm(CONFIRM.REVOKE.MESSAGE, {
       title: 'Revoke Certificate',
       confirmText: 'Revoke',
       variant: 'danger'
@@ -109,17 +110,17 @@ export default function CertificatesPage() {
     if (!confirmed) return
     try {
       await certificatesService.revoke(id)
-      showSuccess('Certificate revoked')
+      showSuccess(SUCCESS.OTHER.REVOKED)
       loadData()
       setSelectedCert(null)
     } catch {
-      showError('Revoke failed')
+      showError(ERRORS.REVOKE_FAILED.CERTIFICATE)
     }
   }
 
   // Delete certificate
   const handleDelete = async (id) => {
-    const confirmed = await showConfirm('Delete this certificate permanently?', {
+    const confirmed = await showConfirm(CONFIRM.DELETE.CERTIFICATE, {
       title: 'Delete Certificate',
       confirmText: 'Delete',
       variant: 'danger'
@@ -127,11 +128,11 @@ export default function CertificatesPage() {
     if (!confirmed) return
     try {
       await certificatesService.delete(id)
-      showSuccess('Certificate deleted')
+      showSuccess(SUCCESS.DELETE.CERTIFICATE)
       loadData()
       setSelectedCert(null)
-    } catch {
-      showError('Delete failed')
+    } catch (error) {
+      showError(error.message || ERRORS.DELETE_FAILED.CERTIFICATE)
     }
   }
 
@@ -146,7 +147,7 @@ export default function CertificatesPage() {
     }
     try {
       await certificatesService.uploadKey(selectedCert.id, keyPem.trim(), keyPassphrase || null)
-      showSuccess('Private key uploaded successfully')
+      showSuccess(SUCCESS.OTHER.KEY_UPLOADED)
       setShowKeyModal(false)
       setKeyPem('')
       setKeyPassphrase('')
@@ -278,9 +279,9 @@ export default function CertificatesPage() {
       a.download = `${cert.common_name || cert.cn || 'certificate'}.${format}`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess('Certificate exported')
+      showSuccess(SUCCESS.EXPORT.CERTIFICATE)
     } catch {
-      showError('Export failed')
+      showError(ERRORS.EXPORT_FAILED.CERTIFICATE)
     }
   }
 
@@ -292,7 +293,7 @@ export default function CertificatesPage() {
       type: 'select',
       value: filterStatus,
       onChange: setFilterStatus,
-      placeholder: 'All Status',
+      placeholder: LABELS.FILTERS.ALL_STATUS,
       options: [
         { value: 'valid', label: 'Valid' },
         { value: 'expiring', label: 'Expiring Soon' },
@@ -306,7 +307,7 @@ export default function CertificatesPage() {
       type: 'select',
       value: filterCA,
       onChange: setFilterCA,
-      placeholder: 'All CAs',
+      placeholder: LABELS.FILTERS.ALL_CAS,
       options: cas.map(ca => ({ 
         value: String(ca.id), 
         label: ca.descr || ca.common_name 
@@ -396,7 +397,7 @@ export default function CertificatesPage() {
               key: 'status',
               value: filterStatus,
               onChange: setFilterStatus,
-              placeholder: 'All Status',
+              placeholder: LABELS.FILTERS.ALL_STATUS,
               options: [
                 { value: 'valid', label: 'Valid' },
                 { value: 'expiring', label: 'Expiring' },
@@ -408,7 +409,7 @@ export default function CertificatesPage() {
               key: 'ca',
               value: filterCA,
               onChange: setFilterCA,
-              placeholder: 'All CAs',
+              placeholder: LABELS.FILTERS.ALL_CAS,
               options: cas.map(ca => ({ 
                 value: String(ca.id), 
                 label: ca.descr || ca.common_name 
@@ -459,7 +460,7 @@ export default function CertificatesPage() {
           onSubmit={async (data) => {
             try {
               await certificatesService.create(data)
-              showSuccess('Certificate issued')
+              showSuccess(SUCCESS.CREATE.CERTIFICATE)
               setShowIssueModal(false)
               loadData()
             } catch (error) {

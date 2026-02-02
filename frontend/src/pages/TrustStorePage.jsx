@@ -17,6 +17,7 @@ import { truststoreService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useModals } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
+import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 
 export default function TrustStorePage() {
   const { showSuccess, showError, showConfirm } = useNotification()
@@ -48,7 +49,7 @@ export default function TrustStorePage() {
       const certs = response.data || []
       setCertificates(certs)
     } catch (error) {
-      showError(error.message || 'Failed to load trust store')
+      showError(error.message || ERRORS.LOAD_FAILED.TRUSTSTORE)
     } finally {
       setLoading(false)
     }
@@ -65,14 +66,14 @@ export default function TrustStorePage() {
 
   const handleAdd = async () => {
     if (!addForm.name || !addForm.certificate_pem) {
-      showError('Name and certificate are required')
+      showError(ERRORS.VALIDATION.TRUSTSTORE_REQUIRED)
       return
     }
     
     setAdding(true)
     try {
       const response = await truststoreService.add(addForm)
-      showSuccess('Certificate added to trust store')
+      showSuccess(SUCCESS.IMPORT.TRUSTSTORE)
       closeModal('add')
       setAddForm({ name: '', description: '', certificate_pem: '', purpose: 'custom', notes: '' })
       loadCertificates()
@@ -80,14 +81,14 @@ export default function TrustStorePage() {
         setSelectedCert(response.data)
       }
     } catch (error) {
-      showError(error.message || 'Failed to add certificate')
+      showError(error.message || ERRORS.IMPORT_FAILED.TRUSTSTORE)
     } finally {
       setAdding(false)
     }
   }
 
   const handleDelete = async (cert) => {
-    const confirmed = await showConfirm('Remove this certificate from the trust store?', {
+    const confirmed = await showConfirm(CONFIRM.DELETE.TRUSTSTORE, {
       title: 'Remove Certificate',
       confirmText: 'Remove',
       variant: 'danger'
@@ -96,13 +97,13 @@ export default function TrustStorePage() {
     
     try {
       await truststoreService.delete(cert.id)
-      showSuccess('Certificate removed from trust store')
+      showSuccess(SUCCESS.DELETE.TRUSTSTORE)
       loadCertificates()
       if (selectedCert?.id === cert.id) {
         setSelectedCert(null)
       }
     } catch (error) {
-      showError(error.message || 'Failed to remove certificate')
+      showError(error.message || ERRORS.DELETE_FAILED.TRUSTSTORE)
     }
   }
 

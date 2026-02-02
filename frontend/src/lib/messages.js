@@ -19,6 +19,9 @@ export const ERRORS = {
     CRL: 'Failed to load CRL data',
     TRUSTSTORE: 'Failed to load trust store',
     DASHBOARD: 'Failed to load dashboard data',
+    HSM_PROVIDERS: 'Failed to load HSM providers',
+    ROLES: 'Failed to load roles',
+    SSO_PROVIDERS: 'Failed to load SSO providers',
     GENERIC: 'Failed to load data',
   },
   CREATE_FAILED: {
@@ -28,6 +31,8 @@ export const ERRORS = {
     USER: 'Failed to create user',
     GROUP: 'Failed to create group',
     TEMPLATE: 'Failed to create template',
+    ROLE: 'Failed to create role',
+    PROVIDER: 'Failed to save provider',
     GENERIC: 'Failed to create',
   },
   UPDATE_FAILED: {
@@ -37,6 +42,7 @@ export const ERRORS = {
     GROUP: 'Failed to update group',
     TEMPLATE: 'Failed to update template',
     SETTINGS: 'Failed to save settings',
+    ROLE: 'Failed to update role',
     GENERIC: 'Failed to update',
   },
   DELETE_FAILED: {
@@ -46,7 +52,50 @@ export const ERRORS = {
     USER: 'Failed to delete user',
     GROUP: 'Failed to delete group',
     TEMPLATE: 'Failed to delete template',
+    BACKUP: 'Failed to delete backup',
+    TRUSTSTORE: 'Failed to remove certificate from trust store',
+    PROVIDER: 'Failed to delete provider',
+    ROLE: 'Failed to delete role',
+    KEY: 'Failed to destroy key',
     GENERIC: 'Failed to delete',
+  },
+  EXPORT_FAILED: {
+    TEMPLATE: 'Failed to export template',
+    GENERIC: 'Failed to export',
+  },
+  IMPORT_FAILED: {
+    TEMPLATE: 'Failed to import template',
+    TRUSTSTORE: 'Failed to add certificate to trust store',
+    GENERIC: 'Failed to import',
+  },
+  DUPLICATE_FAILED: {
+    TEMPLATE: 'Failed to duplicate template',
+    GENERIC: 'Failed to duplicate',
+  },
+  BACKUP: {
+    CREATE_FAILED: 'Failed to create backup',
+    DOWNLOAD_FAILED: 'Failed to download backup',
+    RESTORE_FAILED: 'Failed to restore backup',
+  },
+  DATABASE: {
+    OPTIMIZE_FAILED: 'Failed to optimize database',
+    INTEGRITY_FAILED: 'Failed to check database integrity',
+    EXPORT_FAILED: 'Failed to export database',
+    RESET_FAILED: 'Failed to reset database',
+  },
+  HTTPS: {
+    APPLY_FAILED: 'Failed to apply certificate',
+    REGENERATE_FAILED: 'Failed to regenerate HTTPS certificate',
+  },
+  EMAIL: {
+    TEST_FAILED: 'Failed to send test email',
+  },
+  HSM: {
+    TEST_FAILED: 'Connection test failed',
+  },
+  SSO: {
+    TOGGLE_FAILED: 'Failed to toggle provider',
+    TEST_FAILED: 'Connection test failed',
   },
   VALIDATION: {
     REQUIRED_FIELD: 'This field is required',
@@ -57,11 +106,13 @@ export const ERRORS = {
     INVALID_KEY: 'Invalid private key format - must be PEM format',
     KEY_MISMATCH: 'Private key does not match certificate',
     PASSPHRASE_REQUIRED: 'Private key is encrypted - please provide passphrase',
+    TRUSTSTORE_REQUIRED: 'Name and certificate are required',
   },
   AUTH: {
     LOGIN_FAILED: 'Login failed',
     UNAUTHORIZED: 'Unauthorized',
     SESSION_EXPIRED: 'Session expired, please login again',
+    CANCELLED: 'Operation was cancelled or timed out',
   },
 }
 
@@ -74,6 +125,10 @@ export const SUCCESS = {
     USER: 'User created successfully',
     GROUP: 'Group created successfully',
     TEMPLATE: 'Template created successfully',
+    ROLE: 'Role created',
+    PROVIDER: 'Provider created',
+    KEY: 'Key generated',
+    GENERIC: 'Created successfully',
   },
   UPDATE: {
     CERTIFICATE: 'Certificate updated successfully',
@@ -82,6 +137,8 @@ export const SUCCESS = {
     GROUP: 'Group updated successfully',
     TEMPLATE: 'Template updated successfully',
     SETTINGS: 'Settings saved successfully',
+    ROLE: 'Role updated',
+    PROVIDER: 'Provider updated',
   },
   DELETE: {
     CERTIFICATE: 'Certificate deleted successfully',
@@ -90,22 +147,65 @@ export const SUCCESS = {
     USER: 'User deleted successfully',
     GROUP: 'Group deleted successfully',
     TEMPLATE: 'Template deleted successfully',
+    TRUSTSTORE: 'Certificate removed from trust store',
+    PROVIDER: 'Provider deleted',
+    ROLE: 'Role deleted',
+    KEY: 'Key destroyed',
+    GENERIC: 'Deleted successfully',
   },
   EXPORT: {
     CERTIFICATE: 'Certificate exported successfully',
     CA: 'CA exported successfully',
     BACKUP: 'Backup exported successfully',
+    DATABASE: 'Database exported successfully',
+    TEMPLATE: 'Template exported successfully',
   },
   IMPORT: {
     CERTIFICATE: 'Certificate imported successfully',
     CA: 'CA imported successfully',
     BACKUP: 'Backup restored successfully',
+    TEMPLATE: 'Template imported successfully',
+    TRUSTSTORE: 'Certificate added to trust store',
+  },
+  DUPLICATE: {
+    TEMPLATE: 'Template duplicated successfully',
+  },
+  BACKUP: {
+    CREATED: 'Backup created and downloaded successfully',
+    DOWNLOADED: 'Backup downloaded successfully',
+    DELETED: 'Backup deleted successfully',
+    RESTORED: 'Backup restored successfully',
+  },
+  DATABASE: {
+    OPTIMIZED: 'Database optimized successfully',
+    INTEGRITY_PASSED: 'Database integrity check passed',
+    RESET: 'Database reset successfully. Page will reload.',
+  },
+  HTTPS: {
+    APPLIED: 'HTTPS certificate applied. Server will restart.',
+    REGENERATED: 'HTTPS certificate regenerated. Server will restart.',
+  },
+  EMAIL: {
+    TEST_SENT: 'Test email sent successfully',
   },
   OTHER: {
     PASSWORD_RESET: 'Password reset successfully',
+    PASSWORD_CHANGED: 'Password changed successfully',
     KEY_UPLOADED: 'Private key uploaded successfully',
     REVOKED: 'Certificate revoked successfully',
     SIGNED: 'CSR signed successfully',
+    TWO_FACTOR_ENABLED: '2FA enabled successfully! Save your backup codes.',
+    TWO_FACTOR_DISABLED: 'Two-factor authentication disabled',
+  },
+  CRL: {
+    GENERATED: 'CRL regenerated successfully',
+  },
+  HSM: {
+    CONNECTION_OK: 'Connection successful',
+  },
+  SSO: {
+    CONNECTION_OK: 'Connection successful',
+    TOGGLED: (enabled) => `Provider ${enabled ? 'disabled' : 'enabled'}`,
   },
 }
 
@@ -255,11 +355,25 @@ export const CONFIRM = {
     GROUP: 'Are you sure you want to delete this group?',
     CERTIFICATE: 'Are you sure you want to delete this certificate?',
     CA: 'Are you sure you want to delete this CA?',
+    CSR: 'Are you sure you want to delete this CSR?',
     TEMPLATE: 'Are you sure you want to delete this template?',
+    TRUSTSTORE: 'Remove this certificate from the trust store?',
+    GENERIC: 'Are you sure you want to delete this item?',
   },
   REVOKE: {
     TITLE: 'Confirm Revoke',
     MESSAGE: 'Are you sure you want to revoke this certificate? This action cannot be undone.',
+  },
+  HSM: {
+    DELETE_PROVIDER: 'Delete HSM provider "{name}"?',
+    DELETE_KEY: 'Destroy key "{name}"? This cannot be undone.',
+  },
+  RBAC: {
+    DELETE_ROLE: 'Delete role "{name}"? Users with this role will be set to \'viewer\'.',
+    SYSTEM_ROLE: 'Cannot delete system role',
+  },
+  SSO: {
+    DELETE_PROVIDER: 'Delete SSO provider "{name}"?',
   },
   RESET_PASSWORD: {
     TITLE: 'Reset Password',
