@@ -39,6 +39,7 @@ export function Modal({
             "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
             "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]"
           )}
+          aria-describedby={undefined}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
             <Dialog.Title className="text-sm font-semibold text-text-primary">
