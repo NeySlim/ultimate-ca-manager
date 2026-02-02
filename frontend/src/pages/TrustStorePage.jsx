@@ -3,10 +3,10 @@
  * Manage trusted CA certificates for chain validation
  * Uses ResponsiveLayout for unified UI
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { 
   ShieldCheck, Plus, Trash, Download, Certificate, Clock,
-  CheckCircle, Warning, PencilSimple
+  CheckCircle, Warning, UploadSimple, ArrowsClockwise
 } from '@phosphor-icons/react'
 import {
   Button, Input, Badge, Modal, Textarea, HelpCard,
@@ -22,11 +22,13 @@ import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 export default function TrustStorePage() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
-  const { modals, open: openModal, close: closeModal } = useModals(['add'])
+  const { modals, open: openModal, close: closeModal } = useModals(['add', 'import'])
   
   const [loading, setLoading] = useState(true)
   const [certificates, setCertificates] = useState([])
+  const [certStats, setCertStats] = useState({ total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 })
   const [selectedCert, setSelectedCert] = useState(null)
+  const [syncing, setSyncing] = useState(false)
   
   // Pagination state
   const [page, setPage] = useState(1)
@@ -41,6 +43,11 @@ export default function TrustStorePage() {
     notes: ''
   })
   const [adding, setAdding] = useState(false)
+  
+  // Import modal state
+  const [importFile, setImportFile] = useState(null)
+  const [importForm, setImportForm] = useState({ name: '', purpose: 'root_ca', description: '' })
+  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     loadCertificates()
@@ -49,9 +56,12 @@ export default function TrustStorePage() {
   const loadCertificates = async () => {
     setLoading(true)
     try {
-      const response = await truststoreService.getAll()
-      const certs = response.data || []
-      setCertificates(certs)
+      const [certsRes, statsRes] = await Promise.all([
+        truststoreService.getAll(),
+        truststoreService.getStats()
+      ])
+      setCertificates(certsRes.data || [])
+      setCertStats(statsRes.data || { total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 })
     } catch (error) {
       showError(error.message || ERRORS.LOAD_FAILED.TRUSTSTORE)
     } finally {
@@ -91,6 +101,49 @@ export default function TrustStorePage() {
     }
   }
 
+  const handleImport = async () => {
+    if (!importFile) {
+      showError('Please select a file to import')
+      return
+    }
+    
+    setImporting(true)
+    try {
+      const response = await truststoreService.importFile(importFile, importForm)
+      showSuccess(response.message || 'Certificate imported successfully')
+      closeModal('import')
+      setImportFile(null)
+      setImportForm({ name: '', purpose: 'root_ca', description: '' })
+      loadCertificates()
+      if (response.data) {
+        setSelectedCert(response.data)
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to import certificate')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const handleSyncFromSystem = async () => {
+    const confirmed = await showConfirm(
+      'This will import up to 50 certificates from the system CA bundle (/etc/ssl/certs). Continue?',
+      { title: 'Sync from System', confirmText: 'Sync', variant: 'primary' }
+    )
+    if (!confirmed) return
+    
+    setSyncing(true)
+    try {
+      const response = await truststoreService.syncFromSystem(50)
+      showSuccess(response.message || `Synced ${response.data?.new_count || 0} certificates`)
+      loadCertificates()
+    } catch (error) {
+      showError(error.message || 'Failed to sync from system')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const handleDelete = async (cert) => {
     const confirmed = await showConfirm(CONFIRM.DELETE.TRUSTSTORE, {
       title: 'Remove Certificate',
@@ -123,16 +176,13 @@ export default function TrustStorePage() {
     URL.revokeObjectURL(url)
   }
 
-  // Stats
-  const stats = useMemo(() => {
-    const rootCAs = certificates.filter(c => c.purpose === 'root_ca').length
-    const intermediateCAs = certificates.filter(c => c.purpose === 'intermediate_ca').length
-    return [
-      { icon: ShieldCheck, label: 'Root CAs', value: rootCAs, variant: 'success' },
-      { icon: Certificate, label: 'Intermediate', value: intermediateCAs, variant: 'primary' },
-      { icon: CheckCircle, label: 'Total', value: certificates.length, variant: 'default' }
-    ]
-  }, [certificates])
+  // Stats - from backend API
+  const stats = useMemo(() => [
+    { icon: ShieldCheck, label: 'Root CAs', value: certStats.root_ca, variant: 'success' },
+    { icon: Certificate, label: 'Intermediate', value: certStats.intermediate_ca, variant: 'primary' },
+    { icon: Warning, label: 'Expired', value: certStats.expired, variant: 'danger' },
+    { icon: CheckCircle, label: 'Total', value: certStats.total, variant: 'default' }
+  ], [certStats])
 
   // Columns
   const columns = [
@@ -322,14 +372,26 @@ export default function TrustStorePage() {
                 { value: 'intermediate_ca', label: 'Intermediate' },
                 { value: 'client_auth', label: 'Client Auth' },
                 { value: 'code_signing', label: 'Code Signing' },
+                { value: 'system', label: 'System' },
                 { value: 'custom', label: 'Custom' }
               ]
             }
           ]}
           toolbarActions={canWrite('truststore') && (
-            <Button onClick={() => openModal('add')}>
-              <Plus size={16} /> Add
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={handleSyncFromSystem} disabled={syncing}>
+                <ArrowsClockwise size={16} className={syncing ? 'animate-spin' : ''} />
+                <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync'}</span>
+              </Button>
+              <Button variant="secondary" onClick={() => openModal('import')}>
+                <UploadSimple size={16} />
+                <span className="hidden sm:inline">Import</span>
+              </Button>
+              <Button onClick={() => openModal('add')}>
+                <Plus size={16} />
+                <span className="hidden sm:inline">Add</span>
+              </Button>
+            </div>
           )}
           sortable
           defaultSort={{ key: 'name', direction: 'asc' }}
@@ -406,6 +468,67 @@ export default function TrustStorePage() {
             </Button>
             <Button type="submit" disabled={adding}>
               {adding ? 'Adding...' : 'Add Certificate'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Import Certificate Modal */}
+      <Modal
+        open={modals.import}
+        onClose={() => closeModal('import')}
+        title="Import Certificate File"
+      >
+        <form className="p-4 space-y-4" onSubmit={(e) => { e.preventDefault(); handleImport() }}>
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">
+              Certificate File (PEM or DER)
+            </label>
+            <input
+              type="file"
+              accept=".pem,.crt,.cer,.der"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                setImportFile(file)
+                if (file && !importForm.name) {
+                  setImportForm(prev => ({ ...prev, name: file.name.replace(/\.(pem|crt|cer|der)$/i, '') }))
+                }
+              }}
+              className="w-full px-3 py-2 text-sm bg-bg-secondary border border-border rounded-md text-text-primary file:mr-3 file:py-1 file:px-3 file:border-0 file:rounded file:bg-accent-primary file:text-white file:cursor-pointer"
+            />
+          </div>
+          <Input
+            label="Name"
+            placeholder="Certificate name (auto-filled from filename)"
+            value={importForm.name}
+            onChange={(e) => setImportForm(prev => ({ ...prev, name: e.target.value }))}
+          />
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">Purpose</label>
+            <select
+              value={importForm.purpose}
+              onChange={(e) => setImportForm(prev => ({ ...prev, purpose: e.target.value }))}
+              className="w-full px-3 py-2 text-sm bg-bg-secondary border border-border rounded-md text-text-primary"
+            >
+              <option value="root_ca">Root CA</option>
+              <option value="intermediate_ca">Intermediate CA</option>
+              <option value="client_auth">Client Authentication</option>
+              <option value="code_signing">Code Signing</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <Input
+            label="Description"
+            placeholder="Optional description"
+            value={importForm.description}
+            onChange={(e) => setImportForm(prev => ({ ...prev, description: e.target.value }))}
+          />
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button type="button" variant="secondary" onClick={() => closeModal('import')}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={importing || !importFile}>
+              {importing ? 'Importing...' : 'Import Certificate'}
             </Button>
           </div>
         </form>

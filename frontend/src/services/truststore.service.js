@@ -8,6 +8,10 @@ export const truststoreService = {
     return apiClient.get('/truststore')
   },
 
+  async getStats() {
+    return apiClient.get('/truststore/stats')
+  },
+
   async getById(id) {
     return apiClient.get(`/truststore/${id}`)
   },
@@ -16,8 +20,18 @@ export const truststoreService = {
     return apiClient.post('/truststore', data)
   },
 
-  async import(pemData) {
-    return apiClient.post('/truststore/import', { pem: pemData })
+  async importFile(file, { name, purpose, description, notes } = {}) {
+    const formData = new FormData()
+    formData.append('file', file)
+    if (name) formData.append('name', name)
+    if (purpose) formData.append('purpose', purpose)
+    if (description) formData.append('description', description)
+    if (notes) formData.append('notes', notes)
+    return apiClient.upload('/truststore/import', formData)
+  },
+
+  async syncFromSystem(limit = 50) {
+    return apiClient.post('/truststore/sync', { source: 'system', limit })
   },
 
   async remove(id) {
@@ -30,10 +44,8 @@ export const truststoreService = {
     })
   },
 
-  async verify(certId, trustedCaId) {
-    return apiClient.post('/truststore/verify', {
-      certificate_id: certId,
-      trusted_ca_id: trustedCaId,
-    })
+  // Alias for backwards compatibility
+  async delete(id) {
+    return this.remove(id)
   }
 }
