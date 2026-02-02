@@ -411,7 +411,7 @@ function DesktopTable({
         </thead>
         
         {/* Body */}
-        <tbody className="divide-y divide-border/50">
+        <tbody className="divide-y divide-border/50 border-b border-border">
           {loading ? (
             <tr>
               <td colSpan={columns.length + (rowActions ? 1 : 0)} className="py-12 text-center">
