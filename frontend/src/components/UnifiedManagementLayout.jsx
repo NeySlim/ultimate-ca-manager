@@ -31,11 +31,12 @@ import { cn } from '../lib/utils'
 import { labels, getHelpTitle } from '../lib/ui'
 import { useMobile } from '../contexts'
 import { ResponsiveDataTable } from './ui/responsive/ResponsiveDataTable'
+import { UnifiedPageHeader } from './ui/UnifiedPageHeader'
 import { HelpModal } from './HelpModal'
 import { Button } from './Button'
 import { Badge } from './Badge'
 import { 
-  Question, X, CaretLeft, ArrowLeft 
+  X, CaretLeft, ArrowLeft 
 } from '@phosphor-icons/react'
 
 export function UnifiedManagementLayout({
@@ -128,26 +129,20 @@ export function UnifiedManagementLayout({
     onSelectItem?.(null)
   }, [onSelectItem])
   
-  // Help button
-  const HelpButton = () => helpContent ? (
-    <button
-      onClick={() => setHelpOpen(true)}
-      className={cn(
-        "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all duration-200",
-        "bg-accent-primary/10 border border-accent-primary/30",
-        "text-accent-primary hover:bg-accent-primary/20 hover:border-accent-primary/50",
-        "text-xs font-medium"
-      )}
-      title={labels.helpAndInfo}
-    >
-      <Question size={14} weight="bold" />
-      <span className="hidden sm:inline">{labels.help}</span>
-    </button>
-  ) : null
+  // Transform tabs to UnifiedPageHeader format
+  const headerTabs = tabs?.map(tab => ({
+    id: tab.id,
+    label: tab.label,
+    icon: tab.icon,
+    badge: tab.pro ? { label: 'Pro', variant: 'info' } : undefined
+  }))
   
-  // Stats bar
+  // Stats bar component (kept for placement flexibility)
   const StatsBar = () => stats.length > 0 ? (
-    <div className="flex flex-wrap gap-3 sm:gap-4">
+    <div className={cn(
+      "flex flex-wrap gap-3 sm:gap-4 border-b border-border bg-bg-secondary/50",
+      isMobile ? "px-4 py-2" : "px-6 py-2"
+    )}>
       {stats.map((stat, i) => (
         <div key={i} className="flex items-center gap-2">
           {stat.icon && <stat.icon size={14} className="text-text-tertiary" />}
@@ -157,32 +152,6 @@ export function UnifiedManagementLayout({
           </Badge>
         </div>
       ))}
-    </div>
-  ) : null
-  
-  // Tabs component
-  const TabsHeader = tabs?.length > 0 ? (
-    <div className="flex gap-1">
-      {tabs.map(tab => {
-        const Icon = tab.icon
-        const isActive = activeTab === tab.id
-        return (
-          <button
-            key={tab.id}
-            onClick={() => onTabChange?.(tab.id)}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-              isActive 
-                ? "bg-accent-primary/15 text-accent-primary" 
-                : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
-            )}
-          >
-            {Icon && <Icon size={14} />}
-            <span className="hidden sm:inline">{tab.label}</span>
-            {tab.pro && <Badge variant="info" size="sm">Pro</Badge>}
-          </button>
-        )
-      })}
     </div>
   ) : null
   
@@ -223,25 +192,19 @@ export function UnifiedManagementLayout({
           "flex flex-col h-full transition-opacity duration-300",
           mobileDetailOpen ? "opacity-50" : "opacity-100"
         )}>
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-border bg-bg-secondary shrink-0 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {Icon && (
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center shrink-0">
-                    <Icon size={16} weight="bold" className="text-white" />
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <h1 className="text-base font-semibold text-text-primary">{title}</h1>
-                  {subtitle && <p className="text-xs text-text-secondary">{subtitle}</p>}
-                </div>
-                {TabsHeader}
-              </div>
-              <HelpButton />
-            </div>
-            <StatsBar />
-          </div>
+          {/* Header - Using UnifiedPageHeader */}
+          <UnifiedPageHeader
+            icon={Icon}
+            title={title}
+            subtitle={subtitle}
+            tabs={headerTabs}
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+            showHelp={!!helpContent}
+            onHelpClick={() => setHelpOpen(true)}
+            isMobile={true}
+          />
+          <StatsBar />
           
           {/* DataTable */}
           <div className="flex-1 overflow-hidden">
@@ -289,25 +252,19 @@ export function UnifiedManagementLayout({
         "flex-1 flex flex-col min-w-0 min-h-0 transition-all duration-300",
         selectedItem ? "pr-0" : ""
       )}>
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-border bg-bg-secondary shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-4">
-              {Icon && (
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center shrink-0">
-                  <Icon size={18} weight="bold" className="text-white" />
-                </div>
-              )}
-              <div className="min-w-0">
-                <h1 className="text-lg font-semibold text-text-primary">{title}</h1>
-                {subtitle && <p className="text-sm text-text-secondary">{subtitle}</p>}
-              </div>
-              {TabsHeader}
-            </div>
-            <HelpButton />
-          </div>
-          <StatsBar />
-        </div>
+        {/* Header - Using UnifiedPageHeader */}
+        <UnifiedPageHeader
+          icon={Icon}
+          title={title}
+          subtitle={subtitle}
+          tabs={headerTabs}
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+          showHelp={!!helpContent}
+          onHelpClick={() => setHelpOpen(true)}
+          isMobile={false}
+        />
+        <StatsBar />
         
         {/* DataTable */}
         <div className="flex-1 overflow-hidden">
