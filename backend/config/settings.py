@@ -165,11 +165,31 @@ class Config:
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10MB max for certificate uploads
     
     # Database
-    # Respect package installation DATABASE_PATH or fallback to DATA_DIR
+    # Supports SQLite (default) or PostgreSQL for high availability
+    # DATABASE_URL takes precedence (PostgreSQL), else fallback to SQLite
+    _db_url = os.getenv("DATABASE_URL")
     _db_default = str(DATA_DIR / "ucm.db")
     DATABASE_PATH = Path(os.getenv("DATABASE_PATH", _db_default))
-    SQLALCHEMY_DATABASE_URI = f"sqlite:///{DATABASE_PATH}"
+    
+    if _db_url:
+        # PostgreSQL or external database (HA mode)
+        # Format: postgresql://user:password@host:port/dbname
+        SQLALCHEMY_DATABASE_URI = _db_url
+        DATABASE_TYPE = "postgresql" if "postgresql" in _db_url else "external"
+    else:
+        # SQLite (standalone mode)
+        SQLALCHEMY_DATABASE_URI = f"sqlite:///{DATABASE_PATH}"
+        DATABASE_TYPE = "sqlite"
+    
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # PostgreSQL-specific settings
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),
+        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "10")),
+        "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
+        "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
+    } if _db_url else {}
     
     # JWT Authentication
     JWT_SECRET_KEY = _jwt_secret if _jwt_secret else "INSTALL_TIME_PLACEHOLDER"
@@ -205,8 +225,19 @@ class Config:
     JWT_HEADER_TYPE = "Bearer"
     
     # Session Configuration - Flask server-side sessions
-    SESSION_TYPE = 'filesystem'  # Server-side sessions for multi-worker support
-    SESSION_FILE_DIR = DATA_DIR / 'sessions'
+    # Supports filesystem (default) or Redis (HA mode)
+    _redis_url = os.getenv("REDIS_URL")
+    
+    if _redis_url:
+        # Redis session store for HA deployments
+        SESSION_TYPE = 'redis'
+        SESSION_REDIS = _redis_url  # Will be converted to Redis connection in app.py
+        SESSION_KEY_PREFIX = os.getenv("SESSION_KEY_PREFIX", "ucm:session:")
+    else:
+        # Filesystem sessions for standalone deployment
+        SESSION_TYPE = 'filesystem'
+        SESSION_FILE_DIR = DATA_DIR / 'sessions'
+    
     SESSION_COOKIE_SECURE = True  # HTTPS only
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
