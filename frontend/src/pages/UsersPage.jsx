@@ -20,6 +20,7 @@ import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
 import { formatDate, extractData, cn } from '../lib/utils'
+import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 
 // Base tabs
 const BASE_TABS = [
@@ -120,7 +121,7 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
       setUsers(usersRes.data || [])
       setRolesData(rolesRes)
     } catch (error) {
-      showError('Failed to load users')
+      showError(ERRORS.LOAD_FAILED.USERS)
     } finally {
       setLoading(false)
     }
@@ -138,11 +139,11 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
   const handleCreate = async (userData) => {
     try {
       await usersService.create(userData)
-      showSuccess('User created successfully')
+      showSuccess(SUCCESS.CREATE.USER)
       setShowCreateModal(false)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to create user')
+      showError(error.message || ERRORS.CREATE_FAILED.USER)
     }
   }
 
@@ -150,34 +151,34 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
     if (!selectedUser) return
     try {
       await usersService.update(selectedUser.id, userData)
-      showSuccess('User updated successfully')
+      showSuccess(SUCCESS.UPDATE.USER)
       setShowEditModal(false)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to update user')
+      showError(error.message || ERRORS.UPDATE_FAILED.USER)
     }
   }
 
   const handleDelete = async (id) => {
-    const confirmed = await showConfirm('Are you sure you want to delete this user?', {
-      title: 'Delete User',
+    const confirmed = await showConfirm(CONFIRM.DELETE.USER, {
+      title: CONFIRM.DELETE.TITLE,
       confirmText: 'Delete',
       variant: 'danger'
     })
     if (!confirmed) return
     try {
       await usersService.delete(id)
-      showSuccess('User deleted successfully')
+      showSuccess(SUCCESS.DELETE.USER)
       loadData()
       setSelectedUser(null)
     } catch (error) {
-      showError(error.message || 'Failed to delete user')
+      showError(error.message || ERRORS.DELETE_FAILED.USER)
     }
   }
 
   const handleResetPassword = async (id) => {
-    const confirmed = await showConfirm('Are you sure you want to reset this user\'s password?', {
-      title: 'Reset Password',
+    const confirmed = await showConfirm(CONFIRM.RESET_PASSWORD.MESSAGE, {
+      title: CONFIRM.RESET_PASSWORD.TITLE,
       confirmText: 'Reset Password'
     })
     if (!confirmed) return
@@ -197,11 +198,11 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
       type: 'select',
       value: filterRole,
       onChange: setFilterRole,
-      placeholder: 'All Roles',
+      placeholder: LABELS.FILTERS.ALL_ROLES,
       options: [
-        { value: 'admin', label: 'Admin' },
-        { value: 'operator', label: 'Operator' },
-        { value: 'viewer', label: 'Viewer' }
+        { value: 'admin', label: LABELS.ROLES.ADMIN },
+        { value: 'operator', label: LABELS.ROLES.OPERATOR },
+        { value: 'viewer', label: LABELS.ROLES.VIEWER }
       ]
     },
     {
@@ -210,7 +211,7 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
       type: 'select',
       value: filterActive,
       onChange: setFilterActive,
-      placeholder: 'All Status',
+      placeholder: LABELS.FILTERS.ALL_STATUS,
       options: [
         { value: 'true', label: 'Active' },
         { value: 'false', label: 'Inactive' }
