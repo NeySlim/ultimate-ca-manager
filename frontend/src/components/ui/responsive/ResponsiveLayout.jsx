@@ -351,14 +351,14 @@ function StatsBar({ stats, isMobile }) {
   if (isMobile) {
     // Mobile: horizontal scroll with larger items
     return (
-      <div className="shrink-0 border-b border-border bg-bg-secondary/30 flex overflow-x-auto scrollbar-none gap-4 px-4 py-2.5">
+      <div className="shrink-0 border-b border-border/60 bg-bg-secondary/30 flex overflow-x-auto scrollbar-none gap-4 px-4 py-2.5">
         {stats.map((stat, i) => {
           const Icon = stat.icon
           const colorClass = variants[stat.variant] || variants.primary
           const displayLabel = stat.shortLabel || stat.label
           
           return (
-            <div key={i} className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+            <div key={i} className="flex items-center gap-2 shrink-0 whitespace-nowrap transition-all duration-200">
               {Icon && (
                 <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', `${colorClass} bg-current/10`)}>
                   <Icon size={16} weight="bold" className={colorClass} />
@@ -377,13 +377,13 @@ function StatsBar({ stats, isMobile }) {
   
   // Desktop: compact inline stats
   return (
-    <div className="shrink-0 border-b border-border bg-bg-secondary/20 flex items-center gap-5 px-5 py-1.5">
+    <div className="shrink-0 border-b border-border/60 bg-bg-secondary/20 flex items-center gap-5 px-5 py-1.5 shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)]">
       {stats.map((stat, i) => {
         const Icon = stat.icon
         const colorClass = variants[stat.variant] || variants.primary
         
         return (
-          <div key={i} className="flex items-center gap-1.5">
+          <div key={i} className="flex items-center gap-1.5 transition-all duration-200 hover:opacity-80">
             {Icon && <Icon size={14} weight="bold" className={colorClass} />}
             <span className="font-semibold text-xs text-text-primary">{stat.value}</span>
             <span className="text-xs text-text-secondary">{stat.label}</span>

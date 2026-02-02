@@ -56,7 +56,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center font-semibold border',
+        'inline-flex items-center font-semibold border badge-enhanced',
         'transition-all duration-200 whitespace-nowrap',
         sizes[size],
         variants[variant],
