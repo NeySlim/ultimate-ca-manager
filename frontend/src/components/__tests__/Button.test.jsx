@@ -31,23 +31,26 @@ describe('Button Component', () => {
     expect(handleClick).not.toHaveBeenCalled()
   })
 
-  it('renders with primary variant by default (has gradient style)', () => {
+  it('renders with primary variant by default', () => {
     render(<Button>Primary</Button>)
     const button = screen.getByRole('button')
-    expect(button.style.background).toContain('var(--gradient-accent)')
+    expect(button.className).toContain('btn-gradient')
+    expect(button.className).toContain('text-white')
   })
 
   it('renders secondary variant correctly', () => {
     render(<Button variant="secondary">Secondary</Button>)
     const button = screen.getByRole('button')
-    expect(button.className).toContain('bg-gradient-to-r')
-    expect(button.className).toContain('border')
+    expect(button.className).toContain('btn-soft')
+    expect(button.className).toContain('text-text-primary')
   })
 
-  it('renders danger variant correctly (has gradient style)', () => {
+  it('renders danger variant correctly', () => {
     render(<Button variant="danger">Danger</Button>)
     const button = screen.getByRole('button')
-    expect(button.style.background).toContain('linear-gradient')
+    expect(button.className).toContain('btn-gradient')
+    expect(button.className).toContain('danger')
+    expect(button.className).toContain('text-white')
   })
 
   it('renders ghost variant correctly', () => {
@@ -59,8 +62,8 @@ describe('Button Component', () => {
   it('renders small size correctly', () => {
     render(<Button size="sm">Small</Button>)
     const button = screen.getByRole('button')
-    expect(button.className).toContain('px-2')
-    expect(button.className).toContain('py-0.5')
+    expect(button.className).toContain('px-2.5')
+    expect(button.className).toContain('py-1.5')
     expect(button.className).toContain('text-xs')
   })
 
@@ -68,7 +71,7 @@ describe('Button Component', () => {
     render(<Button size="lg">Large</Button>)
     const button = screen.getByRole('button')
     expect(button.className).toContain('px-4')
-    expect(button.className).toContain('py-2')
+    expect(button.className).toContain('py-2.5')
   })
 
   it('renders children including icons', () => {

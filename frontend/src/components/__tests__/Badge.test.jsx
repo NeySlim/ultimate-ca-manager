@@ -17,29 +17,29 @@ describe('Badge Component', () => {
   it('renders success variant', () => {
     render(<Badge variant="success">Valid</Badge>)
     const badge = screen.getByText('Valid')
-    expect(badge.className).toContain('bg-green-500/12')
-    expect(badge.className).toContain('text-green-400')
+    expect(badge.className).toContain('status-success-bg')
+    expect(badge.className).toContain('status-success-text')
   })
 
   it('renders warning variant', () => {
     render(<Badge variant="warning">Expiring</Badge>)
     const badge = screen.getByText('Expiring')
-    expect(badge.className).toContain('bg-yellow-500/12')
-    expect(badge.className).toContain('text-yellow-400')
+    expect(badge.className).toContain('status-warning-bg')
+    expect(badge.className).toContain('status-warning-text')
   })
 
   it('renders danger variant', () => {
     render(<Badge variant="danger">Revoked</Badge>)
     const badge = screen.getByText('Revoked')
-    expect(badge.className).toContain('bg-red-500/12')
-    expect(badge.className).toContain('text-red-400')
+    expect(badge.className).toContain('status-danger-bg')
+    expect(badge.className).toContain('status-danger-text')
   })
 
   it('renders info variant', () => {
     render(<Badge variant="info">Pending</Badge>)
     const badge = screen.getByText('Pending')
-    expect(badge.className).toContain('bg-blue-500/12')
-    expect(badge.className).toContain('text-blue-400')
+    expect(badge.className).toContain('status-primary-bg')
+    expect(badge.className).toContain('status-primary-text')
   })
 
   it('renders with icon', () => {
@@ -54,14 +54,14 @@ describe('Badge Component', () => {
   it('renders small size correctly', () => {
     render(<Badge size="sm">Small</Badge>)
     const badge = screen.getByText('Small')
-    expect(badge.className).toContain('px-1.5')
+    expect(badge.className).toContain('px-2')
     expect(badge.className).toContain('text-[10px]')
   })
 
   it('renders large size correctly', () => {
     render(<Badge size="lg">Large</Badge>)
     const badge = screen.getByText('Large')
-    expect(badge.className).toContain('px-2.5')
+    expect(badge.className).toContain('px-3')
     expect(badge.className).toContain('text-sm')
   })
 
