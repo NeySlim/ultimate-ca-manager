@@ -6,11 +6,12 @@ import { useSearchParams } from 'react-router-dom'
 import { 
   FileText, Upload, SignIn, Trash, Download, 
   Clock, Key, UploadSimple, CheckCircle, Warning, X,
-  ClockCounterClockwise, Certificate, Stamp
+  ClockCounterClockwise, Certificate, Stamp, ClipboardText
 } from '@phosphor-icons/react'
 import {
-  Badge, Button, Modal, Input, Select, HelpCard, FileUpload,
-  CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats
+  Badge, Button, Modal, Input, Select, HelpCard, FileUpload, Textarea,
+  CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats,
+  KeyIndicator
 } from '../components'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { csrsService, casService } from '../services'
@@ -46,6 +47,10 @@ export default function CSRsPage() {
   const [selectedCSR, setSelectedCSR] = useState(null)
   const [signCA, setSignCA] = useState('')
   const [validityDays, setValidityDays] = useState(VALIDITY.DEFAULT_DAYS)
+  
+  // Upload modal
+  const [uploadMode, setUploadMode] = useState('file') // 'file' or 'paste'
+  const [pastedPEM, setPastedPEM] = useState('')
 
   // Handle tab change
   const handleTabChange = (tabId) => {
@@ -98,6 +103,27 @@ export default function CSRsPage() {
       await csrsService.upload(text)
       showSuccess('CSR uploaded successfully')
       closeModal('upload')
+      loadData()
+    } catch (error) {
+      showError(error.message || 'Failed to upload CSR')
+    }
+  }
+
+  const handlePasteUpload = async () => {
+    if (!pastedPEM.trim()) {
+      showError('Please paste a CSR in PEM format')
+      return
+    }
+    if (!pastedPEM.includes('-----BEGIN') || !pastedPEM.includes('REQUEST')) {
+      showError('Invalid CSR format. Must be in PEM format (-----BEGIN CERTIFICATE REQUEST-----)')
+      return
+    }
+    try {
+      await csrsService.upload(pastedPEM.trim())
+      showSuccess('CSR uploaded successfully')
+      closeModal('upload')
+      setPastedPEM('')
+      setUploadMode('file')
       loadData()
     } catch (error) {
       showError(error.message || 'Failed to upload CSR')
@@ -214,6 +240,7 @@ export default function CSRsPage() {
         <div className="flex items-center gap-2">
           <Certificate size={16} className="text-accent-success shrink-0" />
           <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
+          <KeyIndicator hasKey={row.has_private_key} size={14} />
           {row.source === 'acme' && (
             <Badge variant="info" size="sm">ACME</Badge>
           )}
@@ -391,18 +418,71 @@ export default function CSRsPage() {
       {/* Upload CSR Modal */}
       <Modal
         open={modals.upload}
-        onOpenChange={() => closeModal('upload')}
+        onOpenChange={() => { closeModal('upload'); setPastedPEM(''); setUploadMode('file') }}
         title="Upload CSR"
       >
         <div className="p-4 space-y-4">
-          <p className="text-sm text-text-secondary">
-            Upload a Certificate Signing Request file (.pem, .csr)
-          </p>
-          <FileUpload
-            accept=".pem,.csr"
-            onUpload={handleUpload}
-            maxSize={1024 * 1024}
-          />
+          {/* Mode tabs */}
+          <div className="flex gap-1 p-1 bg-bg-tertiary rounded-lg">
+            <button
+              onClick={() => setUploadMode('file')}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                uploadMode === 'file' 
+                  ? "bg-bg-primary text-text-primary shadow-sm" 
+                  : "text-text-secondary hover:text-text-primary"
+              )}
+            >
+              <UploadSimple size={16} /> Upload File
+            </button>
+            <button
+              onClick={() => setUploadMode('paste')}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                uploadMode === 'paste' 
+                  ? "bg-bg-primary text-text-primary shadow-sm" 
+                  : "text-text-secondary hover:text-text-primary"
+              )}
+            >
+              <ClipboardText size={16} /> Paste PEM
+            </button>
+          </div>
+
+          {uploadMode === 'file' ? (
+            <>
+              <p className="text-sm text-text-secondary">
+                Upload a Certificate Signing Request file (.pem, .csr)
+              </p>
+              <FileUpload
+                accept=".pem,.csr"
+                onUpload={handleUpload}
+                maxSize={1024 * 1024}
+              />
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-text-secondary">
+                Paste your CSR in PEM format below
+              </p>
+              <Textarea
+                value={pastedPEM}
+                onChange={(e) => setPastedPEM(e.target.value)}
+                placeholder="-----BEGIN CERTIFICATE REQUEST-----
+MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
+-----END CERTIFICATE REQUEST-----"
+                rows={10}
+                className="font-mono text-xs"
+              />
+              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+                <Button variant="secondary" onClick={() => { closeModal('upload'); setPastedPEM('') }}>
+                  Cancel
+                </Button>
+                <Button onClick={handlePasteUpload} disabled={!pastedPEM.trim()}>
+                  <UploadSimple size={16} /> Upload
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 
