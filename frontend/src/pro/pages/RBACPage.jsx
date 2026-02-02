@@ -10,7 +10,7 @@ import {
   PencilSimple
 } from '@phosphor-icons/react'
 import {
-  UnifiedManagementLayout, Button, Input, Badge, Modal, HelpCard,
+  UnifiedManagementLayout, Button, Input, Badge, FormModal, HelpCard,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../../components'
 import { useNotification } from '../../contexts'
@@ -412,30 +412,27 @@ export default function RBACPage() {
       />
 
       {/* Create Role Modal */}
-      <Modal
+      <FormModal
         open={modals.create}
-        onOpenChange={(open) => !open && closeModal('create')}
+        onClose={() => closeModal('create')}
         title="Create Custom Role"
+        onSubmit={handleCreate}
+        submitLabel="Create"
+        disabled={!formData.name}
       >
-        <div className="space-y-4">
-          <Input
-            label="Role Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="e.g., Certificate Manager"
-          />
-          <Input
-            label="Description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Brief description of this role"
-          />
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => closeModal('create')}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={!formData.name}>Create</Button>
-          </div>
-        </div>
-      </Modal>
+        <Input
+          label="Role Name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          placeholder="e.g., Certificate Manager"
+        />
+        <Input
+          label="Description"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          placeholder="Brief description of this role"
+        />
+      </FormModal>
     </>
   )
 }

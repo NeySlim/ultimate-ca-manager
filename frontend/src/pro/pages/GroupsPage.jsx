@@ -10,7 +10,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   ManagementLayout, Button, Input, Card,
-  Badge, Modal, HelpCard,
+  Badge, Modal, FormModal, HelpCard,
   CompactHeader, CompactSection, CompactGrid, CompactField, CompactStats
 } from '../../components'
 import { pluralize } from '../../lib/ui'
@@ -295,44 +295,41 @@ export default function GroupsPage() {
       />
 
       {/* Create Group Modal */}
-      <Modal
+      <FormModal
         open={modals.create}
-        onOpenChange={(open) => !open && closeModal('create')}
+        onClose={() => closeModal('create')}
         title="Create Group"
+        onSubmit={handleCreate}
+        submitLabel="Create"
+        disabled={!formData.name}
       >
-        <div className="space-y-4">
-          <Input
-            label="Group Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="e.g., PKI Operators"
-          />
-          <Input
-            label="Description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Optional description"
-          />
-          <div>
-            <label className="text-xs font-medium text-text-secondary mb-1.5 block">
-              Default Role
-            </label>
-            <select
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm text-text-primary"
-            >
-              <option value="viewer">Viewer</option>
-              <option value="operator">Operator</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => closeModal('create')}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={!formData.name}>Create</Button>
-          </div>
+        <Input
+          label="Group Name"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          placeholder="e.g., PKI Operators"
+        />
+        <Input
+          label="Description"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          placeholder="Optional description"
+        />
+        <div>
+          <label className="text-xs font-medium text-text-secondary mb-1.5 block">
+            Default Role
+          </label>
+          <select
+            value={formData.role}
+            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+            className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm text-text-primary"
+          >
+            <option value="viewer">Viewer</option>
+            <option value="operator">Operator</option>
+            <option value="admin">Admin</option>
+          </select>
         </div>
-      </Modal>
+      </FormModal>
 
       {/* Add Member Modal */}
       <Modal
@@ -340,7 +337,7 @@ export default function GroupsPage() {
         onOpenChange={(open) => !open && closeModal('addMember')}
         title="Add Member"
       >
-        <div className="space-y-2 max-h-80 overflow-auto">
+        <div className="p-4 space-y-2 max-h-80 overflow-auto">
           {availableUsers.length === 0 ? (
             <p className="text-sm text-text-tertiary text-center py-4">
               All users are already members of this group
