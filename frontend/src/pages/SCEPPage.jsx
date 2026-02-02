@@ -35,6 +35,10 @@ export default function SCEPPage() {
   const [saving, setSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
+  
   // Modal states
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
@@ -364,6 +368,13 @@ export default function SCEPPage() {
             selectedId={selectedRequest?.id}
             onRowClick={setSelectedRequest}
             renderMobileCard={renderMobileCard}
+            pagination={{
+              page,
+              total: requests.length,
+              perPage,
+              onChange: setPage,
+              onPerPageChange: (v) => { setPerPage(v); setPage(1) }
+            }}
             emptyState={{
               icon: Robot,
               title: 'No SCEP requests',

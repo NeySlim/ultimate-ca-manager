@@ -44,6 +44,10 @@ export default function ACMEPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [proxyEmail, setProxyEmail] = useState('')
+  
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
 
   useEffect(() => {
     loadData()
@@ -617,6 +621,13 @@ export default function ACMEPage() {
       onRowClick={selectAccount}
       selectedRow={selectedAccount}
       getRowId={(row) => row.id}
+      pagination={{
+        page,
+        total: filteredAccounts.length,
+        perPage,
+        onChange: setPage,
+        onPerPageChange: (v) => { setPerPage(v); setPage(1) }
+      }}
       emptyState={{
         icon: Key,
         title: 'No ACME Accounts',

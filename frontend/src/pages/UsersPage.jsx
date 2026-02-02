@@ -432,6 +432,13 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
               <Plus size={16} /> New User
             </Button>
           )}
+          pagination={{
+            page,
+            total: filteredUsers.length,
+            perPage,
+            onChange: setPage,
+            onPerPageChange: (v) => { setPerPage(v); setPage(1) }
+          }}
         />
       </ResponsiveLayout>
 
