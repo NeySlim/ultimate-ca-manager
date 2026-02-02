@@ -23,9 +23,9 @@ export function Sidebar({ activePage }) {
   const { user, logout } = useAuth()
   const { isLargeScreen } = useMobile()
   
-  // Sizes based on screen width (larger icons/buttons on big screens)
-  const iconSize = isLargeScreen ? 22 : 18
-  const buttonSize = isLargeScreen ? 'w-11 h-11' : 'w-10 h-10'
+  // Sizes based on screen width (smaller icons for refined look)
+  const iconSize = isLargeScreen ? 20 : 16
+  const buttonSize = isLargeScreen ? 'w-10 h-10' : 'w-9 h-9'
   
   // Dynamic Pro module loading
   const [proModule, setProModule] = useState(null)
@@ -77,9 +77,9 @@ export function Sidebar({ activePage }) {
   }
 
   return (
-    <div className="w-14 h-full border-r border-border bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-0.5">
+    <div className="w-14 h-full border-r border-border/60 bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-px">
       {/* Logo */}
-      <Link to="/" className={cn(buttonSize, "flex items-center justify-center mb-3")} title="UCM Dashboard">
+      <Link to="/" className={cn(buttonSize, "flex items-center justify-center mb-2")} title="UCM Dashboard">
         <Logo variant="compact" size="sm" withText={false} />
       </Link>
 
@@ -93,19 +93,19 @@ export function Sidebar({ activePage }) {
             to={page.path}
             className={cn(
               buttonSize,
-              "rounded-lg flex items-center justify-center transition-all relative group",
+              "rounded-lg flex items-center justify-center transition-all duration-200 relative group",
               isActive
                 ? "bg-accent-primary/10 text-accent-primary border border-accent-primary/20" 
-                : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
+                : "text-text-secondary hover:bg-bg-tertiary/70 hover:text-text-primary"
             )}
             title={page.label}
           >
             <Icon size={iconSize} weight={isActive ? 'fill' : 'regular'} />
             {isActive && (
-              <div className="absolute left-0 w-0.5 h-6 bg-accent-primary rounded-r-full" />
+              <div className="absolute left-0 w-0.5 h-5 bg-accent-primary rounded-r-full" />
             )}
             {/* Tooltip */}
-            <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-md text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+            <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-md text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
               {page.label}
             </div>
           </Link>
@@ -115,7 +115,7 @@ export function Sidebar({ activePage }) {
       {/* Pro Pages - only show if license is active */}
       {license.isPro && !license.loading && (
         <>
-          <div className="w-8 border-t border-border my-1" />
+          <div className="w-7 border-t border-border/60 my-1" />
           {proPages.map(page => {
             const Icon = page.icon
             const isActive = activePage === page.id
@@ -125,7 +125,7 @@ export function Sidebar({ activePage }) {
                 to={page.path}
                 className={cn(
                   buttonSize,
-                  "rounded-sm flex items-center justify-center transition-all relative group",
+                  "rounded-lg flex items-center justify-center transition-all duration-200 relative group",
                   isActive
                     ? "bg-accent-pro/20 text-accent-pro border border-accent-pro/30" 
                     : "text-accent-pro/60 hover:bg-accent-pro/10 hover:text-accent-pro"
@@ -134,10 +134,10 @@ export function Sidebar({ activePage }) {
               >
                 <Icon size={iconSize} weight={isActive ? 'fill' : 'regular'} />
                 {isActive && (
-                  <div className="absolute left-0 w-0.5 h-8 bg-accent-pro rounded-r-sm" />
+                  <div className="absolute left-0 w-0.5 h-5 bg-accent-pro rounded-r-full" />
                 )}
                 {/* Tooltip */}
-                <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-accent-pro/30 rounded-sm text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 flex items-center gap-1.5">
+                <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-accent-pro/30 rounded-md text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50 flex items-center gap-1.5">
                   <Crown size={12} className="text-accent-pro" />
                   {page.label}
                 </div>
