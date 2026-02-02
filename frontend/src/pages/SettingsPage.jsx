@@ -77,11 +77,11 @@ function AppearanceSettings() {
                 <span className="font-medium text-sm text-text-primary">{theme.name}</span>
               </div>
               <div className="flex gap-1">
-                {/* Preview colors */}
-                <div className="w-6 h-3 rounded-sm" style={{ background: theme.dark['bg-primary'] }} />
-                <div className="w-6 h-3 rounded-sm" style={{ background: theme.dark['bg-secondary'] }} />
-                <div className="w-6 h-3 rounded-sm" style={{ background: theme.light['bg-primary'] }} />
-                <div className="w-6 h-3 rounded-sm" style={{ background: theme.light['bg-secondary'] }} />
+                {/* Preview colors - show accent and distinct bg colors */}
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.accent }} />
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.dark['bg-tertiary'] }} />
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.light['bg-tertiary'] }} />
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.light['accent-primary'] || theme.accent }} />
               </div>
             </button>
           ))}
