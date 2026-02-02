@@ -313,7 +313,7 @@ export default function UsersGroupsPage() {
       priority: 3,
       sortable: true,
       render: (val) => (
-        <Badge variant={val ? 'success' : 'secondary'} size="sm">
+        <Badge variant={val ? 'success' : 'secondary'} size="sm" icon={val ? CheckCircle : XCircle}>
           {val ? 'Active' : 'Disabled'}
         </Badge>
       )
@@ -423,7 +423,7 @@ export default function UsersGroupsPage() {
         title={selectedUser.username}
         subtitle={selectedUser.email}
         badge={
-          <Badge variant={selectedUser.active ? 'success' : 'secondary'} size="sm">
+          <Badge variant={selectedUser.active ? 'success' : 'secondary'} size="sm" icon={selectedUser.active ? CheckCircle : XCircle}>
             {selectedUser.active ? 'Active' : 'Disabled'}
           </Badge>
         }

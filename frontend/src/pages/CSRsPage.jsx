@@ -623,8 +623,8 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
         subtitle={csr.organization}
         badge={
           <div className="flex gap-1">
-            <Badge variant="warning" size="sm">Pending</Badge>
-            {csr.has_private_key && <Badge variant="success" size="sm">Has Key</Badge>}
+            <Badge variant="warning" size="sm" icon={Clock}>Pending</Badge>
+            {csr.has_private_key && <Badge variant="success" size="sm" icon={Key}>Has Key</Badge>}
           </div>
         }
       />
@@ -723,7 +723,7 @@ function SignedCSRDetailsPanel({ cert, onDownload }) {
         subtitle={cert.organization}
         badge={
           <div className="flex gap-1">
-            <Badge variant="success" size="sm">Signed</Badge>
+            <Badge variant="success" size="sm" icon={CheckCircle}>Signed</Badge>
             {isAcme && <Badge variant="info" size="sm">ACME</Badge>}
             {isScep && <Badge variant="purple" size="sm">SCEP</Badge>}
           </div>

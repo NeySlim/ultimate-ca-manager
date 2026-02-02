@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Certificate, Download, Trash, X, Plus, Info,
-  CheckCircle, Warning, UploadSimple, Clock
+  CheckCircle, Warning, UploadSimple, Clock, XCircle
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, HelpCard,
@@ -213,14 +213,23 @@ export default function CertificatesPage() {
       header: 'Status',
       priority: 2,
       sortable: true,
-      render: (val, row) => (
-        <Badge 
-          variant={row.revoked ? 'danger' : val === 'valid' ? 'success' : val === 'expiring' ? 'warning' : 'danger'}
-          size="sm"
-        >
-          {row.revoked ? 'Revoked' : val || 'Unknown'}
-        </Badge>
-      )
+      render: (val, row) => {
+        const isRevoked = row.revoked
+        const status = isRevoked ? 'revoked' : val || 'unknown'
+        const config = {
+          valid: { variant: 'success', icon: CheckCircle, label: 'Valid' },
+          expiring: { variant: 'warning', icon: Clock, label: 'Expiring' },
+          expired: { variant: 'danger', icon: XCircle, label: 'Expired' },
+          revoked: { variant: 'danger', icon: X, label: 'Revoked' },
+          unknown: { variant: 'secondary', icon: Info, label: 'Unknown' }
+        }
+        const { variant, icon, label } = config[status] || config.unknown
+        return (
+          <Badge variant={variant} size="sm" icon={icon}>
+            {label}
+          </Badge>
+        )
+      }
     },
     {
       key: 'issuer',
