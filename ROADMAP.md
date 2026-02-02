@@ -1,11 +1,11 @@
 # 🗺️ UCM Roadmap
 
-**Current Version:** v2.0.0 (2026-01-29)  
+**Current Version:** v2.0.0 (2026-02-02)  
 **Status:** Production Ready
 
 ---
 
-## ✅ v2.0.0 - Complete PKI Platform (CURRENT)
+## ✅ v2.0.0 - Complete Enterprise PKI Platform (CURRENT)
 
 ### Complete Frontend Rewrite ✅
 - ✅ **React 18 + Vite** - Modern SPA replacing HTMX/Alpine.js
@@ -18,8 +18,6 @@
 - ✅ **Paste PEM/JSON** - Direct paste in import modals
 - ✅ **Copy PEM** - One-click copy from detail views
 - ✅ **Auto-Routing** - CA certs (CA:TRUE) → CAs table
-- ✅ **Duplicate Detection** - Auto-update existing entries
-- ✅ **Smart Navigation** - Redirect to correct page after import
 
 ### Authentication ✅
 - ✅ **WebAuthn/FIDO2** - Hardware security key support
@@ -27,99 +25,62 @@
 - ✅ **mTLS** - Client certificate authentication
 - ✅ **Cascade Auth** - Automatic method detection
 
-### Audit Logging ✅
-- ✅ **Complete Audit Trail** - All actions logged
-- ✅ **Filter & Search** - By action, user, date range
-- ✅ **Export CSV** - Download for compliance
-- ✅ **Statistics** - Action counts and trends
+### RBAC & Groups ✅
+- ✅ **Custom Roles** - Create/edit roles with fine-grained permissions
+- ✅ **44 Permissions** - Full coverage (CAs, Certs, Users, Groups, HSM, SSO, etc.)
+- ✅ **User Groups** - Teams, departments organization
+- ✅ **Group-based Permissions** - Assign roles to groups
 
-### Code Quality ✅
-- ✅ **Centralized Constants** - `constants/config.js` with VALIDITY, PAGINATION, TIME
-- ✅ **Shared Hooks** - `useModals`, `useDeleteHandler`, `usePagination`
-- ✅ **Styled Dialogs** - `showConfirm()`, `showPrompt()` replace native JS popups
-- ✅ **UI Consistency** - Standardized border-radius, padding, shadows
+### SSO Integration ✅
+- ✅ **SAML 2.0** - Okta, Azure AD, OneLogin
+- ✅ **OAuth2/OIDC** - Google, GitHub, custom providers
+- ✅ **LDAP/Active Directory** - Enterprise directory integration
+- ✅ **Auto-provisioning** - Create users on first login
+
+### HSM Integration ✅
+- ✅ **PKCS#11 Support** - Generic HSM interface
+- ✅ **AWS CloudHSM** - Cloud HSM integration
+- ✅ **Azure Key Vault** - Microsoft cloud key management
+- ✅ **Google Cloud KMS** - GCP key management
+
+### High Availability ✅
+- ✅ **PostgreSQL Support** - Production database with migrations
+- ✅ **Redis Session Store** - Distributed sessions
+- ✅ **Load Balancer Ready** - X-Forwarded-* headers support
+
+### Protocols ✅
+- ✅ **EST (RFC 7030)** - Enrollment over Secure Transport
+- ✅ **SCEP** - Simple Certificate Enrollment Protocol
+- ✅ **ACME** - Let's Encrypt compatible server
+- ✅ **OCSP** - Online Certificate Status Protocol
+
+### Compliance (Backend) ✅
+- ✅ **Certificate Policies** - Define issuance rules
+- ✅ **Approval Workflows** - Multi-step approval
+- ✅ **Scheduled Reports** - Automated report generation
+- ✅ **Webhooks** - Event notifications
+- ✅ **Audit Logging** - Complete audit trail with export
 
 ### Testing ✅
-- ✅ **Vitest** - 39 frontend unit tests
-- ✅ **Pytest** - 51 backend API tests
-- ✅ **Playwright** - 14 E2E tests (auth, certificates, settings)
+- ✅ **Vitest** - 77 frontend unit tests
+- ✅ **Pytest** - 12 backend unit tests
+- ✅ **Playwright** - 26 E2E tests
 
 ### Pages ✅
 - ✅ Dashboard, CAs, Certificates, CSRs, Templates
-- ✅ Users, ACME, SCEP, Settings, Account, Audit Logs
-
-### Remaining for v2.0.0
-- [ ] Coverage reports (target: 80%)
-- [ ] User guide (getting started)
-- [ ] Admin guide (configuration)
-- [ ] OpenAPI/Swagger spec
-- [ ] Mobile responsive improvements
-- [ ] Keyboard shortcuts (Cmd+K, etc.)
+- ✅ Users & Groups, ACME, SCEP, Settings, Account
+- ✅ Import/Export, TrustStore, CRL/OCSP, Audit Logs
+- ✅ RBAC, HSM, SSO (Pro)
 
 ---
 
-## 🚀 v2.0.0 Pro - Enterprise Features
+## 🚀 v2.0.1 - UI Completion (PLANNED)
 
-### RBAC Enhancement
-- [ ] Custom roles
-- [ ] Fine-grained permissions
-- [ ] Role templates
-- [ ] Permission inheritance
-
-### Group Management
-- [ ] User groups (teams, departments)
-- [ ] Group-based permissions
-- [ ] CA/Certificate ownership by group
-- [ ] Group administrators
-
-### High Availability
-- [ ] PostgreSQL support
-- [ ] Redis session store
-- [ ] Load balancer ready
-- [ ] Database replication
-
-### SSO Integration
-- [ ] SAML 2.0 (Okta, Azure AD)
-- [ ] OAuth2/OIDC
-- [ ] LDAP/Active Directory
-- [ ] Auto-provisioning
-
-### Compliance
-- [ ] Certificate policies
-- [ ] Approval workflows
-- [ ] Scheduled reports
-- [ ] Enhanced email notifications
-
----
-
-## 🌟 v2.1.0 Pro - Advanced PKI
-
-### HSM Integration
-- [ ] PKCS#11 support
-- [ ] YubiHSM
-- [ ] AWS CloudHSM
-- [ ] Azure Key Vault
-
-### Advanced Protocols
-- [ ] EST (RFC 7030)
-- [ ] CMPv2 (RFC 4210)
-- [ ] Certificate Transparency
-
-### Automation
-- [ ] Certificate auto-renewal daemon
-- [ ] Scheduled CRL generation
-- [ ] API webhooks
-- [ ] Terraform provider
-
----
-
-## 💡 Ideas Backlog
-
-### Integrations
-- [ ] Kubernetes cert-manager
-- [ ] HashiCorp Vault connector
-- [ ] Let's Encrypt staging mirror
-- [ ] DigiCert/Sectigo proxy
+### Pro Feature UIs
+- [ ] **PoliciesPage.jsx** - Certificate policy management UI
+- [ ] **ApprovalsPage.jsx** - Approval workflow UI
+- [ ] **WebhooksPage.jsx** - Webhook configuration UI
+- [ ] **ReportsPage.jsx** - Report generation and scheduling UI
 
 ### UI Enhancements
 - [ ] Certificate chain visualization
@@ -127,11 +88,23 @@
 - [ ] Bulk operations UI
 - [ ] Custom dashboard widgets
 
+---
+
+## 🌟 v2.0.2 - Integrations (FUTURE)
+
+### Kubernetes & Cloud
+- [ ] Kubernetes cert-manager issuer
+- [ ] HashiCorp Vault connector
+- [ ] Terraform provider (full)
+
+### Additional Protocols
+- [ ] CMPv2 (RFC 4210)
+- [ ] Certificate Transparency logs
+
 ### Security
 - [ ] Encrypted database at rest
 - [ ] Key ceremony support
 - [ ] Air-gapped mode
-- [ ] Signed audit logs
 
 ---
 
@@ -139,14 +112,26 @@
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| v2.0.0  | 2026-01-29 | React 18 rewrite, Radix UI, import/export, 2FA/WebAuthn, 104 tests |
+| v2.0.0  | 2026-02-02 | React 18, Radix UI, HSM, SSO, RBAC, Groups, EST, PostgreSQL, Redis, 26 E2E tests |
 | v1.9.0  | 2026-01-16 | UI modernization, scheduler, CRL auto-regen |
-| v1.8.3  | 2026-01-10 | Universal installer, screenshots |
 | v1.8.0  | 2026-01-09 | mTLS auth, REST API, OPNsense import |
 | v1.7.0  | 2026-01-08 | ACME server, WebAuthn, email notifications |
-| v1.6.0  | 2026-01-03 | SCEP support, OCSP improvements |
 | v1.0.0  | 2025-12-15 | First public release |
 
 ---
 
-**Last Updated:** 2026-01-29
+## 📁 Pro Feature Status
+
+| Feature | Backend | Frontend | Status |
+|---------|---------|----------|--------|
+| RBAC | ✅ | ✅ `RBACPage.jsx` | Complete |
+| Groups | ✅ | ✅ `GroupsPage.jsx` | Complete |
+| SSO | ✅ | ✅ `SSOPage.jsx` | Complete |
+| HSM | ✅ | ✅ `HSMPage.jsx` | Complete |
+| Policies | ✅ | ❌ Planned | v2.0.1 |
+| Webhooks | ✅ | ❌ Planned | v2.0.1 |
+| Reports | ✅ | ❌ Planned | v2.0.1 |
+
+---
+
+**Last Updated:** 2026-02-02
