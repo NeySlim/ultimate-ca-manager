@@ -505,7 +505,7 @@ export default function TrustStorePage() {
             <select
               value={addForm.purpose}
               onChange={(e) => setAddForm(prev => ({ ...prev, purpose: e.target.value }))}
-              className="w-full px-3 py-2 text-sm bg-bg-secondary border border-border rounded-md text-text-primary"
+              className="select-native select-native-lg w-full"
             >
               <option value="root_ca">Root CA</option>
               <option value="intermediate_ca">Intermediate CA</option>
@@ -575,7 +575,7 @@ export default function TrustStorePage() {
             <select
               value={importForm.purpose}
               onChange={(e) => setImportForm(prev => ({ ...prev, purpose: e.target.value }))}
-              className="w-full px-3 py-2 text-sm bg-bg-secondary border border-border rounded-md text-text-primary"
+              className="select-native select-native-lg w-full"
             >
               <option value="root_ca">Root CA</option>
               <option value="intermediate_ca">Intermediate CA</option>

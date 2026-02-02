@@ -695,8 +695,7 @@ function TableToolbar({
                 key={filter.key}
                 value={activeFilters[filter.key] || 'all'}
                 onChange={(e) => onFilterChange(filter.key, e.target.value)}
-                className="bg-bg-tertiary border border-border rounded-lg px-2.5 py-1.5 text-sm text-text-primary 
-                  focus:outline-none focus:border-accent-primary cursor-pointer"
+                className={cn('select-native', activeFilters[filter.key] && activeFilters[filter.key] !== 'all' && 'active')}
               >
                 <option value="all">{filter.label}: All</option>
                 {filter.options.map(opt => (
@@ -800,7 +799,7 @@ function TablePagination({
         <select
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className="bg-bg-tertiary border border-border rounded px-2 py-1 text-sm text-text-primary focus:outline-none focus:border-accent-primary"
+          className="select-native select-native-sm"
         >
           {pageSizeOptions.map(size => (
             <option key={size} value={size}>{size}</option>

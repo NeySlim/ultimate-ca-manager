@@ -530,7 +530,7 @@ function DesktopPagination({
           <select
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            className="h-7 px-2 bg-bg-tertiary border border-border rounded text-sm text-text-primary"
+            className="select-native select-native-sm h-7"
           >
             {pageSizeOptions.map(size => (
               <option key={size} value={size}>{size}</option>

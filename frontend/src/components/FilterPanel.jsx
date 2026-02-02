@@ -61,11 +61,9 @@ function FilterSelect({
       value={value || ''}
       onChange={(e) => onChange(e.target.value)}
       className={cn(
-        "w-full bg-bg-tertiary border border-border rounded text-text-primary",
-        "focus:outline-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary",
-        "transition-colors appearance-none cursor-pointer",
-        // Size based on device
-        isMobile ? "h-11 px-3 text-base" : "h-8 px-2.5 text-sm"
+        'select-native w-full',
+        isMobile ? 'select-native-lg h-11' : 'h-8',
+        value && 'active'
       )}
     >
       <option value="">{placeholder}</option>

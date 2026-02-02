@@ -798,7 +798,11 @@ function FilterInput({ filter, mobile }) {
         <select
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
-          className={cn(inputClass, "appearance-none cursor-pointer")}
+          className={cn(
+            'select-native w-full',
+            mobile ? 'select-native-lg h-11' : 'h-8',
+            value && 'active'
+          )}
         >
           <option value="">{placeholder || `All ${label}`}</option>
           {options?.map(opt => (
