@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Certificate, Download, Trash, X, Plus, Info,
-  CheckCircle, Warning, UploadSimple
+  CheckCircle, Warning, UploadSimple, Clock
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, HelpCard,
@@ -183,10 +183,12 @@ export default function CertificatesPage() {
   const stats = useMemo(() => {
     const valid = certificates.filter(c => !c.revoked && c.status === 'valid').length
     const expiring = certificates.filter(c => c.status === 'expiring').length
+    const expired = certificates.filter(c => !c.revoked && c.status === 'expired').length
     const revoked = certificates.filter(c => c.revoked).length
     return [
       { icon: CheckCircle, label: 'Valid', value: valid, variant: 'success' },
       { icon: Warning, label: 'Expiring', value: expiring, variant: 'warning' },
+      { icon: Clock, label: 'Expired', value: expired, variant: 'neutral' },
       { icon: X, label: 'Revoked', value: revoked, variant: 'danger' },
       { icon: Certificate, label: 'Total', value: total, variant: 'primary' }
     ]
