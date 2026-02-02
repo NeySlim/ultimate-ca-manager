@@ -1,13 +1,14 @@
 """
 Ultimate CA Manager - Configuration Management
-Handles all application settings with web UI configuration support
 
-Directory Structure by Installation Type:
-- Development: BASE_DIR/data (writable by developer)
-- Docker: /app/data (writable by ucm user, uid 1000)
-- Debian/RPM: /var/lib/ucm (writable by ucm user)
-- Config: /etc/ucm (readable by ucm user)
-- Logs: /var/log/ucm (writable by ucm user)
+Directory Structure (same for all installations):
+- /opt/ucm/          Code (backend/, frontend/)
+- /opt/ucm/data/     Database, certificates, keys
+- /opt/ucm/venv/     Python virtual environment
+- /etc/ucm/          Configuration (ucm.env)
+- /var/log/ucm/      Logs
+
+Development mode uses BASE_DIR/data instead.
 """
 import os
 import subprocess
@@ -25,11 +26,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = BASE_DIR / "backend"
 
 # Load environment from multiple locations (in order of priority)
-# 1. /etc/ucm/ucm.env (package installations)
-# 2. BASE_DIR/.env (development/Docker)
 _env_paths = [
-    Path("/etc/ucm/ucm.env"),
-    BASE_DIR / ".env",
+    Path("/etc/ucm/ucm.env"),  # Package installations
+    BASE_DIR / ".env",         # Development/Docker
 ]
 for _env_path in _env_paths:
     if _env_path.exists():
@@ -37,20 +36,11 @@ for _env_path in _env_paths:
         break
 
 # DATA_DIR: Where writable data lives (database, certs, keys)
-# - Package installations: /var/lib/ucm (set by systemd EnvironmentFile)
-# - Docker: /app/data (set in docker-compose)
-# - Development: BASE_DIR/data (default)
+# Default: BASE_DIR/data (works for /opt/ucm and development)
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(BASE_DIR / "data")))
 
-# CONFIG_DIR: Where configuration lives (read-only after install)
-CONFIG_DIR = Path(os.environ.get("CONFIG_DIR", "/etc/ucm"))
-
-# LOG_DIR: Where logs live
-LOG_DIR = Path(os.environ.get("LOG_DIR", "/var/log/ucm"))
-
-# Create directories only in development mode (packages create them)
-if not Path("/etc/ucm").exists():  # Development mode
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+# Create data directory if it doesn't exist
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # =============================================================================
@@ -326,10 +316,10 @@ class Config:
     RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
     RATE_LIMIT_PER_HOUR = int(os.getenv("RATE_LIMIT_PER_HOUR", "1000"))
     
-    # Logging - use LOG_DIR for packaged installations
+    # Logging - always in DATA_DIR for simplicity
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-    LOG_FILE = LOG_DIR / "ucm.log" if is_packaged() else DATA_DIR / "ucm.log"
-    AUDIT_LOG_FILE = LOG_DIR / "audit.log" if is_packaged() else DATA_DIR / "audit.log"
+    LOG_FILE = DATA_DIR / "ucm.log"
+    AUDIT_LOG_FILE = DATA_DIR / "audit.log"
     
     # CORS
     CORS_ORIGINS = ["https://localhost:8443", "https://127.0.0.1:8443"]
