@@ -11,6 +11,7 @@ import {
 } from '@phosphor-icons/react'
 import { useMobile } from '../../../contexts'
 import { cn } from '../../../lib/utils'
+import { FilterSelect } from '../Select'
 
 export function ResponsiveDataTable({
   // Data
@@ -334,17 +335,14 @@ function SearchBar({ value, onChange, placeholder, isMobile, searchable = true, 
         {!isMobile && filters && filters.length > 0 && (
           <>
             {filters.map((filter) => (
-              <select
+              <FilterSelect
                 key={filter.key}
                 value={filter.value || ''}
-                onChange={(e) => filter.onChange?.(e.target.value)}
-                className={cn('select-native h-8', filter.value && 'active')}
-              >
-                <option value="">{filter.placeholder || `All`}</option>
-                {filter.options?.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+                onChange={filter.onChange}
+                placeholder={filter.placeholder || 'All'}
+                options={filter.options || []}
+                size="sm"
+              />
             ))}
           </>
         )}
@@ -704,15 +702,13 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
       )}>
         {/* Per page selector (desktop only) */}
         {!isMobile && onPerPageChange && (
-          <select
-            value={perPage}
-            onChange={(e) => onPerPageChange(Number(e.target.value))}
-            className="select-native select-native-sm h-7"
-          >
-            {[10, 25, 50, 100].map(n => (
-              <option key={n} value={n}>{n}/page</option>
-            ))}
-          </select>
+          <FilterSelect
+            value={String(perPage)}
+            onChange={(val) => onPerPageChange(Number(val))}
+            options={[10, 25, 50, 100].map(n => ({ value: String(n), label: `${n}/page` }))}
+            placeholder={`${perPage}/page`}
+            size="sm"
+          />
         )}
         
         {/* Prev button */}

@@ -601,20 +601,7 @@ def trigger_expiry_check():
         return error_response(f"Expiry check failed: {str(e)}", 500)
 
 
-@bp.route('/api/v2/system/alerts/expiring-certs', methods=['GET'])
-@require_auth(['read:certificates'])
-def get_expiring_certificates():
-    """Get list of certificates expiring soon"""
-    try:
-        from services.expiry_alert_service import get_expiring_certificates as get_expiring
-        
-        days = request.args.get('days', 30, type=int)
-        include_revoked = request.args.get('include_revoked', 'false').lower() == 'true'
-        
-        certs = get_expiring(days=days, include_revoked=include_revoked)
-        return success_response(data=certs)
-    except Exception as e:
-        return error_response(f"Failed to get expiring certificates: {str(e)}", 500)
+# NOTE: get_expiring_certificates moved to dashboard.py (/api/v2/dashboard/expiring-certs)
 
 
 # ============ Rate Limiting ============

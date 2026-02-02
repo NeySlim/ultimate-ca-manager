@@ -41,15 +41,16 @@ import { cn } from '../lib/utils'
 import { useMobile } from '../contexts'
 import { Button } from './Button'
 import { Badge } from './Badge'
+import { FilterSelect as RadixFilterSelect } from './ui/Select'
 
 // ============================================
 // FILTER INPUT COMPONENTS
 // ============================================
 
 /**
- * Select input for filters
+ * Select input for filters - wrapper around Radix FilterSelect
  */
-function FilterSelect({ 
+function FilterSelectInput({ 
   value, 
   onChange, 
   options = [], 
@@ -57,22 +58,14 @@ function FilterSelect({
   isMobile 
 }) {
   return (
-    <select
+    <RadixFilterSelect
       value={value || ''}
-      onChange={(e) => onChange(e.target.value)}
-      className={cn(
-        'select-native w-full',
-        isMobile ? 'select-native-lg h-11' : 'h-8',
-        value && 'active'
-      )}
-    >
-      <option value="">{placeholder}</option>
-      {options.map(opt => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      options={options}
+      placeholder={placeholder}
+      size={isMobile ? 'lg' : 'default'}
+      className="w-full"
+    />
   )
 }
 
@@ -218,7 +211,7 @@ export function FilterPanel({
         </label>
         
         {type === 'select' && (
-          <FilterSelect
+          <FilterSelectInput
             value={value}
             onChange={onChange}
             options={options}

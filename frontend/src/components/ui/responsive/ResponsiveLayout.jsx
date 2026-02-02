@@ -23,6 +23,7 @@ import { X, ArrowLeft, CaretDown, Question } from '@phosphor-icons/react'
 import { useMobile } from '../../../contexts'
 import { cn } from '../../../lib/utils'
 import { UnifiedPageHeader } from '../UnifiedPageHeader'
+import { FilterSelect } from '../Select'
 
 // =============================================================================
 // PANEL WIDTH CONSTANTS
@@ -703,18 +704,14 @@ function FilterContent({ filters, onClearFilters, onClose }) {
             {filter.label}
           </label>
           {filter.type === 'select' ? (
-            <select
+            <FilterSelect
               value={filter.value || ''}
-              onChange={(e) => filter.onChange?.(e.target.value)}
-              className={cn('select-native select-native-lg w-full h-11', filter.value && 'active')}
-            >
-              <option value="">{filter.placeholder || 'All'}</option>
-              {filter.options?.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              onChange={filter.onChange}
+              options={filter.options || []}
+              placeholder={filter.placeholder || 'All'}
+              size="lg"
+              className="w-full"
+            />
           ) : (
             <input
               type={filter.type || 'text'}

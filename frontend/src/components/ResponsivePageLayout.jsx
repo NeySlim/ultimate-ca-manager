@@ -41,6 +41,7 @@ import { useMobile } from '../contexts'
 import { Button } from './Button'
 import { Badge } from './Badge'
 import { HelpModal } from './HelpModal'
+import { FilterSelect } from './ui/Select'
 import { 
   X, CaretLeft, Question, Funnel, Eraser
 } from '@phosphor-icons/react'
@@ -795,20 +796,14 @@ function FilterInput({ filter, mobile }) {
       </label>
       
       {type === 'select' && (
-        <select
+        <FilterSelect
           value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          className={cn(
-            'select-native w-full',
-            mobile ? 'select-native-lg h-11' : 'h-8',
-            value && 'active'
-          )}
-        >
-          <option value="">{placeholder || `All ${label}`}</option>
-          {options?.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
+          onChange={onChange}
+          options={options || []}
+          placeholder={placeholder || `All ${label}`}
+          size={mobile ? 'lg' : 'default'}
+          className="w-full"
+        />
       )}
       
       {type === 'date' && (
