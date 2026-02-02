@@ -176,6 +176,15 @@
   scrollbar-color: var(--border) transparent;
 }
 
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Logo chain gradient - uses CSS variables */
 .chain-link-gradient {
   border-style: solid;
