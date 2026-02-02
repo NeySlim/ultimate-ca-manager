@@ -62,8 +62,13 @@ export default function CSRsPage() {
   const handleTabChange = (tabId) => {
     setActiveTab(tabId)
     setSelectedCSR(null)
+    setPage(1)
     setSearchParams({ tab: tabId })
   }
+  
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
 
   useEffect(() => {
     loadData()
@@ -434,6 +439,13 @@ export default function CSRsPage() {
             )
           )}
           sortable
+          pagination={{
+            page,
+            total: currentData.length,
+            perPage,
+            onChange: setPage,
+            onPerPageChange: (v) => { setPerPage(v); setPage(1) }
+          }}
           emptyIcon={activeTab === 'pending' ? Warning : CheckCircle}
           emptyTitle={activeTab === 'pending' ? 'No Pending CSRs' : 'No Signed Certificates'}
           emptyDescription={activeTab === 'pending' 

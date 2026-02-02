@@ -42,6 +42,10 @@ export default function CRLOCSPPage() {
   const [ocspStats, setOcspStats] = useState({ total_requests: 0, cache_hits: 0 })
   const [regenerating, setRegenerating] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
 
   useEffect(() => {
     loadData()
@@ -478,6 +482,13 @@ export default function CRLOCSPPage() {
         selectedId={selectedCA?.id}
         onRowClick={handleSelectCA}
         sortable
+        pagination={{
+          page,
+          total: filteredCAs.length,
+          perPage,
+          onChange: setPage,
+          onPerPageChange: (v) => { setPerPage(v); setPage(1) }
+        }}
         emptyState={{
           icon: FileX,
           title: 'No Certificate Authorities',
