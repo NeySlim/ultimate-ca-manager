@@ -47,7 +47,7 @@ export function Pagination({
             <select
               value={perPage}
               onChange={handlePerPageChange}
-              className="bg-bg-tertiary border border-border rounded px-1.5 py-0.5 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary cursor-pointer"
+              className="select-native select-native-sm"
             >
               {PAGE_SIZE_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>

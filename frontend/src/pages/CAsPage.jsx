@@ -41,6 +41,10 @@ export default function CAsPage() {
   const [filterStatus, setFilterStatus] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
+  
   // Tree expanded state
   const [expandedNodes, setExpandedNodes] = useState(new Set())
 
@@ -374,7 +378,7 @@ export default function CAsPage() {
                   <select
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value)}
-                    className="h-8 px-2 text-sm rounded-lg border border-border bg-bg-primary text-text-primary shrink-0"
+                    className={cn('select-native h-8', filterType && 'active')}
                   >
                     <option value="">{LABELS.FILTERS.ALL_TYPES}</option>
                     <option value="root">Root</option>
@@ -383,7 +387,7 @@ export default function CAsPage() {
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="h-8 px-2 text-sm rounded-lg border border-border bg-bg-primary text-text-primary shrink-0"
+                    className={cn('select-native h-8', filterStatus && 'active')}
                   >
                     <option value="">{LABELS.FILTERS.ALL_STATUS}</option>
                     <option value="valid">Valid</option>

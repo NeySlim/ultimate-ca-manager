@@ -859,6 +859,66 @@ input:focus, select:focus, textarea:focus {
     0 2px 4px color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
+/* === NATIVE SELECT (styled) === */
+.select-native {
+  appearance: none;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.375rem 2rem 0.375rem 0.625rem;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 256 256'%3E%3Cpath fill='%239CA8B8' d='M213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  transition: 
+    border-color var(--duration-normal) var(--ease-smooth),
+    background-color var(--duration-normal) var(--ease-smooth),
+    box-shadow var(--duration-normal) var(--ease-smooth);
+}
+
+.select-native:hover {
+  border-color: var(--text-tertiary);
+  background-color: color-mix(in srgb, var(--bg-tertiary) 80%, var(--bg-secondary));
+}
+
+.select-native:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background-color: var(--bg-secondary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 15%, transparent);
+}
+
+.select-native:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Select with active filter indicator */
+.select-native.active {
+  border-color: color-mix(in srgb, var(--accent-primary) 50%, var(--border));
+  background-color: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-tertiary));
+}
+
+/* Light theme select arrow */
+.theme-light .select-native {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 256 256'%3E%3Cpath fill='%236B7280' d='M213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z'/%3E%3C/svg%3E");
+}
+
+/* Size variants */
+.select-native-sm {
+  padding: 0.25rem 1.75rem 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  border-radius: 5px;
+}
+
+.select-native-lg {
+  padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 8px;
+}
+
 /* === TABLE ROW WITH LEFT ACCENT === */
 .table-row-accent {
   position: relative;

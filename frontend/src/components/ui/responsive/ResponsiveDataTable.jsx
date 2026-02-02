@@ -338,7 +338,7 @@ function SearchBar({ value, onChange, placeholder, isMobile, searchable = true, 
                 key={filter.key}
                 value={filter.value || ''}
                 onChange={(e) => filter.onChange?.(e.target.value)}
-                className="h-8 px-2 text-sm rounded-lg border border-border bg-bg-primary text-text-primary shrink-0"
+                className={cn('select-native h-8', filter.value && 'active')}
               >
                 <option value="">{filter.placeholder || `All`}</option>
                 {filter.options?.map((opt) => (
@@ -707,12 +707,7 @@ function PaginationBar({ page, total, perPage, onChange, onPerPageChange, isMobi
           <select
             value={perPage}
             onChange={(e) => onPerPageChange(Number(e.target.value))}
-            className={cn(
-              'h-7 px-2 pr-6 rounded-md border border-border bg-bg-primary',
-              'text-xs text-text-primary cursor-pointer',
-              'focus:outline-none focus:ring-1 focus:ring-accent-primary',
-              'hover:border-accent-primary/50 transition-colors'
-            )}
+            className="select-native select-native-sm h-7"
           >
             {[10, 25, 50, 100].map(n => (
               <option key={n} value={n}>{n}/page</option>

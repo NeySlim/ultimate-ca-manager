@@ -85,18 +85,9 @@ export function UnifiedPageHeader({
                   value={filter.value || ''}
                   onChange={(e) => filter.onChange?.(e.target.value)}
                   className={cn(
-                    'h-8 px-2 pr-7 rounded-md border border-border bg-bg-secondary',
-                    'text-xs text-text-primary transition-all duration-200',
-                    'hover:border-text-tertiary',
-                    'focus:outline-none focus:ring-1 focus:ring-accent-primary',
-                    'appearance-none cursor-pointer',
-                    filter.value ? 'border-accent-primary/50' : ''
+                    'select-native h-8',
+                    filter.value && 'active'
                   )}
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 6px center'
-                  }}
                 >
                   <option value="">{filter.placeholder || `All ${filter.label}`}</option>
                   {filter.options?.map((opt) => (

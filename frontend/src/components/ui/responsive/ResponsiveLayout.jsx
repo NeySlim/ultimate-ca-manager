@@ -706,11 +706,7 @@ function FilterContent({ filters, onClearFilters, onClose }) {
             <select
               value={filter.value || ''}
               onChange={(e) => filter.onChange?.(e.target.value)}
-              className={cn(
-                'w-full h-11 px-3 rounded-lg border border-border bg-bg-primary',
-                'text-text-primary text-sm',
-                'focus:outline-none focus:ring-2 focus:ring-accent-primary/50'
-              )}
+              className={cn('select-native select-native-lg w-full h-11', filter.value && 'active')}
             >
               <option value="">{filter.placeholder || 'All'}</option>
               {filter.options?.map((opt) => (
