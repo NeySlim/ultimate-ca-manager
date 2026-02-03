@@ -281,16 +281,16 @@ export default function UsersGroupsPage() {
       priority: 1,
       sortable: true,
       render: (val, row) => {
-        // Color avatar based on role AND status
+        // Color avatar based on role AND status - theme-aware
         const avatarColors = {
-          admin: 'bg-violet-500/20 text-violet-500 ring-1 ring-violet-500/30',
-          operator: 'bg-accent-primary/15 text-accent-primary ring-1 ring-accent-primary/30',
-          viewer: 'bg-teal-500/15 text-teal-500 ring-1 ring-teal-500/30'
+          admin: 'icon-bg-violet ring-1 ring-violet-500/30',
+          operator: 'icon-bg-blue ring-1 ring-blue-500/30',
+          viewer: 'icon-bg-teal ring-1 ring-teal-500/30'
         }
         // Override with orange for disabled users
         const colorClass = row.active 
           ? (avatarColors[row.role] || avatarColors.viewer)
-          : 'bg-orange-500/15 text-orange-500 ring-1 ring-orange-500/30'
+          : 'icon-bg-orange ring-1 ring-orange-500/30'
         return (
           <div className="flex items-center gap-3">
             <div className={cn(
