@@ -1167,3 +1167,154 @@ input:focus, select:focus, textarea:focus {
   outline: none;
   box-shadow: none;
 }
+
+/* ============================================
+   VISUAL EXCELLENCE UTILITIES
+   Global classes for elevating all pages
+   ============================================ */
+
+/* Icon containers with colored backgrounds */
+.icon-box {
+  @apply w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-200;
+}
+.icon-box-sm {
+  @apply w-6 h-6 rounded-md flex items-center justify-center transition-colors duration-200;
+}
+.icon-box-lg {
+  @apply w-10 h-10 rounded-lg flex items-center justify-center transition-colors duration-200;
+}
+
+/* Colored icon boxes - theme aware */
+.icon-box-primary {
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  color: var(--accent-primary);
+}
+.icon-box-success {
+  background: color-mix(in srgb, var(--accent-success) 15%, transparent);
+  color: var(--accent-success);
+}
+.icon-box-warning {
+  background: color-mix(in srgb, var(--accent-warning) 15%, transparent);
+  color: var(--accent-warning);
+}
+.icon-box-danger {
+  background: color-mix(in srgb, var(--accent-danger) 15%, transparent);
+  color: var(--accent-danger);
+}
+.icon-box-purple {
+  background: color-mix(in srgb, var(--accent-pro) 15%, transparent);
+  color: var(--accent-pro);
+}
+.icon-box-neutral {
+  background: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
+  color: var(--text-secondary);
+}
+
+/* Help panel statistics cards */
+.help-stat-card {
+  @apply text-center p-3 rounded-lg transition-all duration-200;
+  background: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
+}
+.help-stat-card:hover {
+  background: color-mix(in srgb, var(--bg-tertiary) 70%, transparent);
+}
+.help-stat-value {
+  @apply text-2xl font-bold;
+  color: var(--text-primary);
+}
+.help-stat-label {
+  @apply text-xs mt-0.5;
+  color: var(--text-secondary);
+}
+
+/* Colored stat values */
+.help-stat-value-success { color: var(--accent-success); }
+.help-stat-value-warning { color: var(--accent-warning); }
+.help-stat-value-danger { color: var(--accent-danger); }
+.help-stat-value-primary { color: var(--accent-primary); }
+
+/* Visual section with gradient header */
+.visual-section {
+  @apply rounded-xl border overflow-hidden;
+  border-color: var(--border);
+  background: var(--bg-secondary);
+}
+.visual-section-header {
+  @apply px-4 py-3 flex items-center gap-2 text-sm font-semibold;
+  background: linear-gradient(to right,
+    color-mix(in srgb, var(--bg-tertiary) 60%, transparent),
+    color-mix(in srgb, var(--bg-tertiary) 30%, transparent)
+  );
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+.visual-section-body {
+  @apply p-4;
+}
+
+/* Quick info grid for help panels */
+.quick-info-grid {
+  @apply grid gap-3;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+}
+
+/* Table icon column styling */
+.table-icon-cell {
+  @apply flex items-center gap-2;
+}
+.table-icon-cell .icon-box {
+  @apply shrink-0;
+}
+
+/* Gradient accent line (top of cards) */
+.accent-line-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+  opacity: 0.7;
+}
+
+/* Glow effect on important items */
+.glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+@keyframes glow-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 8px color-mix(in srgb, var(--accent-primary) 20%, transparent); 
+  }
+  50% { 
+    box-shadow: 0 0 16px color-mix(in srgb, var(--accent-primary) 40%, transparent); 
+  }
+}
+
+/* Info highlight for empty states */
+.empty-state-enhanced {
+  @apply text-center py-12 px-4;
+  background: linear-gradient(to bottom,
+    color-mix(in srgb, var(--bg-tertiary) 30%, transparent),
+    transparent
+  );
+}
+.empty-state-enhanced .icon-box {
+  @apply w-16 h-16 mx-auto mb-4 rounded-2xl;
+}
+
+/* Table name cell with icon */
+.table-name-cell {
+  @apply flex items-center gap-3;
+}
+.table-name-cell .name-icon {
+  @apply w-8 h-8 rounded-lg flex items-center justify-center shrink-0;
+}
+.table-name-cell .name-text {
+  @apply font-medium truncate;
+  color: var(--text-primary);
+}
+.table-name-cell .name-subtext {
+  @apply text-xs truncate;
+  color: var(--text-secondary);
+}

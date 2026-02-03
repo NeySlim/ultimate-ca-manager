@@ -293,15 +293,49 @@ export default function CAsPage() {
   // Help content
   const helpContent = (
     <div className="space-y-4">
+      {/* Quick Stats */}
+      <div className="visual-section">
+        <div className="visual-section-header">
+          <ShieldCheck size={16} className="status-primary-text" />
+          CA Statistics
+        </div>
+        <div className="visual-section-body">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-warning">{stats.find(s => s.label === 'Root')?.value || 0}</div>
+              <div className="help-stat-label">Root CAs</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-primary">{stats.find(s => s.label === 'Intermediate')?.value || 0}</div>
+              <div className="help-stat-label">Intermediate</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-success">{stats.find(s => s.label === 'Active')?.value || 0}</div>
+              <div className="help-stat-label">Active</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-danger">{stats.find(s => s.label === 'Expired')?.value || 0}</div>
+              <div className="help-stat-label">Expired</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <HelpCard title="Certificate Authorities" variant="info">
         CAs are trusted entities that issue digital certificates.
         Root CAs are self-signed, Intermediate CAs are signed by a parent.
       </HelpCard>
-      <HelpCard title="CA Types" variant="default">
-        <ul className="text-sm space-y-1">
-          <li><Badge variant="primary" size="sm">Root</Badge> - Self-signed, top of trust chain</li>
-          <li><Badge variant="secondary" size="sm">Intermediate</Badge> - Signed by parent CA</li>
-        </ul>
+      <HelpCard title="CA Types" variant="info">
+        <div className="space-y-1.5 mt-2">
+          <div className="flex items-center gap-2">
+            <Badge variant="warning" size="sm" dot>Root</Badge>
+            <span className="text-xs">Self-signed, top of trust chain</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="primary" size="sm" dot>Intermediate</Badge>
+            <span className="text-xs">Signed by parent CA</span>
+          </div>
+        </div>
       </HelpCard>
       <HelpCard title="Best Practice" variant="tip">
         Keep Root CA private keys offline. Use Intermediate CAs for issuing end-entity certificates.
