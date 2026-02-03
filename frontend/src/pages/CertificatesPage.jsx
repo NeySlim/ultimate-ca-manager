@@ -327,22 +327,46 @@ export default function CertificatesPage() {
 
   // Help content
   const helpContent = (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Quick Stats */}
+      <div className="visual-section">
+        <div className="visual-section-header">
+          <Certificate size={16} className="status-primary-text" />
+          Certificate Statistics
+        </div>
+        <div className="visual-section-body">
+          <div className="quick-info-grid">
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-success">{stats.find(s => s.label === 'Valid')?.value || 0}</div>
+              <div className="help-stat-label">Valid</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-warning">{stats.find(s => s.label === 'Expiring')?.value || 0}</div>
+              <div className="help-stat-label">Expiring</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-danger">{stats.find(s => s.label === 'Expired')?.value || 0}</div>
+              <div className="help-stat-label">Expired</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <HelpCard title="About Certificates" variant="info">
         Digital certificates authenticate identities and enable encrypted communications using PKI.
       </HelpCard>
       <HelpCard title="Status Legend" variant="info">
-        <div className="space-y-1 mt-2">
+        <div className="space-y-1.5 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="success" size="sm">Valid</Badge>
+            <Badge variant="success" size="sm" dot>Valid</Badge>
             <span className="text-xs">Active and trusted</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm">Expiring</Badge>
+            <Badge variant="warning" size="sm" dot>Expiring</Badge>
             <span className="text-xs">Expires within 30 days</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="danger" size="sm">Revoked</Badge>
+            <Badge variant="danger" size="sm" dot>Revoked</Badge>
             <span className="text-xs">No longer valid</span>
           </div>
         </div>

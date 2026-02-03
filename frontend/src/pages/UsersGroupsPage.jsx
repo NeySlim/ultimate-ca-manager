@@ -390,22 +390,63 @@ export default function UsersGroupsPage() {
   // ============= HELP CONTENT =============
   
   const helpContent = (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Quick Stats */}
+      <div className="visual-section">
+        <div className="visual-section-header">
+          <Users size={16} className="status-primary-text" />
+          {activeTab === 'users' ? 'User Statistics' : 'Group Statistics'}
+        </div>
+        <div className="visual-section-body">
+          {activeTab === 'users' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="help-stat-card">
+                <div className="help-stat-value help-stat-value-success">{users.filter(u => u.active).length}</div>
+                <div className="help-stat-label">Active</div>
+              </div>
+              <div className="help-stat-card">
+                <div className="help-stat-value">{users.filter(u => !u.active).length}</div>
+                <div className="help-stat-label">Disabled</div>
+              </div>
+              <div className="help-stat-card">
+                <div className="help-stat-value help-stat-value-primary">{users.filter(u => u.role === 'admin').length}</div>
+                <div className="help-stat-label">Admins</div>
+              </div>
+              <div className="help-stat-card">
+                <div className="help-stat-value">{users.length}</div>
+                <div className="help-stat-label">Total</div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="help-stat-card">
+                <div className="help-stat-value help-stat-value-primary">{groups.length}</div>
+                <div className="help-stat-label">Groups</div>
+              </div>
+              <div className="help-stat-card">
+                <div className="help-stat-value">{users.length}</div>
+                <div className="help-stat-label">Users</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <HelpCard title="User Management" variant="info">
         Create and manage user accounts. Assign roles to control access levels.
       </HelpCard>
       <HelpCard title="Roles" variant="tip">
-        <div className="space-y-1 mt-2">
+        <div className="space-y-1.5 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="primary" size="sm">{LABELS.ROLES.ADMIN}</Badge>
+            <Badge variant="primary" size="sm" dot>{LABELS.ROLES.ADMIN}</Badge>
             <span className="text-xs">Full access</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" size="sm">{LABELS.ROLES.OPERATOR}</Badge>
+            <Badge variant="warning" size="sm" dot>{LABELS.ROLES.OPERATOR}</Badge>
             <span className="text-xs">Manage certificates</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" size="sm">{LABELS.ROLES.VIEWER}</Badge>
+            <Badge variant="secondary" size="sm" dot>{LABELS.ROLES.VIEWER}</Badge>
             <span className="text-xs">Read-only access</span>
           </div>
         </div>
