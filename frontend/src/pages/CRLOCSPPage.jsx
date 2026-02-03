@@ -174,7 +174,7 @@ export default function CRLOCSPPage() {
       label: 'Status',
       width: '100px',
       render: (v, row) => (
-        <Badge variant={v ? 'success' : 'secondary'} size="sm">
+        <Badge variant={v ? 'success' : 'warning'} size="sm" dot>
           {v ? 'Active' : 'No CRL'}
         </Badge>
       )
@@ -208,14 +208,14 @@ export default function CRLOCSPPage() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              ca.has_crl ? 'status-success-bg' : 'bg-bg-tertiary'
+              ca.has_crl ? 'status-success-bg' : 'status-warning-bg'
             }`}>
-              <FileX size={20} className={ca.has_crl ? 'status-success-text' : 'text-text-tertiary'} />
+              <FileX size={20} className={ca.has_crl ? 'status-success-text' : 'status-warning-text'} />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-text-primary truncate">{ca.descr || ca.name}</span>
-                <Badge variant={ca.has_crl ? 'success' : 'secondary'} size="sm">
+                <Badge variant={ca.has_crl ? 'success' : 'warning'} size="sm" dot>
                   {ca.has_crl ? 'Active' : 'No CRL'}
                 </Badge>
               </div>
@@ -316,7 +316,7 @@ export default function CRLOCSPPage() {
             <p className="text-xs text-text-secondary">CRL & OCSP Configuration</p>
           </div>
         </div>
-        <Badge variant={selectedCRL ? 'success' : 'secondary'} size="sm">
+        <Badge variant={selectedCRL ? 'success' : 'warning'} size="sm" dot>
           {selectedCRL ? 'Active' : 'No CRL'}
         </Badge>
       </div>
