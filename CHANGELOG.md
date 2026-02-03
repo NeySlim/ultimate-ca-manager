@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-02-03
+
+### 🎉 Major Release: Production Ready
+
+This release marks the first production-ready version with comprehensive QA testing across all features, platforms, and deployment methods.
+
+#### QA Audit Results
+- **50+ API endpoints** tested and verified
+- **Cross-platform deployment** validated (Debian, RPM, Docker)
+- **UI testing** completed on all 15 pages
+- **Security review** passed
+
+#### Fixed
+- **UserSession Model** - Added missing model causing 500 errors on `/account/sessions`
+- **Account Activity** - Fixed query using `user_id` instead of `username`
+- **User Delete Endpoint** - Fixed 500 error (`no_content_response` + `db.session.get`)
+- **Service Restart** - Added sudoers rule for UCM user to restart service
+- **HTTPS Certificate Apply** - Fixed base64 decoding and cross-platform paths
+- **Docker IPv6** - Fixed entrypoint.sh to filter IPv4 only
+- **Debian Packaging** - Disabled dh_installsystemd (path conflicts)
+- **Radix Select** - Fixed empty value handling in RBACPage
+
+#### Changed
+- **WebAuthn Multi-Key** - Allow both platform + cross-platform authenticators
+  - Changed `residentKey` from REQUIRED to PREFERRED
+  - Enables YubiKey + Bitwarden combination
+- **UI Routes** - Serve from `dist/` in production, exclude API paths
+
+#### Cross-Platform Support
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Debian 11/12 | ✅ Tested | .deb package |
+| RHEL/Fedora | ✅ Tested | .rpm package |
+| Docker | ✅ Tested | Multi-arch image |
+| Source | ✅ Tested | pip install |
+
+#### Deployment
+```bash
+# Debian/Ubuntu
+apt install ./ucm_2.0.0_all.deb
+
+# RHEL/Fedora
+dnf install ./ucm-2.0.0-1.noarch.rpm
+
+# Docker
+docker run -d -p 8443:8443 ghcr.io/neyslim/ucm:2.0.0
+
+# From source
+pip install -r requirements.txt
+python run.py
+```
+
+---
+
+## [2.1.0] - 2026-02-02
+
+### 🚀 Major Release: Advanced PKI & Compliance
+
+#### Phase B - RBAC Enhancement (Pro)
+- **Permission Inheritance**: Role hierarchy with inherited permissions
+- **CA/Certificate Ownership**: Group-based access control for resources
+
+#### Phase C - High Availability
+- **PostgreSQL Support**: Use `DATABASE_URL` for external database
+- **Redis Sessions**: Use `REDIS_URL` for distributed session store
+- **Load Balancer Ready**: Enhanced health endpoints `/health/ready`, `/health/live`
+
+#### Phase D - Compliance (Pro)
+- **Certificate Policies**: Define issuance rules and restrictions
+- **Approval Workflows**: Multi-approver certificate request workflows
+- **Scheduled Reports**: Automated compliance and expiry reports
+
+#### Phase E - Advanced PKI (Pro)
+- **EST Protocol**: RFC 7030 implementation (/.well-known/est/*)
+- **Auto-Renewal**: Automatic certificate renewal daemon
+- **API Webhooks**: HTTP notifications for certificate events
+- **Terraform Provider**: Documentation and examples
+
+### Configuration
+```bash
+# High Availability
+DATABASE_URL=postgresql://user:pass@host:5432/ucm
+REDIS_URL=redis://host:6379/0
+
+# Connection Pool
+DB_POOL_SIZE=5
+DB_MAX_OVERFLOW=10
+```
+
+---
+
 ## [2.0.6] - 2026-02-02
 
 ### 🔒 Security & Code Quality
