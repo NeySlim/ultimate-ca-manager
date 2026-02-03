@@ -181,6 +181,24 @@ export default function TrustStorePage() {
     { icon: CheckCircle, label: 'Total', value: certStats.total, variant: 'default' }
   ], [certStats])
 
+  // Header actions - always visible
+  const headerActions = canWrite('truststore') && (
+    <div className="flex gap-2">
+      <Button size="sm" variant="secondary" onClick={handleSyncFromSystem} disabled={syncing}>
+        <ArrowsClockwise size={14} className={syncing ? 'animate-spin' : ''} />
+        <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync'}</span>
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => openModal('import')}>
+        <UploadSimple size={14} />
+        <span className="hidden sm:inline">Import</span>
+      </Button>
+      <Button size="sm" onClick={() => openModal('add')}>
+        <Plus size={14} />
+        <span className="hidden sm:inline">Add</span>
+      </Button>
+    </div>
+  )
+
   // Columns
   const columns = [
     {
@@ -189,7 +207,7 @@ export default function TrustStorePage() {
       sortable: true,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-accent-primary/15 text-accent-primary">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/15 text-blue-500">
             <Certificate size={14} weight="duotone" />
           </div>
           <div className="min-w-0">
@@ -414,6 +432,7 @@ export default function TrustStorePage() {
         subtitle={`${certificates.length} certificate${certificates.length !== 1 ? 's' : ''}`}
         icon={ShieldCheck}
         stats={stats}
+        actions={headerActions}
         helpContent={helpContent}
         helpTitle="Trust Store Help"
         splitView={true}
@@ -454,22 +473,6 @@ export default function TrustStorePage() {
               ]
             }
           ]}
-          toolbarActions={canWrite('truststore') && (
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={handleSyncFromSystem} disabled={syncing}>
-                <ArrowsClockwise size={16} className={syncing ? 'animate-spin' : ''} />
-                <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync'}</span>
-              </Button>
-              <Button variant="secondary" onClick={() => openModal('import')}>
-                <UploadSimple size={16} />
-                <span className="hidden sm:inline">Import</span>
-              </Button>
-              <Button onClick={() => openModal('add')}>
-                <Plus size={16} />
-                <span className="hidden sm:inline">Add</span>
-              </Button>
-            </div>
-          )}
           sortable
           defaultSort={{ key: 'name', direction: 'asc' }}
           pagination={true}

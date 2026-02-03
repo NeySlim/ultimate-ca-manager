@@ -1512,3 +1512,55 @@ input:focus, select:focus, textarea:focus {
   color: var(--accent-primary);
   box-shadow: var(--shadow-xs);
 }
+
+/* ============================================
+   ICON CONTAINERS - COLORFUL BACKGROUNDS
+   ============================================ */
+.icon-container {
+  @apply w-7 h-7 rounded-lg flex items-center justify-center shrink-0;
+}
+
+.icon-container-primary {
+  background: rgba(79, 142, 247, 0.15);
+  color: var(--accent-primary);
+}
+
+.icon-container-success {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--accent-success);
+}
+
+.icon-container-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
+}
+
+.icon-container-orange {
+  background: rgba(249, 115, 22, 0.15);
+  color: #F97316;
+}
+
+.icon-container-danger {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--accent-danger);
+}
+
+.icon-container-violet {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8B5CF6;
+}
+
+.icon-container-amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: #F59E0B;
+}
+
+.icon-container-teal {
+  background: rgba(20, 184, 166, 0.15);
+  color: #14B8A6;
+}
+
+.icon-container-neutral {
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
