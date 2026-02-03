@@ -336,18 +336,35 @@ def create_app(config_name=None):
     # Security headers and cleanup
     @app.after_request
     def add_security_headers(response):
-        """Add security headers and fix deprecated headers"""
-        # Set Permissions-Policy without deprecated features
-        # Only include valid features that are widely supported
+        """Add security headers including CSP"""
+        # Content Security Policy - strict but allows necessary resources
+        if 'Content-Security-Policy' not in response.headers:
+            csp = "; ".join([
+                "default-src 'self'",
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # React needs this
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+                "font-src 'self' https://fonts.gstatic.com data:",
+                "img-src 'self' data: blob:",
+                "connect-src 'self' wss: ws:",  # WebSocket support
+                "frame-ancestors 'self'",
+                "form-action 'self'",
+                "base-uri 'self'",
+                "object-src 'none'"
+            ])
+            response.headers['Content-Security-Policy'] = csp
+        
+        # Permissions-Policy - disable unused features
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
         
-        # Add security headers if not present
+        # Other security headers
         if 'X-Content-Type-Options' not in response.headers:
             response.headers['X-Content-Type-Options'] = 'nosniff'
         if 'X-Frame-Options' not in response.headers:
             response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         if 'X-XSS-Protection' not in response.headers:
             response.headers['X-XSS-Protection'] = '1; mode=block'
+        if 'Referrer-Policy' not in response.headers:
+            response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         
         return response
     

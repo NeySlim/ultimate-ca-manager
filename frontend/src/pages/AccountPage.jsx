@@ -375,7 +375,7 @@ export default function AccountPage() {
                 placeholder="Enter your name"
                 className="mt-1"
               />
-            ) : (accountData.full_name || '—')} 
+            ) : (accountData.full_name || accountData.username || '—')} 
           />
           <CompactField 
             label="Role" 

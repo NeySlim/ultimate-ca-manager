@@ -513,8 +513,8 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <Input
                   label="System Name"
-                  value={settings.system_name || ''}
-                  onChange={(e) => updateSetting('system_name', e.target.value)}
+                  value={settings.site_name || 'UCM'}
+                  onChange={(e) => updateSetting('site_name', e.target.value)}
                   helperText="Display name for the UCM system"
                 />
                 <Input
