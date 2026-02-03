@@ -1,3 +1,28 @@
+BSD 3-Clause License with Commons Clause
+
+"Commons Clause" License Condition v1.0
+
+The Software is provided to you by the Licensor under the License, as defined
+below, subject to the following condition.
+
+Without limiting other conditions in the License, the grant of rights under the
+License will not include, and the License does not grant to you, the right to
+Sell the Software.
+
+For purposes of the foregoing, "Sell" means practicing any or all of the rights
+granted to you under the License to provide to third parties, for a fee or other
+consideration (including without limitation fees for hosting or consulting/
+support services related to the Software), a product or service whose value
+derives, entirely or substantially, from the functionality of the Software.
+Any license notice or attribution required by the License must also include
+this Commons Clause License Condition notice.
+
+Software: Ultimate CA Manager (UCM) Community Edition
+License: BSD 3-Clause License
+Licensor: NeySlim
+
+================================================================================
+
 BSD 3-Clause License
 
 Copyright (c) 2026, NeySlim
@@ -6,11 +31,13 @@ Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
 
 1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
+   list of conditions and the following disclaimer, and the Commons Clause
+   License Condition above.
 
 2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
+   this list of conditions and the following disclaimer, and the Commons Clause
+   License Condition above, in the documentation and/or other materials
+   provided with the distribution.
 
 3. Neither the name of the copyright holder nor the names of its
    contributors may be used to endorse or promote products derived from
@@ -26,3 +53,23 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+================================================================================
+QUICK SUMMARY (not legally binding)
+================================================================================
+
+✅ You CAN:
+   - Use the software freely (personal, business, any purpose)
+   - View, modify, and learn from the source code
+   - Redistribute the software (with attribution)
+   - Create derivative works
+   - Use in commercial environments
+
+❌ You CANNOT:
+   - Sell the software itself
+   - Offer the software as a paid service (SaaS)
+   - Charge for hosting/support as primary business
+
+💡 This is "open source" for users, but not for resellers.
+
+================================================================================
