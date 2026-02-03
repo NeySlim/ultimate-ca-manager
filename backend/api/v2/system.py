@@ -209,27 +209,191 @@ def get_https_cert_info():
 @require_auth(['admin:system'])
 def regenerate_https_cert():
     """Regenerate self-signed HTTPS certificate"""
-    # Trigger script or internal logic to regen cert
-    # Service restart required
-    return success_response(message="Certificate regenerated. Service restart required.")
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from datetime import timedelta
+    import signal
+    
+    data = request.json or {}
+    common_name = data.get('common_name', 'localhost')
+    validity_days = data.get('validity_days', 365)
+    
+    try:
+        # Generate private key
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048
+        )
+        
+        # Build certificate
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "NL"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Ultimate CA Manager"),
+            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+        ])
+        
+        now = datetime.now(timezone.utc)
+        cert = (
+            x509.CertificateBuilder()
+            .subject_name(subject)
+            .issuer_name(issuer)
+            .public_key(private_key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now)
+            .not_valid_after(now + timedelta(days=validity_days))
+            .add_extension(
+                x509.SubjectAlternativeName([
+                    x509.DNSName(common_name),
+                    x509.DNSName("localhost"),
+                ]),
+                critical=False,
+            )
+            .sign(private_key, hashes.SHA256())
+        )
+        
+        # Get data directory from config or env (cross-platform)
+        data_dir = current_app.config.get('DATA_DIR') or os.environ.get('DATA_DIR', '/opt/ucm/data')
+        cert_path = Path(data_dir) / 'https_cert.pem'
+        key_path = Path(data_dir) / 'https_key.pem'
+        
+        # Backup existing
+        if cert_path.exists():
+            backup_suffix = datetime.now().strftime('%Y%m%d_%H%M%S')
+            shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
+        if key_path.exists():
+            shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
+        
+        # Write new cert and key
+        cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+        key_path.write_bytes(private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption()
+        ))
+        os.chmod(key_path, 0o600)
+        
+        # Set ownership
+        import pwd
+        try:
+            ucm_user = pwd.getpwnam('ucm')
+            os.chown(cert_path, ucm_user.pw_uid, ucm_user.pw_gid)
+            os.chown(key_path, ucm_user.pw_uid, ucm_user.pw_gid)
+        except KeyError:
+            pass
+        
+        current_app.logger.info(f"Regenerated HTTPS certificate for {common_name}")
+        
+        # Restart service - method depends on environment
+        is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
+        
+        if is_docker:
+            try:
+                os.kill(os.getppid(), signal.SIGHUP)
+            except Exception:
+                pass
+            return success_response(message="Certificate regenerated. Reload signal sent.")
+        else:
+            subprocess.Popen(['systemctl', 'restart', 'ucm'],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL)
+            return success_response(message="Certificate regenerated. Service restarting...")
+        
+    except Exception as e:
+        current_app.logger.error(f"Failed to regenerate HTTPS cert: {e}")
+        return error_response(f"Failed to regenerate certificate: {str(e)}", 500)
 
 @bp.route('/api/v2/system/https/apply', methods=['POST'])
 @require_auth(['admin:system'])
 def apply_https_cert():
     """Apply a managed certificate to HTTPS"""
+    import base64
+    import signal
+    
     data = request.json
     cert_id = data.get('cert_id')
     
     if not cert_id:
-        return error_response("Certificate ID required")
+        return error_response("Certificate ID required", 400)
         
     cert = Certificate.query.get(cert_id)
     if not cert:
-        return error_response("Certificate not found")
+        return error_response("Certificate not found", 404)
+    
+    # Verify cert has private key
+    if not cert.prv:
+        return error_response("Certificate has no private key - cannot use for HTTPS", 400)
+    
+    try:
+        # Get data directory from config or env (cross-platform)
+        data_dir = current_app.config.get('DATA_DIR') or os.environ.get('DATA_DIR', '/opt/ucm/data')
+        cert_path = Path(data_dir) / 'https_cert.pem'
+        key_path = Path(data_dir) / 'https_key.pem'
         
-    # Logic to write cert.crt and cert.key to system location
-    # and trigger restart
-    return success_response(message="Certificate applied. Service restart required.")
+        # Backup existing certs
+        if cert_path.exists():
+            backup_suffix = datetime.now().strftime('%Y%m%d_%H%M%S')
+            shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
+        if key_path.exists():
+            shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
+        
+        # Decode cert/key - they may be base64 encoded or raw PEM
+        cert_data = cert.crt
+        key_data = cert.prv
+        
+        # Check if base64 encoded (doesn't start with -----BEGIN)
+        if not cert_data.startswith('-----BEGIN'):
+            try:
+                cert_data = base64.b64decode(cert_data).decode('utf-8')
+            except Exception:
+                pass  # Already decoded or different format
+        
+        if not key_data.startswith('-----BEGIN'):
+            try:
+                key_data = base64.b64decode(key_data).decode('utf-8')
+            except Exception:
+                pass
+        
+        # Write new certificate
+        cert_path.write_text(cert_data)
+        
+        # Write private key with restricted permissions
+        key_path.write_text(key_data)
+        os.chmod(key_path, 0o600)
+        
+        # Set ownership to ucm user (if exists)
+        import pwd
+        try:
+            ucm_user = pwd.getpwnam('ucm')
+            os.chown(cert_path, ucm_user.pw_uid, ucm_user.pw_gid)
+            os.chown(key_path, ucm_user.pw_uid, ucm_user.pw_gid)
+        except KeyError:
+            pass  # ucm user doesn't exist, skip chown
+        
+        current_app.logger.info(f"Applied certificate {cert.refid} as HTTPS cert")
+        
+        # Restart service - method depends on environment
+        is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
+        
+        if is_docker:
+            # In Docker, send SIGHUP to gunicorn master to reload
+            # The container orchestrator handles restarts
+            try:
+                os.kill(os.getppid(), signal.SIGHUP)
+            except Exception:
+                pass
+            return success_response(message="Certificate applied. Reload signal sent.")
+        else:
+            # On systemd systems, restart the service
+            subprocess.Popen(['systemctl', 'restart', 'ucm'], 
+                            stdout=subprocess.DEVNULL, 
+                            stderr=subprocess.DEVNULL)
+            return success_response(message="Certificate applied. Service restarting...")
+        
+    except Exception as e:
+        current_app.logger.error(f"Failed to apply HTTPS cert: {e}")
+        return error_response(f"Failed to apply certificate: {str(e)}", 500)
 
 @bp.route('/api/v2/system/backup', methods=['POST'])
 @bp.route('/api/v2/system/backup/create', methods=['POST'])

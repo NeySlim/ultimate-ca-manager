@@ -4,13 +4,12 @@
 import multiprocessing
 import os
 
-# Server socket
+# Server socket - bind to [::] for dual-stack IPv4+IPv6
 # In Docker, always bind to 8443 (the port mapping handles external port)
-# In production, use HTTPS_PORT from environment
 if os.getenv('UCM_DOCKER'):
-    bind = "0.0.0.0:8443"
+    bind = "[::]:8443"
 else:
-    bind = f"0.0.0.0:{os.getenv('HTTPS_PORT', '8443')}"
+    bind = f"[::]:{os.getenv('HTTPS_PORT', '8443')}"
 backlog = 2048
 
 # Worker processes

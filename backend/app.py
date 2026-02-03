@@ -497,12 +497,23 @@ def init_database(app):
         conn = sqlite3.connect(app.config['DATABASE_PATH'])
         cursor = conn.cursor()
         
-        # Define expected columns for users table (2FA columns)
+        # Define expected columns for tables that may need migration
         expected_columns = {
             'users': [
                 ('totp_secret', 'VARCHAR(32)', None),
                 ('totp_confirmed', 'BOOLEAN', '0'),
                 ('backup_codes', 'TEXT', None)
+            ],
+            'certificates': [
+                ('archived', 'BOOLEAN', '0'),
+                ('source', 'VARCHAR(50)', None),
+                ('template_id', 'INTEGER', None)
+            ],
+            'certificate_authorities': [
+                ('cdp_enabled', 'BOOLEAN', '0'),
+                ('cdp_url', 'VARCHAR(512)', None),
+                ('ocsp_enabled', 'BOOLEAN', '0'),
+                ('ocsp_url', 'VARCHAR(512)', None)
             ]
         }
         
