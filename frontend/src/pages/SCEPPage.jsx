@@ -133,13 +133,14 @@ export default function SCEPPage() {
   }
 
   const getStatusBadge = (status) => {
-    const variants = {
-      pending: 'warning',
-      approved: 'success',
-      rejected: 'danger',
-      issued: 'info'
+    const config = {
+      pending: { variant: 'orange', dot: true, pulse: true },
+      approved: { variant: 'success', dot: true, pulse: false },
+      rejected: { variant: 'danger', dot: true, pulse: false },
+      issued: { variant: 'primary', dot: true, pulse: false }
     }
-    return <Badge variant={variants[status] || 'default'}>{status}</Badge>
+    const { variant, dot, pulse } = config[status] || { variant: 'secondary', dot: false, pulse: false }
+    return <Badge variant={variant} size="sm" dot={dot} pulse={pulse}>{status}</Badge>
   }
 
   // Tabs config

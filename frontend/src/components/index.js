@@ -118,3 +118,6 @@ export {
 // NEW: Phase 10 FROM SCRATCH - Unified responsive components
 export { ResponsiveLayout, ResponsiveDataTable } from './ui/responsive'
 export { UnifiedPageHeader } from './ui/UnifiedPageHeader'
+
+// Rich visual components
+export { RichStatsBar } from './ui/RichStatsBar'

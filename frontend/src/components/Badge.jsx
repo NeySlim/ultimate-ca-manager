@@ -28,8 +28,9 @@ export function Badge({
     purple: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-transparent',
     violet: 'bg-violet-500/15 text-violet-600 dark:text-violet-400 border-transparent',
     amber: 'status-warning-bg status-warning-text border-transparent',
-    orange: 'status-warning-bg status-warning-text border-transparent',
-    cyan: 'status-primary-bg status-primary-text border-transparent',
+    orange: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-transparent',
+    cyan: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-transparent',
+    teal: 'bg-teal-500/15 text-teal-600 dark:text-teal-400 border-transparent',
     gray: 'bg-bg-tertiary/60 text-text-secondary border-transparent',
   }
   
@@ -40,6 +41,12 @@ export function Badge({
     warning: 'status-warning-bg-solid',
     danger: 'status-danger-bg-solid',
     info: 'status-primary-bg-solid',
+    violet: 'bg-violet-500',
+    purple: 'bg-purple-500',
+    cyan: 'bg-cyan-500',
+    teal: 'bg-teal-500',
+    orange: 'bg-orange-500',
+    amber: 'bg-amber-500',
   }
   
   // Sizes: sm is pill-shaped, others are rounded

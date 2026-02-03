@@ -337,37 +337,39 @@ export function ResponsiveLayout({
 }
 
 // =============================================================================
-// STATS BAR
+// STATS BAR - Enhanced with rich visual styling like Dashboard
 // =============================================================================
 
 function StatsBar({ stats, isMobile }) {
-  const variants = {
-    primary: 'text-accent-primary',
-    success: 'status-success-text',
-    warning: 'status-warning-text',
-    danger: 'status-danger-text',
-    info: 'status-primary-text'
+  const iconVariants = {
+    primary: 'rich-stat-icon-primary',
+    success: 'rich-stat-icon-success',
+    warning: 'rich-stat-icon-warning',
+    danger: 'rich-stat-icon-danger',
+    info: 'rich-stat-icon-primary',
+    secondary: 'rich-stat-icon-neutral',
+    default: 'rich-stat-icon-neutral'
   }
   
   if (isMobile) {
-    // Mobile: horizontal scroll with larger items
+    // Mobile: horizontal scroll with card-style items
     return (
-      <div className="shrink-0 border-b border-border/60 bg-bg-secondary/30 flex overflow-x-auto scrollbar-none gap-4 px-4 py-2.5">
+      <div className="rich-stats-bar overflow-x-auto scrollbar-none py-3">
         {stats.map((stat, i) => {
           const Icon = stat.icon
-          const colorClass = variants[stat.variant] || variants.primary
+          const iconClass = iconVariants[stat.variant] || iconVariants.primary
           const displayLabel = stat.shortLabel || stat.label
           
           return (
-            <div key={i} className="flex items-center gap-2 shrink-0 whitespace-nowrap transition-all duration-200">
+            <div key={i} className="rich-stat-item shrink-0">
               {Icon && (
-                <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', `${colorClass} bg-current/10`)}>
-                  <Icon size={16} weight="bold" className={colorClass} />
+                <div className={cn('rich-stat-icon', iconClass)}>
+                  <Icon size={18} weight="duotone" />
                 </div>
               )}
-              <div>
-                <p className="font-bold text-base text-text-primary">{stat.value}</p>
-                <p className="text-xs text-text-secondary whitespace-nowrap">{displayLabel}</p>
+              <div className="rich-stat-content">
+                <span className="rich-stat-value">{stat.value}</span>
+                <span className="rich-stat-label">{displayLabel}</span>
               </div>
             </div>
           )
@@ -376,18 +378,24 @@ function StatsBar({ stats, isMobile }) {
     )
   }
   
-  // Desktop: compact inline stats
+  // Desktop: Enhanced card-style stats with gradient icons
   return (
-    <div className="shrink-0 border-b border-border/60 bg-bg-secondary/20 flex items-center gap-5 px-5 py-1.5 shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)]">
+    <div className="rich-stats-bar py-2.5">
       {stats.map((stat, i) => {
         const Icon = stat.icon
-        const colorClass = variants[stat.variant] || variants.primary
+        const iconClass = iconVariants[stat.variant] || iconVariants.primary
         
         return (
-          <div key={i} className="flex items-center gap-1.5 transition-all duration-200 hover:opacity-80">
-            {Icon && <Icon size={14} weight="bold" className={colorClass} />}
-            <span className="font-semibold text-xs text-text-primary">{stat.value}</span>
-            <span className="text-xs text-text-secondary">{stat.label}</span>
+          <div key={i} className="rich-stat-item">
+            {Icon && (
+              <div className={cn('rich-stat-icon', iconClass)}>
+                <Icon size={16} weight="duotone" />
+              </div>
+            )}
+            <div className="rich-stat-content">
+              <span className="rich-stat-value text-sm">{stat.value}</span>
+              <span className="rich-stat-label">{stat.label}</span>
+            </div>
           </div>
         )
       })}

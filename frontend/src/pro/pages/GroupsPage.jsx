@@ -11,7 +11,8 @@ import {
 import {
   ManagementLayout, Button, Input, Card,
   Badge, Modal, FormModal, HelpCard,
-  CompactHeader, CompactSection, CompactGrid, CompactField, CompactStats
+  CompactHeader, CompactSection, CompactGrid, CompactField, CompactStats,
+  FormSelect
 } from '../../components'
 import { pluralize } from '../../lib/ui'
 import { useNotification } from '../../contexts'
@@ -315,20 +316,17 @@ export default function GroupsPage() {
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           placeholder="Optional description"
         />
-        <div>
-          <label className="text-xs font-medium text-text-secondary mb-1.5 block">
-            Default Role
-          </label>
-          <select
-            value={formData.role}
-            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-            className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm text-text-primary"
-          >
-            <option value="viewer">Viewer</option>
-            <option value="operator">Operator</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
+        <FormSelect
+          label="Default Role"
+          value={formData.role}
+          onChange={(val) => setFormData({ ...formData, role: val })}
+          options={[
+            { value: 'viewer', label: 'Viewer' },
+            { value: 'operator', label: 'Operator' },
+            { value: 'admin', label: 'Admin' },
+          ]}
+          size="lg"
+        />
       </FormModal>
 
       {/* Add Member Modal */}

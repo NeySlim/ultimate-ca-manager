@@ -164,7 +164,11 @@ export default function CRLOCSPPage() {
       label: 'CA Name',
       render: (v, row) => (
         <div className="flex items-center gap-2">
-          <FileX size={14} className={row.has_crl ? 'status-success-text' : 'text-text-tertiary'} />
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+            row.has_crl ? 'bg-accent-success/15 text-accent-success' : 'bg-orange-500/15 text-orange-500'
+          }`}>
+            <FileX size={14} weight="duotone" />
+          </div>
           <span className="font-medium">{v || row.name}</span>
         </div>
       )
@@ -174,7 +178,7 @@ export default function CRLOCSPPage() {
       label: 'Status',
       width: '100px',
       render: (v, row) => (
-        <Badge variant={v ? 'success' : 'warning'} size="sm" dot>
+        <Badge variant={v ? 'success' : 'orange'} size="sm" dot pulse={!v}>
           {v ? 'Active' : 'No CRL'}
         </Badge>
       )
@@ -184,9 +188,9 @@ export default function CRLOCSPPage() {
       label: 'Revoked',
       width: '80px',
       render: (v) => (
-        <span className={v > 0 ? 'status-danger-text font-medium' : 'text-text-secondary'}>
+        <Badge variant={v > 0 ? 'danger' : 'secondary'} size="sm" dot={v > 0}>
           {v || 0}
-        </span>
+        </Badge>
       )
     },
     {

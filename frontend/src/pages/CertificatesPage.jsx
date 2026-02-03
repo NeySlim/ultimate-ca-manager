@@ -17,7 +17,7 @@ import { certificatesService, casService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { ERRORS, SUCCESS, LABELS, CONFIRM, BUTTONS } from '../lib/messages'
 import { usePermission } from '../hooks'
-import { formatDate, extractCN } from '../lib/utils'
+import { formatDate, extractCN, cn } from '../lib/utils'
 
 export default function CertificatesPage() {
   const { isMobile } = useMobile()
@@ -200,11 +200,18 @@ export default function CertificatesPage() {
       sortable: true,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <Certificate size={16} className="text-accent-primary shrink-0" />
+          <div className={cn(
+            "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+            row.has_private_key 
+              ? "bg-accent-success/15 text-accent-success" 
+              : "bg-accent-primary/15 text-accent-primary"
+          )}>
+            <Certificate size={14} weight="duotone" />
+          </div>
           <span className="font-medium truncate">{val}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
-          {row.source === 'acme' && <Badge variant="info" size="sm">ACME</Badge>}
-          {row.source === 'scep' && <Badge variant="warning" size="sm">SCEP</Badge>}
+          {row.source === 'acme' && <Badge variant="cyan" size="sm" dot>ACME</Badge>}
+          {row.source === 'scep' && <Badge variant="orange" size="sm" dot>SCEP</Badge>}
         </div>
       )
     },
@@ -217,15 +224,15 @@ export default function CertificatesPage() {
         const isRevoked = row.revoked
         const status = isRevoked ? 'revoked' : val || 'unknown'
         const config = {
-          valid: { variant: 'success', icon: CheckCircle, label: 'Valid' },
-          expiring: { variant: 'warning', icon: Clock, label: 'Expiring' },
-          expired: { variant: 'danger', icon: XCircle, label: 'Expired' },
-          revoked: { variant: 'danger', icon: X, label: 'Revoked' },
-          unknown: { variant: 'secondary', icon: Info, label: 'Unknown' }
+          valid: { variant: 'success', icon: CheckCircle, label: 'Valid', pulse: true },
+          expiring: { variant: 'warning', icon: Clock, label: 'Expiring', pulse: true },
+          expired: { variant: 'danger', icon: XCircle, label: 'Expired', pulse: false },
+          revoked: { variant: 'danger', icon: X, label: 'Revoked', pulse: false },
+          unknown: { variant: 'secondary', icon: Info, label: 'Unknown', pulse: false }
         }
-        const { variant, icon, label } = config[status] || config.unknown
+        const { variant, icon, label, pulse } = config[status] || config.unknown
         return (
-          <Badge variant={variant} size="sm" icon={icon}>
+          <Badge variant={variant} size="sm" icon={icon} dot pulse={pulse}>
             {label}
           </Badge>
         )

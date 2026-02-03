@@ -203,16 +203,21 @@ export default function ACMEPage() {
       key: 'email',
       label: 'Email',
       render: (_, row) => (
-        <span className="font-medium text-text-primary">
-          {row.contact?.[0]?.replace('mailto:', '') || row.email || `Account #${row.id}`}
-        </span>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-accent-primary/15 text-accent-primary">
+            <Key size={14} weight="duotone" />
+          </div>
+          <span className="font-medium text-text-primary">
+            {row.contact?.[0]?.replace('mailto:', '') || row.email || `Account #${row.id}`}
+          </span>
+        </div>
       )
     },
     {
       key: 'status',
       label: 'Status',
       render: (val) => (
-        <Badge variant={val === 'valid' ? 'success' : 'secondary'} size="sm">
+        <Badge variant={val === 'valid' ? 'success' : 'orange'} size="sm" dot pulse={val === 'valid'}>
           {val === 'valid' && <CheckCircle size={10} weight="fill" />}
           {val}
         </Badge>

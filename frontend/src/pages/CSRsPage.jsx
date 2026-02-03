@@ -230,7 +230,9 @@ export default function CSRsPage() {
       priority: 1,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <FileText size={16} className="text-accent-warning shrink-0" />
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-orange-500/15 text-orange-500">
+            <FileText size={14} weight="duotone" />
+          </div>
           <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
         </div>
@@ -274,7 +276,9 @@ export default function CSRsPage() {
       priority: 1,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <Certificate size={16} className="text-accent-success shrink-0" />
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-accent-success/15 text-accent-success">
+            <Certificate size={14} weight="duotone" />
+          </div>
           <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
           {row.source === 'acme' && (

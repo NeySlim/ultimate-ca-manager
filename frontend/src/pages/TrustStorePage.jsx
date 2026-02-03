@@ -189,7 +189,9 @@ export default function TrustStorePage() {
       sortable: true,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <Certificate size={16} className="text-accent-primary shrink-0" />
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-accent-primary/15 text-accent-primary">
+            <Certificate size={14} weight="duotone" />
+          </div>
           <div className="min-w-0">
             <div className="font-medium truncate">{val}</div>
             {row.subject_cn && row.subject_cn !== val && (
@@ -204,14 +206,14 @@ export default function TrustStorePage() {
       header: 'Purpose',
       render: (val) => {
         const variants = {
-          root_ca: 'success',
+          root_ca: 'amber',
           intermediate_ca: 'primary',
-          client_auth: 'purple',
-          code_signing: 'warning',
-          system: 'secondary',
-          custom: 'default'
+          client_auth: 'violet',
+          code_signing: 'orange',
+          system: 'teal',
+          custom: 'secondary'
         }
-        return <Badge variant={variants[val] || 'default'} size="sm">{val?.replace('_', ' ')}</Badge>
+        return <Badge variant={variants[val] || 'secondary'} size="sm" dot>{val?.replace('_', ' ')}</Badge>
       }
     },
     {
@@ -221,10 +223,12 @@ export default function TrustStorePage() {
         if (!val) return <span className="text-text-tertiary">—</span>
         const date = new Date(val)
         const isExpired = date < new Date()
+        const daysLeft = Math.floor((date - new Date()) / (1000 * 60 * 60 * 24))
+        const isExpiringSoon = daysLeft > 0 && daysLeft <= 30
         return (
-          <span className={isExpired ? 'text-status-danger' : ''}>
+          <Badge variant={isExpired ? 'danger' : isExpiringSoon ? 'orange' : 'success'} size="sm" dot pulse={isExpired || isExpiringSoon}>
             {formatDate(val)}
-          </span>
+          </Badge>
         )
       }
     }
