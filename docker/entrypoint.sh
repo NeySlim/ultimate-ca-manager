@@ -165,10 +165,9 @@ chmod 755 /app/backend/data
 chmod 700 /app/backend/data/{cas,certs,backups}
 
 # Fix permissions to ensure UCM user can write
-echo -e "${BLUE}🔧 Fixing file permissions...${NC}"
-# In Docker, we run as root initially, then su to ucm user
-# Ensure all data files are owned by the app user
-if [ -d /app/backend/data ]; then
+echo -e "${BLUE}🔧 Checking file permissions...${NC}"
+# Only try chown if running as root (UID 0)
+if [ "$(id -u)" = "0" ] && [ -d /app/backend/data ]; then
     chown -R 1000:1000 /app/backend/data 2>/dev/null || true
 fi
 
