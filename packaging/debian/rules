@@ -3,15 +3,17 @@
 # UCM Debian Build Rules
 
 export DH_VERBOSE=1
-export PYBUILD_NAME=ucm
-export PYBUILD_DISABLE=test
 
 %:
-	dh $@ --with python3 --buildsystem=pybuild
+	dh $@
+
+override_dh_auto_build:
+	# No build needed - pure Python app
+
+override_dh_auto_clean:
+	# No clean needed
 
 override_dh_auto_install:
-	# Install Python application
-	dh_auto_install
 	
 	# Create directory structure
 	install -d debian/ucm/opt/ucm
