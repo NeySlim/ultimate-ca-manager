@@ -1,6 +1,6 @@
 # Installation Guide
 
-This guide covers all installation methods for Ultimate CA Manager v1.8.0.
+This guide covers all installation methods for Ultimate CA Manager v2.0.0.
 
 ## 📋 System Requirements
 
@@ -35,7 +35,7 @@ docker run -d \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/app/backend/data \
-  ghcr.io/neyslim/ultimate-ca-manager:1.8.0-beta
+  ghcr.io/neyslim/ultimate-ca-manager:2.0.0-beta
 ```
 
 **Access:** https://localhost:8443  
@@ -51,10 +51,10 @@ See: [Debian/Ubuntu Installation Guide](debian-ubuntu.md)
 
 ```bash
 # Download package
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.0-beta/ucm_1.8.0-beta_amd64.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta/ucm_2.0.0-beta_amd64.deb
 
 # Install
-sudo dpkg -i ucm_1.8.0-beta_amd64.deb
+sudo dpkg -i ucm_2.0.0-beta_amd64.deb
 sudo apt-get install -f  # Fix any dependencies
 
 # Enable and start
@@ -75,10 +75,10 @@ See: [RHEL/Rocky/Alma Installation Guide](rhel-rocky-alma.md)
 
 ```bash
 # Download package
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.0-beta/ucm-1.8.0-0.1.beta.x86_64.rpm
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta/ucm-2.0.0-0.1.beta.x86_64.rpm
 
 # Install
-sudo dnf install ucm-1.8.0-0.1.beta.x86_64.rpm
+sudo dnf install ucm-2.0.0-0.1.beta.x86_64.rpm
 
 # Enable and start
 sudo systemctl enable ucm
