@@ -387,3 +387,16 @@ def mock_auth(user_id=1, permissions=None):
     g.auth_method = 'mock'
     g.permissions = permissions or ['*']
     g.user_id = user_id
+
+
+def require_permission(permission):
+    """
+    Decorator to require a specific permission.
+    Shorthand for @require_auth([permission])
+    
+    Usage:
+        @require_permission('admin:groups')
+        def create_group():
+            ...
+    """
+    return require_auth([permission])

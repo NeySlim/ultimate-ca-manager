@@ -26,7 +26,7 @@ echo -e "${YELLOW}Checking build dependencies...${NC}"
 MISSING_DEPS=()
 
 command -v dpkg-buildpackage >/dev/null 2>&1 || MISSING_DEPS+=("dpkg-dev")
-command -v dh >/dev/null 2>&1 || MISSING_DEPS+=("debhelper")
+command -v debhelper >/dev/null 2>&1 || MISSING_DEPS+=("debhelper")
 
 if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     echo -e "${RED}Missing dependencies: ${MISSING_DEPS[*]}${NC}"
@@ -48,16 +48,9 @@ fi
 echo -e "${CYAN}Building version: $VERSION${NC}"
 echo ""
 
-# Generate changelog (skip if not a git repo and changelog exists)
-if [ -d ".git" ]; then
-    echo -e "${YELLOW}Generating changelog from git...${NC}"
-    ./packaging/scripts/generate-changelog.sh "$VERSION"
-elif [ -f "packaging/debian/changelog" ]; then
-    echo -e "${GREEN}✓ Using existing changelog${NC}"
-else
-    echo -e "${RED}Error: No git repo and no changelog file${NC}"
-    exit 1
-fi
+# Generate changelog
+echo -e "${YELLOW}Generating changelog...${NC}"
+./packaging/scripts/generate-changelog.sh "$VERSION"
 echo ""
 
 # Create debian directory if it doesn't exist

@@ -107,6 +107,41 @@ def list_certificates():
     )
 
 
+@bp.route('/api/v2/certificates/stats', methods=['GET'])
+@require_auth(['read:certificates'])
+def get_certificate_stats():
+    """Get certificate statistics"""
+    from models import Certificate
+    from datetime import datetime, timedelta
+    
+    now = datetime.utcnow()
+    expiry_threshold = now + timedelta(days=30)
+    
+    total = Certificate.query.count()
+    revoked = Certificate.query.filter_by(revoked=True).count()
+    expired = Certificate.query.filter(
+        Certificate.valid_to <= now,
+        Certificate.revoked == False
+    ).count()
+    expiring = Certificate.query.filter(
+        Certificate.valid_to <= expiry_threshold,
+        Certificate.valid_to > now,
+        Certificate.revoked == False
+    ).count()
+    valid = Certificate.query.filter(
+        Certificate.valid_to > now,
+        Certificate.revoked == False
+    ).count() - expiring  # Don't double-count expiring as valid
+    
+    return success_response(data={
+        'total': total,
+        'valid': valid,
+        'expiring': expiring,
+        'expired': expired,
+        'revoked': revoked
+    })
+
+
 @bp.route('/api/v2/certificates', methods=['POST'])
 @require_auth(['write:certificates'])
 def create_certificate():

@@ -15,7 +15,7 @@ bp = Blueprint('templates_v2', __name__)
 
 
 @bp.route('/api/v2/templates', methods=['GET'])
-@require_auth()
+@require_auth(["read:templates"])
 def list_templates():
     """
     List all certificate templates
@@ -55,7 +55,7 @@ def list_templates():
 
 
 @bp.route('/api/v2/templates', methods=['POST'])
-@require_auth()
+@require_auth(["write:templates"])
 def create_template():
     """
     Create new certificate template
@@ -150,7 +150,7 @@ def create_template():
 
 
 @bp.route('/api/v2/templates/<int:template_id>', methods=['GET'])
-@require_auth()
+@require_auth(["read:templates"])
 def get_template(template_id):
     """Get single template details"""
     template = CertificateTemplate.query.get(template_id)
@@ -161,7 +161,7 @@ def get_template(template_id):
 
 
 @bp.route('/api/v2/templates/<int:template_id>', methods=['PUT'])
-@require_auth()
+@require_auth(["write:templates"])
 def update_template(template_id):
     """
     Update existing template
@@ -236,7 +236,7 @@ def update_template(template_id):
 
 
 @bp.route('/api/v2/templates/<int:template_id>', methods=['DELETE'])
-@require_auth()
+@require_auth(["read:templates"])
 def delete_template(template_id):
     """
     Delete certificate template

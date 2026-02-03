@@ -8,7 +8,7 @@ Supports:
 """
 
 from flask import Blueprint, request, jsonify, session, current_app
-from auth.unified import AuthManager, require_auth
+from auth.unified import AuthManager, require_auth, require_permission
 from utils.response import success_response, error_response
 from models import User, db
 from datetime import datetime

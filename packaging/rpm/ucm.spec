@@ -1,10 +1,10 @@
 Name:           ucm
-Version:        %{?_version}%{!?_version:2.0.0}
+Version:        %{?_version}%{!?_version:1.8.0}
 Release:        %{?_release}%{!?_release:1}%{?dist}
 Summary:        Ultimate CA Manager - Complete PKI Management Platform
 
 License:        Proprietary
-URL:            https://github.com/NeySlim/ultimate-ca-manager
+URL:            https://github.com/kerberosmansour/ultimate-ca-manager
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch
@@ -17,23 +17,23 @@ Requires:       python3-pip
 Requires:       systemd
 Requires:       openssl >= 1.1.1
 
-# Installation paths - same as Debian for consistency
-%define ucm_home /opt/ucm
-%define ucm_data /opt/ucm/data
-%define ucm_config /etc/ucm
-%define ucm_log /var/log/ucm
-
 %description
 Ultimate CA Manager (UCM) is a comprehensive Public Key Infrastructure (PKI)
 management platform providing:
 - Root and Intermediate Certificate Authorities
 - Certificate lifecycle management (create, renew, revoke, export)
-- OCSP Responder and CRL Distribution Points
+- OCSP Responder
+- CRL Distribution Points
 - SCEP enrollment (iOS, Android, Windows, macOS MDM)
 - ACME protocol support (Let's Encrypt compatible)
 - WebAuthn/FIDO2 passwordless authentication
+- mTLS client certificate authentication
 - REST API with JWT authentication
 - Email notifications for certificate expiration
+- 8 beautiful themes with light/dark variants
+
+Deployment: UCM includes a built-in HTTPS server and can run standalone
+or behind a reverse proxy (nginx/apache recommended for production).
 
 %prep
 %setup -q
@@ -43,25 +43,24 @@ management platform providing:
 
 %install
 # Create directory structure
-install -d %{buildroot}%{ucm_home}
-install -d %{buildroot}%{ucm_data}/{ca,certs,private,crl,scep,backups,sessions}
-install -d %{buildroot}%{ucm_config}
-install -d %{buildroot}%{ucm_log}
+install -d %{buildroot}%{_sysconfdir}/%{name}
+install -d %{buildroot}%{_datadir}/%{name}
+install -d %{buildroot}%{_sharedstatedir}/%{name}/{cas,certs,backups,logs,temp}
+install -d %{buildroot}%{_localstatedir}/log/%{name}
 install -d %{buildroot}%{_unitdir}
 install -d %{buildroot}%{_bindir}
 
-# Install application files to /opt/ucm
-cp -r backend %{buildroot}%{ucm_home}/
-cp -r frontend %{buildroot}%{ucm_home}/
-cp -r scripts %{buildroot}%{ucm_home}/
+# Install application files
+cp -r backend %{buildroot}%{_datadir}/%{name}/
+cp -r frontend %{buildroot}%{_datadir}/%{name}/
+cp -r scripts %{buildroot}%{_datadir}/%{name}/
 
-# Remove .env files (configuration created by postinst)
-find %{buildroot}%{ucm_home} -name ".env*" -delete
+# Remove .env files (configuration is created by %post script)
+find %{buildroot}%{_datadir}/%{name} -name ".env*" -delete
 
-# Install root files (requirements from backend, gunicorn/wsgi from root)
-install -m 644 backend/requirements.txt %{buildroot}%{ucm_home}/
-install -m 644 gunicorn.conf.py %{buildroot}%{ucm_home}/
-install -m 755 wsgi.py %{buildroot}%{ucm_home}/
+install -m 644 requirements.txt %{buildroot}%{_datadir}/%{name}/
+install -m 644 gunicorn.conf.py %{buildroot}%{_datadir}/%{name}/
+install -m 755 wsgi.py %{buildroot}%{_datadir}/%{name}/
 
 # Install systemd service
 install -m 644 packaging/rpm/ucm.service %{buildroot}%{_unitdir}/%{name}.service
@@ -73,22 +72,23 @@ install -m 755 packaging/scripts/ucm-configure %{buildroot}%{_bindir}/ucm-config
 # Create ucm user and group
 getent group %{name} >/dev/null || groupadd -r %{name}
 getent passwd %{name} >/dev/null || \
-    useradd -r -g %{name} -d %{ucm_home} \
+    useradd -r -g %{name} -d %{_sharedstatedir}/%{name} \
     -s /sbin/nologin -c "UCM Service Account" %{name}
 
-# Backup existing data on upgrade
+# Backup existing installation
 if [ $1 -eq 2 ]; then
+    # Upgrade - create backup
     BACKUP_DIR="/var/backups/ucm/upgrade-$(date +%%Y%%m%%d-%%H%%M%%S)"
     mkdir -p "$BACKUP_DIR"
-    if [ -d "%{ucm_data}" ]; then
-        cp -r %{ucm_data} "$BACKUP_DIR/"
+    if [ -d "%{_sharedstatedir}/%{name}" ]; then
+        cp -r %{_sharedstatedir}/%{name} "$BACKUP_DIR/"
         echo "Backup created at: $BACKUP_DIR"
     fi
 fi
 
 %post
-# Generate configuration if not present
-ENV_FILE="%{ucm_config}/ucm.env"
+# Generate secrets if not present
+ENV_FILE="%{_sysconfdir}/%{name}/.env"
 
 if [ ! -f "$ENV_FILE" ]; then
     echo "Generating initial configuration..."
@@ -97,65 +97,87 @@ if [ ! -f "$ENV_FILE" ]; then
     SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
     JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
     ADMIN_PASSWORD=$(python3 -c 'import secrets; print(secrets.token_urlsafe(16))')
+    
+    # Get FQDN
     FQDN=$(hostname -f 2>/dev/null || hostname)
     
+    # Create .env file
     cat > "$ENV_FILE" << EOF
 # UCM Configuration - Generated on $(date)
-# Directory paths
-BASE_DIR=%{ucm_home}
-DATA_DIR=%{ucm_data}
+# IMPORTANT: Review and customize these settings!
 
-# Network
+# Core Settings
+BASE_DIR=%{_datadir}/%{name}
+DATA_DIR=%{_sharedstatedir}/%{name}
+LOG_DIR=%{_localstatedir}/log/%{name}
 FQDN=${FQDN}
 HTTPS_PORT=8443
+HTTP_PORT=8080
 
-# Security (DO NOT SHARE!)
+# Security
 SECRET_KEY=${SECRET_KEY}
 JWT_SECRET_KEY=${JWT_SECRET}
 
 # Database
-DATABASE_PATH=%{ucm_data}/ucm.db
+DATABASE_PATH=%{_sharedstatedir}/%{name}/ucm.db
+SQLALCHEMY_DATABASE_URI=sqlite:///%{_sharedstatedir}/%{name}/ucm.db
 
-# Initial Admin (CHANGE PASSWORD AFTER LOGIN!)
+# Initial Admin (CHANGE PASSWORD IMMEDIATELY!)
 INITIAL_ADMIN_USERNAME=admin
 INITIAL_ADMIN_PASSWORD=${ADMIN_PASSWORD}
 INITIAL_ADMIN_EMAIL=admin@${FQDN}
 
 # HTTPS
-HTTPS_CERT_PATH=%{ucm_data}/https_cert.pem
-HTTPS_KEY_PATH=%{ucm_data}/https_key.pem
+HTTPS_AUTO_GENERATE=true
+HTTPS_CERT_PATH=%{_sysconfdir}/%{name}/https_cert.pem
+HTTPS_KEY_PATH=%{_sysconfdir}/%{name}/https_key.pem
 
 # Features
 SCEP_ENABLED=true
 ACME_ENABLED=true
+OCSP_ENABLED=true
+CRL_AUTO_REGEN=true
 EOF
 
     chmod 600 "$ENV_FILE"
+    chown %{name}:%{name} "$ENV_FILE"
     
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo " UCM INSTALLED!"
+    echo " UCM INSTALLED SUCCESSFULLY!"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo " Admin: admin / ${ADMIN_PASSWORD}"
-    echo " ⚠️  CHANGE PASSWORD AFTER FIRST LOGIN!"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo " Initial admin credentials:"
+    echo "   Username: admin"
+    echo "   Password: ${ADMIN_PASSWORD}"
+    echo ""
+    echo " ⚠️  CHANGE THIS PASSWORD IMMEDIATELY AFTER FIRST LOGIN!"
+    echo ""
+    echo " Configuration file: $ENV_FILE"
+    echo " To reconfigure: ucm-configure"
+    echo ""
 fi
 
-# Set ownership
-chown -R %{name}:%{name} %{ucm_home}
-chown -R %{name}:%{name} %{ucm_data}
-chown -R %{name}:%{name} %{ucm_config}
-chown -R %{name}:%{name} %{ucm_log}
-chmod 700 %{ucm_data}/{ca,certs,private,backups}
+# Set permissions
+chown -R %{name}:%{name} %{_sharedstatedir}/%{name}
+chown -R %{name}:%{name} %{_localstatedir}/log/%{name}
+chown -R %{name}:%{name} %{_sysconfdir}/%{name}
+chmod 700 %{_sharedstatedir}/%{name}/{cas,certs,backups}
+chmod 600 %{_sysconfdir}/%{name}/.env 2>/dev/null || true
 
-# Generate HTTPS certificate if missing
-CERT_PATH="%{ucm_data}/https_cert.pem"
-KEY_PATH="%{ucm_data}/https_key.pem"
+# Allow ucm user to restart service (for HTTPS cert apply)
+echo "ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm" > /etc/sudoers.d/ucm-service
+chmod 440 /etc/sudoers.d/ucm-service
+
+# Generate self-signed HTTPS certificate compatible with modern browsers
+CERT_PATH="%{_sysconfdir}/%{name}/https_cert.pem"
+KEY_PATH="%{_sysconfdir}/%{name}/https_key.pem"
 
 if [ ! -f "$CERT_PATH" ]; then
     echo "Generating HTTPS certificate..."
     FQDN=$(hostname -f 2>/dev/null || hostname)
     IP=$(hostname -I | awk '{print $1}')
+    FQDN_BASE=$(echo $FQDN | cut -d. -f2-)
     
     cat > /tmp/ucm-ssl.cnf << SSLEOF
 [req]
@@ -164,80 +186,128 @@ x509_extensions = v3_req
 prompt = no
 
 [req_distinguished_name]
-CN = ${FQDN}
+C = US
+ST = State
+L = City
 O = Ultimate CA Manager
+OU = IT
+CN = ${FQDN}
 
 [v3_req]
-keyUsage = critical, digitalSignature, keyEncipherment
+# Key Usage - critical for modern browsers (macOS/Safari/Chrome)
+keyUsage = critical, digitalSignature, keyEncipherment, keyAgreement
+# Extended Key Usage - TLS Server Authentication
 extendedKeyUsage = serverAuth
-subjectAltName = DNS:${FQDN},DNS:localhost,IP:${IP},IP:127.0.0.1
+# Subject Alternative Name - required by modern browsers
+subjectAltName = @alt_names
+# Basic Constraints - not a CA
 basicConstraints = critical, CA:FALSE
+# Subject Key Identifier
+subjectKeyIdentifier = hash
+
+[alt_names]
+DNS.1 = ${FQDN}
+DNS.2 = localhost
+DNS.3 = *.${FQDN_BASE}
+IP.1 = ${IP}
+IP.2 = 127.0.0.1
 SSLEOF
     
     openssl req -x509 -newkey rsa:4096 -sha256 -nodes \
-        -keyout "$KEY_PATH" -out "$CERT_PATH" -days 365 \
-        -config /tmp/ucm-ssl.cnf -extensions v3_req 2>/dev/null
+        -keyout "$KEY_PATH" \
+        -out "$CERT_PATH" \
+        -days 365 \
+        -config /tmp/ucm-ssl.cnf \
+        -extensions v3_req \
+        2>/dev/null
     
     rm -f /tmp/ucm-ssl.cnf
     chmod 600 "$KEY_PATH"
     chmod 644 "$CERT_PATH"
-    chown %{name}:%{name} "$KEY_PATH" "$CERT_PATH"
-    echo "✓ Certificate generated"
+    chown %{name}:%{name} "$KEY_PATH"
+    chown %{name}:%{name} "$CERT_PATH"
+    
+    echo "✓ HTTPS certificate generated"
 fi
 
-# Create Python venv
-if [ ! -d "%{ucm_home}/venv" ]; then
-    echo "Creating Python environment..."
-    cd %{ucm_home}
+# Create Python virtual environment
+VENV_DIR="%{_datadir}/%{name}/venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Creating Python virtual environment..."
+    cd %{_datadir}/%{name}
     python3 -m venv venv
     venv/bin/pip install --quiet --upgrade pip
     venv/bin/pip install --quiet -r requirements.txt
-    chown -R %{name}:%{name} venv
-    echo "✓ Python environment ready"
+    echo "✓ Virtual environment created"
 fi
 
-# Initialize database
-if [ ! -f "%{ucm_data}/ucm.db" ]; then
+# Initialize database if it doesn't exist
+if [ ! -f "%{_sharedstatedir}/%{name}/ucm.db" ]; then
     echo "Initializing database..."
-    cd %{ucm_home}/backend
-    set -a; [ -f "$ENV_FILE" ] && . "$ENV_FILE"; set +a
-    sudo -u %{name} ../venv/bin/python init_db.py
+    cd %{_datadir}/%{name}
+    # Load environment variables
+    set -a
+    [ -f "$ENV_FILE" ] && . "$ENV_FILE"
+    set +a
+    venv/bin/python backend/init_db.py
     echo "✓ Database initialized"
 fi
 
-# Clean up any stale lock files
-rm -f %{ucm_data}/.db_init.lock 2>/dev/null || true
-
+# Force update systemd service file
+if [ -f %{_datadir}/%{name}/packaging/rpm/ucm.service ]; then
+    cp -f %{_datadir}/%{name}/packaging/rpm/ucm.service %{_unitdir}/ucm.service
+    echo "✓ Updated systemd service file"
+fi
 systemctl daemon-reload >/dev/null 2>&1 || true
+
+# Enable and start service
 %systemd_post %{name}.service
 
-FQDN=$(hostname -f 2>/dev/null || hostname)
 echo ""
-echo " Access: https://${FQDN}:8443"
-echo " Start:  systemctl start ucm"
-echo " Status: systemctl status ucm"
+echo " Access UCM at: https://${FQDN}:8443"
 echo ""
+echo " Start service: systemctl start ucm"
+echo " Enable on boot: systemctl enable ucm"
+echo " Check status: systemctl status ucm"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 %preun
 %systemd_preun %{name}.service
 
 %postun
 %systemd_postun_with_restart %{name}.service
+
+# Remove user on uninstall (not upgrade)
 if [ $1 -eq 0 ]; then
     userdel %{name} 2>/dev/null || true
     groupdel %{name} 2>/dev/null || true
 fi
 
 %files
-%{ucm_home}/
-%{ucm_data}/
-%dir %{ucm_config}/
-%dir %{ucm_log}/
+%{_datadir}/%{name}/
+%{_sysconfdir}/%{name}/
+%{_sharedstatedir}/%{name}/
+%{_localstatedir}/log/%{name}/
 %{_unitdir}/%{name}.service
 %{_bindir}/ucm-configure
 
 %changelog
-* Sun Feb 02 2026 UCM Team <dev@ucm.local> - 2.0.0-1
-- Major v2.0.0 release
-- Unified installation paths (/opt/ucm)
-- Improved packaging for all distributions
+* Thu Jan 09 2026 UCM Team <dev@ucm.local> - 1.8.0-1
+- Enhanced deployment infrastructure (Docker, packages, CI/CD)
+- Fixed missing dependencies (Flask-Caching, pyasn1)
+- Improved database initialization
+- Added interactive package configuration
+
+* Wed Jan 08 2026 UCM Team <dev@ucm.local> - 1.7.0-1
+- ACME protocol Phase 1 support
+- WebAuthn/FIDO2 authentication
+- mTLS client authentication
+- UI/UX improvements and bug fixes
+- Email notifications for certificate expiry
+
+* Tue Jan 07 2026 UCM Team <dev@ucm.local> - 1.6.2-1
+- Initial RPM package
+- Complete PKI management platform
+- OCSP, CRL, SCEP support
+- REST API and Web UI

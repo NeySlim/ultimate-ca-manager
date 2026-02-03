@@ -471,8 +471,6 @@ class RestoreService:
     
     def _signal_restart(self):
         """Signal that service restart is needed"""
-        # Cross-platform path
-        data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
-        restart_file = Path(data_dir) / '.restart_requested'
+        restart_file = Path('/opt/ucm/backend/data/.restart_requested')
         restart_file.parent.mkdir(parents=True, exist_ok=True)
         restart_file.touch()

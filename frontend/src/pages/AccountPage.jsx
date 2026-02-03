@@ -444,6 +444,7 @@ export default function AccountPage() {
       {/* WebAuthn */}
       <DetailSection 
         title="Security Keys (WebAuthn/FIDO2)"
+        subtitle="Use YubiKey, TouchID, or Windows Hello for passwordless login"
         actions={
           <Button size="sm" onClick={() => setShowWebAuthnModal(true)}>
             <Plus size={14} className="mr-1" />
@@ -451,10 +452,6 @@ export default function AccountPage() {
           </Button>
         }
       >
-        <p className="text-sm text-text-secondary mb-3">
-          Use YubiKey, TouchID, or Windows Hello for passwordless login
-        </p>
-        
         {webauthnCredentials.length === 0 ? (
           <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
             <Fingerprint size={28} className="mx-auto mb-2 text-text-tertiary" />

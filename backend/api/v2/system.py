@@ -295,7 +295,7 @@ def regenerate_https_cert():
                 pass
             return success_response(message="Certificate regenerated. Reload signal sent.")
         else:
-            subprocess.Popen(['systemctl', 'restart', 'ucm'],
+            subprocess.Popen(['sudo', 'systemctl', 'restart', 'ucm'],
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL)
             return success_response(message="Certificate regenerated. Service restarting...")
@@ -386,7 +386,7 @@ def apply_https_cert():
             return success_response(message="Certificate applied. Reload signal sent.")
         else:
             # On systemd systems, restart the service
-            subprocess.Popen(['systemctl', 'restart', 'ucm'], 
+            subprocess.Popen(['sudo', 'systemctl', 'restart', 'ucm'], 
                             stdout=subprocess.DEVNULL, 
                             stderr=subprocess.DEVNULL)
             return success_response(message="Certificate applied. Service restarting...")

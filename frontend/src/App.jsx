@@ -10,7 +10,7 @@ const CertificatesPage = lazy(() => import('./pages/CertificatesPage'))
 const CAsPage = lazy(() => import('./pages/CAsPage'))
 const CSRsPage = lazy(() => import('./pages/CSRsPage'))
 const TemplatesPage = lazy(() => import('./pages/TemplatesPage'))
-const UsersPage = lazy(() => import('./pages/UsersPage'))
+const UsersGroupsPage = lazy(() => import('./pages/UsersGroupsPage'))
 const ACMEPage = lazy(() => import('./pages/ACMEPage'))
 const SCEPPage = lazy(() => import('./pages/SCEPPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
@@ -22,9 +22,6 @@ const TrustStorePage = lazy(() => import('./pages/TrustStorePage'))
 const PrototypeDesign = lazy(() => import('./pages/PrototypeDesign'))
 
 // Pro pages - lazy load with graceful fallback
-const GroupsPage = lazy(() => 
-  import('./pro/pages/GroupsPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
-)
 const RBACPage = lazy(() => 
   import('./pro/pages/RBACPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
 )
@@ -73,7 +70,7 @@ function AppRoutes() {
           <Route path="/cas" element={<ProtectedRoute><CAsPage /></ProtectedRoute>} />
           <Route path="/csrs" element={<ProtectedRoute><CSRsPage /></ProtectedRoute>} />
           <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
-          <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute><UsersGroupsPage /></ProtectedRoute>} />
           <Route path="/acme" element={<ProtectedRoute><ACMEPage /></ProtectedRoute>} />
           <Route path="/scep-config" element={<ProtectedRoute><SCEPPage /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />

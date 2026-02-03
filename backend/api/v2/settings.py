@@ -34,7 +34,6 @@ def get_general_settings():
     """Get general settings from database"""
     return success_response(data={
         'site_name': get_config('site_name', 'UCM'),
-        'base_url': get_config('base_url', ''),
         'timezone': get_config('timezone', 'UTC'),
         'auto_backup_enabled': get_config('auto_backup_enabled', 'false') == 'true',
         'backup_frequency': get_config('backup_frequency', 'daily'),
@@ -54,7 +53,7 @@ def update_general_settings():
     
     # List of allowed settings
     allowed_keys = [
-        'site_name', 'base_url', 'timezone', 'auto_backup_enabled', 'backup_frequency',
+        'site_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
         'backup_retention_days', 'backup_password', 'session_timeout',
         'max_login_attempts', 'lockout_duration'
     ]
