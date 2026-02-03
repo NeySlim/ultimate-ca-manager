@@ -1,26 +1,28 @@
-ucm (1.8.0-beta) unstable; urgency=medium
+ucm (2.0.0) stable; urgency=medium
 
-  * New features:
-    - Enhanced Docker infrastructure with comprehensive ENV configuration
-    - Add Gunicorn deployment with native mTLS support
-    - Implement hybrid mTLS authentication (native + reverse proxy)
-    - Add global loading indicator for page navigation and login
+  * Version 2.0.0 - Major Release
+  
+  * Features:
+    - Complete UI redesign with 8 themes
+    - Pro: HSM integration page
+    - Pro: SSO/SAML/OIDC integration
+    - Pro: RBAC with role inheritance
+    - Pro: Group management with hierarchies
+    - ACME protocol support (Let's Encrypt compatible)
+    - WebAuthn/FIDO2 passwordless authentication
+    - mTLS client certificate authentication
+    - EST protocol support (RFC 7030)
+    - Auto-renewal service
+    - Webhook notifications
+    - Certificate templates
+    - WebAuthn multi-key registration (platform + cross-platform)
+    - HTTPS certificate selection from managed certs
 
   * Bug fixes:
-    - Make loading indicator background transparent to avoid flash
-    - Add padding: 0 to table cards for rounded corners
+    - Fixed WebAuthn registration for multiple authenticators
+    - Fixed Radix Select empty value handling
+    - Fixed database auto-migration
+    - Fixed HTTPS certificate apply and service restart
+    - Fixed cross-platform DATA_DIR paths
 
-  * Other changes:
-    - fix(settings): Remove leftover JavaScript code causing syntax error
-    - refactor(settings): Replace inline mTLS config with link to dedicated page
-    - feat(mtls): Add dynamic reverse proxy configuration guide
-    - perf: Add Flask-Caching for dashboard and SMTP config
-    - security: Fix XSS vulnerabilities and add input validation
-    - docs: Add comprehensive code audit report
-    - feat(notifications): Add My Notification Settings section with user email preference
-    - refactor(notifications): Hide SMTP config for non-admin users, simplify UI labels
-    - refactor(ui): Remove mTLS Authentication from sidebar (moved to Settings page)
-    - feat(ui): Add My Certificates to sidebar under My Account section
-
-
- -- UCM Development Team <dev@ucm-project.org>  Fri, 09 Jan 2026 19:36:33 +0100
+ -- UCM Development Team <dev@ucm-project.org>  Mon, 03 Feb 2026 14:00:00 +0100
