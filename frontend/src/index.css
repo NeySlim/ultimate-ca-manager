@@ -97,23 +97,24 @@
   --detail-field-bg: rgba(255, 255, 255, 0.02);
   --detail-field-border: rgba(255, 255, 255, 0.05);
   
-  /* Icon colors for dark theme */
-  --icon-orange-bg: rgba(249, 115, 22, 0.15);
-  --icon-orange-text: #FB923C;
-  --icon-amber-bg: rgba(245, 158, 11, 0.15);
-  --icon-amber-text: #FBBF24;
-  --icon-emerald-bg: rgba(52, 211, 153, 0.15);
-  --icon-emerald-text: #34D399;
-  --icon-blue-bg: rgba(79, 142, 247, 0.15);
-  --icon-blue-text: #60A5FA;
-  --icon-violet-bg: rgba(139, 92, 246, 0.15);
-  --icon-violet-text: #A78BFA;
-  --icon-teal-bg: rgba(20, 184, 166, 0.15);
-  --icon-teal-text: #2DD4BF;
+  /* Icon colors - now managed by ThemeContext for theme-awareness */
+  /* Default fallbacks only (will be overridden by JS) */
+  --icon-orange-bg: transparent;
+  --icon-orange-text: currentColor;
+  --icon-amber-bg: transparent;
+  --icon-amber-text: currentColor;
+  --icon-emerald-bg: transparent;
+  --icon-emerald-text: currentColor;
+  --icon-blue-bg: transparent;
+  --icon-blue-text: currentColor;
+  --icon-violet-bg: transparent;
+  --icon-violet-text: currentColor;
+  --icon-teal-bg: transparent;
+  --icon-teal-text: currentColor;
 }
 
 /* ============================================
-   THEME: Light
+   THEME: Light (legacy - most values now in ThemeContext)
    ============================================ */
 .theme-light {
   --bg-primary: #FAFBFC;
@@ -130,19 +131,7 @@
   --border-subtle: rgba(0, 0, 0, 0.06);
   --border-strong: rgba(0, 0, 0, 0.12);
   
-  /* Icon colors for light theme - stronger backgrounds */
-  --icon-orange-bg: rgba(249, 115, 22, 0.12);
-  --icon-orange-text: #EA580C;
-  --icon-amber-bg: rgba(245, 158, 11, 0.12);
-  --icon-amber-text: #D97706;
-  --icon-emerald-bg: rgba(16, 185, 129, 0.12);
-  --icon-emerald-text: #059669;
-  --icon-blue-bg: rgba(59, 130, 246, 0.12);
-  --icon-blue-text: #2563EB;
-  --icon-violet-bg: rgba(139, 92, 246, 0.12);
-  --icon-violet-text: #7C3AED;
-  --icon-teal-bg: rgba(20, 184, 166, 0.12);
-  --icon-teal-text: #0D9488;
+  /* Icon colors removed - managed by ThemeContext */
   
   /* Logo gradient colors - light */
   --logo-gradient-start: #3B82F6;

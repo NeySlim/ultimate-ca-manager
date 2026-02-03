@@ -276,7 +276,8 @@ export default function DashboardPage() {
             {/* Recent Certificates */}
             <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
               <Card.Header 
-                icon={Certificate} 
+                icon={Certificate}
+                iconColor="blue"
                 title="Recent Certificates"
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate('/certificates')}>
@@ -319,7 +320,8 @@ export default function DashboardPage() {
             {/* Recent CAs */}
             <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
               <Card.Header 
-                icon={ShieldCheck} 
+                icon={ShieldCheck}
+                iconColor="violet"
                 title="Recent CAs"
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate('/cas')}>
@@ -357,7 +359,8 @@ export default function DashboardPage() {
             {/* System Health */}
             <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
               <Card.Header 
-                icon={Heartbeat} 
+                icon={Heartbeat}
+                iconColor="emerald"
                 title="System Health"
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate('/settings')}>
@@ -407,7 +410,8 @@ export default function DashboardPage() {
             {/* ACME Accounts */}
             <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
               <Card.Header 
-                icon={Globe} 
+                icon={Globe}
+                iconColor="orange"
                 title="ACME Accounts"
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate('/acme')}>
@@ -446,7 +450,8 @@ export default function DashboardPage() {
           {/* Recent Activity with Live Indicator */}
           <Card variant="elevated" className="flex flex-col min-h-[320px] p-0">
             <Card.Header 
-              icon={ClockCounterClockwise} 
+              icon={ClockCounterClockwise}
+              iconColor="teal"
               title="Recent Activity"
               subtitle={isConnected ? "Live updates" : undefined}
               action={
@@ -528,10 +533,10 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
   }
   
   const iconStyles = {
-    blue: 'status-primary-bg status-primary-text',
-    purple: 'status-primary-bg status-primary-text',
-    yellow: 'status-warning-bg status-warning-text',
-    emerald: 'status-success-bg status-success-text',
+    blue: 'icon-bg-blue icon-text-blue',
+    purple: 'icon-bg-violet icon-text-violet',
+    yellow: 'icon-bg-amber icon-text-amber',
+    emerald: 'icon-bg-emerald icon-text-emerald',
     slate: 'bg-bg-tertiary text-text-secondary',
   }
   
