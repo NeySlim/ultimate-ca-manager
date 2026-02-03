@@ -15,6 +15,7 @@ import {
 } from '../../components'
 import { useNotification } from '../../contexts/NotificationContext'
 import { apiClient } from '../../services/apiClient'
+import { ERRORS, SUCCESS, CONFIRM } from '../../lib/messages'
 
 const PROVIDER_TYPES = [
   { value: 'pkcs11', label: 'PKCS#11 (Local HSM)', icon: HardDrive },
@@ -56,7 +57,7 @@ export default function HSMPage() {
       const response = await apiClient.get('/hsm/providers')
       setProviders(response.data || [])
     } catch (error) {
-      showError('Failed to load HSM providers')
+      showError(ERRORS.LOAD_FAILED.HSM_PROVIDERS)
     } finally {
       setLoading(false)
     }
@@ -84,15 +85,15 @@ export default function HSMPage() {
   }
 
   const handleDelete = async (provider) => {
-    if (!confirm(`Delete HSM provider "${provider.name}"?`)) return
+    if (!confirm(CONFIRM.HSM.DELETE_PROVIDER.replace('{name}', provider.name))) return
     
     try {
       await apiClient.delete(`/hsm/providers/${provider.id}`)
-      showSuccess('Provider deleted')
+      showSuccess(SUCCESS.DELETE.PROVIDER)
       loadData()
       setSelectedProvider(null)
     } catch (error) {
-      showError(error.message || 'Failed to delete provider')
+      showError(error.message || ERRORS.DELETE_FAILED.PROVIDER)
     }
   }
 
@@ -101,13 +102,13 @@ export default function HSMPage() {
     try {
       const response = await apiClient.post(`/hsm/providers/${provider.id}/test`)
       if (response.data?.status === 'success') {
-        showSuccess(response.data.message || 'Connection successful')
+        showSuccess(response.data.message || SUCCESS.HSM.CONNECTION_OK)
         loadData()
       } else {
-        showError(response.message || 'Test failed')
+        showError(response.message || ERRORS.HSM.TEST_FAILED)
       }
     } catch (error) {
-      showError(error.message || 'Connection test failed')
+      showError(error.message || ERRORS.HSM.TEST_FAILED)
     } finally {
       setTesting(false)
     }
@@ -117,38 +118,38 @@ export default function HSMPage() {
     try {
       if (modalMode === 'create') {
         await apiClient.post('/hsm/providers', formData)
-        showSuccess('Provider created')
+        showSuccess(SUCCESS.CREATE.PROVIDER)
       } else {
         await apiClient.put(`/hsm/providers/${selectedProvider.id}`, formData)
-        showSuccess('Provider updated')
+        showSuccess(SUCCESS.UPDATE.PROVIDER)
       }
       setShowModal(false)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to save provider')
+      showError(error.message || ERRORS.CREATE_FAILED.PROVIDER)
     }
   }
 
   const handleGenerateKey = async (keyData) => {
     try {
       await apiClient.post(`/hsm/providers/${selectedProvider.id}/keys`, keyData)
-      showSuccess('Key generated')
+      showSuccess(SUCCESS.CREATE.KEY)
       setShowKeyModal(false)
       loadKeys(selectedProvider.id)
     } catch (error) {
-      showError(error.message || 'Failed to generate key')
+      showError(error.message || ERRORS.CREATE_FAILED.GENERIC)
     }
   }
 
   const handleDeleteKey = async (key) => {
-    if (!confirm(`Destroy key "${key.key_label}"? This cannot be undone.`)) return
+    if (!confirm(CONFIRM.HSM.DELETE_KEY.replace('{name}', key.key_label))) return
     
     try {
       await apiClient.delete(`/hsm/keys/${key.id}`)
-      showSuccess('Key destroyed')
+      showSuccess(SUCCESS.DELETE.KEY)
       loadKeys(selectedProvider.id)
     } catch (error) {
-      showError(error.message || 'Failed to destroy key')
+      showError(error.message || ERRORS.DELETE_FAILED.KEY)
     }
   }
 

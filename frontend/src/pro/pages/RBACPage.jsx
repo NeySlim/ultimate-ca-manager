@@ -11,41 +11,68 @@ import {
 } from '@phosphor-icons/react'
 import {
   UnifiedManagementLayout, Button, Input, Badge, FormModal, HelpCard,
-  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
+  CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader,
+  FormSelect
 } from '../../components'
 import { useNotification } from '../../contexts'
 import { useModals } from '../../hooks'
 import { apiClient } from '../../services/apiClient'
+import { ERRORS, SUCCESS, CONFIRM } from '../../lib/messages'
 
-// Permission categories for RBAC
+// Permission categories for RBAC - aligned with backend
 const PERMISSION_CATEGORIES = {
   certificates: {
     label: 'Certificates',
-    permissions: ['read:certs', 'write:certs', 'delete:certs', 'revoke:certs', 'export:certs']
+    permissions: ['read:certs', 'write:certs', 'delete:certs', 'revoke:certs']
   },
   cas: {
     label: 'Certificate Authorities',
-    permissions: ['read:cas', 'write:cas', 'delete:cas', 'export:cas']
+    permissions: ['read:cas', 'write:cas', 'delete:cas', 'admin:cas']
+  },
+  csrs: {
+    label: 'Certificate Requests',
+    permissions: ['read:csrs', 'write:csrs', 'delete:csrs', 'sign:csrs']
   },
   users: {
     label: 'User Management',
-    permissions: ['read:users', 'write:users', 'delete:users']
+    permissions: ['read:users', 'write:users', 'delete:users', 'admin:users']
+  },
+  groups: {
+    label: 'Group Management',
+    permissions: ['read:groups', 'write:groups', 'delete:groups', 'admin:groups']
   },
   settings: {
     label: 'System Settings',
-    permissions: ['read:settings', 'write:settings']
+    permissions: ['read:settings', 'write:settings', 'admin:system']
   },
   audit: {
     label: 'Audit Logs',
     permissions: ['read:audit', 'export:audit']
   },
-  scep: {
-    label: 'SCEP Protocol',
-    permissions: ['read:scep', 'write:scep', 'approve:scep']
-  },
+  // Pro features
   acme: {
     label: 'ACME Protocol',
-    permissions: ['read:acme', 'write:acme']
+    permissions: ['read:acme', 'write:acme', 'delete:acme']
+  },
+  scep: {
+    label: 'SCEP Protocol',
+    permissions: ['read:scep', 'write:scep', 'delete:scep']
+  },
+  truststore: {
+    label: 'Trust Store',
+    permissions: ['read:truststore', 'write:truststore', 'delete:truststore']
+  },
+  hsm: {
+    label: 'HSM Management',
+    permissions: ['read:hsm', 'write:hsm', 'delete:hsm']
+  },
+  sso: {
+    label: 'Single Sign-On',
+    permissions: ['read:sso', 'write:sso', 'delete:sso']
+  },
+  templates: {
+    label: 'Certificate Templates',
+    permissions: ['read:templates', 'write:templates', 'delete:templates']
   }
 }
 
@@ -66,6 +93,7 @@ export default function RBACPage() {
     name: '',
     description: '',
     permissions: [],
+    inherits_from: null,  // Parent role ID for inheritance
     is_system: false
   })
 
@@ -79,7 +107,7 @@ export default function RBACPage() {
       const res = await apiClient.get('/rbac/roles')
       setRoles(res.data || [])
     } catch (error) {
-      showError('Failed to load roles')
+      showError(ERRORS.LOAD_FAILED.ROLES)
     } finally {
       setLoading(false)
     }
@@ -88,12 +116,12 @@ export default function RBACPage() {
   const handleCreate = async () => {
     try {
       await apiClient.post('/rbac/roles', formData)
-      showSuccess('Role created')
+      showSuccess(SUCCESS.CREATE.ROLE)
       closeModal('create')
       loadRoles()
-      setFormData({ name: '', description: '', permissions: [], is_system: false })
+      setFormData({ name: '', description: '', permissions: [], inherits_from: null, is_system: false })
     } catch (error) {
-      showError(error.message || 'Failed to create role')
+      showError(error.message || ERRORS.CREATE_FAILED.ROLE)
     }
   }
 
@@ -104,26 +132,26 @@ export default function RBACPage() {
         ...selectedRole,
         permissions: selectedRole.permissions
       })
-      showSuccess('Role updated')
+      showSuccess(SUCCESS.UPDATE.ROLE)
       loadRoles()
     } catch (error) {
-      showError(error.message || 'Failed to update role')
+      showError(error.message || ERRORS.UPDATE_FAILED.ROLE)
     }
   }
 
   const handleDelete = async (role) => {
     if (role.is_system) {
-      showError('Cannot delete system role')
+      showError(CONFIRM.RBAC.SYSTEM_ROLE)
       return
     }
-    if (!confirm(`Delete role "${role.name}"? Users with this role will be set to 'viewer'.`)) return
+    if (!confirm(CONFIRM.RBAC.DELETE_ROLE.replace('{name}', role.name))) return
     try {
       await apiClient.delete(`/rbac/roles/${role.id}`)
-      showSuccess('Role deleted')
+      showSuccess(SUCCESS.DELETE.ROLE)
       setSelectedRole(null)
       loadRoles()
     } catch (error) {
-      showError(error.message || 'Failed to delete role')
+      showError(error.message || ERRORS.DELETE_FAILED.ROLE)
     }
   }
 
@@ -178,11 +206,23 @@ export default function RBACPage() {
       )
     },
     {
+      key: 'inherits_from',
+      header: 'Inherits',
+      render: (val, row) => val ? (
+        <Badge variant="info" size="sm">
+          ↑ {row.parent_name || `#${val}`}
+        </Badge>
+      ) : (
+        <span className="text-text-tertiary text-xs">—</span>
+      )
+    },
+    {
       key: 'permissions',
       header: 'Permissions',
-      render: (val) => (
+      render: (val, row) => (
         <span className="text-xs text-text-secondary">
-          {val?.length || 0} / {totalPermissions}
+          {row.all_permissions?.length || val?.length || 0} / {totalPermissions}
+          {row.inherits_from && <span className="text-text-tertiary ml-1">(+{(row.all_permissions?.length || 0) - (val?.length || 0)})</span>}
         </span>
       )
     },
@@ -259,9 +299,21 @@ export default function RBACPage() {
         <CompactGrid>
           <CompactField label="Name" value={role.name} />
           <CompactField label="Type" value={role.is_system ? 'System' : 'Custom'} />
+          {role.inherits_from && (
+            <CompactField 
+              label="Inherits From" 
+              value={role.parent_name || `Role #${role.inherits_from}`} 
+            />
+          )}
         </CompactGrid>
         {role.description && (
           <p className="text-xs text-text-secondary mt-2">{role.description}</p>
+        )}
+        {role.inherits_from && (
+          <p className="text-xs text-text-tertiary mt-2 italic">
+            ⚡ Inherited permissions: {(role.all_permissions?.length || 0) - (role.permissions?.length || 0)} 
+            + Direct: {role.permissions?.length || 0}
+          </p>
         )}
       </CompactSection>
 
@@ -270,9 +322,10 @@ export default function RBACPage() {
         <div className="space-y-4">
           {Object.entries(PERMISSION_CATEGORIES).map(([key, category]) => {
             const categoryPerms = category.permissions
-            const selectedPerms = role.permissions || []
-            const allSelected = categoryPerms.every(p => selectedPerms.includes(p))
-            const someSelected = categoryPerms.some(p => selectedPerms.includes(p))
+            const directPerms = role.permissions || []
+            const allPerms = role.all_permissions || directPerms
+            const allSelected = categoryPerms.every(p => allPerms.includes(p))
+            const someSelected = categoryPerms.some(p => allPerms.includes(p))
 
             return (
               <div key={key} className="border-b border-border/30 pb-3 last:border-0 last:pb-0">
@@ -293,26 +346,34 @@ export default function RBACPage() {
 
                 <div className="flex flex-wrap gap-1.5 pl-5">
                   {categoryPerms.map(perm => {
-                    const isSelected = selectedPerms.includes(perm)
+                    const isDirect = directPerms.includes(perm)
+                    const isInherited = !isDirect && allPerms.includes(perm)
+                    const isSelected = isDirect || isInherited
                     const permLabel = perm.split(':')[0]
 
                     return (
                       <button
                         key={perm}
                         onClick={() => togglePermission(perm)}
-                        disabled={role.is_system}
+                        disabled={role.is_system || isInherited}
+                        title={isInherited ? `Inherited from ${role.parent_name}` : undefined}
                         className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-all ${
-                          isSelected
+                          isDirect
                             ? 'status-success-bg status-success-text status-success-border border'
+                            : isInherited
+                            ? 'status-primary-bg status-primary-text border border-dashed border-accent-primary/30'
                             : 'bg-bg-tertiary text-text-secondary hover:bg-bg-tertiary/80'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
-                        {isSelected ? (
+                        {isDirect ? (
                           <CheckCircle size={10} weight="fill" />
+                        ) : isInherited ? (
+                          <CheckCircle size={10} weight="duotone" />
                         ) : (
                           <XCircle size={10} />
                         )}
                         {permLabel}
+                        {isInherited && <span className="opacity-60">↑</span>}
                       </button>
                     )
                   })}
@@ -431,6 +492,19 @@ export default function RBACPage() {
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           placeholder="Brief description of this role"
+        />
+        <FormSelect
+          label="Inherits From"
+          value={formData.inherits_from?.toString() || '__none__'}
+          onChange={(value) => setFormData({ ...formData, inherits_from: value && value !== '__none__' ? parseInt(value) : null })}
+          options={[
+            { value: '__none__', label: 'None (standalone role)' },
+            ...roles.filter(r => !r.is_system).map(r => ({
+              value: r.id.toString(),
+              label: r.name
+            }))
+          ]}
+          hint="Inherit permissions from another role"
         />
       </FormModal>
     </>
