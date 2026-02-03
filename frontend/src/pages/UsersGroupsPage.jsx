@@ -280,32 +280,53 @@ export default function UsersGroupsPage() {
       header: 'User',
       priority: 1,
       sortable: true,
-      render: (val, row) => (
-        <div className="flex items-center gap-3">
-          <div className={cn(
-            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
-            row.active ? "bg-accent-primary/10 text-accent-primary" : "bg-text-muted/10 text-text-muted"
-          )}>
-            {val?.charAt(0)?.toUpperCase() || '?'}
+      render: (val, row) => {
+        // Color avatar based on role AND status
+        const avatarColors = {
+          admin: 'bg-violet-500/20 text-violet-500 ring-1 ring-violet-500/30',
+          operator: 'bg-accent-primary/15 text-accent-primary ring-1 ring-accent-primary/30',
+          viewer: 'bg-teal-500/15 text-teal-500 ring-1 ring-teal-500/30'
+        }
+        // Override with orange for disabled users
+        const colorClass = row.active 
+          ? (avatarColors[row.role] || avatarColors.viewer)
+          : 'bg-orange-500/15 text-orange-500 ring-1 ring-orange-500/30'
+        return (
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm",
+              colorClass
+            )}>
+              {val?.charAt(0)?.toUpperCase() || '?'}
+            </div>
+            <div className="min-w-0">
+              <div className="font-medium text-text-primary truncate">{val || '—'}</div>
+              <div className="text-xs text-text-secondary truncate">{row.email || '—'}</div>
+            </div>
           </div>
-          <div className="min-w-0">
-            <div className="font-medium text-text-primary truncate">{val || '—'}</div>
-            <div className="text-xs text-text-secondary truncate">{row.email || '—'}</div>
-          </div>
-        </div>
-      )
+        )
+      }
     },
     {
       key: 'role',
       header: 'Role',
       priority: 2,
       sortable: true,
-      render: (val, row) => (
-        <Badge variant={val === 'admin' ? 'primary' : val === 'operator' ? 'secondary' : 'outline'} size="sm">
-          {val === 'admin' && <Crown weight="fill" className="h-3 w-3 mr-1" />}
-          {val || 'viewer'}
-        </Badge>
-      )
+      render: (val, row) => {
+        // Colorful role badges for ALL roles
+        const roleConfig = {
+          admin: { variant: 'violet', dot: true },
+          operator: { variant: 'primary', dot: false },
+          viewer: { variant: 'teal', dot: false }
+        }
+        const config = roleConfig[val] || roleConfig.viewer
+        return (
+          <Badge variant={config.variant} size="sm" dot={config.dot}>
+            {val === 'admin' && <Crown weight="fill" className="h-3 w-3 mr-1" />}
+            {val || 'viewer'}
+          </Badge>
+        )
+      }
     },
     {
       key: 'active',
@@ -313,7 +334,13 @@ export default function UsersGroupsPage() {
       priority: 3,
       sortable: true,
       render: (val) => (
-        <Badge variant={val ? 'success' : 'secondary'} size="sm" icon={val ? CheckCircle : XCircle}>
+        <Badge 
+          variant={val ? 'success' : 'orange'} 
+          size="sm" 
+          icon={val ? CheckCircle : XCircle} 
+          dot 
+          pulse={val}
+        >
           {val ? 'Active' : 'Disabled'}
         </Badge>
       )

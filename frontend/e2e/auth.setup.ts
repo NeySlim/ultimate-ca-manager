@@ -15,74 +15,48 @@ const authFile = 'e2e/.auth/user.json'
  * 5. Click link → Enter password → Sign in
  */
 setup('authenticate', async ({ page }) => {
-  // Listen to all network requests for debugging
-  const requests: string[] = []
-  page.on('response', async response => {
-    const url = response.url()
-    if (url.includes('/api/')) {
-      const status = response.status()
-      let body = ''
-      try {
-        body = await response.text()
-      } catch {}
-      requests.push(`${status} ${url}: ${body.substring(0, 200)}`)
-    }
-  })
-  
   // Go to login page
   await page.goto('/login')
-  await page.waitForLoadState('networkidle')
-  await page.waitForTimeout(2000)
+  
+  // Wait for login form
+  await page.waitForSelector('input[type="text"], input[name="username"]', { timeout: 10000 })
   
   // Step 1: Enter username
-  const usernameInput = page.locator('input:visible').first()
-  await usernameInput.click()
-  await usernameInput.type(config.credentials.username)
+  const usernameInput = page.locator('input[type="text"], input[name="username"]').first()
+  await usernameInput.fill(config.credentials.username)
   
   // Click Continue button
-  await page.locator('button:has-text("Continue")').click()
-  await page.waitForTimeout(2000)
+  const continueButton = page.locator('button[type="submit"]').first()
+  await continueButton.click()
   
-  // Step 2: Check if WebAuthn is shown (user has security keys), click Password link
-  // Wait for WebAuthn prompt to appear
+  // Wait for auth method detection and WebAuthn timeout
+  // WebAuthn will timeout after ~30s if no key is touched
+  // The "Use password instead" link appears when loading=false
   await page.waitForTimeout(3000)
   
-  // Click on Password option to switch to password auth
-  const passwordLink = page.getByText('Password', { exact: true })
+  // Try to find and click "Use password instead" link (may need to wait for WebAuthn to stop loading)
+  const usePasswordLink = page.locator('text=Use password instead')
   try {
-    await passwordLink.waitFor({ state: 'visible', timeout: 5000 })
-    await passwordLink.click()
-    await page.waitForTimeout(2000)
+    await usePasswordLink.waitFor({ state: 'visible', timeout: 35000 })
+    await usePasswordLink.click()
   } catch {
-    // Password link might not be visible if WebAuthn not available
-    console.log('No WebAuthn prompt, proceeding with password')
+    // If link doesn't appear, password field might already be visible
+    console.log('Password link not found, checking for password field directly')
   }
   
-  // Step 3: Enter password
-  const passwordInput = page.locator('input[placeholder="Enter your password"]')
-  await passwordInput.waitFor({ state: 'visible', timeout: 10000 })
-  await passwordInput.click()
-  // Type slowly to let React pick up each char
-  await page.keyboard.type(config.credentials.password, { delay: 50 })
-  
-  // Debug: screenshot before clicking Sign In
-  await page.screenshot({ path: 'e2e/debug-before-signin.png' })
+  // Step 2: Enter password
+  await page.waitForSelector('input[type="password"]', { timeout: 10000 })
+  const passwordInput = page.locator('input[type="password"]')
+  await passwordInput.fill(config.credentials.password)
   
   // Click Sign In button
-  await page.locator('button:has-text("Sign In")').click()
-  await page.waitForTimeout(3000)
+  const signInButton = page.locator('button[type="submit"]').first()
+  await signInButton.click()
   
-  // Debug: screenshot after clicking Sign In
-  await page.screenshot({ path: 'e2e/debug-after-signin.png' })
+  // Wait for dashboard (successful login)
+  await page.waitForURL('**/dashboard', { timeout: 15000 })
   
-  // Wait for dashboard or show what happened
-  const currentUrl = page.url()
-  if (!currentUrl.includes('dashboard')) {
-    console.log('API Requests:', requests.join('\n'))
-    throw new Error(`Login failed - current URL: ${currentUrl}\nAPI Requests:\n${requests.join('\n')}`)
-  }
-  
-  // Verify we're logged in
+  // Verify we're logged in (wait for sidebar Dashboard link to be visible)
   await expect(page.getByRole('link', { name: 'Dashboard', exact: true })).toBeVisible({ timeout: 10000 })
   
   // Save authentication state

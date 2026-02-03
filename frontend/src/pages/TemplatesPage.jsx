@@ -209,12 +209,19 @@ export default function TemplatesPage() {
       header: 'Template',
       priority: 1,
       sortable: true,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <FileText size={16} className="text-accent-primary shrink-0" />
-          <span className="font-medium truncate">{val || 'Unnamed'}</span>
-        </div>
-      )
+      render: (val, row) => {
+        const type = getTemplateType(row)
+        return (
+          <div className="flex items-center gap-2">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+              type === 'ca' ? 'bg-amber-500/15 text-amber-500' : 'bg-accent-primary/15 text-accent-primary'
+            }`}>
+              {type === 'ca' ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
+            </div>
+            <span className="font-medium truncate">{val || 'Unnamed'}</span>
+          </div>
+        )
+      }
     },
     {
       key: 'type',
@@ -222,7 +229,7 @@ export default function TemplatesPage() {
       priority: 2,
       sortable: true,
       render: (val) => (
-        <Badge variant={val === 'ca' ? 'warning' : 'primary'} size="sm">
+        <Badge variant={val === 'ca' ? 'amber' : 'primary'} size="sm" dot>
           {val === 'ca' ? 'CA' : 'Certificate'}
         </Badge>
       )

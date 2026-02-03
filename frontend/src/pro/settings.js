@@ -1,5 +1,18 @@
 /**
- * Community Edition - Pro settings features stub  
- * This file exports empty Pro categories for Community edition
+ * Pro Settings Extensions
+ * Dynamically imported by Settings page when Pro module is present
  */
-export const proSettingsCategories = []
+import { Key } from '@phosphor-icons/react'
+import SSOSettingsSection from './components/SSOSettingsSection'
+
+// Additional settings categories for Pro
+export const proSettingsCategories = [
+  { 
+    id: 'sso', 
+    label: 'SSO', 
+    icon: Key, 
+    description: 'Single Sign-On providers',
+    pro: true,
+    component: SSOSettingsSection
+  },
+]
