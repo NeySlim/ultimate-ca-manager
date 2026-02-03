@@ -83,10 +83,25 @@ def create_app(config_name=None):
     migrate = Migrate(app, db)
     jwt = JWTManager(app)
     
+    # Log database type
+    app.logger.info(f"✓ Database: {config.DATABASE_TYPE.upper()}")
+    
     # Initialize server-side session storage
+    # If Redis URL is configured, set up Redis connection
+    redis_url = os.getenv("REDIS_URL")
+    if redis_url:
+        try:
+            import redis
+            app.config['SESSION_REDIS'] = redis.from_url(redis_url)
+            app.logger.info("✓ Redis session store enabled")
+        except ImportError:
+            app.logger.warning("⚠ redis library not installed, falling back to filesystem sessions")
+            app.config['SESSION_TYPE'] = 'filesystem'
+            app.config['SESSION_FILE_DIR'] = config.DATA_DIR / 'sessions'
+    
     Session(app)
     
-    # Ensure session directory exists with correct permissions
+    # Ensure session directory exists with correct permissions (filesystem mode)
     session_dir = app.config.get('SESSION_FILE_DIR')
     if session_dir:
         session_dir.mkdir(parents=True, exist_ok=True)
@@ -223,15 +238,17 @@ def create_app(config_name=None):
                 # ===== PRO TABLES =====
                 # Import Pro models to register them with SQLAlchemy (if Pro is available)
                 try:
-                    from models.pro.group import Group, GroupMember
+                    # Groups are now in community (models.group), Pro only has RBAC/SSO/HSM/Policies
                     from models.pro.rbac import CustomRole, RolePermission
                     from models.pro.sso import SSOProvider, SSOSession
+                    from models.pro.policy import CertificatePolicy, ApprovalRequest
                     
                     # Check if Pro tables exist, create if missing
                     inspector = inspect(db.engine)
                     tables = inspector.get_table_names()
-                    pro_tables = ['pro_groups', 'pro_group_members', 'pro_custom_roles', 
-                                  'pro_role_permissions', 'pro_sso_providers', 'pro_sso_sessions']
+                    pro_tables = ['pro_custom_roles', 'pro_role_permissions', 
+                                  'pro_sso_providers', 'pro_sso_sessions',
+                                  'certificate_policies', 'approval_requests']
                     missing_pro = [t for t in pro_tables if t not in tables]
                     
                     if missing_pro:
@@ -336,35 +353,18 @@ def create_app(config_name=None):
     # Security headers and cleanup
     @app.after_request
     def add_security_headers(response):
-        """Add security headers including CSP"""
-        # Content Security Policy - strict but allows necessary resources
-        if 'Content-Security-Policy' not in response.headers:
-            csp = "; ".join([
-                "default-src 'self'",
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # React needs this
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-                "font-src 'self' https://fonts.gstatic.com data:",
-                "img-src 'self' data: blob:",
-                "connect-src 'self' wss: ws:",  # WebSocket support
-                "frame-ancestors 'self'",
-                "form-action 'self'",
-                "base-uri 'self'",
-                "object-src 'none'"
-            ])
-            response.headers['Content-Security-Policy'] = csp
-        
-        # Permissions-Policy - disable unused features
+        """Add security headers and fix deprecated headers"""
+        # Set Permissions-Policy without deprecated features
+        # Only include valid features that are widely supported
         response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
         
-        # Other security headers
+        # Add security headers if not present
         if 'X-Content-Type-Options' not in response.headers:
             response.headers['X-Content-Type-Options'] = 'nosniff'
         if 'X-Frame-Options' not in response.headers:
             response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         if 'X-XSS-Protection' not in response.headers:
             response.headers['X-XSS-Protection'] = '1; mode=block'
-        if 'Referrer-Policy' not in response.headers:
-            response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         
         return response
     
@@ -498,36 +498,51 @@ def init_database(app):
         cursor = conn.cursor()
         
         # Define expected columns for tables that may need migration
+        # Format: (column_name, sql_type, default_value_or_None)
         expected_columns = {
             'users': [
                 ('totp_secret', 'VARCHAR(32)', None),
                 ('totp_confirmed', 'BOOLEAN', '0'),
-                ('backup_codes', 'TEXT', None)
+                ('backup_codes', 'TEXT', None),
             ],
             'certificates': [
                 ('archived', 'BOOLEAN', '0'),
                 ('source', 'VARCHAR(50)', None),
-                ('template_id', 'INTEGER', None)
+                ('template_id', 'INTEGER', None),
+                ('owner_group_id', 'INTEGER', None),
             ],
             'certificate_authorities': [
                 ('cdp_enabled', 'BOOLEAN', '0'),
                 ('cdp_url', 'VARCHAR(512)', None),
                 ('ocsp_enabled', 'BOOLEAN', '0'),
-                ('ocsp_url', 'VARCHAR(512)', None)
-            ]
+                ('ocsp_url', 'VARCHAR(512)', None),
+                ('owner_group_id', 'INTEGER', None),
+            ],
+            'groups': [
+                ('description', 'TEXT', None),
+            ],
+            'audit_logs': [
+                ('resource_name', 'VARCHAR(255)', None),
+            ],
         }
         
         for table, columns in expected_columns.items():
-            # Get existing columns
-            cursor.execute(f"PRAGMA table_info({table})")
-            existing_cols = {row[1] for row in cursor.fetchall()}
-            
-            for col_name, col_type, default_value in columns:
-                if col_name not in existing_cols:
-                    default_clause = f"DEFAULT {default_value}" if default_value else ""
-                    sql = f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type} {default_clause}".strip()
-                    app.logger.info(f"Adding missing column: {table}.{col_name}")
-                    cursor.execute(sql)
+            # Get existing columns - skip if table doesn't exist
+            try:
+                cursor.execute(f"PRAGMA table_info({table})")
+                existing_cols = {row[1] for row in cursor.fetchall()}
+                if not existing_cols:
+                    # Table doesn't exist yet, skip
+                    continue
+                    
+                for col_name, col_type, default_value in columns:
+                    if col_name not in existing_cols:
+                        default_clause = f"DEFAULT {default_value}" if default_value else ""
+                        sql = f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type} {default_clause}".strip()
+                        app.logger.info(f"✅ Adding missing column: {table}.{col_name}")
+                        cursor.execute(sql)
+            except Exception as e:
+                app.logger.debug(f"Skipping migration for {table}: {e}")
         
         conn.commit()
         conn.close()
@@ -971,6 +986,14 @@ def register_blueprints(app):
     app.register_blueprint(ocsp_bp)                        # OCSP Responder (/ocsp)
     app.register_blueprint(scep_protocol_bp)               # SCEP Protocol (/scep)
     app.register_blueprint(health_bp)  # Health check endpoints (no auth)
+    
+    # EST Protocol (RFC 7030) - /.well-known/est/*
+    try:
+        from api.est_protocol import bp as est_bp
+        app.register_blueprint(est_bp)
+        app.logger.info("✓ EST protocol enabled (/.well-known/est)")
+    except ImportError:
+        pass
     
     # Register UI routes LAST (catch-all for React SPA)
     app.register_blueprint(ui_bp)

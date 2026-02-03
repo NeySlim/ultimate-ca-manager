@@ -19,11 +19,7 @@ class EmailService:
     @staticmethod
     def get_smtp_config() -> Optional[SMTPConfig]:
         """Get SMTP configuration from database"""
-        try:
-            return SMTPConfig.query.first()
-        except Exception:
-            # Table may not exist yet on first startup
-            return None
+        return SMTPConfig.query.first()
     
     @staticmethod
     def test_connection(config: SMTPConfig = None) -> tuple[bool, str]:

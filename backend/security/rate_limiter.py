@@ -1,7 +1,9 @@
 """
 Rate Limiting Module
 Per-endpoint rate limiting with configurable limits
+Configurable via environment variables in /etc/ucm/ucm.env
 """
+import os
 import time
 import logging
 from collections import defaultdict
@@ -13,46 +15,119 @@ from flask import request, jsonify, g
 logger = logging.getLogger(__name__)
 
 
+def _get_env_int(key: str, default: int) -> int:
+    """Get integer from environment variable"""
+    try:
+        return int(os.environ.get(key, default))
+    except (ValueError, TypeError):
+        return default
+
+
+def _get_env_bool(key: str, default: bool) -> bool:
+    """Get boolean from environment variable"""
+    val = os.environ.get(key, str(default)).lower()
+    return val in ('true', '1', 'yes', 'on')
+
+
 class RateLimitConfig:
-    """Rate limit configuration per endpoint pattern"""
+    """Rate limit configuration per endpoint pattern
     
-    # Default limits (requests per minute)
-    DEFAULT_LIMITS = {
-        # Authentication - strict limits
-        '/api/v2/auth/login': {'rpm': 10, 'burst': 3},
-        '/api/v2/auth/register': {'rpm': 5, 'burst': 2},
-        '/api/v2/auth/reset-password': {'rpm': 5, 'burst': 2},
+    Environment variables (set in /etc/ucm/ucm.env):
+    
+    RATE_LIMIT_ENABLED=true           # Enable/disable rate limiting globally
+    RATE_LIMIT_AUTH_RPM=10            # Auth endpoints: requests per minute
+    RATE_LIMIT_AUTH_BURST=3           # Auth endpoints: burst allowance
+    RATE_LIMIT_HEAVY_RPM=30           # Heavy ops (issue cert, create CA): rpm
+    RATE_LIMIT_HEAVY_BURST=5          # Heavy ops: burst
+    RATE_LIMIT_STANDARD_RPM=120       # Standard API endpoints: rpm
+    RATE_LIMIT_STANDARD_BURST=20      # Standard API: burst
+    RATE_LIMIT_PROTOCOL_RPM=500       # Protocol (ACME/SCEP/OCSP): rpm
+    RATE_LIMIT_PROTOCOL_BURST=100     # Protocol: burst
+    RATE_LIMIT_WHITELIST=127.0.0.1,::1  # Comma-separated IPs to whitelist
+    """
+    
+    # Limits loaded from environment or defaults
+    _limits_loaded = False
+    _default_limits: Dict[str, Dict] = {}
+    
+    @classmethod
+    def _load_limits(cls):
+        """Load limits from environment variables"""
+        if cls._limits_loaded:
+            return
         
-        # Heavy operations - moderate limits
-        '/api/v2/certificates/issue': {'rpm': 30, 'burst': 5},
-        '/api/v2/cas': {'rpm': 30, 'burst': 5},
-        '/api/v2/csrs/sign': {'rpm': 20, 'burst': 5},
-        '/api/v2/import': {'rpm': 10, 'burst': 2},
-        '/api/v2/export': {'rpm': 10, 'burst': 2},
-        '/api/v2/backup': {'rpm': 5, 'burst': 2},
+        # Auth limits
+        auth_rpm = _get_env_int('RATE_LIMIT_AUTH_RPM', 10)
+        auth_burst = _get_env_int('RATE_LIMIT_AUTH_BURST', 3)
         
-        # Standard endpoints - reasonable limits
-        '/api/v2/users': {'rpm': 60, 'burst': 10},
-        '/api/v2/certificates': {'rpm': 120, 'burst': 20},
-        '/api/v2/audit': {'rpm': 60, 'burst': 10},
+        # Heavy operation limits
+        heavy_rpm = _get_env_int('RATE_LIMIT_HEAVY_RPM', 30)
+        heavy_burst = _get_env_int('RATE_LIMIT_HEAVY_BURST', 5)
         
-        # Protocol endpoints - higher limits
-        '/acme/': {'rpm': 300, 'burst': 50},
-        '/scep/': {'rpm': 300, 'burst': 50},
-        '/ocsp': {'rpm': 500, 'burst': 100},
-        '/cdp/': {'rpm': 500, 'burst': 100},
+        # Standard API limits
+        standard_rpm = _get_env_int('RATE_LIMIT_STANDARD_RPM', 120)
+        standard_burst = _get_env_int('RATE_LIMIT_STANDARD_BURST', 20)
         
-        # Default for unspecified endpoints
-        '_default': {'rpm': 120, 'burst': 20}
-    }
+        # Protocol limits (ACME, SCEP, OCSP, CDP)
+        protocol_rpm = _get_env_int('RATE_LIMIT_PROTOCOL_RPM', 500)
+        protocol_burst = _get_env_int('RATE_LIMIT_PROTOCOL_BURST', 100)
+        
+        cls._default_limits = {
+            # Authentication - strict limits
+            '/api/v2/auth/login': {'rpm': auth_rpm, 'burst': auth_burst},
+            '/api/v2/auth/register': {'rpm': auth_rpm // 2, 'burst': auth_burst - 1},
+            '/api/v2/auth/reset-password': {'rpm': auth_rpm // 2, 'burst': auth_burst - 1},
+            
+            # Heavy operations - moderate limits
+            '/api/v2/certificates/issue': {'rpm': heavy_rpm, 'burst': heavy_burst},
+            '/api/v2/cas': {'rpm': heavy_rpm, 'burst': heavy_burst},
+            '/api/v2/csrs/sign': {'rpm': heavy_rpm // 2, 'burst': heavy_burst},
+            '/api/v2/import': {'rpm': heavy_rpm // 3, 'burst': 2},
+            '/api/v2/export': {'rpm': heavy_rpm // 3, 'burst': 2},
+            '/api/v2/backup': {'rpm': heavy_rpm // 6, 'burst': 2},
+            
+            # Standard endpoints - reasonable limits
+            '/api/v2/users': {'rpm': standard_rpm // 2, 'burst': standard_burst // 2},
+            '/api/v2/certificates': {'rpm': standard_rpm, 'burst': standard_burst},
+            '/api/v2/audit': {'rpm': standard_rpm // 2, 'burst': standard_burst // 2},
+            
+            # Protocol endpoints - higher limits
+            '/acme/': {'rpm': protocol_rpm // 2, 'burst': protocol_burst // 2},
+            '/scep/': {'rpm': protocol_rpm // 2, 'burst': protocol_burst // 2},
+            '/ocsp': {'rpm': protocol_rpm, 'burst': protocol_burst},
+            '/cdp/': {'rpm': protocol_rpm, 'burst': protocol_burst},
+            
+            # Default for unspecified endpoints
+            '_default': {'rpm': standard_rpm, 'burst': standard_burst}
+        }
+        
+        # Load whitelist from env
+        whitelist_str = os.environ.get('RATE_LIMIT_WHITELIST', '127.0.0.1,::1')
+        if whitelist_str:
+            for ip in whitelist_str.split(','):
+                ip = ip.strip()
+                if ip:
+                    cls._whitelist.add(ip)
+        
+        cls._limits_loaded = True
+        logger.info(f"Rate limits loaded: auth={auth_rpm}rpm, heavy={heavy_rpm}rpm, "
+                   f"standard={standard_rpm}rpm, protocol={protocol_rpm}rpm")
+    
+    @classmethod
+    def get_default_limits(cls) -> Dict[str, Dict]:
+        """Get default limits (loads from env if not loaded)"""
+        cls._load_limits()
+        return cls._default_limits
     
     # Global settings
-    _enabled: bool = True
+    _enabled: bool = None  # Will be loaded from env
     _custom_limits: Dict[str, Dict] = {}
     _whitelist: set = set()  # IPs that bypass rate limiting
     
     @classmethod
     def is_enabled(cls) -> bool:
+        if cls._enabled is None:
+            cls._enabled = _get_env_bool('RATE_LIMIT_ENABLED', True)
         return cls._enabled
     
     @classmethod
@@ -63,17 +138,19 @@ class RateLimitConfig:
     @classmethod
     def get_limit(cls, path: str) -> Dict[str, int]:
         """Get rate limit for a path"""
+        cls._load_limits()
+        
         # Check custom limits first
         for pattern, limit in cls._custom_limits.items():
             if path.startswith(pattern):
                 return limit
         
         # Check default limits
-        for pattern, limit in cls.DEFAULT_LIMITS.items():
+        for pattern, limit in cls._default_limits.items():
             if pattern != '_default' and path.startswith(pattern):
                 return limit
         
-        return cls.DEFAULT_LIMITS['_default']
+        return cls._default_limits['_default']
     
     @classmethod
     def set_custom_limit(cls, path: str, rpm: int, burst: int):
@@ -100,17 +177,28 @@ class RateLimitConfig:
     @classmethod
     def is_whitelisted(cls, ip: str) -> bool:
         """Check if IP is whitelisted"""
+        cls._load_limits()  # Load whitelist from env
         return ip in cls._whitelist
     
     @classmethod
     def get_config(cls) -> Dict[str, Any]:
         """Get full configuration"""
+        cls._load_limits()
         return {
-            'enabled': cls._enabled,
-            'default_limits': cls.DEFAULT_LIMITS,
+            'enabled': cls.is_enabled(),
+            'default_limits': cls._default_limits,
             'custom_limits': cls._custom_limits,
             'whitelist': list(cls._whitelist)
         }
+    
+    @classmethod
+    def reload(cls):
+        """Reload configuration from environment"""
+        cls._limits_loaded = False
+        cls._enabled = None
+        cls._whitelist = set()
+        cls._load_limits()
+        logger.info("Rate limit configuration reloaded")
 
 
 class RateLimiter:
@@ -131,7 +219,8 @@ class RateLimiter:
     def _get_key(self, ip: str, path: str) -> str:
         """Generate bucket key from IP and path pattern"""
         # Normalize path to pattern
-        for pattern in RateLimitConfig.DEFAULT_LIMITS.keys():
+        default_limits = RateLimitConfig.get_default_limits()
+        for pattern in default_limits.keys():
             if pattern != '_default' and path.startswith(pattern):
                 return f"{ip}:{pattern}"
         return f"{ip}:_default"

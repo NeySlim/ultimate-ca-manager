@@ -11,6 +11,7 @@ db = SQLAlchemy()
 # Import sub-models
 from models.certificate_template import CertificateTemplate
 from models.truststore import TrustedCertificate
+from models.group import Group, GroupMember
 
 
 class User(db.Model):
@@ -111,6 +112,10 @@ class CA(db.Model):
     imported_from = db.Column(db.String(50))  # 'opnsense', 'manual', 'generated'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(80))
+    
+    # Ownership (Pro feature - group-based access control)
+    owner_group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
+    owner_group = db.relationship('Group', backref='owned_cas')
     
     # CRL Distribution Points (CDP)
     cdp_enabled = db.Column(db.Boolean, default=False)
@@ -294,6 +299,9 @@ class CA(db.Model):
             # OCSP configuration
             "ocsp_enabled": self.ocsp_enabled,
             "ocsp_url": self.ocsp_url,
+            # Ownership (Pro feature)
+            "owner_group_id": self.owner_group_id,
+            "owner_group_name": self.owner_group.name if self.owner_group else None,
             # PEM for display/copy
             "pem": self._decode_pem(self.crt),
         }
@@ -361,6 +369,10 @@ class Certificate(db.Model):
     
     # Template reference (optional - null if created without template)
     template_id = db.Column(db.Integer, db.ForeignKey("certificate_templates.id"), nullable=True)
+    
+    # Ownership (Pro feature - group-based access control)
+    owner_group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
+    owner_group = db.relationship('Group', backref='owned_certificates')
     
     # Relationships
     ca = db.relationship("CA", back_populates="certificates")
@@ -725,6 +737,9 @@ class Certificate(db.Model):
             # Computed
             "days_remaining": self.days_remaining,
             "san_combined": self.san_combined,
+            # Ownership (Pro feature)
+            "owner_group_id": self.owner_group_id,
+            "owner_group_name": self.owner_group.name if self.owner_group else None,
             # PEM for display/copy
             "pem": self._decode_pem(self.crt),
         }

@@ -27,6 +27,7 @@ from api.v2.webauthn import bp as webauthn_bp
 from api.v2.mtls import bp as mtls_bp
 from api.v2.audit import bp as audit_bp
 from api.v2.websocket import websocket_bp
+from api.v2.groups import bp as groups_bp
 
 # List of all core blueprints to register
 # Pro features are loaded separately via pro/__init__.py in app.py
@@ -52,6 +53,7 @@ API_V2_BLUEPRINTS = [
     mtls_bp,
     audit_bp,
     websocket_bp,
+    groups_bp,
 ]
 
 

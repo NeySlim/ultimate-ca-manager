@@ -165,10 +165,10 @@ export function CADetails({
         <CompactGrid>
           <CompactField icon={Globe} label="Common Name" value={ca.common_name} />
           <CompactField icon={Buildings} label="Organization" value={ca.organization} />
-          <CompactField label="Org Unit" value={ca.organizational_unit} />
+          <CompactField autoIcon label="Org Unit" value={ca.organizational_unit} />
           <CompactField icon={MapPin} label="Locality" value={ca.locality} />
-          <CompactField label="State" value={ca.state} />
-          <CompactField label="Country" value={ca.country} />
+          <CompactField autoIcon label="State" value={ca.state} />
+          <CompactField autoIcon label="Country" value={ca.country} />
           <CompactField icon={Envelope} label="Email" value={ca.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
@@ -194,8 +194,8 @@ export function CADetails({
       <CompactSection title="Technical Details">
         <CompactGrid>
           <CompactField icon={Hash} label="Serial" value={ca.serial} mono copyable />
-          <CompactField icon={Key} label="Key Type" value={ca.key_type} />
-          <CompactField label="Sig Algo" value={ca.signature_algorithm || ca.hash_algorithm} />
+          <CompactField autoIcon label="Key Type" value={ca.key_type} />
+          <CompactField autoIcon label="Sig Algo" value={ca.signature_algorithm || ca.hash_algorithm} />
           <CompactField label="Subject DN" value={ca.subject} mono colSpan={2} />
         </CompactGrid>
       </CompactSection>
@@ -269,8 +269,8 @@ export function CADetails({
       {/* Metadata */}
       <CompactSection title="Metadata" collapsible defaultOpen={false}>
         <CompactGrid>
-          <CompactField label="Created At" value={formatDate(ca.created_at)} />
-          <CompactField label="Created By" value={ca.created_by} />
+          <CompactField autoIcon label="Created" value={formatDate(ca.created_at)} />
+          <CompactField autoIcon label="Created By" value={ca.created_by} />
           <CompactField label="Imported From" value={ca.imported_from} colSpan={2} />
         </CompactGrid>
       </CompactSection>

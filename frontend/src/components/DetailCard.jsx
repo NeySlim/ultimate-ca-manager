@@ -213,7 +213,7 @@ export function DetailHeader({
  * Theme-aware styling
  * @param {boolean} compact - Use compact layout with less padding
  */
-export function DetailSection({ title, description, children, className, noBorder = false, compact = false }) {
+export function DetailSection({ title, description, subtitle, actions, children, className, noBorder = false, compact = false }) {
   const { isMobile } = useMobile()
   
   return (
@@ -237,6 +237,12 @@ export function DetailSection({ title, description, children, className, noBorde
         compact ? "p-2" : "p-2.5",
         !noBorder && "detail-section-frame"
       )}>
+        {(subtitle || actions) && (
+          <div className="flex items-center justify-between gap-4 mb-3">
+            {subtitle && <p className="text-sm text-text-secondary">{subtitle}</p>}
+            {actions && <div className="flex gap-2 shrink-0">{actions}</div>}
+          </div>
+        )}
         {children}
       </div>
     </section>

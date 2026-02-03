@@ -119,9 +119,9 @@ class WebAuthnService:
             challenge=challenge_bytes,
             exclude_credentials=exclude_credentials if exclude_credentials else None,
             authenticator_selection=AuthenticatorSelectionCriteria(
-                authenticator_attachment=AuthenticatorAttachment.CROSS_PLATFORM,  # Force USB/NFC key
+                # Don't restrict authenticator type - allow both platform (Bitwarden) and cross-platform (Yubikey)
                 user_verification=UserVerificationRequirement.PREFERRED,
-                resident_key=ResidentKeyRequirement.REQUIRED,
+                resident_key=ResidentKeyRequirement.PREFERRED,  # PREFERRED allows non-discoverable credentials too
             ),
             supported_pub_key_algs=[
                 COSEAlgorithmIdentifier.ECDSA_SHA_256,

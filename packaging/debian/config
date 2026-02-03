@@ -1,0 +1,90 @@
+#!/bin/bash
+# UCM Debian Configuration Script
+# Handles debconf prompts during installation
+
+set -e
+
+# Source debconf library
+. /usr/share/debconf/confmodule
+
+# Configuration version
+db_version 2.0
+
+# Core settings
+db_input high ucm/fqdn || true
+db_go || true
+
+db_input medium ucm/https_port || true
+db_go || true
+
+# Admin account
+db_input high ucm/admin_username || true
+db_go || true
+
+# Password with confirmation loop
+PASSWORD_MATCH=false
+while [ "$PASSWORD_MATCH" = "false" ]; do
+    db_input critical ucm/admin_password || true
+    db_go || true
+    
+    db_input critical ucm/admin_password_confirm || true
+    db_go || true
+    
+    # Get password values
+    db_get ucm/admin_password
+    PASSWORD1="$RET"
+    
+    db_get ucm/admin_password_confirm
+    PASSWORD2="$RET"
+    
+    # Compare passwords
+    if [ "$PASSWORD1" = "$PASSWORD2" ]; then
+        PASSWORD_MATCH=true
+        
+        # Validate password strength
+        if [ ${#PASSWORD1} -lt 8 ]; then
+            db_input critical ucm/password_mismatch || true
+            db_go || true
+            PASSWORD_MATCH=false
+        fi
+    else
+        db_input critical ucm/password_mismatch || true
+        db_go || true
+    fi
+done
+
+# Clear password confirmation (security)
+db_reset ucm/admin_password_confirm
+
+# SMTP configuration
+db_input medium ucm/smtp_enable || true
+db_go || true
+
+db_get ucm/smtp_enable
+if [ "$RET" = "true" ]; then
+    db_input high ucm/smtp_server || true
+    db_go || true
+    
+    db_input high ucm/smtp_port || true
+    db_go || true
+    
+    db_input high ucm/smtp_username || true
+    db_go || true
+    
+    db_input high ucm/smtp_password || true
+    db_go || true
+    
+    db_input medium ucm/smtp_from || true
+    db_go || true
+fi
+
+# HTTPS certificate
+db_input medium ucm/generate_https_cert || true
+db_go || true
+
+# Auto-start
+db_input high ucm/autostart || true
+db_go || true
+
+# All done
+db_stop
