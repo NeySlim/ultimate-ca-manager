@@ -2,13 +2,18 @@ version: '3.8'
 
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.3
+    image: ghcr.io/neyslim/ultimate-ca-manager:2.0.0
     container_name: ucm
     restart: unless-stopped
     
     ports:
+      # IPv4 + IPv6 dual-stack binding
       - "${UCM_HTTPS_PORT:-8443}:8443"
       - "${UCM_HTTP_PORT:-8080}:8080"
+    
+    # Enable IPv6 for this container
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
     
     volumes:
       # Persistent data volume (REQUIRED)

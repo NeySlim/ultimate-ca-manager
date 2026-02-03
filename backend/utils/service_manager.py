@@ -1,8 +1,11 @@
 """
 UCM Service Management Utilities
 Centralized service restart/reload functionality
+Cross-platform: supports systemd, Docker, and standalone
 """
 import subprocess
+import os
+import signal
 from pathlib import Path
 from typing import Tuple
 
@@ -40,10 +43,17 @@ def reload_service() -> Tuple[bool, str]:
 def is_service_running() -> bool:
     """
     Check if UCM service is currently running.
+    Cross-platform: checks systemd, Docker, or process.
     
     Returns:
         bool: True if service is running, False otherwise
     """
+    is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
+    
+    if is_docker:
+        # In Docker, we're always running if this code executes
+        return True
+    
     try:
         result = subprocess.run(
             ['systemctl', 'is-active', 'ucm'],
@@ -56,7 +66,7 @@ def is_service_running() -> bool:
         # Fallback: check if process is running
         try:
             result = subprocess.run(
-                ['pgrep', '-f', 'python.*app.py'],
+                ['pgrep', '-f', 'gunicorn.*wsgi:app'],
                 capture_output=True,
                 timeout=5
             )
@@ -68,6 +78,7 @@ def is_service_running() -> bool:
 def get_service_status() -> dict:
     """
     Get detailed service status information.
+    Cross-platform: supports systemd, Docker, and standalone.
     
     Returns:
         dict: Service status details (active, uptime, pid, etc.)
@@ -79,6 +90,24 @@ def get_service_status() -> dict:
         'pid': None,
         'memory': None
     }
+    
+    is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
+    
+    if is_docker:
+        # In Docker, get info from /proc
+        status['running'] = True
+        status['status'] = 'active'
+        status['pid'] = os.getpid()
+        try:
+            with open('/proc/self/status', 'r') as f:
+                for line in f:
+                    if line.startswith('VmRSS:'):
+                        mem_kb = int(line.split()[1])
+                        status['memory'] = f"{mem_kb / 1024:.1f} MB"
+                        break
+        except:
+            pass
+        return status
     
     try:
         # Try systemctl status

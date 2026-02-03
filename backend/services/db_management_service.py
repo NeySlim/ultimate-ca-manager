@@ -28,7 +28,9 @@ class DatabaseManagementService:
             if db_uri.startswith('sqlite:///'):
                 self.db_path = db_uri.replace('sqlite:///', '')
             else:
-                self.db_path = '/opt/ucm/data/ucm.db'
+                # Cross-platform default
+                data_dir = current_app.config.get('DATA_DIR') or os.environ.get('DATA_DIR', '/opt/ucm/data')
+                self.db_path = os.path.join(data_dir, 'ucm.db')
         else:
             self.db_path = db_path
     
