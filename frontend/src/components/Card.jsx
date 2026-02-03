@@ -1,4 +1,5 @@
 import { cn } from '../lib/utils'
+import { IconBadge } from './IconBadge'
 
 export function Card({ 
   children, 
@@ -45,15 +46,13 @@ export function Card({
 }
 
 // Card sub-components for structured content
-Card.Header = function CardHeader({ children, className, icon: Icon, title, subtitle, action }) {
+Card.Header = function CardHeader({ children, className, icon: Icon, iconColor = 'primary', title, subtitle, action }) {
   if (Icon || title) {
     return (
       <div className={cn('flex items-start justify-between gap-3 p-4 pb-3 border-b border-border/30', className)}>
         <div className="flex items-center gap-3">
           {Icon && (
-            <div className="w-9 h-9 rounded-lg status-primary-bg flex items-center justify-center shrink-0">
-              <Icon size={18} className="text-accent-primary" weight="duotone" />
-            </div>
+            <IconBadge icon={Icon} color={iconColor} size="sm" rounded="lg" />
           )}
           <div>
             {title && <h3 className="text-sm font-semibold text-text-primary">{title}</h3>}
