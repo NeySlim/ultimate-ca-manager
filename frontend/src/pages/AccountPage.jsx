@@ -1,22 +1,21 @@
 /**
  * Account Page - User Profile & Security Settings
- * Redesigned to match Settings page pattern (horizontal tabs)
+ * Uses DetailCard design system like SettingsPage
  */
 import { useState, useEffect } from 'react'
 import { 
   User, LockKey, Key, FloppyDisk, Fingerprint, Certificate, 
-  PencilSimple, Trash, Plus, Eye, EyeSlash, Copy, Check,
-  ShieldCheck, Clock, Warning
+  PencilSimple, Trash, Plus, Warning, ShieldCheck, Clock
 } from '@phosphor-icons/react'
 import {
   Button, Input, Badge, Modal, FormModal, HelpCard,
-  CompactSection, CompactGrid, CompactField, CompactHeader,
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   UnifiedPageHeader, LoadingSpinner
 } from '../components'
 import { accountService } from '../services'
 import { useAuth, useNotification, useMobile } from '../contexts'
-import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
-import { formatDate, cn } from '../lib/utils'
+import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
+import { formatDate } from '../lib/utils'
 
 // Tab configuration
 const TABS = [
@@ -320,90 +319,70 @@ export default function AccountPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <LoadingSpinner size="lg" />
-      </div>
-    )
-  }
+  // ============ RENDER TAB CONTENT ============
 
-  // ============ RENDER TABS ============
-
-  const renderProfileTab = () => (
-    <div className="p-4 md:p-6 space-y-6">
-      {/* Edit Mode Toggle */}
-      <div className="flex justify-end">
+  const renderProfileContent = () => (
+    <DetailContent>
+      <DetailHeader
+        icon={User}
+        title="Profile Information"
+        subtitle="Your personal account details"
+        actions={editMode ? [
+          { label: 'Cancel', variant: 'secondary', onClick: () => setEditMode(false) },
+          { label: saving ? 'Saving...' : 'Save', icon: FloppyDisk, onClick: handleSaveProfile, disabled: saving }
+        ] : [
+          { label: 'Edit', icon: PencilSimple, variant: 'secondary', onClick: () => setEditMode(true) }
+        ]}
+      />
+      
+      <DetailSection title="Account Information">
         {editMode ? (
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setEditMode(false)}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleSaveProfile} disabled={saving}>
-              <FloppyDisk size={16} className="mr-1" />
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
+          <div className="space-y-4">
+            <Input
+              label="Full Name"
+              value={formData.full_name}
+              onChange={(e) => setFormData(p => ({ ...p, full_name: e.target.value }))}
+              placeholder="Enter your name"
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
+            />
           </div>
         ) : (
-          <Button variant="secondary" size="sm" onClick={() => setEditMode(true)}>
-            <PencilSimple size={16} className="mr-1" />
-            Edit Profile
-          </Button>
+          <DetailGrid>
+            <DetailField label="Username" value={accountData.username || '—'} />
+            <DetailField label="Full Name" value={accountData.full_name || accountData.username || '—'} />
+            <DetailField label="Email" value={accountData.email || '—'} />
+            <DetailField 
+              label="Role" 
+              value={
+                <Badge variant={accountData.role === 'admin' ? 'primary' : 'secondary'}>
+                  {accountData.role || 'User'}
+                </Badge>
+              } 
+            />
+          </DetailGrid>
         )}
-      </div>
-
-      {/* Account Info */}
-      <CompactSection title="Account Information" icon={User} defaultOpen>
-        <CompactGrid>
-          <CompactField label="Username" value={accountData.username || '—'} />
-          <CompactField 
-            label="Email" 
-            value={editMode ? (
-              <Input
-                value={formData.email}
-                onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
-                className="mt-1"
-              />
-            ) : (accountData.email || '—')} 
-          />
-          <CompactField 
-            label="Full Name" 
-            value={editMode ? (
-              <Input
-                value={formData.full_name}
-                onChange={(e) => setFormData(p => ({ ...p, full_name: e.target.value }))}
-                placeholder="Enter your name"
-                className="mt-1"
-              />
-            ) : (accountData.full_name || accountData.username || '—')} 
-          />
-          <CompactField 
-            label="Role" 
-            value={
-              <Badge variant={accountData.role === 'admin' ? 'primary' : 'secondary'}>
-                {accountData.role || 'User'}
-              </Badge>
-            } 
-          />
-        </CompactGrid>
-      </CompactSection>
-
-      {/* Account Stats */}
-      <CompactSection title="Account Activity" icon={Clock} defaultOpen>
-        <CompactGrid>
-          <CompactField 
+      </DetailSection>
+      
+      <DetailSection title="Account Activity">
+        <DetailGrid>
+          <DetailField 
             label="Account Created" 
             value={accountData.created_at ? formatDate(accountData.created_at) : '—'} 
           />
-          <CompactField 
+          <DetailField 
             label="Last Login" 
             value={accountData.last_login ? formatDate(accountData.last_login, true) : '—'} 
           />
-          <CompactField 
+          <DetailField 
             label="Total Logins" 
             value={accountData.login_count || 0} 
           />
-          <CompactField 
+          <DetailField 
             label="Status" 
             value={
               <Badge variant={accountData.active ? 'success' : 'danger'}>
@@ -411,15 +390,21 @@ export default function AccountPage() {
               </Badge>
             } 
           />
-        </CompactGrid>
-      </CompactSection>
-    </div>
+        </DetailGrid>
+      </DetailSection>
+    </DetailContent>
   )
 
-  const renderSecurityTab = () => (
-    <div className="p-4 md:p-6 space-y-6">
+  const renderSecurityContent = () => (
+    <DetailContent>
+      <DetailHeader
+        icon={ShieldCheck}
+        title="Security Settings"
+        subtitle="Manage your account security"
+      />
+      
       {/* Password */}
-      <CompactSection title="Password" icon={LockKey} defaultOpen>
+      <DetailSection title="Password">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-text-primary">Change your password</p>
@@ -433,10 +418,10 @@ export default function AccountPage() {
             Change Password
           </Button>
         </div>
-      </CompactSection>
+      </DetailSection>
 
       {/* 2FA */}
-      <CompactSection title="Two-Factor Authentication" icon={ShieldCheck} defaultOpen>
+      <DetailSection title="Two-Factor Authentication">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-text-primary">Authenticator App (TOTP)</p>
@@ -454,114 +439,113 @@ export default function AccountPage() {
             {accountData.two_factor_enabled ? 'Disable 2FA' : 'Enable 2FA'}
           </Button>
         </div>
-      </CompactSection>
+      </DetailSection>
 
-      {/* WebAuthn / Security Keys */}
-      <CompactSection 
-        title="Security Keys (WebAuthn/FIDO2)" 
-        icon={Fingerprint} 
-        badge={webauthnCredentials.length > 0 ? String(webauthnCredentials.length) : undefined}
-        defaultOpen
+      {/* WebAuthn */}
+      <DetailSection 
+        title="Security Keys (WebAuthn/FIDO2)"
+        actions={
+          <Button size="sm" onClick={() => setShowWebAuthnModal(true)}>
+            <Plus size={14} className="mr-1" />
+            Add Key
+          </Button>
+        }
       >
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-text-secondary">
-              Use YubiKey, TouchID, or Windows Hello for passwordless login
-            </p>
-            <Button size="sm" onClick={() => setShowWebAuthnModal(true)}>
-              <Plus size={14} className="mr-1" />
-              Add Key
-            </Button>
+        <p className="text-sm text-text-secondary mb-3">
+          Use YubiKey, TouchID, or Windows Hello for passwordless login
+        </p>
+        
+        {webauthnCredentials.length === 0 ? (
+          <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
+            <Fingerprint size={28} className="mx-auto mb-2 text-text-tertiary" />
+            <p className="text-sm text-text-secondary">No security keys registered</p>
           </div>
-          
-          {webauthnCredentials.length === 0 ? (
-            <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
-              <Fingerprint size={28} className="mx-auto mb-2 text-text-tertiary" />
-              <p className="text-sm text-text-secondary">No security keys registered</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {webauthnCredentials.map(cred => (
-                <div 
-                  key={cred.id} 
-                  className="flex items-center justify-between p-3 bg-bg-tertiary/50 border border-border rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <Fingerprint size={20} className="text-accent-primary" />
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">{cred.name || 'Security Key'}</p>
-                      <p className="text-xs text-text-tertiary">
-                        Added {formatDate(cred.created_at)}
-                        {cred.last_used_at && ` • Used ${formatDate(cred.last_used_at)}`}
-                      </p>
-                    </div>
+        ) : (
+          <div className="space-y-2">
+            {webauthnCredentials.map(cred => (
+              <div 
+                key={cred.id} 
+                className="flex items-center justify-between p-3 bg-bg-tertiary/50 border border-border rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <Fingerprint size={20} className="text-accent-primary" />
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">{cred.name || 'Security Key'}</p>
+                    <p className="text-xs text-text-tertiary">
+                      Added {formatDate(cred.created_at)}
+                      {cred.last_used_at && ` • Used ${formatDate(cred.last_used_at)}`}
+                    </p>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => handleDeleteWebAuthn(cred.id)}>
-                    <Trash size={16} className="text-status-danger" />
-                  </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </CompactSection>
+                <Button size="sm" variant="ghost" onClick={() => handleDeleteWebAuthn(cred.id)}>
+                  <Trash size={16} className="text-status-danger" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </DetailSection>
 
       {/* mTLS Certificates */}
-      <CompactSection 
-        title="Client Certificates (mTLS)" 
-        icon={Certificate}
-        badge={mtlsCertificates.length > 0 ? String(mtlsCertificates.length) : undefined}
-        defaultOpen
+      <DetailSection 
+        title="Client Certificates (mTLS)"
+        actions={
+          <Button size="sm" onClick={() => setShowMTLSModal(true)}>
+            <Plus size={14} className="mr-1" />
+            Add Certificate
+          </Button>
+        }
       >
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-text-secondary">
-              Use X.509 client certificates for mutual TLS authentication
-            </p>
-            <Button size="sm" onClick={() => setShowMTLSModal(true)}>
-              <Plus size={14} className="mr-1" />
-              Add Certificate
-            </Button>
+        <p className="text-sm text-text-secondary mb-3">
+          Use X.509 client certificates for mutual TLS authentication
+        </p>
+        
+        {mtlsCertificates.length === 0 ? (
+          <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
+            <Certificate size={28} className="mx-auto mb-2 text-text-tertiary" />
+            <p className="text-sm text-text-secondary">No client certificates enrolled</p>
           </div>
-          
-          {mtlsCertificates.length === 0 ? (
-            <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
-              <Certificate size={28} className="mx-auto mb-2 text-text-tertiary" />
-              <p className="text-sm text-text-secondary">No client certificates enrolled</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {mtlsCertificates.map(cert => (
-                <div 
-                  key={cert.id} 
-                  className="flex items-center justify-between p-3 bg-bg-tertiary/50 border border-border rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <Certificate size={20} className="text-accent-primary" />
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">{cert.cn || cert.subject}</p>
-                      <p className="text-xs text-text-tertiary">
-                        Expires {formatDate(cert.not_after)}
-                      </p>
-                    </div>
+        ) : (
+          <div className="space-y-2">
+            {mtlsCertificates.map(cert => (
+              <div 
+                key={cert.id} 
+                className="flex items-center justify-between p-3 bg-bg-tertiary/50 border border-border rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <Certificate size={20} className="text-accent-primary" />
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">{cert.cn || cert.subject}</p>
+                    <p className="text-xs text-text-tertiary">
+                      Expires {formatDate(cert.not_after)}
+                    </p>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => handleDeleteMTLS(cert.id)}>
-                    <Trash size={16} className="text-status-danger" />
-                  </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </CompactSection>
-    </div>
+                <Button size="sm" variant="ghost" onClick={() => handleDeleteMTLS(cert.id)}>
+                  <Trash size={16} className="text-status-danger" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </DetailSection>
+    </DetailContent>
   )
 
-  const renderApiKeysTab = () => (
-    <div className="p-4 md:p-6 space-y-6">
+  const renderApiKeysContent = () => (
+    <DetailContent>
+      <DetailHeader
+        icon={Key}
+        title="API Keys"
+        subtitle="Manage your programmatic access keys"
+        actions={[
+          { label: 'Create Key', icon: Plus, onClick: () => setShowApiKeyModal(true) }
+        ]}
+      />
+      
       <HelpCard 
         variant="tip" 
-        title="API Keys" 
+        title="About API Keys" 
         items={[
           'API keys allow programmatic access to UCM',
           'Keep your keys secret and rotate them regularly',
@@ -569,83 +553,91 @@ export default function AccountPage() {
         ]} 
       />
 
-      <CompactSection 
-        title="Your API Keys" 
-        icon={Key}
-        badge={apiKeys.length > 0 ? String(apiKeys.length) : undefined}
-        defaultOpen
-      >
-        <div className="space-y-3">
-          <div className="flex justify-end">
-            <Button size="sm" onClick={() => setShowApiKeyModal(true)}>
-              <Plus size={14} className="mr-1" />
-              Create Key
-            </Button>
+      <DetailSection title="Your API Keys">
+        {apiKeys.length === 0 ? (
+          <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
+            <Key size={28} className="mx-auto mb-2 text-text-tertiary" />
+            <p className="text-sm text-text-secondary">No API keys created</p>
+            <p className="text-xs text-text-tertiary mt-1">Create a key to access UCM API</p>
           </div>
-          
-          {apiKeys.length === 0 ? (
-            <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
-              <Key size={28} className="mx-auto mb-2 text-text-tertiary" />
-              <p className="text-sm text-text-secondary">No API keys created</p>
-              <p className="text-xs text-text-tertiary mt-1">Create a key to access UCM API</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {apiKeys.map(key => (
-                <div 
-                  key={key.id} 
-                  className="flex items-center justify-between p-3 bg-bg-tertiary/50 border border-border rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <Key size={20} className={key.is_active ? 'text-accent-primary' : 'text-text-tertiary'} />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-text-primary">{key.name}</p>
-                        {!key.is_active && <Badge variant="secondary" size="xs">Inactive</Badge>}
-                      </div>
-                      <p className="text-xs text-text-tertiary font-mono">{key.key_prefix}...</p>
-                      <p className="text-xs text-text-tertiary">
-                        Created {formatDate(key.created_at)}
-                        {key.expires_at && ` • Expires ${formatDate(key.expires_at)}`}
-                      </p>
+        ) : (
+          <div className="space-y-2">
+            {apiKeys.map(key => (
+              <div 
+                key={key.id} 
+                className="flex items-center justify-between p-3 bg-bg-tertiary/50 border border-border rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <Key size={20} className={key.is_active ? 'text-accent-primary' : 'text-text-tertiary'} />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-text-primary">{key.name}</p>
+                      {!key.is_active && <Badge variant="secondary" size="xs">Inactive</Badge>}
                     </div>
+                    <p className="text-xs text-text-tertiary font-mono">{key.key_prefix}...</p>
+                    <p className="text-xs text-text-tertiary">
+                      Created {formatDate(key.created_at)}
+                      {key.expires_at && ` • Expires ${formatDate(key.expires_at)}`}
+                    </p>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => handleDeleteApiKey(key.id)}>
-                    <Trash size={16} className="text-status-danger" />
-                  </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </CompactSection>
-    </div>
+                <Button size="sm" variant="ghost" onClick={() => handleDeleteApiKey(key.id)}>
+                  <Trash size={16} className="text-status-danger" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </DetailSection>
+    </DetailContent>
   )
 
-  return (
-    <div className="h-full flex flex-col">
-      {/* Header with tabs */}
-      <UnifiedPageHeader
-        icon={User}
-        title="My Account"
-        subtitle={accountData.email || user?.username}
-        badge={
-          <Badge variant={accountData.role === 'admin' ? 'primary' : 'secondary'}>
-            {accountData.role || 'User'}
-          </Badge>
-        }
-        tabs={TABS}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        isMobile={isMobile}
-      />
+  // Render content based on active tab
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'profile':
+        return renderProfileContent()
+      case 'security':
+        return renderSecurityContent()
+      case 'api-keys':
+        return renderApiKeysContent()
+      default:
+        return renderProfileContent()
+    }
+  }
 
-      {/* Tab Content - centered on desktop */}
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-4xl mx-auto">
-          {activeTab === 'profile' && renderProfileTab()}
-          {activeTab === 'security' && renderSecurityTab()}
-          {activeTab === 'api-keys' && renderApiKeysTab()}
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner message="Loading account..." />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div className="flex flex-col h-full w-full">
+        {/* Header with tabs */}
+        <UnifiedPageHeader
+          icon={User}
+          title="My Account"
+          subtitle={accountData.email || user?.username}
+          badge={
+            <Badge variant={accountData.role === 'admin' ? 'primary' : 'secondary'}>
+              {accountData.role || 'User'}
+            </Badge>
+          }
+          tabs={TABS}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          isMobile={isMobile}
+        />
+        
+        {/* Content area - centered on desktop */}
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-4xl mx-auto p-4 md:p-6">
+            {renderContent()}
+          </div>
         </div>
       </div>
 
@@ -802,7 +794,7 @@ export default function AccountPage() {
         </div>
       </Modal>
 
-      {/* mTLS Certificate Modal - TODO: Implement */}
+      {/* mTLS Certificate Modal */}
       <Modal
         open={showMTLSModal}
         onOpenChange={setShowMTLSModal}
@@ -819,6 +811,6 @@ export default function AccountPage() {
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   )
 }
