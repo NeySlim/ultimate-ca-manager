@@ -222,7 +222,7 @@ export default function TemplatesPage() {
       priority: 2,
       sortable: true,
       render: (val) => (
-        <Badge variant={val === 'ca' ? 'violet' : 'secondary'} size="sm">
+        <Badge variant={val === 'ca' ? 'warning' : 'primary'} size="sm">
           {val === 'ca' ? 'CA' : 'Certificate'}
         </Badge>
       )
@@ -284,11 +284,11 @@ export default function TemplatesPage() {
       <HelpCard title="Template Types" variant="tip">
         <div className="space-y-1 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" size="sm">Certificate</Badge>
+            <Badge variant="primary" size="sm">Certificate</Badge>
             <span className="text-xs">End-entity certs (servers, users)</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="violet" size="sm">CA</Badge>
+            <Badge variant="warning" size="sm">CA</Badge>
             <span className="text-xs">Intermediate CAs</span>
           </div>
         </div>
@@ -305,11 +305,11 @@ export default function TemplatesPage() {
     <div className="p-3 space-y-4">
       <CompactHeader
         icon={FileText}
-        iconClass={selectedTemplate.type === 'ca' ? "bg-violet-500/20" : "bg-accent-primary/20"}
+        iconClass={selectedTemplate.type === 'ca' ? "bg-accent-warning/20" : "bg-accent-primary/20"}
         title={selectedTemplate.name}
         subtitle={`${selectedTemplate.usage_count || 0} certificates issued`}
         badge={
-          <Badge variant={selectedTemplate.type === 'ca' ? 'violet' : 'secondary'} size="sm">
+          <Badge variant={selectedTemplate.type === 'ca' ? 'warning' : 'primary'} size="sm">
             {selectedTemplate.type === 'ca' ? 'CA' : 'Certificate'}
           </Badge>
         }
