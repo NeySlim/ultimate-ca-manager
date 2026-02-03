@@ -211,11 +211,12 @@ export default function TemplatesPage() {
       sortable: true,
       render: (val, row) => {
         const type = getTemplateType(row)
+        const iconClass = type === 'ca' 
+          ? 'bg-amber-500/15 text-amber-500' 
+          : 'bg-blue-500/15 text-blue-500'
         return (
           <div className="flex items-center gap-2">
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-              type === 'ca' ? 'bg-amber-500/15 text-amber-500' : 'bg-accent-primary/15 text-accent-primary'
-            }`}>
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
               {type === 'ca' ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
             </div>
             <span className="font-medium truncate">{val || 'Unnamed'}</span>

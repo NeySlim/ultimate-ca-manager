@@ -165,7 +165,7 @@ export default function CRLOCSPPage() {
       render: (v, row) => (
         <div className="flex items-center gap-2">
           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-            row.has_crl ? 'bg-accent-success/15 text-accent-success' : 'bg-orange-500/15 text-orange-500'
+            row.has_crl ? 'bg-emerald-500/15 text-emerald-500' : 'bg-orange-500/15 text-orange-500'
           }`}>
             <FileX size={14} weight="duotone" />
           </div>
