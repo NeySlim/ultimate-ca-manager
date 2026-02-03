@@ -14,6 +14,32 @@ from models.truststore import TrustedCertificate
 from models.group import Group, GroupMember
 
 
+class UserSession(db.Model):
+    """Track active user sessions for session management"""
+    __tablename__ = "user_sessions"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    session_id = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    ip_address = db.Column(db.String(45))  # IPv6-compatible
+    user_agent = db.Column(db.String(500))
+    auth_method = db.Column(db.String(50), default='password')  # password, webauthn, mtls
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_activity = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ip_address': self.ip_address,
+            'user_agent': self.user_agent,
+            'auth_method': self.auth_method,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_activity': self.last_activity.isoformat() if self.last_activity else None,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None
+        }
+
+
 class User(db.Model):
     """User model for authentication"""
     __tablename__ = "users"
