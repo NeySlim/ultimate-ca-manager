@@ -325,20 +325,23 @@ def delete_user(user_id):
     if g.current_user.id == user_id:
         return error_response('Cannot delete your own account', 403)
     
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return error_response('User not found', 404)
     
     # Soft delete
+    username = user.username
     user.active = False
     
     try:
         db.session.commit()
-        return no_content_response(
-            message=f'User {user.username} deactivated successfully'
+        return success_response(
+            message=f'User {username} deactivated successfully'
         )
     except Exception as e:
         db.session.rollback()
+        import traceback
+        traceback.print_exc()
         return error_response('Failed to delete user', 500)
 
 
