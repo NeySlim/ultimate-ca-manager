@@ -204,7 +204,7 @@ export default function ACMEPage() {
       label: 'Email',
       render: (_, row) => (
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/15 text-blue-500">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-blue">
             <Key size={14} weight="duotone" />
           </div>
           <span className="font-medium text-text-primary">
