@@ -207,7 +207,7 @@ export default function TrustStorePage() {
       sortable: true,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/15 text-blue-500">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-blue">
             <Certificate size={14} weight="duotone" />
           </div>
           <div className="min-w-0">

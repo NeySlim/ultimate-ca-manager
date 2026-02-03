@@ -212,8 +212,8 @@ export default function TemplatesPage() {
       render: (val, row) => {
         const type = getTemplateType(row)
         const iconClass = type === 'ca' 
-          ? 'bg-amber-500/15 text-amber-500' 
-          : 'bg-blue-500/15 text-blue-500'
+          ? 'icon-bg-amber' 
+          : 'icon-bg-blue'
         return (
           <div className="flex items-center gap-2">
             <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>

@@ -230,7 +230,7 @@ export default function CSRsPage() {
       priority: 1,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-orange-500/15 text-orange-500">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-orange">
             <FileText size={14} weight="duotone" />
           </div>
           <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
@@ -276,7 +276,7 @@ export default function CSRsPage() {
       priority: 1,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/15 text-emerald-500">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
             <Certificate size={14} weight="duotone" />
           </div>
           <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
