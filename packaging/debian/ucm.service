@@ -25,7 +25,7 @@ LimitNOFILE=65536
 # Execution
 ExecStart=/opt/ucm/venv/bin/gunicorn \
     --config /opt/ucm/gunicorn.conf.py \
-    --bind 0.0.0.0:8443 \
+    --bind 0.0.0.0:${HTTPS_PORT} \
     --certfile /opt/ucm/data/https_cert.pem \
     --keyfile /opt/ucm/data/https_key.pem \
     --access-logfile /opt/ucm/data/access.log \

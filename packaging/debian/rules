@@ -25,10 +25,8 @@ override_dh_auto_install:
 	install -d debian/ucm/opt/ucm
 	install -d debian/ucm/opt/ucm/backend
 	install -d debian/ucm/opt/ucm/frontend
-	install -d debian/ucm/var/lib/ucm
-	install -d debian/ucm/var/lib/ucm/data
+	install -d debian/ucm/opt/ucm/data
 	install -d debian/ucm/etc/ucm
-	install -d debian/ucm/var/log/ucm
 	install -d debian/ucm/usr/share/doc/ucm
 	
 	# Copy application files
@@ -42,25 +40,20 @@ override_dh_auto_install:
 	# Remove .env files (configuration is created by postinst)
 	rm -f debian/ucm/opt/ucm/.env* debian/ucm/opt/ucm/backend/.env* 2>/dev/null || true
 	
-	# Install start script
-	install -m 755 packaging/debian/start-ucm.sh debian/ucm/opt/ucm/start-ucm.sh
-	
 	# Install requirements.txt
 	install -m 644 backend/requirements.txt debian/ucm/opt/ucm/requirements.txt
 	
 	# Copy documentation
 	cp README.md debian/ucm/usr/share/doc/ucm/
-	cp DOCKER_QUICKSTART.md debian/ucm/usr/share/doc/ucm/ 2>/dev/null || true
 	cp LICENSE debian/ucm/usr/share/doc/ucm/ 2>/dev/null || true
 	
 	# Install systemd service
-	install -d debian/ucm/lib/systemd/system
-	install -m 644 packaging/debian/ucm.service debian/ucm/lib/systemd/system/
+	install -d debian/ucm/usr/lib/systemd/system
+	install -m 644 packaging/debian/ucm.service debian/ucm/usr/lib/systemd/system/
 	
 	# Set permissions
 	find debian/ucm/opt/ucm -type f -exec chmod 644 {} \;
 	find debian/ucm/opt/ucm -type d -exec chmod 755 {} \;
-	chmod +x debian/ucm/opt/ucm/start-ucm.sh || true
 
 override_dh_installinit:
 	dh_installinit --name=ucm
@@ -70,6 +63,5 @@ override_dh_installsystemd:
 
 override_dh_fixperms:
 	dh_fixperms
-	# Ensure correct permissions for sensitive directories
-	chmod 750 debian/ucm/var/lib/ucm || true
-	chmod 755 debian/ucm/var/log/ucm || true
+	# Ensure correct permissions for data directory
+	chmod 750 debian/ucm/opt/ucm/data || true
