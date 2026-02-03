@@ -343,24 +343,48 @@ export default function CSRsPage() {
 
   // Help content
   const helpContent = (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Quick Stats */}
+      <div className="visual-section">
+        <div className="visual-section-header">
+          <FileText size={16} className="status-primary-text" />
+          CSR Statistics
+        </div>
+        <div className="visual-section-body">
+          <div className="quick-info-grid">
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-warning">{pendingCSRs.length}</div>
+              <div className="help-stat-label">Pending</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-success">{historyCSRs.length}</div>
+              <div className="help-stat-label">Signed</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-primary">{pendingCSRs.length + historyCSRs.length}</div>
+              <div className="help-stat-label">Total</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <HelpCard title="About CSRs" variant="info">
         A Certificate Signing Request contains the public key and identity information needed to issue a certificate.
       </HelpCard>
-      <HelpCard title="Tabs" variant="info">
-        <div className="space-y-1 mt-2">
+      <HelpCard title="Status" variant="info">
+        <div className="space-y-1.5 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm">Pending</Badge>
+            <Badge variant="warning" size="sm" dot>Pending</Badge>
             <span className="text-xs">CSRs awaiting signature</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="success" size="sm">History</Badge>
+            <Badge variant="success" size="sm" dot>Signed</Badge>
             <span className="text-xs">Previously signed CSRs</span>
           </div>
         </div>
       </HelpCard>
       <HelpCard title="Workflow" variant="tip">
-        1. Upload CSR → 2. Review details → 3. Sign with CA → 4. Certificate appears in History
+        1. Upload CSR → 2. Review details → 3. Sign with CA → 4. Certificate issued
       </HelpCard>
     </div>
   )
