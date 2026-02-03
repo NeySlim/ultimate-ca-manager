@@ -637,13 +637,16 @@ export default function AccountPage() {
         tabs={TABS}
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        isMobile={isMobile}
       />
 
-      {/* Tab Content */}
+      {/* Tab Content - centered on desktop */}
       <div className="flex-1 overflow-auto">
-        {activeTab === 'profile' && renderProfileTab()}
-        {activeTab === 'security' && renderSecurityTab()}
-        {activeTab === 'api-keys' && renderApiKeysTab()}
+        <div className="max-w-4xl mx-auto">
+          {activeTab === 'profile' && renderProfileTab()}
+          {activeTab === 'security' && renderSecurityTab()}
+          {activeTab === 'api-keys' && renderApiKeysTab()}
+        </div>
       </div>
 
       {/* ============ MODALS ============ */}
