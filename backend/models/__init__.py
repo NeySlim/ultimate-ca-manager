@@ -362,6 +362,7 @@ class Certificate(db.Model):
     # Certificate details
     cert_type = db.Column(db.String(50))  # client_cert, server_cert, combined_cert, ca_cert
     subject = db.Column(db.Text)
+    subject_cn = db.Column(db.String(255))  # Extracted CN for sorting
     issuer = db.Column(db.Text)
     serial_number = db.Column(db.String(100))
     valid_from = db.Column(db.DateTime)
