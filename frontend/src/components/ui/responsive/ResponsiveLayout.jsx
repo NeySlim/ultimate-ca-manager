@@ -74,6 +74,7 @@ export function ResponsiveLayout({
   slideOverTitle,
   slideOverContent,
   slideOverWidth = 'default', // 'narrow' | 'default' | 'wide'
+  slideOverActions, // ReactNode - actions to show in slide-over header (e.g., favorite button)
   onSlideOverClose,
   
   // Split view (xl+ screens) - panel always visible
@@ -243,12 +244,17 @@ export function ResponsiveLayout({
             {slideOverOpen && slideOverContent ? (
               <div className="h-full flex flex-col overflow-hidden">
                 {/* Panel header */}
-                <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-text-primary truncate">{slideOverTitle}</h3>
+                <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-text-primary truncate flex-1">{slideOverTitle}</h3>
+                  {slideOverActions && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      {slideOverActions}
+                    </div>
+                  )}
                   {onSlideOverClose && (
                     <button
                       onClick={onSlideOverClose}
-                      className="p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                      className="p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary shrink-0"
                     >
                       <X size={16} />
                     </button>

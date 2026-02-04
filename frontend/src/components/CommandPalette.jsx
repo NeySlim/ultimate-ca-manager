@@ -7,9 +7,10 @@ import * as Dialog from '@radix-ui/react-dialog'
 import {
   MagnifyingGlass, House, Certificate, ShieldCheck, FileText, List,
   User, Key, Gear, Robot, UploadSimple, ClockCounterClockwise,
-  UsersThree, Shield, Lock, UserCircle, ArrowRight, Command
+  UsersThree, Shield, Lock, UserCircle, ArrowRight, Command, Clock, Star
 } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
+import { useAllRecentHistory, useAllFavorites } from '../hooks'
 
 const COMMANDS = [
   // Navigation
@@ -44,6 +45,40 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef(null)
   const listRef = useRef(null)
+  const { allRecent, refreshHistory } = useAllRecentHistory()
+  const { allFavorites, refreshFavorites } = useAllFavorites()
+
+  // Get icon for recent item type
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case 'certificates': return Certificate
+      case 'cas': return ShieldCheck
+      case 'users': return User
+      case 'csrs': return FileText
+      case 'templates': return List
+      default: return Clock
+    }
+  }
+  
+  // Get path for recent item
+  const getTypePath = (type, id) => {
+    switch (type) {
+      case 'certificates': return `/certificates?selected=${id}`
+      case 'cas': return `/cas?selected=${id}`
+      case 'users': return `/users?selected=${id}`
+      case 'csrs': return `/csrs?selected=${id}`
+      case 'templates': return `/templates?selected=${id}`
+      default: return '/'
+    }
+  }
+
+  // Refresh history and favorites when opened
+  useEffect(() => {
+    if (open) {
+      refreshHistory()
+      refreshFavorites()
+    }
+  }, [open, refreshHistory, refreshFavorites])
 
   // Filter commands based on search and pro status
   const filteredCommands = useMemo(() => {
@@ -56,6 +91,32 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
       cmd.category.toLowerCase().includes(lower)
     )
   }, [search, isPro])
+  
+  // Filter recent items based on search
+  const filteredRecent = useMemo(() => {
+    if (!allRecent.length) return []
+    if (!search) return allRecent.slice(0, 5)
+    
+    const lower = search.toLowerCase()
+    return allRecent.filter(item =>
+      item.name?.toLowerCase().includes(lower) ||
+      item.subtitle?.toLowerCase().includes(lower) ||
+      item.type?.toLowerCase().includes(lower)
+    ).slice(0, 5)
+  }, [search, allRecent])
+  
+  // Filter favorites based on search
+  const filteredFavorites = useMemo(() => {
+    if (!allFavorites.length) return []
+    if (!search) return allFavorites.slice(0, 5)
+    
+    const lower = search.toLowerCase()
+    return allFavorites.filter(item =>
+      item.name?.toLowerCase().includes(lower) ||
+      item.subtitle?.toLowerCase().includes(lower) ||
+      item.type?.toLowerCase().includes(lower)
+    ).slice(0, 5)
+  }, [search, allFavorites])
 
   // Group by category
   const groupedCommands = useMemo(() => {
@@ -146,7 +207,71 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
 
           {/* Commands List */}
           <div ref={listRef} className="max-h-80 overflow-auto p-2">
-            {filteredCommands.length === 0 ? (
+            {/* Favorites Section */}
+            {filteredFavorites.length > 0 && (
+              <div className="mb-2">
+                <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                  <Star size={10} weight="fill" className="text-yellow-500" />
+                  Favorites
+                </div>
+                {filteredFavorites.map(item => {
+                  const Icon = getTypeIcon(item.type)
+                  return (
+                    <button
+                      key={`fav-${item.type}-${item.id}`}
+                      onClick={() => {
+                        navigate(getTypePath(item.type, item.id))
+                        onOpenChange(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
+                    >
+                      <Icon size={16} weight="duotone" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm block truncate">{item.name}</span>
+                        {item.subtitle && (
+                          <span className="text-[10px] text-text-tertiary truncate block">{item.subtitle}</span>
+                        )}
+                      </div>
+                      <Star size={12} weight="fill" className="text-yellow-500" />
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            
+            {/* Recent Items Section */}
+            {filteredRecent.length > 0 && (
+              <div className="mb-2">
+                <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock size={10} />
+                  Recent
+                </div>
+                {filteredRecent.map(item => {
+                  const Icon = getTypeIcon(item.type)
+                  return (
+                    <button
+                      key={`recent-${item.type}-${item.id}`}
+                      onClick={() => {
+                        navigate(getTypePath(item.type, item.id))
+                        onOpenChange(false)
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
+                    >
+                      <Icon size={16} weight="duotone" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm block truncate">{item.name}</span>
+                        {item.subtitle && (
+                          <span className="text-[10px] text-text-tertiary truncate block">{item.subtitle}</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-text-tertiary capitalize">{item.type}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            
+            {filteredCommands.length === 0 && filteredRecent.length === 0 && filteredFavorites.length === 0 ? (
               <div className="px-3 py-8 text-center text-text-tertiary text-sm">
                 No commands found
               </div>
