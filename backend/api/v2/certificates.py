@@ -71,7 +71,8 @@ def list_certificates():
         'created_at': Certificate.created_at,
         'serial_number': Certificate.serial_number,
         'revoked': Certificate.revoked,
-        'descr': Certificate.descr
+        'descr': Certificate.descr,
+        'status': 'special'  # Handled separately with CASE
     }
     
     query = Certificate.query
@@ -108,10 +109,31 @@ def list_certificates():
     
     # Apply sorting BEFORE pagination (use whitelist)
     sort_column = ALLOWED_SORT_COLUMNS.get(sort_by, Certificate.subject)
-    if sort_order == 'desc':
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
+    
+    if sort_by == 'status':
+        # Special handling: sort by computed status (revoked > expired > expiring > valid)
+        # Then alphabetically by subject within each group
+        from sqlalchemy import case
+        now = datetime.utcnow()
+        expiry_threshold = now + timedelta(days=30)
+        
+        # Status priority: 1=revoked, 2=expired, 3=expiring, 4=valid
+        status_order = case(
+            (Certificate.revoked == True, 1),
+            (Certificate.valid_to <= now, 2),
+            (Certificate.valid_to <= expiry_threshold, 3),
+            else_=4
+        )
+        
+        if sort_order == 'desc':
+            query = query.order_by(status_order.desc(), Certificate.subject.asc())
+        else:
+            query = query.order_by(status_order.asc(), Certificate.subject.asc())
+    elif sort_column != 'special':
+        if sort_order == 'desc':
+            query = query.order_by(sort_column.desc())
+        else:
+            query = query.order_by(sort_column.asc())
     
     # Paginate
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)

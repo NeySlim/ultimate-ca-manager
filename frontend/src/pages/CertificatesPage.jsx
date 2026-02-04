@@ -289,10 +289,10 @@ export default function CertificatesPage() {
     setPage(1) // Reset to first page when sorting
     if (newSort) {
       // Map frontend column keys to backend field names
-      // Only map columns that are actually sortable in backend
       const keyMap = {
         'cn': 'subject',
         'common_name': 'subject',
+        'status': 'status', // Backend handles with CASE (groups by type)
         'issuer': 'issuer',
         'expires': 'valid_to',
         'valid_to': 'valid_to',
@@ -303,7 +303,6 @@ export default function CertificatesPage() {
         setSortBy(backendKey)
         setSortOrder(newSort.direction)
       }
-      // Ignore columns that can't be sorted server-side (status, key)
     } else {
       setSortBy('subject')
       setSortOrder('asc')
@@ -339,7 +338,7 @@ export default function CertificatesPage() {
       key: 'status',
       header: 'Status',
       priority: 2,
-      sortable: false, // Not sortable server-side
+      sortable: true, // Groups by status type, then alphabetically
       render: (val, row) => {
         const isRevoked = row.revoked
         const status = isRevoked ? 'revoked' : val || 'unknown'
