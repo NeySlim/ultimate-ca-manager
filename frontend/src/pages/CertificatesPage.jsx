@@ -44,6 +44,14 @@ export default function CertificatesPage() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCA, setFilterCA] = useState('')
   
+  // Apply filter preset callback
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.status) setFilterStatus(filters.status)
+    else setFilterStatus('')
+    if (filters.ca) setFilterCA(filters.ca)
+    else setFilterCA('')
+  }, [])
+  
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
 
@@ -514,6 +522,10 @@ export default function CertificatesPage() {
           searchPlaceholder="Search certificates..."
           searchKeys={['cn', 'common_name', 'subject', 'issuer', 'serial']}
           columnStorageKey="ucm-certs-columns"
+          filterPresetsKey="ucm-certs-presets"
+          onApplyFilterPreset={handleApplyFilterPreset}
+          exportEnabled
+          exportFilename="certificates"
           toolbarFilters={[
             {
               key: 'status',

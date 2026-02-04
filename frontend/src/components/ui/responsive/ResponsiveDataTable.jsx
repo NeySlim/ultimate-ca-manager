@@ -7,10 +7,11 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { 
   MagnifyingGlass, CaretUp, CaretDown, DotsThreeVertical,
-  CaretLeft, CaretRight, FunnelSimple, X, Columns, Eye, EyeSlash, Check
+  CaretLeft, CaretRight, FunnelSimple, X, Columns, Eye, EyeSlash, Check,
+  BookmarkSimple, FloppyDisk, Trash, Export
 } from '@phosphor-icons/react'
 import { useMobile } from '../../../contexts'
-import { cn } from '../../../lib/utils'
+import { cn, exportToCSV, exportToJSON } from '../../../lib/utils'
 import { FilterSelect } from '../Select'
 
 export function ResponsiveDataTable({
@@ -39,6 +40,14 @@ export function ResponsiveDataTable({
   
   // Column customization
   columnStorageKey, // localStorage key for saving column preferences (e.g. 'ucm-certs-columns')
+  
+  // Filter presets
+  filterPresetsKey, // localStorage key for saving filter presets (e.g. 'ucm-certs-presets')
+  onApplyFilterPreset, // (preset) => void - callback when a preset is applied
+  
+  // Export
+  exportEnabled = false, // Enable export button
+  exportFilename = 'export', // Base filename for exports
   
   // Sorting
   sortable = false,
@@ -116,6 +125,112 @@ export function ResponsiveDataTable({
   const userVisibleColumns = useMemo(() => {
     return columns.filter(col => !hiddenColumns.includes(col.key))
   }, [columns, hiddenColumns])
+  
+  // Filter presets state
+  const [showPresetsMenu, setShowPresetsMenu] = useState(false)
+  const [showSavePresetModal, setShowSavePresetModal] = useState(false)
+  const [presetName, setPresetName] = useState('')
+  const presetsMenuRef = useRef(null)
+  const [filterPresets, setFilterPresets] = useState(() => {
+    if (filterPresetsKey) {
+      try {
+        const saved = localStorage.getItem(filterPresetsKey)
+        return saved ? JSON.parse(saved) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
+  
+  // Save presets to localStorage
+  useEffect(() => {
+    if (filterPresetsKey) {
+      localStorage.setItem(filterPresetsKey, JSON.stringify(filterPresets))
+    }
+  }, [filterPresets, filterPresetsKey])
+  
+  // Get current filter values for saving
+  const getCurrentFilterValues = useCallback(() => {
+    if (!toolbarFilters) return {}
+    const values = {}
+    toolbarFilters.forEach(filter => {
+      if (filter.type === 'dateRange') {
+        if (filter.from) values[`${filter.key}_from`] = filter.from
+        if (filter.to) values[`${filter.key}_to`] = filter.to
+      } else if (filter.value) {
+        values[filter.key] = filter.value
+      }
+    })
+    if (searchValue) values._search = searchValue
+    return values
+  }, [toolbarFilters, searchValue])
+  
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    if (searchValue) return true
+    if (!toolbarFilters) return false
+    return toolbarFilters.some(f => 
+      f.type === 'dateRange' ? (f.from || f.to) : f.value
+    )
+  }, [toolbarFilters, searchValue])
+  
+  // Save current filters as preset
+  const savePreset = () => {
+    if (!presetName.trim()) return
+    const newPreset = {
+      id: Date.now(),
+      name: presetName.trim(),
+      filters: getCurrentFilterValues()
+    }
+    setFilterPresets(prev => [...prev, newPreset])
+    setPresetName('')
+    setShowSavePresetModal(false)
+  }
+  
+  // Delete a preset
+  const deletePreset = (id) => {
+    setFilterPresets(prev => prev.filter(p => p.id !== id))
+  }
+  
+  // Apply a preset
+  const applyPreset = (preset) => {
+    if (onApplyFilterPreset) {
+      onApplyFilterPreset(preset.filters)
+    }
+    setShowPresetsMenu(false)
+  }
+  
+  // Export menu state (functions defined after sortedData/visibleColumns)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef(null)
+  
+  // Close export menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showExportMenu])
+  
+  // Close presets menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (presetsMenuRef.current && !presetsMenuRef.current.contains(e.target)) {
+        setShowPresetsMenu(false)
+        setShowSavePresetModal(false)
+      }
+    }
+    if (showPresetsMenu || showSavePresetModal) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showPresetsMenu, showSavePresetModal])
   
   // Close column menu on click outside
   useEffect(() => {
@@ -247,6 +362,17 @@ export function ResponsiveDataTable({
     return cols
   }, [userVisibleColumns, isDesktop])
   
+  // Export functions (must be after sortedData and visibleColumns)
+  const handleExportCSV = useCallback(() => {
+    exportToCSV(sortedData, visibleColumns, exportFilename)
+    setShowExportMenu(false)
+  }, [sortedData, visibleColumns, exportFilename])
+  
+  const handleExportJSON = useCallback(() => {
+    exportToJSON(sortedData, exportFilename)
+    setShowExportMenu(false)
+  }, [sortedData, exportFilename])
+  
   // Get primary and secondary columns for mobile cards
   const { primaryCol, secondaryCol, tertiaryCol } = useMemo(() => {
     const sorted = [...columns].sort((a, b) => (a.priority || 99) - (b.priority || 99))
@@ -257,18 +383,12 @@ export function ResponsiveDataTable({
     }
   }, [columns])
   
-  // Check if there are active filters (toolbar filters or search)
-  const hasActiveFilters = searchValue || (toolbarFilters && toolbarFilters.some(f => 
-    (f.value && f.value !== '' && f.value !== 'all') || 
-    (f.type === 'dateRange' && (f.from || f.to))
-  ))
-  
   // Empty state - but ALWAYS show toolbar if there are filters to clear
   if (!loading && sortedData.length === 0) {
     return (
       <div className={cn('flex flex-col h-full', className)}>
         {/* Always show toolbar when there are filters or actions */}
-        {(searchable || toolbarFilters || toolbarActions || columnStorageKey) && (
+        {(searchable || toolbarFilters || toolbarActions || columnStorageKey || filterPresetsKey) && (
           <SearchBar
             value={searchValue}
             onChange={setSearchValue}
@@ -283,6 +403,22 @@ export function ResponsiveDataTable({
             showColumnMenu={showColumnMenu}
             setShowColumnMenu={setShowColumnMenu}
             columnMenuRef={columnMenuRef}
+            // Filter presets
+            filterPresetsKey={filterPresetsKey}
+            filterPresets={filterPresets}
+            showPresetsMenu={showPresetsMenu}
+            setShowPresetsMenu={setShowPresetsMenu}
+            showSavePresetModal={showSavePresetModal}
+            setShowSavePresetModal={setShowSavePresetModal}
+            presetName={presetName}
+            setPresetName={setPresetName}
+            presetsMenuRef={presetsMenuRef}
+            hasActiveFilters={hasActiveFilters}
+            savePreset={savePreset}
+            deletePreset={deletePreset}
+            applyPreset={applyPreset}
+            // Export - disabled in empty state
+            exportEnabled={false}
           />
         )}
         
@@ -328,7 +464,7 @@ export function ResponsiveDataTable({
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* SEARCH BAR + TOOLBAR */}
-      {(searchable || toolbarFilters || toolbarActions || columnStorageKey) && (
+      {(searchable || toolbarFilters || toolbarActions || columnStorageKey || filterPresetsKey) && (
         <SearchBar
           value={searchValue}
           onChange={setSearchValue}
@@ -343,6 +479,28 @@ export function ResponsiveDataTable({
           showColumnMenu={showColumnMenu}
           setShowColumnMenu={setShowColumnMenu}
           columnMenuRef={columnMenuRef}
+          // Filter presets
+          filterPresetsKey={filterPresetsKey}
+          filterPresets={filterPresets}
+          showPresetsMenu={showPresetsMenu}
+          setShowPresetsMenu={setShowPresetsMenu}
+          showSavePresetModal={showSavePresetModal}
+          setShowSavePresetModal={setShowSavePresetModal}
+          presetName={presetName}
+          setPresetName={setPresetName}
+          presetsMenuRef={presetsMenuRef}
+          hasActiveFilters={hasActiveFilters}
+          savePreset={savePreset}
+          deletePreset={deletePreset}
+          applyPreset={applyPreset}
+          // Export
+          exportEnabled={exportEnabled}
+          showExportMenu={showExportMenu}
+          setShowExportMenu={setShowExportMenu}
+          exportMenuRef={exportMenuRef}
+          handleExportCSV={handleExportCSV}
+          handleExportJSON={handleExportJSON}
+          dataCount={sortedData.length}
         />
       )}
       
@@ -404,7 +562,29 @@ function SearchBar({
   toggleColumn,
   showColumnMenu,
   setShowColumnMenu,
-  columnMenuRef
+  columnMenuRef,
+  // Filter presets
+  filterPresetsKey,
+  filterPresets,
+  showPresetsMenu,
+  setShowPresetsMenu,
+  showSavePresetModal,
+  setShowSavePresetModal,
+  presetName,
+  setPresetName,
+  presetsMenuRef,
+  hasActiveFilters,
+  savePreset,
+  deletePreset,
+  applyPreset,
+  // Export
+  exportEnabled,
+  showExportMenu,
+  setShowExportMenu,
+  exportMenuRef,
+  handleExportCSV,
+  handleExportJSON,
+  dataCount
 }) {
   return (
     <div className={cn(
@@ -565,6 +745,159 @@ function SearchBar({
                     </button>
                   </>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Filter Presets (desktop only) */}
+        {!isMobile && filterPresetsKey && (
+          <div className="relative shrink-0" ref={presetsMenuRef}>
+            <button
+              onClick={() => setShowPresetsMenu?.(!showPresetsMenu)}
+              className={cn(
+                'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors',
+                showPresetsMenu
+                  ? 'border-accent-primary bg-accent-primary/10 text-accent-primary'
+                  : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
+              )}
+              title="Filter presets"
+            >
+              <BookmarkSimple size={14} />
+              {filterPresets?.length > 0 && (
+                <span className="text-[10px] bg-accent-primary/20 text-accent-primary px-1 rounded">
+                  {filterPresets.length}
+                </span>
+              )}
+            </button>
+            
+            {/* Presets dropdown */}
+            {showPresetsMenu && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
+                <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
+                  Filter Presets
+                </div>
+                
+                {/* Save current filter button */}
+                {hasActiveFilters && !showSavePresetModal && (
+                  <button
+                    onClick={() => setShowSavePresetModal?.(true)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-bg-hover transition-colors text-accent-primary"
+                  >
+                    <FloppyDisk size={14} />
+                    Save current filters
+                  </button>
+                )}
+                
+                {/* Save preset input */}
+                {showSavePresetModal && (
+                  <div className="px-3 py-2 border-b border-border">
+                    <input
+                      type="text"
+                      value={presetName}
+                      onChange={(e) => setPresetName?.(e.target.value)}
+                      placeholder="Preset name..."
+                      className="w-full h-7 px-2 text-xs rounded border border-border bg-bg-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-primary"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') savePreset?.()
+                        if (e.key === 'Escape') setShowSavePresetModal?.(false)
+                      }}
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={savePreset}
+                        disabled={!presetName?.trim()}
+                        className="flex-1 h-6 text-xs rounded bg-accent-primary text-white hover:bg-accent-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setShowSavePresetModal?.(false)}
+                        className="h-6 px-2 text-xs rounded border border-border hover:bg-bg-hover"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Preset list */}
+                {filterPresets?.length > 0 ? (
+                  <>
+                    {hasActiveFilters && <div className="border-t border-border my-1" />}
+                    {filterPresets.map(preset => (
+                      <div
+                        key={preset.id}
+                        className="group flex items-center gap-2 px-3 py-1.5 hover:bg-bg-hover transition-colors"
+                      >
+                        <button
+                          onClick={() => applyPreset?.(preset)}
+                          className="flex-1 text-xs text-left text-text-primary truncate"
+                          title={Object.entries(preset.filters || {}).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                        >
+                          {preset.name}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            deletePreset?.(preset.id)
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-text-tertiary hover:text-red-500 transition-all"
+                          title="Delete preset"
+                        >
+                          <Trash size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                ) : !hasActiveFilters && (
+                  <div className="px-3 py-4 text-xs text-text-tertiary text-center">
+                    No saved presets.<br/>
+                    Apply filters and save them here.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Export Button (desktop only) */}
+        {!isMobile && exportEnabled && dataCount > 0 && (
+          <div className="relative shrink-0" ref={exportMenuRef}>
+            <button
+              onClick={() => setShowExportMenu?.(!showExportMenu)}
+              className={cn(
+                'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors',
+                showExportMenu
+                  ? 'border-accent-primary bg-accent-primary/10 text-accent-primary'
+                  : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
+              )}
+              title="Export data"
+            >
+              <Export size={14} />
+            </button>
+            
+            {/* Export dropdown */}
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
+                <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
+                  Export {dataCount} items
+                </div>
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-bg-hover transition-colors"
+                >
+                  <Export size={14} />
+                  Export as CSV
+                </button>
+                <button
+                  onClick={handleExportJSON}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left hover:bg-bg-hover transition-colors"
+                >
+                  <Export size={14} />
+                  Export as JSON
+                </button>
               </div>
             )}
           </div>

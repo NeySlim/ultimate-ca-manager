@@ -103,6 +103,14 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
   const [filterRole, setFilterRole] = useState('')
   const [filterActive, setFilterActive] = useState('')
   
+  // Apply filter preset callback
+  const handleApplyFilterPreset = useCallback((filters) => {
+    if (filters.role) setFilterRole(filters.role)
+    else setFilterRole('')
+    if (filters.status) setFilterActive(filters.status)
+    else setFilterActive('')
+  }, [])
+  
   // Pagination state
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
@@ -389,6 +397,8 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
           searchPlaceholder="Search users..."
           searchKeys={['username', 'email', 'full_name', 'role']}
           columnStorageKey="ucm-users-columns"
+          filterPresetsKey="ucm-users-presets"
+          onApplyFilterPreset={handleApplyFilterPreset}
           toolbarFilters={[
             {
               key: 'role',
@@ -402,7 +412,7 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
               ]
             },
             {
-              key: 'active',
+              key: 'status',
               value: filterActive,
               onChange: setFilterActive,
               placeholder: 'All Status',
