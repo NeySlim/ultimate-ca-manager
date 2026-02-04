@@ -201,24 +201,54 @@ export function ResponsiveDataTable({
     }
   }, [columns])
   
-  // Empty state
+  // Check if there are active filters (toolbar filters or search)
+  const hasActiveFilters = searchValue || (toolbarFilters && toolbarFilters.some(f => f.value && f.value !== '' && f.value !== 'all'))
+  
+  // Empty state - but ALWAYS show toolbar if there are filters to clear
   if (!loading && sortedData.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-4">
-        {EmptyIcon && (
-          <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
-            <EmptyIcon size={32} className="text-text-secondary" />
-          </div>
+      <div className={cn('flex flex-col h-full', className)}>
+        {/* Always show toolbar when there are filters or actions */}
+        {(searchable || toolbarFilters || toolbarActions) && (
+          <SearchBar
+            value={searchValue}
+            onChange={setSearchValue}
+            placeholder={searchPlaceholder}
+            isMobile={isMobile}
+            searchable={searchable}
+            filters={toolbarFilters}
+            actions={toolbarActions}
+          />
         )}
-        <h3 className="text-lg font-medium text-text-primary mb-1">
-          {emptyTitle}
-        </h3>
-        {emptyDescription && (
+        
+        {/* Empty state content */}
+        <div className="flex-1 flex flex-col items-center justify-center py-16 px-4">
+          {EmptyIcon && (
+            <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
+              <EmptyIcon size={32} className="text-text-secondary" />
+            </div>
+          )}
+          <h3 className="text-lg font-medium text-text-primary mb-1">
+            {hasActiveFilters ? 'No matching results' : emptyTitle}
+          </h3>
           <p className="text-sm text-text-secondary text-center max-w-sm mb-4">
-            {emptyDescription}
+            {hasActiveFilters 
+              ? 'Try adjusting your filters or search terms'
+              : emptyDescription
+            }
           </p>
-        )}
-        {emptyAction}
+          {hasActiveFilters ? (
+            <button
+              onClick={() => {
+                setSearchValue('')
+                toolbarFilters?.forEach(f => f.onChange?.(''))
+              }}
+              className="text-sm text-accent-primary hover:text-accent-primary/80 font-medium"
+            >
+              Clear all filters
+            </button>
+          ) : emptyAction}
+        </div>
       </div>
     )
   }
