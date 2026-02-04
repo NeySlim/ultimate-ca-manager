@@ -8,9 +8,10 @@ import {
   PencilSimple, Trash, Plus, Warning, ShieldCheck, Clock
 } from '@phosphor-icons/react'
 import {
+  ResponsiveLayout,
   Button, Input, Badge, Modal, FormModal, HelpCard,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
-  UnifiedPageHeader, LoadingSpinner
+  LoadingSpinner
 } from '../components'
 import { accountService } from '../services'
 import { useAuth, useNotification, useMobile } from '../contexts'
@@ -613,30 +614,19 @@ export default function AccountPage() {
 
   return (
     <>
-      <div className="flex flex-col h-full w-full">
-        {/* Header with tabs */}
-        <UnifiedPageHeader
-          icon={User}
-          title="My Account"
-          subtitle={accountData.email || user?.username}
-          badge={
-            <Badge variant={accountData.role === 'admin' ? 'primary' : 'secondary'}>
-              {accountData.role || 'User'}
-            </Badge>
-          }
-          tabs={TABS}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          isMobile={isMobile}
-        />
-        
-        {/* Content area - centered on desktop */}
-        <div className="flex-1 overflow-auto">
-          <div className="max-w-4xl mx-auto p-4 md:p-6">
-            {renderContent()}
-          </div>
+      <ResponsiveLayout
+        title="My Account"
+        subtitle={accountData.email || user?.username}
+        icon={User}
+        tabs={TABS}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        helpPageKey="account"
+      >
+        <div className="max-w-4xl mx-auto p-4 md:p-6">
+          {renderContent()}
         </div>
-      </div>
+      </ResponsiveLayout>
 
       {/* ============ MODALS ============ */}
 

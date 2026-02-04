@@ -84,7 +84,7 @@ function formatDate(dateStr, format = 'full') {
 function ExpiryIndicator({ daysRemaining, validTo }) {
   let color = 'text-status-success'
   let bgColor = 'bg-status-success/10'
-  let label = `${daysRemaining} days remaining`
+  let label = `${daysRemaining}d`
   
   if (daysRemaining <= 0) {
     color = 'text-status-error'
@@ -93,18 +93,21 @@ function ExpiryIndicator({ daysRemaining, validTo }) {
   } else if (daysRemaining <= 7) {
     color = 'text-status-error'
     bgColor = 'bg-status-error/10'
-    label = `${daysRemaining} days remaining`
+    label = `${daysRemaining}d left`
   } else if (daysRemaining <= 30) {
     color = 'text-status-warning'
     bgColor = 'bg-status-warning/10'
+    label = `${daysRemaining}d left`
+  } else {
+    label = `${daysRemaining}d left`
   }
   
   return (
-    <div className={cn("flex items-center gap-2 px-3 py-2 rounded-lg", bgColor)}>
-      <Clock size={16} className={color} />
+    <div className={cn("flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg", bgColor)}>
+      <Clock size={14} className={cn("sm:w-4 sm:h-4", color)} />
       <div>
-        <div className={cn("text-sm font-medium", color)}>{label}</div>
-        <div className="text-xs text-text-tertiary">Expires {formatDate(validTo, 'short')}</div>
+        <div className={cn("text-xs sm:text-sm font-medium", color)}>{label}</div>
+        <div className="text-[10px] sm:text-xs text-text-tertiary">Exp: {formatDate(validTo, 'short')}</div>
       </div>
     </div>
   )
@@ -134,24 +137,24 @@ export function CertificateDetails({
   const sourceBadge = sourceConfig[cert.source] || null
   
   return (
-    <div className={cn("space-y-4 p-4", compact && "space-y-3 p-3")}>
+    <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", compact && "space-y-2 p-2")}>
       {/* Header */}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2 sm:gap-3">
         <div className={cn(
-          "p-2.5 rounded-lg shrink-0",
+          "p-2 sm:p-2.5 rounded-lg shrink-0",
           cert.revoked ? "bg-status-error/10" : "bg-accent-primary/10"
         )}>
-          <Certificate size={24} className={cert.revoked ? "text-status-error" : "text-accent-primary"} />
+          <Certificate size={20} className={cn("sm:w-6 sm:h-6", cert.revoked ? "text-status-error" : "text-accent-primary")} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-lg font-semibold text-text-primary truncate">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <h3 className="text-base sm:text-lg font-semibold text-text-primary truncate">
               {cert.cn || cert.common_name || cert.descr || 'Certificate'}
             </h3>
             <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
             {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
           </div>
-          <p className="text-xs text-text-tertiary truncate mt-0.5">{cert.subject}</p>
+          <p className="text-[10px] sm:text-xs text-text-tertiary truncate mt-0.5">{cert.subject}</p>
         </div>
       </div>
       
@@ -161,71 +164,57 @@ export function CertificateDetails({
       )}
       
       {/* Quick stats */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
-          <Key size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-xs font-medium text-text-primary">{cert.key_algorithm || 'RSA'}</div>
-          <div className="text-[10px] text-text-tertiary">{cert.key_size ? `${cert.key_size} bits` : '—'}</div>
+      <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
+        <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
+          <Key size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
+          <div className="text-[10px] sm:text-xs font-medium text-text-primary">{cert.key_algorithm || 'RSA'}</div>
+          <div className="text-[9px] sm:text-[10px] text-text-tertiary hidden sm:block">{cert.key_size ? `${cert.key_size} bits` : '—'}</div>
         </div>
-        <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
-          <Lock size={16} className={cn("mx-auto mb-1", cert.has_private_key ? "text-status-success" : "text-text-tertiary")} />
-          <div className="text-xs font-medium text-text-primary">{cert.has_private_key ? 'Has Key' : 'No Key'}</div>
-          {cert.has_private_key ? (
-            <div className="text-[10px] text-text-tertiary">{cert.private_key_location || '—'}</div>
-          ) : onUploadKey && canWrite ? (
-            <button 
-              onClick={onUploadKey}
-              className="text-[10px] text-accent-primary hover:underline cursor-pointer"
-            >
-              Upload Key
-            </button>
-          ) : (
-            <div className="text-[10px] text-text-tertiary">—</div>
-          )}
+        <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
+          <Lock size={14} className={cn("mx-auto mb-0.5 sm:mb-1 sm:w-4 sm:h-4", cert.has_private_key ? "text-status-success" : "text-text-tertiary")} />
+          <div className="text-[10px] sm:text-xs font-medium text-text-primary">{cert.has_private_key ? 'Key' : 'No Key'}</div>
+          <div className="text-[9px] sm:text-[10px] text-text-tertiary hidden sm:block">
+            {cert.has_private_key ? (cert.private_key_location || '—') : '—'}
+          </div>
         </div>
-        <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
-          <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-xs font-medium text-text-primary truncate">{cert.signature_algorithm || '—'}</div>
-          <div className="text-[10px] text-text-tertiary">Signature</div>
+        <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
+          <ShieldCheck size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
+          <div className="text-[10px] sm:text-xs font-medium text-text-primary truncate">{cert.signature_algorithm?.split('-')[0] || '—'}</div>
+          <div className="text-[9px] sm:text-[10px] text-text-tertiary hidden sm:block">Signature</div>
         </div>
       </div>
       
-      {/* Actions */}
+      {/* Actions - compact on mobile */}
       {showActions && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           {onExport && (
             <>
-              <Button size="sm" variant="secondary" onClick={() => onExport('pem')}>
-                <Download size={14} /> PEM
+              <Button size="xs" variant="secondary" onClick={() => onExport('pem')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
+                <Download size={12} className="sm:w-3.5 sm:h-3.5" /> PEM
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => onExport('der')}>
-                <Download size={14} /> DER
+              <Button size="xs" variant="secondary" onClick={() => onExport('der')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
+                <Download size={12} className="sm:w-3.5 sm:h-3.5" /> DER
               </Button>
               {cert.has_private_key && (
-                <Button size="sm" variant="secondary" onClick={() => onExport('p12')}>
-                  <Download size={14} /> PKCS#12
+                <Button size="xs" variant="secondary" onClick={() => onExport('p12')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
+                  <Download size={12} className="sm:w-3.5 sm:h-3.5" /> P12
                 </Button>
               )}
             </>
           )}
-          {onUploadKey && canWrite && !cert.has_private_key && (
-            <Button size="sm" variant="secondary" onClick={onUploadKey}>
-              <UploadSimple size={14} /> Upload Key
-            </Button>
-          )}
           {onRenew && canWrite && !cert.revoked && (
-            <Button size="sm" variant="secondary" onClick={onRenew}>
-              <ArrowsClockwise size={14} /> Renew
+            <Button size="xs" variant="secondary" onClick={onRenew} className="sm:!h-8 sm:!px-3">
+              <ArrowsClockwise size={12} className="sm:w-3.5 sm:h-3.5" />
             </Button>
           )}
           {onRevoke && canWrite && !cert.revoked && (
-            <Button size="sm" variant="danger" onClick={onRevoke}>
-              <X size={14} /> Revoke
+            <Button size="xs" variant="danger" onClick={onRevoke} className="sm:!h-8 sm:!px-3">
+              <X size={12} className="sm:w-3.5 sm:h-3.5" />
             </Button>
           )}
           {onDelete && canDelete && (
-            <Button size="sm" variant="danger" onClick={onDelete}>
-              <Trash size={14} />
+            <Button size="xs" variant="danger" onClick={onDelete} className="sm:!h-8 sm:!px-3">
+              <Trash size={12} className="sm:w-3.5 sm:h-3.5" />
             </Button>
           )}
         </div>

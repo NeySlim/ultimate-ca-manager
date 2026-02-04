@@ -305,6 +305,33 @@ export default function UsersGroupsPage() {
             </div>
           </div>
         )
+      },
+      // Mobile: Avatar + Username left, Status badge right
+      mobileRender: (val, row) => {
+        const avatarColors = {
+          admin: 'icon-bg-violet',
+          operator: 'icon-bg-blue',
+          viewer: 'icon-bg-teal'
+        }
+        const colorClass = row.active 
+          ? (avatarColors[row.role] || avatarColors.viewer)
+          : 'icon-bg-orange'
+        return (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className={cn(
+                "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
+                colorClass
+              )}>
+                {val?.charAt(0)?.toUpperCase() || '?'}
+              </div>
+              <span className="font-medium truncate">{val || '—'}</span>
+            </div>
+            <Badge variant={row.active ? 'success' : 'orange'} size="sm" dot>
+              {row.active ? 'Active' : 'Disabled'}
+            </Badge>
+          </div>
+        )
       }
     },
     {
@@ -326,12 +353,31 @@ export default function UsersGroupsPage() {
             {val || 'viewer'}
           </Badge>
         )
+      },
+      // Mobile: show email + role badge (status already shown in username row)
+      mobileRender: (val, row) => {
+        const roleConfig = {
+          admin: { variant: 'violet', dot: true },
+          operator: { variant: 'primary', dot: false },
+          viewer: { variant: 'teal', dot: false }
+        }
+        const config = roleConfig[val] || roleConfig.viewer
+        return (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-text-secondary truncate">{row.email || '—'}</span>
+            <Badge variant={config.variant} size="xs" dot={config.dot}>
+              {val === 'admin' && <Crown weight="fill" className="h-2.5 w-2.5 mr-0.5" />}
+              {val || 'viewer'}
+            </Badge>
+          </div>
+        )
       }
     },
     {
       key: 'active',
       header: 'Status',
       priority: 3,
+      hideOnMobile: true,
       sortable: true,
       render: (val) => (
         <Badge 

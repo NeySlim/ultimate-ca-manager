@@ -90,7 +90,10 @@ export function ResponsiveLayout({
   // Custom class
   className
 }) {
-  const { isMobile, isDesktop, isTouch, isLargeScreen } = useMobile()
+  const { isMobile, isTablet, isDesktop, isTouch, isLargeScreen, screenWidth } = useMobile()
+  
+  // Show inline header when sidebar is visible (matches AppShell's breakpoint)
+  const showInlineHeader = screenWidth >= 768
   
   // Local state for filter/help drawers (mobile only)
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
@@ -181,23 +184,61 @@ export function ResponsiveLayout({
       'flex flex-col h-full w-full overflow-hidden',
       className
     )}>
-      {/* HEADER - Using UnifiedPageHeader for consistency */}
-      <UnifiedPageHeader
-        title={title}
-        subtitle={subtitle}
-        icon={Icon}
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-        filters={filters}
-        activeFilters={activeFilters}
-        onClearFilters={onClearFilters}
-        onOpenFilters={() => setFilterDrawerOpen(true)}
-        actions={actions}
-        showHelp={!!helpPageKey || !!helpContent}
-        onHelpClick={() => setHelpDrawerOpen(true)}
-        isMobile={isMobile}
-      />
+      {/* HEADER - Show when sidebar is visible (>= 768px) */}
+      {showInlineHeader && (
+        <UnifiedPageHeader
+          title={title}
+          subtitle={subtitle}
+          icon={Icon}
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+          filters={filters}
+          activeFilters={activeFilters}
+          onClearFilters={onClearFilters}
+          onOpenFilters={() => setFilterDrawerOpen(true)}
+          actions={actions}
+          showHelp={!!helpPageKey || !!helpContent}
+          onHelpClick={() => setHelpDrawerOpen(true)}
+          isMobile={false}
+        />
+      )}
+      
+      {/* MOBILE ONLY (< 768px): Tabs bar */}
+      {!showInlineHeader && tabs && tabs.length > 0 && (
+        <div className="shrink-0 border-b border-border/50 bg-bg-secondary/50 overflow-x-auto scrollbar-hide px-2">
+          <div className="flex gap-0.5 min-w-max">
+            {tabs.map((tab) => {
+              const TabIcon = tab.icon
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => onTabChange?.(tab.id)}
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-all",
+                    "border-b-2 -mb-px",
+                    isActive
+                      ? "border-accent-primary text-accent-primary"
+                      : "border-transparent text-text-secondary"
+                  )}
+                >
+                  {TabIcon && <TabIcon size={14} weight={isActive ? "fill" : "regular"} />}
+                  <span>{tab.label}</span>
+                  {tab.count !== undefined && (
+                    <span className={cn(
+                      'px-1 py-0.5 rounded text-[10px]',
+                      isActive ? 'bg-accent-primary/15' : 'bg-bg-tertiary'
+                    )}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
       
       {/* STATS BAR (if provided) */}
       {stats && stats.length > 0 && (
@@ -378,36 +419,40 @@ function StatsBar({ stats, isMobile, onStatClick, activeStatFilter }) {
   }
   
   if (isMobile) {
-    // Mobile: horizontal scroll with card-style items
+    // Mobile: Premium pill-style stats with colored backgrounds
     return (
-      <div className="rich-stats-bar overflow-x-auto scrollbar-none py-3">
+      <div className="flex items-center gap-1.5 px-3 py-2 overflow-x-auto scrollbar-none border-b border-border/30 bg-bg-secondary/20">
         {stats.map((stat, i) => {
-          const Icon = stat.icon
-          const iconClass = iconVariants[stat.variant] || iconVariants.primary
-          const displayLabel = stat.shortLabel || stat.label
           const isActive = activeStatFilter && stat.filterValue === activeStatFilter
           const isClickable = onStatClick && stat.filterValue !== undefined
+          const displayLabel = stat.shortLabel || stat.label
+          
+          // Premium colored pills
+          const pillColors = {
+            success: 'stats-inline-item stats-success',
+            warning: 'stats-inline-item stats-warning', 
+            danger: 'stats-inline-item stats-danger',
+            primary: 'stats-inline-item stats-primary',
+            info: 'stats-inline-item stats-primary',
+            secondary: 'stats-inline-item',
+            default: 'stats-inline-item'
+          }
+          const pillClass = pillColors[stat.variant] || pillColors.default
           
           return (
-            <div 
-              key={i} 
-              className={cn(
-                "rich-stat-item shrink-0",
-                isClickable && "cursor-pointer hover:bg-bg-tertiary/50 rounded-lg transition-colors",
-                isActive && "ring-2 ring-accent-primary/50 bg-accent-primary/10"
-              )}
+            <button
+              key={i}
               onClick={() => isClickable && onStatClick(stat.filterValue)}
-            >
-              {Icon && (
-                <div className={cn('rich-stat-icon', iconClass)}>
-                  <Icon size={18} weight="duotone" />
-                </div>
+              disabled={!isClickable}
+              className={cn(
+                pillClass,
+                isActive && "ring-2 ring-offset-1 ring-offset-bg-primary ring-current",
+                !isClickable && "cursor-default opacity-80"
               )}
-              <div className="rich-stat-content">
-                <span className="rich-stat-value">{stat.value}</span>
-                <span className="rich-stat-label">{displayLabel}</span>
-              </div>
-            </div>
+            >
+              <span className="font-bold">{stat.value}</span>
+              <span className="opacity-80">{displayLabel}</span>
+            </button>
           )
         })}
       </div>

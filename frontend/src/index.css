@@ -1627,3 +1627,226 @@ input:focus, select:focus, textarea:focus {
   background: var(--icon-teal-bg);
   color: var(--icon-teal-text);
 }
+
+/* ============================================
+   MOBILE PREMIUM POLISH
+   Visual enhancements for mobile experience
+   ============================================ */
+
+/* Mobile card with subtle gradient background */
+.mobile-card-premium {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--bg-secondary) 80%, transparent),
+    color-mix(in srgb, var(--bg-tertiary) 40%, transparent)
+  );
+  border-radius: 12px;
+  transition: all 0.2s var(--ease-smooth);
+}
+.mobile-card-premium:active {
+  transform: scale(0.98);
+  background: var(--bg-tertiary);
+}
+
+/* Stats bar inline - colored backgrounds */
+.stats-inline-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  background: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
+  transition: all 0.15s var(--ease-smooth);
+}
+.stats-inline-item:active {
+  transform: scale(0.95);
+}
+.stats-inline-item.stats-success {
+  background: color-mix(in srgb, var(--accent-success) 15%, transparent);
+  color: var(--accent-success);
+}
+.stats-inline-item.stats-warning {
+  background: color-mix(in srgb, var(--accent-warning) 15%, transparent);
+  color: var(--accent-warning);
+}
+.stats-inline-item.stats-danger {
+  background: color-mix(in srgb, var(--accent-danger) 15%, transparent);
+  color: var(--accent-danger);
+}
+.stats-inline-item.stats-primary {
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  color: var(--accent-primary);
+}
+
+/* Search bar premium - rounded with inset shadow */
+.search-bar-premium {
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  box-shadow: inset 0 1px 3px color-mix(in srgb, var(--bg-primary) 50%, transparent);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.2s var(--ease-smooth);
+}
+.search-bar-premium:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 
+    inset 0 1px 3px color-mix(in srgb, var(--bg-primary) 50%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent);
+}
+
+/* FAB button (floating action button) - gradient + shadow */
+.fab-button {
+  background: var(--gradient-primary);
+  border-radius: 14px;
+  box-shadow: 
+    0 4px 12px color-mix(in srgb, var(--accent-primary) 40%, transparent),
+    var(--shadow-inner-highlight);
+  transition: all 0.2s var(--ease-smooth);
+}
+.fab-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 
+    0 6px 16px color-mix(in srgb, var(--accent-primary) 50%, transparent),
+    var(--shadow-inner-highlight);
+}
+.fab-button:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Gradient divider instead of flat line */
+.divider-gradient {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--border) 60%, transparent) 20%,
+    color-mix(in srgb, var(--border) 60%, transparent) 80%,
+    transparent
+  );
+}
+
+/* Pagination premium */
+.pagination-premium {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--bg-secondary) 80%, transparent);
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+}
+.pagination-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: all 0.15s var(--ease-smooth);
+}
+.pagination-btn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+.pagination-btn:disabled {
+  opacity: 0.4;
+}
+.pagination-current {
+  padding: 4px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  color: var(--accent-primary);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* Mobile navbar accent line */
+.navbar-mobile-accent {
+  position: relative;
+}
+.navbar-mobile-accent::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent-primary) 30%, transparent) 30%,
+    color-mix(in srgb, var(--accent-primary) 30%, transparent) 70%,
+    transparent
+  );
+}
+
+/* Avatar glow ring for status */
+.avatar-glow-success {
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 12px color-mix(in srgb, var(--accent-success) 50%, transparent);
+}
+.avatar-glow-warning {
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 12px color-mix(in srgb, var(--accent-warning) 50%, transparent);
+}
+.avatar-glow-danger {
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 12px color-mix(in srgb, var(--accent-danger) 50%, transparent);
+}
+
+/* Tab pills mobile */
+.tab-pill-mobile {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 0.2s var(--ease-smooth);
+}
+.tab-pill-mobile[data-state="active"],
+.tab-pill-mobile.active {
+  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
+  color: var(--accent-primary);
+}
+
+/* Badge glass effect */
+.badge-glass {
+  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--bg-tertiary) 70%, transparent);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Card list container with rounded edges */
+.card-list-container {
+  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+/* Quick action button row */
+.quick-action-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.quick-action-row::-webkit-scrollbar {
+  display: none;
+}
+.quick-action-btn {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.15s var(--ease-smooth);
+}
+.quick-action-btn:active {
+  transform: scale(0.95);
+  background: var(--bg-secondary);
+}

@@ -143,13 +143,33 @@ export default function SCEPPage() {
     return <Badge variant={variant} size="sm" dot={dot} pulse={pulse}>{status}</Badge>
   }
 
+  // Parse DN to extract CN and other fields
+  const parseDN = (dn) => {
+    if (!dn) return { cn: null, parts: {} }
+    const parts = {}
+    // Parse DN like "CN=scep-test-device,OU=MDM,O=UCM Test,C=FR"
+    const regex = /([A-Z]+)=([^,]+)/g
+    let match
+    while ((match = regex.exec(dn)) !== null) {
+      parts[match[1]] = match[2]
+    }
+    return { cn: parts.CN || null, parts }
+  }
+
   // Tabs config
   const tabs = useMemo(() => [
-    { id: 'requests', label: 'Requests', badge: stats.pending > 0 ? stats.pending : null },
-    { id: 'config', label: 'Configuration' },
-    { id: 'challenge', label: 'Challenges' },
-    { id: 'info', label: 'Info' }
+    { id: 'requests', label: 'Requests', icon: ListBullets, badge: stats.pending > 0 ? stats.pending : null },
+    { id: 'config', label: 'Configuration', icon: Gear },
+    { id: 'challenge', label: 'Challenges', icon: Key },
+    { id: 'info', label: 'Info', icon: Info }
   ], [stats.pending])
+
+  // Get SCEP CA name from config
+  const scepCaName = useMemo(() => {
+    if (!config.ca_id) return null
+    const ca = cas.find(c => c.id === config.ca_id)
+    return ca?.cn || ca?.common_name || ca?.name || null
+  }, [config.ca_id, cas])
 
   // Stats for header
   const headerStats = useMemo(() => [
@@ -161,50 +181,146 @@ export default function SCEPPage() {
 
   // Request table columns
   const requestColumns = useMemo(() => [
-    { key: 'id', label: 'ID', width: '60px' },
+    { key: 'id', label: 'ID', width: '60px', hideOnMobile: true },
+    { 
+      key: 'subject', 
+      label: 'Subject', 
+      priority: 1,
+      // Desktop: CN as main text + O/OU as secondary
+      render: (v, row) => {
+        const { cn, parts } = parseDN(v)
+        return (
+          <div className="space-y-0.5">
+            <div className="font-medium text-text-primary">
+              {cn || `Request #${row.id}`}
+            </div>
+            {(parts.O || parts.OU) && (
+              <div className="text-xs text-text-secondary">
+                {[parts.O, parts.OU].filter(Boolean).join(' • ')}
+              </div>
+            )}
+          </div>
+        )
+      },
+      // Mobile: CN left + status badge right (same pattern as Certificates)
+      mobileRender: (v, row) => {
+        const { cn, parts } = parseDN(v)
+        return (
+          <div className="flex items-center justify-between gap-2 w-full">
+            <span className="font-medium truncate flex-1 min-w-0">
+              {cn || `Request #${row.id}`}
+            </span>
+            <div className="shrink-0">
+              {getStatusBadge(row.status)}
+            </div>
+          </div>
+        )
+      }
+    },
+    { 
+      key: 'status', 
+      label: 'Status', 
+      priority: 2,
+      hideOnMobile: true, // Status shown in subject mobileRender
+      render: (v) => getStatusBadge(v)
+    },
+    {
+      key: 'ca',
+      label: 'CA',
+      priority: 3,
+      hideOnMobile: true,
+      render: () => (
+        <span className="text-text-secondary truncate">
+          {scepCaName || <span className="text-text-tertiary italic">Not configured</span>}
+        </span>
+      )
+    },
     { 
       key: 'transaction_id', 
       label: 'Transaction ID', 
+      priority: 4,
+      hideOnMobile: true,
       render: (v) => (
         <code className="text-xs bg-bg-tertiary px-1.5 py-0.5 rounded">{v?.slice(0, 16)}...</code>
       )
     },
-    { key: 'subject', label: 'Subject', render: (v) => v || <span className="text-text-tertiary">-</span> },
-    { key: 'status', label: 'Status', render: (v) => getStatusBadge(v) },
-    { key: 'created_at', label: 'Requested', render: (v) => formatDate(v) }
-  ], [])
+    { 
+      key: 'created_at', 
+      label: 'Requested', 
+      priority: 5,
+      render: (v) => formatDate(v),
+      // Mobile: CA + organization info + date
+      mobileRender: (v, row) => {
+        const { parts } = parseDN(row.subject)
+        return (
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            {scepCaName && (
+              <span><span className="text-text-tertiary">CA:</span> <span className="text-text-secondary">{scepCaName}</span></span>
+            )}
+            {parts.O && (
+              <span><span className="text-text-tertiary">Org:</span> <span className="text-text-secondary">{parts.O}</span></span>
+            )}
+            <span><span className="text-text-tertiary">Date:</span> <span className="text-text-secondary">{formatDate(v)}</span></span>
+          </div>
+        )
+      }
+    }
+  ], [scepCaName])
 
   // Mobile card render for requests
-  const renderMobileCard = useCallback((req, isSelected) => (
-    <div className={`p-4 ${isSelected ? 'mobile-row-selected' : ''}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-text-primary truncate">
-              {req.subject || `Request #${req.id}`}
-            </span>
+  const renderMobileCard = useCallback((req, isSelected) => {
+    const { cn, parts } = parseDN(req.subject)
+    const displayName = cn || `Request #${req.id}`
+    
+    return (
+      <div className={`p-3 ${isSelected ? 'mobile-row-selected' : ''}`}>
+        {/* Row 1: CN left, Status badge right */}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="font-medium text-text-primary truncate flex-1 min-w-0">
+            {displayName}
+          </span>
+          <div className="shrink-0">
             {getStatusBadge(req.status)}
           </div>
-          <div className="text-xs text-text-secondary mt-1">
-            <code className="bg-bg-tertiary px-1 py-0.5 rounded">{req.transaction_id?.slice(0, 20)}...</code>
-          </div>
-          <div className="text-xs text-text-tertiary mt-1">
-            {formatDate(req.created_at)}
-          </div>
         </div>
+        
+        {/* Row 2: DN details */}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-secondary mb-1.5">
+          {parts.OU && (
+            <span><span className="text-text-tertiary">OU:</span> {parts.OU}</span>
+          )}
+          {parts.O && (
+            <span><span className="text-text-tertiary">O:</span> {parts.O}</span>
+          )}
+          {parts.C && (
+            <span><span className="text-text-tertiary">C:</span> {parts.C}</span>
+          )}
+        </div>
+        
+        {/* Row 3: Transaction ID + Date */}
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <code className="bg-bg-tertiary px-1.5 py-0.5 rounded text-text-tertiary truncate max-w-[140px]">
+            {req.transaction_id?.slice(0, 12)}...
+          </code>
+          <span className="text-text-tertiary shrink-0">
+            {formatDate(req.created_at)}
+          </span>
+        </div>
+        
+        {/* Action buttons for pending */}
         {req.status === 'pending' && hasPermission('write:scep') && (
-          <div className="flex gap-1">
-            <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); handleApprove(req); }}>
-              <CheckCircle size={14} />
+          <div className="flex gap-2 mt-2 pt-2 border-t border-border/50">
+            <Button size="sm" variant="success" className="flex-1" onClick={(e) => { e.stopPropagation(); handleApprove(req); }}>
+              <CheckCircle size={14} className="mr-1" /> Approve
             </Button>
-            <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); setSelectedRequest(req); setShowRejectModal(true); }}>
-              <XCircle size={14} />
+            <Button size="sm" variant="danger" className="flex-1" onClick={(e) => { e.stopPropagation(); setSelectedRequest(req); setShowRejectModal(true); }}>
+              <XCircle size={14} className="mr-1" /> Reject
             </Button>
           </div>
         )}
       </div>
-    </div>
-  ), [hasPermission])
+    )
+  }, [hasPermission])
 
   // Help content
   const helpContent = (

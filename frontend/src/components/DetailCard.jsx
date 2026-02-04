@@ -81,6 +81,7 @@ const FIELD_ICONS = {
 /**
  * DetailHeader - Soft gradient card header with icon (Style A)
  * Uses CSS variables for theme compatibility
+ * Now supports compact mode for simpler layouts
  */
 export function DetailHeader({
   icon: Icon,
@@ -89,12 +90,42 @@ export function DetailHeader({
   badge,
   stats,      // Array of { icon, label, value }
   actions,    // Array of { label, icon, onClick, variant }
+  compact,    // If true, renders a simpler inline header without card background
   className
 }) {
   const { isMobile } = useMobile()
   const [menuOpen, setMenuOpen] = useState(false)
   // Use dropdown when: mobile with 2+ actions OR desktop with 3+ actions (narrow panels)
   const showDropdown = (isMobile && actions?.length > 1) || actions?.length > 2
+
+  // Compact mode - simple inline header without gradient card
+  if (compact) {
+    return (
+      <div className={cn("flex items-center justify-between gap-4 mb-4", className)}>
+        <div className="flex items-center gap-2 min-w-0">
+          {Icon && <Icon size={18} className="text-accent-primary shrink-0" weight="duotone" />}
+          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+          {badge}
+        </div>
+        {actions && actions.length > 0 && (
+          <div className="flex items-center gap-2">
+            {actions.map((action, i) => (
+              <Button
+                key={i}
+                variant={action.variant || 'secondary'}
+                size="sm"
+                onClick={action.onClick}
+                disabled={action.disabled}
+              >
+                {action.icon && <action.icon size={14} />}
+                {action.label}
+              </Button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className={cn(
@@ -212,23 +243,32 @@ export function DetailHeader({
  * DetailSection - Clean minimal section with card frame (Style B + frames)
  * Theme-aware styling
  * @param {boolean} compact - Use compact layout with less padding
+ * @param {Component} icon - Optional icon component
+ * @param {string} iconClass - Optional icon background class (e.g., 'icon-bg-blue')
  */
-export function DetailSection({ title, description, subtitle, actions, children, className, noBorder = false, compact = false }) {
+export function DetailSection({ title, description, subtitle, actions, children, className, noBorder = false, compact = false, icon: Icon, iconClass }) {
   const { isMobile } = useMobile()
   
   return (
     <section className={cn(compact ? "py-1.5" : "py-2.5", className)}>
       {title && (
-        <div className="mb-2">
-          <h2 className={cn(
-            "font-semibold text-text-secondary tracking-wide",
-            isMobile ? "text-xs" : "text-sm"
-          )}>
-            {title}
-          </h2>
-          {description && (
-            <p className="text-xs text-text-tertiary mt-0.5">{description}</p>
+        <div className="mb-2 flex items-center gap-2">
+          {Icon && iconClass && (
+            <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center shrink-0", iconClass)}>
+              <Icon size={12} weight="fill" />
+            </div>
           )}
+          <div>
+            <h2 className={cn(
+              "font-semibold text-text-secondary tracking-wide",
+              isMobile ? "text-xs" : "text-sm"
+            )}>
+              {title}
+            </h2>
+            {description && (
+              <p className="text-xs text-text-tertiary mt-0.5">{description}</p>
+            )}
+          </div>
         </div>
       )}
       {/* Content in a framed card - uses theme-aware class */}
@@ -468,13 +508,18 @@ export function CompactSection({ title, children, className, collapsible = false
 }
 
 /**
- * CompactGrid - 2-column grid for compact key-value pairs
+ * CompactGrid - Responsive grid for compact key-value pairs
+ * - Mobile: 1 column
+ * - Desktop: 2-3 columns based on cols prop
  */
 export function CompactGrid({ children, cols = 2, className }) {
   return (
     <div className={cn(
       "grid gap-x-3 gap-y-1.5 text-xs",
-      cols === 2 ? "grid-cols-2" : cols === 3 ? "grid-cols-3" : "grid-cols-1",
+      // Mobile: always 1 column for readability
+      "grid-cols-1",
+      // Desktop: respect cols prop
+      cols === 2 ? "sm:grid-cols-2" : cols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-1",
       className
     )}>
       {children}

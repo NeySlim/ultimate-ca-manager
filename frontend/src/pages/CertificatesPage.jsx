@@ -236,7 +236,7 @@ export default function CertificatesPage() {
     let result = certificates.map(cert => ({
       ...cert,
       status: cert.revoked ? 'revoked' : cert.status,
-      cn: extractCN(cert.subject) || cert.common_name || 'Certificate',
+      cn: cert.cn || cert.common_name || extractCN(cert.subject) || 'Certificate',
       isOrphan: cert.ca_id && !caIds.has(cert.ca_id) && !caIds.has(Number(cert.ca_id))
     }))
     
@@ -311,6 +311,21 @@ export default function CertificatesPage() {
   }, [])
 
   // Table columns
+  // Status badge helper for mobile
+  const getStatusBadge = (row) => {
+    const isRevoked = row.revoked
+    const status = isRevoked ? 'revoked' : row.status || 'unknown'
+    const config = {
+      valid: { variant: 'success', icon: CheckCircle, label: 'Valid', pulse: true },
+      expiring: { variant: 'warning', icon: Clock, label: 'Expiring', pulse: true },
+      expired: { variant: 'danger', icon: XCircle, label: 'Expired', pulse: false },
+      revoked: { variant: 'danger', icon: X, label: 'Revoked', pulse: false },
+      unknown: { variant: 'secondary', icon: Info, label: 'Unknown', pulse: false }
+    }
+    const { variant, icon, label, pulse } = config[status] || config.unknown
+    return <Badge variant={variant} size="sm" icon={icon} dot pulse={pulse}>{label}</Badge>
+  }
+
   const columns = useMemo(() => [
     {
       key: 'cn',
@@ -333,6 +348,18 @@ export default function CertificatesPage() {
           {row.source === 'acme' && <Badge variant="cyan" size="sm" dot>ACME</Badge>}
           {row.source === 'scep' && <Badge variant="orange" size="sm" dot>SCEP</Badge>}
         </div>
+      ),
+      // Mobile: CN left + status badge right
+      mobileRender: (val, row) => (
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className="font-medium truncate">{val || row.cn || row.common_name || 'Certificate'}</span>
+            <KeyIndicator hasKey={row.has_private_key} size={12} />
+          </div>
+          <div className="shrink-0">
+            {getStatusBadge(row)}
+          </div>
+        </div>
       )
     },
     {
@@ -340,6 +367,7 @@ export default function CertificatesPage() {
       header: 'Status',
       priority: 2,
       sortable: true, // Groups by status type, then alphabetically
+      hideOnMobile: true, // Status shown in CN mobileRender
       render: (val, row) => {
         const isRevoked = row.revoked
         const status = isRevoked ? 'revoked' : val || 'unknown'
@@ -362,23 +390,41 @@ export default function CertificatesPage() {
       key: 'issuer',
       header: 'Issuer',
       priority: 3,
-      hideOnMobile: true,
       sortable: true,
       render: (val, row) => (
         <span className="text-text-secondary truncate">
           {extractCN(val) || row.issuer_name || '—'}
         </span>
+      ),
+      // Mobile: labeled CA info
+      mobileRender: (val, row) => (
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className="text-text-tertiary">CA:</span>
+          <span className="text-text-secondary truncate">{extractCN(val) || row.issuer_name || '—'}</span>
+        </div>
       )
     },
     {
       key: 'valid_to',
       header: 'Expires',
-      hideOnMobile: true,
+      priority: 4, // Show on mobile as tertiary
       sortable: true,
       render: (val) => (
         <span className="text-xs text-text-secondary whitespace-nowrap">
           {formatDate(val)}
         </span>
+      ),
+      // Mobile: labeled expiration with badges
+      mobileRender: (val, row) => (
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-text-tertiary">Exp:</span>
+            <span className="text-text-secondary">{formatDate(val)}</span>
+          </div>
+          {row.isOrphan && <Badge variant="warning" size="xs" icon={LinkBreak}>Orphan</Badge>}
+          {row.source === 'acme' && <Badge variant="cyan" size="xs" dot>ACME</Badge>}
+          {row.source === 'scep' && <Badge variant="orange" size="xs" dot>SCEP</Badge>}
+        </div>
       )
     },
     {
