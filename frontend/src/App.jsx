@@ -25,9 +25,6 @@ const PrototypeDesign = lazy(() => import('./pages/PrototypeDesign'))
 const RBACPage = lazy(() => 
   import('./pro/pages/RBACPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
 )
-const SSOPage = lazy(() => 
-  import('./pro/pages/SSOPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
-)
 const HSMPage = lazy(() => 
   import('./pro/pages/HSMPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
 )
