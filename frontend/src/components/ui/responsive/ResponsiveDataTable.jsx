@@ -390,13 +390,18 @@ export function ResponsiveDataTable({
   }, [sortedData, exportFilename])
   
   // Get primary and secondary columns for mobile cards
+  // NOTE: If secondaryCol has mobileRender, it likely includes tertiary info already
   const { primaryCol, secondaryCol, tertiaryCol } = useMemo(() => {
-    const sorted = [...columns].sort((a, b) => (a.priority || 99) - (b.priority || 99))
-    return {
-      primaryCol: sorted[0],
-      secondaryCol: sorted[1],
-      tertiaryCol: sorted[2]
-    }
+    // Filter out hideOnMobile columns, then sort by priority
+    const mobileColumns = columns.filter(col => col.hideOnMobile !== true)
+    const sorted = [...mobileColumns].sort((a, b) => (a.priority || 99) - (b.priority || 99))
+    
+    const primary = sorted[0]
+    const secondary = sorted[1]
+    // Only show tertiary if secondary doesn't have mobileRender (which combines info)
+    const tertiary = sorted.length > 2 && !secondary?.mobileRender ? sorted[2] : null
+    
+    return { primaryCol: primary, secondaryCol: secondary, tertiaryCol: tertiary }
   }, [columns])
   
   // Empty state - but ALWAYS show toolbar if there are filters to clear
@@ -604,18 +609,24 @@ function SearchBar({
 }) {
   return (
     <div className={cn(
-      'shrink-0 border-b border-border/50 bg-bg-secondary/30',
-      isMobile ? 'px-4 py-3' : 'px-4 py-2.5'
+      'shrink-0 border-b border-border/30',
+      isMobile ? 'px-3 py-2 bg-bg-secondary/10' : 'px-4 py-2 bg-bg-secondary/30'
     )}>
       <div className="flex items-center gap-2">
-        {/* Search input */}
+        {/* Search input - premium styling on mobile */}
         {searchable && (
-          <div className="relative group flex-1 min-w-0">
+          <div className={cn(
+            "relative group flex-1 min-w-0",
+            isMobile && "search-bar-premium"
+          )}>
             <MagnifyingGlass 
-              size={isMobile ? 20 : 16} 
+              size={isMobile ? 14 : 16} 
               className={cn(
-                "absolute left-3 top-1/2 -translate-y-1/2",
-                "text-text-tertiary group-focus-within:text-accent-primary transition-colors"
+                "absolute left-2.5 top-1/2 -translate-y-1/2",
+                isMobile 
+                  ? "text-accent-primary/60 group-focus-within:text-accent-primary"
+                  : "text-text-tertiary group-focus-within:text-accent-primary",
+                "transition-colors"
               )}
             />
             <input
@@ -624,27 +635,24 @@ function SearchBar({
               onChange={(e) => onChange(e.target.value)}
               placeholder={placeholder}
               className={cn(
-                'w-full rounded-lg border border-border bg-bg-primary',
-                'text-text-primary placeholder:text-text-tertiary',
+                'w-full text-text-primary placeholder:text-text-tertiary',
                 'transition-all duration-200',
-                'focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary',
-                'hover:border-border-hover',
+                'focus:outline-none',
                 isMobile 
-                  ? 'h-11 pl-10 pr-4 text-base' 
-                  : 'h-8 pl-9 pr-3 text-sm'
+                  ? 'h-9 pl-8 pr-3 text-sm bg-transparent border-none rounded-xl' 
+                  : 'h-8 pl-9 pr-3 text-sm bg-bg-primary border border-border rounded-lg focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary hover:border-border-hover'
               )}
             />
             {value && (
               <button
                 onClick={() => onChange('')}
                 className={cn(
-                  'absolute right-2 top-1/2 -translate-y-1/2 rounded-md',
+                  'absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md',
                   'text-text-tertiary hover:text-text-primary hover:bg-bg-hover',
-                  'transition-all duration-150',
-                  isMobile ? 'p-2' : 'p-1'
+                  'transition-all duration-150 p-1'
                 )}
               >
-                <X size={isMobile ? 18 : 14} weight="bold" />
+                <X size={14} weight="bold" />
               </button>
             )}
           </div>
@@ -919,9 +927,12 @@ function SearchBar({
           </div>
         )}
         
-        {/* Actions */}
+        {/* Actions - same height as search bar on mobile */}
         {actions && (
-          <div className="flex items-center gap-2 shrink-0">
+          <div className={cn(
+            "flex items-center gap-2 shrink-0",
+            isMobile && "[&>button]:h-9 [&>button]:px-3 [&>button]:text-xs"
+          )}>
             {actions}
           </div>
         )}
@@ -1152,18 +1163,21 @@ function MobileCardList({
   
   return (
     <div className="flex-1 overflow-auto">
-      <div className="divide-y divide-border/50">
+      {/* Gradient dividers instead of flat lines */}
+      <div className="space-y-px">
         {data.map((row, idx) => (
-          <MobileCardRow
-            key={row.id || idx}
-            row={row}
-            primaryCol={primaryCol}
-            secondaryCol={secondaryCol}
-            tertiaryCol={tertiaryCol}
-            isSelected={selectedId === row.id}
-            onClick={() => onRowClick?.(row)}
-            actions={rowActions?.(row)}
-          />
+          <div key={row.id || idx}>
+            {idx > 0 && <div className="divider-gradient mx-3" />}
+            <MobileCardRow
+              row={row}
+              primaryCol={primaryCol}
+              secondaryCol={secondaryCol}
+              tertiaryCol={tertiaryCol}
+              isSelected={selectedId === row.id}
+              onClick={() => onRowClick?.(row)}
+              actions={rowActions?.(row)}
+            />
+          </div>
         ))}
       </div>
     </div>
@@ -1185,44 +1199,50 @@ function MobileCardRow({
     <div
       onClick={onClick}
       className={cn(
-        'px-4 py-3.5 transition-all duration-150',
+        'px-3 py-2.5 transition-all duration-150',
         'active:bg-bg-tertiary active:scale-[0.99]',
         // Selected state - uses theme color via CSS
         isSelected && 'mobile-row-selected'
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2">
         {/* Main content */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 space-y-0.5">
           {/* Primary */}
           {primaryCol && (
             <div className={cn(
-              "font-medium truncate transition-colors",
+              "font-medium transition-colors text-sm",
               isSelected ? "text-accent-primary" : "text-text-primary"
             )}>
-              {primaryCol.render 
-                ? primaryCol.render(row[primaryCol.key], row)
-                : row[primaryCol.key]
+              {primaryCol.mobileRender 
+                ? primaryCol.mobileRender(row[primaryCol.key], row)
+                : primaryCol.render 
+                  ? primaryCol.render(row[primaryCol.key], row)
+                  : row[primaryCol.key]
               }
             </div>
           )}
           
-          {/* Secondary */}
+          {/* Secondary - uses mobileRender if available */}
           {secondaryCol && (
-            <div className="text-sm text-text-secondary mt-0.5">
-              {secondaryCol.render 
-                ? secondaryCol.render(row[secondaryCol.key], row)
-                : row[secondaryCol.key]
+            <div className="text-text-secondary">
+              {secondaryCol.mobileRender 
+                ? secondaryCol.mobileRender(row[secondaryCol.key], row)
+                : secondaryCol.render 
+                  ? secondaryCol.render(row[secondaryCol.key], row)
+                  : row[secondaryCol.key]
               }
             </div>
           )}
           
-          {/* Tertiary (badge/status) */}
+          {/* Tertiary (badge/status) - uses mobileRender if available */}
           {tertiaryCol && (
-            <div className="mt-1.5">
-              {tertiaryCol.render 
-                ? tertiaryCol.render(row[tertiaryCol.key], row)
-                : row[tertiaryCol.key]
+            <div className="mt-1" data-tertiary-key={tertiaryCol.key}>
+              {tertiaryCol.mobileRender 
+                ? tertiaryCol.mobileRender(row[tertiaryCol.key], row)
+                : tertiaryCol.render 
+                  ? tertiaryCol.render(row[tertiaryCol.key], row)
+                  : row[tertiaryCol.key]
               }
             </div>
           )}
