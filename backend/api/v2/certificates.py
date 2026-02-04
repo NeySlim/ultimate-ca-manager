@@ -57,11 +57,16 @@ def list_certificates():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     status = request.args.get('status')  # valid, revoked, expired, expiring
+    ca_id = request.args.get('ca_id', type=int)  # Filter by CA
     search = request.args.get('search', '').strip()
     sort_by = request.args.get('sort_by', 'subject')  # Default sort by subject (common_name)
     sort_order = request.args.get('sort_order', 'asc')  # Default ascending (A-Z)
     
     query = Certificate.query
+    
+    # Apply CA filter
+    if ca_id:
+        query = query.filter_by(ca_id=ca_id)
     
     # Apply status filter
     if status == 'revoked':

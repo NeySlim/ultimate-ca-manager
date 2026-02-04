@@ -201,7 +201,12 @@ export function ResponsiveLayout({
       
       {/* STATS BAR (if provided) */}
       {stats && stats.length > 0 && (
-        <StatsBar stats={stats} isMobile={isMobile} />
+        <StatsBar 
+          stats={stats} 
+          isMobile={isMobile} 
+          onStatClick={onStatClick}
+          activeStatFilter={activeStatFilter}
+        />
       )}
       
       {/* MAIN AREA - Content + SlideOver/SplitPanel */}
@@ -361,7 +366,7 @@ export function ResponsiveLayout({
 // STATS BAR - Enhanced with rich visual styling like Dashboard
 // =============================================================================
 
-function StatsBar({ stats, isMobile }) {
+function StatsBar({ stats, isMobile, onStatClick, activeStatFilter }) {
   const iconVariants = {
     primary: 'rich-stat-icon-primary',
     success: 'rich-stat-icon-success',
@@ -380,9 +385,19 @@ function StatsBar({ stats, isMobile }) {
           const Icon = stat.icon
           const iconClass = iconVariants[stat.variant] || iconVariants.primary
           const displayLabel = stat.shortLabel || stat.label
+          const isActive = activeStatFilter && stat.filterValue === activeStatFilter
+          const isClickable = onStatClick && stat.filterValue !== undefined
           
           return (
-            <div key={i} className="rich-stat-item shrink-0">
+            <div 
+              key={i} 
+              className={cn(
+                "rich-stat-item shrink-0",
+                isClickable && "cursor-pointer hover:bg-bg-tertiary/50 rounded-lg transition-colors",
+                isActive && "ring-2 ring-accent-primary/50 bg-accent-primary/10"
+              )}
+              onClick={() => isClickable && onStatClick(stat.filterValue)}
+            >
               {Icon && (
                 <div className={cn('rich-stat-icon', iconClass)}>
                   <Icon size={18} weight="duotone" />
@@ -405,9 +420,20 @@ function StatsBar({ stats, isMobile }) {
       {stats.map((stat, i) => {
         const Icon = stat.icon
         const iconClass = iconVariants[stat.variant] || iconVariants.primary
+        const isActive = activeStatFilter && stat.filterValue === activeStatFilter
+        const isClickable = onStatClick && stat.filterValue !== undefined
         
         return (
-          <div key={i} className="rich-stat-item">
+          <div 
+            key={i} 
+            className={cn(
+              "rich-stat-item",
+              isClickable && "cursor-pointer hover:bg-bg-tertiary/50 rounded-lg transition-colors",
+              isActive && "ring-2 ring-accent-primary/50 bg-accent-primary/10"
+            )}
+            onClick={() => isClickable && onStatClick(stat.filterValue)}
+            title={isClickable ? `Click to filter by ${stat.label}` : undefined}
+          >
             {Icon && (
               <div className={cn('rich-stat-icon', iconClass)}>
                 <Icon size={16} weight="duotone" />
