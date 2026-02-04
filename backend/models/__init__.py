@@ -366,6 +366,7 @@ class Certificate(db.Model):
     serial_number = db.Column(db.String(100))
     valid_from = db.Column(db.DateTime)
     valid_to = db.Column(db.DateTime)
+    key_algo = db.Column(db.String(50))  # RSA 2048, EC P-256, etc. (for sorting)
     
     # Subject Alternative Names (SAN)
     san_dns = db.Column(db.Text)  # JSON array of DNS names
@@ -754,6 +755,7 @@ class Certificate(db.Model):
             "status": status,
             # Key and signature info
             "key_type": self.key_type,
+            "key_algo": self.key_algo,  # Stored value for sorting
             "key_algorithm": self.key_algorithm,
             "key_size": self.key_size,
             "signature_algorithm": self.signature_algorithm,

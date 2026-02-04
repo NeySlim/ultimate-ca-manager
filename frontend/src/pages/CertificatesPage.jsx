@@ -296,6 +296,7 @@ export default function CertificatesPage() {
         'issuer': 'issuer',
         'expires': 'valid_to',
         'valid_to': 'valid_to',
+        'key_type': 'key_algo',
         'created_at': 'created_at'
       }
       const backendKey = keyMap[newSort.key]
@@ -384,9 +385,10 @@ export default function CertificatesPage() {
       key: 'key_type',
       header: 'Key',
       hideOnMobile: true,
+      sortable: true,
       render: (val, row) => (
         <span className="text-xs font-mono text-text-secondary">
-          {row.key_algorithm || val || 'RSA'}
+          {row.key_algorithm || row.key_algo || val || 'RSA'}
         </span>
       )
     }
