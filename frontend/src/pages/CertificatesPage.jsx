@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Certificate, Download, Trash, X, Plus, Info,
-  CheckCircle, Warning, UploadSimple, Clock, XCircle, ArrowClockwise, LinkBreak
+  CheckCircle, Warning, UploadSimple, Clock, XCircle, ArrowClockwise, LinkBreak, Star
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, HelpCard,
@@ -16,11 +16,13 @@ import {
 import { certificatesService, casService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { ERRORS, SUCCESS, LABELS, CONFIRM, BUTTONS } from '../lib/messages'
-import { usePermission } from '../hooks'
+import { usePermission, useRecentHistory, useFavorites } from '../hooks'
 import { formatDate, extractCN, cn } from '../lib/utils'
 
 export default function CertificatesPage() {
   const { isMobile } = useMobile()
+  const { addToHistory } = useRecentHistory('certificates')
+  const { isFavorite, toggleFavorite } = useFavorites('certificates')
   
   // Data
   const [certificates, setCertificates] = useState([])
@@ -88,11 +90,18 @@ export default function CertificatesPage() {
     }
     try {
       const res = await certificatesService.getById(cert.id)
-      setSelectedCert(res.data || cert)
+      const fullCert = res.data || cert
+      setSelectedCert(fullCert)
+      // Add to recent history
+      addToHistory({
+        id: fullCert.id,
+        name: fullCert.common_name || extractCN(fullCert.subject) || `Certificate ${fullCert.id}`,
+        subtitle: fullCert.issuer ? extractCN(fullCert.issuer) : ''
+      })
     } catch {
       setSelectedCert(cert)
     }
-  }, [])
+  }, [addToHistory])
 
   // Export certificate
   const handleExport = async (format) => {
@@ -509,6 +518,24 @@ export default function CertificatesPage() {
         slideOverTitle={selectedCert?.cn || selectedCert?.common_name || 'Certificate Details'}
         slideOverContent={slideOverContent}
         slideOverWidth="wide"
+        slideOverActions={selectedCert && (
+          <button
+            onClick={() => toggleFavorite({
+              id: selectedCert.id,
+              name: selectedCert.common_name || extractCN(selectedCert.subject),
+              subtitle: selectedCert.issuer ? extractCN(selectedCert.issuer) : ''
+            })}
+            className={cn(
+              'p-1.5 rounded-md transition-colors',
+              isFavorite(selectedCert.id)
+                ? 'text-yellow-500 hover:text-yellow-400 bg-yellow-500/10'
+                : 'text-text-tertiary hover:text-yellow-500 hover:bg-yellow-500/10'
+            )}
+            title={isFavorite(selectedCert.id) ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Star size={16} weight={isFavorite(selectedCert.id) ? 'fill' : 'regular'} />
+          </button>
+        )}
         onSlideOverClose={() => setSelectedCert(null)}
       >
         <ResponsiveDataTable

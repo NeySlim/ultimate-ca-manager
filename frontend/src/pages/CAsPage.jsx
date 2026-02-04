@@ -17,7 +17,7 @@ import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
 import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
-import { usePermission, useModals } from '../hooks'
+import { usePermission, useModals, useRecentHistory } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
 
@@ -26,6 +26,7 @@ export default function CAsPage() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { addToHistory } = useRecentHistory('cas')
   
   const [cas, setCAs] = useState([])
   const [selectedCA, setSelectedCA] = useState(null)
@@ -106,7 +107,14 @@ export default function CAsPage() {
   const loadCADetails = async (ca) => {
     try {
       const caData = await casService.getById(ca.id)
-      setSelectedCA(extractData(caData) || ca)
+      const fullCA = extractData(caData) || ca
+      setSelectedCA(fullCA)
+      // Add to recent history
+      addToHistory({
+        id: fullCA.id,
+        name: fullCA.common_name || fullCA.descr || `CA ${fullCA.id}`,
+        subtitle: fullCA.is_root ? 'Root CA' : (fullCA.parent_name || 'Intermediate')
+      })
     } catch {
       setSelectedCA(ca)
     }
