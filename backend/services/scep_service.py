@@ -216,6 +216,17 @@ class SCEPService:
             sender_nonce = attrs.get('senderNonce')
             challenge_pwd = attrs.get('challengePassword')
             
+            # Also check for challengePassword in CSR attributes (where scepclient puts it)
+            if not challenge_pwd:
+                try:
+                    from cryptography.x509.oid import AttributeOID
+                    for attr in csr.attributes:
+                        if attr.oid == AttributeOID.CHALLENGE_PASSWORD:
+                            challenge_pwd = attr.value
+                            break
+                except Exception as e:
+                    print(f"DEBUG: Could not extract challenge from CSR: {e}", flush=True)
+            
             print(f"DEBUG: Extracted attributes: txn_id={transaction_id}, msg_type={message_type}, challenge_pwd={'***' if challenge_pwd else None}", flush=True)
             
             if not transaction_id:

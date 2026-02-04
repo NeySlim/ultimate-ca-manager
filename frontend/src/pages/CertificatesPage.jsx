@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Certificate, Download, Trash, X, Plus, Info,
-  CheckCircle, Warning, UploadSimple, Clock, XCircle
+  CheckCircle, Warning, UploadSimple, Clock, XCircle, ArrowClockwise
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, HelpCard,
@@ -118,6 +118,27 @@ export default function CertificatesPage() {
       setSelectedCert(null)
     } catch {
       showError(ERRORS.REVOKE_FAILED.CERTIFICATE)
+    }
+  }
+
+  // Renew certificate
+  const handleRenew = async (id) => {
+    const confirmed = await showConfirm(
+      'This will create a new certificate with the same subject and extended validity. The current certificate will remain valid until revoked.',
+      {
+        title: 'Renew Certificate',
+        confirmText: 'Renew',
+        variant: 'primary'
+      }
+    )
+    if (!confirmed) return
+    try {
+      await certificatesService.renew(id)
+      showSuccess('Certificate renewed successfully')
+      loadData()
+      setSelectedCert(null)
+    } catch (error) {
+      showError(error.message || 'Failed to renew certificate')
     }
   }
 
@@ -276,6 +297,10 @@ export default function CertificatesPage() {
   const rowActions = useCallback((row) => [
     { label: 'View Details', icon: Info, onClick: () => handleSelectCert(row) },
     { label: 'Export PEM', icon: Download, onClick: () => handleExportRow(row, 'pem') },
+    { label: 'Export PKCS#12', icon: Download, onClick: () => handleExportRow(row, 'p12') },
+    ...(canWrite('certificates') && !row.revoked && row.has_private_key ? [
+      { label: 'Renew', icon: ArrowClockwise, onClick: () => handleRenew(row.id) }
+    ] : []),
     ...(canWrite('certificates') && !row.revoked ? [
       { label: 'Revoke', icon: X, variant: 'danger', onClick: () => handleRevoke(row.id) }
     ] : []),
@@ -284,8 +309,25 @@ export default function CertificatesPage() {
     ] : [])
   ], [canWrite, canDelete])
 
+  // State for P12 password modal
+  const [showP12Modal, setShowP12Modal] = useState(false)
+  const [p12Password, setP12Password] = useState('')
+  const [p12Cert, setP12Cert] = useState(null)
+
   // Export from row
   const handleExportRow = async (cert, format) => {
+    // For P12, we need a password - show modal
+    if (format === 'p12' || format === 'pkcs12') {
+      if (!cert.has_private_key) {
+        showError('Certificate has no private key for PKCS#12 export')
+        return
+      }
+      setP12Cert(cert)
+      setP12Password('')
+      setShowP12Modal(true)
+      return
+    }
+    
     try {
       const blob = await certificatesService.export(cert.id, format)
       const url = URL.createObjectURL(blob)
@@ -297,6 +339,29 @@ export default function CertificatesPage() {
       showSuccess(SUCCESS.EXPORT.CERTIFICATE)
     } catch {
       showError(ERRORS.EXPORT_FAILED.CERTIFICATE)
+    }
+  }
+
+  // Export P12 with password
+  const handleExportP12 = async () => {
+    if (!p12Password || p12Password.length < 4) {
+      showError('Password must be at least 4 characters')
+      return
+    }
+    try {
+      const blob = await certificatesService.export(p12Cert.id, 'pkcs12', { password: p12Password })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${p12Cert.common_name || p12Cert.cn || 'certificate'}.p12`
+      a.click()
+      URL.revokeObjectURL(url)
+      showSuccess('Certificate exported as PKCS#12')
+      setShowP12Modal(false)
+      setP12Password('')
+      setP12Cert(null)
+    } catch (error) {
+      showError(error.message || 'Failed to export PKCS#12')
     }
   }
 
@@ -543,6 +608,45 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
             </Button>
             <Button onClick={handleUploadKey} disabled={!keyPem.trim()}>
               <UploadSimple size={16} /> Upload Key
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* PKCS#12 Export Modal */}
+      <Modal
+        open={showP12Modal}
+        onClose={() => { setShowP12Modal(false); setP12Password(''); setP12Cert(null) }}
+        title="Export PKCS#12"
+      >
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-text-secondary">
+            Enter a password to protect the PKCS#12 file. This password will be required when importing the certificate.
+          </p>
+          <Input
+            label="Password"
+            type="password"
+            value={p12Password}
+            onChange={(e) => setP12Password(e.target.value)}
+            placeholder="Minimum 4 characters"
+            autoFocus
+          />
+          <Input
+            label="Confirm Password"
+            type="password"
+            placeholder="Re-enter password"
+            onBlur={(e) => {
+              if (e.target.value && e.target.value !== p12Password) {
+                showError('Passwords do not match')
+              }
+            }}
+          />
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
+            <Button variant="secondary" onClick={() => { setShowP12Modal(false); setP12Password(''); setP12Cert(null) }}>
+              Cancel
+            </Button>
+            <Button onClick={handleExportP12} disabled={!p12Password || p12Password.length < 4}>
+              <Download size={16} /> Export PKCS#12
             </Button>
           </div>
         </div>

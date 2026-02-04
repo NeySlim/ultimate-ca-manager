@@ -19,6 +19,12 @@ This release marks the first production-ready version with comprehensive QA test
 - **UI testing** completed on all 15 pages
 - **Security review** passed
 
+#### Added
+- **Certificate Renewal UI** - Renew button in certificate actions (requires private key)
+- **PKCS#12 Export** - Export certificates with private key as P12/PFX format
+- **SCEP Pending Requests** - Approve/reject SCEP requests in manual mode
+- **SCEP Challenge Password** - Extract from CSR attributes (scepclient compatibility)
+
 #### Fixed
 - **UserSession Model** - Added missing model causing 500 errors on `/account/sessions`
 - **Account Activity** - Fixed query using `user_id` instead of `username`
@@ -28,6 +34,8 @@ This release marks the first production-ready version with comprehensive QA test
 - **Docker IPv6** - Fixed entrypoint.sh to filter IPv4 only
 - **Debian Packaging** - Disabled dh_installsystemd (path conflicts)
 - **Radix Select** - Fixed empty value handling in RBACPage
+- **SCEP Routes** - Fixed SPA routing conflict with `/scep-config`
+- **pytz Dependency** - Added to venv for SCEP service
 
 #### Changed
 - **WebAuthn Multi-Key** - Allow both platform + cross-platform authenticators
