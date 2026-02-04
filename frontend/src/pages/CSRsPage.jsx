@@ -811,7 +811,7 @@ function SignedCSRDetailsPanel({ cert, onDownload }) {
         <CompactGrid>
           <CompactField label="Algorithm" value={cert.key_algorithm || 'RSA'} />
           <CompactField label="Key Size" value={cert.key_size} />
-          <CompactField label="Serial" value={cert.serial_number} className="col-span-2" />
+          <CompactField label="Serial" value={cert.serial_number} copyable mono className="col-span-2" />
         </CompactGrid>
       </CompactSection>
 

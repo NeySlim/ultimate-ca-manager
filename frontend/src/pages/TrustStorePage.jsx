@@ -383,7 +383,7 @@ export default function TrustStorePage() {
         {/* Technical Details */}
         <CompactSection title="Technical Details" icon={Info}>
           <CompactGrid>
-            <CompactField icon={Hash} label="Serial" value={selectedCert.serial_number} mono />
+            <CompactField icon={Hash} label="Serial" value={selectedCert.serial_number} mono copyable />
             <CompactField icon={Key} label="Key Type" value={selectedCert.key_type} />
           </CompactGrid>
         </CompactSection>
