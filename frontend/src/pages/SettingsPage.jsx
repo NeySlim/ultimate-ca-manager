@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
-  Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop
+  Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop, Info
 } from '@phosphor-icons/react'
 import {
   Button, Input, Select, Badge, Card,
@@ -39,6 +39,7 @@ const BASE_SETTINGS_CATEGORIES = [
 // Appearance Settings Component
 function AppearanceSettings() {
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
+  const { forceDesktop, setForceDesktop, screenWidth, breakpoints } = useMobile()
   
   const modeOptions = [
     { id: 'system', label: 'Follow System', icon: Desktop, description: 'Automatically switch based on your OS settings' },
@@ -132,6 +133,56 @@ function AppearanceSettings() {
         </div>
       </DetailSection>
       
+      <DetailSection title="Layout Mode">
+        <p className="text-sm text-text-secondary mb-4">
+          Control responsive layout behavior for smaller windows
+        </p>
+        <button
+          onClick={() => setForceDesktop(!forceDesktop)}
+          className={`
+            w-full p-4 rounded-lg border-2 transition-all text-left flex items-center gap-4
+            ${forceDesktop 
+              ? 'border-accent-primary bg-accent-primary/10' 
+              : 'border-border hover:border-text-tertiary bg-bg-tertiary/50'
+            }
+          `}
+        >
+          <div className={`
+            w-10 h-10 rounded-lg flex items-center justify-center
+            ${forceDesktop ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}
+          `}>
+            <Desktop size={20} weight={forceDesktop ? 'fill' : 'regular'} />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-text-primary">Force Desktop Layout</div>
+            <div className="text-xs text-text-tertiary">
+              {forceDesktop 
+                ? 'Desktop layout always enabled' 
+                : `Mobile layout activates below ${breakpoints.lg}px (current: ${screenWidth}px)`
+              }
+            </div>
+          </div>
+          <div className={`
+            w-12 h-6 rounded-full transition-colors relative
+            ${forceDesktop ? 'bg-accent-primary' : 'bg-bg-secondary border border-border'}
+          `}>
+            <div className={`
+              absolute top-1 w-4 h-4 rounded-full transition-transform
+              ${forceDesktop 
+                ? 'bg-white translate-x-6' 
+                : 'bg-text-tertiary translate-x-1'
+              }
+            `} />
+          </div>
+        </button>
+        {forceDesktop && (
+          <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1">
+            <Info size={12} />
+            This setting is saved in your browser and persists across sessions.
+          </p>
+        )}
+      </DetailSection>
+      
       <DetailSection title="Preview">
         <div className="p-4 rounded-lg bg-bg-tertiary border border-border">
           <p className="text-sm text-text-secondary mb-2">Current settings:</p>
@@ -141,6 +192,12 @@ function AppearanceSettings() {
             <span className="text-text-secondary">
               {mode === 'system' ? 'Following system preference' : mode === 'dark' ? 'Dark mode' : 'Light mode'}
             </span>
+            {forceDesktop && (
+              <>
+                {' · '}
+                <span className="text-accent-primary">Desktop forced</span>
+              </>
+            )}
           </p>
         </div>
       </DetailSection>
