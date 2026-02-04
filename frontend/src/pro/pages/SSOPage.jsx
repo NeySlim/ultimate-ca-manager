@@ -164,11 +164,17 @@ export default function SSOPage() {
         <div className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {filteredProviders.map(provider => {
             const Icon = PROVIDER_ICONS[provider.provider_type] || Key
+            const isSelected = selectedProvider?.id === provider.id
+            const typeColors = {
+              ldap: 'bg-status-orange/15 text-status-orange',
+              oauth2: 'bg-status-cyan/15 text-status-cyan',
+              saml: 'bg-status-purple/15 text-status-purple'
+            }
             return (
               <Card
                 key={provider.id}
                 className={`cursor-pointer transition-all ${
-                  selectedProvider?.id === provider.id 
+                  isSelected 
                     ? 'ring-2 ring-accent-primary bg-accent-primary/5' 
                     : 'hover:bg-bg-tertiary'
                 }`}
@@ -176,10 +182,10 @@ export default function SSOPage() {
               >
                 <div className="flex items-start gap-3">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    selectedProvider?.id === provider.id ? 'bg-accent-primary/20' : 'bg-bg-tertiary'
+                    isSelected ? 'bg-accent-primary/20' : typeColors[provider.provider_type] || 'bg-bg-tertiary'
                   }`}>
-                    <Icon size={20} className={
-                      selectedProvider?.id === provider.id ? 'text-accent-primary' : 'text-text-tertiary'
+                    <Icon size={20} weight="duotone" className={
+                      isSelected ? 'text-accent-primary' : ''
                     } />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -187,15 +193,23 @@ export default function SSOPage() {
                       <span className="font-medium text-text-primary truncate">
                         {provider.display_name || provider.name}
                       </span>
-                      {provider.enabled ? (
-                        <CheckCircle size={16} className="status-success-text shrink-0" weight="fill" />
-                      ) : (
-                        <XCircle size={16} className="text-text-tertiary shrink-0" />
-                      )}
+                      <Badge 
+                        variant={provider.enabled ? 'success' : 'secondary'} 
+                        size="sm" 
+                        dot 
+                        pulse={provider.enabled}
+                      >
+                        {provider.enabled ? 'Active' : 'Off'}
+                      </Badge>
                     </div>
-                    <p className="text-xs text-text-tertiary mt-0.5">
-                      {provider.provider_type?.toUpperCase() || 'Unknown'}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge 
+                        variant={provider.provider_type === 'ldap' ? 'orange' : provider.provider_type === 'oauth2' ? 'cyan' : 'purple'} 
+                        size="sm"
+                      >
+                        {provider.provider_type?.toUpperCase() || 'Unknown'}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               </Card>

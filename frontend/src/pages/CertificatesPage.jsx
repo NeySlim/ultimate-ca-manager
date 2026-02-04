@@ -455,6 +455,7 @@ export default function CertificatesPage() {
       certificate={selectedCert}
       onExport={handleExport}
       onRevoke={() => handleRevoke(selectedCert.id)}
+      onRenew={selectedCert.has_private_key && !selectedCert.revoked ? () => handleRenew(selectedCert.id) : null}
       onDelete={() => handleDelete(selectedCert.id)}
       onUploadKey={() => setShowKeyModal(true)}
       canWrite={canWrite('certificates')}
