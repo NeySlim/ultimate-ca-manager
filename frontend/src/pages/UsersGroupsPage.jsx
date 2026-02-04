@@ -8,7 +8,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
-  User, Users, Plus, Trash, PencilSimple, Key, 
+  User, Users, UsersThree, Plus, Trash, PencilSimple, Key, 
   CheckCircle, XCircle, Crown, Clock, ShieldCheck, UserCircle
 } from '@phosphor-icons/react'
 import {
@@ -364,12 +364,20 @@ export default function UsersGroupsPage() {
       header: 'Group',
       priority: 1,
       sortable: true,
-      render: (val) => (
-        <div className="flex items-center gap-2">
-          <Users size={16} className="text-accent-primary shrink-0" />
-          <span className="font-medium">{val}</span>
-        </div>
-      )
+      render: (val, row) => {
+        const memberCount = row.members?.length || row.member_count || 0
+        return (
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "icon-box-sm",
+              memberCount > 0 ? "icon-box-primary" : "icon-box-neutral"
+            )}>
+              <UsersThree size={14} weight="duotone" />
+            </div>
+            <span className="font-medium">{val}</span>
+          </div>
+        )
+      }
     },
     {
       key: 'description',
@@ -388,7 +396,7 @@ export default function UsersGroupsPage() {
       render: (val, row) => {
         const count = row.members?.length || val || 0
         return (
-          <Badge variant="outline" size="sm">
+          <Badge variant={count > 0 ? 'primary' : 'secondary'} size="sm" dot>
             {count} {count === 1 ? 'member' : 'members'}
           </Badge>
         )
