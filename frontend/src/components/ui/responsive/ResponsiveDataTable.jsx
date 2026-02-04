@@ -7,7 +7,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { 
   MagnifyingGlass, CaretUp, CaretDown, DotsThreeVertical,
-  CaretLeft, CaretRight, FunnelSimple, X
+  CaretLeft, CaretRight, FunnelSimple, X, Columns, Eye, EyeSlash, Check
 } from '@phosphor-icons/react'
 import { useMobile } from '../../../contexts'
 import { cn } from '../../../lib/utils'
@@ -36,6 +36,9 @@ export function ResponsiveDataTable({
   // Toolbar (filters + actions next to search)
   toolbarFilters, // Array of { key, value, onChange, placeholder, options: [{value, label}] }
   toolbarActions, // ReactNode - buttons to show on right side of toolbar
+  
+  // Column customization
+  columnStorageKey, // localStorage key for saving column preferences (e.g. 'ucm-certs-columns')
   
   // Sorting
   sortable = false,
@@ -77,6 +80,55 @@ export function ResponsiveDataTable({
   // Row actions dropdown
   const [openActionMenu, setOpenActionMenu] = useState(null)
   const actionMenuRef = useRef(null)
+  
+  // Column visibility state
+  const [showColumnMenu, setShowColumnMenu] = useState(false)
+  const columnMenuRef = useRef(null)
+  const [hiddenColumns, setHiddenColumns] = useState(() => {
+    if (columnStorageKey) {
+      try {
+        const saved = localStorage.getItem(columnStorageKey)
+        return saved ? JSON.parse(saved) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
+  
+  // Save column preferences
+  useEffect(() => {
+    if (columnStorageKey) {
+      localStorage.setItem(columnStorageKey, JSON.stringify(hiddenColumns))
+    }
+  }, [hiddenColumns, columnStorageKey])
+  
+  // Toggle column visibility
+  const toggleColumn = (key) => {
+    setHiddenColumns(prev => 
+      prev.includes(key) 
+        ? prev.filter(k => k !== key)
+        : [...prev, key]
+    )
+  }
+  
+  // Filter columns by user preference
+  const userVisibleColumns = useMemo(() => {
+    return columns.filter(col => !hiddenColumns.includes(col.key))
+  }, [columns, hiddenColumns])
+  
+  // Close column menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (columnMenuRef.current && !columnMenuRef.current.contains(e.target)) {
+        setShowColumnMenu(false)
+      }
+    }
+    if (showColumnMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showColumnMenu])
   
   // Close action menu on click outside
   useEffect(() => {
@@ -184,12 +236,16 @@ export function ResponsiveDataTable({
     })
   }, [sortable])
   
-  // Get visible columns based on device
+  // Get visible columns based on device + user preferences
   const visibleColumns = useMemo(() => {
-    if (isDesktop) return columns
-    // On mobile, filter columns that have hideOnMobile
-    return columns.filter(col => !col.hideOnMobile)
-  }, [columns, isDesktop])
+    // First filter by user preference (hidden columns)
+    let cols = userVisibleColumns
+    // On mobile, also filter columns that have hideOnMobile
+    if (!isDesktop) {
+      cols = cols.filter(col => !col.hideOnMobile)
+    }
+    return cols
+  }, [userVisibleColumns, isDesktop])
   
   // Get primary and secondary columns for mobile cards
   const { primaryCol, secondaryCol, tertiaryCol } = useMemo(() => {
@@ -212,7 +268,7 @@ export function ResponsiveDataTable({
     return (
       <div className={cn('flex flex-col h-full', className)}>
         {/* Always show toolbar when there are filters or actions */}
-        {(searchable || toolbarFilters || toolbarActions) && (
+        {(searchable || toolbarFilters || toolbarActions || columnStorageKey) && (
           <SearchBar
             value={searchValue}
             onChange={setSearchValue}
@@ -221,6 +277,12 @@ export function ResponsiveDataTable({
             searchable={searchable}
             filters={toolbarFilters}
             actions={toolbarActions}
+            columns={columnStorageKey ? columns : null}
+            hiddenColumns={hiddenColumns}
+            toggleColumn={toggleColumn}
+            showColumnMenu={showColumnMenu}
+            setShowColumnMenu={setShowColumnMenu}
+            columnMenuRef={columnMenuRef}
           />
         )}
         
@@ -266,7 +328,7 @@ export function ResponsiveDataTable({
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* SEARCH BAR + TOOLBAR */}
-      {(searchable || toolbarFilters || toolbarActions) && (
+      {(searchable || toolbarFilters || toolbarActions || columnStorageKey) && (
         <SearchBar
           value={searchValue}
           onChange={setSearchValue}
@@ -275,6 +337,12 @@ export function ResponsiveDataTable({
           searchable={searchable}
           filters={toolbarFilters}
           actions={toolbarActions}
+          columns={columnStorageKey ? columns : null}
+          hiddenColumns={hiddenColumns}
+          toggleColumn={toggleColumn}
+          showColumnMenu={showColumnMenu}
+          setShowColumnMenu={setShowColumnMenu}
+          columnMenuRef={columnMenuRef}
         />
       )}
       
@@ -322,7 +390,22 @@ export function ResponsiveDataTable({
 // SEARCH BAR + TOOLBAR
 // =============================================================================
 
-function SearchBar({ value, onChange, placeholder, isMobile, searchable = true, filters, actions }) {
+function SearchBar({ 
+  value, 
+  onChange, 
+  placeholder, 
+  isMobile, 
+  searchable = true, 
+  filters, 
+  actions,
+  // Column customization
+  columns,
+  hiddenColumns,
+  toggleColumn,
+  showColumnMenu,
+  setShowColumnMenu,
+  columnMenuRef
+}) {
   return (
     <div className={cn(
       'shrink-0 border-b border-border/50 bg-bg-secondary/30',
@@ -419,6 +502,71 @@ function SearchBar({ value, onChange, placeholder, isMobile, searchable = true, 
                 />
               )
             })}
+          </div>
+        )}
+        
+        {/* Column Selector (desktop only) */}
+        {!isMobile && columns && columns.length > 0 && (
+          <div className="relative shrink-0" ref={columnMenuRef}>
+            <button
+              onClick={() => setShowColumnMenu?.(!showColumnMenu)}
+              className={cn(
+                'flex items-center gap-1.5 h-7 px-2 rounded-md border text-xs font-medium transition-colors',
+                showColumnMenu
+                  ? 'border-accent-primary bg-accent-primary/10 text-accent-primary'
+                  : 'border-border bg-bg-primary text-text-secondary hover:text-text-primary hover:border-border-hover'
+              )}
+              title="Customize columns"
+            >
+              <Columns size={14} />
+            </button>
+            
+            {/* Dropdown menu */}
+            {showColumnMenu && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
+                <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
+                  Show columns
+                </div>
+                {columns.map(col => (
+                  <button
+                    key={col.key}
+                    onClick={() => toggleColumn?.(col.key)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-bg-hover transition-colors"
+                  >
+                    <span className={cn(
+                      'w-4 h-4 rounded border flex items-center justify-center',
+                      hiddenColumns?.includes(col.key)
+                        ? 'border-border bg-bg-secondary'
+                        : 'border-accent-primary bg-accent-primary text-white'
+                    )}>
+                      {!hiddenColumns?.includes(col.key) && <Check size={10} weight="bold" />}
+                    </span>
+                    <span className={cn(
+                      hiddenColumns?.includes(col.key) ? 'text-text-tertiary' : 'text-text-primary'
+                    )}>
+                      {col.header || col.key}
+                    </span>
+                  </button>
+                ))}
+                {hiddenColumns?.length > 0 && (
+                  <>
+                    <div className="border-t border-border my-1" />
+                    <button
+                      onClick={() => {
+                        columns.forEach(col => {
+                          if (hiddenColumns.includes(col.key)) {
+                            toggleColumn?.(col.key)
+                          }
+                        })
+                      }}
+                      className="w-full px-3 py-1.5 text-xs text-accent-primary hover:bg-bg-hover transition-colors text-left"
+                    >
+                      Show all columns
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
         
