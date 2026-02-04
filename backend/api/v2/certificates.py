@@ -64,7 +64,8 @@ def list_certificates():
     
     # Whitelist of allowed sort columns
     ALLOWED_SORT_COLUMNS = {
-        'subject': Certificate.subject,
+        'subject': Certificate.subject_cn,  # Sort by CN, not full DN
+        'subject_cn': Certificate.subject_cn,
         'issuer': Certificate.issuer,
         'valid_to': Certificate.valid_to,
         'valid_from': Certificate.valid_from,
