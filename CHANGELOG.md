@@ -20,10 +20,18 @@ This release marks the first production-ready version with comprehensive QA test
 - **Security review** passed
 
 #### Added
+- **Contextual Help System** - Rich help modals for every page with:
+  - Page overview and explanations
+  - Section-by-section documentation with icons
+  - Pro tips and best practices
+  - Warnings and security notes
+  - Related pages navigation
 - **Certificate Renewal UI** - Renew button in certificate actions (requires private key)
 - **PKCS#12 Export** - Export certificates with private key as P12/PFX format
 - **SCEP Pending Requests** - Approve/reject SCEP requests in manual mode
 - **SCEP Challenge Password** - Extract from CSR attributes (scepclient compatibility)
+- **Dynamic Column Sizing** - Tables adapt to content with min/max constraints
+- **Table Overflow Protection** - Global responsive handling for tablet viewports
 
 #### Fixed
 - **UserSession Model** - Added missing model causing 500 errors on `/account/sessions`
