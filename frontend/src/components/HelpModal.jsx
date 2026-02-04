@@ -1,11 +1,10 @@
 /**
- * Help Modal Component - Contextual help, stats, and quick actions
- * Opens from FocusPanel help button
+ * Legacy Help Modal Component - Simple wrapper around Modal
+ * @deprecated Use HelpModal from components/ui/HelpModal.jsx with pageKey instead
  */
 import { Modal } from './Modal'
-import { Info } from '@phosphor-icons/react'
 
-export function HelpModal({ 
+export function LegacyHelpModal({ 
   open, 
   onClose, 
   title = 'Help & Information',
@@ -24,3 +23,6 @@ export function HelpModal({
     </Modal>
   )
 }
+
+// Re-export new HelpModal as default
+export { HelpModal } from './ui/HelpModal'

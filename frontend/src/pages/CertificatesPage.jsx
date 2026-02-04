@@ -469,8 +469,7 @@ export default function CertificatesPage() {
         subtitle={`${total} certificate${total !== 1 ? 's' : ''}`}
         icon={Certificate}
         stats={stats}
-        helpContent={helpContent}
-        helpTitle="Certificates Help"
+        helpPageKey="certificates"
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">

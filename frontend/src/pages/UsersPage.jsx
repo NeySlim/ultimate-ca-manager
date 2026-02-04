@@ -353,7 +353,7 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
         activeTab={activeTab}
         onTabChange={onTabChange}
         stats={stats}
-        helpContent={helpContent}
+        helpPageKey="users"
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">

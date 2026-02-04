@@ -433,8 +433,7 @@ export default function TrustStorePage() {
         icon={ShieldCheck}
         stats={stats}
         actions={headerActions}
-        helpContent={helpContent}
-        helpTitle="Trust Store Help"
+        helpPageKey="truststore"
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">

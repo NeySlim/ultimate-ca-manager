@@ -330,7 +330,7 @@ export default function SCEPPage() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         stats={activeTab === 'requests' ? headerStats : undefined}
-        helpContent={helpContent}
+        helpPageKey="scep"
         splitView={activeTab === 'requests'}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">

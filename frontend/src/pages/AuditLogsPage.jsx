@@ -697,7 +697,7 @@ export default function AuditLogsPage() {
         icon={ClockCounterClockwise}
         subtitle={`${total} log entries`}
         stats={headerStats}
-        helpContent={helpContent}
+        helpPageKey="auditLogs"
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
