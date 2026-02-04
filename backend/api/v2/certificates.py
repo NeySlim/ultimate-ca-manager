@@ -72,6 +72,7 @@ def list_certificates():
         'serial_number': Certificate.serial_number,
         'revoked': Certificate.revoked,
         'descr': Certificate.descr,
+        'key_algo': Certificate.key_algo,
         'status': 'special'  # Handled separately with CASE
     }
     
