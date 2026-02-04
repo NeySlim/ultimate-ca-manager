@@ -898,11 +898,39 @@ def init_database(app):
         if CustomRole.query.count() == 0:
             app.logger.info("Creating default Pro roles...")
             
-            default_roles = [
+            # System roles (built-in, cannot be deleted)
+            system_roles = [
+                {
+                    "name": "Administrator",
+                    "description": "Full system access with all permissions",
+                    "is_system": True,
+                    "permissions": ["*"]  # Wildcard = all permissions
+                },
+                {
+                    "name": "Operator",
+                    "description": "Day-to-day certificate operations",
+                    "is_system": True,
+                    "permissions": [
+                        "read:dashboard", "read:cas", "read:certificates", "write:certificates",
+                        "read:csrs", "write:csrs", "read:templates", "read:crl", "write:crl",
+                        "read:scep", "read:acme", "read:truststore", "write:truststore"
+                    ]
+                },
+                {
+                    "name": "User",
+                    "description": "Basic read access to certificates",
+                    "is_system": True,
+                    "permissions": [
+                        "read:dashboard", "read:certificates", "read:cas", "read:templates"
+                    ]
+                }
+            ]
+            
+            # Custom roles (can be modified/deleted)
+            custom_roles = [
                 {
                     "name": "Certificate Manager",
                     "description": "Full certificate lifecycle management",
-                    "base_role": "operator",
                     "permissions": [
                         "read:certificates", "write:certificates", "delete:certificates",
                         "read:csrs", "write:csrs", "delete:csrs",
@@ -912,7 +940,6 @@ def init_database(app):
                 {
                     "name": "CA Administrator",
                     "description": "Certificate Authority management",
-                    "base_role": "operator",
                     "permissions": [
                         "read:cas", "write:cas", "delete:cas",
                         "read:certificates", "write:certificates",
@@ -922,7 +949,6 @@ def init_database(app):
                 {
                     "name": "Security Auditor",
                     "description": "Read-only audit and compliance access",
-                    "base_role": "viewer",
                     "permissions": [
                         "read:audit", "read:dashboard", "read:certificates",
                         "read:cas", "read:users", "read:settings"
@@ -930,21 +956,28 @@ def init_database(app):
                 }
             ]
             
-            for role_data in default_roles:
+            # Create system roles first
+            for role_data in system_roles:
                 role = CustomRole(
                     name=role_data["name"],
                     description=role_data["description"],
-                    base_role=role_data.get("base_role")
+                    permissions=role_data["permissions"],
+                    is_system=True
                 )
                 db.session.add(role)
-                db.session.flush()  # Get the ID
-                
-                # Add permissions
-                for perm in role_data["permissions"]:
-                    db.session.add(RolePermission(role_id=role.id, permission=perm))
+            
+            # Create custom roles
+            for role_data in custom_roles:
+                role = CustomRole(
+                    name=role_data["name"],
+                    description=role_data["description"],
+                    permissions=role_data["permissions"],
+                    is_system=False
+                )
+                db.session.add(role)
             
             db.session.commit()
-            app.logger.info(f"✓ Created {len(default_roles)} default Pro roles")
+            app.logger.info(f"✓ Created {len(system_roles)} system roles and {len(custom_roles)} custom roles")
     
     except ImportError:
         pass  # Pro not available

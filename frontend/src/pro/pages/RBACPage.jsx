@@ -2,19 +2,19 @@
  * RBAC Management Page (Pro Feature)
  * Role-Based Access Control with custom roles and permissions
  * 
- * Uses UnifiedManagementLayout for consistent UX with UsersPage
+ * Migrated to ResponsiveLayout for consistent UX
  */
 import { useState, useEffect, useMemo } from 'react'
 import { 
-  Shield, Plus, Trash, Lock, CheckCircle, XCircle, Warning, UsersThree,
-  PencilSimple
+  Shield, Plus, Trash, Lock, CheckCircle, XCircle, Warning, UsersThree
 } from '@phosphor-icons/react'
 import {
-  UnifiedManagementLayout, Button, Input, Badge, FormModal, HelpCard,
+  Badge, Button, Input, FormModal, HelpCard,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader,
   FormSelect
 } from '../../components'
-import { useNotification } from '../../contexts'
+import { ResponsiveLayout, ResponsiveDataTable } from '../../components/ui/responsive'
+import { useNotification, useMobile } from '../../contexts'
 import { useModals } from '../../hooks'
 import { apiClient } from '../../services/apiClient'
 import { ERRORS, SUCCESS, CONFIRM } from '../../lib/messages'
@@ -49,7 +49,6 @@ const PERMISSION_CATEGORIES = {
     label: 'Audit Logs',
     permissions: ['read:audit', 'export:audit']
   },
-  // Pro features
   acme: {
     label: 'ACME Protocol',
     permissions: ['read:acme', 'write:acme', 'delete:acme']
@@ -83,17 +82,18 @@ const totalPermissions = Object.values(PERMISSION_CATEGORIES).reduce(
 export default function RBACPage() {
   const { showSuccess, showError } = useNotification()
   const { modals, open: openModal, close: closeModal } = useModals(['create'])
+  const { isMobile } = useMobile()
   
   const [loading, setLoading] = useState(true)
   const [roles, setRoles] = useState([])
   const [selectedRole, setSelectedRole] = useState(null)
+  const [filterType, setFilterType] = useState('')
   
-  // Form state for create modal
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     permissions: [],
-    inherits_from: null,  // Parent role ID for inheritance
+    inherits_from: null,
     is_system: false
   })
 
@@ -157,41 +157,38 @@ export default function RBACPage() {
 
   const togglePermission = (permission) => {
     if (!selectedRole || selectedRole.is_system) return
-    
     const current = selectedRole.permissions || []
     const updated = current.includes(permission)
       ? current.filter(p => p !== permission)
       : [...current, permission]
-    
     setSelectedRole({ ...selectedRole, permissions: updated })
   }
 
   const toggleCategoryPermissions = (category) => {
     if (!selectedRole || selectedRole.is_system) return
-    
     const categoryPerms = PERMISSION_CATEGORIES[category].permissions
     const current = selectedRole.permissions || []
     const allSelected = categoryPerms.every(p => current.includes(p))
-    
     const updated = allSelected
       ? current.filter(p => !categoryPerms.includes(p))
       : [...new Set([...current, ...categoryPerms])]
-    
     setSelectedRole({ ...selectedRole, permissions: updated })
   }
 
-  // Table columns
+  // Table columns with icon-bg classes
   const columns = [
     {
       key: 'name',
       header: 'Role Name',
+      priority: 1,
+      sortable: true,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          {row.is_system ? (
-            <Lock size={16} className="text-text-tertiary shrink-0" />
-          ) : (
-            <Shield size={16} className="text-accent-primary shrink-0" />
-          )}
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+            row.is_system ? 'icon-bg-amber' : 'icon-bg-violet'
+          }`}>
+            {row.is_system ? <Lock size={14} weight="duotone" /> : <Shield size={14} weight="duotone" />}
+          </div>
           <span className="font-medium truncate">{val}</span>
         </div>
       )
@@ -199,8 +196,10 @@ export default function RBACPage() {
     {
       key: 'is_system',
       header: 'Type',
+      priority: 2,
+      sortable: true,
       render: (val) => (
-        <Badge variant={val ? 'secondary' : 'primary'} size="sm">
+        <Badge variant={val ? 'warning' : 'success'} size="sm" dot>
           {val ? 'System' : 'Custom'}
         </Badge>
       )
@@ -208,9 +207,10 @@ export default function RBACPage() {
     {
       key: 'inherits_from',
       header: 'Inherits',
+      priority: 3,
       render: (val, row) => val ? (
-        <Badge variant="info" size="sm">
-          ↑ {row.parent_name || `#${val}`}
+        <Badge variant="cyan" size="sm" icon={Shield}>
+          {row.parent_name || `#${val}`}
         </Badge>
       ) : (
         <span className="text-text-tertiary text-xs">—</span>
@@ -219,43 +219,66 @@ export default function RBACPage() {
     {
       key: 'permissions',
       header: 'Permissions',
-      render: (val, row) => (
-        <span className="text-xs text-text-secondary">
-          {row.all_permissions?.length || val?.length || 0} / {totalPermissions}
-          {row.inherits_from && <span className="text-text-tertiary ml-1">(+{(row.all_permissions?.length || 0) - (val?.length || 0)})</span>}
-        </span>
-      )
+      priority: 2,
+      render: (val, row) => {
+        const permCount = row.all_permissions?.length || val?.length || 0
+        const percentage = Math.round((permCount / totalPermissions) * 100)
+        return (
+          <div className="flex items-center gap-2">
+            <div className="w-16 h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
+              <div className="h-full bg-accent-primary transition-all" style={{ width: `${percentage}%` }} />
+            </div>
+            <span className="text-xs text-text-secondary">{permCount}</span>
+          </div>
+        )
+      }
     },
     {
       key: 'user_count',
       header: 'Users',
-      render: (val) => val || 0
+      priority: 3,
+      render: (val) => (
+        <Badge variant={val > 0 ? 'primary' : 'secondary'} size="sm">
+          {val || 0}
+        </Badge>
+      )
     }
   ]
 
-  // Row actions
   const rowActions = (row) => row.is_system ? [] : [
     { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }
   ]
 
-  // Stats
   const stats = useMemo(() => {
     const systemRoles = roles.filter(r => r.is_system).length
     const customRoles = roles.filter(r => !r.is_system).length
+    const totalUsers = roles.reduce((acc, r) => acc + (r.user_count || 0), 0)
     return [
-      { label: 'Total', value: roles.length, icon: Shield },
-      { label: 'System', value: systemRoles, icon: Lock, variant: 'secondary' },
+      { label: 'Total', value: roles.length, icon: Shield, variant: 'primary' },
+      { label: 'System', value: systemRoles, icon: Lock, variant: 'warning' },
       { label: 'Custom', value: customRoles, icon: Shield, variant: 'success' },
+      { label: 'Users', value: totalUsers, icon: UsersThree, variant: 'cyan' },
     ]
   }, [roles])
 
-  // Render details panel
+  // Help content
+  const helpContent = (
+    <div className="space-y-4">
+      <HelpCard title="RBAC" variant="info">
+        Define granular permissions per role. System roles are read-only.
+      </HelpCard>
+      <HelpCard title="System Roles" variant="warning">
+        Built-in roles (admin, operator, viewer) cannot be modified.
+      </HelpCard>
+    </div>
+  )
+
+  // Details panel content
   const renderDetails = (role) => (
     <div className="p-3 space-y-3">
-      {/* Header */}
       <CompactHeader
         icon={role.is_system ? Lock : Shield}
-        iconClass={role.is_system ? 'bg-bg-tertiary' : 'bg-accent-primary/20'}
+        iconClass={role.is_system ? 'icon-bg-amber' : 'icon-bg-violet'}
         title={role.name}
         subtitle={role.description || 'No description'}
         badge={
@@ -265,18 +288,15 @@ export default function RBACPage() {
         }
       />
 
-      {/* Stats */}
       <CompactStats stats={[
         { icon: CheckCircle, value: `${role.permissions?.length || 0} perms` },
         { icon: UsersThree, value: `${role.user_count || 0} users` },
       ]} />
 
-      {/* Actions */}
       {!role.is_system && (
         <div className="flex gap-2">
           <Button size="sm" className="flex-1" onClick={handleUpdate}>
-            <CheckCircle size={14} />
-            Save Changes
+            <CheckCircle size={14} /> Save Changes
           </Button>
           <Button size="sm" variant="danger" onClick={() => handleDelete(role)}>
             <Trash size={14} />
@@ -284,7 +304,6 @@ export default function RBACPage() {
         </div>
       )}
 
-      {/* System Role Warning */}
       {role.is_system && (
         <div className="p-3 rounded-lg status-warning-bg status-warning-border border">
           <div className="flex items-center gap-2 status-warning-text text-xs">
@@ -294,30 +313,17 @@ export default function RBACPage() {
         </div>
       )}
 
-      {/* Role Info */}
       <CompactSection title="Role Information">
         <CompactGrid>
           <CompactField label="Name" value={role.name} />
           <CompactField label="Type" value={role.is_system ? 'System' : 'Custom'} />
           {role.inherits_from && (
-            <CompactField 
-              label="Inherits From" 
-              value={role.parent_name || `Role #${role.inherits_from}`} 
-            />
+            <CompactField label="Inherits From" value={role.parent_name || `Role #${role.inherits_from}`} />
           )}
         </CompactGrid>
-        {role.description && (
-          <p className="text-xs text-text-secondary mt-2">{role.description}</p>
-        )}
-        {role.inherits_from && (
-          <p className="text-xs text-text-tertiary mt-2 italic">
-            ⚡ Inherited permissions: {(role.all_permissions?.length || 0) - (role.permissions?.length || 0)} 
-            + Direct: {role.permissions?.length || 0}
-          </p>
-        )}
+        {role.description && <p className="text-xs text-text-secondary mt-2">{role.description}</p>}
       </CompactSection>
 
-      {/* Permissions */}
       <CompactSection title="Permissions">
         <div className="space-y-4">
           {Object.entries(PERMISSION_CATEGORIES).map(([key, category]) => {
@@ -343,14 +349,11 @@ export default function RBACPage() {
                   )}
                   {category.label}
                 </button>
-
                 <div className="flex flex-wrap gap-1.5 pl-5">
                   {categoryPerms.map(perm => {
                     const isDirect = directPerms.includes(perm)
                     const isInherited = !isDirect && allPerms.includes(perm)
-                    const isSelected = isDirect || isInherited
                     const permLabel = perm.split(':')[0]
-
                     return (
                       <button
                         key={perm}
@@ -365,13 +368,7 @@ export default function RBACPage() {
                             : 'bg-bg-tertiary text-text-secondary hover:bg-bg-tertiary/80'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
-                        {isDirect ? (
-                          <CheckCircle size={10} weight="fill" />
-                        ) : isInherited ? (
-                          <CheckCircle size={10} weight="duotone" />
-                        ) : (
-                          <XCircle size={10} />
-                        )}
+                        {isDirect ? <CheckCircle size={10} weight="fill" /> : isInherited ? <CheckCircle size={10} weight="duotone" /> : <XCircle size={10} />}
                         {permLabel}
                         {isInherited && <span className="opacity-60">↑</span>}
                       </button>
@@ -384,61 +381,27 @@ export default function RBACPage() {
         </div>
       </CompactSection>
 
-      {/* Summary */}
       <CompactSection title="Coverage">
         <div className="flex items-center gap-4">
           <div className="flex-1 bg-bg-tertiary rounded-full h-2 overflow-hidden">
-            <div 
-              className="h-full bg-accent-primary transition-all"
-              style={{ width: `${((role.permissions?.length || 0) / totalPermissions) * 100}%` }}
-            />
+            <div className="h-full bg-accent-primary transition-all" style={{ width: `${((role.permissions?.length || 0) / totalPermissions) * 100}%` }} />
           </div>
-          <span className="text-xs text-text-secondary">
-            {role.permissions?.length || 0}/{totalPermissions}
-          </span>
+          <span className="text-xs text-text-secondary">{role.permissions?.length || 0}/{totalPermissions}</span>
         </div>
       </CompactSection>
     </div>
   )
 
-  // Help content
-  const helpContent = (
-    <div className="space-y-4">
-      <HelpCard title="RBAC" variant="info">
-        Define granular permissions per role. System roles are read-only.
-      </HelpCard>
-      <HelpCard title="System Roles" variant="warning">
-        Built-in roles (admin, operator, viewer) cannot be modified.
-      </HelpCard>
-    </div>
-  )
-
-  // Table filters
-  const tableFilters = [
-    {
-      key: 'is_system',
-      label: 'Type',
-      options: [
-        { value: true, label: 'System' },
-        { value: false, label: 'Custom' }
-      ]
-    }
-  ]
-
   return (
     <>
-      <UnifiedManagementLayout
+      <ResponsiveLayout
         title="Role-Based Access Control"
         subtitle={`${roles.length} role${roles.length !== 1 ? 's' : ''}`}
         icon={Shield}
         stats={stats}
-        data={roles}
-        columns={columns}
-        loading={loading}
-        selectedItem={selectedRole}
-        onSelectItem={setSelectedRole}
-        renderDetails={renderDetails}
-        detailsTitle="Role Details"
+        helpContent={helpContent}
+        helpTitle="RBAC Management"
+        helpPageKey="rbac"
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -448,31 +411,58 @@ export default function RBACPage() {
             <p className="text-sm text-text-secondary">Select a role to view permissions</p>
           </div>
         }
-        searchable
-        searchPlaceholder="Search roles..."
-        searchKeys={['name', 'description']}
-        sortable
-        defaultSort={{ key: 'name', direction: 'asc' }}
-        paginated={false}
-        rowActions={rowActions}
-        filters={tableFilters}
-        emptyIcon={Shield}
-        emptyTitle="No roles found"
-        emptyDescription="Create custom roles for granular access control"
-        emptyAction={
-          <Button onClick={() => openModal('create')}>
-            <Plus size={16} /> Create Role
-          </Button>
-        }
-        helpContent={helpContent}
-        actions={
-          <Button size="sm" onClick={() => openModal('create')}>
-            <Plus size={16} /> Create Role
-          </Button>
-        }
-      />
+        slideOverOpen={!!selectedRole}
+        slideOverTitle={selectedRole?.name || 'Role Details'}
+        slideOverContent={selectedRole && renderDetails(selectedRole)}
+        slideOverWidth="lg"
+        onSlideOverClose={() => setSelectedRole(null)}
+      >
+        <div className="flex flex-col h-full min-h-0">
+          <ResponsiveDataTable
+            data={roles}
+            columns={columns}
+            loading={loading}
+            onRowClick={setSelectedRole}
+            selectedId={selectedRole?.id}
+            rowActions={rowActions}
+            searchable
+            searchPlaceholder="Search roles..."
+            searchKeys={['name', 'description']}
+            toolbarFilters={[
+              {
+                key: 'is_system',
+                value: filterType,
+                onChange: setFilterType,
+                placeholder: 'All Types',
+                options: [
+                  { value: 'true', label: 'System' },
+                  { value: 'false', label: 'Custom' }
+                ]
+              }
+            ]}
+            toolbarActions={
+              isMobile ? (
+                <Button size="lg" onClick={() => openModal('create')} className="w-11 h-11 p-0">
+                  <Plus size={22} weight="bold" />
+                </Button>
+              ) : (
+                <Button size="sm" onClick={() => openModal('create')}>
+                  <Plus size={16} /> Create Role
+                </Button>
+              )
+            }
+            emptyIcon={Shield}
+            emptyTitle="No roles found"
+            emptyDescription="Create custom roles for granular access control"
+            emptyAction={
+              <Button onClick={() => openModal('create')}>
+                <Plus size={16} /> Create Role
+              </Button>
+            }
+          />
+        </div>
+      </ResponsiveLayout>
 
-      {/* Create Role Modal */}
       <FormModal
         open={modals.create}
         onClose={() => closeModal('create')}

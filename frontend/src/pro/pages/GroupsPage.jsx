@@ -155,18 +155,19 @@ export default function GroupsPage() {
     <div className="p-3 space-y-3">
       <CompactHeader
         icon={UsersThree}
-        iconClass="bg-accent-primary/20"
+        iconClass={group.member_count > 0 ? 'bg-status-cyan/20' : 'bg-bg-tertiary'}
         title={group.name}
         subtitle={group.description || 'No description'}
         badge={
-          <Badge variant="primary" size="sm">
+          <Badge variant={group.member_count > 0 ? 'cyan' : 'secondary'} size="sm" dot>
             {pluralize(group.member_count || 0, 'member')}
           </Badge>
         }
       />
 
       <CompactStats stats={[
-        { icon: Shield, value: `${group.permissions?.length || 0} perms` },
+        { icon: User, value: `${group.member_count || 0} members`, variant: 'cyan' },
+        { icon: Shield, value: `${group.permissions?.length || 0} perms`, variant: 'purple' },
         { icon: Calendar, value: group.created_at ? new Date(group.created_at).toLocaleDateString() : 'N/A' }
       ]} />
 
@@ -262,12 +263,13 @@ export default function GroupsPage() {
         selectedItem={selectedGroup}
         onSelectItem={selectGroup}
         
-        // Item display
+        // Item display with colors
         itemIcon={UsersThree}
+        itemIconClass={(g) => g.member_count > 0 ? 'bg-accent-primary/15 text-accent-primary' : 'bg-bg-tertiary text-text-tertiary'}
         itemTitle={(g) => g.name}
         itemSubtitle={(g) => pluralize(g.member_count || 0, 'member')}
         itemBadge={(g) => (
-          <Badge variant="secondary" size="sm">
+          <Badge variant={g.permissions?.length > 5 ? 'success' : g.permissions?.length > 0 ? 'primary' : 'secondary'} size="sm" dot>
             {g.permissions?.length || 0} perms
           </Badge>
         )}
@@ -286,7 +288,7 @@ export default function GroupsPage() {
         searchPlaceholder="Search groups..."
         
         // Help
-        helpContent={helpContent}
+        helpPageKey="groups"
         
         // Empty state
         emptyIcon={UsersThree}
