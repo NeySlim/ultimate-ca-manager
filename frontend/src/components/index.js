@@ -88,8 +88,6 @@ export { TrustCertDetails } from './TrustCertDetails'
 // Data Table Components
 export { DataTable, SimpleTable, CardGrid } from './DataTable'
 
-// Management Layout (legacy - prefer ResponsiveLayout)
-export { ManagementLayout } from './ManagementLayout'
 export { SlideOverPanel, useSlideOver } from './SlideOverPanel'
 
 // New Responsive Components (Phase 10 - Mobile/Desktop unified)
