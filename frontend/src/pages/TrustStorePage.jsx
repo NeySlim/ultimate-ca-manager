@@ -181,8 +181,8 @@ export default function TrustStorePage() {
     { icon: CheckCircle, label: 'Total', value: certStats.total, variant: 'default' }
   ], [certStats])
 
-  // Header actions - always visible
-  const headerActions = canWrite('truststore') && (
+  // Toolbar actions - next to search bar
+  const toolbarActions = canWrite('truststore') && (
     <div className="flex gap-2">
       <Button size="sm" variant="secondary" onClick={handleSyncFromSystem} disabled={syncing}>
         <ArrowsClockwise size={14} className={syncing ? 'animate-spin' : ''} />
@@ -432,7 +432,6 @@ export default function TrustStorePage() {
         subtitle={`${certificates.length} certificate${certificates.length !== 1 ? 's' : ''}`}
         icon={ShieldCheck}
         stats={stats}
-        actions={headerActions}
         helpPageKey="truststore"
         splitView={true}
         splitEmptyContent={
@@ -472,6 +471,7 @@ export default function TrustStorePage() {
               ]
             }
           ]}
+          toolbarActions={toolbarActions}
           sortable
           defaultSort={{ key: 'name', direction: 'asc' }}
           pagination={true}
