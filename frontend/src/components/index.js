@@ -81,6 +81,8 @@ export {
 
 // Certificate Details (reusable)
 export { CertificateDetails } from './CertificateDetails'
+export { CertificateCompareModal } from './CertificateCompareModal'
+export { TemplatePreviewModal } from './TemplatePreviewModal'
 export { CADetails } from './CADetails'
 export { CSRDetails } from './CSRDetails'
 export { TrustCertDetails } from './TrustCertDetails'
@@ -114,3 +116,6 @@ export { UnifiedPageHeader } from './ui/UnifiedPageHeader'
 
 // Rich visual components
 export { RichStatsBar } from './ui/RichStatsBar'
+
+// Dashboard charts
+export { CertificateTrendChart, StatusPieChart, MiniSparkline } from './DashboardChart'

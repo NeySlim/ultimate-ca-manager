@@ -7,7 +7,7 @@ import {
   List, X, MagnifyingGlass,
   House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
   UploadSimple, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock,
-  UserCircle, Palette
+  UserCircle, Palette, Warning
 } from '@phosphor-icons/react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
@@ -15,6 +15,8 @@ import { WebSocketIndicator } from './WebSocketIndicator'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
 import { useTheme } from '../contexts/ThemeContext'
+import { useNotification } from '../contexts/NotificationContext'
+import { certificatesService } from '../services'
 
 // Mobile navigation items (grid menu)
 const mobileNavItems = [
@@ -48,6 +50,7 @@ export function AppShell() {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isPro, setIsPro] = useState(false)
+  const { showWarning } = useNotification()
   
   // Extract current page from pathname (empty string for dashboard)
   const activePage = location.pathname.split('/')[1] || ''
@@ -66,6 +69,39 @@ export function AppShell() {
       .then(() => setIsPro(true))
       .catch(() => setIsPro(false))
   }, [])
+  
+  // Check for expiring certificates on mount (once per session)
+  useEffect(() => {
+    const checkExpiringCerts = async () => {
+      // Check if we already showed the alert this session
+      const alreadyShown = sessionStorage.getItem('ucm-expiring-alert-shown')
+      if (alreadyShown) return
+      
+      try {
+        const stats = await certificatesService.getStats()
+        const expiring = stats?.data?.expiring || 0
+        const expired = stats?.data?.expired || 0
+        
+        if (expiring > 0 || expired > 0) {
+          sessionStorage.setItem('ucm-expiring-alert-shown', 'true')
+          
+          if (expired > 0 && expiring > 0) {
+            showWarning(`${expired} certificate${expired > 1 ? 's have' : ' has'} expired and ${expiring} ${expiring > 1 ? 'are' : 'is'} expiring soon`)
+          } else if (expired > 0) {
+            showWarning(`${expired} certificate${expired > 1 ? 's have' : ' has'} expired`)
+          } else {
+            showWarning(`${expiring} certificate${expiring > 1 ? 's are' : ' is'} expiring soon`)
+          }
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
+    
+    // Delay check to let the app settle
+    const timer = setTimeout(checkExpiringCerts, 2000)
+    return () => clearTimeout(timer)
+  }, [showWarning])
 
   // Close mobile menu on navigation
   useEffect(() => {
