@@ -454,6 +454,7 @@ export default function CSRsPage() {
           searchable
           searchPlaceholder={activeTab === 'pending' ? 'Search pending CSRs...' : 'Search signed certificates...'}
           searchKeys={['cn', 'common_name', 'subject', 'organization', 'signed_by']}
+          columnStorageKey={`ucm-csrs-${activeTab}-columns`}
           toolbarActions={activeTab === 'pending' && canWrite('csrs') && (
             isMobile ? (
               <Button size="lg" onClick={() => openModal('upload')} className="w-11 h-11 p-0">
