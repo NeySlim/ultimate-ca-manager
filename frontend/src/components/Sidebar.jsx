@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
   SignOut, Palette, Check, UserCircle, UploadSimple, ClockCounterClockwise, Robot,
-  UsersThree, Shield, Crown, Lock, FileX, Vault
+  UsersThree, Shield, Crown, Lock, FileX, Vault, Warning
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -16,12 +16,34 @@ import { cn } from '../lib/utils'
 import { Logo } from './Logo'
 import { WebSocketIndicator } from './WebSocketIndicator'
 import { useMobile } from '../contexts/MobileContext'
+import { certificatesService } from '../services'
 
 export function Sidebar({ activePage }) {
   const navigate = useNavigate()
   const { themeFamily, setThemeFamily, mode, setMode, themes, isLight } = useTheme()
   const { user, logout } = useAuth()
   const { isLargeScreen } = useMobile()
+  
+  // Expiring certificates badge
+  const [expiringCount, setExpiringCount] = useState(0)
+  
+  // Load expiring count on mount and periodically
+  useEffect(() => {
+    const loadExpiringCount = async () => {
+      try {
+        const stats = await certificatesService.getStats()
+        const expiring = stats?.data?.expiring || 0
+        const expired = stats?.data?.expired || 0
+        setExpiringCount(expiring + expired)
+      } catch {
+        // Ignore errors
+      }
+    }
+    
+    loadExpiringCount()
+    const interval = setInterval(loadExpiringCount, 5 * 60 * 1000) // Refresh every 5 min
+    return () => clearInterval(interval)
+  }, [])
   
   // Sizes based on screen width (smaller icons for refined look)
   const iconSize = isLargeScreen ? 20 : 16
@@ -87,6 +109,7 @@ export function Sidebar({ activePage }) {
       {pages.map(page => {
         const Icon = page.icon
         const isActive = activePage === page.id
+        const showBadge = page.id === 'certificates' && expiringCount > 0
         return (
           <Link
             key={page.id}
@@ -98,15 +121,26 @@ export function Sidebar({ activePage }) {
                 ? "bg-accent-primary/10 text-accent-primary border border-accent-primary/20" 
                 : "text-text-secondary hover:bg-bg-tertiary/70 hover:text-text-primary"
             )}
-            title={page.label}
+            title={showBadge ? `${page.label} (${expiringCount} expiring)` : page.label}
           >
             <Icon size={iconSize} weight={isActive ? 'fill' : 'regular'} />
             {isActive && (
               <div className="absolute left-0 w-0.5 h-5 bg-accent-primary rounded-r-full" />
             )}
+            {/* Expiring badge */}
+            {showBadge && (
+              <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-orange-500 border border-bg-secondary flex items-center justify-center">
+                <span className="text-[9px] font-bold text-white">
+                  {expiringCount > 9 ? '9+' : expiringCount}
+                </span>
+              </div>
+            )}
             {/* Tooltip */}
             <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-md text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
               {page.label}
+              {showBadge && (
+                <span className="ml-1 text-orange-500">({expiringCount} expiring)</span>
+              )}
             </div>
           </Link>
         )

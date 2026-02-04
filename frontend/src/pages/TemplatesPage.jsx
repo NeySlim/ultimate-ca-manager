@@ -8,11 +8,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { 
   FileText, Plus, Copy, Trash, Download, FileArrowUp, PencilSimple,
-  Certificate, ShieldCheck, Clock
+  Certificate, ShieldCheck, Clock, Eye
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select, Textarea,
-  HelpCard, LoadingSpinner,
+  HelpCard, LoadingSpinner, TemplatePreviewModal,
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { templatesService } from '../services'
@@ -37,6 +37,7 @@ export default function TemplatesPage() {
   // Modals
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
   
   // Pagination
@@ -325,6 +326,9 @@ export default function TemplatesPage() {
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="secondary" onClick={() => setShowPreviewModal(true)}>
+          <Eye size={14} /> Preview
+        </Button>
         {canWrite('templates') && (
           <>
             <Button size="sm" variant="secondary" onClick={() => { setEditingTemplate(selectedTemplate); setShowTemplateModal(true) }}>
@@ -532,6 +536,13 @@ export default function TemplatesPage() {
           </div>
         </div>
       </Modal>
+      
+      {/* Template Preview Modal */}
+      <TemplatePreviewModal
+        open={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        template={selectedTemplate}
+      />
     </>
   )
 }

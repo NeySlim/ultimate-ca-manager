@@ -7,11 +7,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Certificate, Download, Trash, X, Plus, Info,
-  CheckCircle, Warning, UploadSimple, Clock, XCircle, ArrowClockwise, LinkBreak, Star
+  CheckCircle, Warning, UploadSimple, Clock, XCircle, ArrowClockwise, LinkBreak, Star, ArrowsLeftRight
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, HelpCard,
-  CertificateDetails, KeyIndicator
+  CertificateDetails, CertificateCompareModal, KeyIndicator
 } from '../components'
 import { certificatesService, casService } from '../services'
 import { useNotification, useMobile } from '../contexts'
@@ -34,6 +34,7 @@ export default function CertificatesPage() {
   const [selectedCert, setSelectedCert] = useState(null)
   const [showIssueModal, setShowIssueModal] = useState(false)
   const [showKeyModal, setShowKeyModal] = useState(false)
+  const [showCompareModal, setShowCompareModal] = useState(false)
   const [keyPem, setKeyPem] = useState('')
   const [keyPassphrase, setKeyPassphrase] = useState('')
   
@@ -577,18 +578,28 @@ export default function CertificatesPage() {
               }))
             }
           ]}
-          toolbarActions={canWrite('certificates') && (
-            isMobile ? (
-              <Button size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
-                <Plus size={22} weight="bold" />
-              </Button>
-            ) : (
-              <Button size="sm" onClick={() => setShowIssueModal(true)}>
-                <Plus size={14} weight="bold" />
-                Issue
-              </Button>
-            )
-          )}
+          toolbarActions={
+            <div className="flex items-center gap-2">
+              {!isMobile && (
+                <Button size="sm" variant="secondary" onClick={() => setShowCompareModal(true)}>
+                  <ArrowsLeftRight size={14} />
+                  Compare
+                </Button>
+              )}
+              {canWrite('certificates') && (
+                isMobile ? (
+                  <Button size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
+                    <Plus size={22} weight="bold" />
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={() => setShowIssueModal(true)}>
+                    <Plus size={14} weight="bold" />
+                    Issue
+                  </Button>
+                )
+              )}
+            </div>
+          }
           sortable
           defaultSort={{ key: 'cn', direction: 'asc' }}
           pagination={{
@@ -708,6 +719,14 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
           </div>
         </div>
       </Modal>
+      
+      {/* Certificate Compare Modal */}
+      <CertificateCompareModal
+        open={showCompareModal}
+        onClose={() => setShowCompareModal(false)}
+        certificates={certificates}
+        initialCert={selectedCert}
+      />
     </>
   )
 }

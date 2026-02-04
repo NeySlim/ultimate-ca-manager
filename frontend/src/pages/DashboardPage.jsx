@@ -8,13 +8,48 @@ import {
   ShieldCheck, Certificate, ClockCounterClockwise, Clock,
   Plus, ArrowsClockwise, ListChecks, Gear, CaretRight, 
   User, Globe, SignIn, SignOut, Trash, PencilSimple, 
-  UploadSimple, Key, Warning, WifiHigh, Heartbeat, Database, Lightning
+  UploadSimple, Key, Warning, WifiHigh, Heartbeat, Database, Lightning,
+  SlidersHorizontal, Eye, EyeSlash, DotsSixVertical, X
 } from '@phosphor-icons/react'
-import { Card, Button, Badge, LoadingSpinner, Logo } from '../components'
+import { Card, Button, Badge, LoadingSpinner, Logo, Modal, CertificateTrendChart, StatusPieChart } from '../components'
 import { dashboardService, certificatesService, acmeService } from '../services'
 import { useNotification } from '../contexts'
 import { useWebSocket, EventType } from '../hooks'
 import { formatRelativeTime } from '../lib/ui'
+
+// Default widgets configuration
+const DEFAULT_WIDGETS = [
+  { id: 'stats', name: 'Statistics', visible: true },
+  { id: 'charts', name: 'Charts & Analytics', visible: true },
+  { id: 'system', name: 'System Status', visible: true },
+  { id: 'expiring', name: 'Expiring Certificates', visible: true },
+  { id: 'activity', name: 'Recent Activity', visible: true },
+  { id: 'certs', name: 'Recent Certificates', visible: true },
+  { id: 'cas', name: 'Certificate Authorities', visible: true },
+  { id: 'acme', name: 'ACME Accounts', visible: true },
+]
+
+// Load widget preferences from localStorage
+const loadWidgetPrefs = () => {
+  try {
+    const saved = localStorage.getItem('ucm-dashboard-widgets')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // Merge with defaults to handle new widgets
+      return DEFAULT_WIDGETS.map(w => ({
+        ...w,
+        visible: parsed.find(p => p.id === w.id)?.visible ?? w.visible,
+        order: parsed.findIndex(p => p.id === w.id)
+      })).sort((a, b) => (a.order >= 0 ? a.order : 999) - (b.order >= 0 ? b.order : 999))
+    }
+  } catch {}
+  return DEFAULT_WIDGETS
+}
+
+// Save widget preferences to localStorage
+const saveWidgetPrefs = (widgets) => {
+  localStorage.setItem('ucm-dashboard-widgets', JSON.stringify(widgets.map(w => ({ id: w.id, visible: w.visible }))))
+}
 
 // Action icons mapping
 const actionIcons = {
@@ -44,6 +79,10 @@ export default function DashboardPage() {
   const [expiringCerts, setExpiringCerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
+  
+  // Widget customization
+  const [widgets, setWidgets] = useState(loadWidgetPrefs)
+  const [showWidgetSettings, setShowWidgetSettings] = useState(false)
   const refreshTimeoutRef = useRef(null)
 
   // WebSocket for live updates
@@ -209,11 +248,21 @@ export default function DashboardPage() {
               >
                 <ArrowsClockwise size={14} />
               </Button>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => setShowWidgetSettings(true)} 
+                title="Customize dashboard"
+                className="hidden md:flex"
+              >
+                <SlidersHorizontal size={14} />
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Stats Row - Now with colors and live indicators */}
+        {widgets.find(w => w.id === 'stats')?.visible && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard 
             icon={Certificate}
@@ -247,9 +296,49 @@ export default function DashboardPage() {
             onClick={() => navigate('/acme')}
           />
         </div>
+        )}
+        
+        {/* Charts Row */}
+        {widgets.find(w => w.id === 'charts')?.visible && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Certificate Trend */}
+          <Card variant="elevated" className="p-0">
+            <Card.Header 
+              icon={Lightning}
+              iconColor="blue"
+              title="Certificate Activity"
+              subtitle="Last 7 days"
+            />
+            <Card.Body className="!pt-0 !pb-2">
+              <CertificateTrendChart height={140} />
+            </Card.Body>
+          </Card>
+          
+          {/* Status Distribution */}
+          <Card variant="elevated" className="p-0">
+            <Card.Header 
+              icon={Certificate}
+              iconColor="violet"
+              title="Status Distribution"
+              subtitle="Current certificates"
+            />
+            <Card.Body className="!pt-0 !pb-2">
+              <StatusPieChart 
+                data={{
+                  valid: Math.max(0, (stats?.total_certificates || 0) - (stats?.expiring_soon || 0) - (stats?.revoked || 0)),
+                  expiring: stats?.expiring_soon || 0,
+                  expired: 0,
+                  revoked: stats?.revoked || 0,
+                }}
+                height={140} 
+              />
+            </Card.Body>
+          </Card>
+        </div>
+        )}
 
         {/* Expiring Certs Warning Banner */}
-        {expiringCount > 0 && (
+        {widgets.find(w => w.id === 'expiring')?.visible && expiringCount > 0 && (
           <div 
             onClick={() => navigate('/certificates?filter=expiring')}
             className="flex items-center gap-3 p-3 rounded-lg stat-card-warning cursor-pointer border transition-colors"
@@ -274,6 +363,7 @@ export default function DashboardPage() {
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
             
             {/* Recent Certificates */}
+            {widgets.find(w => w.id === 'certs')?.visible && (
             <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
               <Card.Header 
                 icon={Certificate}
@@ -316,8 +406,10 @@ export default function DashboardPage() {
                 )}
               </Card.Body>
             </Card>
+            )}
 
             {/* Recent CAs */}
+            {widgets.find(w => w.id === 'cas')?.visible && (
             <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
               <Card.Header 
                 icon={ShieldCheck}
@@ -355,8 +447,10 @@ export default function DashboardPage() {
                 )}
               </Card.Body>
             </Card>
+            )}
 
             {/* System Health */}
+            {widgets.find(w => w.id === 'system')?.visible && (
             <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
               <Card.Header 
                 icon={Heartbeat}
@@ -406,8 +500,10 @@ export default function DashboardPage() {
                 </div>
               </Card.Body>
             </Card>
+            )}
 
             {/* ACME Accounts */}
+            {widgets.find(w => w.id === 'acme')?.visible && (
             <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
               <Card.Header 
                 icon={Globe}
@@ -445,9 +541,11 @@ export default function DashboardPage() {
                 )}
               </Card.Body>
             </Card>
+            )}
           </div>
 
           {/* Recent Activity with Live Indicator */}
+          {widgets.find(w => w.id === 'activity')?.visible && (
           <Card variant="elevated" className="flex flex-col min-h-[320px] p-0">
             <Card.Header 
               icon={ClockCounterClockwise}
@@ -507,10 +605,96 @@ export default function DashboardPage() {
               )}
             </Card.Body>
           </Card>
+          )}
         </div>
 
       </div>
+      
+      {/* Widget Settings Modal */}
+      <WidgetSettingsModal
+        open={showWidgetSettings}
+        onClose={() => setShowWidgetSettings(false)}
+        widgets={widgets}
+        onSave={(newWidgets) => {
+          setWidgets(newWidgets)
+          saveWidgetPrefs(newWidgets)
+          setShowWidgetSettings(false)
+        }}
+      />
     </div>
+  )
+}
+
+// Widget Settings Modal
+function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
+  const [localWidgets, setLocalWidgets] = useState(widgets)
+  
+  useEffect(() => {
+    setLocalWidgets(widgets)
+  }, [widgets, open])
+  
+  const toggleWidget = (id) => {
+    setLocalWidgets(prev => prev.map(w => 
+      w.id === id ? { ...w, visible: !w.visible } : w
+    ))
+  }
+  
+  const resetToDefaults = () => {
+    setLocalWidgets(DEFAULT_WIDGETS)
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} size="sm">
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg icon-bg-blue flex items-center justify-center">
+              <SlidersHorizontal size={18} className="text-accent-primary" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-text-primary">Customize Dashboard</h2>
+              <p className="text-xs text-text-secondary">Show or hide widgets</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary">
+            <X size={18} />
+          </button>
+        </div>
+        
+        <div className="space-y-1 mb-4">
+          {localWidgets.map(widget => (
+            <button
+              key={widget.id}
+              onClick={() => toggleWidget(widget.id)}
+              className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-bg-tertiary transition-colors"
+            >
+              <div className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                widget.visible ? 'bg-accent-primary text-white' : 'bg-bg-tertiary text-text-tertiary'
+              }`}>
+                {widget.visible ? <Eye size={14} /> : <EyeSlash size={14} />}
+              </div>
+              <span className={`text-sm ${widget.visible ? 'text-text-primary' : 'text-text-tertiary'}`}>
+                {widget.name}
+              </span>
+            </button>
+          ))}
+        </div>
+        
+        <div className="flex items-center justify-between pt-3 border-t border-border">
+          <Button size="sm" variant="ghost" onClick={resetToDefaults}>
+            Reset to defaults
+          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => onSave(localWidgets)}>
+              Save
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
