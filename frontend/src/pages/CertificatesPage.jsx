@@ -7,7 +7,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Certificate, Download, Trash, X, Plus, Info,
-  CheckCircle, Warning, UploadSimple, Clock, XCircle, ArrowClockwise
+  CheckCircle, Warning, UploadSimple, Clock, XCircle, ArrowClockwise, LinkBreak
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, HelpCard,
@@ -184,12 +184,15 @@ export default function CertificatesPage() {
     }
   }
 
-  // Normalize and filter data
+  // Normalize and filter data - detect orphans (cert without existing CA)
   const filteredCerts = useMemo(() => {
+    const caIds = new Set(cas.map(ca => ca.id))
+    
     let result = certificates.map(cert => ({
       ...cert,
       status: cert.revoked ? 'revoked' : cert.status,
-      cn: extractCN(cert.subject) || cert.common_name || 'Certificate'
+      cn: extractCN(cert.subject) || cert.common_name || 'Certificate',
+      isOrphan: cert.ca_id && !caIds.has(cert.ca_id) && !caIds.has(Number(cert.ca_id))
     }))
     
     if (filterStatus) {
@@ -201,16 +204,29 @@ export default function CertificatesPage() {
     }
     
     return result
-  }, [certificates, filterStatus, filterCA])
+  }, [certificates, cas, filterStatus, filterCA])
+
+  // Count orphans for stats
+  const orphanCount = useMemo(() => {
+    const caIds = new Set(cas.map(ca => ca.id))
+    return certificates.filter(c => c.ca_id && !caIds.has(c.ca_id) && !caIds.has(Number(c.ca_id))).length
+  }, [certificates, cas])
 
   // Stats - from backend API for accurate counts
-  const stats = useMemo(() => [
-    { icon: CheckCircle, label: 'Valid', value: certStats.valid, variant: 'success' },
-    { icon: Warning, label: 'Expiring', shortLabel: 'Exp.', value: certStats.expiring, variant: 'warning' },
-    { icon: Clock, label: 'Expired', value: certStats.expired, variant: 'neutral' },
-    { icon: X, label: 'Revoked', shortLabel: 'Rev.', value: certStats.revoked, variant: 'danger' },
-    { icon: Certificate, label: 'Total', value: certStats.total, variant: 'primary' }
-  ], [certStats])
+  const stats = useMemo(() => {
+    const baseStats = [
+      { icon: CheckCircle, label: 'Valid', value: certStats.valid, variant: 'success' },
+      { icon: Warning, label: 'Expiring', shortLabel: 'Exp.', value: certStats.expiring, variant: 'warning' },
+      { icon: Clock, label: 'Expired', value: certStats.expired, variant: 'neutral' },
+      { icon: X, label: 'Revoked', shortLabel: 'Rev.', value: certStats.revoked, variant: 'danger' }
+    ]
+    // Add orphan stat if there are any
+    if (orphanCount > 0) {
+      baseStats.push({ icon: LinkBreak, label: 'Orphan', value: orphanCount, variant: 'warning' })
+    }
+    baseStats.push({ icon: Certificate, label: 'Total', value: certStats.total, variant: 'primary' })
+    return baseStats
+  }, [certStats, orphanCount])
 
   // Table columns
   const columns = useMemo(() => [
@@ -231,6 +247,7 @@ export default function CertificatesPage() {
           </div>
           <span className="font-medium truncate">{val}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
+          {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak} title="CA not found">Orphan</Badge>}
           {row.source === 'acme' && <Badge variant="cyan" size="sm" dot>ACME</Badge>}
           {row.source === 'scep' && <Badge variant="orange" size="sm" dot>SCEP</Badge>}
         </div>
