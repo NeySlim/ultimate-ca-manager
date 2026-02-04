@@ -12,10 +12,11 @@ import {
 } from '@phosphor-icons/react'
 import {
   Button, Input, Select, Badge, Card,
-  LoadingSpinner, FileUpload, Modal, HelpCard, HelpModal,
+  LoadingSpinner, FileUpload, Modal, HelpCard,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   UnifiedPageHeader
 } from '../components'
+import { HelpModal } from '../components/ui/HelpModal'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
@@ -1146,12 +1147,10 @@ export default function SettingsPage() {
       
       {/* Help Modal */}
       <HelpModal
-        open={helpOpen}
+        isOpen={helpOpen}
         onClose={() => setHelpOpen(false)}
-        title="Settings Help"
-      >
-        {helpContent}
-      </HelpModal>
+        pageKey="settings"
+      />
 
       {/* Backup Password Modal */}
       <Modal
