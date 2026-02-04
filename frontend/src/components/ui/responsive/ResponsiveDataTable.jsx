@@ -376,35 +376,50 @@ function DesktopTable({
   actionMenuRef,
   loading
 }) {
+  // Calculate column flex styles based on content type
+  const getColStyle = (col) => {
+    if (col.width) return { width: col.width, minWidth: col.width, maxWidth: col.width }
+    // Dynamic sizing with constraints
+    const defaults = {
+      minWidth: col.minWidth || '80px',
+      maxWidth: col.maxWidth || '300px',
+      flex: col.flex || '1 1 auto'
+    }
+    return defaults
+  }
+
   return (
     <div className="flex-1 overflow-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-sm" style={{ tableLayout: 'auto' }}>
         {/* Header */}
         <thead className="sticky top-0 z-10 bg-bg-secondary/95 backdrop-blur-sm border-b border-border shadow-sm">
           <tr>
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                onClick={() => sortable && col.sortable !== false && onSort(col.key)}
-                className={cn(
-                  'text-left px-4 py-1.5 text-[11px] font-medium text-text-tertiary tracking-wide',
-                  'transition-colors duration-200',
-                  sortable && col.sortable !== false && 'cursor-pointer hover:text-text-secondary',
-                  sort?.key === col.key && 'text-accent-primary',
-                  col.width && `w-[${col.width}]`
-                )}
-              >
-                <div className="flex items-center gap-1.5">
-                  {col.header || col.label}
-                  {sort?.key === col.key && (
-                    sort.direction === 'asc' 
-                      ? <CaretUp size={10} weight="bold" className="text-accent-primary" />
-                      : <CaretDown size={10} weight="bold" className="text-accent-primary" />
+            {columns.map((col) => {
+              const style = getColStyle(col)
+              return (
+                <th
+                  key={col.key}
+                  onClick={() => sortable && col.sortable !== false && onSort(col.key)}
+                  style={style}
+                  className={cn(
+                    'text-left px-4 py-1.5 text-[11px] font-medium text-text-tertiary tracking-wide',
+                    'transition-colors duration-200',
+                    sortable && col.sortable !== false && 'cursor-pointer hover:text-text-secondary',
+                    sort?.key === col.key && 'text-accent-primary'
                   )}
-                </div>
-              </th>
-            ))}
-            {rowActions && <th className="w-12" />}
+                >
+                  <div className="flex items-center gap-1.5 truncate">
+                    {col.header || col.label}
+                    {sort?.key === col.key && (
+                      sort.direction === 'asc' 
+                        ? <CaretUp size={10} weight="bold" className="text-accent-primary" />
+                        : <CaretDown size={10} weight="bold" className="text-accent-primary" />
+                    )}
+                  </div>
+                </th>
+              )
+            })}
+            {rowActions && <th className="w-12 min-w-[48px]" />}
           </tr>
         </thead>
         
@@ -430,14 +445,32 @@ function DesktopTable({
                   // Selected state - uses theme-aware CSS class
                   selectedId === row.id && 'row-selected'
                 )}>
-                {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-1.5 transition-colors duration-200">
-                    {col.render 
-                      ? col.render(row[col.key], row)
-                      : row[col.key] ?? '—'
-                    }
-                  </td>
-                ))}
+                {columns.map((col) => {
+                  const style = getColStyle(col)
+                  return (
+                    <td 
+                      key={col.key}
+                      style={style}
+                      className={cn(
+                        "px-4 py-1.5 transition-colors duration-200",
+                        col.className
+                      )}
+                    >
+                      <div 
+                        className={cn(
+                          // Global overflow protection
+                          !col.noTruncate && "truncate"
+                        )}
+                        title={!col.noTruncate && typeof row[col.key] === 'string' ? row[col.key] : undefined}
+                      >
+                        {col.render 
+                          ? col.render(row[col.key], row)
+                          : row[col.key] ?? '—'
+                        }
+                      </div>
+                    </td>
+                  )
+                })}
                 {rowActions && (
                   <td className="px-2 py-1.5 relative">
                     <RowActionMenu
@@ -475,10 +508,10 @@ function RowActionMenu({ row, idx, actions, isOpen, onToggle, menuRef }) {
         }}
         className={cn(
           'w-8 h-8 rounded-lg flex items-center justify-center',
-          'text-text-tertiary opacity-0 group-hover:opacity-100',
-          'hover:bg-bg-tertiary hover:text-text-primary',
+          'text-text-tertiary hover:text-text-primary',
+          'hover:bg-bg-tertiary',
           'transition-all duration-150',
-          isOpen && 'opacity-100 bg-accent-primary/10 text-accent-primary'
+          isOpen && 'bg-accent-primary/10 text-accent-primary'
         )}
       >
         <DotsThreeVertical size={18} weight="bold" />
