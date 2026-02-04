@@ -406,7 +406,7 @@ export default function CSRsPage() {
         subtitle={`${pendingCSRs.length} pending, ${historyCSRs.length} signed`}
         icon={FileText}
         stats={stats}
-        helpContent={helpContent}
+        helpPageKey="csrs"
         tabs={tabsWithCounts}
         activeTab={activeTab}
         onTabChange={handleTabChange}

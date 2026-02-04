@@ -11,8 +11,9 @@ import {
 } from '@phosphor-icons/react'
 import {
   Button, ExportDropdown, Input, LoadingSpinner, 
-  Select, Card, Badge, HelpCard, HelpModal, DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
+  Select, Card, Badge, HelpCard, DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
 } from '../components'
+import { HelpModal } from '../components/ui/HelpModal'
 import { opnsenseService, casService, certificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { cn } from '../lib/utils'
@@ -797,12 +798,10 @@ export default function ImportExportPage() {
       
       {/* Help Modal */}
       <HelpModal
-        open={helpOpen}
+        isOpen={helpOpen}
         onClose={() => setHelpOpen(false)}
-        title="Import & Export Help"
-      >
-        {helpContent}
-      </HelpModal>
+        pageKey="importExport"
+      />
     </>
   )
 }

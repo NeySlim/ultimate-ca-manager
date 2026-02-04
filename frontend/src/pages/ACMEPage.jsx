@@ -675,8 +675,7 @@ export default function ACMEPage() {
           }
         }}
         actions={headerActions}
-        helpContent={helpContent}
-        helpTitle="ACME Help"
+        helpPageKey="acme"
         
         // Split view for accounts tab
         splitView={activeTab === 'accounts'}

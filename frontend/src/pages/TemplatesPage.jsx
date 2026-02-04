@@ -393,8 +393,7 @@ export default function TemplatesPage() {
         subtitle={`${templates.length} template${templates.length !== 1 ? 's' : ''}`}
         icon={FileText}
         stats={stats}
-        helpContent={helpContent}
-        helpTitle="Templates Help"
+        helpPageKey="templates"
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">

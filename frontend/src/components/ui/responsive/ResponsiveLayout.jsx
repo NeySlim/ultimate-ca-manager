@@ -24,6 +24,7 @@ import { useMobile } from '../../../contexts'
 import { cn } from '../../../lib/utils'
 import { UnifiedPageHeader } from '../UnifiedPageHeader'
 import { FilterSelect } from '../Select'
+import { HelpModal } from '../HelpModal'
 
 // =============================================================================
 // PANEL WIDTH CONSTANTS
@@ -59,7 +60,9 @@ export function ResponsiveLayout({
   activeFilters = 0, // count of active filters
   onClearFilters,
   
-  // Help (optional - help content for help panel)
+  // Help - pass pageKey to show contextual help modal
+  helpPageKey, // e.g., 'cas', 'certificates', 'settings'
+  // Legacy support - JSX content (deprecated)
   helpContent,
   helpTitle = 'Help',
   
@@ -187,7 +190,7 @@ export function ResponsiveLayout({
         onClearFilters={onClearFilters}
         onOpenFilters={() => setFilterDrawerOpen(true)}
         actions={actions}
-        showHelp={!!helpContent}
+        showHelp={!!helpPageKey || !!helpContent}
         onHelpClick={() => setHelpDrawerOpen(true)}
         isMobile={isMobile}
       />
@@ -313,8 +316,17 @@ export function ResponsiveLayout({
         </MobileDrawer>
       )}
       
-      {/* HELP DRAWER - Mobile: bottom sheet, Desktop: slide-over */}
-      {helpContent && (
+      {/* HELP MODAL - New contextual help system */}
+      {helpPageKey && (
+        <HelpModal
+          isOpen={helpDrawerOpen}
+          onClose={() => setHelpDrawerOpen(false)}
+          pageKey={helpPageKey}
+        />
+      )}
+      
+      {/* LEGACY HELP DRAWER - For backwards compatibility with JSX content */}
+      {!helpPageKey && helpContent && (
         isMobile ? (
           <MobileDrawer
             open={helpDrawerOpen}

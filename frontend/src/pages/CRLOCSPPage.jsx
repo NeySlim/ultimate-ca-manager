@@ -8,6 +8,7 @@ import {
   Database, Pulse, Calendar, Hash, CheckCircle, XCircle, Eye,
   Info, Link as LinkIcon
 } from '@phosphor-icons/react'
+import * as Switch from '@radix-ui/react-switch'
 import {
   ResponsiveLayout,
   ResponsiveDataTable,
@@ -25,6 +26,7 @@ import { ERRORS, SUCCESS, LABELS } from '../lib/messages'
 const crlApi = {
   ...crlService,
   regenerate: (caId) => apiClient.post(`/crl/${caId}/regenerate`),
+  toggleAutoRegen: (caId, enabled) => apiClient.post(`/crl/${caId}/auto-regen`, { enabled }),
   getOcspStatus: () => apiClient.get('/ocsp/status'),
   getOcspStats: () => apiClient.get('/ocsp/stats'),
 }
@@ -99,6 +101,20 @@ export default function CRLOCSPPage() {
       showError(error.message || ERRORS.LOAD_FAILED.CRL)
     } finally {
       setRegenerating(false)
+    }
+  }
+
+  const handleToggleAutoRegen = async (ca) => {
+    try {
+      const result = await crlApi.toggleAutoRegen(ca.id, !ca.cdp_enabled)
+      showSuccess(`Auto-regeneration ${result.data.cdp_enabled ? 'enabled' : 'disabled'} for ${ca.descr}`)
+      // Update local state
+      setCas(prev => prev.map(c => c.id === ca.id ? { ...c, cdp_enabled: result.data.cdp_enabled } : c))
+      if (selectedCA?.id === ca.id) {
+        setSelectedCA(prev => ({ ...prev, cdp_enabled: result.data.cdp_enabled }))
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to toggle auto-regeneration')
     }
   }
 
@@ -184,6 +200,22 @@ export default function CRLOCSPPage() {
       )
     },
     {
+      key: 'cdp_enabled',
+      label: 'Auto',
+      width: '70px',
+      render: (v, row) => (
+        <Switch.Root
+          checked={v}
+          onCheckedChange={() => handleToggleAutoRegen(row)}
+          disabled={!row.has_private_key || !canWrite('crl')}
+          className="w-9 h-5 bg-bg-tertiary rounded-full relative data-[state=checked]:bg-accent-success transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-100 translate-x-0.5 data-[state=checked]:translate-x-[18px]" />
+        </Switch.Root>
+      )
+    },
+    {
       key: 'revoked_count',
       label: 'Revoked',
       width: '80px',
@@ -203,7 +235,7 @@ export default function CRLOCSPPage() {
         </span>
       )
     }
-  ], [])
+  ], [canWrite, handleToggleAutoRegen])
 
   // Mobile card render
   const renderMobileCard = useCallback((ca, isSelected) => {
@@ -450,7 +482,7 @@ export default function CRLOCSPPage() {
       icon={FileX}
       subtitle={`${crls.length} active CRLs`}
       stats={headerStats}
-      helpContent={helpContent}
+      helpPageKey="crlocsp"
       splitView={true}
       splitEmptyContent={
         <div className="h-full flex flex-col items-center justify-center p-6 text-center">
