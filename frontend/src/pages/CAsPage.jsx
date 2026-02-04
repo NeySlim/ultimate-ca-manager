@@ -5,7 +5,8 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   ShieldCheck, Crown, Key, Download, Trash, PencilSimple,
-  Certificate, UploadSimple, Clock, Plus, Warning, CaretRight, CaretDown
+  Certificate, UploadSimple, Clock, Plus, Warning, CaretRight, CaretDown,
+  TreeStructure, List, Copy, Check
 } from '@phosphor-icons/react'
 import {
   Badge, Button, Modal, Input, Select, HelpCard, LoadingSpinner,
@@ -48,6 +49,16 @@ export default function CAsPage() {
   
   // Tree expanded state
   const [expandedNodes, setExpandedNodes] = useState(new Set())
+  
+  // View mode: 'tree' or 'list'
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('ucm-ca-view-mode') || 'tree'
+  })
+  
+  // Save view mode preference
+  useEffect(() => {
+    localStorage.setItem('ucm-ca-view-mode', viewMode)
+  }, [viewMode])
 
   useEffect(() => {
     loadCAs()
@@ -356,6 +367,36 @@ export default function CAsPage() {
               </div>
               {!isMobile && (
                 <>
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center rounded-lg border border-border bg-bg-secondary/50 p-0.5">
+                    <button
+                      onClick={() => setViewMode('tree')}
+                      className={cn(
+                        'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors',
+                        viewMode === 'tree' 
+                          ? 'bg-accent-primary text-white' 
+                          : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                      )}
+                      title="Hierarchical view"
+                    >
+                      <TreeStructure size={14} weight={viewMode === 'tree' ? 'fill' : 'regular'} />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={cn(
+                        'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors',
+                        viewMode === 'list' 
+                          ? 'bg-accent-primary text-white' 
+                          : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
+                      )}
+                      title="List view"
+                    >
+                      <List size={14} weight={viewMode === 'list' ? 'fill' : 'regular'} />
+                    </button>
+                  </div>
+                  
+                  <div className="w-px h-5 bg-border/50" />
+                  
                   <FilterSelect
                     value={filterType}
                     onChange={setFilterType}
@@ -425,6 +466,7 @@ export default function CAsPage() {
                 {!isMobile && (
                   <div className="flex items-center gap-3 px-3 py-2 mb-2 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider border-b border-border/50">
                     <div className="flex-1 min-w-0">Certificate Authority</div>
+                    {viewMode === 'list' && <div className="w-24 text-center">Parent</div>}
                     <div className="w-20 text-center">Type</div>
                     <div className="w-16 text-center">Certs</div>
                     <div className="w-20 text-center">Expires</div>
@@ -434,21 +476,51 @@ export default function CAsPage() {
                 
                 {/* Single card with all CAs */}
                 <div className="rounded-xl border border-border/60 bg-bg-secondary/30 overflow-hidden divide-y divide-border/40">
-                  {filteredTree.map((ca, idx) => (
-                    <TreeNode
-                      key={ca.id}
-                      ca={ca}
-                      level={0}
-                      selectedId={selectedCA?.id}
-                      expandedNodes={expandedNodes}
-                      onToggle={toggleNode}
-                      onSelect={loadCADetails}
-                      isOrphan={isOrphanIntermediate(ca)}
-                      isMobile={isMobile}
-                      isLast={idx === filteredTree.length - 1}
-                      isFirst={idx === 0}
-                    />
-                  ))}
+                  {viewMode === 'tree' ? (
+                    // Hierarchical tree view
+                    filteredTree.map((ca, idx) => (
+                      <TreeNode
+                        key={ca.id}
+                        ca={ca}
+                        level={0}
+                        selectedId={selectedCA?.id}
+                        expandedNodes={expandedNodes}
+                        onToggle={toggleNode}
+                        onSelect={loadCADetails}
+                        isOrphan={isOrphanIntermediate(ca)}
+                        isMobile={isMobile}
+                        isLast={idx === filteredTree.length - 1}
+                        isFirst={idx === 0}
+                      />
+                    ))
+                  ) : (
+                    // Flat list view
+                    cas
+                      .filter(ca => {
+                        // Apply search filter
+                        if (searchQuery) {
+                          const query = searchQuery.toLowerCase()
+                          if (!(ca.name || '').toLowerCase().includes(query) &&
+                              !(ca.common_name || '').toLowerCase().includes(query) &&
+                              !(ca.subject || '').toLowerCase().includes(query)) {
+                            return false
+                          }
+                        }
+                        // Apply type filter
+                        if (filterType && ca.type !== filterType) return false
+                        return true
+                      })
+                      .map((ca, idx, arr) => (
+                        <ListRow
+                          key={ca.id}
+                          ca={ca}
+                          allCAs={cas}
+                          selectedId={selectedCA?.id}
+                          onSelect={loadCADetails}
+                          isMobile={isMobile}
+                        />
+                      ))
+                  )}
                 </div>
               </div>
             )}
@@ -822,6 +894,165 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
 }
 
 // =============================================================================
+// LIST ROW COMPONENT - Flat list view
+// =============================================================================
+
+function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
+  const isSelected = selectedId === ca.id
+  
+  // Find parent CA name
+  const parentCA = ca.parent_id ? allCAs.find(c => c.id === ca.parent_id) : null
+  
+  // Format expiration
+  const formatExpiry = (date) => {
+    if (!date) return null
+    const d = new Date(date)
+    const now = new Date()
+    const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24))
+    if (diffDays < 0) return { text: 'Expired', variant: 'danger' }
+    if (diffDays < 30) return { text: `${diffDays}d left`, variant: 'warning' }
+    if (diffDays < 365) return { text: `${Math.floor(diffDays / 30)}mo`, variant: 'default' }
+    const formatted = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+    return { text: formatted, variant: 'default' }
+  }
+  
+  const expiry = formatExpiry(ca.valid_to || ca.not_after)
+  
+  return (
+    <div
+      onClick={() => onSelect(ca)}
+      className={cn(
+        'relative flex items-center gap-3 cursor-pointer transition-all duration-150',
+        'hover:bg-bg-tertiary/50',
+        isSelected && 'bg-accent-primary/8 hover:bg-accent-primary/12',
+        isMobile ? 'py-3 px-3' : 'py-2 px-3'
+      )}
+    >
+      {/* Left accent for selected */}
+      {isSelected && (
+        <div className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-accent-primary" />
+      )}
+      
+      {/* Icon with background */}
+      <div className={cn(
+        'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+        ca.type === 'root' 
+          ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/20'
+          : 'bg-gradient-to-br from-blue-500/20 to-cyan-500/10 border border-blue-500/20'
+      )}>
+        {ca.type === 'root' ? (
+          <Crown size={16} weight="duotone" className="text-amber-500" />
+        ) : (
+          <ShieldCheck size={16} weight="duotone" className="text-blue-500" />
+        )}
+      </div>
+      
+      {/* Name & Subject */}
+      <div className="flex-1 min-w-0">
+        <div className={cn(
+          'font-medium truncate',
+          isMobile ? 'text-sm' : 'text-xs',
+          isSelected ? 'text-accent-primary' : 'text-text-primary'
+        )}>
+          {ca.name || ca.common_name || 'Unnamed CA'}
+        </div>
+        {!isMobile && ca.subject && (
+          <div className="text-[10px] text-text-tertiary truncate mt-0.5">
+            {ca.subject.split(',')[0]}
+          </div>
+        )}
+      </div>
+      
+      {/* Desktop columns */}
+      {!isMobile && (
+        <>
+          {/* Parent */}
+          <div className="w-24 flex justify-center">
+            {parentCA ? (
+              <span className="text-[10px] text-text-secondary truncate max-w-[90px]" title={parentCA.name || parentCA.common_name}>
+                {parentCA.name || parentCA.common_name || '—'}
+              </span>
+            ) : (
+              <span className="text-[10px] text-text-tertiary">—</span>
+            )}
+          </div>
+          
+          {/* Type badge */}
+          <div className="w-20 flex justify-center">
+            <span className={cn(
+              'px-2 py-0.5 rounded-md text-[10px] font-semibold',
+              ca.type === 'root' 
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+            )}>
+              {ca.type === 'root' ? 'Root' : 'Intermediate'}
+            </span>
+          </div>
+          
+          {/* Certs count */}
+          <div className="w-16 flex justify-center">
+            {ca.certs > 0 ? (
+              <span className="flex items-center gap-1 text-[11px] text-text-secondary">
+                <Certificate size={12} weight="duotone" className="text-text-tertiary" />
+                <span className="font-medium">{ca.certs}</span>
+              </span>
+            ) : (
+              <span className="text-[11px] text-text-tertiary">—</span>
+            )}
+          </div>
+          
+          {/* Expiry */}
+          <div className="w-20 flex justify-center">
+            {expiry ? (
+              <span className={cn(
+                'text-[11px] font-medium',
+                expiry.variant === 'danger' ? 'text-red-500' : 
+                expiry.variant === 'warning' ? 'text-amber-500' : 'text-text-secondary'
+              )}>
+                {expiry.text}
+              </span>
+            ) : (
+              <span className="text-[11px] text-text-tertiary">—</span>
+            )}
+          </div>
+          
+          {/* Status */}
+          <div className="w-16 flex justify-center">
+            <span className={cn(
+              'px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1',
+              ca.status === 'Active' 
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                : ca.status === 'Expired'
+                  ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+            )}>
+              <span className={cn(
+                'w-1.5 h-1.5 rounded-full',
+                ca.status === 'Active' ? 'bg-emerald-500' : ca.status === 'Expired' ? 'bg-red-500' : 'bg-amber-500'
+              )} />
+              {ca.status || '?'}
+            </span>
+          </div>
+        </>
+      )}
+      
+      {/* Mobile: Compact badges */}
+      {isMobile && (
+        <div className="flex items-center gap-2">
+          {ca.certs > 0 && (
+            <span className="text-xs text-text-tertiary">{ca.certs}</span>
+          )}
+          <span className={cn(
+            'w-2.5 h-2.5 rounded-full shrink-0',
+            ca.status === 'Active' ? 'bg-emerald-500' : ca.status === 'Expired' ? 'bg-red-500' : 'bg-amber-500'
+          )} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// =============================================================================
 // CA DETAILS PANEL
 // =============================================================================
 
@@ -863,7 +1094,7 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete }) {
       {/* Subject Info */}
       <CompactSection title="Subject">
         <CompactGrid>
-          <CompactField label="Common Name" value={ca.common_name} className="col-span-2" />
+          <CompactField label="Common Name" value={ca.common_name} copyable className="col-span-2" />
           <CompactField label="Organization" value={ca.organization} />
           <CompactField label="Country" value={ca.country} />
           <CompactField label="State" value={ca.state} />
@@ -885,7 +1116,7 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete }) {
         <CompactGrid>
           <CompactField label="Not Before" value={ca.valid_from ? formatDate(ca.valid_from) : '—'} />
           <CompactField label="Not After" value={ca.valid_to ? formatDate(ca.valid_to) : '—'} />
-          <CompactField label="Serial" value={ca.serial_number} className="col-span-2 font-mono text-xs" />
+          <CompactField label="Serial" value={ca.serial_number} copyable mono className="col-span-2" />
         </CompactGrid>
       </CompactSection>
 
@@ -894,10 +1125,10 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete }) {
         <CompactSection title="Fingerprints">
           <CompactGrid>
             {ca.thumbprint_sha1 && (
-              <CompactField label="SHA-1" value={ca.thumbprint_sha1} className="col-span-2 font-mono text-xs break-all" />
+              <CompactField label="SHA-1" value={ca.thumbprint_sha1} copyable mono className="col-span-2" />
             )}
             {ca.thumbprint_sha256 && (
-              <CompactField label="SHA-256" value={ca.thumbprint_sha256} className="col-span-2 font-mono text-xs break-all" />
+              <CompactField label="SHA-256" value={ca.thumbprint_sha256} copyable mono className="col-span-2" />
             )}
           </CompactGrid>
         </CompactSection>
