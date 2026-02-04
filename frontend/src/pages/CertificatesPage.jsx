@@ -49,6 +49,7 @@ export default function CertificatesPage() {
   
   // Apply filter preset callback
   const handleApplyFilterPreset = useCallback((filters) => {
+    setPage(1) // Reset to first page when applying preset
     if (filters.status) setFilterStatus(filters.status)
     else setFilterStatus('')
     if (filters.ca) setFilterCA(filters.ca)
@@ -58,20 +59,37 @@ export default function CertificatesPage() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
 
-  // Load data
+  // Load data - reload when filters change
   useEffect(() => {
     loadData()
-  }, [page, perPage])
+  }, [page, perPage, filterStatus, filterCA])
 
   const loadData = async () => {
     try {
       setLoading(true)
+      
+      // Build query params with filters
+      const params = { page, per_page: perPage }
+      if (filterStatus && filterStatus !== 'orphan') {
+        params.status = filterStatus
+      }
+      if (filterCA) {
+        params.ca_id = filterCA
+      }
+      
       const [certsRes, casRes, statsRes] = await Promise.all([
-        certificatesService.getAll({ page, per_page: perPage }),
+        certificatesService.getAll(params),
         casService.getAll(),
         certificatesService.getStats()
       ])
-      const certs = certsRes.data || []
+      let certs = certsRes.data || []
+      
+      // Handle orphan filter client-side (no CA or CA not in our list)
+      if (filterStatus === 'orphan' && cas.length > 0) {
+        const caIds = new Set(cas.map(ca => ca.id))
+        certs = certs.filter(c => c.ca_id && !caIds.has(c.ca_id) && !caIds.has(Number(c.ca_id)))
+      }
+      
       setCertificates(certs)
       setTotal(certsRes.meta?.total || certsRes.pagination?.total || certs.length)
       setCas(casRes.data || [])
@@ -231,20 +249,31 @@ export default function CertificatesPage() {
   }, [certificates, cas])
 
   // Stats - from backend API for accurate counts
+  // Each stat is clickable to filter the table
   const stats = useMemo(() => {
     const baseStats = [
-      { icon: CheckCircle, label: 'Valid', value: certStats.valid, variant: 'success' },
-      { icon: Warning, label: 'Expiring', shortLabel: 'Exp.', value: certStats.expiring, variant: 'warning' },
-      { icon: Clock, label: 'Expired', value: certStats.expired, variant: 'neutral' },
-      { icon: X, label: 'Revoked', shortLabel: 'Rev.', value: certStats.revoked, variant: 'danger' }
+      { icon: CheckCircle, label: 'Valid', value: certStats.valid, variant: 'success', filterValue: 'valid' },
+      { icon: Warning, label: 'Expiring', shortLabel: 'Exp.', value: certStats.expiring, variant: 'warning', filterValue: 'expiring' },
+      { icon: Clock, label: 'Expired', value: certStats.expired, variant: 'neutral', filterValue: 'expired' },
+      { icon: X, label: 'Revoked', shortLabel: 'Rev.', value: certStats.revoked, variant: 'danger', filterValue: 'revoked' }
     ]
     // Add orphan stat if there are any
     if (orphanCount > 0) {
-      baseStats.push({ icon: LinkBreak, label: 'Orphan', value: orphanCount, variant: 'warning' })
+      baseStats.push({ icon: LinkBreak, label: 'Orphan', value: orphanCount, variant: 'warning', filterValue: 'orphan' })
     }
-    baseStats.push({ icon: Certificate, label: 'Total', value: certStats.total, variant: 'primary' })
+    baseStats.push({ icon: Certificate, label: 'Total', value: certStats.total, variant: 'primary', filterValue: '' })
     return baseStats
   }, [certStats, orphanCount])
+  
+  // Handle stat click to filter
+  const handleStatClick = useCallback((filterValue) => {
+    setPage(1) // Reset to first page when filtering
+    if (filterValue === filterStatus) {
+      setFilterStatus('') // Toggle off if same
+    } else {
+      setFilterStatus(filterValue)
+    }
+  }, [filterStatus])
 
   // Table columns
   const columns = useMemo(() => [
@@ -505,6 +534,8 @@ export default function CertificatesPage() {
         subtitle={`${total} certificate${total !== 1 ? 's' : ''}`}
         icon={Certificate}
         stats={stats}
+        onStatClick={handleStatClick}
+        activeStatFilter={filterStatus}
         helpPageKey="certificates"
         splitView={true}
         splitEmptyContent={
