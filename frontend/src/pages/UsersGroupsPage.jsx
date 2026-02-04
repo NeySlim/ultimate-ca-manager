@@ -283,18 +283,18 @@ export default function UsersGroupsPage() {
       render: (val, row) => {
         // Color avatar based on role AND status - theme-aware
         const avatarColors = {
-          admin: 'icon-bg-violet ring-1 ring-violet-500/30',
-          operator: 'icon-bg-blue ring-1 ring-blue-500/30',
-          viewer: 'icon-bg-teal ring-1 ring-teal-500/30'
+          admin: 'icon-bg-violet',
+          operator: 'icon-bg-blue',
+          viewer: 'icon-bg-teal'
         }
         // Override with orange for disabled users
         const colorClass = row.active 
           ? (avatarColors[row.role] || avatarColors.viewer)
-          : 'icon-bg-orange ring-1 ring-orange-500/30'
+          : 'icon-bg-orange'
         return (
           <div className="flex items-center gap-3">
             <div className={cn(
-              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm",
+              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ring-1 ring-white/10",
               colorClass
             )}>
               {val?.charAt(0)?.toUpperCase() || '?'}
@@ -369,8 +369,8 @@ export default function UsersGroupsPage() {
         return (
           <div className="flex items-center gap-2">
             <div className={cn(
-              "icon-box-sm",
-              memberCount > 0 ? "icon-box-primary" : "icon-box-neutral"
+              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+              memberCount > 0 ? "icon-bg-blue" : "icon-bg-teal"
             )}>
               <UsersThree size={14} weight="duotone" />
             </div>

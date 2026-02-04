@@ -97,20 +97,19 @@
   --detail-field-bg: rgba(255, 255, 255, 0.02);
   --detail-field-border: rgba(255, 255, 255, 0.05);
   
-  /* Icon colors - now managed by ThemeContext for theme-awareness */
-  /* Default fallbacks only (will be overridden by JS) */
-  --icon-orange-bg: transparent;
-  --icon-orange-text: currentColor;
-  --icon-amber-bg: transparent;
-  --icon-amber-text: currentColor;
-  --icon-emerald-bg: transparent;
-  --icon-emerald-text: currentColor;
-  --icon-blue-bg: transparent;
-  --icon-blue-text: currentColor;
-  --icon-violet-bg: transparent;
-  --icon-violet-text: currentColor;
-  --icon-teal-bg: transparent;
-  --icon-teal-text: currentColor;
+  /* Icon colors - defaults for dark theme, overridden by ThemeContext for colored themes */
+  --icon-orange-bg: rgba(249, 115, 22, 0.15);
+  --icon-orange-text: #FB923C;
+  --icon-amber-bg: rgba(245, 158, 11, 0.15);
+  --icon-amber-text: #FBBF24;
+  --icon-emerald-bg: rgba(52, 211, 153, 0.15);
+  --icon-emerald-text: #34D399;
+  --icon-blue-bg: rgba(79, 142, 247, 0.15);
+  --icon-blue-text: #60A5FA;
+  --icon-violet-bg: rgba(139, 92, 246, 0.15);
+  --icon-violet-text: #A78BFA;
+  --icon-teal-bg: rgba(20, 184, 166, 0.15);
+  --icon-teal-text: #2DD4BF;
 }
 
 /* ============================================
@@ -1225,6 +1224,19 @@ input:focus, select:focus, textarea:focus {
 .icon-box-neutral {
   background: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
   color: var(--text-secondary);
+}
+/* Additional color variants for avatars and special icons */
+.icon-box-cyan {
+  background: color-mix(in srgb, #06b6d4 15%, transparent);
+  color: #06b6d4;
+}
+.icon-box-teal {
+  background: color-mix(in srgb, #14b8a6 15%, transparent);
+  color: #14b8a6;
+}
+.icon-box-indigo {
+  background: color-mix(in srgb, #6366f1 15%, transparent);
+  color: #6366f1;
 }
 
 /* Help panel statistics cards */
