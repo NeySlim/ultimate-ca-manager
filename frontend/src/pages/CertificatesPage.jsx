@@ -43,6 +43,10 @@ export default function CertificatesPage() {
   const [perPage, setPerPage] = useState(25)
   const [total, setTotal] = useState(0)
   
+  // Sorting (server-side)
+  const [sortBy, setSortBy] = useState('subject')
+  const [sortOrder, setSortOrder] = useState('asc')
+  
   // Filters
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCA, setFilterCA] = useState('')
@@ -59,17 +63,22 @@ export default function CertificatesPage() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
 
-  // Load data - reload when filters change
+  // Load data - reload when filters or sort change
   useEffect(() => {
     loadData()
-  }, [page, perPage, filterStatus, filterCA])
+  }, [page, perPage, filterStatus, filterCA, sortBy, sortOrder])
 
   const loadData = async () => {
     try {
       setLoading(true)
       
-      // Build query params with filters
-      const params = { page, per_page: perPage }
+      // Build query params with filters and sort
+      const params = { 
+        page, 
+        per_page: perPage,
+        sort_by: sortBy,
+        sort_order: sortOrder
+      }
       if (filterStatus && filterStatus !== 'orphan') {
         params.status = filterStatus
       }
@@ -274,6 +283,28 @@ export default function CertificatesPage() {
       setFilterStatus(filterValue)
     }
   }, [filterStatus])
+  
+  // Handle sort change (server-side)
+  const handleSortChange = useCallback((newSort) => {
+    setPage(1) // Reset to first page when sorting
+    if (newSort) {
+      // Map frontend column keys to backend field names
+      const keyMap = {
+        'cn': 'subject',
+        'common_name': 'subject',
+        'status': 'revoked',
+        'issuer': 'issuer',
+        'expires': 'valid_to',
+        'valid_to': 'valid_to',
+        'key': 'key_type'
+      }
+      setSortBy(keyMap[newSort.key] || newSort.key)
+      setSortOrder(newSort.direction)
+    } else {
+      setSortBy('subject')
+      setSortOrder('asc')
+    }
+  }, [])
 
   // Table columns
   const columns = useMemo(() => [
@@ -633,6 +664,7 @@ export default function CertificatesPage() {
           }
           sortable
           defaultSort={{ key: 'cn', direction: 'asc' }}
+          onSortChange={handleSortChange}
           pagination={{
             page,
             total,
