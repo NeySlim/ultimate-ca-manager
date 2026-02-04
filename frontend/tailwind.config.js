@@ -45,7 +45,8 @@ export default {
         'border-hover': 'var(--text-tertiary)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Geist', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
         mono: ['SF Mono', 'Monaco', 'Cascadia Code', 'monospace'],
       },
       animation: {
