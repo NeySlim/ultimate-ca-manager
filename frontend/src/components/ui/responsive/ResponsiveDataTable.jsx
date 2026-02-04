@@ -52,6 +52,7 @@ export function ResponsiveDataTable({
   // Sorting
   sortable = false,
   defaultSort, // { key, direction: 'asc' | 'desc' }
+  onSortChange, // (sort: { key, direction }) => void - for server-side sorting
   
   // Pagination (external OR auto)
   pagination, // { page, total, perPage, onChange, onPerPageChange } OR true for auto
@@ -273,6 +274,9 @@ export function ResponsiveDataTable({
   
   // Sort filtered data
   const sortedData = useMemo(() => {
+    // If server-side sorting is enabled, don't sort client-side
+    if (onSortChange) return filteredData
+    
     if (!sort || !sort.key) return filteredData
     
     return [...filteredData].sort((a, b) => {
@@ -286,7 +290,7 @@ export function ResponsiveDataTable({
       const comparison = String(aVal).localeCompare(String(bVal), undefined, { numeric: true })
       return sort.direction === 'desc' ? -comparison : comparison
     })
-  }, [filteredData, sort])
+  }, [filteredData, sort, onSortChange])
   
   // ==========================================================================
   // AUTO-PAGINATION: Internal state for client-side pagination
@@ -345,11 +349,23 @@ export function ResponsiveDataTable({
     if (!sortable) return
     
     setSort(prev => {
-      if (prev?.key !== key) return { key, direction: 'asc' }
-      if (prev.direction === 'asc') return { key, direction: 'desc' }
-      return null // Remove sort
+      let newSort
+      if (prev?.key !== key) {
+        newSort = { key, direction: 'asc' }
+      } else if (prev.direction === 'asc') {
+        newSort = { key, direction: 'desc' }
+      } else {
+        newSort = null // Remove sort
+      }
+      
+      // Notify parent for server-side sorting
+      if (onSortChange) {
+        onSortChange(newSort)
+      }
+      
+      return newSort
     })
-  }, [sortable])
+  }, [sortable, onSortChange])
   
   // Get visible columns based on device + user preferences
   const visibleColumns = useMemo(() => {
