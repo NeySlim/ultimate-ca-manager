@@ -75,18 +75,18 @@ const themeFamilies = {
       'detail-section-border': '#E2E8F0',
       'detail-field-bg': 'rgba(0,0,0,0.02)',
       'detail-field-border': 'rgba(0,0,0,0.06)',
-      // Icon colors - standard (stronger for light)
-      'icon-orange-bg': 'rgba(249, 115, 22, 0.12)',
+      // Icon colors - stronger opacity for light mode visibility
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.35)',
       'icon-orange-text': '#EA580C',
-      'icon-amber-bg': 'rgba(245, 158, 11, 0.12)',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.35)',
       'icon-amber-text': '#D97706',
-      'icon-emerald-bg': 'rgba(16, 185, 129, 0.12)',
+      'icon-emerald-bg': 'rgba(16, 185, 129, 0.35)',
       'icon-emerald-text': '#059669',
-      'icon-blue-bg': 'rgba(59, 130, 246, 0.12)',
+      'icon-blue-bg': 'rgba(59, 130, 246, 0.35)',
       'icon-blue-text': '#2563EB',
-      'icon-violet-bg': 'rgba(139, 92, 246, 0.12)',
+      'icon-violet-bg': 'rgba(139, 92, 246, 0.35)',
       'icon-violet-text': '#7C3AED',
-      'icon-teal-bg': 'rgba(20, 184, 166, 0.12)',
+      'icon-teal-bg': 'rgba(20, 184, 166, 0.35)',
       'icon-teal-text': '#0D9488',
     }
   },
@@ -122,9 +122,9 @@ const themeFamilies = {
       'detail-field-bg': 'rgba(255,255,255,0.02)',
       'detail-field-border': 'rgba(255,255,255,0.05)',
       // Icon colors - avoid blue/teal, use warm colors
-      'icon-orange-bg': 'rgba(249, 115, 22, 0.18)',
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.35)',
       'icon-orange-text': '#FB923C',
-      'icon-amber-bg': 'rgba(245, 158, 11, 0.18)',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.35)',
       'icon-amber-text': '#FBBF24',
       'icon-emerald-bg': 'rgba(52, 211, 153, 0.15)',
       'icon-emerald-text': '#34D399',
@@ -167,13 +167,13 @@ const themeFamilies = {
       'icon-orange-text': '#EA580C',
       'icon-amber-bg': 'rgba(245, 158, 11, 0.15)',
       'icon-amber-text': '#D97706',
-      'icon-emerald-bg': 'rgba(16, 185, 129, 0.12)',
+      'icon-emerald-bg': 'rgba(16, 185, 129, 0.35)',
       'icon-emerald-text': '#059669',
-      'icon-blue-bg': 'rgba(249, 115, 22, 0.12)',  // Orange
+      'icon-blue-bg': 'rgba(249, 115, 22, 0.35)',  // Orange
       'icon-blue-text': '#EA580C',
-      'icon-violet-bg': 'rgba(236, 72, 153, 0.12)',
+      'icon-violet-bg': 'rgba(236, 72, 153, 0.35)',
       'icon-violet-text': '#DB2777',
-      'icon-teal-bg': 'rgba(249, 115, 22, 0.12)',  // Orange
+      'icon-teal-bg': 'rgba(249, 115, 22, 0.35)',  // Orange
       'icon-teal-text': '#EA580C',
     }
   },
@@ -209,9 +209,9 @@ const themeFamilies = {
       'detail-field-bg': 'rgba(255,255,255,0.02)',
       'detail-field-border': 'rgba(255,255,255,0.05)',
       // Icon colors - avoid violet/pink, use teal/cyan
-      'icon-orange-bg': 'rgba(249, 115, 22, 0.18)',
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.35)',
       'icon-orange-text': '#FB923C',
-      'icon-amber-bg': 'rgba(245, 158, 11, 0.18)',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.35)',
       'icon-amber-text': '#FBBF24',
       'icon-emerald-bg': 'rgba(52, 211, 153, 0.15)',
       'icon-emerald-text': '#34D399',
@@ -254,13 +254,13 @@ const themeFamilies = {
       'icon-orange-text': '#EA580C',
       'icon-amber-bg': 'rgba(245, 158, 11, 0.15)',
       'icon-amber-text': '#D97706',
-      'icon-emerald-bg': 'rgba(16, 185, 129, 0.12)',
+      'icon-emerald-bg': 'rgba(16, 185, 129, 0.35)',
       'icon-emerald-text': '#059669',
-      'icon-blue-bg': 'rgba(20, 184, 166, 0.12)',  // Teal
+      'icon-blue-bg': 'rgba(20, 184, 166, 0.35)',  // Teal
       'icon-blue-text': '#0D9488',
-      'icon-violet-bg': 'rgba(20, 184, 166, 0.12)', // Teal
+      'icon-violet-bg': 'rgba(20, 184, 166, 0.35)', // Teal
       'icon-violet-text': '#0D9488',
-      'icon-teal-bg': 'rgba(16, 185, 129, 0.12)',
+      'icon-teal-bg': 'rgba(16, 185, 129, 0.35)',
       'icon-teal-text': '#059669',
     }
   },
@@ -296,9 +296,9 @@ const themeFamilies = {
       'detail-field-bg': 'rgba(255,255,255,0.02)',
       'detail-field-border': 'rgba(255,255,255,0.05)',
       // Icon colors - avoid green/teal, use violet/pink
-      'icon-orange-bg': 'rgba(249, 115, 22, 0.18)',
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.35)',
       'icon-orange-text': '#FB923C',
-      'icon-amber-bg': 'rgba(245, 158, 11, 0.18)',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.35)',
       'icon-amber-text': '#FBBF24',
       'icon-emerald-bg': 'rgba(139, 92, 246, 0.15)', // Violet instead
       'icon-emerald-text': '#A78BFA',
@@ -341,13 +341,13 @@ const themeFamilies = {
       'icon-orange-text': '#EA580C',
       'icon-amber-bg': 'rgba(245, 158, 11, 0.15)',
       'icon-amber-text': '#D97706',
-      'icon-emerald-bg': 'rgba(139, 92, 246, 0.12)', // Violet
+      'icon-emerald-bg': 'rgba(139, 92, 246, 0.35)', // Violet
       'icon-emerald-text': '#7C3AED',
-      'icon-blue-bg': 'rgba(59, 130, 246, 0.12)',
+      'icon-blue-bg': 'rgba(59, 130, 246, 0.35)',
       'icon-blue-text': '#2563EB',
-      'icon-violet-bg': 'rgba(236, 72, 153, 0.12)', // Pink
+      'icon-violet-bg': 'rgba(236, 72, 153, 0.35)', // Pink
       'icon-violet-text': '#DB2777',
-      'icon-teal-bg': 'rgba(139, 92, 246, 0.12)',  // Violet
+      'icon-teal-bg': 'rgba(139, 92, 246, 0.35)',  // Violet
       'icon-teal-text': '#7C3AED',
     }
   },
@@ -424,17 +424,17 @@ const themeFamilies = {
       'detail-field-bg': 'rgba(249,115,22,0.03)',
       'detail-field-border': 'rgba(249,115,22,0.1)',
       // Icon colors - avoid orange/amber
-      'icon-orange-bg': 'rgba(59, 130, 246, 0.12)',  // Blue
+      'icon-orange-bg': 'rgba(59, 130, 246, 0.35)',  // Blue
       'icon-orange-text': '#2563EB',
-      'icon-amber-bg': 'rgba(20, 184, 166, 0.12)',  // Teal
+      'icon-amber-bg': 'rgba(20, 184, 166, 0.35)',  // Teal
       'icon-amber-text': '#0D9488',
-      'icon-emerald-bg': 'rgba(16, 185, 129, 0.12)',
+      'icon-emerald-bg': 'rgba(16, 185, 129, 0.35)',
       'icon-emerald-text': '#059669',
-      'icon-blue-bg': 'rgba(59, 130, 246, 0.12)',
+      'icon-blue-bg': 'rgba(59, 130, 246, 0.35)',
       'icon-blue-text': '#2563EB',
-      'icon-violet-bg': 'rgba(139, 92, 246, 0.12)',
+      'icon-violet-bg': 'rgba(139, 92, 246, 0.35)',
       'icon-violet-text': '#7C3AED',
-      'icon-teal-bg': 'rgba(20, 184, 166, 0.12)',
+      'icon-teal-bg': 'rgba(20, 184, 166, 0.35)',
       'icon-teal-text': '#0D9488',
     }
   },
@@ -470,9 +470,9 @@ const themeFamilies = {
       'detail-field-bg': 'rgba(255,255,255,0.02)',
       'detail-field-border': 'rgba(255,255,255,0.05)',
       // Icon colors - avoid pink/violet, use green/teal
-      'icon-orange-bg': 'rgba(249, 115, 22, 0.18)',
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.35)',
       'icon-orange-text': '#FB923C',
-      'icon-amber-bg': 'rgba(245, 158, 11, 0.18)',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.35)',
       'icon-amber-text': '#FBBF24',
       'icon-emerald-bg': 'rgba(52, 211, 153, 0.15)',
       'icon-emerald-text': '#34D399',
@@ -515,13 +515,13 @@ const themeFamilies = {
       'icon-orange-text': '#EA580C',
       'icon-amber-bg': 'rgba(245, 158, 11, 0.15)',
       'icon-amber-text': '#D97706',
-      'icon-emerald-bg': 'rgba(16, 185, 129, 0.12)',
+      'icon-emerald-bg': 'rgba(16, 185, 129, 0.35)',
       'icon-emerald-text': '#059669',
-      'icon-blue-bg': 'rgba(20, 184, 166, 0.12)',  // Teal
+      'icon-blue-bg': 'rgba(20, 184, 166, 0.35)',  // Teal
       'icon-blue-text': '#0D9488',
-      'icon-violet-bg': 'rgba(16, 185, 129, 0.12)', // Green
+      'icon-violet-bg': 'rgba(16, 185, 129, 0.35)', // Green
       'icon-violet-text': '#059669',
-      'icon-teal-bg': 'rgba(16, 185, 129, 0.12)',
+      'icon-teal-bg': 'rgba(16, 185, 129, 0.35)',
       'icon-teal-text': '#059669',
     }
   }
