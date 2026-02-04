@@ -513,6 +513,7 @@ export default function CertificatesPage() {
           searchable
           searchPlaceholder="Search certificates..."
           searchKeys={['cn', 'common_name', 'subject', 'issuer', 'serial']}
+          columnStorageKey="ucm-certs-columns"
           toolbarFilters={[
             {
               key: 'status',

@@ -388,6 +388,7 @@ function UsersContent({ tabs, activeTab, onTabChange }) {
           searchable
           searchPlaceholder="Search users..."
           searchKeys={['username', 'email', 'full_name', 'role']}
+          columnStorageKey="ucm-users-columns"
           toolbarFilters={[
             {
               key: 'role',
