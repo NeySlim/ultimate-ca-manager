@@ -25,9 +25,9 @@ const COMMANDS = [
   { id: 'audit', label: 'Go to Audit Logs', icon: ClockCounterClockwise, path: '/audit', category: 'Navigation' },
   { id: 'settings', label: 'Go to Settings', icon: Gear, path: '/settings', category: 'Navigation' },
   { id: 'account', label: 'Go to Account', icon: UserCircle, path: '/account', category: 'Navigation' },
+  { id: 'groups', label: 'Go to Groups', icon: UsersThree, path: '/users?tab=groups', category: 'Navigation' },
   
   // Pro Navigation
-  { id: 'groups', label: 'Go to Groups', icon: UsersThree, path: '/groups', category: 'Pro', pro: true },
   { id: 'rbac', label: 'Go to RBAC', icon: Shield, path: '/rbac', category: 'Pro', pro: true },
   { id: 'sso', label: 'Go to SSO', icon: Key, path: '/sso', category: 'Pro', pro: true },
   { id: 'hsm', label: 'Go to HSM', icon: Lock, path: '/hsm', category: 'Pro', pro: true },
