@@ -202,7 +202,10 @@ export function ResponsiveDataTable({
   }, [columns])
   
   // Check if there are active filters (toolbar filters or search)
-  const hasActiveFilters = searchValue || (toolbarFilters && toolbarFilters.some(f => f.value && f.value !== '' && f.value !== 'all'))
+  const hasActiveFilters = searchValue || (toolbarFilters && toolbarFilters.some(f => 
+    (f.value && f.value !== '' && f.value !== 'all') || 
+    (f.type === 'dateRange' && (f.from || f.to))
+  ))
   
   // Empty state - but ALWAYS show toolbar if there are filters to clear
   if (!loading && sortedData.length === 0) {
@@ -241,7 +244,14 @@ export function ResponsiveDataTable({
             <button
               onClick={() => {
                 setSearchValue('')
-                toolbarFilters?.forEach(f => f.onChange?.(''))
+                toolbarFilters?.forEach(f => {
+                  f.onChange?.('')
+                  // Clear date range filters
+                  if (f.type === 'dateRange') {
+                    f.onFromChange?.('')
+                    f.onToChange?.('')
+                  }
+                })
               }}
               className="text-sm text-accent-primary hover:text-accent-primary/80 font-medium"
             >
@@ -363,18 +373,53 @@ function SearchBar({ value, onChange, placeholder, isMobile, searchable = true, 
         
         {/* Filters (desktop only) */}
         {!isMobile && filters && filters.length > 0 && (
-          <>
-            {filters.map((filter) => (
-              <FilterSelect
-                key={filter.key}
-                value={filter.value || ''}
-                onChange={filter.onChange}
-                placeholder={filter.placeholder || 'All'}
-                options={filter.options || []}
-                size="sm"
-              />
-            ))}
-          </>
+          <div className="flex items-center gap-2 shrink-0">
+            {filters.map((filter) => {
+              // Date range filter
+              if (filter.type === 'dateRange') {
+                return (
+                  <div key={filter.key} className="flex items-center gap-1.5 shrink-0">
+                    <input
+                      type="date"
+                      value={filter.from || ''}
+                      onChange={(e) => filter.onFromChange?.(e.target.value)}
+                      className={cn(
+                        'h-7 w-28 px-2 text-xs rounded-md border border-border bg-bg-primary',
+                        'text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary',
+                        '[color-scheme:dark]',
+                        filter.from && 'border-accent-primary/50'
+                      )}
+                      title={filter.fromPlaceholder || 'From date'}
+                    />
+                    <span className="text-text-tertiary text-xs">→</span>
+                    <input
+                      type="date"
+                      value={filter.to || ''}
+                      onChange={(e) => filter.onToChange?.(e.target.value)}
+                      className={cn(
+                        'h-7 w-28 px-2 text-xs rounded-md border border-border bg-bg-primary',
+                        'text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-primary',
+                        '[color-scheme:dark]',
+                        filter.to && 'border-accent-primary/50'
+                      )}
+                      title={filter.toPlaceholder || 'To date'}
+                    />
+                  </div>
+                )
+              }
+              // Default: FilterSelect
+              return (
+                <FilterSelect
+                  key={filter.key}
+                  value={filter.value || ''}
+                  onChange={filter.onChange}
+                  placeholder={filter.placeholder || 'All'}
+                  options={filter.options || []}
+                  size="sm"
+                />
+              )
+            })}
+          </div>
         )}
         
         {/* Actions */}
