@@ -653,10 +653,10 @@ export const helpContent = {
   // PRO FEATURES
   // ===========================================
 
-  // GROUPS (Pro)
+  // GROUPS (Community feature)
   groups: {
     title: 'Groups',
-    subtitle: 'Team and access management (Pro)',
+    subtitle: 'Team and access management',
     overview: 'Groups allow you to organize users into teams and apply permissions at the group level. Members inherit the group\'s role-based permissions.',
     sections: [
       {
