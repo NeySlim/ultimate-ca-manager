@@ -52,8 +52,11 @@ export function ResponsiveLayout({
   // Actions (top-right buttons)
   actions,
   
-  // Stats bar (optional - array of { icon, label, value, variant })
+  // Stats bar (optional - array of { icon, label, value, variant, filterValue })
   stats,
+  // Stats clicking - when stats are clickable for filtering
+  activeStatFilter, // currently active stat filter value
+  onStatClick, // (stat) => void - called when stat is clicked
   
   // Filters (optional - for filter drawer/panel)
   filters,
