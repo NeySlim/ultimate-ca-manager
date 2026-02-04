@@ -62,6 +62,18 @@ def list_certificates():
     sort_by = request.args.get('sort_by', 'subject')  # Default sort by subject (common_name)
     sort_order = request.args.get('sort_order', 'asc')  # Default ascending (A-Z)
     
+    # Whitelist of allowed sort columns
+    ALLOWED_SORT_COLUMNS = {
+        'subject': Certificate.subject,
+        'issuer': Certificate.issuer,
+        'valid_to': Certificate.valid_to,
+        'valid_from': Certificate.valid_from,
+        'created_at': Certificate.created_at,
+        'serial_number': Certificate.serial_number,
+        'revoked': Certificate.revoked,
+        'descr': Certificate.descr
+    }
+    
     query = Certificate.query
     
     # Apply CA filter
@@ -94,8 +106,8 @@ def list_certificates():
             )
         )
     
-    # Apply sorting BEFORE pagination
-    sort_column = getattr(Certificate, sort_by, Certificate.valid_to)
+    # Apply sorting BEFORE pagination (use whitelist)
+    sort_column = ALLOWED_SORT_COLUMNS.get(sort_by, Certificate.subject)
     if sort_order == 'desc':
         query = query.order_by(sort_column.desc())
     else:

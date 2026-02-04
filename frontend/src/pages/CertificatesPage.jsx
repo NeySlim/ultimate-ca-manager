@@ -289,17 +289,21 @@ export default function CertificatesPage() {
     setPage(1) // Reset to first page when sorting
     if (newSort) {
       // Map frontend column keys to backend field names
+      // Only map columns that are actually sortable in backend
       const keyMap = {
         'cn': 'subject',
         'common_name': 'subject',
-        'status': 'revoked',
         'issuer': 'issuer',
         'expires': 'valid_to',
         'valid_to': 'valid_to',
-        'key': 'key_type'
+        'created_at': 'created_at'
       }
-      setSortBy(keyMap[newSort.key] || newSort.key)
-      setSortOrder(newSort.direction)
+      const backendKey = keyMap[newSort.key]
+      if (backendKey) {
+        setSortBy(backendKey)
+        setSortOrder(newSort.direction)
+      }
+      // Ignore columns that can't be sorted server-side (status, key)
     } else {
       setSortBy('subject')
       setSortOrder('asc')
@@ -335,7 +339,7 @@ export default function CertificatesPage() {
       key: 'status',
       header: 'Status',
       priority: 2,
-      sortable: true,
+      sortable: false, // Not sortable server-side
       render: (val, row) => {
         const isRevoked = row.revoked
         const status = isRevoked ? 'revoked' : val || 'unknown'
@@ -359,6 +363,7 @@ export default function CertificatesPage() {
       header: 'Issuer',
       priority: 3,
       hideOnMobile: true,
+      sortable: true,
       render: (val, row) => (
         <span className="text-text-secondary truncate">
           {extractCN(val) || row.issuer_name || '—'}
