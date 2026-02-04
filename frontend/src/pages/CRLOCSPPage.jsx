@@ -180,9 +180,7 @@ export default function CRLOCSPPage() {
       label: 'CA Name',
       render: (v, row) => (
         <div className="flex items-center gap-2">
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-            row.has_crl ? 'icon-bg-emerald' : 'icon-bg-orange'
-          }`}>
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${row.has_crl ? 'icon-bg-emerald' : 'icon-bg-orange'}`}>
             <FileX size={14} weight="duotone" />
           </div>
           <span className="font-medium">{v || row.name}</span>

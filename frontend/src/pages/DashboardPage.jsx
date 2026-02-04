@@ -533,11 +533,11 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
   }
   
   const iconStyles = {
-    blue: 'icon-bg-blue icon-text-blue',
-    purple: 'icon-bg-violet icon-text-violet',
-    yellow: 'icon-bg-amber icon-text-amber',
-    emerald: 'icon-bg-emerald icon-text-emerald',
-    slate: 'bg-bg-tertiary text-text-secondary',
+    blue: 'icon-bg-blue',
+    purple: 'icon-bg-violet',
+    yellow: 'icon-bg-amber',
+    emerald: 'icon-bg-emerald',
+    slate: 'icon-bg-teal',
   }
   
   const variant = colorClasses[color] || ''
