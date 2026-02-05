@@ -790,7 +790,7 @@ function FilterInput({ filter, mobile }) {
     <div className={cn(mobile ? "space-y-2" : "space-y-1.5")}>
       <label className={cn(
         "font-medium text-text-secondary uppercase tracking-wider block",
-        mobile ? "text-xs" : "text-[11px]"
+        mobile ? "text-xs" : "text-2xs"
       )}>
         {label}
       </label>

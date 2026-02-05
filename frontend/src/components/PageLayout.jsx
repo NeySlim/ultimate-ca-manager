@@ -277,7 +277,7 @@ export function FocusItem({
             {badge}
           </div>
           {subtitle && (
-            <p className="text-[11px] text-text-tertiary mt-0.5 truncate">
+            <p className="text-2xs text-text-tertiary mt-0.5 truncate">
               {subtitle}
             </p>
           )}

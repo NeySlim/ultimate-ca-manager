@@ -594,9 +594,9 @@ export default function DashboardPage() {
                             {activity.message || `${activity.action} ${activity.resource_type || ''}`}
                           </p>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[10px] text-text-secondary font-medium">{activity.user || 'System'}</span>
-                            <span className="text-text-tertiary text-[10px]">•</span>
-                            <span className="text-[10px] text-text-tertiary">
+                            <span className="text-2xs text-text-secondary font-medium">{activity.user || 'System'}</span>
+                            <span className="text-text-tertiary text-2xs">•</span>
+                            <span className="text-2xs text-text-tertiary">
                               {formatRelativeTime(activity.timestamp)}
                             </span>
                           </div>
@@ -739,7 +739,7 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
       {/* Live indicator */}
       {live && (
         <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
-          <span className="text-[10px] status-success-text font-medium opacity-0 group-hover:opacity-100 transition-opacity">Live</span>
+          <span className="text-2xs status-success-text font-medium opacity-0 group-hover:opacity-100 transition-opacity">Live</span>
           <div className="w-2 h-2 rounded-full status-success-bg-solid animate-pulse-soft" />
         </div>
       )}
@@ -782,7 +782,7 @@ function SystemStat({ icon: Icon, label, value, status }) {
         }`}>
           <Icon size={12} className={status === 'online' ? 'status-success-text' : 'status-danger-text'} weight="bold" />
         </div>
-        <span className="text-[10px] text-text-tertiary uppercase tracking-wide font-medium">{label}</span>
+        <span className="text-2xs text-text-tertiary uppercase tracking-wide font-medium">{label}</span>
       </div>
       <p className={`text-xs font-semibold mt-1 ${
         status === 'online' ? 'status-success-text' : 'status-danger-text'

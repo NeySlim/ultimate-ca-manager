@@ -253,7 +253,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
               placeholder="Search commands, certificates, CAs, users..."
               className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
             />
-            <kbd className="px-1.5 py-0.5 text-[10px] bg-bg-tertiary border border-border rounded text-text-tertiary">
+            <kbd className="px-1.5 py-0.5 text-2xs bg-bg-tertiary border border-border rounded text-text-tertiary">
               ESC
             </kbd>
           </div>
@@ -266,7 +266,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                 {/* Certificates */}
                 {searchResults.certificates?.length > 0 && (
                   <div className="mb-2">
-                    <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                    <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
                       <Certificate size={10} />
                       Certificates ({searchResults.certificates.length})
                     </div>
@@ -282,10 +282,10 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                         <Certificate size={16} weight="duotone" className="text-accent-primary" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
-                          <span className="text-[10px] text-text-tertiary truncate block">{item.subject}</span>
+                          <span className="text-2xs text-text-tertiary truncate block">{item.subject}</span>
                         </div>
                         <span className={cn(
-                          'text-[10px] px-1.5 py-0.5 rounded',
+                          'text-2xs px-1.5 py-0.5 rounded',
                           item.status === 'valid' ? 'badge-bg-green' :
                           item.status === 'expired' ? 'alert-bg-red' :
                           'badge-bg-amber'
@@ -298,7 +298,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                 {/* CAs */}
                 {searchResults.cas?.length > 0 && (
                   <div className="mb-2">
-                    <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                    <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
                       <ShieldCheck size={10} />
                       Certificate Authorities ({searchResults.cas.length})
                     </div>
@@ -314,10 +314,10 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                         <ShieldCheck size={16} weight="duotone" className="text-violet-500" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
-                          <span className="text-[10px] text-text-tertiary truncate block">{item.subject}</span>
+                          <span className="text-2xs text-text-tertiary truncate block">{item.subject}</span>
                         </div>
                         {item.is_root && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded badge-bg-violet">Root</span>
+                          <span className="text-2xs px-1.5 py-0.5 rounded badge-bg-violet">Root</span>
                         )}
                       </button>
                     ))}
@@ -327,7 +327,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                 {/* Users */}
                 {searchResults.users?.length > 0 && (
                   <div className="mb-2">
-                    <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                    <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
                       <User size={10} />
                       Users ({searchResults.users.length})
                     </div>
@@ -343,9 +343,9 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                         <User size={16} weight="duotone" className="text-status-success" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
-                          <span className="text-[10px] text-text-tertiary truncate block">{item.email}</span>
+                          <span className="text-2xs text-text-tertiary truncate block">{item.email}</span>
                         </div>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary">{item.role}</span>
+                        <span className="text-2xs px-1.5 py-0.5 rounded bg-bg-tertiary">{item.role}</span>
                       </button>
                     ))}
                   </div>
@@ -354,7 +354,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                 {/* Templates */}
                 {searchResults.templates?.length > 0 && (
                   <div className="mb-2">
-                    <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                    <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
                       <List size={10} />
                       Templates ({searchResults.templates.length})
                     </div>
@@ -370,7 +370,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                         <List size={16} weight="duotone" className="text-status-warning" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
-                          <span className="text-[10px] text-text-tertiary truncate block">{item.description}</span>
+                          <span className="text-2xs text-text-tertiary truncate block">{item.description}</span>
                         </div>
                       </button>
                     ))}
@@ -380,7 +380,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                 {/* CSRs */}
                 {searchResults.csrs?.length > 0 && (
                   <div className="mb-2">
-                    <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                    <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
                       <FileText size={10} />
                       CSRs ({searchResults.csrs.length})
                     </div>
@@ -396,9 +396,9 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                         <FileText size={16} weight="duotone" className="text-teal-500" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
-                          <span className="text-[10px] text-text-tertiary truncate block">{item.subject}</span>
+                          <span className="text-2xs text-text-tertiary truncate block">{item.subject}</span>
                         </div>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary">{item.status}</span>
+                        <span className="text-2xs px-1.5 py-0.5 rounded bg-bg-tertiary">{item.status}</span>
                       </button>
                     ))}
                   </div>
@@ -428,7 +428,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
             {/* Favorites Section */}
             {filteredFavorites.length > 0 && !searchResults && (
               <div className="mb-2">
-                <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
                   <Star size={10} weight="fill" className="text-status-warning" />
                   Favorites
                 </div>
@@ -447,7 +447,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                       <div className="flex-1 min-w-0">
                         <span className="text-sm block truncate">{item.name}</span>
                         {item.subtitle && (
-                          <span className="text-[10px] text-text-tertiary truncate block">{item.subtitle}</span>
+                          <span className="text-2xs text-text-tertiary truncate block">{item.subtitle}</span>
                         )}
                       </div>
                       <Star size={12} weight="fill" className="text-status-warning" />
@@ -460,7 +460,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
             {/* Recent Items Section */}
             {filteredRecent.length > 0 && (
               <div className="mb-2">
-                <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
                   <Clock size={10} />
                   Recent
                 </div>
@@ -479,10 +479,10 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                       <div className="flex-1 min-w-0">
                         <span className="text-sm block truncate">{item.name}</span>
                         {item.subtitle && (
-                          <span className="text-[10px] text-text-tertiary truncate block">{item.subtitle}</span>
+                          <span className="text-2xs text-text-tertiary truncate block">{item.subtitle}</span>
                         )}
                       </div>
-                      <span className="text-[10px] text-text-tertiary capitalize">{item.type}</span>
+                      <span className="text-2xs text-text-tertiary capitalize">{item.type}</span>
                     </button>
                   )
                 })}
@@ -496,7 +496,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
             ) : (
               Object.entries(groupedCommands).map(([category, commands]) => (
                 <div key={category} className="mb-2">
-                  <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
+                  <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider">
                     {category}
                   </div>
                   {commands.map(cmd => {
@@ -530,7 +530,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-2 border-t border-border bg-bg-tertiary/50 flex items-center gap-4 text-[10px] text-text-tertiary">
+          <div className="px-4 py-2 border-t border-border bg-bg-tertiary/50 flex items-center gap-4 text-2xs text-text-tertiary">
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-bg-tertiary border border-border rounded">↑↓</kbd>
               Navigate

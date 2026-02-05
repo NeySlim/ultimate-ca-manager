@@ -385,7 +385,7 @@ export default function ACMEPage() {
             <tab.icon size={14} />
             {tab.label}
             {tab.count > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-bg-tertiary">
+              <span className="ml-1 px-1.5 py-0.5 text-2xs rounded-full bg-bg-tertiary">
                 {tab.count}
               </span>
             )}
@@ -410,7 +410,7 @@ export default function ACMEPage() {
           </CompactSection>
 
           <CompactSection title="Account ID" collapsible defaultOpen={false}>
-            <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-2 rounded">
+            <p className="font-mono text-2xs text-text-secondary break-all bg-bg-tertiary/50 p-2 rounded">
               {selectedAccount.account_id}
             </p>
           </CompactSection>

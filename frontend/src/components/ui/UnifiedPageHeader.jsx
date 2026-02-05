@@ -121,7 +121,7 @@ export function UnifiedPageHeader({
             >
               <Funnel size={16} className="text-text-secondary" />
               {activeFilters > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent-primary text-white text-[10px] flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent-primary text-white text-2xs flex items-center justify-center">
                   {activeFilters}
                 </span>
               )}
@@ -195,7 +195,7 @@ export function UnifiedPageHeader({
                   </span>
                   {tab.count !== undefined && (
                     <span className={cn(
-                      'px-1.5 py-0.5 rounded-full text-[10px] font-medium',
+                      'px-1.5 py-0.5 rounded-full text-2xs font-medium',
                       isActive
                         ? 'bg-accent-primary/15 text-accent-primary'
                         : 'bg-bg-tertiary text-text-tertiary'

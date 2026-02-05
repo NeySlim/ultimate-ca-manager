@@ -132,7 +132,7 @@ export function Sidebar({ activePage }) {
             {/* Expiring badge */}
             {showBadge && (
               <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-status-warning border border-bg-secondary flex items-center justify-center">
-                <span className="text-[9px] font-bold text-white">
+                <span className="text-3xs font-bold text-white">
                   {expiringCount > 9 ? '9+' : expiringCount}
                 </span>
               </div>

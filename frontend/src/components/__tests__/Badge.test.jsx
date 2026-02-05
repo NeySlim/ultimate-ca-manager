@@ -55,7 +55,7 @@ describe('Badge Component', () => {
     render(<Badge size="sm">Small</Badge>)
     const badge = screen.getByText('Small')
     expect(badge.className).toContain('px-2')
-    expect(badge.className).toContain('text-[10px]')
+    expect(badge.className).toContain('text-2xs')
   })
 
   it('renders large size correctly', () => {

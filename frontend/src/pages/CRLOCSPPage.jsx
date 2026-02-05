@@ -360,17 +360,17 @@ export default function CRLOCSPPage() {
         <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
           <Hash size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.crl_number || '-'}</div>
-          <div className="text-[10px] text-text-tertiary">CRL #</div>
+          <div className="text-2xs text-text-tertiary">CRL #</div>
         </div>
         <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
           <XCircle size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.revoked_count || 0}</div>
-          <div className="text-[10px] text-text-tertiary">Revoked</div>
+          <div className="text-2xs text-text-tertiary">Revoked</div>
         </div>
         <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
           <Calendar size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-'}</div>
-          <div className="text-[10px] text-text-tertiary">Updated</div>
+          <div className="text-2xs text-text-tertiary">Updated</div>
         </div>
       </div>
 

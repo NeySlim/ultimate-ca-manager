@@ -225,7 +225,7 @@ export function AppShell() {
           />
           <div className="fixed top-10 right-2 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl p-1.5 min-w-[160px] max-h-[60vh] overflow-auto">
             {/* Color Themes */}
-            <div className="px-2 py-0.5 text-[9px] text-text-tertiary uppercase tracking-wider">Color</div>
+            <div className="px-2 py-0.5 text-3xs text-text-tertiary uppercase tracking-wider">Color</div>
             {themes.map((theme) => (
               <button
                 key={theme.id}
@@ -248,7 +248,7 @@ export function AppShell() {
             <div className="h-px bg-border my-1.5" />
             
             {/* Mode */}
-            <div className="px-2 py-0.5 text-[9px] text-text-tertiary uppercase tracking-wider">Appearance</div>
+            <div className="px-2 py-0.5 text-3xs text-text-tertiary uppercase tracking-wider">Appearance</div>
             {[
               { id: 'system', label: 'System' },
               { id: 'dark', label: 'Dark' },
@@ -301,11 +301,11 @@ export function AppShell() {
                       )}
                     >
                       <Icon size={20} weight={isActive ? "fill" : "regular"} />
-                      <span className="text-[9px] font-medium text-center leading-tight">
+                      <span className="text-3xs font-medium text-center leading-tight">
                         {item.label}
                       </span>
                       {item.pro && (
-                        <span className="text-[7px] px-0.5 py-0.5 status-warning-bg status-warning-text rounded">
+                        <span className="text-3xs px-0.5 py-0.5 status-warning-bg status-warning-text rounded">
                           PRO
                         </span>
                       )}

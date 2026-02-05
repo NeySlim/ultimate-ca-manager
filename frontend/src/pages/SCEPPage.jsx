@@ -408,7 +408,7 @@ export default function SCEPPage() {
 
       {selectedRequest.csr_pem && (
         <CompactSection title="CSR Content" collapsible defaultOpen={false}>
-          <pre className="text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
+          <pre className="text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
             {selectedRequest.csr_pem}
           </pre>
         </CompactSection>
