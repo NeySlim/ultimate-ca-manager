@@ -131,6 +131,7 @@ class CA(db.Model):
     # Certificate details (parsed from crt)
     subject = db.Column(db.Text)
     issuer = db.Column(db.Text)
+    serial_number = db.Column(db.String(100))  # Certificate serial number for duplicate detection
     valid_from = db.Column(db.DateTime)
     valid_to = db.Column(db.DateTime)
     
