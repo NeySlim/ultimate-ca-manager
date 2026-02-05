@@ -57,8 +57,25 @@ export function AppShell() {
   // Extract current page from pathname (empty string for dashboard)
   const activePage = location.pathname.split('/')[1] || ''
   
+  // Map URL paths to helpContent keys
+  const helpPageKeyMap = {
+    '': 'dashboard',
+    'scep-config': 'scep',
+    'import': 'importExport',
+    'audit': 'auditLogs',
+    'crl-ocsp': 'crlocsp'
+  }
+  const helpPageKey = helpPageKeyMap[activePage] || activePage
+  
   // Pages that have contextual help
-  const pagesWithHelp = ['certificates', 'cas', 'csrs', 'users', 'templates', 'acme', 'scep-config', 'settings', 'truststore', 'crl-ocsp', 'import']
+  const pagesWithHelp = [
+    // Core pages
+    'certificates', 'cas', 'csrs', 'users', 'templates', 
+    'acme', 'scep-config', 'settings', 'truststore', 'crl-ocsp', 
+    'import', 'audit', 'account',
+    // Pro pages
+    'rbac', 'hsm'
+  ]
   const hasHelp = pagesWithHelp.includes(activePage) || activePage === ''
 
   // Check for mobile viewport
@@ -142,9 +159,13 @@ export function AppShell() {
           {/* Spacer */}
           <div className="flex-1" />
           
-          {/* Page title */}
-          <span className="text-xs font-medium text-text-primary truncate max-w-[120px]">
-            {activePage ? activePage.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Dashboard'}
+          {/* Page title - custom labels for some pages */}
+          <span className="text-xs font-medium text-text-primary truncate max-w-[140px]">
+            {activePage === '' ? 'Dashboard' : 
+             activePage === 'import' ? 'Import / Export' :
+             activePage === 'scep-config' ? 'SCEP Protocol' :
+             activePage === 'crl-ocsp' ? 'CRL & OCSP' :
+             activePage.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
           </span>
           
           {/* Help button - only if page has help */}
@@ -323,7 +344,7 @@ export function AppShell() {
         <HelpModal
           isOpen={helpModalOpen}
           onClose={() => setHelpModalOpen(false)}
-          pageKey={activePage || 'dashboard'}
+          pageKey={helpPageKey}
         />
       )}
     </div>
