@@ -1,24 +1,35 @@
 /**
- * SmartImportModal - Intelligent import interface for certificates, keys, CSRs
+ * SmartImport - Intelligent import component for all crypto formats
+ * 
+ * Supports: PEM, DER, PKCS12/PFX, PKCS7/P7B, CSR, private keys
+ * Can be used standalone or wrapped in a modal
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { 
   UploadSimple, FileText, Key, ShieldCheck, Certificate,
   WarningCircle, CheckCircle, XCircle, LockSimple, Link,
-  CaretDown, CaretRight, ArrowsClockwise
+  CaretDown, CaretRight, ArrowsClockwise, File, Trash
 } from '@phosphor-icons/react'
-import { Modal } from './Modal'
 import { Button } from './Button'
 import { Badge } from './Badge'
+import { Modal } from './Modal'
 import { apiClient as api } from '../services'
 import { useNotification } from '../contexts/NotificationContext'
 
+// Supported file formats
+const SUPPORTED_FORMATS = {
+  text: ['.pem', '.crt', '.cer', '.key', '.csr', '.p7b', '.p7c'],
+  binary: ['.der', '.p12', '.pfx']
+}
+
+const ALL_FORMATS = [...SUPPORTED_FORMATS.text, ...SUPPORTED_FORMATS.binary].join(',')
+
 // Type icons and colors
 const TYPE_CONFIG = {
-  certificate: { icon: Certificate, color: 'cyan', label: 'Certificate' },
-  private_key: { icon: Key, color: 'amber', label: 'Private Key' },
+  certificate: { icon: Certificate, color: 'blue', label: 'Certificate' },
+  private_key: { icon: Key, color: 'orange', label: 'Private Key' },
   csr: { icon: FileText, color: 'purple', label: 'CSR' },
-  ca_certificate: { icon: ShieldCheck, color: 'emerald', label: 'CA Certificate' }
+  ca_certificate: { icon: ShieldCheck, color: 'green', label: 'CA Certificate' }
 }
 
 // Object card component
@@ -26,8 +37,6 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
   const config = obj.is_ca ? TYPE_CONFIG.ca_certificate : TYPE_CONFIG[obj.type] || TYPE_CONFIG.certificate
   const Icon = config.icon
   const displayName = obj.subject || obj.san_dns?.[0] || `${obj.type} #${obj.index + 1}`
-  
-  const iconBgColor = config.color === 'cyan' ? 'blue' : config.color === 'amber' ? 'orange' : config.color === 'emerald' ? 'green' : 'purple'
   
   return (
     <div className={`border rounded-lg transition-colors ${selected ? 'border-accent-primary bg-accent-primary/5' : 'border-border hover:border-border-hover'}`}>
@@ -39,8 +48,8 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
           className="w-4 h-4 rounded border-border text-accent-primary focus:ring-accent-primary"
         />
         
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center icon-bg-${iconBgColor}`}>
-          <Icon size={16} className={`text-accent-${iconBgColor}`} />
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center icon-bg-${config.color}`}>
+          <Icon size={16} className={`text-accent-${config.color}`} />
         </div>
         
         <div className="flex-1 min-w-0">
@@ -166,12 +175,16 @@ function ValidationIssues({ validation }) {
   )
 }
 
-export default function SmartImportModal({ isOpen, onClose, onImportComplete }) {
+/**
+ * SmartImport Widget - can be used standalone or in modal
+ */
+export function SmartImportWidget({ onImportComplete, onCancel, compact = false }) {
   const { showNotification } = useNotification()
   const fileInputRef = useRef(null)
   
   const [step, setStep] = useState('input')
-  const [content, setContent] = useState('')
+  const [files, setFiles] = useState([]) // { name, type, data (base64 or text), size }
+  const [pemContent, setPemContent] = useState('')
   const [password, setPassword] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -184,59 +197,105 @@ export default function SmartImportModal({ isOpen, onClose, onImportComplete }) 
     import_cas: true, import_certs: true, import_keys: true, import_csrs: true, skip_duplicates: true
   })
   
-  useEffect(() => {
-    if (isOpen) {
-      setStep('input')
-      setContent('')
-      setPassword('')
-      setAnalysisResult(null)
-      setImportResult(null)
-      setSelectedObjects(new Set())
-      setExpandedObjects(new Set())
-    }
-  }, [isOpen])
+  // Check if we have encrypted content
+  const hasEncrypted = pemContent.includes('ENCRYPTED') || files.some(f => f.name.match(/\.(p12|pfx)$/i))
   
-  const readFiles = useCallback(async (files) => {
-    const contents = []
-    for (const file of files) {
-      try {
-        if (file.name.endsWith('.p12') || file.name.endsWith('.pfx')) {
-          const buffer = await file.arrayBuffer()
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
-          contents.push(`-----BEGIN PKCS12-----\n${base64}\n-----END PKCS12-----`)
-        } else if (file.name.endsWith('.der') || file.name.endsWith('.cer')) {
-          const buffer = await file.arrayBuffer()
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
-          contents.push(`-----BEGIN CERTIFICATE-----\n${base64}\n-----END CERTIFICATE-----`)
-        } else {
-          contents.push(await file.text())
-        }
-      } catch (err) {
-        console.error(`Failed to read ${file.name}:`, err)
-      }
-    }
-    setContent(prev => prev ? prev + '\n\n' + contents.join('\n\n') : contents.join('\n\n'))
+  // Reset state
+  const reset = useCallback(() => {
+    setStep('input')
+    setFiles([])
+    setPemContent('')
+    setPassword('')
+    setAnalysisResult(null)
+    setImportResult(null)
+    setSelectedObjects(new Set())
+    setExpandedObjects(new Set())
   }, [])
   
+  // Read a single file
+  const readFile = async (file) => {
+    const ext = '.' + file.name.split('.').pop().toLowerCase()
+    const isBinary = SUPPORTED_FORMATS.binary.includes(ext)
+    
+    try {
+      if (isBinary) {
+        const buffer = await file.arrayBuffer()
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+        return { name: file.name, type: 'binary', data: base64, size: file.size, ext }
+      } else {
+        const text = await file.text()
+        return { name: file.name, type: 'text', data: text, size: file.size, ext }
+      }
+    } catch (err) {
+      console.error(`Failed to read ${file.name}:`, err)
+      return null
+    }
+  }
+  
+  // Read multiple files
+  const readFiles = useCallback(async (fileList) => {
+    const results = await Promise.all(Array.from(fileList).map(readFile))
+    const validFiles = results.filter(Boolean)
+    setFiles(prev => [...prev, ...validFiles])
+  }, [])
+  
+  // Drag & drop handlers
   const handleDragOver = useCallback((e) => { e.preventDefault(); setIsDragOver(true) }, [])
   const handleDragLeave = useCallback((e) => { e.preventDefault(); setIsDragOver(false) }, [])
   const handleDrop = useCallback((e) => {
     e.preventDefault()
     setIsDragOver(false)
-    const files = Array.from(e.dataTransfer.files)
-    if (files.length > 0) readFiles(files)
+    if (e.dataTransfer.files.length > 0) readFiles(e.dataTransfer.files)
   }, [readFiles])
   const handleFileSelect = useCallback((e) => {
-    const files = Array.from(e.target.files)
-    if (files.length > 0) readFiles(files)
+    if (e.target.files.length > 0) readFiles(e.target.files)
     e.target.value = ''
   }, [readFiles])
   
+  // Remove a file
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index))
+  }
+  
+  // Build content for API
+  const buildContent = () => {
+    const parts = []
+    
+    // Add pasted PEM content
+    if (pemContent.trim()) {
+      parts.push(pemContent.trim())
+    }
+    
+    // Add files
+    for (const file of files) {
+      if (file.type === 'text') {
+        parts.push(file.data)
+      } else {
+        // Binary files: wrap in pseudo-PEM for transport
+        const typeMarker = file.ext === '.p12' || file.ext === '.pfx' ? 'PKCS12' 
+          : file.ext === '.der' ? 'DER CERTIFICATE' 
+          : 'BINARY DATA'
+        parts.push(`-----BEGIN ${typeMarker}-----\n${file.data}\n-----END ${typeMarker}-----`)
+      }
+    }
+    
+    return parts.join('\n\n')
+  }
+  
+  // Analyze content
   const handleAnalyze = async () => {
-    if (!content.trim()) return
+    const content = buildContent()
+    if (!content) {
+      showNotification('error', 'Please add files or paste PEM content')
+      return
+    }
+    
     setIsAnalyzing(true)
     try {
-      const response = await api.post('/api/v2/import/analyze', { content: content.trim(), password: password || undefined })
+      const response = await api.post('/api/v2/import/analyze', { 
+        content, 
+        password: password || undefined 
+      })
       setAnalysisResult(response.data.data)
       setSelectedObjects(new Set(response.data.data.objects.map((_, i) => i)))
       setStep('preview')
@@ -247,13 +306,15 @@ export default function SmartImportModal({ isOpen, onClose, onImportComplete }) 
     }
   }
   
+  // Execute import
   const handleImport = async () => {
     if (!analysisResult || selectedObjects.size === 0) return
+    
     setIsImporting(true)
     setStep('importing')
     try {
       const response = await api.post('/api/v2/import/execute', {
-        content: content.trim(),
+        content: buildContent(),
         password: password || undefined,
         options: { ...importOptions, selected_indices: Array.from(selectedObjects) }
       })
@@ -270,6 +331,7 @@ export default function SmartImportModal({ isOpen, onClose, onImportComplete }) 
     }
   }
   
+  // Toggle object selection/expansion
   const toggleObject = (index) => {
     setSelectedObjects(prev => {
       const next = new Set(prev)
@@ -294,8 +356,10 @@ export default function SmartImportModal({ isOpen, onClose, onImportComplete }) 
     }
   }
   
+  // Render input step
   const renderInputStep = () => (
     <div className="space-y-4">
+      {/* Drop zone */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -307,37 +371,80 @@ export default function SmartImportModal({ isOpen, onClose, onImportComplete }) 
           Drop files here or{' '}
           <button type="button" onClick={() => fileInputRef.current?.click()} className="text-accent-primary hover:underline">browse</button>
         </p>
-        <p className="text-xs text-text-secondary">PEM, DER, PKCS12, PKCS7 files supported</p>
-        <input ref={fileInputRef} type="file" multiple accept=".pem,.crt,.cer,.der,.key,.p12,.pfx,.p7b,.p7c,.csr" onChange={handleFileSelect} className="hidden" />
+        <p className="text-xs text-text-secondary">
+          All formats: PEM, DER, CRT, CER, KEY, CSR, P12/PFX, P7B
+        </p>
+        <input 
+          ref={fileInputRef} 
+          type="file" 
+          multiple 
+          accept={ALL_FORMATS}
+          onChange={handleFileSelect} 
+          className="hidden" 
+        />
       </div>
       
+      {/* File list */}
+      {files.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-sm font-medium">Files ({files.length})</div>
+          {files.map((file, i) => (
+            <div key={i} className="flex items-center gap-2 p-2 bg-bg-secondary rounded-lg">
+              <File size={16} className="text-text-secondary" />
+              <span className="text-sm flex-1 truncate">{file.name}</span>
+              <Badge variant={file.type === 'binary' ? 'amber' : 'blue'} size="xs">
+                {file.ext.toUpperCase().slice(1)}
+              </Badge>
+              <span className="text-xs text-text-secondary">{(file.size / 1024).toFixed(1)} KB</span>
+              <button onClick={() => removeFile(i)} className="text-red-500 hover:text-red-600">
+                <Trash size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* Or paste PEM */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border"></div></div>
-        <div className="relative flex justify-center text-xs uppercase"><span className="bg-bg-primary px-2 text-text-secondary">or paste content</span></div>
+        <div className="relative flex justify-center text-xs uppercase"><span className="bg-bg-primary px-2 text-text-secondary">or paste PEM content</span></div>
       </div>
       
       <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
+        value={pemContent}
+        onChange={(e) => setPemContent(e.target.value)}
         placeholder="Paste PEM-encoded certificates, keys, CSRs, or chains here..."
-        className="w-full h-48 p-3 font-mono text-xs border border-border rounded-lg bg-bg-secondary resize-none focus:outline-none focus:ring-2 focus:ring-accent-primary"
+        className="w-full h-32 p-3 font-mono text-xs border border-border rounded-lg bg-bg-secondary resize-none focus:outline-none focus:ring-2 focus:ring-accent-primary"
       />
       
-      {content.includes('ENCRYPTED') && (
-        <div className="flex items-center gap-2">
-          <LockSimple size={16} className="text-amber-500" />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password for encrypted content"
-            className="flex-1 px-3 py-2 text-sm border border-border rounded-lg bg-bg-secondary focus:outline-none focus:ring-2 focus:ring-accent-primary"
-          />
+      {/* Password for encrypted content */}
+      {hasEncrypted && (
+        <div className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg">
+          <LockSimple size={18} className="text-amber-500" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-600">Encrypted content detected</p>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              className="mt-2 w-full px-3 py-2 text-sm border border-border rounded-lg bg-bg-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
+            />
+          </div>
         </div>
       )}
+      
+      {/* Actions */}
+      <div className="flex justify-end gap-2 pt-2">
+        {onCancel && <Button variant="secondary" onClick={onCancel}>Cancel</Button>}
+        <Button onClick={handleAnalyze} disabled={(!pemContent.trim() && files.length === 0) || isAnalyzing}>
+          {isAnalyzing ? <><ArrowsClockwise size={16} className="animate-spin" /> Analyzing...</> : 'Analyze'}
+        </Button>
+      </div>
     </div>
   )
   
+  // Render preview step  
   const renderPreviewStep = () => {
     const { objects, chains, matching, validation } = analysisResult || {}
     const stats = {
@@ -349,13 +456,15 @@ export default function SmartImportModal({ isOpen, onClose, onImportComplete }) 
     
     return (
       <div className="space-y-4">
-        <div className="flex gap-4 text-sm">
-          {stats.certs > 0 && <div>🔐 {stats.certs} Certificate{stats.certs > 1 ? 's' : ''}</div>}
-          {stats.cas > 0 && <div>🛡️ {stats.cas} CA{stats.cas > 1 ? 's' : ''}</div>}
-          {stats.keys > 0 && <div>🔑 {stats.keys} Key{stats.keys > 1 ? 's' : ''}</div>}
-          {stats.csrs > 0 && <div>📄 {stats.csrs} CSR{stats.csrs > 1 ? 's' : ''}</div>}
+        {/* Stats */}
+        <div className="flex flex-wrap gap-3 text-sm">
+          {stats.certs > 0 && <Badge variant="blue" icon={Certificate}>{stats.certs} Certificate{stats.certs > 1 ? 's' : ''}</Badge>}
+          {stats.cas > 0 && <Badge variant="green" icon={ShieldCheck}>{stats.cas} CA{stats.cas > 1 ? 's' : ''}</Badge>}
+          {stats.keys > 0 && <Badge variant="orange" icon={Key}>{stats.keys} Key{stats.keys > 1 ? 's' : ''}</Badge>}
+          {stats.csrs > 0 && <Badge variant="purple" icon={FileText}>{stats.csrs} CSR{stats.csrs > 1 ? 's' : ''}</Badge>}
         </div>
         
+        {/* Chains */}
         {chains?.length > 0 && (
           <div className="space-y-2">
             <h3 className="text-sm font-medium">Certificate Chains</h3>
@@ -363,6 +472,7 @@ export default function SmartImportModal({ isOpen, onClose, onImportComplete }) 
           </div>
         )}
         
+        {/* Key matching */}
         {matching?.matched_pairs?.length > 0 && (
           <div className="text-sm text-green-600 bg-green-500/10 p-2 rounded flex items-center gap-2">
             <Link size={16} />
@@ -372,21 +482,23 @@ export default function SmartImportModal({ isOpen, onClose, onImportComplete }) 
         
         <ValidationIssues validation={validation} />
         
+        {/* Objects list */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">Detected Objects</h3>
+            <h3 className="text-sm font-medium">Detected Objects ({objects?.length || 0})</h3>
             <button type="button" onClick={selectAll} className="text-xs text-accent-primary hover:underline">
               {selectedObjects.size === objects?.length ? 'Deselect All' : 'Select All'}
             </button>
           </div>
           
-          <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+          <div className={`space-y-2 overflow-y-auto pr-1 ${compact ? 'max-h-48' : 'max-h-64'}`}>
             {objects?.map((obj, i) => (
               <ObjectCard key={i} obj={obj} expanded={expandedObjects.has(i)} onToggle={() => toggleExpand(i)} selected={selectedObjects.has(i)} onSelect={() => toggleObject(i)} />
             ))}
           </div>
         </div>
         
+        {/* Import options */}
         <div className="border-t border-border pt-4">
           <h3 className="text-sm font-medium mb-2">Import Options</h3>
           <div className="grid grid-cols-2 gap-2 text-sm">
@@ -408,10 +520,19 @@ export default function SmartImportModal({ isOpen, onClose, onImportComplete }) 
             </label>
           </div>
         </div>
+        
+        {/* Actions */}
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={() => setStep('input')}>Back</Button>
+          <Button onClick={handleImport} disabled={selectedObjects.size === 0 || isImporting}>
+            Import {selectedObjects.size} Object{selectedObjects.size > 1 ? 's' : ''}
+          </Button>
+        </div>
       </div>
     )
   }
   
+  // Render importing step
   const renderImportingStep = () => (
     <div className="flex flex-col items-center justify-center py-12">
       <ArrowsClockwise size={48} className="text-accent-primary animate-spin mb-4" />
@@ -419,6 +540,7 @@ export default function SmartImportModal({ isOpen, onClose, onImportComplete }) 
     </div>
   )
   
+  // Render result step
   const renderResultStep = () => {
     const { imported, skipped, failed } = importResult || {}
     return (
@@ -459,55 +581,52 @@ export default function SmartImportModal({ isOpen, onClose, onImportComplete }) 
             {failed.map((item, i) => <div key={i} className="text-sm pl-4">✗ {item.type}: {item.error}</div>)}
           </div>
         )}
+        
+        {/* Actions */}
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="secondary" onClick={reset}>Import More</Button>
+          <Button onClick={() => { onImportComplete?.(importResult); }}>Done</Button>
+        </div>
       </div>
     )
   }
   
-  const renderFooter = () => {
-    switch (step) {
-      case 'input':
-        return (
-          <>
-            <Button variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleAnalyze} disabled={!content.trim() || isAnalyzing}>{isAnalyzing ? 'Analyzing...' : 'Analyze'}</Button>
-          </>
-        )
-      case 'preview':
-        return (
-          <>
-            <Button variant="secondary" onClick={() => setStep('input')}>Back</Button>
-            <Button onClick={handleImport} disabled={selectedObjects.size === 0 || isImporting}>Import {selectedObjects.size} Object{selectedObjects.size > 1 ? 's' : ''}</Button>
-          </>
-        )
-      case 'result':
-        return (
-          <>
-            <Button variant="secondary" onClick={() => { setStep('input'); setContent(''); setAnalysisResult(null); setImportResult(null) }}>Import More</Button>
-            <Button onClick={() => { onImportComplete?.(); onClose() }}>Done</Button>
-          </>
-        )
-      default:
-        return null
-    }
+  return (
+    <div className={compact ? '' : 'space-y-4'}>
+      {step === 'input' && renderInputStep()}
+      {step === 'preview' && renderPreviewStep()}
+      {step === 'importing' && renderImportingStep()}
+      {step === 'result' && renderResultStep()}
+    </div>
+  )
+}
+
+/**
+ * SmartImport Modal - wraps widget in a modal
+ */
+export function SmartImportModal({ isOpen, onClose, onImportComplete }) {
+  const handleComplete = (result) => {
+    onImportComplete?.(result)
+    onClose()
   }
   
   return (
     <Modal
       isOpen={isOpen}
-      onClose={step !== 'importing' ? onClose : undefined}
-      title={step === 'input' ? 'Smart Import' : step === 'preview' ? 'Review & Import' : step === 'importing' ? 'Importing...' : 'Import Result'}
+      onClose={onClose}
+      title="Smart Import"
       size="lg"
     >
       <div className="p-4">
-        {step === 'input' && renderInputStep()}
-        {step === 'preview' && renderPreviewStep()}
-        {step === 'importing' && renderImportingStep()}
-        {step === 'result' && renderResultStep()}
-      </div>
-      
-      <div className="flex justify-end gap-2 p-4 border-t border-border">
-        {renderFooter()}
+        <SmartImportWidget 
+          onImportComplete={handleComplete}
+          onCancel={onClose}
+          compact
+        />
       </div>
     </Modal>
   )
 }
+
+// Default export for backward compatibility
+export default SmartImportModal
