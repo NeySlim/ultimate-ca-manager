@@ -25,6 +25,7 @@ class ValidationResult:
     is_valid: bool = True
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
+    infos: List[str] = field(default_factory=list)
     
     def add_error(self, msg: str):
         self.errors.append(msg)
@@ -33,11 +34,15 @@ class ValidationResult:
     def add_warning(self, msg: str):
         self.warnings.append(msg)
     
+    def add_info(self, msg: str):
+        self.infos.append(msg)
+    
     def to_dict(self) -> Dict:
         return {
             "is_valid": self.is_valid,
             "errors": self.errors,
-            "warnings": self.warnings
+            "warnings": self.warnings,
+            "infos": self.infos
         }
 
 
@@ -176,12 +181,26 @@ class ImportValidator:
     
     def _validate_chain(self, chain: ChainInfo, result: ValidationResult):
         """Validate a certificate chain"""
+        from models import CA
         
         if not chain.is_complete:
             if chain.leaf:
-                result.add_warning(
-                    f"Chain for '{self._get_cn(chain.leaf.subject)}' is incomplete - issuing CA not found in import"
-                )
+                # Check if issuer CA exists in database
+                issuer = chain.leaf.issuer
+                # Walk up the chain to find the top
+                if chain.intermediates:
+                    issuer = chain.intermediates[-1].issuer
+                
+                # Look for issuer in database by subject
+                existing_ca = CA.query.filter(CA.subject == issuer).first()
+                if existing_ca:
+                    result.add_info(
+                        f"Chain for '{self._get_cn(chain.leaf.subject)}' will be linked to existing CA '{existing_ca.common_name}'"
+                    )
+                else:
+                    result.add_warning(
+                        f"Chain for '{self._get_cn(chain.leaf.subject)}' is incomplete - issuing CA not found"
+                    )
         
         if chain.errors:
             for error in chain.errors:

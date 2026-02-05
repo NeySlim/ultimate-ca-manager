@@ -151,8 +151,8 @@ function ChainCard({ chain, index }) {
 // Validation issues
 function ValidationIssues({ validation }) {
   if (!validation) return null
-  const { errors, warnings, info } = validation
-  if (!errors?.length && !warnings?.length && !info?.length) return null
+  const { errors, warnings, infos } = validation
+  if (!errors?.length && !warnings?.length && !infos?.length) return null
   
   return (
     <div className="space-y-2">
@@ -166,8 +166,8 @@ function ValidationIssues({ validation }) {
           <WarningCircle size={16} className="shrink-0 mt-0.5" /><span>{warn}</span>
         </div>
       ))}
-      {info?.map((inf, i) => (
-        <div key={`i${i}`} className="flex items-start gap-2 text-sm text-blue-500 bg-blue-500/10 p-2 rounded">
+      {infos?.map((inf, i) => (
+        <div key={`i${i}`} className="flex items-start gap-2 text-sm text-green-500 bg-green-500/10 p-2 rounded">
           <CheckCircle size={16} className="shrink-0 mt-0.5" /><span>{inf}</span>
         </div>
       ))}
@@ -531,7 +531,11 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="secondary" onClick={() => setStep('input')}>Back</Button>
+          <Button variant="secondary" onClick={() => {
+            setStep('input')
+            setAnalysisResult(null)
+            setSelectedObjects(new Set())
+          }}>Back</Button>
           <Button onClick={handleImport} disabled={selectedObjects.size === 0 || isImporting}>
             Import {selectedObjects.size} Object{selectedObjects.size > 1 ? 's' : ''}
           </Button>
@@ -645,7 +649,9 @@ export function SmartImportModal({ isOpen, onClose, onImportComplete }) {
       size="lg"
     >
       <div className="p-4">
+        {/* Key forces remount when modal opens, resetting all state */}
         <SmartImportWidget 
+          key={isOpen ? 'open' : 'closed'}
           onImportComplete={handleComplete}
           onCancel={onClose}
           compact
