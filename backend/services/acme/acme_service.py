@@ -673,6 +673,7 @@ class AcmeService:
             caref=ca.refid,
             csr=base64.b64encode(csr_pem.encode()).decode('utf-8'),
             cert_type='server_cert',
+            source='acme',
             created_by='acme'
         )
         db.session.add(cert)
