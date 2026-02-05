@@ -349,12 +349,12 @@ export function DetailField({
     )}>
       <dt className={cn(
         "text-text-tertiary uppercase tracking-wide",
-        compact ? "text-[9px] mb-0.5" : "text-[10px] mb-0.5"
+        compact ? "text-3xs mb-0.5" : "text-2xs mb-0.5"
       )}>{label}</dt>
       <dd 
         className={cn(
           mono 
-            ? cn("font-mono text-text-primary break-all", compact ? "text-[11px]" : "text-xs")
+            ? cn("font-mono text-text-primary break-all", compact ? "text-2xs" : "text-xs")
             : cn("text-text-primary font-medium", compact ? "text-xs" : "text-sm"),
           copyable && "cursor-pointer hover:text-accent-primary transition-colors flex items-center gap-2"
         )}
@@ -578,7 +578,7 @@ export function CompactField({
           <Icon size={11} className="text-text-tertiary" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] text-text-tertiary uppercase tracking-wider">{label}</div>
+          <div className="text-2xs text-text-tertiary uppercase tracking-wider">{label}</div>
           <div className={cn(
             "text-sm text-text-primary break-all",
             mono && "font-mono text-xs"

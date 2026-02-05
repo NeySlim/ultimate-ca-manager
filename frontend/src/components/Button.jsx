@@ -27,7 +27,7 @@ export function Button({ children, variant = 'primary', size = 'default', loadin
   
   // Standardized sizes - sm is the default for content actions
   const sizes = {
-    xs: 'px-2 py-1 text-[11px] gap-1',      // Very compact (icon buttons)
+    xs: 'px-2 py-1 text-2xs gap-1',      // Very compact (icon buttons)
     sm: 'px-2.5 py-1.5 text-xs gap-1.5',    // Content headers, inline actions
     default: 'px-3 py-2 text-sm gap-1.5',   // Forms, modals
     lg: 'px-4 py-2.5 text-sm gap-2',        // Prominent actions

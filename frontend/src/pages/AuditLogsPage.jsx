@@ -631,7 +631,7 @@ export default function AuditLogsPage() {
 
       {selectedLog.details && (
         <CompactSection title="Details" collapsible>
-          <pre className="text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
+          <pre className="text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
             {selectedLog.details}
           </pre>
         </CompactSection>
@@ -639,7 +639,7 @@ export default function AuditLogsPage() {
 
       {selectedLog.user_agent && (
         <CompactSection title="Client Information" collapsible defaultOpen={false}>
-          <pre className="text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto whitespace-pre-wrap">
+          <pre className="text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto whitespace-pre-wrap">
             {selectedLog.user_agent}
           </pre>
         </CompactSection>

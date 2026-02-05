@@ -290,7 +290,7 @@ export function SlideOver({
                   {title}
                 </h2>
                 {subtitle && (
-                  <p className="text-[11px] text-text-tertiary truncate mt-0.5">{subtitle}</p>
+                  <p className="text-2xs text-text-tertiary truncate mt-0.5">{subtitle}</p>
                 )}
               </div>
               
@@ -348,7 +348,7 @@ export function SlideOverSection({
     <section className={cn("border-b border-border last:border-b-0", className)}>
       {title && (
         <div className="px-4 py-2 bg-bg-tertiary/30">
-          <h3 className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
+          <h3 className="text-2xs font-semibold text-text-secondary uppercase tracking-wider">
             {title}
           </h3>
         </div>

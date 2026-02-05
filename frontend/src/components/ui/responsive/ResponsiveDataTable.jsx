@@ -728,7 +728,7 @@ function SearchBar({
             {/* Dropdown menu */}
             {showColumnMenu && (
               <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
-                <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
+                <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
                   Show columns
                 </div>
                 {columns.map(col => (
@@ -789,7 +789,7 @@ function SearchBar({
             >
               <BookmarkSimple size={14} />
               {filterPresets?.length > 0 && (
-                <span className="text-[10px] bg-accent-primary/20 text-accent-primary px-1 rounded">
+                <span className="text-2xs bg-accent-primary/20 text-accent-primary px-1 rounded">
                   {filterPresets.length}
                 </span>
               )}
@@ -798,7 +798,7 @@ function SearchBar({
             {/* Presets dropdown */}
             {showPresetsMenu && (
               <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
-                <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
+                <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
                   Filter Presets
                 </div>
                 
@@ -905,7 +905,7 @@ function SearchBar({
             {/* Export dropdown */}
             {showExportMenu && (
               <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-lg border border-border bg-bg-primary shadow-lg py-1">
-                <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
+                <div className="px-3 py-1.5 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border mb-1">
                   Export {dataCount} items
                 </div>
                 <button
@@ -985,7 +985,7 @@ function DesktopTable({
                   onClick={() => sortable && col.sortable !== false && onSort(col.key)}
                   style={style}
                   className={cn(
-                    'text-left px-4 py-1.5 text-[11px] font-medium text-text-tertiary tracking-wide',
+                    'text-left px-4 py-1.5 text-2xs font-medium text-text-tertiary tracking-wide',
                     'transition-colors duration-200',
                     sortable && col.sortable !== false && 'cursor-pointer hover:text-text-secondary',
                     sort?.key === col.key && 'text-accent-primary'

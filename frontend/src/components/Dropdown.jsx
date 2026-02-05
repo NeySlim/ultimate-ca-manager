@@ -84,7 +84,7 @@ export function Dropdown({ trigger, items, onSelect, disabled = false, size = 'd
                 )}
                 <span className="flex-1">{item.label}</span>
                 {item.shortcut && (
-                  <span className="text-[10px] text-text-secondary">{item.shortcut}</span>
+                  <span className="text-2xs text-text-secondary">{item.shortcut}</span>
                 )}
               </DropdownMenu.Item>
             )

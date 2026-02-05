@@ -227,7 +227,7 @@ export function ResponsiveLayout({
                   <span>{tab.label}</span>
                   {tab.count !== undefined && (
                     <span className={cn(
-                      'px-1 py-0.5 rounded text-[10px]',
+                      'px-1 py-0.5 rounded text-2xs',
                       isActive ? 'bg-accent-primary/15' : 'bg-bg-tertiary'
                     )}>
                       {tab.count}

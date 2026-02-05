@@ -44,9 +44,13 @@ export default {
         'border': 'var(--border)',
         'border-hover': 'var(--text-tertiary)',
       },
+      fontSize: {
+        // Custom sizes for compact UI
+        '2xs': ['0.625rem', { lineHeight: '0.875rem' }],  // 10px
+        '3xs': ['0.5625rem', { lineHeight: '0.75rem' }],  // 9px
+      },
       fontFamily: {
         sans: ['Geist', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
         mono: ['SF Mono', 'Monaco', 'Cascadia Code', 'monospace'],
       },
       animation: {

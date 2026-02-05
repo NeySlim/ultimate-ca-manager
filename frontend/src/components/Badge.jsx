@@ -52,7 +52,7 @@ export function Badge({
   
   // Sizes: sm is pill-shaped, others are rounded
   const sizes = {
-    sm: 'px-2 py-px text-[10px] gap-1 rounded-full',
+    sm: 'px-2 py-px text-2xs gap-1 rounded-full',
     default: 'px-2.5 py-0.5 text-xs gap-1.5 rounded-md',
     lg: 'px-3 py-1 text-sm gap-2 rounded-md',
   }

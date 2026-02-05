@@ -208,7 +208,7 @@ function Section({ section }) {
 
       {/* Code/example block */}
       {section.example && (
-        <div className="mt-2 p-3 rounded-xl bg-bg-tertiary/70 border border-border/30 font-mono text-[11px] sm:text-xs text-text-secondary overflow-x-auto">
+        <div className="mt-2 p-3 rounded-xl bg-bg-tertiary/70 border border-border/30 font-mono text-2xs sm:text-xs text-text-secondary overflow-x-auto">
           {section.example}
         </div>
       )}

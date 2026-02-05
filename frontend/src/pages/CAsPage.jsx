@@ -477,7 +477,7 @@ export default function CAsPage() {
               <div className="p-3">
                 {/* Table Header - Desktop */}
                 {!isMobile && (
-                  <div className="flex items-center gap-3 px-3 py-2 mb-2 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider border-b border-border/50">
+                  <div className="flex items-center gap-3 px-3 py-2 mb-2 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border/50">
                     <div className="flex-1 min-w-0">Certificate Authority</div>
                     {viewMode === 'list' && <div className="w-24 text-center">Parent</div>}
                     <div className="w-20 text-center">Type</div>
@@ -779,7 +779,7 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
             {ca.name || ca.common_name || 'Unnamed CA'}
           </div>
           {!isMobile && ca.subject && (
-            <div className="text-[10px] text-text-tertiary truncate mt-0.5">
+            <div className="text-2xs text-text-tertiary truncate mt-0.5">
               {ca.subject.split(',')[0]}
             </div>
           )}
@@ -791,7 +791,7 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
             {/* Type badge */}
             <div className="w-20 flex justify-center">
               <span className={cn(
-                'px-2 py-0.5 rounded-md text-[10px] font-semibold',
+                'px-2 py-0.5 rounded-md text-2xs font-semibold',
                 ca.type === 'root' ? 'badge-bg-amber' : 'badge-bg-blue'
               )}>
                 {ca.type === 'root' ? 'Root' : 'Intermediate'}
@@ -801,12 +801,12 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
             {/* Certs count */}
             <div className="w-16 flex justify-center">
               {ca.certs > 0 ? (
-                <span className="flex items-center gap-1 text-[11px] text-text-secondary">
+                <span className="flex items-center gap-1 text-2xs text-text-secondary">
                   <Certificate size={12} weight="duotone" className="text-text-tertiary" />
                   <span className="font-medium">{ca.certs}</span>
                 </span>
               ) : (
-                <span className="text-[11px] text-text-tertiary">—</span>
+                <span className="text-2xs text-text-tertiary">—</span>
               )}
             </div>
             
@@ -814,21 +814,21 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
             <div className="w-20 flex justify-center">
               {expiry ? (
                 <span className={cn(
-                  'text-[11px] font-medium',
+                  'text-2xs font-medium',
                   expiry.variant === 'danger' ? 'text-status-danger' : 
                   expiry.variant === 'warning' ? 'text-status-warning' : 'text-text-secondary'
                 )}>
                   {expiry.text}
                 </span>
               ) : (
-                <span className="text-[11px] text-text-tertiary">—</span>
+                <span className="text-2xs text-text-tertiary">—</span>
               )}
             </div>
             
             {/* Status */}
             <div className="w-16 flex justify-center">
               <span className={cn(
-                'px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1',
+                'px-2 py-0.5 rounded-full text-2xs font-medium flex items-center gap-1',
                 ca.status === 'Active' 
                   ? 'bg-status-success/10 text-status-success'
                   : ca.status === 'Expired'
@@ -935,7 +935,7 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
           {ca.name || ca.common_name || 'Unnamed CA'}
         </div>
         {!isMobile && ca.subject && (
-          <div className="text-[10px] text-text-tertiary truncate mt-0.5">
+          <div className="text-2xs text-text-tertiary truncate mt-0.5">
             {ca.subject.split(',')[0]}
           </div>
         )}
@@ -947,18 +947,18 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
           {/* Parent */}
           <div className="w-24 flex justify-center">
             {parentCA ? (
-              <span className="text-[10px] text-text-secondary truncate max-w-[90px]" title={parentCA.name || parentCA.common_name}>
+              <span className="text-2xs text-text-secondary truncate max-w-[90px]" title={parentCA.name || parentCA.common_name}>
                 {parentCA.name || parentCA.common_name || '—'}
               </span>
             ) : (
-              <span className="text-[10px] text-text-tertiary">—</span>
+              <span className="text-2xs text-text-tertiary">—</span>
             )}
           </div>
           
           {/* Type badge */}
           <div className="w-20 flex justify-center">
             <span className={cn(
-              'px-2 py-0.5 rounded-md text-[10px] font-semibold',
+              'px-2 py-0.5 rounded-md text-2xs font-semibold',
               ca.type === 'root' ? 'badge-bg-amber' : 'badge-bg-blue'
             )}>
               {ca.type === 'root' ? 'Root' : 'Intermediate'}
@@ -968,12 +968,12 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
           {/* Certs count */}
           <div className="w-16 flex justify-center">
             {ca.certs > 0 ? (
-              <span className="flex items-center gap-1 text-[11px] text-text-secondary">
+              <span className="flex items-center gap-1 text-2xs text-text-secondary">
                 <Certificate size={12} weight="duotone" className="text-text-tertiary" />
                 <span className="font-medium">{ca.certs}</span>
               </span>
             ) : (
-              <span className="text-[11px] text-text-tertiary">—</span>
+              <span className="text-2xs text-text-tertiary">—</span>
             )}
           </div>
           
@@ -981,21 +981,21 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
           <div className="w-20 flex justify-center">
             {expiry ? (
               <span className={cn(
-                'text-[11px] font-medium',
+                'text-2xs font-medium',
                 expiry.variant === 'danger' ? 'text-status-danger' : 
                 expiry.variant === 'warning' ? 'text-status-warning' : 'text-text-secondary'
               )}>
                 {expiry.text}
               </span>
             ) : (
-              <span className="text-[11px] text-text-tertiary">—</span>
+              <span className="text-2xs text-text-tertiary">—</span>
             )}
           </div>
           
           {/* Status */}
           <div className="w-16 flex justify-center">
             <span className={cn(
-              'px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1',
+              'px-2 py-0.5 rounded-full text-2xs font-medium flex items-center gap-1',
               ca.status === 'Active' 
                 ? 'bg-status-success/10 text-status-success'
                 : ca.status === 'Expired'

@@ -115,7 +115,7 @@ export function IconAvatar({
         <Icon size={iconSizes[size]} weight="duotone" />
       ) : initials ? (
         <span className={cn(
-          size === 'xs' && 'text-[10px]',
+          size === 'xs' && 'text-2xs',
           size === 'sm' && 'text-xs',
           size === 'md' && 'text-sm',
           size === 'lg' && 'text-base',

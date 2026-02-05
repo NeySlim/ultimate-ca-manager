@@ -235,7 +235,7 @@ export function DataField({
       fullWidth && "col-span-full",
       className
     )}>
-      <p className="text-[11px] text-text-tertiary uppercase tracking-wide mb-1">
+      <p className="text-2xs text-text-tertiary uppercase tracking-wide mb-1">
         {label}
       </p>
       <div 

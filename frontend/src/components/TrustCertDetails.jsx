@@ -148,17 +148,17 @@ export function TrustCertDetails({
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-[10px] text-text-tertiary">Key Type</div>
+          <div className="text-2xs text-text-tertiary">Key Type</div>
           <div className="text-xs font-medium text-text-primary">{cert.key_type || 'N/A'}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-[10px] text-text-tertiary">Signature</div>
+          <div className="text-2xs text-text-tertiary">Signature</div>
           <div className="text-xs font-medium text-text-primary">{cert.signature_algorithm || 'N/A'}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Certificate size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-[10px] text-text-tertiary">Type</div>
+          <div className="text-2xs text-text-tertiary">Type</div>
           <div className="text-xs font-medium text-text-primary">{cert.is_ca ? 'CA' : 'End Entity'}</div>
         </div>
       </div>
@@ -247,7 +247,7 @@ export function TrustCertDetails({
         <CompactSection title="PEM Certificate" icon={Certificate} collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
-              "text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
+              "text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
               !showFullPem && "max-h-24 overflow-hidden"
             )}>
               {cert.pem}

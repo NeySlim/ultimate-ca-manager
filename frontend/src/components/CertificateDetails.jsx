@@ -107,7 +107,7 @@ function ExpiryIndicator({ daysRemaining, validTo }) {
       <Clock size={14} className={cn("sm:w-4 sm:h-4", color)} />
       <div>
         <div className={cn("text-xs sm:text-sm font-medium", color)}>{label}</div>
-        <div className="text-[10px] sm:text-xs text-text-tertiary">Exp: {formatDate(validTo, 'short')}</div>
+        <div className="text-2xs sm:text-xs text-text-tertiary">Exp: {formatDate(validTo, 'short')}</div>
       </div>
     </div>
   )
@@ -154,7 +154,7 @@ export function CertificateDetails({
             <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
             {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
           </div>
-          <p className="text-[10px] sm:text-xs text-text-tertiary truncate mt-0.5">{cert.subject}</p>
+          <p className="text-2xs sm:text-xs text-text-tertiary truncate mt-0.5">{cert.subject}</p>
         </div>
       </div>
       
@@ -167,20 +167,20 @@ export function CertificateDetails({
       <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
         <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
           <Key size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
-          <div className="text-[10px] sm:text-xs font-medium text-text-primary">{cert.key_algorithm || 'RSA'}</div>
-          <div className="text-[9px] sm:text-[10px] text-text-tertiary hidden sm:block">{cert.key_size ? `${cert.key_size} bits` : '—'}</div>
+          <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.key_algorithm || 'RSA'}</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">{cert.key_size ? `${cert.key_size} bits` : '—'}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
           <Lock size={14} className={cn("mx-auto mb-0.5 sm:mb-1 sm:w-4 sm:h-4", cert.has_private_key ? "text-status-success" : "text-text-tertiary")} />
-          <div className="text-[10px] sm:text-xs font-medium text-text-primary">{cert.has_private_key ? 'Key' : 'No Key'}</div>
-          <div className="text-[9px] sm:text-[10px] text-text-tertiary hidden sm:block">
+          <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.has_private_key ? 'Key' : 'No Key'}</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">
             {cert.has_private_key ? (cert.private_key_location || '—') : '—'}
           </div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
           <ShieldCheck size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
-          <div className="text-[10px] sm:text-xs font-medium text-text-primary truncate">{cert.signature_algorithm?.split('-')[0] || '—'}</div>
-          <div className="text-[9px] sm:text-[10px] text-text-tertiary hidden sm:block">Signature</div>
+          <div className="text-2xs sm:text-xs font-medium text-text-primary truncate">{cert.signature_algorithm?.split('-')[0] || '—'}</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">Signature</div>
         </div>
       </div>
       
@@ -292,7 +292,7 @@ export function CertificateDetails({
         <CompactSection title="PEM Certificate" icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
-              "text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto border border-border/30",
+              "text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto border border-border/30",
               !showFullPem && "max-h-24 overflow-hidden"
             )}>
               {cert.pem}
