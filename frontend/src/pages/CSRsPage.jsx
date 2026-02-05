@@ -13,6 +13,7 @@ import {
   CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats,
   KeyIndicator
 } from '../components'
+import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { csrsService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -46,6 +47,7 @@ export default function CSRsPage() {
   
   // Selection & modals
   const [selectedCSR, setSelectedCSR] = useState(null)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [signCA, setSignCA] = useState('')
   const [validityDays, setValidityDays] = useState(VALIDITY.DEFAULT_DAYS)
   
@@ -457,13 +459,13 @@ export default function CSRsPage() {
           columnStorageKey={`ucm-csrs-${activeTab}-columns`}
           toolbarActions={activeTab === 'pending' && canWrite('csrs') && (
             isMobile ? (
-              <Button size="lg" onClick={() => openModal('upload')} className="w-11 h-11 p-0">
+              <Button size="lg" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
                 <UploadSimple size={22} weight="bold" />
               </Button>
             ) : (
-              <Button size="sm" onClick={() => openModal('upload')}>
+              <Button size="sm" onClick={() => setShowImportModal(true)}>
                 <UploadSimple size={14} weight="bold" />
-                Upload
+                Import
               </Button>
             )
           )}
@@ -481,8 +483,8 @@ export default function CSRsPage() {
             ? 'Upload a CSR to get started' 
             : 'Sign a CSR to see it here'}
           emptyAction={activeTab === 'pending' && canWrite('csrs') && (
-            <Button onClick={() => openModal('upload')}>
-              <UploadSimple size={16} /> Upload CSR
+            <Button onClick={() => setShowImportModal(true)}>
+              <UploadSimple size={16} /> Import CSR
             </Button>
           )}
         />
@@ -633,6 +635,16 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
           </div>
         </div>
       </Modal>
+
+      {/* Smart Import Modal */}
+      <SmartImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={() => {
+          setShowImportModal(false)
+          loadData()
+        }}
+      />
     </>
   )
 }

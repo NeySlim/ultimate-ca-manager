@@ -13,6 +13,7 @@ import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, HelpCard,
   CertificateDetails, CertificateCompareModal, KeyIndicator
 } from '../components'
+import { SmartImportModal } from '../components/SmartImport'
 import { certificatesService, casService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { ERRORS, SUCCESS, LABELS, CONFIRM, BUTTONS } from '../lib/messages'
@@ -33,6 +34,7 @@ export default function CertificatesPage() {
   // Selection
   const [selectedCert, setSelectedCert] = useState(null)
   const [showIssueModal, setShowIssueModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [showKeyModal, setShowKeyModal] = useState(false)
   const [showCompareModal, setShowCompareModal] = useState(false)
   const [keyPem, setKeyPem] = useState('')
@@ -702,14 +704,25 @@ export default function CertificatesPage() {
               )}
               {canWrite('certificates') && (
                 isMobile ? (
-                  <Button size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
-                    <Plus size={22} weight="bold" />
-                  </Button>
+                  <>
+                    <Button size="lg" variant="secondary" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
+                      <UploadSimple size={22} weight="bold" />
+                    </Button>
+                    <Button size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
+                      <Plus size={22} weight="bold" />
+                    </Button>
+                  </>
                 ) : (
-                  <Button size="sm" onClick={() => setShowIssueModal(true)}>
-                    <Plus size={14} weight="bold" />
-                    Issue
-                  </Button>
+                  <>
+                    <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
+                      <UploadSimple size={14} />
+                      Import
+                    </Button>
+                    <Button size="sm" onClick={() => setShowIssueModal(true)}>
+                      <Plus size={14} weight="bold" />
+                      Issue
+                    </Button>
+                  </>
                 )
               )}
             </div>
@@ -841,6 +854,16 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
         onClose={() => setShowCompareModal(false)}
         certificates={certificates}
         initialCert={selectedCert}
+      />
+
+      {/* Smart Import Modal */}
+      <SmartImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={() => {
+          setShowImportModal(false)
+          loadData()
+        }}
       />
     </>
   )

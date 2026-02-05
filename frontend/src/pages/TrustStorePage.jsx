@@ -13,6 +13,7 @@ import {
   Button, Input, Badge, Modal, Textarea, HelpCard,
   CompactSection, CompactGrid, CompactField, FormSelect
 } from '../components'
+import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { truststoreService } from '../services'
 import { useNotification } from '../contexts'
@@ -23,13 +24,14 @@ import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 export default function TrustStorePage() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
-  const { modals, open: openModal, close: closeModal } = useModals(['add', 'import'])
+  const { modals, open: openModal, close: closeModal } = useModals(['add'])
   
   const [loading, setLoading] = useState(true)
   const [certificates, setCertificates] = useState([])
   const [certStats, setCertStats] = useState({ total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 })
   const [selectedCert, setSelectedCert] = useState(null)
   const [syncing, setSyncing] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   
   // Add modal state
   const [addForm, setAddForm] = useState({
@@ -40,11 +42,6 @@ export default function TrustStorePage() {
     notes: ''
   })
   const [adding, setAdding] = useState(false)
-  
-  // Import modal state
-  const [importFile, setImportFile] = useState(null)
-  const [importForm, setImportForm] = useState({ name: '', purpose: 'root_ca', description: '' })
-  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     loadCertificates()
@@ -95,30 +92,6 @@ export default function TrustStorePage() {
       showError(error.message || ERRORS.IMPORT_FAILED.TRUSTSTORE)
     } finally {
       setAdding(false)
-    }
-  }
-
-  const handleImport = async () => {
-    if (!importFile) {
-      showError('Please select a file to import')
-      return
-    }
-    
-    setImporting(true)
-    try {
-      const response = await truststoreService.importFile(importFile, importForm)
-      showSuccess(response.message || 'Certificate imported successfully')
-      closeModal('import')
-      setImportFile(null)
-      setImportForm({ name: '', purpose: 'root_ca', description: '' })
-      loadCertificates()
-      if (response.data) {
-        setSelectedCert(response.data)
-      }
-    } catch (error) {
-      showError(error.message || 'Failed to import certificate')
-    } finally {
-      setImporting(false)
     }
   }
 
@@ -188,7 +161,7 @@ export default function TrustStorePage() {
         <ArrowsClockwise size={14} className={syncing ? 'animate-spin' : ''} />
         <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync'}</span>
       </Button>
-      <Button size="sm" variant="secondary" onClick={() => openModal('import')}>
+      <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
         <UploadSimple size={14} />
         <span className="hidden sm:inline">Import</span>
       </Button>
@@ -545,65 +518,15 @@ export default function TrustStorePage() {
         </form>
       </Modal>
 
-      {/* Import Certificate Modal */}
-      <Modal
-        open={modals.import}
-        onClose={() => closeModal('import')}
-        title="Import Certificate File"
-      >
-        <form className="p-4 space-y-4" onSubmit={(e) => { e.preventDefault(); handleImport() }}>
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
-              Certificate File (PEM or DER)
-            </label>
-            <input
-              type="file"
-              accept=".pem,.crt,.cer,.der"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                setImportFile(file)
-                if (file && !importForm.name) {
-                  setImportForm(prev => ({ ...prev, name: file.name.replace(/\.(pem|crt|cer|der)$/i, '') }))
-                }
-              }}
-              className="w-full px-3 py-2 text-sm bg-bg-secondary border border-border rounded-md text-text-primary file:mr-3 file:py-1 file:px-3 file:border-0 file:rounded file:bg-accent-primary file:text-white file:cursor-pointer"
-            />
-          </div>
-          <Input
-            label="Name"
-            placeholder="Certificate name (auto-filled from filename)"
-            value={importForm.name}
-            onChange={(e) => setImportForm(prev => ({ ...prev, name: e.target.value }))}
-          />
-          <FormSelect
-            label="Purpose"
-            value={importForm.purpose}
-            onChange={(val) => setImportForm(prev => ({ ...prev, purpose: val }))}
-            options={[
-              { value: 'root_ca', label: 'Root CA' },
-              { value: 'intermediate_ca', label: 'Intermediate CA' },
-              { value: 'client_auth', label: 'Client Authentication' },
-              { value: 'code_signing', label: 'Code Signing' },
-              { value: 'custom', label: 'Custom' },
-            ]}
-            size="lg"
-          />
-          <Input
-            label="Description"
-            placeholder="Optional description"
-            value={importForm.description}
-            onChange={(e) => setImportForm(prev => ({ ...prev, description: e.target.value }))}
-          />
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => closeModal('import')}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={importing || !importFile}>
-              {importing ? 'Importing...' : 'Import Certificate'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      {/* Smart Import Modal */}
+      <SmartImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={() => {
+          setShowImportModal(false)
+          loadCertificates()
+        }}
+      />
     </>
   )
 }
