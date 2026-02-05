@@ -55,8 +55,8 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm truncate">{displayName}</span>
-            {obj.is_encrypted && <LockSimple size={16} className="text-amber-500" title="Encrypted" />}
-            {obj.matched_key_index !== null && <Link size={16} className="text-green-500" title="Has matching key" />}
+            {obj.is_encrypted && <LockSimple size={16} className="text-status-warning" title="Encrypted" />}
+            {obj.matched_key_index !== null && <Link size={16} className="text-status-success" title="Has matching key" />}
           </div>
           <div className="flex items-center gap-2 text-xs text-text-secondary">
             <Badge variant={config.color} size="xs">{config.label}</Badge>
@@ -138,7 +138,7 @@ function ChainCard({ chain, index }) {
       </div>
       
       {hasIssues && (
-        <div className="mt-2 text-xs text-amber-600">
+        <div className="mt-2 text-xs text-status-warning">
           {chain.errors.map((err, i) => (
             <div key={i} className="flex items-center gap-1"><WarningCircle size={12} />{err}</div>
           ))}
@@ -404,7 +404,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
                 {file.ext.toUpperCase().slice(1)}
               </Badge>
               <span className="text-xs text-text-secondary">{(file.size / 1024).toFixed(1)} KB</span>
-              <button onClick={() => removeFile(i)} className="text-red-500 hover:text-red-600">
+              <button onClick={() => removeFile(i)} className="text-status-danger hover:text-status-danger">
                 <Trash size={14} />
               </button>
             </div>
@@ -567,13 +567,13 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         <div className="text-center py-6">
           {totalImported > 0 ? (
             <>
-              <CheckCircle size={48} className="text-green-500 mx-auto mb-3" weight="fill" />
+              <CheckCircle size={48} className="text-status-success mx-auto mb-3" weight="fill" />
               <h3 className="text-lg font-medium">Import Complete</h3>
               <p className="text-sm text-text-secondary">Successfully imported {totalImported} object{totalImported > 1 ? 's' : ''}</p>
             </>
           ) : (
             <>
-              <WarningCircle size={48} className="text-amber-500 mx-auto mb-3" />
+              <WarningCircle size={48} className="text-status-warning mx-auto mb-3" />
               <h3 className="text-lg font-medium">No Objects Imported</h3>
               <p className="text-sm text-text-secondary">{errors.length > 0 ? errors[0] : 'All objects were skipped or already exist'}</p>
             </>
@@ -583,7 +583,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         {/* Show what was imported */}
         {totalImported > 0 && (
           <div className="space-y-1">
-            <h4 className="text-sm font-medium text-green-600">Imported:</h4>
+            <h4 className="text-sm font-medium text-status-success">Imported:</h4>
             {importResult?.csrs_imported > 0 && (
               <div className="text-sm pl-4">✓ {importResult.csrs_imported} CSR{importResult.csrs_imported > 1 ? 's' : ''}</div>
             )}
@@ -601,14 +601,14 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         
         {warnings.length > 0 && (
           <div className="space-y-1">
-            <h4 className="text-sm font-medium text-amber-600">Warnings:</h4>
+            <h4 className="text-sm font-medium text-status-warning">Warnings:</h4>
             {warnings.map((w, i) => <div key={i} className="text-sm pl-4">⚠ {w}</div>)}
           </div>
         )}
         
         {errors.length > 0 && (
           <div className="space-y-1">
-            <h4 className="text-sm font-medium text-red-600">Errors:</h4>
+            <h4 className="text-sm font-medium text-status-danger">Errors:</h4>
             {errors.map((e, i) => <div key={i} className="text-sm pl-4">✗ {e}</div>)}
           </div>
         )}

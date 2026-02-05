@@ -658,8 +658,8 @@ export default function CertificatesPage() {
             className={cn(
               'p-1.5 rounded-md transition-colors',
               isFavorite(selectedCert.id)
-                ? 'text-yellow-500 hover:text-yellow-400 bg-yellow-500/10'
-                : 'text-text-tertiary hover:text-yellow-500 hover:bg-yellow-500/10'
+                ? 'text-status-warning hover:text-status-warning bg-status-warning/10'
+                : 'text-text-tertiary hover:text-status-warning hover:bg-status-warning/10'
             )}
             title={isFavorite(selectedCert.id) ? 'Remove from favorites' : 'Add to favorites'}
           >

@@ -286,7 +286,7 @@ export default function CRLOCSPPage() {
             <p className="text-xs text-text-secondary">Active CRLs</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-status-error">{totalRevoked}</p>
+            <p className="text-2xl font-bold text-status-danger">{totalRevoked}</p>
             <p className="text-xs text-text-secondary">Revoked Certs</p>
           </div>
         </div>

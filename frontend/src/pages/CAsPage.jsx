@@ -815,8 +815,8 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
               {expiry ? (
                 <span className={cn(
                   'text-[11px] font-medium',
-                  expiry.variant === 'danger' ? 'text-red-500' : 
-                  expiry.variant === 'warning' ? 'text-amber-500' : 'text-text-secondary'
+                  expiry.variant === 'danger' ? 'text-status-danger' : 
+                  expiry.variant === 'warning' ? 'text-status-warning' : 'text-text-secondary'
                 )}>
                   {expiry.text}
                 </span>
@@ -830,14 +830,14 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
               <span className={cn(
                 'px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1',
                 ca.status === 'Active' 
-                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  ? 'bg-status-success/10 text-status-success'
                   : ca.status === 'Expired'
-                    ? 'bg-red-500/15 text-red-600 dark:text-red-400'
-                    : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                    ? 'bg-status-danger/10 text-status-danger'
+                    : 'bg-status-warning/10 text-status-warning'
               )}>
                 <span className={cn(
                   'w-1.5 h-1.5 rounded-full',
-                  ca.status === 'Active' ? 'bg-emerald-500' : ca.status === 'Expired' ? 'bg-red-500' : 'bg-amber-500'
+                  ca.status === 'Active' ? 'bg-status-success' : ca.status === 'Expired' ? 'bg-status-danger' : 'bg-status-warning'
                 )} />
                 {ca.status || '?'}
               </span>
@@ -853,7 +853,7 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
             )}
             <span className={cn(
               'w-2.5 h-2.5 rounded-full shrink-0',
-              ca.status === 'Active' ? 'bg-emerald-500' : ca.status === 'Expired' ? 'bg-red-500' : 'bg-amber-500'
+              ca.status === 'Active' ? 'bg-status-success' : ca.status === 'Expired' ? 'bg-status-danger' : 'bg-status-warning'
             )} />
           </div>
         )}
@@ -982,8 +982,8 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
             {expiry ? (
               <span className={cn(
                 'text-[11px] font-medium',
-                expiry.variant === 'danger' ? 'text-red-500' : 
-                expiry.variant === 'warning' ? 'text-amber-500' : 'text-text-secondary'
+                expiry.variant === 'danger' ? 'text-status-danger' : 
+                expiry.variant === 'warning' ? 'text-status-warning' : 'text-text-secondary'
               )}>
                 {expiry.text}
               </span>
@@ -997,14 +997,14 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
             <span className={cn(
               'px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1',
               ca.status === 'Active' 
-                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                ? 'bg-status-success/10 text-status-success'
                 : ca.status === 'Expired'
-                  ? 'bg-red-500/15 text-red-600 dark:text-red-400'
-                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                  ? 'bg-status-danger/10 text-status-danger'
+                  : 'bg-status-warning/10 text-status-warning'
             )}>
               <span className={cn(
                 'w-1.5 h-1.5 rounded-full',
-                ca.status === 'Active' ? 'bg-emerald-500' : ca.status === 'Expired' ? 'bg-red-500' : 'bg-amber-500'
+                ca.status === 'Active' ? 'bg-status-success' : ca.status === 'Expired' ? 'bg-status-danger' : 'bg-status-warning'
               )} />
               {ca.status || '?'}
             </span>
@@ -1020,7 +1020,7 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
           )}
           <span className={cn(
             'w-2.5 h-2.5 rounded-full shrink-0',
-            ca.status === 'Active' ? 'bg-emerald-500' : ca.status === 'Expired' ? 'bg-red-500' : 'bg-amber-500'
+            ca.status === 'Active' ? 'bg-status-success' : ca.status === 'Expired' ? 'bg-status-danger' : 'bg-status-warning'
           )} />
         </div>
       )}

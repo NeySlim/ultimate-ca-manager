@@ -130,7 +130,7 @@ export function CADetails({
       {ca.days_remaining !== null && (
         <div className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-lg text-xs",
-          ca.days_remaining <= 0 && "bg-status-error/10 text-status-error",
+          ca.days_remaining <= 0 && "bg-status-danger/10 text-status-danger",
           ca.days_remaining > 0 && ca.days_remaining <= 30 && "bg-status-warning/10 text-status-warning",
           ca.days_remaining > 30 && ca.days_remaining <= 90 && "bg-status-info/10 text-status-info",
           ca.days_remaining > 90 && "bg-status-success/10 text-status-success"

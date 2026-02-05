@@ -167,7 +167,7 @@ export function TrustCertDetails({
       {daysRemaining !== null && (
         <div className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-lg text-xs",
-          daysRemaining <= 0 && "bg-status-error/10 text-status-error",
+          daysRemaining <= 0 && "bg-status-danger/10 text-status-danger",
           daysRemaining > 0 && daysRemaining <= 30 && "bg-status-warning/10 text-status-warning",
           daysRemaining > 30 && daysRemaining <= 90 && "bg-status-info/10 text-status-info",
           daysRemaining > 90 && "bg-status-success/10 text-status-success"

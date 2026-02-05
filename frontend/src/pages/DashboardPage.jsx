@@ -77,6 +77,7 @@ export default function DashboardPage() {
   const [activityLog, setActivityLog] = useState([])
   const [systemStatus, setSystemStatus] = useState(null)
   const [expiringCerts, setExpiringCerts] = useState([])
+  const [certificateTrend, setCertificateTrend] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
   
@@ -90,12 +91,13 @@ export default function DashboardPage() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const [statsData, casData, certsData, activityData, statusData] = await Promise.all([
+      const [statsData, casData, certsData, activityData, statusData, trendData] = await Promise.all([
         dashboardService.getStats(),
         dashboardService.getRecentCAs(5),
         certificatesService.getAll({ limit: 5, sort: 'created_at', order: 'desc' }),
         dashboardService.getActivityLog(10),
         dashboardService.getSystemStatus(),
+        dashboardService.getCertificateTrend(7),
       ])
       
       setStats(statsData.data || {})
@@ -103,6 +105,7 @@ export default function DashboardPage() {
       setRecentCerts(certsData.data?.certificates || certsData.data || [])
       setActivityLog(activityData.data?.activity || [])
       setSystemStatus(statusData.data || {})
+      setCertificateTrend(trendData.data?.trend || [])
       setLastUpdate(new Date())
       
       // Get expiring certificates (within 30 days)
@@ -310,7 +313,7 @@ export default function DashboardPage() {
               subtitle="Last 7 days"
             />
             <Card.Body className="!pt-0 !pb-2">
-              <CertificateTrendChart height={140} />
+              <CertificateTrendChart data={certificateTrend} height={140} />
             </Card.Body>
           </Card>
           

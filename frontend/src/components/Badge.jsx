@@ -42,12 +42,12 @@ export function Badge({
     warning: 'status-warning-bg-solid',
     danger: 'status-danger-bg-solid',
     info: 'status-primary-bg-solid',
-    violet: 'bg-violet-500',
-    purple: 'bg-purple-500',
-    cyan: 'bg-cyan-500',
-    teal: 'bg-teal-500',
-    orange: 'bg-orange-500',
-    amber: 'bg-amber-500',
+    violet: 'bg-accent-pro',
+    purple: 'bg-accent-pro',
+    cyan: 'bg-accent-primary',
+    teal: 'bg-accent-success',
+    orange: 'bg-status-warning',
+    amber: 'bg-status-warning',
   }
   
   // Sizes: sm is pill-shaped, others are rounded

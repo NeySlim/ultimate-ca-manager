@@ -279,7 +279,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                       >
-                        <Certificate size={16} weight="duotone" className="text-blue-500" />
+                        <Certificate size={16} weight="duotone" className="text-accent-primary" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
                           <span className="text-[10px] text-text-tertiary truncate block">{item.subject}</span>
@@ -340,7 +340,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                       >
-                        <User size={16} weight="duotone" className="text-emerald-500" />
+                        <User size={16} weight="duotone" className="text-status-success" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
                           <span className="text-[10px] text-text-tertiary truncate block">{item.email}</span>
@@ -367,7 +367,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                       >
-                        <List size={16} weight="duotone" className="text-orange-500" />
+                        <List size={16} weight="duotone" className="text-status-warning" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
                           <span className="text-[10px] text-text-tertiary truncate block">{item.description}</span>
@@ -429,7 +429,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
             {filteredFavorites.length > 0 && !searchResults && (
               <div className="mb-2">
                 <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
-                  <Star size={10} weight="fill" className="text-yellow-500" />
+                  <Star size={10} weight="fill" className="text-status-warning" />
                   Favorites
                 </div>
                 {filteredFavorites.map(item => {
@@ -450,7 +450,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                           <span className="text-[10px] text-text-tertiary truncate block">{item.subtitle}</span>
                         )}
                       </div>
-                      <Star size={12} weight="fill" className="text-yellow-500" />
+                      <Star size={12} weight="fill" className="text-status-warning" />
                     </button>
                   )
                 })}
