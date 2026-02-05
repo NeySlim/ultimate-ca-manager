@@ -36,6 +36,12 @@ export default function CAsPage() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [createFormType, setCreateFormType] = useState('root')
   
+  // P12/PFX export modal
+  const [showP12Modal, setShowP12Modal] = useState(false)
+  const [p12Password, setP12Password] = useState('')
+  const [p12CA, setP12CA] = useState(null)
+  const [p12Format, setP12Format] = useState('pkcs12')
+  
   // Filter state
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -136,16 +142,49 @@ export default function CAsPage() {
   }
 
   const handleExport = async (ca, format = 'pem') => {
+    // PKCS12/PFX need password - show password modal
+    if (format === 'pkcs12' || format === 'pfx') {
+      setP12CA(ca)
+      setP12Format(format)
+      setShowP12Modal(true)
+      return
+    }
+    
     try {
       const blob = await casService.export(ca.id, format, {})
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const ext = format === 'pkcs12' ? 'p12' : format === 'der' ? 'der' : 'pem'
+      const ext = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12', pfx: 'pfx' }[format] || format
       a.download = `${ca.name || ca.common_name || 'ca'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
       showSuccess(SUCCESS.EXPORT.CA)
+    } catch (error) {
+      showError(error.message || 'Failed to export CA')
+    }
+  }
+  
+  // Export P12/PFX with password
+  const handleExportP12 = async () => {
+    if (!p12Password || p12Password.length < 4) {
+      showError('Password must be at least 4 characters')
+      return
+    }
+    try {
+      const blob = await casService.export(p12CA.id, p12Format, { password: p12Password })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const ext = p12Format === 'pfx' ? 'pfx' : 'p12'
+      a.download = `${p12CA.name || p12CA.common_name || 'ca'}.${ext}`
+      a.click()
+      URL.revokeObjectURL(url)
+      showSuccess(`CA exported as ${p12Format.toUpperCase()}`)
+      setShowP12Modal(false)
+      setP12Password('')
+      setP12CA(null)
+      setP12Format('pkcs12')
     } catch (error) {
       showError(error.message || 'Failed to export CA')
     }
@@ -606,6 +645,34 @@ export default function CAsPage() {
           loadData()
         }}
       />
+      
+      {/* P12/PFX Export Password Modal */}
+      <Modal
+        open={showP12Modal}
+        onOpenChange={() => { setShowP12Modal(false); setP12Password(''); setP12CA(null) }}
+        title={`Export as ${p12Format.toUpperCase()}`}
+      >
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-text-secondary">
+            Enter a password to protect the PKCS#12 file. This password will be required to import the certificate elsewhere.
+          </p>
+          <Input
+            type="password"
+            placeholder="Enter password (min 4 characters)"
+            value={p12Password}
+            onChange={(e) => setP12Password(e.target.value)}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button variant="secondary" onClick={() => { setShowP12Modal(false); setP12Password(''); setP12CA(null) }}>
+              Cancel
+            </Button>
+            <Button onClick={handleExportP12} disabled={!p12Password || p12Password.length < 4}>
+              <Download size={14} /> Export
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   )
 }
@@ -1014,14 +1081,26 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete }) {
         { badge: ca.status, badgeVariant: ca.status === 'Active' ? 'success' : 'danger' }
       ]} />
 
-      {/* Actions */}
-      <div className="flex gap-2">
-        <Button size="sm" variant="secondary" className="flex-1" onClick={() => onExport('pem')}>
-          <Download size={14} /> Export
+      {/* Export Actions */}
+      <div className="flex flex-wrap gap-1.5 sm:gap-2">
+        <Button size="xs" variant="secondary" onClick={() => onExport('pem')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
+          <Download size={12} className="sm:w-3.5 sm:h-3.5" /> PEM
+        </Button>
+        <Button size="xs" variant="secondary" onClick={() => onExport('der')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
+          <Download size={12} className="sm:w-3.5 sm:h-3.5" /> DER
+        </Button>
+        <Button size="xs" variant="secondary" onClick={() => onExport('pkcs7')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
+          <Download size={12} className="sm:w-3.5 sm:h-3.5" /> P7B
+        </Button>
+        <Button size="xs" variant="secondary" onClick={() => onExport('pkcs12')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
+          <Download size={12} className="sm:w-3.5 sm:h-3.5" /> P12
+        </Button>
+        <Button size="xs" variant="secondary" onClick={() => onExport('pfx')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
+          <Download size={12} className="sm:w-3.5 sm:h-3.5" /> PFX
         </Button>
         {canDelete('cas') && (
-          <Button size="sm" variant="danger" onClick={onDelete}>
-            <Trash size={14} />
+          <Button size="xs" variant="danger" onClick={onDelete} className="sm:!h-8 sm:!px-3">
+            <Trash size={12} className="sm:w-3.5 sm:h-3.5" />
           </Button>
         )}
       </div>
