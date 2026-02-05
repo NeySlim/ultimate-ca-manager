@@ -307,10 +307,16 @@ class SmartParser:
     def _parse_pem_keys(self, content: str, password: Optional[str] = None) -> List[ParsedObject]:
         """Extract all PEM private keys"""
         objects = []
+        seen_positions = set()  # Deduplicate by position
         pwd = password.encode() if password else None
         
         for pattern in self.PEM_KEY_PATTERNS:
             for match in pattern.finditer(content):
+                # Skip if we already processed a key at this position
+                if match.start() in seen_positions:
+                    continue
+                seen_positions.add(match.start())
+                
                 pem_block = match.group(0)
                 is_encrypted = 'ENCRYPTED' in pem_block
                 
