@@ -606,6 +606,68 @@ def delete_ca(ca_id):
     return no_content_response()
 
 
+@bp.route('/api/v2/cas/export', methods=['GET'])
+@require_auth(['read:cas'])
+def export_all_cas():
+    """Export all CA certificates in various formats"""
+    from flask import Response
+    from models import CA
+    import base64
+    import subprocess
+    import tempfile
+    import os
+    
+    export_format = request.args.get('format', 'pem').lower()
+    
+    cas = CA.query.filter(CA.crt.isnot(None)).all()
+    if not cas:
+        return error_response('No CAs to export', 404)
+    
+    try:
+        if export_format == 'pem':
+            pem_data = b''
+            for ca in cas:
+                if ca.crt:
+                    pem_data += base64.b64decode(ca.crt)
+                    if not pem_data.endswith(b'\n'):
+                        pem_data += b'\n'
+            
+            return Response(
+                pem_data,
+                mimetype='application/x-pem-file',
+                headers={'Content-Disposition': 'attachment; filename="ca-certificates.pem"'}
+            )
+        
+        elif export_format == 'pkcs7' or export_format == 'p7b':
+            with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
+                for ca in cas:
+                    if ca.crt:
+                        f.write(base64.b64decode(ca.crt))
+                        f.write(b'\n')
+                pem_file = f.name
+            
+            try:
+                p7b_output = subprocess.check_output([
+                    'openssl', 'crl2pkcs7', '-nocrl',
+                    '-certfile', pem_file,
+                    '-outform', 'DER'
+                ], stderr=subprocess.DEVNULL)
+                
+                return Response(
+                    p7b_output,
+                    mimetype='application/x-pkcs7-certificates',
+                    headers={'Content-Disposition': 'attachment; filename="ca-certificates.p7b"'}
+                )
+            finally:
+                os.unlink(pem_file)
+        
+        else:
+            return error_response(f'Bulk export only supports PEM and P7B formats. Use individual export for DER/PKCS12/PFX', 400)
+    
+    except Exception as e:
+        return error_response(f'Export failed: {str(e)}', 500)
+
+
 @bp.route('/api/v2/cas/<int:ca_id>/export', methods=['GET'])
 @require_auth(['read:cas'])
 def export_ca(ca_id):
@@ -730,6 +792,67 @@ def export_ca(ca_id):
                 p12_bytes,
                 mimetype='application/x-pkcs12',
                 headers={'Content-Disposition': f'attachment; filename="{ca.descr or ca.refid}.p12"'}
+            )
+        
+        elif export_format == 'pkcs7' or export_format == 'p7b':
+            import subprocess
+            import tempfile
+            import os
+            
+            # Create temporary PEM file with CA chain
+            with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
+                f.write(cert_pem)
+                # Include parent chain
+                if include_chain and ca.caref:
+                    parent = CA.query.filter_by(refid=ca.caref).first()
+                    while parent:
+                        if parent.crt:
+                            f.write(b'\n')
+                            f.write(base64.b64decode(parent.crt))
+                        if parent.caref:
+                            parent = CA.query.filter_by(refid=parent.caref).first()
+                        else:
+                            break
+                pem_file = f.name
+            
+            try:
+                p7b_output = subprocess.check_output([
+                    'openssl', 'crl2pkcs7', '-nocrl',
+                    '-certfile', pem_file,
+                    '-outform', 'DER'
+                ], stderr=subprocess.DEVNULL)
+                
+                return Response(
+                    p7b_output,
+                    mimetype='application/x-pkcs7-certificates',
+                    headers={'Content-Disposition': f'attachment; filename="{ca.descr or ca.refid}.p7b"'}
+                )
+            finally:
+                os.unlink(pem_file)
+        
+        elif export_format == 'pfx':
+            # PFX is same as PKCS12
+            if not password:
+                return error_response('Password required for PFX export', 400)
+            if not ca.prv:
+                return error_response('CA has no private key for PFX export', 400)
+            
+            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+            key_pem_data = base64.b64decode(ca.prv)
+            private_key = serialization.load_pem_private_key(key_pem_data, password=None, backend=default_backend())
+            
+            p12_bytes = pkcs12.serialize_key_and_certificates(
+                name=(ca.descr or ca.refid).encode(),
+                key=private_key,
+                cert=cert,
+                cas=None,
+                encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
+            )
+            
+            return Response(
+                p12_bytes,
+                mimetype='application/x-pkcs12',
+                headers={'Content-Disposition': f'attachment; filename="{ca.descr or ca.refid}.pfx"'}
             )
         
         else:
