@@ -489,13 +489,23 @@ class Certificate(db.Model):
     
     @property
     def common_name(self) -> str:
-        """Extract Common Name from subject"""
-        if not self.subject:
-            return ""
-        # Subject format: "CN=example.com,O=Company,..."
-        for part in self.subject.split(','):
-            if part.strip().startswith('CN='):
-                return part.strip()[3:]
+        """Extract Common Name from subject, or fallback to first SAN DNS"""
+        if self.subject:
+            # Subject format: "CN=example.com,O=Company,..."
+            for part in self.subject.split(','):
+                if part.strip().startswith('CN='):
+                    return part.strip()[3:]
+        # Fallback: use first SAN DNS if available
+        if self.san_dns:
+            try:
+                dns_list = json.loads(self.san_dns) if self.san_dns.startswith('[') else [self.san_dns]
+                if dns_list:
+                    return dns_list[0]
+            except (json.JSONDecodeError, TypeError):
+                pass
+        # Last fallback: use descr
+        if self.descr:
+            return self.descr
         return ""
     
     @property
