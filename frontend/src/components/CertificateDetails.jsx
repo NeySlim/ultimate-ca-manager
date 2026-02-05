@@ -187,49 +187,51 @@ export function CertificateDetails({
       {/* Actions - compact on mobile */}
       {showActions && (
         <div className="flex flex-wrap gap-1.5 sm:gap-2">
+          {/* Export buttons grouped */}
           {onExport && (
-            <>
-              <Button size="xs" variant="secondary" onClick={() => onExport('pem')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
-                <Download size={12} className="sm:w-3.5 sm:h-3.5" /> PEM
+            <div className="flex flex-wrap gap-1 p-1 rounded-lg bg-bg-tertiary/50">
+              <Button size="xs" variant="ghost" onClick={() => onExport('pem')} className="!px-2 hover:bg-bg-secondary">
+                <Download size={12} /> PEM
               </Button>
-              <Button size="xs" variant="secondary" onClick={() => onExport('der')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
-                <Download size={12} className="sm:w-3.5 sm:h-3.5" /> DER
+              <Button size="xs" variant="ghost" onClick={() => onExport('der')} className="!px-2 hover:bg-bg-secondary">
+                <Download size={12} /> DER
               </Button>
-              <Button size="xs" variant="secondary" onClick={() => onExport('pkcs7')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
-                <Download size={12} className="sm:w-3.5 sm:h-3.5" /> P7B
+              <Button size="xs" variant="ghost" onClick={() => onExport('pkcs7')} className="!px-2 hover:bg-bg-secondary">
+                <Download size={12} /> P7B
               </Button>
               {cert.has_private_key && (
                 <>
-                  <Button size="xs" variant="secondary" onClick={() => onExport('pkcs12')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
-                    <Download size={12} className="sm:w-3.5 sm:h-3.5" /> P12
+                  <Button size="xs" variant="ghost" onClick={() => onExport('pkcs12')} className="!px-2 hover:bg-bg-secondary">
+                    <Download size={12} /> P12
                   </Button>
-                  <Button size="xs" variant="secondary" onClick={() => onExport('pfx')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
-                    <Download size={12} className="sm:w-3.5 sm:h-3.5" /> PFX
+                  <Button size="xs" variant="ghost" onClick={() => onExport('pfx')} className="!px-2 hover:bg-bg-secondary">
+                    <Download size={12} /> PFX
                   </Button>
                 </>
               )}
-            </>
+            </div>
           )}
+          {/* Action buttons */}
           {onRenew && canWrite && !cert.revoked && (
-            <Button size="xs" variant="secondary" onClick={onRenew} className="sm:!h-8 sm:!px-3">
-              <ArrowsClockwise size={12} className="sm:w-3.5 sm:h-3.5" />
+            <Button size="xs" variant="secondary" onClick={onRenew} title="Renew">
+              <ArrowsClockwise size={14} />
             </Button>
           )}
           {onRevoke && canWrite && !cert.revoked && (
-            <Button size="xs" variant="danger" onClick={onRevoke} className="sm:!h-8 sm:!px-3">
-              <X size={12} className="sm:w-3.5 sm:h-3.5" />
+            <Button size="xs" variant="warning-soft" onClick={onRevoke} title="Revoke">
+              <X size={14} />
             </Button>
           )}
           {onDelete && canDelete && (
-            <Button size="xs" variant="danger" onClick={onDelete} className="sm:!h-8 sm:!px-3">
-              <Trash size={12} className="sm:w-3.5 sm:h-3.5" />
+            <Button size="xs" variant="danger-soft" onClick={onDelete} title="Delete">
+              <Trash size={14} />
             </Button>
           )}
         </div>
       )}
       
       {/* Subject Information */}
-      <CompactSection title="Subject">
+      <CompactSection title="Subject" icon={Globe} iconClass="icon-bg-blue">
         <CompactGrid>
           <CompactField icon={Globe} label="Common Name" value={cert.cn || cert.common_name} />
           <CompactField icon={Buildings} label="Organization" value={cert.organization} />
@@ -242,7 +244,7 @@ export function CertificateDetails({
       </CompactSection>
       
       {/* Validity Period */}
-      <CompactSection title="Validity">
+      <CompactSection title="Validity" icon={Calendar} iconClass="icon-bg-green">
         <CompactGrid>
           <CompactField icon={Calendar} label="Valid From" value={formatDate(cert.valid_from)} />
           <CompactField icon={Calendar} label="Valid Until" value={formatDate(cert.valid_to)} />
@@ -250,7 +252,7 @@ export function CertificateDetails({
       </CompactSection>
       
       {/* Technical Details */}
-      <CompactSection title="Technical Details">
+      <CompactSection title="Technical Details" icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
           <CompactField icon={Hash} label="Serial" value={cert.serial_number} mono copyable />
           <CompactField autoIcon label="Key Type" value={cert.key_type} />
@@ -261,7 +263,7 @@ export function CertificateDetails({
       
       {/* SANs */}
       {cert.san_combined && (
-        <CompactSection title="Subject Alternative Names">
+        <CompactSection title="Subject Alternative Names" icon={Globe} iconClass="icon-bg-cyan">
           <div className="text-xs font-mono text-text-primary break-all bg-bg-tertiary/30 p-2 rounded border border-border/50">
             {cert.san_combined}
           </div>
@@ -269,7 +271,7 @@ export function CertificateDetails({
       )}
       
       {/* Issuer */}
-      <CompactSection title="Issuer">
+      <CompactSection title="Issuer" icon={ShieldCheck} iconClass="icon-bg-orange">
         <CompactGrid cols={1}>
           <CompactField autoIcon label="Issuer" value={cert.issuer} mono />
           <CompactField autoIcon label="CA" value={cert.issuer_name} />
@@ -278,7 +280,7 @@ export function CertificateDetails({
       </CompactSection>
       
       {/* Thumbprints */}
-      <CompactSection title="Fingerprints" collapsible defaultOpen={false}>
+      <CompactSection title="Fingerprints" icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
         <CompactGrid cols={1}>
           <CompactField autoIcon label="SHA-1" value={cert.thumbprint_sha1} mono copyable />
           <CompactField autoIcon label="SHA-256" value={cert.thumbprint_sha256} mono copyable />
@@ -287,7 +289,7 @@ export function CertificateDetails({
       
       {/* PEM */}
       {showPem && cert.pem && (
-        <CompactSection title="PEM Certificate" collapsible defaultOpen={false}>
+        <CompactSection title="PEM Certificate" icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
               "text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto border border-border/30",
