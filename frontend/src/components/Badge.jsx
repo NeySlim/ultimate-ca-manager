@@ -25,12 +25,12 @@ export function Badge({
     red: 'status-danger-bg status-danger-text border-transparent',
     blue: 'status-primary-bg status-primary-text border-transparent',
     yellow: 'status-warning-bg status-warning-text border-transparent',
-    purple: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-transparent',
-    violet: 'bg-violet-500/15 text-violet-600 dark:text-violet-400 border-transparent',
+    purple: 'icon-bg-violet border-transparent',
+    violet: 'icon-bg-violet border-transparent',
     amber: 'status-warning-bg status-warning-text border-transparent',
-    orange: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-transparent',
-    cyan: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-transparent',
-    teal: 'bg-teal-500/15 text-teal-600 dark:text-teal-400 border-transparent',
+    orange: 'icon-bg-orange border-transparent',
+    cyan: 'icon-bg-teal border-transparent',
+    teal: 'icon-bg-teal border-transparent',
     gray: 'bg-bg-tertiary/60 text-text-secondary border-transparent',
   }
   
@@ -89,6 +89,7 @@ export function Badge({
 /**
  * CATypeIcon - Consistent icon for Root/Intermediate CA
  * Reusable across CAsPage tree view and CADetails panel
+ * Uses global CSS classes for theme-aware colors
  */
 import { Crown, ShieldCheck } from '@phosphor-icons/react'
 
@@ -105,15 +106,13 @@ export function CATypeIcon({ isRoot, size = 'md', className }) {
     <div className={cn(
       container,
       'rounded-lg flex items-center justify-center shrink-0',
-      isRoot 
-        ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/30'
-        : 'bg-gradient-to-br from-blue-500/20 to-cyan-500/10 border border-blue-500/30',
+      isRoot ? 'ca-icon-root' : 'ca-icon-intermediate',
       className
     )}>
       {isRoot ? (
-        <Crown size={icon} weight="duotone" className="text-amber-500" />
+        <Crown size={icon} weight="duotone" />
       ) : (
-        <ShieldCheck size={icon} weight="duotone" className="text-blue-500" />
+        <ShieldCheck size={icon} weight="duotone" />
       )}
     </div>
   )

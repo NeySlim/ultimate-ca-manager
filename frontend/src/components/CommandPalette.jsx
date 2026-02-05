@@ -286,9 +286,9 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                         </div>
                         <span className={cn(
                           'text-[10px] px-1.5 py-0.5 rounded',
-                          item.status === 'valid' ? 'bg-green-500/20 text-green-500' :
-                          item.status === 'expired' ? 'bg-red-500/20 text-red-500' :
-                          'bg-yellow-500/20 text-yellow-500'
+                          item.status === 'valid' ? 'badge-bg-green' :
+                          item.status === 'expired' ? 'alert-bg-red' :
+                          'badge-bg-amber'
                         )}>{item.status}</span>
                       </button>
                     ))}
@@ -317,7 +317,7 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
                           <span className="text-[10px] text-text-tertiary truncate block">{item.subject}</span>
                         </div>
                         {item.is_root && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-500">Root</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded badge-bg-violet">Root</span>
                         )}
                       </button>
                     ))}

@@ -83,7 +83,7 @@ export function CADetails({
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <CATypeIcon isRoot={ca.is_root} size="md" />
+            <CATypeIcon isRoot={ca.is_root} size="lg" />
             <h3 className="text-base font-semibold text-text-primary truncate">
               {ca.common_name || ca.descr}
             </h3>

@@ -792,9 +792,7 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
             <div className="w-20 flex justify-center">
               <span className={cn(
                 'px-2 py-0.5 rounded-md text-[10px] font-semibold',
-                ca.type === 'root' 
-                  ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                  : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                ca.type === 'root' ? 'badge-bg-amber' : 'badge-bg-blue'
               )}>
                 {ca.type === 'root' ? 'Root' : 'Intermediate'}
               </span>
@@ -961,9 +959,7 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
           <div className="w-20 flex justify-center">
             <span className={cn(
               'px-2 py-0.5 rounded-md text-[10px] font-semibold',
-              ca.type === 'root' 
-                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+              ca.type === 'root' ? 'badge-bg-amber' : 'badge-bg-blue'
             )}>
               {ca.type === 'root' ? 'Root' : 'Intermediate'}
             </span>

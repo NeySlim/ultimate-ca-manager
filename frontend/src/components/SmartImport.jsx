@@ -112,7 +112,7 @@ function ChainCard({ chain, index }) {
   const hasIssues = chain.errors?.length > 0
   
   return (
-    <div className={`border rounded-lg p-3 ${hasIssues ? 'border-amber-500 bg-amber-500/5' : 'border-border'}`}>
+    <div className={`border rounded-lg p-3 ${hasIssues ? 'alert-bg-amber' : 'border-border'}`}>
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm font-medium">Chain {index + 1}</span>
         {chain.is_complete ? <Badge variant="green" size="xs">Complete</Badge> : <Badge variant="amber" size="xs">Incomplete</Badge>}
@@ -122,18 +122,18 @@ function ChainCard({ chain, index }) {
       <div className="flex items-center gap-1 text-xs flex-wrap">
         {chain.root && (
           <>
-            <span className="px-2 py-1 bg-amber-500/10 text-amber-600 rounded">{chain.root.subject?.split(',')[0] || 'Root'}</span>
+            <span className="px-2 py-1 rounded badge-bg-amber">{chain.root.subject?.split(',')[0] || 'Root'}</span>
             <span className="text-text-secondary">→</span>
           </>
         )}
         {chain.intermediates?.map((int, i) => (
           <span key={i}>
-            <span className="px-2 py-1 bg-blue-500/10 text-blue-600 rounded">{int.subject?.split(',')[0] || `Intermediate ${i + 1}`}</span>
+            <span className="px-2 py-1 rounded badge-bg-blue">{int.subject?.split(',')[0] || `Intermediate ${i + 1}`}</span>
             <span className="text-text-secondary mx-1">→</span>
           </span>
         ))}
         {chain.leaf && (
-          <span className="px-2 py-1 bg-cyan-500/10 text-cyan-600 rounded">{chain.leaf.subject?.split(',')[0] || chain.leaf.san_dns?.[0] || 'Leaf'}</span>
+          <span className="px-2 py-1 rounded icon-bg-teal">{chain.leaf.subject?.split(',')[0] || chain.leaf.san_dns?.[0] || 'Leaf'}</span>
         )}
       </div>
       
@@ -157,17 +157,17 @@ function ValidationIssues({ validation }) {
   return (
     <div className="space-y-2">
       {errors?.map((err, i) => (
-        <div key={`e${i}`} className="flex items-start gap-2 text-sm text-red-500 bg-red-500/10 p-2 rounded">
+        <div key={`e${i}`} className="flex items-start gap-2 text-sm p-2 rounded alert-bg-red">
           <XCircle size={16} className="shrink-0 mt-0.5" /><span>{err}</span>
         </div>
       ))}
       {warnings?.map((warn, i) => (
-        <div key={`w${i}`} className="flex items-start gap-2 text-sm text-amber-500 bg-amber-500/10 p-2 rounded">
+        <div key={`w${i}`} className="flex items-start gap-2 text-sm p-2 rounded alert-bg-amber">
           <WarningCircle size={16} className="shrink-0 mt-0.5" /><span>{warn}</span>
         </div>
       ))}
       {infos?.map((inf, i) => (
-        <div key={`i${i}`} className="flex items-start gap-2 text-sm text-green-500 bg-green-500/10 p-2 rounded">
+        <div key={`i${i}`} className="flex items-start gap-2 text-sm p-2 rounded alert-bg-green">
           <CheckCircle size={16} className="shrink-0 mt-0.5" /><span>{inf}</span>
         </div>
       ))}
@@ -427,10 +427,10 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       
       {/* Password for encrypted content */}
       {hasEncrypted && (
-        <div className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg">
-          <LockSimple size={18} className="text-amber-500" />
+        <div className="flex items-center gap-2 p-3 rounded-lg alert-bg-amber">
+          <LockSimple size={18} />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-600">Encrypted content detected</p>
+            <p className="text-sm font-medium">Encrypted content detected</p>
             <input
               type="password"
               value={password}
@@ -482,7 +482,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         
         {/* Key matching */}
         {matching?.matched_pairs?.length > 0 && (
-          <div className="text-sm text-green-600 bg-green-500/10 p-2 rounded flex items-center gap-2">
+          <div className="text-sm p-2 rounded flex items-center gap-2 alert-bg-green">
             <Link size={16} />
             {matching.matched_pairs.length} key-certificate pair{matching.matched_pairs.length > 1 ? 's' : ''} detected
           </div>

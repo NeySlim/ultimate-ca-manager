@@ -1690,6 +1690,64 @@ input:focus, select:focus, textarea:focus {
   color: var(--text-secondary);
 }
 
+/* CA Type Icons - Gradient backgrounds with borders */
+.ca-icon-root {
+  background: linear-gradient(135deg, var(--icon-amber-bg), color-mix(in srgb, var(--icon-orange-bg) 50%, transparent));
+  border: 1px solid color-mix(in srgb, var(--icon-amber-text) 30%, transparent);
+  color: var(--icon-amber-text);
+}
+
+.ca-icon-intermediate {
+  background: linear-gradient(135deg, var(--icon-blue-bg), color-mix(in srgb, var(--icon-teal-bg) 50%, transparent));
+  border: 1px solid color-mix(in srgb, var(--icon-blue-text) 30%, transparent);
+  color: var(--icon-blue-text);
+}
+
+/* Badge backgrounds for status chips */
+.badge-bg-amber {
+  background: var(--icon-amber-bg);
+  color: var(--icon-amber-text);
+  border: 1px solid color-mix(in srgb, var(--icon-amber-text) 20%, transparent);
+}
+
+.badge-bg-blue {
+  background: var(--icon-blue-bg);
+  color: var(--icon-blue-text);
+  border: 1px solid color-mix(in srgb, var(--icon-blue-text) 20%, transparent);
+}
+
+.badge-bg-green {
+  background: var(--icon-emerald-bg);
+  color: var(--icon-emerald-text);
+}
+
+.badge-bg-violet {
+  background: var(--icon-violet-bg);
+  color: var(--icon-violet-text);
+}
+
+/* Alert/info backgrounds */
+.alert-bg-amber {
+  background: var(--icon-amber-bg);
+  border: 1px solid color-mix(in srgb, var(--icon-amber-text) 20%, transparent);
+  color: var(--icon-amber-text);
+}
+
+.alert-bg-green {
+  background: var(--icon-emerald-bg);
+  color: var(--icon-emerald-text);
+}
+
+.alert-bg-blue {
+  background: var(--icon-blue-bg);
+  color: var(--icon-blue-text);
+}
+
+.alert-bg-red {
+  background: color-mix(in srgb, var(--status-danger) 15%, transparent);
+  color: var(--status-danger);
+}
+
 /* ============================================
    MOBILE PREMIUM POLISH
    Visual enhancements for mobile experience

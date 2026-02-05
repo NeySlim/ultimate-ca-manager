@@ -87,12 +87,12 @@ export function HelpModal({ isOpen, onClose, pageKey }) {
 
             {/* Tips with premium styling */}
             {content.tips && content.tips.length > 0 && (
-              <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/5 border border-amber-500/20 p-3 sm:p-4">
+              <div className="rounded-xl p-3 sm:p-4 alert-bg-amber">
                 <div className="flex items-center gap-2 mb-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                    <Lightbulb size={16} weight="fill" className="text-amber-500" />
+                  <div className="w-7 h-7 rounded-lg icon-bg-amber flex items-center justify-center">
+                    <Lightbulb size={16} weight="fill" />
                   </div>
-                  <h3 className="text-sm font-semibold text-amber-600 dark:text-amber-400">Pro Tips</h3>
+                  <h3 className="text-sm font-semibold">Pro Tips</h3>
                 </div>
                 <ul className="space-y-2">
                   {content.tips.map((tip, idx) => (
