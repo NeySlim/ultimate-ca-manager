@@ -449,7 +449,7 @@ export function DetailTabs({ tabs, activeTab, onChange, className }) {
  * @param {boolean} collapsible - Allow expand/collapse
  * @param {boolean} defaultOpen - Initial state if collapsible
  */
-export function CompactSection({ title, children, className, collapsible = false, defaultOpen = true, icon: Icon }) {
+export function CompactSection({ title, children, className, collapsible = false, defaultOpen = true, icon: Icon, iconClass }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
   
   return (
@@ -475,8 +475,8 @@ export function CompactSection({ title, children, className, collapsible = false
         
         <div className="flex items-center gap-2">
           {Icon && (
-            <div className="w-5 h-5 rounded bg-tertiary-60 flex items-center justify-center">
-              <Icon size={12} className="text-accent-70" weight="bold" />
+            <div className={cn("w-5 h-5 rounded flex items-center justify-center", iconClass || "bg-tertiary-60")}>
+              <Icon size={12} className={iconClass ? "" : "text-accent-70"} weight="bold" />
             </div>
           )}
           <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">

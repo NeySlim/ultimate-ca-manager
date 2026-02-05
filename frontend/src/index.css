@@ -850,6 +850,48 @@ input:focus, select:focus, textarea:focus {
   box-shadow: var(--shadow-inner-sm);
 }
 
+/* === DANGER SOFT BUTTON (less aggressive) === */
+.btn-danger-soft {
+  background: color-mix(in srgb, var(--status-error) 10%, var(--bg-secondary));
+  border: 1px solid color-mix(in srgb, var(--status-error) 30%, var(--border));
+  color: var(--status-error);
+  border-radius: 8px;
+  position: relative;
+  box-shadow: var(--shadow-xs);
+  transition: all var(--duration-normal) var(--ease-smooth);
+}
+
+.btn-danger-soft:hover {
+  background: color-mix(in srgb, var(--status-error) 20%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--status-error) 50%, var(--border));
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.btn-danger-soft:active {
+  transform: translateY(0);
+  background: color-mix(in srgb, var(--status-error) 25%, var(--bg-secondary));
+  box-shadow: var(--shadow-inner-sm);
+}
+
+/* === WARNING SOFT BUTTON === */
+.btn-warning-soft {
+  background: color-mix(in srgb, var(--status-warning) 10%, var(--bg-secondary));
+  border: 1px solid color-mix(in srgb, var(--status-warning) 30%, var(--border));
+  color: color-mix(in srgb, var(--status-warning) 80%, #000);
+  border-radius: 8px;
+  position: relative;
+  box-shadow: var(--shadow-xs);
+  transition: all var(--duration-normal) var(--ease-smooth);
+}
+
+.btn-warning-soft:hover {
+  background: color-mix(in srgb, var(--status-warning) 20%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--status-warning) 50%, var(--border));
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
 /* === INPUT SOFT FOCUS === */
 .input-soft-focus {
   background: var(--bg-tertiary);
@@ -1626,6 +1668,26 @@ input:focus, select:focus, textarea:focus {
 .icon-bg-teal {
   background: var(--icon-teal-bg);
   color: var(--icon-teal-text);
+}
+
+.icon-bg-green {
+  background: var(--icon-emerald-bg);
+  color: var(--icon-emerald-text);
+}
+
+.icon-bg-purple {
+  background: var(--icon-violet-bg);
+  color: var(--icon-violet-text);
+}
+
+.icon-bg-cyan {
+  background: var(--icon-teal-bg);
+  color: var(--icon-teal-text);
+}
+
+.icon-bg-gray {
+  background: color-mix(in srgb, var(--text-tertiary) 15%, transparent);
+  color: var(--text-secondary);
 }
 
 /* ============================================

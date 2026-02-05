@@ -568,13 +568,13 @@ export default function UsersGroupsPage() {
           </>
         )}
         {canDelete('users') && (
-          <Button size="sm" variant="danger" onClick={() => handleDeleteUser(selectedUser)}>
+          <Button size="sm" variant="danger-soft" onClick={() => handleDeleteUser(selectedUser)}>
             <Trash size={14} /> Delete
           </Button>
         )}
       </div>
 
-      <CompactSection title="User Information" icon={UserCircle}>
+      <CompactSection title="User Information" icon={UserCircle} iconClass="icon-bg-blue">
         <CompactGrid columns={1}>
           <CompactField label="Full Name" value={selectedUser.full_name || '—'} />
           <CompactField label="Email" value={selectedUser.email} />
@@ -582,7 +582,7 @@ export default function UsersGroupsPage() {
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title="Activity" icon={Clock}>
+      <CompactSection title="Activity" icon={Clock} iconClass="icon-bg-green">
         <CompactGrid columns={1}>
           <CompactField label="Created" value={formatDate(selectedUser.created_at)} />
           <CompactField label="Last Login" value={selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never'} />
@@ -590,7 +590,7 @@ export default function UsersGroupsPage() {
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title="Security" icon={ShieldCheck}>
+      <CompactSection title="Security" icon={ShieldCheck} iconClass="icon-bg-purple">
         <CompactGrid columns={1}>
           <CompactField label="MFA Enabled" value={selectedUser.mfa_enabled ? 'Yes' : 'No'} />
           <CompactField label="TOTP Configured" value={selectedUser.totp_confirmed ? 'Yes' : 'No'} />
@@ -616,13 +616,13 @@ export default function UsersGroupsPage() {
           </Button>
         )}
         {canDelete('users') && (
-          <Button size="sm" variant="danger" onClick={() => handleDeleteGroup(selectedGroup)}>
+          <Button size="sm" variant="danger-soft" onClick={() => handleDeleteGroup(selectedGroup)}>
             <Trash size={14} /> Delete
           </Button>
         )}
       </div>
 
-      <CompactSection title="Group Information">
+      <CompactSection title="Group Information" icon={Users} iconClass="icon-bg-orange">
         <CompactGrid columns={1}>
           <CompactField label="Name" value={selectedGroup.name} />
           <CompactField label="Description" value={selectedGroup.description || '—'} />
