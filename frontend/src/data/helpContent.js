@@ -830,6 +830,71 @@ export const helpContent = {
       'Attribute mapping errors may prevent login'
     ],
     related: ['Users', 'Groups', 'RBAC']
+  },
+
+  // ===========================================
+  // SECURITY DASHBOARD (Pro)
+  // ===========================================
+  security: {
+    title: 'Security Dashboard',
+    subtitle: 'Monitor and manage security settings (Pro)',
+    overview: 'The Security Dashboard provides visibility into UCM security status. Monitor secrets, detect anomalies, and verify audit log integrity.',
+    sections: [
+      {
+        title: 'Secrets Management',
+        icon: Key,
+        content: 'UCM uses cryptographic secrets for JWT signing and session management:',
+        definitions: [
+          { term: 'JWT Secret', description: 'Signs authentication tokens (32+ bytes recommended)' },
+          { term: 'Session Secret', description: 'Encrypts server-side sessions' },
+          { term: 'Encryption Key', description: 'Optional key for encrypting private keys at rest' },
+        ]
+      },
+      {
+        title: 'Secret Rotation',
+        icon: ShieldCheck,
+        content: 'Rotate secrets periodically for security:',
+        items: [
+          { label: 'Generate', text: 'Click "Rotate JWT Secret" to generate a new secret' },
+          { label: 'Apply', text: 'Copy the new secret to your environment variables' },
+          { label: 'Restart', text: 'Restart UCM backend to apply the new secret' },
+          { label: 'Grace Period', text: 'Old tokens remain valid until they expire' },
+        ]
+      },
+      {
+        title: 'Anomaly Detection',
+        icon: ShieldCheck,
+        content: 'Automatic detection of suspicious login patterns:',
+        definitions: [
+          { term: 'Credential Stuffing', description: 'Multiple failed logins from same IP' },
+          { term: 'Unusual Hours', description: 'Logins outside normal business hours' },
+          { term: 'New Device', description: 'Login from previously unseen device/location' },
+          { term: 'Brute Force', description: 'Rapid login attempts on same account' },
+        ]
+      },
+      {
+        title: 'Audit Integrity',
+        icon: Lock,
+        content: 'Audit logs use a cryptographic hash chain. Each entry contains a hash of the previous entry, making it impossible to modify or delete logs without detection.',
+        items: [
+          { label: 'Verify', text: 'Click "Verify Audit Integrity" to check the hash chain' },
+          { label: 'Green', text: 'All entries verified - no tampering detected' },
+          { label: 'Red', text: 'Hash mismatch - investigate immediately' },
+        ]
+      }
+    ],
+    tips: [
+      'Rotate JWT secrets every 90 days',
+      'Review anomalies daily for suspicious activity',
+      'Verify audit integrity after any incident',
+      'Use strong secrets (32+ random bytes)'
+    ],
+    warnings: [
+      'Rotating secrets invalidates all existing sessions',
+      'Keep backup of current secrets before rotation',
+      'Audit integrity failures may indicate compromise'
+    ],
+    related: ['Audit Logs', 'Users', 'Settings']
   }
 }
 

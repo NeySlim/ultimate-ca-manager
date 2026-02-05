@@ -28,6 +28,9 @@ const RBACPage = lazy(() =>
 const HSMPage = lazy(() => 
   import('./pro/pages/HSMPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
 )
+const SecurityDashboardPage = lazy(() => 
+  import('./pro/pages/SecurityDashboardPage').catch(() => ({ default: () => <Navigate to="/" replace /> }))
+)
 
 // Loading fallback for lazy components
 function PageLoader() {
@@ -82,6 +85,7 @@ function AppRoutes() {
           <Route path="/rbac" element={<ProtectedRoute><RBACPage /></ProtectedRoute>} />
           <Route path="/sso" element={<Navigate to="/settings?tab=sso" replace />} />
           <Route path="/hsm" element={<ProtectedRoute><HSMPage /></ProtectedRoute>} />
+          <Route path="/security" element={<ProtectedRoute><SecurityDashboardPage /></ProtectedRoute>} />
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />
