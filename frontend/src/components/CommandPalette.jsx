@@ -1,16 +1,18 @@
 /**
  * Command Palette Component - Global search with Cmd+K
  */
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as Dialog from '@radix-ui/react-dialog'
 import {
   MagnifyingGlass, House, Certificate, ShieldCheck, FileText, List,
   User, Key, Gear, Robot, UploadSimple, ClockCounterClockwise,
-  UsersThree, Shield, Lock, UserCircle, ArrowRight, Command, Clock, Star
+  UsersThree, Shield, Lock, UserCircle, ArrowRight, Command, Clock, Star,
+  Spinner, Database
 } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { useAllRecentHistory, useAllFavorites } from '../hooks'
+import { searchService } from '../services'
 
 const COMMANDS = [
   // Navigation
@@ -43,34 +45,80 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [searchResults, setSearchResults] = useState(null)
+  const [isSearching, setIsSearching] = useState(false)
   const inputRef = useRef(null)
   const listRef = useRef(null)
+  const searchTimeoutRef = useRef(null)
   const { allRecent, refreshHistory } = useAllRecentHistory()
   const { allFavorites, refreshFavorites } = useAllFavorites()
 
   // Get icon for recent item type
   const getTypeIcon = (type) => {
     switch (type) {
-      case 'certificates': return Certificate
-      case 'cas': return ShieldCheck
-      case 'users': return User
-      case 'csrs': return FileText
-      case 'templates': return List
+      case 'certificates': case 'certificate': return Certificate
+      case 'cas': case 'ca': return ShieldCheck
+      case 'users': case 'user': return User
+      case 'csrs': case 'csr': return FileText
+      case 'templates': case 'template': return List
       default: return Clock
     }
   }
   
-  // Get path for recent item
+  // Get path for item type
   const getTypePath = (type, id) => {
     switch (type) {
-      case 'certificates': return `/certificates?selected=${id}`
-      case 'cas': return `/cas?selected=${id}`
-      case 'users': return `/users?selected=${id}`
-      case 'csrs': return `/csrs?selected=${id}`
-      case 'templates': return `/templates?selected=${id}`
+      case 'certificates': case 'certificate': return `/certificates?selected=${id}`
+      case 'cas': case 'ca': return `/cas?selected=${id}`
+      case 'users': case 'user': return `/users?selected=${id}`
+      case 'csrs': case 'csr': return `/csrs?selected=${id}`
+      case 'templates': case 'template': return `/templates?selected=${id}`
       default: return '/'
     }
   }
+
+  // Debounced global search
+  const performSearch = useCallback(async (query) => {
+    if (!query || query.length < 2) {
+      setSearchResults(null)
+      setIsSearching(false)
+      return
+    }
+    
+    setIsSearching(true)
+    try {
+      const results = await searchService.globalSearch(query, 5)
+      setSearchResults(results)
+    } catch (error) {
+      console.error('Search failed:', error)
+      setSearchResults(null)
+    } finally {
+      setIsSearching(false)
+    }
+  }, [])
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+    
+    if (search.length >= 2) {
+      setIsSearching(true)
+      searchTimeoutRef.current = setTimeout(() => {
+        performSearch(search)
+      }, 300)
+    } else {
+      setSearchResults(null)
+      setIsSearching(false)
+    }
+    
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [search, performSearch])
 
   // Refresh history and favorites when opened
   useEffect(() => {
@@ -191,13 +239,17 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
         >
           {/* Search Input */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-            <MagnifyingGlass size={18} className="text-text-tertiary" />
+            {isSearching ? (
+              <Spinner size={18} className="text-accent-primary animate-spin" />
+            ) : (
+              <MagnifyingGlass size={18} className="text-text-tertiary" />
+            )}
             <input
               ref={inputRef}
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search commands..."
+              placeholder="Search commands, certificates, CAs, users..."
               className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
             />
             <kbd className="px-1.5 py-0.5 text-[10px] bg-bg-tertiary border border-border rounded text-text-tertiary">
@@ -207,8 +259,173 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
 
           {/* Commands List */}
           <div ref={listRef} className="max-h-80 overflow-auto p-2">
+            {/* Database Search Results */}
+            {searchResults && (
+              <>
+                {/* Certificates */}
+                {searchResults.certificates?.length > 0 && (
+                  <div className="mb-2">
+                    <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                      <Certificate size={10} />
+                      Certificates ({searchResults.certificates.length})
+                    </div>
+                    {searchResults.certificates.map(item => (
+                      <button
+                        key={`cert-${item.id}`}
+                        onClick={() => {
+                          navigate(`/certificates?selected=${item.id}`)
+                          onOpenChange(false)
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
+                      >
+                        <Certificate size={16} weight="duotone" className="text-blue-500" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm block truncate">{item.name}</span>
+                          <span className="text-[10px] text-text-tertiary truncate block">{item.subject}</span>
+                        </div>
+                        <span className={cn(
+                          'text-[10px] px-1.5 py-0.5 rounded',
+                          item.status === 'valid' ? 'bg-green-500/20 text-green-500' :
+                          item.status === 'expired' ? 'bg-red-500/20 text-red-500' :
+                          'bg-yellow-500/20 text-yellow-500'
+                        )}>{item.status}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* CAs */}
+                {searchResults.cas?.length > 0 && (
+                  <div className="mb-2">
+                    <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck size={10} />
+                      Certificate Authorities ({searchResults.cas.length})
+                    </div>
+                    {searchResults.cas.map(item => (
+                      <button
+                        key={`ca-${item.id}`}
+                        onClick={() => {
+                          navigate(`/cas?selected=${item.id}`)
+                          onOpenChange(false)
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
+                      >
+                        <ShieldCheck size={16} weight="duotone" className="text-violet-500" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm block truncate">{item.name}</span>
+                          <span className="text-[10px] text-text-tertiary truncate block">{item.subject}</span>
+                        </div>
+                        {item.is_root && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-500">Root</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Users */}
+                {searchResults.users?.length > 0 && (
+                  <div className="mb-2">
+                    <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                      <User size={10} />
+                      Users ({searchResults.users.length})
+                    </div>
+                    {searchResults.users.map(item => (
+                      <button
+                        key={`user-${item.id}`}
+                        onClick={() => {
+                          navigate(`/users?selected=${item.id}`)
+                          onOpenChange(false)
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
+                      >
+                        <User size={16} weight="duotone" className="text-emerald-500" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm block truncate">{item.name}</span>
+                          <span className="text-[10px] text-text-tertiary truncate block">{item.email}</span>
+                        </div>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary">{item.role}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Templates */}
+                {searchResults.templates?.length > 0 && (
+                  <div className="mb-2">
+                    <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                      <List size={10} />
+                      Templates ({searchResults.templates.length})
+                    </div>
+                    {searchResults.templates.map(item => (
+                      <button
+                        key={`tpl-${item.id}`}
+                        onClick={() => {
+                          navigate(`/templates?selected=${item.id}`)
+                          onOpenChange(false)
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
+                      >
+                        <List size={16} weight="duotone" className="text-orange-500" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm block truncate">{item.name}</span>
+                          <span className="text-[10px] text-text-tertiary truncate block">{item.description}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* CSRs */}
+                {searchResults.csrs?.length > 0 && (
+                  <div className="mb-2">
+                    <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
+                      <FileText size={10} />
+                      CSRs ({searchResults.csrs.length})
+                    </div>
+                    {searchResults.csrs.map(item => (
+                      <button
+                        key={`csr-${item.id}`}
+                        onClick={() => {
+                          navigate(`/csrs?selected=${item.id}`)
+                          onOpenChange(false)
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
+                      >
+                        <FileText size={16} weight="duotone" className="text-teal-500" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm block truncate">{item.name}</span>
+                          <span className="text-[10px] text-text-tertiary truncate block">{item.subject}</span>
+                        </div>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary">{item.status}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* No results message */}
+                {searchResults.certificates?.length === 0 && 
+                 searchResults.cas?.length === 0 && 
+                 searchResults.users?.length === 0 && 
+                 searchResults.templates?.length === 0 && 
+                 searchResults.csrs?.length === 0 && (
+                  <div className="px-3 py-4 text-center text-text-tertiary text-sm">
+                    <Database size={24} className="mx-auto mb-2 opacity-50" />
+                    No results found in database
+                  </div>
+                )}
+
+                {/* Separator */}
+                {(searchResults.certificates?.length > 0 || searchResults.cas?.length > 0 || 
+                  searchResults.users?.length > 0 || searchResults.templates?.length > 0 || 
+                  searchResults.csrs?.length > 0) && filteredCommands.length > 0 && (
+                  <div className="border-t border-border my-2" />
+                )}
+              </>
+            )}
+
             {/* Favorites Section */}
-            {filteredFavorites.length > 0 && (
+            {filteredFavorites.length > 0 && !searchResults && (
               <div className="mb-2">
                 <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1.5">
                   <Star size={10} weight="fill" className="text-yellow-500" />
