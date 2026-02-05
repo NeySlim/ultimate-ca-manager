@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
   SignOut, Palette, Check, UserCircle, UploadSimple, ClockCounterClockwise, Robot,
-  UsersThree, Shield, Crown, Lock, FileX, Vault, Warning
+  UsersThree, Shield, Crown, Lock, FileX, Vault, Warning, Wrench
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -82,6 +82,7 @@ export function Sidebar({ activePage }) {
     { id: 'crl-ocsp', icon: FileX, label: 'CRL/OCSP', path: '/crl-ocsp' },
     { id: 'truststore', icon: Vault, label: 'Trust Store', path: '/truststore' },
     { id: 'import', icon: UploadSimple, label: 'Import', path: '/import' },
+    { id: 'tools', icon: Wrench, label: 'Tools', path: '/tools' },
     { id: 'audit', icon: ClockCounterClockwise, label: 'Audit', path: '/audit' },
     { id: 'settings', icon: Gear, label: 'Settings', path: '/settings' },
   ]

@@ -8,7 +8,7 @@ import {
   MagnifyingGlass, House, Certificate, ShieldCheck, FileText, List,
   User, Key, Gear, Robot, UploadSimple, ClockCounterClockwise,
   UsersThree, Shield, Lock, UserCircle, ArrowRight, Command, Clock, Star,
-  Spinner, Database
+  Spinner, Database, Wrench
 } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { useAllRecentHistory, useAllFavorites } from '../hooks'
@@ -25,6 +25,7 @@ const COMMANDS = [
   { id: 'acme', label: 'Go to ACME', icon: Key, path: '/acme', category: 'Navigation' },
   { id: 'scep', label: 'Go to SCEP', icon: Robot, path: '/scep-config', category: 'Navigation' },
   { id: 'import', label: 'Go to Import', icon: UploadSimple, path: '/import', category: 'Navigation' },
+  { id: 'tools', label: 'Go to Certificate Tools', icon: Wrench, path: '/tools', category: 'Navigation' },
   { id: 'audit', label: 'Go to Audit Logs', icon: ClockCounterClockwise, path: '/audit', category: 'Navigation' },
   { id: 'settings', label: 'Go to Settings', icon: Gear, path: '/settings', category: 'Navigation' },
   { id: 'account', label: 'Go to Account', icon: UserCircle, path: '/account', category: 'Navigation' },

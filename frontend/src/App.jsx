@@ -15,6 +15,7 @@ const ACMEPage = lazy(() => import('./pages/ACMEPage'))
 const SCEPPage = lazy(() => import('./pages/SCEPPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const ImportExportPage = lazy(() => import('./pages/ImportExportPage'))
+const CertificateToolsPage = lazy(() => import('./pages/CertificateToolsPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'))
 const CRLOCSPPage = lazy(() => import('./pages/CRLOCSPPage'))
@@ -71,6 +72,7 @@ function AppRoutes() {
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           <Route path="/audit" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
           <Route path="/import" element={<ProtectedRoute><ImportExportPage /></ProtectedRoute>} />
+          <Route path="/tools" element={<ProtectedRoute><CertificateToolsPage /></ProtectedRoute>} />
           <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
           <Route path="/crl-ocsp" element={<ProtectedRoute><CRLOCSPPage /></ProtectedRoute>} />
           <Route path="/truststore" element={<ProtectedRoute><TrustStorePage /></ProtectedRoute>} />
