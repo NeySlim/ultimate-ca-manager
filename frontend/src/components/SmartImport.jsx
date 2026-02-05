@@ -296,11 +296,14 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         content, 
         password: password || undefined 
       })
-      setAnalysisResult(response.data.data)
-      setSelectedObjects(new Set(response.data.data.objects.map((_, i) => i)))
+      // response = {success, data} - data contains {objects, chains, ...}
+      const result = response.data || response
+      setAnalysisResult(result)
+      setSelectedObjects(new Set(result.objects.map((_, i) => i)))
       setStep('preview')
     } catch (err) {
-      showError(err.response?.data?.error || 'Failed to analyze content')
+      console.error('[SmartImport] Analysis error:', err)
+      showError(err.response?.data?.error || err.message || 'Failed to analyze content')
     } finally {
       setIsAnalyzing(false)
     }
@@ -318,10 +321,11 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         password: password || undefined,
         options: { ...importOptions, selected_indices: Array.from(selectedObjects) }
       })
-      setImportResult(response.data.data)
+      const result = response.data || response
+      setImportResult(result)
       setStep('result')
-      if (response.data.data.imported?.length > 0) {
-        showSuccess(`Successfully imported ${response.data.data.imported.length} object(s)`)
+      if (result.imported?.length > 0) {
+        showSuccess(`Successfully imported ${result.imported.length} object(s)`)
       }
     } catch (err) {
       showError(err.response?.data?.error || 'Import failed')
