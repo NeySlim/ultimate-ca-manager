@@ -153,7 +153,7 @@ export function CADetails({
             </Button>
           )}
           {onDelete && canDelete && (
-            <Button size="sm" variant="danger" onClick={onDelete}>
+            <Button size="sm" variant="danger-soft" onClick={onDelete}>
               <Trash size={14} /> Delete
             </Button>
           )}
@@ -161,7 +161,7 @@ export function CADetails({
       )}
       
       {/* Subject Information */}
-      <CompactSection title="Subject">
+      <CompactSection title="Subject" icon={Globe} iconClass="icon-bg-blue">
         <CompactGrid>
           <CompactField icon={Globe} label="Common Name" value={ca.common_name} />
           <CompactField icon={Buildings} label="Organization" value={ca.organization} />
@@ -175,7 +175,7 @@ export function CADetails({
       
       {/* Issuer (if intermediate) */}
       {!ca.is_root && ca.issuer && (
-        <CompactSection title="Issuer">
+        <CompactSection title="Issuer" icon={TreeStructure} iconClass="icon-bg-orange">
           <CompactGrid cols={1}>
             <CompactField icon={TreeStructure} label="Issuer DN" value={ca.issuer} />
           </CompactGrid>
@@ -183,7 +183,7 @@ export function CADetails({
       )}
       
       {/* Validity Period */}
-      <CompactSection title="Validity">
+      <CompactSection title="Validity" icon={Calendar} iconClass="icon-bg-green">
         <CompactGrid>
           <CompactField icon={Calendar} label="Valid From" value={formatDate(ca.valid_from)} />
           <CompactField icon={Calendar} label="Valid Until" value={formatDate(ca.valid_to)} />
@@ -191,7 +191,7 @@ export function CADetails({
       </CompactSection>
       
       {/* Technical Details */}
-      <CompactSection title="Technical Details">
+      <CompactSection title="Technical Details" icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
           <CompactField icon={Hash} label="Serial" value={ca.serial} mono copyable />
           <CompactField autoIcon label="Key Type" value={ca.key_type} />
@@ -202,7 +202,7 @@ export function CADetails({
       
       {/* CRL/OCSP Configuration */}
       {(ca.cdp_enabled || ca.ocsp_enabled) && (
-        <CompactSection title="Revocation Configuration">
+        <CompactSection title="Revocation Configuration" icon={Link} iconClass="icon-bg-cyan">
           <CompactGrid cols={1}>
             {ca.cdp_enabled && (
               <CompactField icon={Link} label="CRL Distribution Point" value={ca.cdp_url} mono />
@@ -215,7 +215,7 @@ export function CADetails({
       )}
       
       {/* Fingerprints */}
-      <CompactSection title="Fingerprints" collapsible defaultOpen={false}>
+      <CompactSection title="Fingerprints" icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
         <CompactGrid cols={1}>
           <CompactField icon={Fingerprint} label="SHA-256" value={ca.thumbprint_sha256} mono copyable />
           <CompactField icon={Fingerprint} label="SHA-1" value={ca.thumbprint_sha1} mono copyable />
@@ -224,7 +224,7 @@ export function CADetails({
       
       {/* PEM */}
       {showPem && ca.pem && (
-        <CompactSection title="PEM Certificate" collapsible defaultOpen={false}>
+        <CompactSection title="PEM Certificate" icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
               "text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",

@@ -18,6 +18,8 @@ export function Button({ children, variant = 'primary', size = 'default', loadin
     primary: 'btn-gradient text-white',
     secondary: 'btn-soft text-text-primary',
     danger: 'btn-gradient danger text-white',
+    'danger-soft': 'btn-danger-soft',
+    'warning-soft': 'btn-warning-soft',
     success: 'btn-gradient success text-white',
     ghost: 'hover:bg-bg-tertiary/80 text-text-primary hover:text-text-primary transition-colors',
     outline: 'border border-border bg-transparent text-text-primary hover:bg-bg-tertiary/60 hover:border-border-strong transition-all',
