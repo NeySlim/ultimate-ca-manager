@@ -85,3 +85,36 @@ export function Badge({
     </span>
   )
 }
+
+/**
+ * CATypeIcon - Consistent icon for Root/Intermediate CA
+ * Reusable across CAsPage tree view and CADetails panel
+ */
+import { Crown, ShieldCheck } from '@phosphor-icons/react'
+
+export function CATypeIcon({ isRoot, size = 'md', className }) {
+  const sizes = {
+    sm: { container: 'w-5 h-5', icon: 14 },
+    md: { container: 'w-7 h-7', icon: 16 },
+    lg: { container: 'w-8 h-8', icon: 18 }
+  }
+  
+  const { container, icon } = sizes[size] || sizes.md
+  
+  return (
+    <div className={cn(
+      container,
+      'rounded-lg flex items-center justify-center shrink-0',
+      isRoot 
+        ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/30'
+        : 'bg-gradient-to-br from-blue-500/20 to-cyan-500/10 border border-blue-500/30',
+      className
+    )}>
+      {isRoot ? (
+        <Crown size={icon} weight="duotone" className="text-amber-500" />
+      ) : (
+        <ShieldCheck size={icon} weight="duotone" className="text-blue-500" />
+      )}
+    </div>
+  )
+}

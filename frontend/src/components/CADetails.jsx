@@ -23,13 +23,11 @@ import {
   Hash,
   Fingerprint,
   TreeStructure,
-  Link,
-  Crown
+  Link
 } from '@phosphor-icons/react'
-import { Badge } from './Badge'
+import { Badge, CATypeIcon } from './Badge'
 import { Button } from './Button'
 import { CompactSection, CompactGrid, CompactField } from './DetailCard'
-import { cn } from '../lib/utils'
 
 // Format date helper
 function formatDate(dateStr, format = 'full') {
@@ -85,11 +83,7 @@ export function CADetails({
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            {ca.is_root ? (
-              <Crown size={18} weight="duotone" className="text-amber-500 flex-shrink-0" />
-            ) : (
-              <ShieldCheck size={18} weight="duotone" className="text-blue-500 flex-shrink-0" />
-            )}
+            <CATypeIcon isRoot={ca.is_root} size="md" />
             <h3 className="text-base font-semibold text-text-primary truncate">
               {ca.common_name || ca.descr}
             </h3>
@@ -101,7 +95,7 @@ export function CADetails({
             </Badge>
           </div>
           {ca.organization && (
-            <p className="text-xs text-text-secondary mt-1 pl-6">{ca.organization}</p>
+            <p className="text-xs text-text-secondary mt-1 pl-9">{ca.organization}</p>
           )}
         </div>
       </div>

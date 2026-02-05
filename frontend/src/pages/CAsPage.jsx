@@ -4,14 +4,14 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
-  ShieldCheck, Crown, Key, Download, Trash, PencilSimple,
+  Key, Download, Trash, PencilSimple,
   Certificate, UploadSimple, Clock, Plus, Warning, CaretRight, CaretDown,
-  TreeStructure, List, Copy, Check
+  TreeStructure, List, Copy, Check, Crown, ShieldCheck
 } from '@phosphor-icons/react'
 import {
   Badge, Button, Modal, Input, Select, HelpCard, LoadingSpinner,
   CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats,
-  FilterSelect
+  FilterSelect, CATypeIcon
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout } from '../components/ui/responsive'
@@ -766,18 +766,7 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
           )}
           
           {/* Icon with background */}
-          <div className={cn(
-            'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-            ca.type === 'root' 
-              ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/20'
-              : 'bg-gradient-to-br from-blue-500/20 to-cyan-500/10 border border-blue-500/20'
-          )}>
-            {ca.type === 'root' ? (
-              <Crown size={16} weight="duotone" className="text-amber-500" />
-            ) : (
-              <ShieldCheck size={16} weight="duotone" className="text-blue-500" />
-            )}
-          </div>
+          <CATypeIcon isRoot={ca.type === 'root'} size="lg" />
         </div>
         
         {/* Name & Subject */}
@@ -936,18 +925,7 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
       )}
       
       {/* Icon with background */}
-      <div className={cn(
-        'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-        ca.type === 'root' 
-          ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/20'
-          : 'bg-gradient-to-br from-blue-500/20 to-cyan-500/10 border border-blue-500/20'
-      )}>
-        {ca.type === 'root' ? (
-          <Crown size={16} weight="duotone" className="text-amber-500" />
-        ) : (
-          <ShieldCheck size={16} weight="duotone" className="text-blue-500" />
-        )}
-      </div>
+      <CATypeIcon isRoot={ca.type === 'root'} size="lg" />
       
       {/* Name & Subject */}
       <div className="flex-1 min-w-0">
