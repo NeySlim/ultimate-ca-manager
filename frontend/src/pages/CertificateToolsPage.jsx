@@ -6,7 +6,7 @@ import { useState, useCallback } from 'react'
 import {
   Wrench, Globe, FileMagnifyingGlass, Key, ArrowsLeftRight,
   CheckCircle, XCircle, Warning, Certificate, Lock, ShieldCheck,
-  Copy, Download, ArrowRight, Spinner, Info, ClipboardText
+  Copy, Download, ArrowRight, Spinner, Info, ClipboardText, UploadSimple
 } from '@phosphor-icons/react'
 import {
   Button, Badge, Textarea, Input, Modal, HelpCard,
@@ -116,12 +116,47 @@ export default function CertificateToolsPage() {
 
   // Converter state
   const [convertPem, setConvertPem] = useState('')
+  const [convertFile, setConvertFile] = useState(null)
+  const [convertFileData, setConvertFileData] = useState(null)
   const [convertType, setConvertType] = useState('certificate')
   const [convertFormat, setConvertFormat] = useState('der')
   const [convertKey, setConvertKey] = useState('')
+  const [convertKeyFile, setConvertKeyFile] = useState(null)
   const [convertChain, setConvertChain] = useState('')
   const [convertPassword, setConvertPassword] = useState('')
   const [pkcs12Password, setPkcs12Password] = useState('')
+
+  // Handle file upload for converter
+  const handleConvertFileChange = async (e, setter, dataSetter) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setter(file)
+    
+    // Read file content
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const content = event.target.result
+      // Check if it's text (PEM) or binary
+      if (typeof content === 'string') {
+        dataSetter(content)
+      } else {
+        // Binary - convert to base64
+        const bytes = new Uint8Array(content)
+        let binary = ''
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i])
+        }
+        dataSetter('BASE64:' + btoa(binary))
+      }
+    }
+    
+    // Try reading as text first for PEM files
+    if (file.name.match(/\.(pem|crt|cer|key|csr)$/i)) {
+      reader.readAsText(file)
+    } else {
+      reader.readAsArrayBuffer(file)
+    }
+  }
 
   const resetResult = () => setResult(null)
 
@@ -210,11 +245,15 @@ export default function CertificateToolsPage() {
   }
 
   const handleConvert = async () => {
-    if (!convertPem.trim()) {
-      showError('Please paste content to convert')
+    // Get content from file or textarea
+    const content = convertFileData || convertPem.trim()
+    const keyContent = convertKeyFile ? await readFileAsText(convertKeyFile) : convertKey.trim()
+    
+    if (!content) {
+      showError('Please upload a file or paste content to convert')
       return
     }
-    if (convertFormat === 'pkcs12' && !convertKey.trim()) {
+    if (convertFormat === 'pkcs12' && !keyContent) {
       showError('Private key is required for PKCS12 conversion')
       return
     }
@@ -222,10 +261,10 @@ export default function CertificateToolsPage() {
     resetResult()
     try {
       const response = await apiClient.post('/api/v2/tools/convert', {
-        pem: convertPem.trim(),
+        pem: content,
         input_type: convertType,
         output_format: convertFormat,
-        private_key: convertKey.trim(),
+        private_key: keyContent,
         chain: convertChain.trim(),
         password: convertPassword,
         pkcs12_password: pkcs12Password
@@ -237,6 +276,15 @@ export default function CertificateToolsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Helper to read file as text
+  const readFileAsText = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = (e) => resolve(e.target.result)
+      reader.readAsText(file)
+    })
   }
 
   const downloadConverted = () => {
@@ -269,6 +317,66 @@ export default function CertificateToolsPage() {
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
     showSuccess('Copied to clipboard')
+  }
+
+  // Reusable Textarea with file upload
+  const TextareaWithUpload = ({ label, placeholder, value, onChange, rows = 6, accept = '.pem,.crt,.cer,.der,.p12,.pfx,.p7b,.key,.csr' }) => {
+    const fileInputId = `file-${label.replace(/\s/g, '-').toLowerCase()}`
+    
+    const handleFile = async (e) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+      
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const content = event.target.result
+        if (typeof content === 'string') {
+          onChange({ target: { value: content } })
+        } else {
+          // Binary - convert to base64 with prefix
+          const bytes = new Uint8Array(content)
+          let binary = ''
+          for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i])
+          }
+          onChange({ target: { value: 'BASE64:' + btoa(binary) } })
+        }
+      }
+      
+      // PEM files as text, others as binary
+      if (file.name.match(/\.(pem|crt|cer|key|csr)$/i)) {
+        reader.readAsText(file)
+      } else {
+        reader.readAsArrayBuffer(file)
+      }
+    }
+    
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-text-primary">{label}</label>
+          <label htmlFor={fileInputId} className="flex items-center gap-1 text-xs text-accent-primary hover:underline cursor-pointer">
+            <UploadSimple size={12} />
+            Upload file
+          </label>
+          <input
+            id={fileInputId}
+            type="file"
+            accept={accept}
+            onChange={handleFile}
+            className="hidden"
+          />
+        </div>
+        <textarea
+          placeholder={placeholder}
+          value={value?.startsWith('BASE64:') ? `[Binary file loaded - ${Math.round(value.length / 1.37)} bytes]` : value}
+          onChange={onChange}
+          rows={rows}
+          className="w-full px-3 py-2 rounded-md border border-border bg-bg-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary/30 font-mono text-xs resize-none"
+          readOnly={value?.startsWith('BASE64:')}
+        />
+      </div>
+    )
   }
 
   // Render tool selector
@@ -330,13 +438,13 @@ export default function CertificateToolsPage() {
   // Render CSR Decoder
   const renderCSRDecoder = () => (
     <div className="space-y-4">
-      <Textarea
-        label="CSR (PEM format)"
+      <TextareaWithUpload
+        label="CSR (PEM or DER)"
         placeholder="-----BEGIN CERTIFICATE REQUEST-----&#10;...&#10;-----END CERTIFICATE REQUEST-----"
         value={csrPem}
         onChange={(e) => setCsrPem(e.target.value)}
         rows={8}
-        className="font-mono text-xs"
+        accept=".pem,.csr,.der"
       />
       <Button onClick={handleDecodeCSR} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <FileMagnifyingGlass size={16} />}
@@ -348,13 +456,13 @@ export default function CertificateToolsPage() {
   // Render Certificate Decoder
   const renderCertDecoder = () => (
     <div className="space-y-4">
-      <Textarea
-        label="Certificate (PEM format)"
+      <TextareaWithUpload
+        label="Certificate (PEM or DER)"
         placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
         value={certPem}
         onChange={(e) => setCertPem(e.target.value)}
         rows={8}
-        className="font-mono text-xs"
+        accept=".pem,.crt,.cer,.der"
       />
       <Button onClick={handleDecodeCert} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Certificate size={16} />}
@@ -367,29 +475,29 @@ export default function CertificateToolsPage() {
   const renderKeyMatcher = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Textarea
+        <TextareaWithUpload
           label="Certificate (optional)"
           placeholder="-----BEGIN CERTIFICATE-----"
           value={matchCert}
           onChange={(e) => setMatchCert(e.target.value)}
           rows={6}
-          className="font-mono text-xs"
+          accept=".pem,.crt,.cer,.der"
         />
-        <Textarea
+        <TextareaWithUpload
           label="Private Key (optional)"
           placeholder="-----BEGIN PRIVATE KEY-----"
           value={matchKey}
           onChange={(e) => setMatchKey(e.target.value)}
           rows={6}
-          className="font-mono text-xs"
+          accept=".pem,.key,.der"
         />
-        <Textarea
+        <TextareaWithUpload
           label="CSR (optional)"
           placeholder="-----BEGIN CERTIFICATE REQUEST-----"
           value={matchCsr}
           onChange={(e) => setMatchCsr(e.target.value)}
           rows={6}
-          className="font-mono text-xs"
+          accept=".pem,.csr,.der"
         />
       </div>
       <Input
@@ -410,20 +518,57 @@ export default function CertificateToolsPage() {
   // Render Converter
   const renderConverter = () => (
     <div className="space-y-4">
-      <div className="flex gap-4 flex-wrap">
+      {/* Input section */}
+      <div className="p-4 border border-border rounded-lg bg-bg-secondary/50 space-y-4">
+        <div className="text-sm font-medium text-text-primary">Input (any format)</div>
+        
+        {/* File upload */}
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">Input Type</label>
-          <select
-            value={convertType}
-            onChange={(e) => setConvertType(e.target.value)}
-            className="px-3 py-2 text-sm bg-bg-secondary border border-border rounded-md text-text-primary"
-          >
-            <option value="certificate">Certificate</option>
-            <option value="private_key">Private Key</option>
-            <option value="csr">CSR</option>
-          </select>
+          <label className="block text-xs font-medium text-text-secondary mb-1">Upload File</label>
+          <input
+            type="file"
+            accept=".pem,.crt,.cer,.der,.p12,.pfx,.p7b,.p7c,.key,.csr"
+            onChange={(e) => handleConvertFileChange(e, setConvertFile, setConvertFileData)}
+            className="w-full text-sm text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:border-0 file:rounded file:bg-accent-primary file:text-white file:cursor-pointer hover:file:bg-accent-primary/90"
+          />
+          <p className="text-xs text-text-secondary mt-1">
+            Supports: PEM, DER, CRT, CER, P12/PFX, P7B, KEY, CSR
+          </p>
         </div>
-        <div className="flex items-end pb-0.5">
+        
+        {convertFile && (
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle size={16} className="text-status-success" />
+            <span className="text-text-primary">{convertFile.name}</span>
+            <button 
+              onClick={() => { setConvertFile(null); setConvertFileData(null) }}
+              className="text-text-secondary hover:text-status-danger"
+            >
+              <XCircle size={16} />
+            </button>
+          </div>
+        )}
+        
+        {/* Or paste */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-text-secondary">or paste PEM content</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+        
+        <Textarea
+          placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
+          value={convertPem}
+          onChange={(e) => setConvertPem(e.target.value)}
+          rows={4}
+          className="font-mono text-xs"
+          disabled={!!convertFileData}
+        />
+      </div>
+
+      {/* Output format */}
+      <div className="flex gap-4 flex-wrap items-end">
+        <div className="flex items-center gap-2">
           <ArrowRight size={20} className="text-text-secondary" />
         </div>
         <div>
@@ -433,43 +578,46 @@ export default function CertificateToolsPage() {
             onChange={(e) => setConvertFormat(e.target.value)}
             className="px-3 py-2 text-sm bg-bg-secondary border border-border rounded-md text-text-primary"
           >
-            <option value="der">DER (Binary)</option>
             <option value="pem">PEM (Text)</option>
-            {convertType === 'certificate' && (
-              <>
-                <option value="pkcs12">PKCS12 (.p12/.pfx)</option>
-                <option value="pkcs7">PKCS7 (.p7b)</option>
-              </>
-            )}
+            <option value="der">DER (Binary)</option>
+            <option value="pkcs12">PKCS12 (.p12/.pfx)</option>
+            <option value="pkcs7">PKCS7 (.p7b)</option>
           </select>
         </div>
       </div>
 
-      <Textarea
-        label={`${convertType === 'certificate' ? 'Certificate' : convertType === 'private_key' ? 'Private Key' : 'CSR'} (PEM)`}
-        placeholder="Paste PEM content here..."
-        value={convertPem}
-        onChange={(e) => setConvertPem(e.target.value)}
-        rows={6}
-        className="font-mono text-xs"
-      />
-
+      {/* Additional inputs for PKCS12 output */}
       {convertFormat === 'pkcs12' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Textarea
-            label="Private Key (required for PKCS12)"
-            placeholder="-----BEGIN PRIVATE KEY-----"
-            value={convertKey}
-            onChange={(e) => setConvertKey(e.target.value)}
-            rows={4}
-            className="font-mono text-xs"
-          />
+        <div className="p-4 border border-border rounded-lg bg-bg-secondary/50 space-y-4">
+          <div className="text-sm font-medium text-text-primary">PKCS12 requires private key</div>
+          
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">Private Key File (optional if included in input)</label>
+            <input
+              type="file"
+              accept=".pem,.key,.der"
+              onChange={(e) => handleConvertFileChange(e, setConvertKeyFile, (data) => setConvertKey(data))}
+              className="w-full text-sm text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:border-0 file:rounded file:bg-bg-tertiary file:text-text-primary file:cursor-pointer"
+            />
+          </div>
+          
+          {!convertKeyFile && (
+            <Textarea
+              label="Or paste private key"
+              placeholder="-----BEGIN PRIVATE KEY-----"
+              value={convertKey}
+              onChange={(e) => setConvertKey(e.target.value)}
+              rows={3}
+              className="font-mono text-xs"
+            />
+          )}
+          
           <Textarea
             label="CA Chain (optional)"
             placeholder="Intermediate and root certificates..."
             value={convertChain}
             onChange={(e) => setConvertChain(e.target.value)}
-            rows={4}
+            rows={3}
             className="font-mono text-xs"
           />
         </div>
@@ -486,22 +634,20 @@ export default function CertificateToolsPage() {
         />
       )}
 
-      <div className="flex gap-3 flex-wrap">
-        {(convertType === 'private_key' || convertFormat === 'pkcs12') && (
-          <Input
-            label="Key Password"
-            type="password"
-            placeholder="If key is encrypted"
-            value={convertPassword}
-            onChange={(e) => setConvertPassword(e.target.value)}
-            className="w-48"
-          />
-        )}
+      <div className="flex gap-3 flex-wrap items-end">
+        <Input
+          label="Input Password"
+          type="password"
+          placeholder="For encrypted files"
+          value={convertPassword}
+          onChange={(e) => setConvertPassword(e.target.value)}
+          className="w-48"
+        />
         {convertFormat === 'pkcs12' && (
           <Input
-            label="PKCS12 Password"
+            label="Output PKCS12 Password"
             type="password"
-            placeholder="Password for output file"
+            placeholder="Password for .p12"
             value={pkcs12Password}
             onChange={(e) => setPkcs12Password(e.target.value)}
             className="w-48"

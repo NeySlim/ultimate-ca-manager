@@ -287,16 +287,22 @@ def decode_csr():
     pem_data = data.get('pem', '').strip()
     
     if not pem_data:
-        return jsonify({'error': 'CSR PEM data is required'}), 400
+        return jsonify({'error': 'CSR data is required'}), 400
     
     try:
-        # Try to load as PEM
-        if '-----BEGIN' not in pem_data:
-            pem_data = f"-----BEGIN CERTIFICATE REQUEST-----\n{pem_data}\n-----END CERTIFICATE REQUEST-----"
+        csr = None
         
-        csr = x509.load_pem_x509_csr(pem_data.encode(), default_backend())
+        # Check for BASE64-encoded binary (DER)
+        if pem_data.startswith('BASE64:'):
+            raw_bytes = base64.b64decode(pem_data[7:])
+            csr = x509.load_der_x509_csr(raw_bytes, default_backend())
+        else:
+            # Try to load as PEM
+            if '-----BEGIN' not in pem_data:
+                pem_data = f"-----BEGIN CERTIFICATE REQUEST-----\n{pem_data}\n-----END CERTIFICATE REQUEST-----"
+            csr = x509.load_pem_x509_csr(pem_data.encode(), default_backend())
+        
         result = csr_to_dict(csr)
-        
         return jsonify({'success': True, 'data': result})
     
     except Exception as e:
@@ -310,16 +316,22 @@ def decode_cert():
     pem_data = data.get('pem', '').strip()
     
     if not pem_data:
-        return jsonify({'error': 'Certificate PEM data is required'}), 400
+        return jsonify({'error': 'Certificate data is required'}), 400
     
     try:
-        # Try to load as PEM
-        if '-----BEGIN' not in pem_data:
-            pem_data = f"-----BEGIN CERTIFICATE-----\n{pem_data}\n-----END CERTIFICATE-----"
+        cert = None
         
-        cert = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
+        # Check for BASE64-encoded binary (DER)
+        if pem_data.startswith('BASE64:'):
+            raw_bytes = base64.b64decode(pem_data[7:])
+            cert = x509.load_der_x509_certificate(raw_bytes, default_backend())
+        else:
+            # Try to load as PEM
+            if '-----BEGIN' not in pem_data:
+                pem_data = f"-----BEGIN CERTIFICATE-----\n{pem_data}\n-----END CERTIFICATE-----"
+            cert = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
+        
         result = cert_to_dict(cert)
-        
         return jsonify({'success': True, 'data': result})
     
     except Exception as e:
@@ -346,13 +358,45 @@ def match_keys():
     
     public_keys = {}
     
+    def load_cert_any_format(data):
+        """Load certificate from PEM or DER"""
+        if data.startswith('BASE64:'):
+            raw = base64.b64decode(data[7:])
+            return x509.load_der_x509_certificate(raw, default_backend())
+        if '-----BEGIN' not in data:
+            data = f"-----BEGIN CERTIFICATE-----\n{data}\n-----END CERTIFICATE-----"
+        return x509.load_pem_x509_certificate(data.encode(), default_backend())
+    
+    def load_key_any_format(data, pwd):
+        """Load private key from PEM or DER"""
+        pwd_bytes = pwd.encode() if pwd else None
+        if data.startswith('BASE64:'):
+            raw = base64.b64decode(data[7:])
+            try:
+                return serialization.load_der_private_key(raw, password=pwd_bytes, backend=default_backend())
+            except TypeError:
+                return serialization.load_der_private_key(raw, password=None, backend=default_backend())
+        if '-----BEGIN' not in data:
+            data = f"-----BEGIN PRIVATE KEY-----\n{data}\n-----END PRIVATE KEY-----"
+        try:
+            return serialization.load_pem_private_key(data.encode(), password=pwd_bytes, backend=default_backend())
+        except TypeError:
+            return serialization.load_pem_private_key(data.encode(), password=None, backend=default_backend())
+    
+    def load_csr_any_format(data):
+        """Load CSR from PEM or DER"""
+        if data.startswith('BASE64:'):
+            raw = base64.b64decode(data[7:])
+            return x509.load_der_x509_csr(raw, default_backend())
+        if '-----BEGIN' not in data:
+            data = f"-----BEGIN CERTIFICATE REQUEST-----\n{data}\n-----END CERTIFICATE REQUEST-----"
+        return x509.load_pem_x509_csr(data.encode(), default_backend())
+    
     try:
         # Parse certificate
         if cert_pem:
             try:
-                if '-----BEGIN' not in cert_pem:
-                    cert_pem = f"-----BEGIN CERTIFICATE-----\n{cert_pem}\n-----END CERTIFICATE-----"
-                cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
+                cert = load_cert_any_format(cert_pem)
                 pub_bytes = get_public_key_bytes(cert)
                 public_keys['certificate'] = pub_bytes
                 
@@ -379,15 +423,7 @@ def match_keys():
         # Parse private key
         if key_pem:
             try:
-                if '-----BEGIN' not in key_pem:
-                    key_pem = f"-----BEGIN PRIVATE KEY-----\n{key_pem}\n-----END PRIVATE KEY-----"
-                
-                pwd = password.encode() if password else None
-                try:
-                    key = serialization.load_pem_private_key(key_pem.encode(), password=pwd, backend=default_backend())
-                except TypeError:
-                    key = serialization.load_pem_private_key(key_pem.encode(), password=None, backend=default_backend())
-                
+                key = load_key_any_format(key_pem, password)
                 pub_bytes = get_public_key_bytes(key.public_key())
                 public_keys['private_key'] = pub_bytes
                 
@@ -414,9 +450,7 @@ def match_keys():
         # Parse CSR
         if csr_pem:
             try:
-                if '-----BEGIN' not in csr_pem:
-                    csr_pem = f"-----BEGIN CERTIFICATE REQUEST-----\n{csr_pem}\n-----END CERTIFICATE REQUEST-----"
-                csr = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
+                csr = load_csr_any_format(csr_pem)
                 pub_bytes = get_public_key_bytes(csr)
                 public_keys['csr'] = pub_bytes
                 
@@ -469,178 +503,283 @@ def match_keys():
 
 @tools_bp.route('/convert', methods=['POST'])
 def convert_certificate():
-    """Convert certificate/key between formats"""
+    """Convert certificate/key between formats
+    
+    Supports input formats: PEM, DER, PKCS12/PFX, PKCS7/P7B
+    Supports output formats: PEM, DER, PKCS12, PKCS7
+    
+    Input can be:
+    - PEM text (-----BEGIN ... -----)
+    - Base64-encoded binary with 'BASE64:' prefix
+    """
     data = request.get_json() or {}
-    pem_data = data.get('pem', '').strip()
-    input_type = data.get('input_type', 'certificate')  # certificate, private_key, csr
-    output_format = data.get('output_format', 'der')  # der, pkcs12, pkcs7
-    password = data.get('password', '')
-    pkcs12_password = data.get('pkcs12_password', '')
-    include_chain = data.get('include_chain', False)
+    input_data = data.get('pem', '').strip()
+    input_type = data.get('input_type', 'auto')  # auto, certificate, private_key, csr, pkcs12, pkcs7
+    output_format = data.get('output_format', 'pem')  # pem, der, pkcs12, pkcs7
+    password = data.get('password', '')  # Input file password (for encrypted keys or P12)
+    pkcs12_password = data.get('pkcs12_password', '')  # Output P12 password
     chain_pem = data.get('chain', '').strip()
     key_pem = data.get('private_key', '').strip()
     
-    if not pem_data:
-        return jsonify({'error': 'PEM data is required'}), 400
+    if not input_data:
+        return jsonify({'error': 'Input data is required'}), 400
     
     try:
+        import subprocess
+        
+        # Check if input is base64-encoded binary
+        raw_bytes = None
+        if input_data.startswith('BASE64:'):
+            raw_bytes = base64.b64decode(input_data[7:])
+            input_data = None
+        
+        # Auto-detect format and parse
+        certs = []
+        keys = []
+        csrs = []
+        detected_format = 'unknown'
+        
+        # Try to parse the input
+        if raw_bytes:
+            # Binary data - try different formats
+            
+            # Try PKCS12 first
+            try:
+                p12_pwd = password.encode() if password else None
+                private_key, cert, additional_certs = serialization.pkcs12.load_key_and_certificates(
+                    raw_bytes, p12_pwd, default_backend()
+                )
+                detected_format = 'pkcs12'
+                if cert:
+                    certs.append(cert)
+                if additional_certs:
+                    certs.extend(additional_certs)
+                if private_key:
+                    keys.append(private_key)
+            except Exception:
+                pass
+            
+            # Try DER certificate
+            if detected_format == 'unknown':
+                try:
+                    cert = x509.load_der_x509_certificate(raw_bytes, default_backend())
+                    certs.append(cert)
+                    detected_format = 'der_cert'
+                except Exception:
+                    pass
+            
+            # Try DER private key
+            if detected_format == 'unknown':
+                try:
+                    key = serialization.load_der_private_key(raw_bytes, password=password.encode() if password else None, backend=default_backend())
+                    keys.append(key)
+                    detected_format = 'der_key'
+                except Exception:
+                    pass
+            
+            # Try DER CSR
+            if detected_format == 'unknown':
+                try:
+                    csr = x509.load_der_x509_csr(raw_bytes, default_backend())
+                    csrs.append(csr)
+                    detected_format = 'der_csr'
+                except Exception:
+                    pass
+            
+            # Try PKCS7/P7B (use OpenSSL)
+            if detected_format == 'unknown':
+                try:
+                    with tempfile.NamedTemporaryFile(suffix='.p7b', delete=False) as f:
+                        f.write(raw_bytes)
+                        temp_p7b = f.name
+                    try:
+                        # Extract certs from P7B
+                        pem_output = subprocess.check_output([
+                            'openssl', 'pkcs7', '-print_certs', '-in', temp_p7b, '-inform', 'DER'
+                        ], stderr=subprocess.DEVNULL)
+                        # Parse extracted PEM certs
+                        for c in x509.load_pem_x509_certificates(pem_output):
+                            certs.append(c)
+                        detected_format = 'pkcs7'
+                    finally:
+                        os.unlink(temp_p7b)
+                except Exception:
+                    pass
+        
+        else:
+            # Text data (PEM format)
+            detected_format = 'pem'
+            
+            # Parse certificates
+            if '-----BEGIN CERTIFICATE-----' in input_data:
+                try:
+                    for cert in x509.load_pem_x509_certificates(input_data.encode()):
+                        certs.append(cert)
+                except Exception:
+                    pass
+            
+            # Parse private keys
+            if '-----BEGIN' in input_data and 'PRIVATE KEY-----' in input_data:
+                try:
+                    pwd = password.encode() if password else None
+                    key = serialization.load_pem_private_key(input_data.encode(), password=pwd, backend=default_backend())
+                    keys.append(key)
+                except Exception:
+                    pass
+            
+            # Parse CSRs
+            if '-----BEGIN CERTIFICATE REQUEST-----' in input_data:
+                try:
+                    csr = x509.load_pem_x509_csr(input_data.encode(), default_backend())
+                    csrs.append(csr)
+                except Exception:
+                    pass
+            
+            # If nothing parsed, try as certificate only
+            if not certs and not keys and not csrs:
+                try:
+                    # Try adding PEM headers
+                    clean = input_data.replace(' ', '').replace('\n', '')
+                    pem_cert = f"-----BEGIN CERTIFICATE-----\n{clean}\n-----END CERTIFICATE-----"
+                    cert = x509.load_pem_x509_certificate(pem_cert.encode(), default_backend())
+                    certs.append(cert)
+                except Exception:
+                    pass
+        
+        # Also parse additional key from key_pem if provided
+        if key_pem:
+            try:
+                pwd = password.encode() if password else None
+                key = serialization.load_pem_private_key(key_pem.encode(), password=pwd, backend=default_backend())
+                keys.append(key)
+            except Exception:
+                pass
+        
+        # Parse chain
+        chain_certs = []
+        if chain_pem:
+            try:
+                for c in x509.load_pem_x509_certificates(chain_pem.encode()):
+                    chain_certs.append(c)
+            except Exception:
+                pass
+        
+        # Validate we have something to convert
+        if not certs and not keys and not csrs:
+            return jsonify({'error': 'Could not parse input data. Supported formats: PEM, DER, PKCS12, PKCS7'}), 400
+        
         result = {}
         
-        if input_type == 'certificate':
-            # Load certificate
-            if '-----BEGIN' not in pem_data:
-                pem_data = f"-----BEGIN CERTIFICATE-----\n{pem_data}\n-----END CERTIFICATE-----"
-            cert = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
+        # Convert to requested output format
+        if output_format == 'pem':
+            pem_parts = []
+            for cert in certs:
+                pem_parts.append(cert.public_bytes(serialization.Encoding.PEM).decode())
+            for key in keys:
+                enc = serialization.NoEncryption()
+                pem_parts.append(key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=enc
+                ).decode())
+            for csr in csrs:
+                pem_parts.append(csr.public_bytes(serialization.Encoding.PEM).decode())
             
-            if output_format == 'der':
-                # PEM to DER
-                der_data = cert.public_bytes(serialization.Encoding.DER)
-                result = {
-                    'format': 'der',
-                    'data': base64.b64encode(der_data).decode(),
-                    'filename': 'certificate.der'
+            result = {
+                'format': 'pem',
+                'data': '\n'.join(pem_parts),
+                'filename': 'converted.pem',
+                'detected_format': detected_format,
+                'contents': {
+                    'certificates': len(certs),
+                    'private_keys': len(keys),
+                    'csrs': len(csrs)
                 }
-            
-            elif output_format == 'pkcs12':
-                # PEM to PKCS12
-                if not key_pem:
-                    return jsonify({'error': 'Private key is required for PKCS12 conversion'}), 400
-                
-                # Load private key
-                pwd = password.encode() if password else None
-                try:
-                    key = serialization.load_pem_private_key(key_pem.encode(), password=pwd, backend=default_backend())
-                except TypeError:
-                    key = serialization.load_pem_private_key(key_pem.encode(), password=None, backend=default_backend())
-                
-                # Load chain if provided
-                ca_certs = None
-                if chain_pem:
-                    ca_certs = []
-                    for match in x509.load_pem_x509_certificates(chain_pem.encode()):
-                        ca_certs.append(match)
-                
-                # Create PKCS12
-                p12_password = pkcs12_password.encode() if pkcs12_password else None
-                p12_data = serialization.pkcs12.serialize_key_and_certificates(
-                    name=b"certificate",
-                    key=key,
-                    cert=cert,
-                    cas=ca_certs,
-                    encryption_algorithm=serialization.BestAvailableEncryption(p12_password) if p12_password else serialization.NoEncryption()
-                )
-                
-                result = {
-                    'format': 'pkcs12',
-                    'data': base64.b64encode(p12_data).decode(),
-                    'filename': 'certificate.p12'
-                }
-            
-            elif output_format == 'pkcs7':
-                # PEM to PKCS7 using OpenSSL
-                certs = [crypto.load_certificate(crypto.FILETYPE_PEM, pem_data)]
-                
-                if chain_pem:
-                    for cert_pem in chain_pem.split('-----END CERTIFICATE-----'):
-                        if '-----BEGIN CERTIFICATE-----' in cert_pem:
-                            cert_pem = cert_pem + '-----END CERTIFICATE-----'
-                            certs.append(crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem.encode()))
-                
-                # Create PKCS7
-                p7 = crypto.PKCS7()
-                for c in certs:
-                    p7.set_type(crypto.PKCS7_SIGNED)
-                
-                # Use temp file for conversion
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as f:
-                    f.write(pem_data)
-                    if chain_pem:
-                        f.write('\n')
-                        f.write(chain_pem)
-                    temp_pem = f.name
-                
-                try:
-                    # Use openssl command for PKCS7
-                    import subprocess
-                    p7_data = subprocess.check_output([
-                        'openssl', 'crl2pkcs7', '-nocrl', '-certfile', temp_pem
-                    ])
-                    result = {
-                        'format': 'pkcs7',
-                        'data': p7_data.decode(),
-                        'filename': 'certificate.p7b'
-                    }
-                finally:
-                    os.unlink(temp_pem)
-            
-            elif output_format == 'pem':
-                # Already PEM, just return cleaned version
-                result = {
-                    'format': 'pem',
-                    'data': cert.public_bytes(serialization.Encoding.PEM).decode(),
-                    'filename': 'certificate.pem'
-                }
+            }
         
-        elif input_type == 'private_key':
-            # Load key
-            pwd = password.encode() if password else None
-            try:
-                key = serialization.load_pem_private_key(pem_data.encode(), password=pwd, backend=default_backend())
-            except TypeError:
-                key = serialization.load_pem_private_key(pem_data.encode(), password=None, backend=default_backend())
-            
-            if output_format == 'der':
-                der_data = key.private_bytes(
+        elif output_format == 'der':
+            # DER can only contain one object
+            if certs:
+                der_data = certs[0].public_bytes(serialization.Encoding.DER)
+                filename = 'certificate.der'
+            elif keys:
+                der_data = keys[0].private_bytes(
                     encoding=serialization.Encoding.DER,
                     format=serialization.PrivateFormat.PKCS8,
                     encryption_algorithm=serialization.NoEncryption()
                 )
-                result = {
-                    'format': 'der',
-                    'data': base64.b64encode(der_data).decode(),
-                    'filename': 'private_key.der'
-                }
+                filename = 'private_key.der'
+            elif csrs:
+                der_data = csrs[0].public_bytes(serialization.Encoding.DER)
+                filename = 'request.der'
+            else:
+                return jsonify({'error': 'No data to convert to DER'}), 400
             
-            elif output_format == 'pem':
-                # Re-export with or without encryption
-                if pkcs12_password:
-                    enc = serialization.BestAvailableEncryption(pkcs12_password.encode())
-                else:
-                    enc = serialization.NoEncryption()
-                
-                pem_out = key.private_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PrivateFormat.PKCS8,
-                    encryption_algorithm=enc
-                )
-                result = {
-                    'format': 'pem',
-                    'data': pem_out.decode(),
-                    'filename': 'private_key.pem'
-                }
+            result = {
+                'format': 'der',
+                'data': base64.b64encode(der_data).decode(),
+                'filename': filename,
+                'detected_format': detected_format
+            }
         
-        elif input_type == 'csr':
-            # Load CSR
-            if '-----BEGIN' not in pem_data:
-                pem_data = f"-----BEGIN CERTIFICATE REQUEST-----\n{pem_data}\n-----END CERTIFICATE REQUEST-----"
-            csr = x509.load_pem_x509_csr(pem_data.encode(), default_backend())
+        elif output_format == 'pkcs12':
+            if not certs:
+                return jsonify({'error': 'Certificate is required for PKCS12'}), 400
+            if not keys:
+                return jsonify({'error': 'Private key is required for PKCS12'}), 400
             
-            if output_format == 'der':
-                der_data = csr.public_bytes(serialization.Encoding.DER)
-                result = {
-                    'format': 'der',
-                    'data': base64.b64encode(der_data).decode(),
-                    'filename': 'request.der'
-                }
-            elif output_format == 'pem':
-                result = {
-                    'format': 'pem',
-                    'data': csr.public_bytes(serialization.Encoding.PEM).decode(),
-                    'filename': 'request.pem'
-                }
+            # Use first cert and key
+            cert = certs[0]
+            key = keys[0]
+            
+            # Additional certs (rest of certs + chain)
+            ca_certs = certs[1:] + chain_certs if len(certs) > 1 or chain_certs else None
+            
+            p12_pwd = pkcs12_password.encode() if pkcs12_password else None
+            p12_data = serialization.pkcs12.serialize_key_and_certificates(
+                name=b"certificate",
+                key=key,
+                cert=cert,
+                cas=ca_certs,
+                encryption_algorithm=serialization.BestAvailableEncryption(p12_pwd) if p12_pwd else serialization.NoEncryption()
+            )
+            
+            result = {
+                'format': 'pkcs12',
+                'data': base64.b64encode(p12_data).decode(),
+                'filename': 'certificate.p12',
+                'detected_format': detected_format
+            }
         
-        if not result:
-            return jsonify({'error': f'Unsupported conversion: {input_type} to {output_format}'}), 400
+        elif output_format == 'pkcs7':
+            if not certs:
+                return jsonify({'error': 'At least one certificate is required for PKCS7'}), 400
+            
+            # Build PEM with all certs
+            all_certs_pem = ''
+            for cert in certs + chain_certs:
+                all_certs_pem += cert.public_bytes(serialization.Encoding.PEM).decode()
+            
+            # Use OpenSSL to create PKCS7
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as f:
+                f.write(all_certs_pem)
+                temp_pem = f.name
+            
+            try:
+                p7_data = subprocess.check_output([
+                    'openssl', 'crl2pkcs7', '-nocrl', '-certfile', temp_pem
+                ])
+                result = {
+                    'format': 'pkcs7',
+                    'data': p7_data.decode(),
+                    'filename': 'certificates.p7b',
+                    'detected_format': detected_format
+                }
+            finally:
+                os.unlink(temp_pem)
+        
+        else:
+            return jsonify({'error': f'Unknown output format: {output_format}'}), 400
         
         return jsonify({'success': True, 'data': result})
     

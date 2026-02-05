@@ -139,6 +139,9 @@ class SmartParser:
         else:
             content_str = content
         
+        # Check for pseudo-PEM wrappers for binary data (from frontend)
+        objects.extend(self._parse_pseudo_pem_binary(content_str, password))
+        
         # Check if it's base64-encoded binary
         if self._looks_like_base64(content_str) and '-----BEGIN' not in content_str:
             try:
@@ -158,6 +161,56 @@ class SmartParser:
         for i, obj in enumerate(objects):
             obj.index = i
             
+        return objects
+    
+    def _parse_pseudo_pem_binary(self, content: str, password: Optional[str] = None) -> List[ParsedObject]:
+        """Parse pseudo-PEM wrapped binary data (PKCS12, DER) from frontend uploads"""
+        objects: List[ParsedObject] = []
+        
+        # PKCS12 pattern
+        pkcs12_pattern = re.compile(
+            r'-----BEGIN\s+PKCS12-----\s*\n([A-Za-z0-9+/=\s]+)-----END\s+PKCS12-----',
+            re.MULTILINE
+        )
+        for match in pkcs12_pattern.finditer(content):
+            try:
+                b64_data = match.group(1).replace('\n', '').replace('\r', '').replace(' ', '')
+                binary_data = base64.b64decode(b64_data)
+                objs = self._parse_pkcs12(binary_data, password)
+                objects.extend(objs)
+            except Exception:
+                pass
+        
+        # DER certificate pattern
+        der_cert_pattern = re.compile(
+            r'-----BEGIN\s+DER\s+CERTIFICATE-----\s*\n([A-Za-z0-9+/=\s]+)-----END\s+DER\s+CERTIFICATE-----',
+            re.MULTILINE
+        )
+        for match in der_cert_pattern.finditer(content):
+            try:
+                b64_data = match.group(1).replace('\n', '').replace('\r', '').replace(' ', '')
+                binary_data = base64.b64decode(b64_data)
+                obj = self._parse_der_cert(binary_data)
+                if obj:
+                    objects.append(obj)
+            except Exception:
+                pass
+        
+        # DER key pattern
+        der_key_pattern = re.compile(
+            r'-----BEGIN\s+DER\s+KEY-----\s*\n([A-Za-z0-9+/=\s]+)-----END\s+DER\s+KEY-----',
+            re.MULTILINE
+        )
+        for match in der_key_pattern.finditer(content):
+            try:
+                b64_data = match.group(1).replace('\n', '').replace('\r', '').replace(' ', '')
+                binary_data = base64.b64decode(b64_data)
+                obj = self._parse_der_key(binary_data, password)
+                if obj:
+                    objects.append(obj)
+            except Exception:
+                pass
+        
         return objects
     
     def _looks_like_base64(self, content: str) -> bool:
@@ -392,6 +445,57 @@ class SmartParser:
         ).decode()
         
         return obj
+    
+    def _parse_pkcs12(self, data: bytes, password: Optional[str] = None) -> List[ParsedObject]:
+        """Parse PKCS12 binary data"""
+        objects = []
+        try:
+            pwd = password.encode() if password else None
+            private_key, cert, additional_certs = pkcs12.load_key_and_certificates(data, pwd)
+            
+            idx = 0
+            if cert:
+                obj = self._parse_x509_cert(cert)
+                obj.index = idx
+                objects.append(obj)
+                idx += 1
+                
+            if private_key:
+                obj = self._parse_private_key(private_key)
+                obj.index = idx
+                objects.append(obj)
+                idx += 1
+                
+            if additional_certs:
+                for add_cert in additional_certs:
+                    obj = self._parse_x509_cert(add_cert)
+                    obj.index = idx
+                    objects.append(obj)
+                    idx += 1
+        except Exception:
+            pass
+        return objects
+    
+    def _parse_der_cert(self, data: bytes) -> Optional[ParsedObject]:
+        """Parse DER certificate"""
+        try:
+            cert = x509.load_der_x509_certificate(data, default_backend())
+            obj = self._parse_x509_cert(cert)
+            obj.raw_der = data
+            return obj
+        except Exception:
+            return None
+    
+    def _parse_der_key(self, data: bytes, password: Optional[str] = None) -> Optional[ParsedObject]:
+        """Parse DER private key"""
+        try:
+            pwd = password.encode() if password else None
+            key = serialization.load_der_private_key(data, password=pwd, backend=default_backend())
+            obj = self._parse_private_key(key)
+            obj.raw_der = data
+            return obj
+        except Exception:
+            return None
     
     def _get_key_info(self, key) -> Tuple[str, int]:
         """Extract algorithm and size from any key type"""

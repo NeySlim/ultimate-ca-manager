@@ -72,7 +72,7 @@ export function AppShell() {
     // Core pages
     'certificates', 'cas', 'csrs', 'users', 'templates', 
     'acme', 'scep-config', 'settings', 'truststore', 'crl-ocsp', 
-    'import', 'audit', 'account',
+    'import', 'tools', 'audit', 'account',
     // Pro pages
     'rbac', 'hsm'
   ]
