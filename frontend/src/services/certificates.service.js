@@ -51,6 +51,17 @@ export const certificatesService = {
     })
   },
 
+  async exportAll(format = 'pem', options = {}) {
+    const params = new URLSearchParams()
+    params.append('format', format)
+    if (options.includeChain) params.append('include_chain', 'true')
+    if (options.password) params.append('password', options.password)
+    
+    return apiClient.get(`/certificates/export?${params.toString()}`, {
+      responseType: 'blob'
+    })
+  },
+
   async delete(id) {
     return apiClient.delete(`/certificates/${id}`)
   },

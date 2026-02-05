@@ -125,7 +125,9 @@ export default function ImportExportPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `certificates.${format === 'pkcs12' ? 'p12' : format}`
+      // Map format to extension
+      const ext = { pem: 'pem', der: 'der', pkcs12: 'p12', pkcs7: 'p7b', pfx: 'pfx', p7b: 'p7b' }[format] || format
+      a.download = `certificates.${ext}`
       a.click()
       URL.revokeObjectURL(url)
       showSuccess('Certificates exported')
@@ -140,7 +142,8 @@ export default function ImportExportPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `ca-certificates.${format}`
+      const ext = { pem: 'pem', der: 'der', pkcs12: 'p12', pkcs7: 'p7b', pfx: 'pfx', p7b: 'p7b' }[format] || format
+      a.download = `ca-certificates.${ext}`
       a.click()
       URL.revokeObjectURL(url)
       showSuccess('CA certificates exported')
@@ -251,32 +254,31 @@ export default function ImportExportPage() {
       
       case 'export-certs':
         return (
-          <DetailSection title="Export All Certificates" icon={Certificate} iconClass="icon-bg-blue" description="Download all certificates in your preferred format">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <DetailSection title="Export All Certificates" icon={Certificate} iconClass="icon-bg-blue" description="Download all certificates in a single file">
+            <div className="grid grid-cols-2 gap-3">
               <Button variant="secondary" onClick={() => handleExportAllCerts('pem')} className="justify-center">
-                <DownloadSimple size={16} /> PEM Format
+                <DownloadSimple size={16} /> PEM Bundle
               </Button>
-              <Button variant="secondary" onClick={() => handleExportAllCerts('der')} className="justify-center">
-                <DownloadSimple size={16} /> DER Format
-              </Button>
-              <Button onClick={() => handleExportAllCerts('pkcs12')} className="justify-center">
-                <DownloadSimple size={16} /> PKCS#12
+              <Button onClick={() => handleExportAllCerts('pkcs7')} className="justify-center">
+                <DownloadSimple size={16} /> P7B Bundle
               </Button>
             </div>
+            <p className="text-xs text-text-tertiary mt-2">Use individual certificate export for DER, PKCS#12, or PFX formats</p>
           </DetailSection>
         )
       
       case 'export-cas':
         return (
           <DetailSection title="Export All CAs" icon={ShieldCheck} iconClass="icon-bg-green" description={`Download all CA certificates (${cas.length} total)`}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Button variant="secondary" onClick={() => handleExportAllCAs('pem')} className="justify-center">
-                <DownloadSimple size={16} /> PEM Format
+                <DownloadSimple size={16} /> PEM Bundle
               </Button>
-              <Button onClick={() => handleExportAllCAs('der')} className="justify-center">
-                <DownloadSimple size={16} /> DER Format
+              <Button onClick={() => handleExportAllCAs('pkcs7')} className="justify-center">
+                <DownloadSimple size={16} /> P7B Bundle
               </Button>
             </div>
+            <p className="text-xs text-text-tertiary mt-2">Use individual CA export for DER, PKCS#12, or PFX formats</p>
           </DetailSection>
         )
       
