@@ -188,6 +188,66 @@ def list_acme_orders():
     return success_response(data=data)
 
 
+@bp.route('/api/v2/acme/accounts/<int:account_id>/orders', methods=['GET'])
+@require_auth(['read:acme'])
+def list_account_orders(account_id):
+    """List orders for a specific ACME account"""
+    account = AcmeAccount.query.get_or_404(account_id)
+    
+    orders = AcmeOrder.query.filter_by(account_id=account.id).order_by(
+        AcmeOrder.created_at.desc()
+    ).limit(50).all()
+    
+    data = []
+    for order in orders:
+        identifiers_str = ", ".join([i.get('value', '') for i in order.identifiers_list])
+        
+        method = "N/A"
+        if order.authorizations.count() > 0:
+            first_authz = order.authorizations.first()
+            if first_authz.challenges.count() > 0:
+                method = first_authz.challenges.first().type.upper()
+        
+        data.append({
+            'id': order.id,
+            'order_id': order.order_id,
+            'domain': identifiers_str,
+            'status': order.status.capitalize(),
+            'expires': order.expires.strftime('%Y-%m-%d') if order.expires else None,
+            'method': method,
+            'created_at': order.created_at.isoformat()
+        })
+        
+    return success_response(data=data)
+
+
+@bp.route('/api/v2/acme/accounts/<int:account_id>/challenges', methods=['GET'])
+@require_auth(['read:acme'])
+def list_account_challenges(account_id):
+    """List challenges for a specific ACME account"""
+    account = AcmeAccount.query.get_or_404(account_id)
+    
+    # Get all orders for this account
+    orders = AcmeOrder.query.filter_by(account_id=account.id).all()
+    
+    data = []
+    for order in orders:
+        for authz in order.authorizations:
+            for challenge in authz.challenges:
+                data.append({
+                    'id': challenge.id,
+                    'type': challenge.type.upper(),
+                    'status': challenge.status.capitalize(),
+                    'domain': authz.identifier_value,
+                    'token': challenge.token[:20] + '...' if challenge.token and len(challenge.token) > 20 else challenge.token,
+                    'validated': challenge.validated.isoformat() if challenge.validated else None,
+                    'order_id': order.order_id,
+                    'created_at': challenge.created_at.isoformat() if hasattr(challenge, 'created_at') and challenge.created_at else None
+                })
+    
+    return success_response(data=data)
+
+
 @bp.route('/api/v2/acme/proxy/register', methods=['POST'])
 @require_auth(['write:acme'])
 def register_proxy_account():
