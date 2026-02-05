@@ -2,7 +2,7 @@
  * CertificateCompareModal - Compare two certificates side by side
  */
 import { useState, useEffect, useMemo } from 'react'
-import { X, Certificate, Check, XCircle, ArrowsLeftRight } from '@phosphor-icons/react'
+import { X, Certificate, ArrowsLeftRight } from '@phosphor-icons/react'
 import { Modal } from './Modal'
 import { Badge } from './Badge'
 import { Select } from './ui/Select'

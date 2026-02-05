@@ -16,7 +16,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { cn } from '../lib/utils'
 import { 
   MagnifyingGlass, CaretUp, CaretDown, CaretLeft, CaretRight,
-  Columns, Funnel, Check, X, DotsThree, ArrowsDownUp,
+  Columns, Check, X, DotsThree,
   CaretDoubleLeft, CaretDoubleRight, CaretRight as ChevronRight
 } from '@phosphor-icons/react'
 import { useMobile } from '../contexts'

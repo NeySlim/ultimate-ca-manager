@@ -7,7 +7,7 @@ import {
   List, X, MagnifyingGlass,
   House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
   UploadSimple, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock,
-  UserCircle, Palette, Warning, Question
+  UserCircle, Palette, Question
 } from '@phosphor-icons/react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'

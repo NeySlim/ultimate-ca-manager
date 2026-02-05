@@ -13,15 +13,15 @@ import {
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
-  Button, Input, Select, Badge, Card,
+  Button, Input, Select, Badge,
   LoadingSpinner, FileUpload, Modal, HelpCard,
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate, cn } from '../lib/utils'
-import { ERRORS, SUCCESS, LABELS } from '../lib/messages'
+import { formatDate } from '../lib/utils'
+import { ERRORS, SUCCESS } from '../lib/messages'
 import { useTheme } from '../contexts/ThemeContext'
 
 // Base settings categories (Community)

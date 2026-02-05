@@ -44,7 +44,7 @@ import {
 } from '../components';
 import { useNotification } from '../contexts';
 import auditService from '../services/audit.service';
-import { ERRORS, SUCCESS, LABELS } from '../lib/messages';
+import { ERRORS, LABELS } from '../lib/messages';
 
 // Action icons mapping
 const actionIcons = {

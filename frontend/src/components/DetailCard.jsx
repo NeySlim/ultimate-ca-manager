@@ -8,9 +8,9 @@ import { cn } from '../lib/utils'
 import { 
   Copy, Check, CaretDown,
   // Auto-icon mapping
-  Globe, MapPin, Buildings, Flag, Key, Lock, ShieldCheck, 
+  Globe, MapPin, Buildings, Flag, Key, ShieldCheck, 
   Hash, Calendar, Clock, Fingerprint, Envelope, User,
-  Certificate, FileText, Code, Database
+  Certificate, FileText, Database
 } from '@phosphor-icons/react'
 import { useMobile } from '../contexts'
 import { Badge } from './Badge'

@@ -6,13 +6,13 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Robot, Gear, CheckCircle, XCircle, Clock, Copy, ArrowsClockwise, 
   Eye, ShieldCheck, Plugs, Key, Warning, Info, FileText, Globe, Database, 
-  ListBullets, Question
+  ListBullets
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
   ResponsiveDataTable,
   Button, Input, Select, Card,
-  Badge, LoadingSpinner, Modal, Textarea, EmptyState, StatusIndicator, HelpCard,
+  Badge, LoadingSpinner, Modal, Textarea, EmptyState, HelpCard,
   CompactHeader, CompactSection, CompactGrid, CompactField, CompactStats
 } from '../components'
 import { scepService, casService } from '../services'

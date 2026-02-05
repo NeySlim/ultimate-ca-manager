@@ -43,7 +43,7 @@ import { Badge } from './Badge'
 import { FilterSelect } from './ui/Select'
 import { 
   CaretUp, CaretDown, CaretLeft, CaretRight,
-  DotsThreeVertical, MagnifyingGlass
+  DotsThreeVertical
 } from '@phosphor-icons/react'
 
 export function ResponsiveTable({

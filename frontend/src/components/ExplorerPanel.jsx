@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { SearchBar } from './SearchBar'
 import { BottomSheet } from './BottomSheet'
-import { HelpModal } from './HelpModal'
+import { HelpModal } from './ui/HelpModal'
 import { useMobile } from '../contexts'
 import { cn } from '../lib/utils'
 import { labels, getHelpTitle } from '../lib/ui'

@@ -40,7 +40,7 @@ import {
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
-import { CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats } from './DetailCard'
+import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { cn } from '../lib/utils'
 
 // Status badge config

@@ -3,7 +3,6 @@
  * Shows real-time connection status in the UI
  */
 
-import React from 'react';
 import { useWebSocket, ConnectionState } from '../hooks/useWebSocket';
 import { WifiHigh, WifiSlash, CircleNotch } from '@phosphor-icons/react';
 import { cn } from '../lib/utils';
