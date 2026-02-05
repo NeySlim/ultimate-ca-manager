@@ -324,8 +324,12 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       const result = response.data || response
       setImportResult(result)
       setStep('result')
-      if (result.imported?.length > 0) {
-        showSuccess(`Successfully imported ${result.imported.length} object(s)`)
+      // Count total imports
+      const totalImported = (result.csrs_imported || 0) + 
+                           (result.certificates_imported || 0) + 
+                           (result.cas_imported || 0)
+      if (totalImported > 0) {
+        showSuccess(`Successfully imported ${totalImported} object(s)`)
       }
     } catch (err) {
       showError(err.response?.data?.error || 'Import failed')
@@ -546,43 +550,62 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
   
   // Render result step
   const renderResultStep = () => {
-    const { imported, skipped, failed } = importResult || {}
+    // Backend returns: csrs_imported, certificates_imported, cas_imported, imported_ids, errors, warnings
+    const totalImported = (importResult?.csrs_imported || 0) + 
+                         (importResult?.certificates_imported || 0) + 
+                         (importResult?.cas_imported || 0)
+    const errors = importResult?.errors || []
+    const warnings = importResult?.warnings || []
+    const importedIds = importResult?.imported_ids || {}
+    
     return (
       <div className="space-y-4">
         <div className="text-center py-6">
-          {imported?.length > 0 ? (
+          {totalImported > 0 ? (
             <>
               <CheckCircle size={48} className="text-green-500 mx-auto mb-3" weight="fill" />
               <h3 className="text-lg font-medium">Import Complete</h3>
-              <p className="text-sm text-text-secondary">Successfully imported {imported.length} object{imported.length > 1 ? 's' : ''}</p>
+              <p className="text-sm text-text-secondary">Successfully imported {totalImported} object{totalImported > 1 ? 's' : ''}</p>
             </>
           ) : (
             <>
               <WarningCircle size={48} className="text-amber-500 mx-auto mb-3" />
               <h3 className="text-lg font-medium">No Objects Imported</h3>
-              <p className="text-sm text-text-secondary">{skipped?.length > 0 ? 'All objects were skipped or already exist' : 'Import failed'}</p>
+              <p className="text-sm text-text-secondary">{errors.length > 0 ? errors[0] : 'All objects were skipped or already exist'}</p>
             </>
           )}
         </div>
         
-        {imported?.length > 0 && (
+        {/* Show what was imported */}
+        {totalImported > 0 && (
           <div className="space-y-1">
             <h4 className="text-sm font-medium text-green-600">Imported:</h4>
-            {imported.map((item, i) => <div key={i} className="text-sm pl-4">✓ {item.type}: {item.name || item.subject || `#${item.id}`}</div>)}
+            {importResult?.csrs_imported > 0 && (
+              <div className="text-sm pl-4">✓ {importResult.csrs_imported} CSR{importResult.csrs_imported > 1 ? 's' : ''}</div>
+            )}
+            {importResult?.certificates_imported > 0 && (
+              <div className="text-sm pl-4">✓ {importResult.certificates_imported} Certificate{importResult.certificates_imported > 1 ? 's' : ''}</div>
+            )}
+            {importResult?.cas_imported > 0 && (
+              <div className="text-sm pl-4">✓ {importResult.cas_imported} CA{importResult.cas_imported > 1 ? 's' : ''}</div>
+            )}
+            {importResult?.keys_matched > 0 && (
+              <div className="text-sm pl-4 text-text-secondary">🔑 {importResult.keys_matched} private key{importResult.keys_matched > 1 ? 's' : ''} matched</div>
+            )}
           </div>
         )}
         
-        {skipped?.length > 0 && (
+        {warnings.length > 0 && (
           <div className="space-y-1">
-            <h4 className="text-sm font-medium text-amber-600">Skipped:</h4>
-            {skipped.map((item, i) => <div key={i} className="text-sm pl-4">⊘ {item.type}: {item.reason}</div>)}
+            <h4 className="text-sm font-medium text-amber-600">Warnings:</h4>
+            {warnings.map((w, i) => <div key={i} className="text-sm pl-4">⚠ {w}</div>)}
           </div>
         )}
         
-        {failed?.length > 0 && (
+        {errors.length > 0 && (
           <div className="space-y-1">
-            <h4 className="text-sm font-medium text-red-600">Failed:</h4>
-            {failed.map((item, i) => <div key={i} className="text-sm pl-4">✗ {item.type}: {item.error}</div>)}
+            <h4 className="text-sm font-medium text-red-600">Errors:</h4>
+            {errors.map((e, i) => <div key={i} className="text-sm pl-4">✗ {e}</div>)}
           </div>
         )}
         
