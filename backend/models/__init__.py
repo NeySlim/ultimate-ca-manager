@@ -63,6 +63,7 @@ class User(db.Model):
     last_login = db.Column(db.DateTime)
     login_count = db.Column(db.Integer, default=0)  # Total successful logins
     failed_logins = db.Column(db.Integer, default=0)  # Failed login attempts
+    locked_until = db.Column(db.DateTime, nullable=True)  # Account lockout timestamp
     
     def set_password(self, password: str):
         """Hash and set password"""
