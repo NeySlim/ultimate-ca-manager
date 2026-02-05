@@ -168,11 +168,11 @@ export default function CertificateToolsPage() {
     setLoading(true)
     resetResult()
     try {
-      const response = await apiClient.post('/api/v2/tools/check-ssl', {
+      const response = await apiClient.post('/tools/check-ssl', {
         hostname: sslHostname.trim(),
         port: parseInt(sslPort) || 443
       })
-      setResult({ type: 'ssl', data: response.data.data })
+      setResult({ type: 'ssl', data: response.data })
     } catch (error) {
       showError(error.message || 'Failed to check SSL')
       setResult({ type: 'error', message: error.message })
@@ -189,10 +189,10 @@ export default function CertificateToolsPage() {
     setLoading(true)
     resetResult()
     try {
-      const response = await apiClient.post('/api/v2/tools/decode-csr', {
+      const response = await apiClient.post('/tools/decode-csr', {
         pem: csrPem.trim()
       })
-      setResult({ type: 'csr', data: response.data.data })
+      setResult({ type: 'csr', data: response.data })
     } catch (error) {
       showError(error.message || 'Failed to decode CSR')
       setResult({ type: 'error', message: error.message })
@@ -209,10 +209,10 @@ export default function CertificateToolsPage() {
     setLoading(true)
     resetResult()
     try {
-      const response = await apiClient.post('/api/v2/tools/decode-cert', {
+      const response = await apiClient.post('/tools/decode-cert', {
         pem: certPem.trim()
       })
-      setResult({ type: 'cert', data: response.data.data })
+      setResult({ type: 'cert', data: response.data })
     } catch (error) {
       showError(error.message || 'Failed to decode certificate')
       setResult({ type: 'error', message: error.message })
@@ -229,13 +229,13 @@ export default function CertificateToolsPage() {
     setLoading(true)
     resetResult()
     try {
-      const response = await apiClient.post('/api/v2/tools/match-keys', {
+      const response = await apiClient.post('/tools/match-keys', {
         certificate: matchCert.trim(),
         private_key: matchKey.trim(),
         csr: matchCsr.trim(),
         password: matchPassword
       })
-      setResult({ type: 'match', data: response.data.data })
+      setResult({ type: 'match', data: response.data })
     } catch (error) {
       showError(error.message || 'Failed to match keys')
       setResult({ type: 'error', message: error.message })
@@ -260,7 +260,7 @@ export default function CertificateToolsPage() {
     setLoading(true)
     resetResult()
     try {
-      const response = await apiClient.post('/api/v2/tools/convert', {
+      const response = await apiClient.post('/tools/convert', {
         pem: content,
         input_type: convertType,
         output_format: convertFormat,
@@ -269,7 +269,7 @@ export default function CertificateToolsPage() {
         password: convertPassword,
         pkcs12_password: pkcs12Password
       })
-      setResult({ type: 'convert', data: response.data.data })
+      setResult({ type: 'convert', data: response.data })
     } catch (error) {
       showError(error.message || 'Conversion failed')
       setResult({ type: 'error', message: error.message })
@@ -663,7 +663,9 @@ export default function CertificateToolsPage() {
   )
 
   // Render SSL result
-  const renderSSLResult = (data) => (
+  const renderSSLResult = (data) => {
+    if (!data) return null
+    return (
     <CompactSection title="SSL Check Result" defaultOpen>
       <div className="space-y-4">
         {/* Status banner */}
@@ -738,10 +740,12 @@ export default function CertificateToolsPage() {
         </CompactGrid>
       </div>
     </CompactSection>
-  )
+  )}
 
   // Render CSR result
-  const renderCSRResult = (data) => (
+  const renderCSRResult = (data) => {
+    if (!data) return null
+    return (
     <CompactSection title="CSR Details" defaultOpen>
       <div className="space-y-4">
         <CompactGrid cols={2}>
@@ -769,10 +773,12 @@ export default function CertificateToolsPage() {
         )}
       </div>
     </CompactSection>
-  )
+  )}
 
   // Render Certificate result
-  const renderCertResult = (data) => (
+  const renderCertResult = (data) => {
+    if (!data) return null
+    return (
     <CompactSection title="Certificate Details" defaultOpen>
       <div className="space-y-4">
         {/* Status */}
@@ -859,10 +865,12 @@ export default function CertificateToolsPage() {
         </CompactGrid>
       </div>
     </CompactSection>
-  )
+  )}
 
   // Render Match result
-  const renderMatchResult = (data) => (
+  const renderMatchResult = (data) => {
+    if (!data) return null
+    return (
     <CompactSection title="Key Match Results" defaultOpen>
       <div className="space-y-4">
         {/* Overall status */}
@@ -937,10 +945,12 @@ export default function CertificateToolsPage() {
         )}
       </div>
     </CompactSection>
-  )
+  )}
 
   // Render Convert result
-  const renderConvertResult = (data) => (
+  const renderConvertResult = (data) => {
+    if (!data) return null
+    return (
     <CompactSection title="Conversion Result" defaultOpen>
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -948,7 +958,7 @@ export default function CertificateToolsPage() {
           <div>
             <div className="font-medium text-text-primary">Conversion Successful</div>
             <div className="text-sm text-text-secondary">
-              Output: {data.filename} ({data.format.toUpperCase()})
+              Output: {data.filename} ({data.format?.toUpperCase()})
             </div>
           </div>
         </div>
@@ -974,7 +984,7 @@ export default function CertificateToolsPage() {
         </Button>
       </div>
     </CompactSection>
-  )
+  )}
 
   // Render result based on type
   const renderResult = () => {
