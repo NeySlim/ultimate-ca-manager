@@ -6,11 +6,12 @@ import { useNavigate } from 'react-router-dom'
 import { 
   UploadSimple, Certificate, ShieldCheck, FloppyDisk, FileArrowUp, 
   DownloadSimple, CloudArrowUp, ArrowsLeftRight, CheckCircle, File,
-  Gear, Key
+  Gear, Key, MagicWand
 } from '@phosphor-icons/react'
 import { 
   ResponsiveLayout, Button, Input, Select, Badge, DetailSection 
 } from '../components'
+import SmartImportModal from '../components/SmartImportModal'
 import { opnsenseService, casService, certificatesService } from '../services'
 import { useNotification } from '../contexts'
 import { cn } from '../lib/utils'
@@ -20,6 +21,7 @@ const STORAGE_KEY = 'opnsense_config'
 
 // Tab definitions - simplified for ResponsiveLayout
 const TABS = [
+  { id: 'smart-import', label: 'Smart Import', icon: MagicWand },
   { id: 'import-cert', label: 'Certificate', icon: Certificate },
   { id: 'import-ca', label: 'CA', icon: ShieldCheck },
   { id: 'import-opnsense', label: 'OpnSense', icon: CloudArrowUp },
@@ -30,10 +32,13 @@ const TABS = [
 export default function ImportExportPage() {
   const { showSuccess, showError } = useNotification()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('import-cert')
+  const [activeTab, setActiveTab] = useState('smart-import')
   const [processing, setProcessing] = useState(false)
   const certFileRef = useRef(null)
   const caFileRef = useRef(null)
+  
+  // Smart Import modal state
+  const [showSmartImport, setShowSmartImport] = useState(false)
   
   // Import form state
   const [importName, setImportName] = useState('')
@@ -295,6 +300,34 @@ export default function ImportExportPage() {
   // Content for each tab
   const renderContent = () => {
     switch (activeTab) {
+      case 'smart-import':
+        return (
+          <div className="space-y-4">
+            <DetailSection 
+              title="Smart Import" 
+              icon={MagicWand} 
+              iconClass="icon-bg-violet" 
+              description="Intelligently detect and import certificates, keys, CSRs, and chains"
+            >
+              <div className="space-y-4">
+                <p className="text-sm text-text-secondary">
+                  Drop or paste any combination of PEM/DER/PKCS12 files. The smart parser will:
+                </p>
+                <ul className="text-sm text-text-secondary space-y-1 ml-4">
+                  <li>• <span className="text-text-primary">Auto-detect</span> certificates, CA certificates, private keys, and CSRs</li>
+                  <li>• <span className="text-text-primary">Match</span> private keys to their corresponding certificates</li>
+                  <li>• <span className="text-text-primary">Build</span> certificate chains (leaf → intermediate → root)</li>
+                  <li>• <span className="text-text-primary">Validate</span> signatures, dates, and detect duplicates</li>
+                </ul>
+                <Button onClick={() => setShowSmartImport(true)} size="lg" className="w-full md:w-auto">
+                  <MagicWand size={18} />
+                  Open Smart Import
+                </Button>
+              </div>
+            </DetailSection>
+          </div>
+        )
+
       case 'import-cert':
         return (
           <div className="space-y-4">
@@ -553,18 +586,29 @@ export default function ImportExportPage() {
   }
 
   return (
-    <ResponsiveLayout
-      title="Import / Export"
-      subtitle="Transfer certificates and CAs"
-      icon={ArrowsLeftRight}
-      tabs={TABS}
-      activeTab={activeTab}
-      onTabChange={handleTabChange}
-      helpPageKey="importExport"
-    >
-      <div className="max-w-3xl mx-auto p-4 md:p-6">
-        {renderContent()}
-      </div>
-    </ResponsiveLayout>
+    <>
+      <ResponsiveLayout
+        title="Import / Export"
+        subtitle="Transfer certificates and CAs"
+        icon={ArrowsLeftRight}
+        tabs={TABS}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        helpPageKey="importExport"
+      >
+        <div className="max-w-3xl mx-auto p-4 md:p-6">
+          {renderContent()}
+        </div>
+      </ResponsiveLayout>
+      
+      <SmartImportModal 
+        isOpen={showSmartImport}
+        onClose={() => setShowSmartImport(false)}
+        onImportComplete={() => {
+          // Optionally navigate to certificates or reload
+          navigate('/certificates')
+        }}
+      />
+    </>
   )
 }
