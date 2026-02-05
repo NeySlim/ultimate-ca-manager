@@ -194,6 +194,8 @@ class Config:
     
     # JWT Authentication
     JWT_SECRET_KEY = _jwt_secret if _jwt_secret else "INSTALL_TIME_PLACEHOLDER"
+    # Previous JWT key for rotation - tokens signed with this are still valid during transition
+    JWT_SECRET_KEY_PREVIOUS = os.getenv("JWT_SECRET_KEY_PREVIOUS", "")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         seconds=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", "3600"))
     )

@@ -883,6 +883,15 @@ class AuditLog(db.Model):
     ip_address = db.Column(db.String(45))
     user_agent = db.Column(db.String(255))
     success = db.Column(db.Boolean, default=True)
+    # Tamper-evident hash chain: SHA-256(prev_hash + this_entry)
+    prev_hash = db.Column(db.String(64))  # Hash of previous log entry
+    entry_hash = db.Column(db.String(64))  # Hash of this entry (includes prev_hash)
+    
+    def compute_hash(self, prev_hash: str = None) -> str:
+        """Compute SHA-256 hash of this entry for tamper detection"""
+        import hashlib
+        data = f"{self.id}|{self.timestamp}|{self.username}|{self.action}|{self.resource_type}|{self.resource_id}|{self.details}|{self.success}|{prev_hash or ''}"
+        return hashlib.sha256(data.encode()).hexdigest()
     
     def to_dict(self):
         """Convert to dictionary"""
@@ -898,6 +907,8 @@ class AuditLog(db.Model):
             "ip_address": self.ip_address,
             "user_agent": self.user_agent,
             "success": self.success,
+            "entry_hash": self.entry_hash,
+            "prev_hash": self.prev_hash,
         }
 
 

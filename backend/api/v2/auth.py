@@ -21,6 +21,13 @@ try:
 except ImportError:
     HAS_CSRF = False
 
+# Import anomaly detection
+try:
+    from security.anomaly_detection import get_anomaly_detector
+    HAS_ANOMALY = True
+except ImportError:
+    HAS_ANOMALY = False
+
 bp = Blueprint('auth_v2', __name__)
 
 # Import limiter for rate limiting login attempts
@@ -120,20 +127,35 @@ def login():
     if _check_account_lockout(username):
         return error_response('Account temporarily locked. Try again later.', 429)
     
+    # Get client info for anomaly detection
+    client_ip = request.remote_addr or 'unknown'
+    user_agent = request.headers.get('User-Agent', 'unknown')
+    
     # Find user
     user = User.query.filter_by(username=username).first()
     
     if not user or not user.active:
         _record_failed_attempt(username)
+        # Record failed login for anomaly detection
+        if HAS_ANOMALY:
+            get_anomaly_detector().record_login(0, client_ip, user_agent, success=False)
         return error_response('Invalid credentials', 401)
     
     # Verify password (assumes User has check_password method)
     if not user.check_password(password):
         _record_failed_attempt(username)
+        # Record failed login for anomaly detection
+        if HAS_ANOMALY:
+            get_anomaly_detector().record_login(user.id, client_ip, user_agent, success=False)
         return error_response('Invalid credentials', 401)
     
     # Clear failed attempts on success
     _clear_failed_attempts(username)
+    
+    # Record successful login for anomaly detection
+    anomalies = []
+    if HAS_ANOMALY:
+        anomalies = get_anomaly_detector().record_login(user.id, client_ip, user_agent, success=True)
     
     # Check if JWT requested
     accept_header = request.headers.get('Accept', '')
@@ -158,7 +180,8 @@ def login():
                     'id': user.id,
                     'username': user.username
                 },
-                'csrf_token': csrf_token
+                'csrf_token': csrf_token,
+                'security_alerts': [a['message'] for a in anomalies if a.get('severity') in ('medium', 'high')]
             },
             message='Login successful'
         )
