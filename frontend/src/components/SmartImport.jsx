@@ -179,7 +179,7 @@ function ValidationIssues({ validation }) {
  * SmartImport Widget - can be used standalone or in modal
  */
 export function SmartImportWidget({ onImportComplete, onCancel, compact = false }) {
-  const { showNotification } = useNotification()
+  const { showError, showSuccess } = useNotification()
   const fileInputRef = useRef(null)
   
   const [step, setStep] = useState('input')
@@ -286,13 +286,13 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
   const handleAnalyze = async () => {
     const content = buildContent()
     if (!content) {
-      showNotification('error', 'Please add files or paste PEM content')
+      showError('Please add files or paste PEM content')
       return
     }
     
     setIsAnalyzing(true)
     try {
-      const response = await api.post('/api/v2/import/analyze', { 
+      const response = await api.post('/import/analyze', { 
         content, 
         password: password || undefined 
       })
@@ -300,7 +300,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       setSelectedObjects(new Set(response.data.data.objects.map((_, i) => i)))
       setStep('preview')
     } catch (err) {
-      showNotification('error', err.response?.data?.error || 'Failed to analyze content')
+      showError(err.response?.data?.error || 'Failed to analyze content')
     } finally {
       setIsAnalyzing(false)
     }
@@ -313,7 +313,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
     setIsImporting(true)
     setStep('importing')
     try {
-      const response = await api.post('/api/v2/import/execute', {
+      const response = await api.post('/import/execute', {
         content: buildContent(),
         password: password || undefined,
         options: { ...importOptions, selected_indices: Array.from(selectedObjects) }
@@ -321,10 +321,10 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       setImportResult(response.data.data)
       setStep('result')
       if (response.data.data.imported?.length > 0) {
-        showNotification('success', `Successfully imported ${response.data.data.imported.length} object(s)`)
+        showSuccess(`Successfully imported ${response.data.data.imported.length} object(s)`)
       }
     } catch (err) {
-      showNotification('error', err.response?.data?.error || 'Import failed')
+      showError(err.response?.data?.error || 'Import failed')
       setStep('preview')
     } finally {
       setIsImporting(false)
