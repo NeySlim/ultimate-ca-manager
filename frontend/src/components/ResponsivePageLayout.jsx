@@ -40,7 +40,7 @@ import { cn } from '../lib/utils'
 import { useMobile } from '../contexts'
 import { Button } from './Button'
 import { Badge } from './Badge'
-import { HelpModal } from './HelpModal'
+import { HelpModal } from './ui/HelpModal'
 import { FilterSelect } from './ui/Select'
 import { 
   X, CaretLeft, Question, Funnel, Eraser

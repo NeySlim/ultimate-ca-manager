@@ -4,23 +4,23 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
-  FileX, ShieldCheck, ArrowsClockwise, Download, Globe, Copy,
-  Database, Pulse, Calendar, Hash, CheckCircle, XCircle, Eye,
-  Info, Link as LinkIcon
+  FileX, ShieldCheck, ArrowsClockwise, Download, Copy,
+  Database, Pulse, Calendar, Hash, XCircle,
+  Info as LinkIcon
 } from '@phosphor-icons/react'
 import * as Switch from '@radix-ui/react-switch'
 import {
   ResponsiveLayout,
   ResponsiveDataTable,
   Button, Card, Badge, 
-  LoadingSpinner, EmptyState, StatusIndicator, HelpCard,
+  LoadingSpinner, StatusIndicator, HelpCard,
   CompactSection, CompactGrid, CompactField
 } from '../components'
 import { casService, crlService, apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
-import { ERRORS, SUCCESS, LABELS } from '../lib/messages'
+import { ERRORS, SUCCESS } from '../lib/messages'
 
 // Extended CRL service methods
 const crlApi = {

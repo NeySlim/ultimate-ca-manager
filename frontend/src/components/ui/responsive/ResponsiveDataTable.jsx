@@ -7,7 +7,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { 
   MagnifyingGlass, CaretUp, CaretDown, DotsThreeVertical,
-  CaretLeft, CaretRight, FunnelSimple, X, Columns, Eye, EyeSlash, Check,
+  CaretLeft, CaretRight, X, Columns, Check,
   BookmarkSimple, FloppyDisk, Trash, Export
 } from '@phosphor-icons/react'
 import { useMobile } from '../../../contexts'

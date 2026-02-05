@@ -16,7 +16,7 @@ import {
 import { SmartImportModal } from '../components/SmartImport'
 import { certificatesService, casService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { ERRORS, SUCCESS, LABELS, CONFIRM, BUTTONS } from '../lib/messages'
+import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 import { usePermission, useRecentHistory, useFavorites } from '../hooks'
 import { formatDate, extractCN, cn } from '../lib/utils'
 

@@ -1,16 +1,16 @@
 /**
  * CAs (Certificate Authorities) Page - Using ResponsiveLayout
  */
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
-  Key, Download, Trash, PencilSimple,
-  Certificate, UploadSimple, Clock, Plus, Warning, CaretRight, CaretDown,
-  TreeStructure, List, Copy, Check, Crown, ShieldCheck
+  Key, Download, Trash,
+  Certificate, UploadSimple, Clock, Plus, CaretRight, CaretDown,
+  TreeStructure, List, Check, Crown, ShieldCheck
 } from '@phosphor-icons/react'
 import {
-  Badge, Button, Modal, Input, Select, HelpCard, LoadingSpinner,
-  CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats,
+  Badge, Button, Modal, Input, Select, LoadingSpinner,
+  CompactSection, CompactGrid, CompactField, CompactStats,
   FilterSelect, CATypeIcon
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
@@ -1036,17 +1036,22 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete }) {
   return (
     <div className="p-3 space-y-3">
       {/* Header */}
-      <CompactHeader
-        icon={ca.type === 'root' ? Crown : ShieldCheck}
-        iconClass={ca.type === 'root' ? "status-warning-bg" : "status-primary-bg"}
-        title={ca.name || ca.common_name || 'CA'}
-        subtitle={ca.subject}
-        badge={
-          <Badge variant={ca.type === 'root' ? 'warning' : 'primary'} size="sm">
-            {ca.type || 'unknown'}
-          </Badge>
-        }
-      />
+      <div className="flex items-center gap-2">
+        <CATypeIcon isRoot={ca.type === 'root' || ca.is_root} size="lg" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-text-primary truncate">
+              {ca.name || ca.common_name || 'CA'}
+            </h3>
+            <Badge variant={ca.type === 'root' || ca.is_root ? 'warning' : 'primary'} size="sm">
+              {ca.type === 'root' || ca.is_root ? 'root' : 'intermediate'}
+            </Badge>
+          </div>
+          {ca.subject && (
+            <p className="text-xs text-text-secondary truncate">{ca.subject}</p>
+          )}
+        </div>
+      </div>
 
       {/* Stats */}
       <CompactStats stats={[

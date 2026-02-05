@@ -9,7 +9,7 @@ import {
   Plus, ArrowsClockwise, ListChecks, Gear, CaretRight, 
   User, Globe, SignIn, SignOut, Trash, PencilSimple, 
   UploadSimple, Key, Warning, WifiHigh, Heartbeat, Database, Lightning,
-  SlidersHorizontal, Eye, EyeSlash, DotsSixVertical, X
+  SlidersHorizontal, Eye, EyeSlash, X
 } from '@phosphor-icons/react'
 import { Card, Button, Badge, LoadingSpinner, Logo, Modal, CertificateTrendChart, StatusPieChart } from '../components'
 import { dashboardService, certificatesService, acmeService } from '../services'

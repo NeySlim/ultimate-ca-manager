@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   FileText, Upload, SignIn, Trash, Download, 
-  Clock, Key, UploadSimple, CheckCircle, Warning, X,
+  Clock, Key, UploadSimple, CheckCircle, Warning,
   ClockCounterClockwise, Certificate, Stamp, ClipboardText
 } from '@phosphor-icons/react'
 import {
@@ -21,7 +21,7 @@ import { usePermission, useModals } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
 import { VALIDITY } from '../constants/config'
-import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
+import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 
 // Tab definitions
 const TABS = [

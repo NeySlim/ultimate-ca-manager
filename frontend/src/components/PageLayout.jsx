@@ -11,7 +11,7 @@ import { useState } from 'react'
 import { cn } from '../lib/utils'
 import { labels, getHelpTitle } from '../lib/ui'
 import { Question, X, ArrowLeft } from '@phosphor-icons/react'
-import { HelpModal } from './HelpModal'
+import { HelpModal } from './ui/HelpModal'
 import { useMobile } from '../contexts'
 
 export function PageLayout({

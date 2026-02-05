@@ -1,4 +1,5 @@
 import { cn } from '../lib/utils'
+import { Crown, ShieldCheck } from '@phosphor-icons/react'
 
 export function Badge({ 
   children, 
@@ -91,7 +92,6 @@ export function Badge({
  * Reusable across CAsPage tree view and CADetails panel
  * Uses global CSS classes for theme-aware colors
  */
-import { Crown, ShieldCheck } from '@phosphor-icons/react'
 
 export function CATypeIcon({ isRoot, size = 'md', className }) {
   const sizes = {
