@@ -136,12 +136,22 @@ export default function CertificatesPage() {
   // Export certificate
   const handleExport = async (format) => {
     if (!selectedCert) return
+    
+    // PKCS12/PFX need password - show password modal
+    if ((format === 'pkcs12' || format === 'pfx') && selectedCert.has_private_key) {
+      setP12Cert(selectedCert)
+      setP12Format(format)
+      setShowP12Modal(true)
+      return
+    }
+    
     try {
       const blob = await certificatesService.export(selectedCert.id, format)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${selectedCert.common_name || 'certificate'}.${format}`
+      const ext = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12', pfx: 'pfx' }[format] || format
+      a.download = `${selectedCert.common_name || 'certificate'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
       showSuccess(SUCCESS.EXPORT.CERTIFICATE)
@@ -462,6 +472,7 @@ export default function CertificatesPage() {
   const [showP12Modal, setShowP12Modal] = useState(false)
   const [p12Password, setP12Password] = useState('')
   const [p12Cert, setP12Cert] = useState(null)
+  const [p12Format, setP12Format] = useState('pkcs12')
 
   // Export from row
   const handleExportRow = async (cert, format) => {
@@ -491,26 +502,28 @@ export default function CertificatesPage() {
     }
   }
 
-  // Export P12 with password
+  // Export P12/PFX with password
   const handleExportP12 = async () => {
     if (!p12Password || p12Password.length < 4) {
       showError('Password must be at least 4 characters')
       return
     }
     try {
-      const blob = await certificatesService.export(p12Cert.id, 'pkcs12', { password: p12Password })
+      const blob = await certificatesService.export(p12Cert.id, p12Format, { password: p12Password })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${p12Cert.common_name || p12Cert.cn || 'certificate'}.p12`
+      const ext = p12Format === 'pfx' ? 'pfx' : 'p12'
+      a.download = `${p12Cert.common_name || p12Cert.cn || 'certificate'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess('Certificate exported as PKCS#12')
+      showSuccess(`Certificate exported as ${p12Format.toUpperCase()}`)
       setShowP12Modal(false)
       setP12Password('')
       setP12Cert(null)
+      setP12Format('pkcs12')
     } catch (error) {
-      showError(error.message || 'Failed to export PKCS#12')
+      showError(error.message || 'Failed to export certificate')
     }
   }
 

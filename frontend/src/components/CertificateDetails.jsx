@@ -195,10 +195,18 @@ export function CertificateDetails({
               <Button size="xs" variant="secondary" onClick={() => onExport('der')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
                 <Download size={12} className="sm:w-3.5 sm:h-3.5" /> DER
               </Button>
+              <Button size="xs" variant="secondary" onClick={() => onExport('pkcs7')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
+                <Download size={12} className="sm:w-3.5 sm:h-3.5" /> P7B
+              </Button>
               {cert.has_private_key && (
-                <Button size="xs" variant="secondary" onClick={() => onExport('p12')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
-                  <Download size={12} className="sm:w-3.5 sm:h-3.5" /> P12
-                </Button>
+                <>
+                  <Button size="xs" variant="secondary" onClick={() => onExport('pkcs12')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
+                    <Download size={12} className="sm:w-3.5 sm:h-3.5" /> P12
+                  </Button>
+                  <Button size="xs" variant="secondary" onClick={() => onExport('pfx')} className="sm:!h-8 sm:!px-3 sm:!text-xs">
+                    <Download size={12} className="sm:w-3.5 sm:h-3.5" /> PFX
+                  </Button>
+                </>
               )}
             </>
           )}
