@@ -85,6 +85,14 @@ class AuditService:
             )
             
             db.session.add(audit_log)
+            db.session.flush()  # Get ID before computing hash
+            
+            # Tamper-evident: chain to previous log entry
+            prev_log = AuditLog.query.filter(AuditLog.id < audit_log.id).order_by(AuditLog.id.desc()).first()
+            prev_hash = prev_log.entry_hash if prev_log and prev_log.entry_hash else '0' * 64
+            audit_log.prev_hash = prev_hash
+            audit_log.entry_hash = audit_log.compute_hash(prev_hash)
+            
             db.session.commit()
             
             # Also log to file/console for debugging
@@ -100,6 +108,58 @@ class AuditService:
             logger.error(f"Failed to create audit log: {e}")
             db.session.rollback()
             return None
+    
+    @staticmethod
+    def verify_integrity(start_id: int = None, end_id: int = None) -> dict:
+        """
+        Verify audit log integrity using hash chain.
+        Returns dict with verification results.
+        """
+        query = AuditLog.query.order_by(AuditLog.id.asc())
+        if start_id:
+            query = query.filter(AuditLog.id >= start_id)
+        if end_id:
+            query = query.filter(AuditLog.id <= end_id)
+        
+        logs = query.all()
+        if not logs:
+            return {'valid': True, 'checked': 0, 'errors': []}
+        
+        errors = []
+        prev_hash = '0' * 64
+        
+        for log in logs:
+            # Skip entries without hash (legacy)
+            if not log.entry_hash:
+                prev_hash = '0' * 64
+                continue
+            
+            # Verify prev_hash matches
+            if log.prev_hash and log.prev_hash != prev_hash:
+                errors.append({
+                    'id': log.id,
+                    'error': 'prev_hash mismatch',
+                    'expected': prev_hash,
+                    'actual': log.prev_hash
+                })
+            
+            # Verify entry_hash
+            computed = log.compute_hash(log.prev_hash)
+            if computed != log.entry_hash:
+                errors.append({
+                    'id': log.id,
+                    'error': 'entry_hash mismatch (tampered)',
+                    'expected': computed,
+                    'actual': log.entry_hash
+                })
+            
+            prev_hash = log.entry_hash
+        
+        return {
+            'valid': len(errors) == 0,
+            'checked': len(logs),
+            'errors': errors
+        }
     
     # =========================================================================
     # CENTRALIZED LOGGING HELPERS - Use these instead of log_action directly

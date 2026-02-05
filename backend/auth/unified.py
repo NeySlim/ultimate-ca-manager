@@ -116,7 +116,7 @@ class AuthManager:
     
     def verify_jwt(self, token):
         """
-        Verify JWT token
+        Verify JWT token - supports key rotation (current + previous key)
         
         Args:
             token: JWT token string
@@ -127,14 +127,30 @@ class AuthManager:
         if not User:
             return None
         
+        # Try current key first, then previous key (for rotation)
+        secrets_to_try = [self.jwt_secret]
+        previous_secret = current_app.config.get('JWT_SECRET_KEY_PREVIOUS', '')
+        if previous_secret:
+            secrets_to_try.append(previous_secret)
+        
+        payload = None
+        for secret in secrets_to_try:
+            try:
+                payload = jwt.decode(
+                    token,
+                    secret,
+                    algorithms=['HS256']
+                )
+                break  # Success with this key
+            except jwt.ExpiredSignatureError:
+                return None  # Expired regardless of key
+            except jwt.InvalidTokenError:
+                continue  # Try next key
+        
+        if not payload:
+            return None  # No valid key found
+        
         try:
-            # Decode JWT
-            payload = jwt.decode(
-                token,
-                self.jwt_secret,
-                algorithms=['HS256']
-            )
-            
             # Get user
             user = User.query.get(payload['user_id'])
             if not user or not user.is_active:
@@ -147,11 +163,6 @@ class AuthManager:
                 'permissions': ['*'],  # JWT = full access
                 'token_expires': payload['exp']
             }
-        
-        except jwt.ExpiredSignatureError:
-            return None
-        except jwt.InvalidTokenError:
-            return None
         except Exception as e:
             current_app.logger.error(f"JWT verification error: {e}")
             return None

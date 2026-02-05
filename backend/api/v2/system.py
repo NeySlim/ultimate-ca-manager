@@ -848,3 +848,108 @@ def reset_rate_limits():
         return success_response(message="Rate limits reset")
     except Exception as e:
         return error_response(f"Failed to reset: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/security/rotate-secrets', methods=['POST'])
+@require_auth(['admin:system'])
+def rotate_secrets():
+    """
+    Rotate JWT secret key.
+    
+    Process:
+    1. Current JWT_SECRET_KEY becomes JWT_SECRET_KEY_PREVIOUS
+    2. New key is generated and set as JWT_SECRET_KEY
+    3. Tokens signed with old key remain valid during transition period
+    4. After JWT_ACCESS_TOKEN_EXPIRES, remove the PREVIOUS key
+    
+    Body:
+        new_secret: Optional - provide your own secret (32+ chars)
+        
+    Returns:
+        Instructions for updating environment
+    """
+    import secrets as py_secrets
+    
+    data = request.get_json() or {}
+    new_secret = data.get('new_secret')
+    
+    # Generate new secret if not provided
+    if not new_secret:
+        new_secret = py_secrets.token_urlsafe(32)
+    elif len(new_secret) < 32:
+        return error_response("Secret must be at least 32 characters", 400)
+    
+    # Get current secret
+    current_secret = os.getenv('JWT_SECRET_KEY', '')
+    
+    # Log the rotation
+    from services.audit_service import AuditService
+    AuditService.log_action(
+        action='secrets_rotated',
+        resource_type='security',
+        details='JWT secret key rotated. Previous key kept for transition.',
+        success=True
+    )
+    
+    # Return instructions (we can't modify .env directly for security)
+    return success_response(
+        data={
+            'new_secret': new_secret,
+            'previous_secret': current_secret[:8] + '...' if current_secret else None,
+            'instructions': [
+                '1. Edit /etc/ucm/ucm.env',
+                '2. Set JWT_SECRET_KEY_PREVIOUS to your current JWT_SECRET_KEY value',
+                f'3. Set JWT_SECRET_KEY={new_secret}',
+                '4. Restart UCM: systemctl restart ucm',
+                '5. After 1 hour (token expiry), remove JWT_SECRET_KEY_PREVIOUS'
+            ]
+        },
+        message='New secret generated. Follow instructions to complete rotation.'
+    )
+
+
+@bp.route('/api/v2/system/security/secrets-status', methods=['GET'])
+@require_auth(['admin:system'])
+def secrets_status():
+    """Get status of secret keys (without revealing them)"""
+    from config.settings import Config
+    
+    jwt_configured = bool(os.getenv('JWT_SECRET_KEY')) and Config.JWT_SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
+    jwt_previous = bool(os.getenv('JWT_SECRET_KEY_PREVIOUS'))
+    session_configured = bool(os.getenv('SECRET_KEY')) and Config.SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
+    encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY'))
+    
+    return success_response(data={
+        'jwt_secret': {
+            'configured': jwt_configured,
+            'has_previous': jwt_previous,
+            'rotation_in_progress': jwt_previous
+        },
+        'session_secret': {
+            'configured': session_configured
+        },
+        'encryption_key': {
+            'configured': encryption_configured
+        }
+    })
+
+
+@bp.route('/api/v2/system/security/anomalies', methods=['GET'])
+@require_auth(['admin:system'])
+def get_security_anomalies():
+    """Get recent security anomalies"""
+    try:
+        from security.anomaly_detection import get_anomaly_detector
+        
+        hours = request.args.get('hours', 24, type=int)
+        anomalies = get_anomaly_detector().get_recent_anomalies(hours)
+        
+        return success_response(
+            data={
+                'anomalies': anomalies,
+                'period_hours': hours,
+                'total': len(anomalies)
+            }
+        )
+    except Exception as e:
+        return error_response(f"Failed to get anomalies: {str(e)}", 500)
