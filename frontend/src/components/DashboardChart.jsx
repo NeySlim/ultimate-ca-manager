@@ -2,12 +2,45 @@
  * DashboardChart - Interactive chart component for dashboard
  * Uses Recharts for beautiful responsive charts
  */
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { 
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts'
 import { useTheme } from '../contexts/ThemeContext'
+
+// Get computed CSS variable value
+function getCssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
+// Hook to get chart colors from CSS variables
+function useChartColors() {
+  const { mode } = useTheme()
+  const [colors, setColors] = useState({
+    primary: '#3b82f6',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    danger: '#ef4444',
+    pro: '#8b5cf6',
+  })
+  
+  useEffect(() => {
+    // Read colors from CSS variables after theme change
+    const timer = setTimeout(() => {
+      setColors({
+        primary: getCssVar('--accent-primary') || '#3b82f6',
+        success: getCssVar('--accent-success') || '#22c55e',
+        warning: getCssVar('--accent-warning') || '#f59e0b',
+        danger: getCssVar('--accent-danger') || '#ef4444',
+        pro: getCssVar('--accent-pro') || '#8b5cf6',
+      })
+    }, 50) // Small delay to ensure CSS is applied
+    return () => clearTimeout(timer)
+  }, [mode])
+  
+  return colors
+}
 
 // Custom tooltip component
 function CustomTooltip({ active, payload, label }) {
@@ -28,23 +61,24 @@ function CustomTooltip({ active, payload, label }) {
 // Certificate trend chart (area chart)
 export function CertificateTrendChart({ data = [], height = 150 }) {
   const { mode } = useTheme()
+  const colors = useChartColors()
   
-  // Generate sample data if none provided
+  // Use provided data directly
   const chartData = useMemo(() => {
     if (data.length > 0) return data
     
-    // Generate last 7 days of fake data for demo
+    // Return empty placeholder data if no data provided
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    return days.map((day, i) => ({
+    return days.map(day => ({
       name: day,
-      issued: Math.floor(Math.random() * 5) + 1,
-      revoked: Math.floor(Math.random() * 2),
+      issued: 0,
+      revoked: 0,
     }))
   }, [data])
   
-  const strokeColor = mode === 'dark' ? '#60a5fa' : '#3b82f6'
-  const fillColor = mode === 'dark' ? 'rgba(96, 165, 250, 0.15)' : 'rgba(59, 130, 246, 0.2)'
-  const revokedColor = mode === 'dark' ? '#f87171' : '#ef4444'
+  const strokeColor = colors.primary
+  const fillColor = `${colors.primary}30`
+  const revokedColor = colors.danger
   const gridColor = mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
   
   return (
@@ -93,17 +127,17 @@ export function CertificateTrendChart({ data = [], height = 150 }) {
 
 // Status distribution pie chart
 export function StatusPieChart({ data = {}, height = 150 }) {
-  const { mode } = useTheme()
+  const colors = useChartColors()
   
   const chartData = useMemo(() => {
     const { valid = 0, expiring = 0, expired = 0, revoked = 0 } = data
     return [
-      { name: 'Valid', value: valid, color: mode === 'dark' ? '#4ade80' : '#22c55e' },
-      { name: 'Expiring', value: expiring, color: mode === 'dark' ? '#fbbf24' : '#f59e0b' },
-      { name: 'Expired', value: expired, color: mode === 'dark' ? '#f87171' : '#ef4444' },
-      { name: 'Revoked', value: revoked, color: mode === 'dark' ? '#a78bfa' : '#8b5cf6' },
+      { name: 'Valid', value: valid, color: colors.success },
+      { name: 'Expiring', value: expiring, color: colors.warning },
+      { name: 'Expired', value: expired, color: colors.danger },
+      { name: 'Revoked', value: revoked, color: colors.pro },
     ].filter(d => d.value > 0)
-  }, [data, mode])
+  }, [data, colors])
   
   if (chartData.length === 0) {
     return (
@@ -147,14 +181,15 @@ export function StatusPieChart({ data = {}, height = 150 }) {
 
 // Simple mini sparkline
 export function MiniSparkline({ data = [], color = 'blue', height = 30 }) {
-  const { mode } = useTheme()
+  const colors = useChartColors()
   
-  const strokeColor = {
-    blue: mode === 'dark' ? '#60a5fa' : '#3b82f6',
-    green: mode === 'dark' ? '#4ade80' : '#22c55e',
-    red: mode === 'dark' ? '#f87171' : '#ef4444',
-    yellow: mode === 'dark' ? '#fbbf24' : '#f59e0b',
-  }[color] || '#60a5fa'
+  const colorMap = {
+    blue: colors.primary,
+    green: colors.success,
+    red: colors.danger,
+    yellow: colors.warning,
+  }
+  const strokeColor = colorMap[color] || colors.primary
   
   if (data.length === 0) return null
   

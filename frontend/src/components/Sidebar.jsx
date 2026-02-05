@@ -131,7 +131,7 @@ export function Sidebar({ activePage }) {
             )}
             {/* Expiring badge */}
             {showBadge && (
-              <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-orange-500 border border-bg-secondary flex items-center justify-center">
+              <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-status-warning border border-bg-secondary flex items-center justify-center">
                 <span className="text-[9px] font-bold text-white">
                   {expiringCount > 9 ? '9+' : expiringCount}
                 </span>
@@ -141,7 +141,7 @@ export function Sidebar({ activePage }) {
             <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-md text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
               {page.label}
               {showBadge && (
-                <span className="ml-1 text-orange-500">({expiringCount} expiring)</span>
+                <span className="ml-1 text-status-warning">({expiringCount} expiring)</span>
               )}
             </div>
           </Link>

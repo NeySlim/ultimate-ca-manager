@@ -17,14 +17,14 @@ function CompareField({ label, value1, value2, mono = false }) {
       <span className={cn(
         "text-xs truncate",
         mono && "font-mono",
-        same ? "text-text-primary" : "text-amber-500"
+        same ? "text-text-primary" : "text-status-warning"
       )}>
         {value1 || '—'}
       </span>
       <span className={cn(
         "text-xs truncate",
         mono && "font-mono", 
-        same ? "text-text-primary" : "text-amber-500"
+        same ? "text-text-primary" : "text-status-warning"
       )}>
         {value2 || '—'}
       </span>

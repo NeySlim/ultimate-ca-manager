@@ -999,7 +999,7 @@ export default function SettingsPage() {
 
             <DetailSection title="Danger Zone" icon={WarningCircle} iconClass="icon-bg-orange" className="mt-4">
               <div className="p-4 status-danger-bg status-danger-border border rounded-lg">
-                <h4 className="text-sm font-semibold text-red-400 mb-2">⚠️ Database Reset</h4>
+                <h4 className="text-sm font-semibold text-status-danger mb-2">⚠️ Database Reset</h4>
                 <p className="text-xs text-text-secondary mb-3">
                   Reset database to initial state. This will DELETE ALL certificates, CAs, users, and settings.
                 </p>

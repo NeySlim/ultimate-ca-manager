@@ -867,7 +867,7 @@ function SearchBar({
                             e.stopPropagation()
                             deletePreset?.(preset.id)
                           }}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-text-tertiary hover:text-red-500 transition-all"
+                          className="opacity-0 group-hover:opacity-100 p-1 text-text-tertiary hover:text-status-danger transition-all"
                           title="Delete preset"
                         >
                           <Trash size={12} />

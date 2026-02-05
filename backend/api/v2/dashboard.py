@@ -221,6 +221,62 @@ def get_activity_log():
         return success_response(data={'activity': []})
 
 
+@bp.route('/api/v2/dashboard/certificate-trend', methods=['GET'])
+@require_auth()
+def get_certificate_trend():
+    """Get certificate activity for the last 7 days"""
+    from models import db
+    from sqlalchemy import text
+    from datetime import datetime, timedelta
+    
+    days = request.args.get('days', 7, type=int)
+    
+    try:
+        # Calculate dates for the last N days
+        today = datetime.now().date()
+        trend_data = []
+        
+        for i in range(days - 1, -1, -1):
+            day = today - timedelta(days=i)
+            day_start = datetime.combine(day, datetime.min.time())
+            day_end = datetime.combine(day, datetime.max.time())
+            
+            # Count certificates issued on this day
+            issued = db.session.execute(
+                text("""
+                    SELECT COUNT(*) FROM certificates 
+                    WHERE created_at >= :start AND created_at <= :end
+                """),
+                {'start': day_start, 'end': day_end}
+            ).scalar() or 0
+            
+            # Count certificates revoked on this day
+            revoked = db.session.execute(
+                text("""
+                    SELECT COUNT(*) FROM certificates 
+                    WHERE revoked_at >= :start AND revoked_at <= :end
+                """),
+                {'start': day_start, 'end': day_end}
+            ).scalar() or 0
+            
+            # Day name abbreviation
+            day_name = day.strftime('%a')
+            
+            trend_data.append({
+                'name': day_name,
+                'date': day.isoformat(),
+                'issued': issued,
+                'revoked': revoked
+            })
+        
+        return success_response(data={'trend': trend_data})
+    except Exception as e:
+        import logging
+        logging.error(f"Certificate trend error: {e}")
+        # Return empty but valid data
+        return success_response(data={'trend': []})
+
+
 @bp.route('/api/v2/dashboard/system-status', methods=['GET'])
 def get_system_status():
     """Get system services status (no auth required - for login page)"""

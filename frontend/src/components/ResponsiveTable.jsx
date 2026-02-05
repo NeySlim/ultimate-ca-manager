@@ -392,7 +392,7 @@ function DesktopRow({ row, columns, selected, onClick, actions }) {
                       }}
                       className={cn(
                         "w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 hover:bg-bg-tertiary",
-                        action.variant === 'danger' && "text-status-error"
+                        action.variant === 'danger' && "text-status-danger"
                       )}
                     >
                       {action.icon && <action.icon size={14} />}
@@ -486,7 +486,7 @@ function MobileRow({ row, columns, selected, onClick, actions }) {
                       }}
                       className={cn(
                         "w-full px-4 py-3 text-sm text-left flex items-center gap-3 active:bg-bg-tertiary",
-                        action.variant === 'danger' && "text-status-error"
+                        action.variant === 'danger' && "text-status-danger"
                       )}
                     >
                       {action.icon && <action.icon size={18} />}

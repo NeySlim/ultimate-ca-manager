@@ -87,12 +87,12 @@ function ExpiryIndicator({ daysRemaining, validTo }) {
   let label = `${daysRemaining}d`
   
   if (daysRemaining <= 0) {
-    color = 'text-status-error'
-    bgColor = 'bg-status-error/10'
+    color = 'text-status-danger'
+    bgColor = 'bg-status-danger/10'
     label = 'Expired'
   } else if (daysRemaining <= 7) {
-    color = 'text-status-error'
-    bgColor = 'bg-status-error/10'
+    color = 'text-status-danger'
+    bgColor = 'bg-status-danger/10'
     label = `${daysRemaining}d left`
   } else if (daysRemaining <= 30) {
     color = 'text-status-warning'
@@ -142,9 +142,9 @@ export function CertificateDetails({
       <div className="flex items-start gap-2 sm:gap-3">
         <div className={cn(
           "p-2 sm:p-2.5 rounded-lg shrink-0",
-          cert.revoked ? "bg-status-error/10" : "bg-accent-primary/10"
+          cert.revoked ? "bg-status-danger/10" : "bg-accent-primary/10"
         )}>
-          <Certificate size={20} className={cn("sm:w-6 sm:h-6", cert.revoked ? "text-status-error" : "text-accent-primary")} />
+          <Certificate size={20} className={cn("sm:w-6 sm:h-6", cert.revoked ? "text-status-danger" : "text-accent-primary")} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
@@ -334,8 +334,8 @@ export function CertificateDetails({
       {/* Revocation info */}
       {cert.revoked && (
         <CompactSection title="Revocation Details">
-          <div className="bg-status-error/10 border border-status-error/20 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-status-error mb-2">
+          <div className="bg-status-danger/10 border border-status-danger/20 rounded-lg p-3">
+            <div className="flex items-center gap-2 text-status-danger mb-2">
               <X size={16} />
               <span className="font-medium">This certificate has been revoked</span>
             </div>

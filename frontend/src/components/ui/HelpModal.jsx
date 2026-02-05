@@ -97,7 +97,7 @@ export function HelpModal({ isOpen, onClose, pageKey }) {
                 <ul className="space-y-2">
                   {content.tips.map((tip, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-xs sm:text-sm text-text-secondary">
-                      <Sparkle size={12} weight="fill" className="text-amber-500 mt-1 shrink-0" />
+                      <Sparkle size={12} weight="fill" className="text-status-warning mt-1 shrink-0" />
                       <span>{tip}</span>
                     </li>
                   ))}
@@ -109,15 +109,15 @@ export function HelpModal({ isOpen, onClose, pageKey }) {
             {content.warnings && content.warnings.length > 0 && (
               <div className="rounded-xl bg-gradient-to-br from-red-500/10 to-rose-500/5 border border-red-500/20 p-3 sm:p-4">
                 <div className="flex items-center gap-2 mb-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-red-500/20 flex items-center justify-center">
-                    <Warning size={16} weight="fill" className="text-red-500" />
+                  <div className="w-7 h-7 rounded-lg bg-status-danger/20 flex items-center justify-center">
+                    <Warning size={16} weight="fill" className="text-status-danger" />
                   </div>
-                  <h3 className="text-sm font-semibold text-red-600 dark:text-red-400">Important</h3>
+                  <h3 className="text-sm font-semibold text-status-danger">Important</h3>
                 </div>
                 <ul className="space-y-2">
                   {content.warnings.map((warning, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-xs sm:text-sm text-text-secondary">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-status-danger mt-1.5 shrink-0" />
                       <span>{warning}</span>
                     </li>
                   ))}

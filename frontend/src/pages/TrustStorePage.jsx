@@ -252,9 +252,9 @@ export default function TrustStorePage() {
         <div className="flex items-start gap-3">
           <div className={cn(
             "p-2.5 rounded-lg shrink-0",
-            isExpired ? "bg-status-error/10" : "bg-accent-primary/10"
+            isExpired ? "bg-status-danger/10" : "bg-accent-primary/10"
           )}>
-            <Certificate size={24} className={isExpired ? "text-status-error" : "text-accent-primary"} />
+            <Certificate size={24} className={isExpired ? "text-status-danger" : "text-accent-primary"} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
@@ -276,19 +276,19 @@ export default function TrustStorePage() {
         {daysRemaining !== null && (
           <div className={cn(
             "flex items-center gap-2 px-3 py-2 rounded-lg",
-            isExpired && "bg-status-error/10",
+            isExpired && "bg-status-danger/10",
             isExpiring && "bg-status-warning/10",
             !isExpired && !isExpiring && "bg-status-success/10"
           )}>
             <Clock size={16} className={cn(
-              isExpired && "text-status-error",
+              isExpired && "text-status-danger",
               isExpiring && "text-status-warning",
               !isExpired && !isExpiring && "text-status-success"
             )} />
             <div>
               <div className={cn(
                 "text-sm font-medium",
-                isExpired && "text-status-error",
+                isExpired && "text-status-danger",
                 isExpiring && "text-status-warning",
                 !isExpired && !isExpiring && "text-status-success"
               )}>

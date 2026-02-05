@@ -579,7 +579,7 @@ export default function AuditLogsPage() {
     <div className="p-3 space-y-3">
       <CompactHeader
         icon={actionIcons[selectedLog.action] || actionIcons.default}
-        iconClass={selectedLog.success ? "bg-status-success/20" : "bg-status-error/20"}
+        iconClass={selectedLog.success ? "bg-status-success/20" : "bg-status-danger/20"}
         title={selectedLog.action?.replace(/_/g, ' ') || 'Event'}
         subtitle={`${selectedLog.resource_type || 'System'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`}
         badge={
@@ -667,7 +667,7 @@ export default function AuditLogsPage() {
         <ArrowsClockwise size={14} />
       </Button>
       <Button variant="secondary" size="sm" onClick={() => setShowCleanupModal(true)}>
-        <Trash size={14} className="text-status-error" />
+        <Trash size={14} className="text-status-danger" />
         <span className="hidden md:inline">Cleanup</span>
       </Button>
       {/* Mobile: More filters */}

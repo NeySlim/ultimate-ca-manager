@@ -228,7 +228,7 @@ export default function ImportExportPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-status-error">Connection failed. Check your credentials.</div>
+                  <div className="text-sm text-status-danger">Connection failed. Check your credentials.</div>
                 )}
               </DetailSection>
             )}

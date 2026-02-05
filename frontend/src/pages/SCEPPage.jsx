@@ -341,7 +341,7 @@ export default function SCEPPage() {
             <p className="text-xs text-text-secondary">Approved</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-status-error">{stats.rejected}</p>
+            <p className="text-2xl font-bold text-status-danger">{stats.rejected}</p>
             <p className="text-xs text-text-secondary">Rejected</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
@@ -376,7 +376,7 @@ export default function SCEPPage() {
     <div className="p-3 space-y-3">
       <CompactHeader
         icon={Robot}
-        iconClass={selectedRequest.status === 'approved' ? "bg-status-success/20" : selectedRequest.status === 'rejected' ? "bg-status-error/20" : "bg-status-warning/20"}
+        iconClass={selectedRequest.status === 'approved' ? "bg-status-success/20" : selectedRequest.status === 'rejected' ? "bg-status-danger/20" : "bg-status-warning/20"}
         title={`Request #${selectedRequest.id}`}
         subtitle={selectedRequest.subject || 'SCEP Enrollment Request'}
         badge={getStatusBadge(selectedRequest.status)}
