@@ -1020,6 +1020,14 @@ def register_blueprints(app):
     app.register_blueprint(scep_protocol_bp)               # SCEP Protocol (/scep)
     app.register_blueprint(health_bp)  # Health check endpoints (no auth)
     
+    # ACME Protocol (RFC 8555) - /acme/*
+    try:
+        from api.acme import acme_bp
+        app.register_blueprint(acme_bp)
+        app.logger.info("✓ ACME protocol enabled (/acme)")
+    except ImportError as e:
+        app.logger.warning(f"⚠️ ACME protocol not available: {e}")
+    
     # EST Protocol (RFC 7030) - /.well-known/est/*
     try:
         from api.est_protocol import bp as est_bp
