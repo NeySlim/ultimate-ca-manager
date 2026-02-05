@@ -612,7 +612,7 @@ export function SmartImportModal({ isOpen, onClose, onImportComplete }) {
   
   return (
     <Modal
-      isOpen={isOpen}
+      open={isOpen}
       onClose={onClose}
       title="Smart Import"
       size="lg"
