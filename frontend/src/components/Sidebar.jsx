@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
   SignOut, Palette, Check, UserCircle, UploadSimple, ClockCounterClockwise, Robot,
-  UsersThree, Shield, Crown, Lock, FileX, Vault, Warning, Wrench
+  UsersThree, Shield, Crown, Lock, FileX, Vault, Wrench
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'

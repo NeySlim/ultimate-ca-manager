@@ -36,7 +36,7 @@
  * />
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { X, Funnel, Eraser, CaretDown, Check } from '@phosphor-icons/react'
+import { X, Funnel, Eraser, Check } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { useMobile } from '../contexts'
 import { Button } from './Button'

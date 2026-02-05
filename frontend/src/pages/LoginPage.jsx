@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft, CaretRight } from '@phosphor-icons/react'
+import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft } from '@phosphor-icons/react'
 import { Card, Button, Input, Logo, LoadingSpinner } from '../components'
 import { useAuth, useNotification } from '../contexts'
 import { authMethodsService } from '../services/authMethods.service'

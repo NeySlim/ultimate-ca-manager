@@ -3,7 +3,7 @@
  * Manage trusted CA certificates for chain validation
  * Uses ResponsiveLayout for unified UI
  */
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   ShieldCheck, Plus, Trash, Download, Certificate, Clock,
   CheckCircle, Warning, UploadSimple, ArrowsClockwise, Calendar,
