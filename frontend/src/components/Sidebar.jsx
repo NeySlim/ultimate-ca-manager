@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
   SignOut, Palette, Check, UserCircle, UploadSimple, ClockCounterClockwise, Robot,
-  UsersThree, Shield, Crown, Lock, FileX, Vault, Wrench
+  UsersThree, Shield, Crown, Lock, FileX, Vault, Wrench, Detective
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
@@ -92,6 +92,7 @@ export function Sidebar({ activePage }) {
   const proPages = [
     { id: 'rbac', icon: Shield, label: 'RBAC', path: '/rbac' },
     { id: 'hsm', icon: Lock, label: 'HSM', path: '/hsm' },
+    { id: 'security', icon: Detective, label: 'Security', path: '/security' },
   ]
 
   const handleLogout = async () => {

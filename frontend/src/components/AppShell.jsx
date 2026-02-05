@@ -7,7 +7,7 @@ import {
   List, X, MagnifyingGlass,
   House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
   UploadSimple, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock,
-  UserCircle, Palette, Question
+  UserCircle, Palette, Question, Detective
 } from '@phosphor-icons/react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
@@ -38,6 +38,7 @@ const mobileNavItems = [
 
 // Pro items (added dynamically)
 const proNavItems = [
+  { id: 'security', icon: Detective, label: 'Security', path: '/security', pro: true },
   { id: 'rbac', icon: Shield, label: 'RBAC', path: '/rbac', pro: true },
   { id: 'hsm', icon: Lock, label: 'HSM', path: '/hsm', pro: true },
 ]
@@ -74,7 +75,7 @@ export function AppShell() {
     'acme', 'scep-config', 'settings', 'truststore', 'crl-ocsp', 
     'import', 'tools', 'audit', 'account',
     // Pro pages
-    'rbac', 'hsm'
+    'rbac', 'hsm', 'security'
   ]
   const hasHelp = pagesWithHelp.includes(activePage) || activePage === ''
 
