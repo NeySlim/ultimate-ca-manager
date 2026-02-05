@@ -236,7 +236,7 @@ export default function CertificatesPage() {
     let result = certificates.map(cert => ({
       ...cert,
       status: cert.revoked ? 'revoked' : cert.status,
-      cn: cert.cn || cert.common_name || extractCN(cert.subject) || 'Certificate',
+      cn: cert.cn || cert.common_name || extractCN(cert.subject) || cert.descr || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate',
       isOrphan: cert.ca_id && !caIds.has(cert.ca_id) && !caIds.has(Number(cert.ca_id))
     }))
     
