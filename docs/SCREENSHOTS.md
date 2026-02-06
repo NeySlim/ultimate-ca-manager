@@ -85,16 +85,55 @@ UCM v2.0.0 features a completely redesigned interface built with React 18 and Ra
 
 ---
 
-## 🎨 Available Themes
+## 🎨 Theme Gallery
 
-| Theme | Light | Dark |
-|-------|-------|------|
-| Gray | ⚪ | ⚫ |
-| Blue Ocean | 🔵 | 🌊 |
-| Purple Night | 💜 | 🌌 |
-| Green Forest | 💚 | 🌲 |
-| Orange Sunset | 🧡 | 🌅 |
-| Cyber Pink | 💗 | 🌸 |
+UCM offers 12 theme variants (6 colors × Light/Dark modes).
+
+### Gray (Default)
+![Gray Theme](screenshots/theme-gray.png)
+
+### Blue Ocean
+![Blue Ocean Theme](screenshots/theme-blue-ocean.png)
+
+### Purple Night
+![Purple Night Theme](screenshots/theme-purple-night.png)
+
+### Green Forest
+![Green Forest Theme](screenshots/theme-green-forest.png)
+
+### Orange Sunset
+![Orange Sunset Theme](screenshots/theme-orange-sunset.png)
+
+### Cyber Pink
+![Cyber Pink Theme](screenshots/theme-cyber-pink.png)
+
+---
+
+## 📱 Responsive Design
+
+UCM is fully responsive and works on all devices.
+
+### Mobile (iPhone)
+| Dashboard | Certificates | Login |
+|-----------|--------------|-------|
+| ![Mobile Dashboard](screenshots/mobile-dashboard.png) | ![Mobile Certs](screenshots/mobile-certificates.png) | ![Mobile Login](screenshots/mobile-login.png) |
+
+### Tablet (iPad)
+| Dashboard | Certificates |
+|-----------|--------------|
+| ![Tablet Dashboard](screenshots/tablet-dashboard.png) | ![Tablet Certs](screenshots/tablet-certificates.png) |
+
+---
+
+## 🌙 Dark Mode
+
+All themes support dark mode with smooth transitions.
+
+| Dashboard Dark | CAs Dark | Certificates Dark |
+|----------------|----------|-------------------|
+| ![Dashboard Dark](screenshots/dashboard-dark.png) | ![CAs Dark](screenshots/cas-dark.png) | ![Certificates Dark](screenshots/certificates-dark.png) |
+
+---
 
 All themes support:
 - **Light/Dark modes** with smooth transitions
