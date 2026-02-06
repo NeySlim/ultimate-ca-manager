@@ -95,7 +95,11 @@ def create_backup():
     try:
         from services.backup_service import BackupService
         data = request.json or {}
-        password = data.get('password', 'default_backup_password')
+        password = data.get('password')
+        
+        # Security: Require explicit password for encrypted backups
+        if not password or len(password) < 8:
+            return error_response('Backup password required (minimum 8 characters)', 400)
         
         service = BackupService()
         backup_bytes = service.create_backup(password)
@@ -135,7 +139,11 @@ def restore_backup():
     if file.filename == '':
         return error_response('No file selected', 400)
     
-    password = request.form.get('password', 'default_backup_password')
+    password = request.form.get('password')
+    
+    # Security: Require password for restore
+    if not password:
+        return error_response('Backup password required', 400)
     
     try:
         from services.backup_service import BackupService
