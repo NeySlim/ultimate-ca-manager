@@ -132,10 +132,13 @@ jobs:
           # Convert version for RPM (2.0.0-beta1 -> 2.0.0~beta1)
           RPM_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
           
+          mkdir -p /tmp/rpm-output
+          
           docker run --rm \
             -v $(pwd):/workspace \
             -v /tmp/rpm-output:/output \
-            fedora:43 bash -c "
+            -e RPM_VERSION="$RPM_VERSION" \
+            fedora:43 bash -c '
               dnf install -y rpm-build python3 python3-pip python3-devel systemd-rpm-macros gcc openssl-devel make tar gzip
               
               mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
@@ -144,22 +147,22 @@ jobs:
               
               # Create source tarball
               tar czf ~/rpmbuild/SOURCES/ucm-${RPM_VERSION}.tar.gz \
-                --transform 's,^,ucm-${RPM_VERSION}/,' \
-                --exclude='.git' --exclude='*.pyc' --exclude='__pycache__' \
-                --exclude='node_modules' --exclude='.pytest_cache' .
+                --transform "s,^,ucm-${RPM_VERSION}/," \
+                --exclude=".git" --exclude="*.pyc" --exclude="__pycache__" \
+                --exclude="node_modules" --exclude=".pytest_cache" .
               
               # Update version in spec
-              sed -i \"s/^Version:.*/Version:        ${RPM_VERSION}/\" packaging/rpm/ucm.spec
+              sed -i "s/^Version:.*/Version:        ${RPM_VERSION}/" packaging/rpm/ucm.spec
               
               # Build RPM
               rpmbuild -bb packaging/rpm/ucm.spec \
-                --define \"_sourcedir \$(pwd)/packaging/rpm\" \
-                --define \"_topdir ~/rpmbuild\"
+                --define "_sourcedir $(pwd)/packaging/rpm" \
+                --define "_topdir ~/rpmbuild"
               
               # Copy output
               cp ~/rpmbuild/RPMS/*/*.rpm /output/
               cd /output && sha256sum *.rpm > checksums.sha256
-            "
+            '
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
