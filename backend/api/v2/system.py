@@ -953,3 +953,78 @@ def get_security_anomalies():
         )
     except Exception as e:
         return error_response(f"Failed to get anomalies: {str(e)}", 500)
+
+
+# ============================================================================
+# UPDATE MANAGEMENT
+# ============================================================================
+
+@bp.route('/api/v2/system/updates/check', methods=['GET'])
+@require_auth(['admin:system'])
+def check_updates():
+    """Check for available updates"""
+    try:
+        from services.updates import check_for_updates
+        
+        include_prereleases = request.args.get('include_prereleases', 'false').lower() == 'true'
+        result = check_for_updates(include_prereleases=include_prereleases)
+        
+        return success_response(data=result)
+    except Exception as e:
+        return error_response(f"Failed to check for updates: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/updates/install', methods=['POST'])
+@require_auth(['admin:system'])
+def install_update():
+    """Download and install an update"""
+    try:
+        from services.updates import check_for_updates, download_update, install_update as do_install
+        
+        # Get update info
+        include_prereleases = request.json.get('include_prereleases', False)
+        update_info = check_for_updates(include_prereleases=include_prereleases)
+        
+        if not update_info.get('update_available'):
+            return error_response("No update available", 400)
+        
+        if not update_info.get('download_url'):
+            return error_response("No download URL available for this platform", 400)
+        
+        # Download
+        package_path = download_update(
+            update_info['download_url'],
+            update_info['package_name']
+        )
+        
+        # Install (this will restart the service)
+        do_install(package_path)
+        
+        # Log the update
+        from services.audit import log_audit_event
+        log_audit_event(
+            action='system.update',
+            resource_type='system',
+            resource_id='ucm',
+            details={
+                'from_version': update_info['current_version'],
+                'to_version': update_info['latest_version']
+            }
+        )
+        
+        return success_response(
+            message=f"Update to {update_info['latest_version']} initiated. Service will restart shortly."
+        )
+    except Exception as e:
+        return error_response(f"Update failed: {str(e)}", 500)
+
+
+@bp.route('/api/v2/system/updates/version', methods=['GET'])
+def get_version():
+    """Get current version info (public endpoint)"""
+    from services.updates import get_current_version, get_edition
+    
+    return success_response(data={
+        'version': get_current_version(),
+        'edition': get_edition()
+    })
