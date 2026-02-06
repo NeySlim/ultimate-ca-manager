@@ -10,15 +10,26 @@
  */
 import { cn } from '../lib/utils'
 
+/**
+ * Size scale for IconBadge
+ * - table: Dense table rows (28px container, 14px icon)
+ * - xs: Extra small (24px container, 12px icon)
+ * - sm: Small (32px container, 16px icon)
+ * - md: Medium/Default (40px container, 20px icon)
+ * - lg: Large (48px container, 24px icon)
+ * - xl: Extra large (56px container, 28px icon)
+ */
 const sizes = {
-  xs: 'w-6 h-6',
-  sm: 'w-8 h-8',
-  md: 'w-10 h-10',
-  lg: 'w-12 h-12',
-  xl: 'w-14 h-14',
+  table: 'w-7 h-7',   // 28px - for dense table rows
+  xs: 'w-6 h-6',      // 24px
+  sm: 'w-8 h-8',      // 32px
+  md: 'w-10 h-10',    // 40px
+  lg: 'w-12 h-12',    // 48px
+  xl: 'w-14 h-14',    // 56px
 }
 
 const iconSizes = {
+  table: 14,  // Dense tables
   xs: 12,
   sm: 16,
   md: 20,

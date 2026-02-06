@@ -1,13 +1,13 @@
 /**
  * Components - Centralized exports
+ * 
+ * Main components: ResponsiveLayout + ResponsiveDataTable
+ * Detail panels: CompactHeader, CompactSection, CompactGrid, CompactField, CompactStats
  */
 
 // Layout
 export { AppShell } from './AppShell'
 export { Sidebar } from './Sidebar'
-export { PageLayout, ContentSection, FocusItem } from './PageLayout'
-export { ExplorerPanel, ExplorerPanel as FocusPanel } from './ExplorerPanel'
-export { DetailsPanel, DetailsPanel as ContentPanel } from './DetailsPanel'
 export { BottomSheet } from './BottomSheet'
 export { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 
@@ -15,8 +15,7 @@ export { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 export { Card } from './Card'
 export { Button } from './Button'
 export { Badge, CATypeIcon } from './Badge'
-export { Table } from './Table'
-export { AutoTable } from './AutoTable'
+export { IconBadge, IconAvatar } from './IconBadge'
 export { TreeView } from './TreeView'
 export { SearchBar } from './SearchBar'
 export { Modal } from './Modal'
@@ -42,26 +41,13 @@ export { Pagination } from './Pagination'
 export { Logo } from './Logo'
 export { PermissionsDisplay } from './PermissionsDisplay'
 export { ErrorBoundary } from './ErrorBoundary'
-export { ExplorerItem, ExplorerSection, ExplorerStat, ExplorerInfo } from './ExplorerItem'
 export { KeyIndicator } from './ui/KeyIndicator'
+export { WebSocketIndicator } from './WebSocketIndicator'
 
 // Hooks
 export { useAutoPageSize } from '../hooks/useAutoPageSize'
 
-// Responsive Content Components
-export { 
-  ContentHeader, 
-  ContentBody, 
-  ContentSection as ResponsiveContentSection, 
-  DataGrid, 
-  DataField, 
-  InfoCard, 
-  ActionBar,
-  TabsResponsive,
-  DetailView 
-} from './ResponsiveContent'
-
-// Detail Card Components (Mix Header A + Sections B)
+// Detail Card Components - for slide-over panels
 export { 
   DetailHeader, 
   DetailSection, 
@@ -70,7 +56,6 @@ export {
   DetailDivider,
   DetailContent,
   DetailTabs,
-  // Compact components for slide-over panels
   CompactSection,
   CompactGrid,
   CompactField,
@@ -87,34 +72,14 @@ export { CADetails } from './CADetails'
 export { CSRDetails } from './CSRDetails'
 export { TrustCertDetails } from './TrustCertDetails'
 
-// Data Table Components
-export { DataTable, SimpleTable, CardGrid } from './DataTable'
+// Filter components
+export { FilterPanel, FilterChips, FilterButton } from './FilterPanel'
+export { ActionBar, HeaderBar } from './ActionBar'
 
-export { SlideOverPanel, useSlideOver } from './SlideOverPanel'
-
-// New Responsive Components (Phase 10 - Mobile/Desktop unified)
-export { 
-  SlideOver, 
-  SlideOverSection, 
-  SlideOverRow, 
-  SlideOverBadges,
-  SlideOverActions 
-} from './SlideOver'
-export { 
-  FilterPanel, 
-  FilterChips, 
-  FilterButton 
-} from './FilterPanel'
-export { 
-  ActionBar as ResponsiveActionBar, 
-  HeaderBar 
-} from './ActionBar'
-
-// NEW: Phase 10 FROM SCRATCH - Unified responsive components
+// Responsive Components - MAIN BUILDING BLOCKS
 export { ResponsiveLayout, ResponsiveDataTable } from './ui/responsive'
+export { MobileCard, SimpleMobileCard } from './ui/MobileCard'
 export { UnifiedPageHeader } from './ui/UnifiedPageHeader'
-
-// Rich visual components
 export { RichStatsBar } from './ui/RichStatsBar'
 
 // Dashboard charts

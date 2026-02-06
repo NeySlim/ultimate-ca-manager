@@ -348,9 +348,7 @@ export default function CertificatesPage() {
         <div className="flex items-center gap-2">
           <div className={cn(
             "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
-            row.has_private_key 
-              ? "bg-accent-success/15 text-accent-success" 
-              : "bg-accent-primary/15 text-accent-primary"
+            row.has_private_key ? "icon-bg-emerald" : "icon-bg-blue"
           )}>
             <Certificate size={14} weight="duotone" />
           </div>
@@ -361,10 +359,16 @@ export default function CertificatesPage() {
           {row.source === 'scep' && <Badge variant="orange" size="sm" dot>SCEP</Badge>}
         </div>
       ),
-      // Mobile: CN left + status badge right
+      // Mobile: Icon + CN left + status badge right
       mobileRender: (val, row) => (
         <div className="flex items-center justify-between gap-2 w-full">
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className={cn(
+              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+              row.has_private_key ? "icon-bg-emerald" : "icon-bg-blue"
+            )}>
+              <Certificate size={14} weight="duotone" />
+            </div>
             <span className="font-medium truncate">{val || row.cn || row.common_name || 'Certificate'}</span>
             <KeyIndicator hasKey={row.has_private_key} size={12} />
           </div>
@@ -410,7 +414,7 @@ export default function CertificatesPage() {
       ),
       // Mobile: labeled CA info
       mobileRender: (val, row) => (
-        <div className="flex items-center gap-1.5 text-xs">
+        <div className="flex items-center gap-2 text-xs">
           <span className="text-text-tertiary">CA:</span>
           <span className="text-text-secondary truncate">{extractCN(val) || row.issuer_name || '—'}</span>
         </div>
@@ -429,7 +433,7 @@ export default function CertificatesPage() {
       // Mobile: labeled expiration with badges
       mobileRender: (val, row) => (
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 text-xs">
+          <div className="flex items-center gap-2 text-xs">
             <span className="text-text-tertiary">Exp:</span>
             <span className="text-text-secondary">{formatDate(val)}</span>
           </div>

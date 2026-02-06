@@ -250,7 +250,7 @@
 
 body {
   margin: 0;
-  font-family: 'Geist', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   overflow: hidden;

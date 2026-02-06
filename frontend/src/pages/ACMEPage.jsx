@@ -10,7 +10,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
-  Globe, Lightning, Database, Gear,
+  Globe, Lightning, Database, Gear, ClockCounterClockwise, Certificate, Clock,
   ArrowsClockwise
 } from '@phosphor-icons/react'
 import {
@@ -22,7 +22,7 @@ import {
 } from '../components'
 import { acmeService, casService } from '../services'
 import { useNotification } from '../contexts'
-import { formatDate } from '../lib/utils'
+import { formatDate, cn } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
 
 export default function ACMEPage() {
@@ -31,10 +31,12 @@ export default function ACMEPage() {
   // Data states
   const [accounts, setAccounts] = useState([])
   const [selectedAccount, setSelectedAccount] = useState(null)
+  const [selectedCert, setSelectedCert] = useState(null)
   const [orders, setOrders] = useState([])
   const [challenges, setChallenges] = useState([])
   const [acmeSettings, setAcmeSettings] = useState({})
   const [cas, setCas] = useState([])
+  const [history, setHistory] = useState([])
   
   // UI states
   const [loading, setLoading] = useState(true)
@@ -48,6 +50,10 @@ export default function ACMEPage() {
   // Pagination state
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
+  
+  // History filters
+  const [historyFilterStatus, setHistoryFilterStatus] = useState('')
+  const [historyFilterCA, setHistoryFilterCA] = useState('')
 
   useEffect(() => {
     loadData()
@@ -56,14 +62,16 @@ export default function ACMEPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [accountsRes, settingsRes, casRes] = await Promise.all([
+      const [accountsRes, settingsRes, casRes, historyRes] = await Promise.all([
         acmeService.getAccounts(),
         acmeService.getSettings(),
-        casService.getAll()
+        casService.getAll(),
+        acmeService.getHistory()
       ])
       setAccounts(accountsRes.data || accountsRes.accounts || [])
       setAcmeSettings(settingsRes.data || settingsRes || {})
       setCas(casRes.data || casRes.cas || [])
+      setHistory(historyRes.data || [])
     } catch (error) {
       showError(error.message || ERRORS.LOAD_FAILED.ACME)
     } finally {
@@ -201,7 +209,8 @@ export default function ACMEPage() {
   const accountColumns = useMemo(() => [
     {
       key: 'email',
-      label: 'Email',
+      header: 'Email',
+      priority: 1,
       render: (_, row) => (
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-blue">
@@ -211,11 +220,28 @@ export default function ACMEPage() {
             {row.contact?.[0]?.replace('mailto:', '') || row.email || `Account #${row.id}`}
           </span>
         </div>
+      ),
+      mobileRender: (_, row) => (
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-blue">
+              <Key size={14} weight="duotone" />
+            </div>
+            <span className="font-medium truncate">
+              {row.contact?.[0]?.replace('mailto:', '') || row.email || `Account #${row.id}`}
+            </span>
+          </div>
+          <Badge variant={row.status === 'valid' ? 'success' : 'orange'} size="sm" dot>
+            {row.status}
+          </Badge>
+        </div>
       )
     },
     {
       key: 'status',
-      label: 'Status',
+      header: 'Status',
+      priority: 2,
+      hideOnMobile: true,
       render: (val) => (
         <Badge variant={val === 'valid' ? 'success' : 'orange'} size="sm" dot pulse={val === 'valid'}>
           {val === 'valid' && <CheckCircle size={10} weight="fill" />}
@@ -225,15 +251,23 @@ export default function ACMEPage() {
     },
     {
       key: 'created_at',
-      label: 'Created',
-      render: (val) => formatDate(val)
+      header: 'Created',
+      priority: 3,
+      hideOnMobile: true,
+      render: (val) => formatDate(val),
+      mobileRender: (val) => (
+        <div className="text-xs text-text-tertiary">
+          Created: <span className="text-text-secondary">{formatDate(val)}</span>
+        </div>
+      )
     }
   ], [])
 
   // Main tabs
   const tabs = [
     { id: 'config', label: 'Configuration', icon: Gear },
-    { id: 'accounts', label: 'Accounts', icon: Key, count: accounts.length }
+    { id: 'accounts', label: 'Accounts', icon: Key, count: accounts.length },
+    { id: 'history', label: 'History', icon: ClockCounterClockwise, count: history.length }
   ]
 
   // Detail tabs (when account selected)
@@ -438,13 +472,50 @@ export default function ACMEPage() {
           {orders.length === 0 ? (
             <p className="text-xs text-text-tertiary py-4 text-center">No certificate orders</p>
           ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
               {orders.map((order, i) => (
-                <div key={i} className="flex items-center justify-between p-2 bg-bg-tertiary/30 rounded text-xs">
-                  <span className="text-text-primary truncate flex-1">{order.domain || order.identifier}</span>
-                  <Badge variant={order.status === 'valid' ? 'success' : 'warning'} size="sm">
-                    {order.status}
-                  </Badge>
+                <div key={i} className="p-3 bg-bg-tertiary/50 rounded-lg border border-border/50 hover:border-border transition-colors">
+                  {/* Header: Domain + Status */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-sm font-medium text-text-primary truncate flex-1">
+                      {order.domain || order.identifier || 'Unknown'}
+                    </span>
+                    <Badge 
+                      variant={
+                        order.status?.toLowerCase() === 'valid' ? 'success' : 
+                        order.status?.toLowerCase() === 'pending' ? 'warning' :
+                        order.status?.toLowerCase() === 'ready' ? 'info' :
+                        'error'
+                      } 
+                      size="sm"
+                    >
+                      {order.status || 'Unknown'}
+                    </Badge>
+                  </div>
+                  
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-text-tertiary">Method</span>
+                      <span className="text-text-secondary font-medium">{order.method || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-text-tertiary">Expires</span>
+                      <span className="text-text-secondary">{order.expires || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between col-span-2">
+                      <span className="text-text-tertiary">Created</span>
+                      <span className="text-text-secondary">{order.created_at ? formatDate(order.created_at) : 'N/A'}</span>
+                    </div>
+                    {order.order_id && (
+                      <div className="flex justify-between col-span-2 mt-1 pt-1 border-t border-border/30">
+                        <span className="text-text-tertiary">Order ID</span>
+                        <span className="text-text-tertiary font-mono text-[10px] truncate max-w-[180px]" title={order.order_id}>
+                          {order.order_id}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -647,6 +718,256 @@ export default function ACMEPage() {
     />
   )
 
+  // History content
+  const historyColumns = useMemo(() => [
+    {
+      key: 'common_name',
+      header: 'Common Name',
+      priority: 1,
+      sortable: true,
+      render: (value, row) => (
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+            row?.revoked ? "icon-bg-red" : "icon-bg-blue"
+          )}>
+            <Certificate size={14} weight="duotone" />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="font-medium truncate">{value}</span>
+            {row?.order?.account && (
+              <span className="text-xs text-text-tertiary">via {row.order.account}</span>
+            )}
+          </div>
+        </div>
+      ),
+      mobileRender: (value, row) => (
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className={cn(
+              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+              row?.revoked ? "icon-bg-red" : "icon-bg-blue"
+            )}>
+              <Certificate size={14} weight="duotone" />
+            </div>
+            <span className="font-medium truncate">{value}</span>
+          </div>
+          <Badge 
+            variant={row?.revoked ? 'danger' : 'success'} 
+            size="sm"
+            icon={row?.revoked ? XCircle : CheckCircle}
+          >
+            {row?.revoked ? 'Revoked' : 'Valid'}
+          </Badge>
+        </div>
+      )
+    },
+    {
+      key: 'revoked',
+      header: 'Status',
+      priority: 2,
+      hideOnMobile: true,
+      render: (value) => (
+        <Badge 
+          variant={value ? 'danger' : 'success'} 
+          size="sm"
+          icon={value ? XCircle : CheckCircle}
+          dot
+          pulse={!value}
+        >
+          {value ? 'Revoked' : 'Valid'}
+        </Badge>
+      )
+    },
+    {
+      key: 'issuer',
+      header: 'Issuer',
+      priority: 3,
+      sortable: true,
+      hideOnMobile: true,
+      render: (value) => (
+        <span className="text-sm text-text-secondary">{value || 'Unknown'}</span>
+      ),
+      mobileRender: (value) => (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-text-tertiary">CA:</span>
+          <span className="text-text-secondary truncate">{value || 'Unknown'}</span>
+        </div>
+      )
+    },
+    {
+      key: 'valid_to',
+      header: 'Expires',
+      priority: 4,
+      sortable: true,
+      render: (value) => {
+        if (!value) return <span className="text-text-tertiary">N/A</span>
+        const expires = new Date(value)
+        const now = new Date()
+        const daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24))
+        const isExpiring = daysLeft > 0 && daysLeft < 30
+        const isExpired = daysLeft <= 0
+        return (
+          <div className="flex items-center gap-2">
+            <Clock size={14} className={cn(
+              isExpired ? "text-status-error" : 
+              isExpiring ? "text-status-warning" : 
+              "text-text-tertiary"
+            )} />
+            <div className="flex flex-col">
+              <span className="text-xs text-text-secondary whitespace-nowrap">{formatDate(value)}</span>
+              <span className={cn(
+                "text-xs",
+                isExpired ? "text-status-error" : 
+                isExpiring ? "text-status-warning" : 
+                "text-text-tertiary"
+              )}>
+                {isExpired ? 'Expired' : `${daysLeft} days`}
+              </span>
+            </div>
+          </div>
+        )
+      },
+      mobileRender: (value) => {
+        if (!value) return null
+        const expires = new Date(value)
+        const now = new Date()
+        const daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24))
+        const isExpired = daysLeft <= 0
+        return (
+          <div className="flex items-center gap-2 text-xs">
+            <Clock size={12} className="text-text-tertiary" />
+            <span className={isExpired ? "text-status-error" : "text-text-secondary"}>
+              {isExpired ? 'Expired' : `${daysLeft}d`}
+            </span>
+          </div>
+        )
+      }
+    },
+    {
+      key: 'created_at',
+      header: 'Issued',
+      priority: 5,
+      sortable: true,
+      hideOnMobile: true,
+      render: (value) => (
+        <span className="text-xs text-text-tertiary whitespace-nowrap">
+          {value ? formatDate(value) : 'N/A'}
+        </span>
+      )
+    }
+  ], [])
+
+  // Certificate detail content for history tab
+  const certDetailContent = selectedCert && (
+    <div className="p-3 space-y-3">
+      <CompactHeader
+        icon={ClockCounterClockwise}
+        iconClass={selectedCert.revoked ? "bg-status-error/20" : "bg-status-success/20"}
+        title={selectedCert.common_name}
+        subtitle={`Issued by ${selectedCert.issuer || 'Unknown CA'}`}
+        badge={
+          <Badge variant={selectedCert.revoked ? 'danger' : 'success'} size="sm">
+            {!selectedCert.revoked && <CheckCircle size={10} weight="fill" />}
+            {selectedCert.revoked ? 'Revoked' : 'Valid'}
+          </Badge>
+        }
+      />
+
+      <CompactStats stats={[
+        { icon: Key, value: selectedCert.order?.account || 'Unknown' },
+        { icon: Globe, value: selectedCert.order?.status || 'N/A' },
+      ]} />
+      
+      <CompactSection title="Certificate Details">
+        <CompactGrid>
+          <CompactField label="Common Name" value={selectedCert.common_name} copyable />
+          <CompactField label="Serial Number" value={selectedCert.serial} mono copyable />
+          <CompactField label="Issuer" value={selectedCert.issuer || 'Unknown'} />
+        </CompactGrid>
+      </CompactSection>
+      
+      <CompactSection title="Validity">
+        <CompactGrid>
+          <CompactField label="Valid From" value={selectedCert.valid_from ? formatDate(selectedCert.valid_from) : 'N/A'} />
+          <CompactField label="Valid To" value={selectedCert.valid_to ? formatDate(selectedCert.valid_to) : 'N/A'} />
+          <CompactField label="Issued" value={selectedCert.created_at ? formatDate(selectedCert.created_at) : 'N/A'} />
+        </CompactGrid>
+      </CompactSection>
+      
+      {selectedCert.order && (
+        <CompactSection title="ACME Order">
+          <CompactGrid>
+            <CompactField label="Account" value={selectedCert.order.account} />
+            <CompactField label="Order Status" value={selectedCert.order.status} />
+            <CompactField label="Order ID" value={selectedCert.order.order_id} mono copyable />
+          </CompactGrid>
+        </CompactSection>
+      )}
+    </div>
+  )
+  
+  // Filter history data
+  const filteredHistory = useMemo(() => {
+    let filtered = history
+    if (historyFilterStatus) {
+      filtered = filtered.filter(cert => 
+        historyFilterStatus === 'revoked' ? cert.revoked : !cert.revoked
+      )
+    }
+    if (historyFilterCA) {
+      filtered = filtered.filter(cert => cert.issuer === historyFilterCA)
+    }
+    return filtered
+  }, [history, historyFilterStatus, historyFilterCA])
+
+  // Get unique CAs from history for filter
+  const historyCAs = useMemo(() => {
+    const cas = [...new Set(history.map(c => c.issuer).filter(Boolean))]
+    return cas.map(ca => ({ value: ca, label: ca }))
+  }, [history])
+  
+  const historyContent = (
+    <ResponsiveDataTable
+      data={filteredHistory}
+      columns={historyColumns}
+      searchable
+      searchPlaceholder="Search certificates..."
+      searchKeys={['common_name', 'serial', 'issuer']}
+      getRowId={(row) => row.id}
+      onRowClick={setSelectedCert}
+      selectedRow={selectedCert}
+      sortable
+      defaultSort={{ key: 'created_at', direction: 'desc' }}
+      exportEnabled
+      exportFilename="acme-certificates"
+      toolbarFilters={[
+        {
+          key: 'status',
+          value: historyFilterStatus,
+          onChange: setHistoryFilterStatus,
+          placeholder: 'All Status',
+          options: [
+            { value: 'valid', label: 'Valid' },
+            { value: 'revoked', label: 'Revoked' }
+          ]
+        },
+        {
+          key: 'ca',
+          value: historyFilterCA,
+          onChange: setHistoryFilterCA,
+          placeholder: 'All CAs',
+          options: historyCAs
+        }
+      ]}
+      emptyState={{
+        icon: ClockCounterClockwise,
+        title: 'No ACME Certificates',
+        description: 'Certificates issued via ACME will appear here'
+      }}
+    />
+  )
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -664,7 +985,7 @@ export default function ACMEPage() {
         stats={[
           { icon: Key, label: 'Accounts', value: accounts.length },
           { icon: CheckCircle, label: 'Active', value: stats.active, variant: 'success' },
-          { icon: Globe, label: 'Orders', value: stats.orders, variant: 'primary' },
+          { icon: ClockCounterClockwise, label: 'Certificates', value: history.length, variant: 'primary' },
         ]}
         tabs={tabs}
         activeTab={activeTab}
@@ -672,19 +993,36 @@ export default function ACMEPage() {
           setActiveTab(tab)
           if (tab === 'config') {
             setSelectedAccount(null)
+            setSelectedCert(null)
+          } else if (tab === 'accounts') {
+            setSelectedCert(null)
+          } else if (tab === 'history') {
+            setSelectedAccount(null)
           }
         }}
         actions={headerActions}
         helpPageKey="acme"
         
-        // Split view for accounts tab
-        splitView={activeTab === 'accounts'}
-        slideOverOpen={!!selectedAccount}
-        slideOverTitle={selectedAccount?.email || 'Account Details'}
-        slideOverContent={accountDetailContent}
-        onSlideOverClose={() => setSelectedAccount(null)}
+        // Split view for accounts and history tabs
+        splitView={activeTab === 'accounts' || activeTab === 'history'}
+        slideOverOpen={activeTab === 'accounts' ? !!selectedAccount : !!selectedCert}
+        slideOverTitle={
+          activeTab === 'accounts' 
+            ? (selectedAccount?.email || 'Account Details')
+            : (selectedCert?.common_name || 'Certificate Details')
+        }
+        slideOverContent={activeTab === 'accounts' ? accountDetailContent : certDetailContent}
+        onSlideOverClose={() => {
+          if (activeTab === 'accounts') {
+            setSelectedAccount(null)
+          } else {
+            setSelectedCert(null)
+          }
+        }}
       >
-        {activeTab === 'config' ? configContent : accountsContent}
+        {activeTab === 'config' && configContent}
+        {activeTab === 'accounts' && accountsContent}
+        {activeTab === 'history' && historyContent}
       </ResponsiveLayout>
 
       {/* Create Account Modal */}

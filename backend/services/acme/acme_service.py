@@ -229,6 +229,11 @@ class AcmeService:
             )
             order.authorizations.append(auth)
         
+        # Check if all authorizations are already valid (reuse case)
+        # If so, set order to "ready" immediately
+        if order.authorizations and all(a.status == "valid" for a in order.authorizations):
+            order.status = "ready"
+        
         db.session.commit()
         
         return order
