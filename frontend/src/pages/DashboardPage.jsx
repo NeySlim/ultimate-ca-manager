@@ -1,6 +1,6 @@
 /**
  * Dashboard Page - Live Operational Dashboard with WebSocket
- * Real-time updates via WebSocket events
+ * Clean redesign using theme-aware CSS classes
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -9,10 +9,9 @@ import {
   Plus, ArrowsClockwise, ListChecks, Gear, CaretRight, 
   User, Globe, SignIn, SignOut, Trash, PencilSimple, 
   UploadSimple, Key, Warning, WifiHigh, Heartbeat, Database, Lightning,
-  SlidersHorizontal, Eye, EyeSlash, X
+  SlidersHorizontal, Eye, EyeSlash, X, CheckCircle, XCircle
 } from '@phosphor-icons/react'
 import { Card, Button, Badge, LoadingSpinner, Logo, Modal } from '../components'
-// Charts loaded directly to allow proper code splitting (recharts is large)
 import { CertificateTrendChart, StatusPieChart } from '../components/DashboardChart'
 import { dashboardService, certificatesService, acmeService } from '../services'
 import { useNotification } from '../contexts'
@@ -31,13 +30,11 @@ const DEFAULT_WIDGETS = [
   { id: 'acme', name: 'ACME Accounts', visible: true },
 ]
 
-// Load widget preferences from localStorage
 const loadWidgetPrefs = () => {
   try {
     const saved = localStorage.getItem('ucm-dashboard-widgets')
     if (saved) {
       const parsed = JSON.parse(saved)
-      // Merge with defaults to handle new widgets
       return DEFAULT_WIDGETS.map(w => ({
         ...w,
         visible: parsed.find(p => p.id === w.id)?.visible ?? w.visible,
@@ -48,12 +45,10 @@ const loadWidgetPrefs = () => {
   return DEFAULT_WIDGETS
 }
 
-// Save widget preferences to localStorage
 const saveWidgetPrefs = (widgets) => {
   localStorage.setItem('ucm-dashboard-widgets', JSON.stringify(widgets.map(w => ({ id: w.id, visible: w.visible }))))
 }
 
-// Action icons mapping
 const actionIcons = {
   login_success: SignIn,
   login_failed: SignIn,
@@ -84,12 +79,10 @@ export default function DashboardPage() {
   const [lastUpdate, setLastUpdate] = useState(new Date())
   const [versionInfo, setVersionInfo] = useState({ version: '', edition: 'community' })
   
-  // Widget customization
   const [widgets, setWidgets] = useState(loadWidgetPrefs)
   const [showWidgetSettings, setShowWidgetSettings] = useState(false)
   const refreshTimeoutRef = useRef(null)
 
-  // WebSocket for live updates
   const { isConnected, subscribe } = useWebSocket({ showToasts: true })
 
   const loadDashboard = useCallback(async () => {
@@ -111,18 +104,13 @@ export default function DashboardPage() {
       setCertificateTrend(trendData.data?.trend || [])
       setLastUpdate(new Date())
       
-      // Get expiring certificates (within 30 days)
       try {
-        const expiringData = await certificatesService.getAll({ 
-          expiring_within: 30, 
-          limit: 5 
-        })
+        const expiringData = await certificatesService.getAll({ expiring_within: 30, limit: 5 })
         setExpiringCerts(expiringData.data?.certificates || [])
       } catch {
         setExpiringCerts([])
       }
       
-      // Try to get ACME accounts
       try {
         const acmeData = await acmeService.getAccounts()
         setRecentAcme(acmeData.data?.slice(0, 5) || [])
@@ -140,7 +128,6 @@ export default function DashboardPage() {
     loadDashboard()
   }, [loadDashboard])
 
-  // Load version info (public endpoint, only once)
   useEffect(() => {
     const loadVersion = async () => {
       try {
@@ -149,32 +136,22 @@ export default function DashboardPage() {
           const data = await response.json()
           setVersionInfo(data.data || { version: '', edition: 'community' })
         }
-      } catch {
-        // Ignore errors, version display is not critical
-      }
+      } catch {}
     }
     loadVersion()
   }, [])
 
-  // Subscribe to PKI events for auto-refresh
   useEffect(() => {
     if (!isConnected) return
     
     const debouncedRefresh = () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current)
-      }
-      refreshTimeoutRef.current = setTimeout(() => {
-        loadDashboard()
-      }, 1000)
+      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current)
+      refreshTimeoutRef.current = setTimeout(() => loadDashboard(), 1000)
     }
     
-    // Subscribe to certificate events
     const unsub1 = subscribe(EventType.CERTIFICATE_ISSUED, debouncedRefresh)
     const unsub2 = subscribe(EventType.CERTIFICATE_REVOKED, debouncedRefresh)
     const unsub3 = subscribe(EventType.CA_CREATED, debouncedRefresh)
-    
-    // Subscribe for activity log updates
     const unsub4 = subscribe(EventType.USER_LOGIN, (data) => {
       setActivityLog(prev => [{
         id: Date.now(),
@@ -186,13 +163,8 @@ export default function DashboardPage() {
     })
     
     return () => {
-      unsub1?.()
-      unsub2?.()
-      unsub3?.()
-      unsub4?.()
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current)
-      }
+      unsub1?.(); unsub2?.(); unsub3?.(); unsub4?.()
+      if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current)
     }
   }, [isConnected, subscribe, loadDashboard])
 
@@ -204,13 +176,6 @@ export default function DashboardPage() {
     )
   }
 
-  const getGreeting = () => {
-    const hour = new Date().getHours()
-    if (hour < 12) return 'Good morning'
-    if (hour < 18) return 'Good afternoon'
-    return 'Good evening'
-  }
-
   const totalCerts = stats?.total_certificates || 0
   const totalCAs = stats?.total_cas || 0
   const pendingCSRs = stats?.pending_csrs || 0
@@ -219,360 +184,320 @@ export default function DashboardPage() {
 
   return (
     <div className="flex-1 h-full overflow-y-auto xl:overflow-hidden bg-bg-primary">
-      <div className="p-4 space-y-4 max-w-[1800px] mx-auto xl:h-full xl:flex xl:flex-col">
+      <div className="p-4 lg:p-6 space-y-4 lg:space-y-5 max-w-[1920px] mx-auto xl:h-full xl:flex xl:flex-col">
         
-        {/* Compact Header Row */}
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Left: Logo + Version */}
+        {/* Header */}
+        <header className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-3">
             <Logo variant="horizontal" size="md" />
-            <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-border/50">
-              <Badge variant="primary" size="sm">{versionInfo.edition === 'pro' ? 'Pro' : 'Community'}</Badge>
-              <span className="text-xs text-text-tertiary">v{versionInfo.version || '2.0.0'}</span>
+            <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-border">
+              <Badge variant={versionInfo.edition === 'pro' ? 'purple' : 'primary'} size="sm">
+                {versionInfo.edition === 'pro' ? 'Pro' : 'Community'}
+              </Badge>
+              <span className="text-xs text-text-tertiary font-mono">v{versionInfo.version || '2.0.0'}</span>
             </div>
           </div>
           
           <div className="flex-1" />
           
-          {/* Right: Status + Actions */}
-          <div className="flex items-center gap-3">
-            {/* Live Status Pill */}
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+          <div className="flex items-center gap-2">
+            {/* Connection Status */}
+            <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
               isConnected 
-                ? 'bg-accent-success/10 text-accent-success border border-accent-success/20' 
-                : 'bg-bg-tertiary text-text-tertiary border border-border'
+                ? 'bg-[color-mix(in_srgb,var(--accent-success)_10%,transparent)] text-[var(--accent-success)] border-[color-mix(in_srgb,var(--accent-success)_25%,transparent)]' 
+                : 'bg-bg-tertiary text-text-tertiary border-border'
             }`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-current animate-pulse' : 'bg-current'}`} />
+              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-current animate-pulse' : 'bg-current opacity-50'}`} />
               {isConnected ? 'Live' : 'Offline'}
             </div>
             
-            {/* Actions */}
-            <div className="flex items-center gap-1.5">
-              <Button size="sm" onClick={() => navigate('/certificates?action=create')}>
-                <Plus size={14} weight="bold" />
-                <span className="hidden sm:inline">Issue Cert</span>
-              </Button>
-              <Button size="sm" variant="ghost" onClick={loadDashboard} title="Refresh">
-                <ArrowsClockwise size={16} />
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setShowWidgetSettings(true)} title="Customize" className="hidden md:flex">
-                <SlidersHorizontal size={16} />
-              </Button>
-            </div>
+            <Button size="sm" onClick={() => navigate('/certificates?action=create')}>
+              <Plus size={14} weight="bold" />
+              <span className="hidden sm:inline">Issue Cert</span>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={loadDashboard} title="Refresh">
+              <ArrowsClockwise size={16} />
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowWidgetSettings(true)} title="Customize" className="hidden md:flex">
+              <SlidersHorizontal size={16} />
+            </Button>
           </div>
-        </div>
+        </header>
 
-        {/* Stats Row - Compact horizontal stats */}
+        {/* Stats Grid */}
         {widgets.find(w => w.id === 'stats')?.visible && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard icon={Certificate} label="Certificates" value={totalCerts} color="blue" onClick={() => navigate('/certificates')} />
-          <StatCard icon={ShieldCheck} label="Authorities" value={totalCAs} color="violet" onClick={() => navigate('/cas')} />
-          <StatCard icon={ListChecks} label="CSR Queue" value={pendingCSRs} color={pendingCSRs > 0 ? 'amber' : 'slate'} badge={pendingCSRs > 0 ? 'Pending' : null} onClick={() => navigate('/csrs')} />
-          <StatCard icon={Globe} label="ACME" value={acmeAccounts} color="emerald" onClick={() => navigate('/acme')} />
+          <StatCard 
+            icon={Certificate} 
+            label="Certificates" 
+            value={totalCerts} 
+            color="primary"
+            onClick={() => navigate('/certificates')} 
+          />
+          <StatCard 
+            icon={ShieldCheck} 
+            label="Authorities" 
+            value={totalCAs} 
+            color="purple"
+            onClick={() => navigate('/cas')} 
+          />
+          <StatCard 
+            icon={ListChecks} 
+            label="CSR Queue" 
+            value={pendingCSRs} 
+            color={pendingCSRs > 0 ? 'warning' : 'default'}
+            badge={pendingCSRs > 0 ? 'Pending' : null}
+            onClick={() => navigate('/csrs')} 
+          />
+          <StatCard 
+            icon={Globe} 
+            label="ACME" 
+            value={acmeAccounts} 
+            color="success"
+            onClick={() => navigate('/acme')} 
+          />
         </div>
         )}
         
-        {/* Charts Row - visible on 2xl+ screens only */}
+        {/* Charts - 2xl+ only */}
         {widgets.find(w => w.id === 'charts')?.visible && (
         <div className="hidden 2xl:grid grid-cols-2 gap-4">
-          {/* Certificate Trend */}
-          <Card variant="elevated" className="p-0">
-            <Card.Header 
-              icon={Lightning}
-              iconColor="blue"
-              title="Certificate Activity"
-              subtitle="Last 7 days"
-            />
-            <Card.Body className="!pt-0 !pb-2">
-              <CertificateTrendChart data={certificateTrend} height={100} />
-            </Card.Body>
-          </Card>
+          <div className="dashboard-widget p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg icon-bg-blue flex items-center justify-center">
+                <Lightning size={16} weight="duotone" className="text-[var(--icon-blue-text)]" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary">Certificate Activity</h3>
+                <p className="text-2xs text-text-tertiary">Last 7 days</p>
+              </div>
+            </div>
+            <CertificateTrendChart data={certificateTrend} height={90} />
+          </div>
           
-          {/* Status Distribution */}
-          <Card variant="elevated" className="p-0">
-            <Card.Header 
-              icon={Certificate}
-              iconColor="violet"
-              title="Status Distribution"
-              subtitle="Current certificates"
+          <div className="dashboard-widget p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg icon-bg-violet flex items-center justify-center">
+                <Certificate size={16} weight="duotone" className="text-[var(--icon-violet-text)]" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary">Status Distribution</h3>
+                <p className="text-2xs text-text-tertiary">Current certificates</p>
+              </div>
+            </div>
+            <StatusPieChart 
+              data={{
+                valid: Math.max(0, (stats?.total_certificates || 0) - (stats?.expiring_soon || 0) - (stats?.revoked || 0)),
+                expiring: stats?.expiring_soon || 0,
+                expired: 0,
+                revoked: stats?.revoked || 0,
+              }}
+              height={90} 
             />
-            <Card.Body className="!pt-0 !pb-2">
-              <StatusPieChart 
-                data={{
-                  valid: Math.max(0, (stats?.total_certificates || 0) - (stats?.expiring_soon || 0) - (stats?.revoked || 0)),
-                  expiring: stats?.expiring_soon || 0,
-                  expired: 0,
-                  revoked: stats?.revoked || 0,
-                }}
-                height={100} 
-              />
-            </Card.Body>
-          </Card>
+          </div>
         </div>
         )}
 
-        {/* Expiring Warning Banner - more elegant */}
+        {/* Expiring Warning */}
         {widgets.find(w => w.id === 'expiring')?.visible && expiringCount > 0 && (
           <button 
             onClick={() => navigate('/certificates?filter=expiring')}
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 hover:border-amber-500/40 transition-all group"
+            className="w-full flex items-center gap-3 p-3 rounded-xl stat-card-warning group"
           >
-            <div className="w-9 h-9 rounded-lg bg-amber-500/15 flex items-center justify-center">
-              <Warning size={18} weight="fill" className="text-amber-500" />
+            <div className="w-10 h-10 rounded-lg status-warning-bg flex items-center justify-center">
+              <Warning size={20} weight="fill" className="status-warning-text" />
             </div>
             <div className="flex-1 text-left">
-              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+              <p className="text-sm font-semibold status-warning-text">
                 {expiringCount} certificate{expiringCount > 1 ? 's' : ''} expiring soon
               </p>
-              <p className="text-xs text-text-secondary">Click to view and renew</p>
+              <p className="text-xs text-text-secondary">Click to review and renew</p>
             </div>
-            <CaretRight size={16} className="text-amber-500 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+            <CaretRight size={16} className="status-warning-text opacity-50 group-hover:opacity-100 transition-all" />
           </button>
         )}
 
-        {/* Main Content - 2 columns on lg+ */}
+        {/* Main Grid */}
         <div className="xl:flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4">
           
-          {/* Left: 2x2 Grid for Certs, CAs, System, ACME */}
-          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 sm:grid-rows-2 gap-3 sm:auto-rows-fr">
+          {/* Left: 2x2 Grid */}
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             
             {/* Recent Certificates */}
             {widgets.find(w => w.id === 'certs')?.visible && (
-            <Card variant="elevated" className="flex flex-col p-0">
-              <Card.Header 
-                icon={Certificate}
-                iconColor="blue"
-                title="Recent Certificates"
-                action={
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/certificates')}>
-                    View all <CaretRight size={12} />
-                  </Button>
-                }
-              />
-              <Card.Body className="flex-1 overflow-y-auto space-y-0.5 !pt-0">
-                {recentCerts.length === 0 ? (
-                  <EmptyWidget icon={Certificate} text="No certificates yet" />
-                ) : (
-                  recentCerts.slice(0, 2).map((cert, i) => (
-                    <div 
+            <WidgetCard
+              icon={Certificate}
+              iconClass="icon-bg-blue"
+              iconTextClass="text-[var(--icon-blue-text)]"
+              title="Recent Certificates"
+              action={<Button size="sm" variant="ghost" onClick={() => navigate('/certificates')}>View all</Button>}
+            >
+              {recentCerts.length === 0 ? (
+                <EmptyState icon={Certificate} text="No certificates yet" />
+              ) : (
+                <div className="space-y-1">
+                  {recentCerts.slice(0, 3).map((cert, i) => (
+                    <ListItem
                       key={cert.id || i}
+                      icon={Certificate}
+                      title={cert.common_name || cert.descr || 'Certificate'}
+                      subtitle={formatRelativeTime(cert.created_at)}
+                      badge={<Badge variant={cert.revoked ? 'danger' : 'success'} size="sm" dot>{cert.revoked ? 'Revoked' : 'Valid'}</Badge>}
                       onClick={() => navigate(`/certificates/${cert.id}`)}
-                      className="p-2.5 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-all group flex items-center gap-3"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary/10 transition-colors">
-                        <Certificate size={16} weight="duotone" className="text-text-tertiary group-hover:text-accent-primary transition-colors" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
-                            {cert.common_name || cert.descr || cert.subject || 'Certificate'}
-                          </span>
-                          <Badge variant={cert.revoked ? 'danger' : 'success'} size="sm" dot>
-                            {cert.revoked ? 'Revoked' : 'Valid'}
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-text-tertiary mt-0.5">
-                          {formatRelativeTime(cert.created_at)}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </Card.Body>
-            </Card>
+                    />
+                  ))}
+                </div>
+              )}
+            </WidgetCard>
             )}
 
             {/* Recent CAs */}
             {widgets.find(w => w.id === 'cas')?.visible && (
-            <Card variant="elevated" className="flex flex-col  p-0">
-              <Card.Header 
-                icon={ShieldCheck}
-                iconColor="violet"
-                title="Recent CAs"
-                action={
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/cas')}>
-                    View all <CaretRight size={12} />
-                  </Button>
-                }
-              />
-              <Card.Body className="flex-1 overflow-y-auto space-y-0.5 !pt-0">
-                {recentCAs.length === 0 ? (
-                  <EmptyWidget icon={ShieldCheck} text="No CAs yet" />
-                ) : (
-                  recentCAs.slice(0, 2).map((ca, i) => (
-                    <div 
+            <WidgetCard
+              icon={ShieldCheck}
+              iconClass="icon-bg-violet"
+              iconTextClass="text-[var(--icon-violet-text)]"
+              title="Certificate Authorities"
+              action={<Button size="sm" variant="ghost" onClick={() => navigate('/cas')}>View all</Button>}
+            >
+              {recentCAs.length === 0 ? (
+                <EmptyState icon={ShieldCheck} text="No CAs yet" />
+              ) : (
+                <div className="space-y-1">
+                  {recentCAs.slice(0, 3).map((ca, i) => (
+                    <ListItem
                       key={ca.id || i}
+                      icon={ShieldCheck}
+                      title={ca.dn_commonname || ca.descr || ca.name}
+                      badge={<Badge variant={ca.is_root ? 'purple' : 'info'} size="sm">{ca.is_root ? 'Root' : 'Sub'}</Badge>}
                       onClick={() => navigate(`/cas/${ca.id}`)}
-                      className="p-2.5 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-3"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary/10 transition-colors">
-                        <ShieldCheck size={16} weight="duotone" className="text-text-tertiary group-hover:text-accent-primary transition-colors" />
-                      </div>
-                      <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
-                          {ca.dn_commonname || ca.descr || ca.name}
-                        </span>
-                        <Badge variant={ca.is_root ? 'purple' : 'info'} size="sm">
-                          {ca.is_root ? 'Root' : 'Sub'}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </Card.Body>
-            </Card>
+                    />
+                  ))}
+                </div>
+              )}
+            </WidgetCard>
             )}
 
             {/* System Health */}
             {widgets.find(w => w.id === 'system')?.visible && (
-            <Card variant="elevated" className="flex flex-col  p-0">
-              <Card.Header 
-                icon={Heartbeat}
-                iconColor="emerald"
-                title="System Health"
-                action={
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/settings')}>
-                    <Gear size={14} />
-                  </Button>
-                }
-              />
-              <Card.Body className="!pt-0 !pb-2">
-                <div className="grid grid-cols-2 gap-1.5 mb-2">
-                  <SystemStat 
+            <WidgetCard
+              icon={Heartbeat}
+              iconClass="icon-bg-emerald"
+              iconTextClass="text-[var(--icon-emerald-text)]"
+              title="System Health"
+              action={<Button size="sm" variant="ghost" onClick={() => navigate('/settings')}><Gear size={14} /></Button>}
+            >
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <MiniStat 
                     icon={WifiHigh} 
                     label="WebSocket" 
                     value={isConnected ? 'Connected' : 'Offline'} 
-                    status={isConnected ? 'online' : 'offline'} 
+                    status={isConnected ? 'success' : 'danger'} 
                   />
-                  <SystemStat 
+                  <MiniStat 
                     icon={Database} 
                     label="Database" 
                     value="Healthy" 
-                    status="online" 
+                    status="success" 
                   />
                 </div>
-                <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-1.5">
-                  Services
+                <div>
+                  <p className="text-2xs text-text-tertiary uppercase tracking-wider font-semibold mb-2">Services</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    <ServicePill name="ACME" online={systemStatus?.acme?.enabled} />
+                    <ServicePill name="SCEP" online={systemStatus?.scep?.enabled} />
+                    <ServicePill name="OCSP" online={systemStatus?.ocsp?.enabled} />
+                    <ServicePill name="CRL" online={systemStatus?.crl?.enabled} />
+                  </div>
                 </div>
-                <div className="grid grid-cols-4 gap-1.5">
-                  <ServiceBadge name="ACME" status={systemStatus?.acme} />
-                  <ServiceBadge name="SCEP" status={systemStatus?.scep} />
-                  <ServiceBadge name="OCSP" status={systemStatus?.ocsp} />
-                  <ServiceBadge name="CRL" status={systemStatus?.crl} />
-                </div>
-              </Card.Body>
-            </Card>
+              </div>
+            </WidgetCard>
             )}
 
             {/* ACME Accounts */}
             {widgets.find(w => w.id === 'acme')?.visible && (
-            <Card variant="elevated" className="flex flex-col  p-0">
-              <Card.Header 
-                icon={Globe}
-                iconColor="orange"
-                title="ACME Accounts"
-                action={
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/acme')}>
-                    View all <CaretRight size={12} />
-                  </Button>
-                }
-              />
-              <Card.Body className="flex-1 overflow-y-auto !pt-0">
-                {recentAcme.length === 0 ? (
-                  <EmptyWidget icon={Globe} text="No ACME accounts" />
-                ) : (
-                  <div className="space-y-0.5">
-                    {recentAcme.slice(0, 2).map((account, i) => (
-                      <div 
-                        key={account.id || i} 
-                        className="p-2.5 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-3"
-                        onClick={() => navigate('/acme')}
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0 group-hover:bg-accent-primary/10 transition-colors">
-                          <User size={16} weight="duotone" className="text-text-tertiary group-hover:text-accent-primary transition-colors" />
-                        </div>
-                        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
-                            {account.email || account.contact}
-                          </span>
-                          <Badge variant="secondary" size="sm">{account.orders_count || 0} orders</Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card.Body>
-            </Card>
+            <WidgetCard
+              icon={Globe}
+              iconClass="icon-bg-orange"
+              iconTextClass="text-[var(--icon-orange-text)]"
+              title="ACME Accounts"
+              action={<Button size="sm" variant="ghost" onClick={() => navigate('/acme')}>View all</Button>}
+            >
+              {recentAcme.length === 0 ? (
+                <EmptyState icon={Globe} text="No ACME accounts" />
+              ) : (
+                <div className="space-y-1">
+                  {recentAcme.slice(0, 3).map((account, i) => (
+                    <ListItem
+                      key={account.id || i}
+                      icon={User}
+                      title={account.email || account.contact}
+                      badge={<Badge variant="secondary" size="sm">{account.orders_count || 0} orders</Badge>}
+                      onClick={() => navigate('/acme')}
+                    />
+                  ))}
+                </div>
+              )}
+            </WidgetCard>
             )}
           </div>
 
-          {/* Recent Activity with Live Indicator */}
+          {/* Right: Activity */}
           {widgets.find(w => w.id === 'activity')?.visible && (
-          <Card variant="elevated" className="flex flex-col min-h-[320px] p-0">
-            <Card.Header 
-              icon={ClockCounterClockwise}
-              iconColor="teal"
-              title="Recent Activity"
-              subtitle={isConnected ? "Live updates" : undefined}
-              action={
-                <div className="flex items-center gap-2">
-                  {isConnected && (
-                    <Badge variant="success" size="sm" dot pulse>Live</Badge>
-                  )}
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/audit')}>
-                    View all <CaretRight size={12} />
-                  </Button>
-                </div>
-              }
-            />
-            <Card.Body className="flex-1 overflow-y-auto !pt-0">
-              {activityLog.length === 0 ? (
-                <EmptyWidget icon={ClockCounterClockwise} text="No recent activity" />
-              ) : (
-                <div className="space-y-0.5">
-                  {activityLog.map((activity, i) => {
-                    const Icon = actionIcons[activity.action] || actionIcons.default
-                    const isError = activity.action === 'login_failed' || activity.action === 'revoke'
-                    const isSuccess = activity.action === 'login_success' || activity.action === 'create'
-                    return (
-                      <div 
-                        key={activity.id || i}
-                        className="flex items-start gap-2.5 py-2 px-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors"
-                      >
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                          isError 
-                            ? 'status-danger-bg status-danger-text' 
-                            : isSuccess 
-                              ? 'status-success-bg status-success-text'
-                              : 'status-primary-bg status-primary-text'
-                        }`}>
-                          <Icon size={14} weight="bold" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-text-primary leading-tight">
-                            {activity.message || `${activity.action} ${activity.resource_type || ''}`}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-2xs text-text-secondary font-medium">{activity.user || 'System'}</span>
-                            <span className="text-text-tertiary text-2xs">•</span>
-                            <span className="text-2xs text-text-tertiary">
-                              {formatRelativeTime(activity.timestamp)}
-                            </span>
-                          </div>
+          <WidgetCard
+            icon={ClockCounterClockwise}
+            iconClass="icon-bg-teal"
+            iconTextClass="text-[var(--icon-teal-text)]"
+            title="Recent Activity"
+            subtitle={isConnected ? 'Live updates' : undefined}
+            action={
+              <div className="flex items-center gap-2">
+                {isConnected && <Badge variant="success" size="sm" dot pulse>Live</Badge>}
+                <Button size="sm" variant="ghost" onClick={() => navigate('/audit')}>View all</Button>
+              </div>
+            }
+            className="min-h-[280px] xl:min-h-0"
+          >
+            {activityLog.length === 0 ? (
+              <EmptyState icon={ClockCounterClockwise} text="No recent activity" />
+            ) : (
+              <div className="space-y-0.5">
+                {activityLog.slice(0, 6).map((activity, i) => {
+                  const Icon = actionIcons[activity.action] || actionIcons.default
+                  const isError = activity.action === 'login_failed' || activity.action === 'revoke'
+                  const isSuccess = activity.action === 'login_success' || activity.action === 'create'
+                  
+                  return (
+                    <div key={activity.id || i} className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                        isError ? 'status-danger-bg' : isSuccess ? 'status-success-bg' : 'status-primary-bg'
+                      }`}>
+                        <Icon size={14} weight="bold" className={
+                          isError ? 'status-danger-text' : isSuccess ? 'status-success-text' : 'status-primary-text'
+                        } />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-text-primary truncate">
+                          {activity.message || `${activity.action} ${activity.resource_type || ''}`}
+                        </p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-2xs text-text-secondary font-medium">{activity.user || 'System'}</span>
+                          <span className="text-2xs text-text-tertiary">•</span>
+                          <span className="text-2xs text-text-tertiary">{formatRelativeTime(activity.timestamp)}</span>
                         </div>
                       </div>
-                    )
+                    </div>
+                  )
                 })}
-                </div>
-              )}
-            </Card.Body>
-          </Card>
+              </div>
+            )}
+          </WidgetCard>
           )}
         </div>
 
       </div>
       
-      {/* Widget Settings Modal */}
       <WidgetSettingsModal
         open={showWidgetSettings}
         onClose={() => setShowWidgetSettings(false)}
@@ -587,7 +512,131 @@ export default function DashboardPage() {
   )
 }
 
-// Widget Settings Modal
+// ============ Components ============
+
+function StatCard({ icon: Icon, label, value, color = 'default', onClick, badge }) {
+  const colorClasses = {
+    primary: 'stat-card-primary',
+    success: 'stat-card-success', 
+    warning: 'stat-card-warning',
+    danger: 'stat-card-danger',
+    purple: 'status-purple-bg status-purple-border',
+    default: 'bg-bg-secondary border-border hover:border-text-tertiary/30',
+  }
+  
+  const iconClasses = {
+    primary: 'status-primary-bg status-primary-text',
+    success: 'status-success-bg status-success-text',
+    warning: 'status-warning-bg status-warning-text',
+    danger: 'status-danger-bg status-danger-text',
+    purple: 'status-purple-bg status-purple-text',
+    default: 'bg-bg-tertiary text-text-secondary',
+  }
+  
+  return (
+    <button 
+      onClick={onClick}
+      className={`relative p-4 text-left group rounded-xl border transition-all duration-200 hover:shadow-md ${colorClasses[color]}`}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${iconClasses[color]}`}>
+          <Icon size={22} weight="duotone" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-2xl font-bold text-text-primary tracking-tight tabular-nums">{value}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-text-secondary font-medium">{label}</p>
+            {badge && <Badge variant="warning" size="sm" dot>{badge}</Badge>}
+          </div>
+        </div>
+        <CaretRight size={14} className="text-text-tertiary opacity-0 group-hover:opacity-70 transition-all group-hover:translate-x-0.5" />
+      </div>
+    </button>
+  )
+}
+
+function WidgetCard({ icon: Icon, iconClass, iconTextClass, title, subtitle, action, children, className = '' }) {
+  return (
+    <div className={`dashboard-widget flex flex-col ${className}`}>
+      <div className="flex items-center justify-between p-3 pb-2">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconClass}`}>
+            <Icon size={16} weight="duotone" className={iconTextClass} />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+            {subtitle && <p className="text-2xs text-text-tertiary">{subtitle}</p>}
+          </div>
+        </div>
+        {action}
+      </div>
+      <div className="flex-1 px-3 pb-3 overflow-y-auto">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function ListItem({ icon: Icon, title, subtitle, badge, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors group text-left"
+    >
+      <div className="w-8 h-8 rounded-lg bg-bg-tertiary/50 flex items-center justify-center shrink-0 group-hover:bg-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] transition-colors">
+        <Icon size={14} weight="duotone" className="text-text-tertiary group-hover:text-[var(--accent-primary)] transition-colors" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-text-primary truncate group-hover:text-[var(--accent-primary)] transition-colors">{title}</p>
+        {subtitle && <p className="text-2xs text-text-tertiary">{subtitle}</p>}
+      </div>
+      {badge}
+    </button>
+  )
+}
+
+function MiniStat({ icon: Icon, label, value, status }) {
+  const statusClass = status === 'success' ? 'stat-card-success' : status === 'danger' ? 'stat-card-danger' : 'stat-card-primary'
+  const iconBg = status === 'success' ? 'status-success-bg' : status === 'danger' ? 'status-danger-bg' : 'status-primary-bg'
+  const textClass = status === 'success' ? 'status-success-text' : status === 'danger' ? 'status-danger-text' : 'status-primary-text'
+  
+  return (
+    <div className={`p-2.5 rounded-lg border ${statusClass}`}>
+      <div className="flex items-center gap-2">
+        <div className={`w-5 h-5 rounded flex items-center justify-center ${iconBg}`}>
+          <Icon size={12} weight="bold" className={textClass} />
+        </div>
+        <span className="text-2xs text-text-tertiary uppercase tracking-wide font-medium">{label}</span>
+      </div>
+      <p className={`text-xs font-semibold mt-1 ${textClass}`}>{value}</p>
+    </div>
+  )
+}
+
+function ServicePill({ name, online }) {
+  return (
+    <div className={`px-2 py-1.5 rounded-lg border text-center transition-all ${
+      online ? 'stat-card-success' : 'bg-bg-tertiary border-border'
+    }`}>
+      <div className="flex items-center justify-center gap-1.5">
+        <span className={`w-1.5 h-1.5 rounded-full ${online ? 'status-success-bg-solid animate-pulse' : 'bg-text-tertiary'}`} />
+        <span className={`text-2xs font-semibold ${online ? 'text-text-primary' : 'text-text-tertiary'}`}>{name}</span>
+      </div>
+    </div>
+  )
+}
+
+function EmptyState({ icon: Icon, text }) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
+      <div className="w-10 h-10 rounded-xl bg-bg-tertiary/50 flex items-center justify-center mb-2 border border-border/50">
+        <Icon size={20} className="text-text-tertiary opacity-50" />
+      </div>
+      <p className="text-xs text-text-tertiary">{text}</p>
+    </div>
+  )
+}
+
 function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
   const [localWidgets, setLocalWidgets] = useState(widgets)
   
@@ -596,13 +645,7 @@ function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
   }, [widgets, open])
   
   const toggleWidget = (id) => {
-    setLocalWidgets(prev => prev.map(w => 
-      w.id === id ? { ...w, visible: !w.visible } : w
-    ))
-  }
-  
-  const resetToDefaults = () => {
-    setLocalWidgets(DEFAULT_WIDGETS)
+    setLocalWidgets(prev => prev.map(w => w.id === id ? { ...w, visible: !w.visible } : w))
   }
 
   return (
@@ -611,7 +654,7 @@ function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg icon-bg-blue flex items-center justify-center">
-              <SlidersHorizontal size={18} className="text-accent-primary" />
+              <SlidersHorizontal size={18} className="text-[var(--icon-blue-text)]" />
             </div>
             <div>
               <h2 className="text-base font-semibold text-text-primary">Customize Dashboard</h2>
@@ -631,7 +674,7 @@ function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
               className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-bg-tertiary transition-colors"
             >
               <div className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
-                widget.visible ? 'bg-accent-primary text-white' : 'bg-bg-tertiary text-text-tertiary'
+                widget.visible ? 'status-primary-bg-solid text-white' : 'bg-bg-tertiary text-text-tertiary'
               }`}>
                 {widget.visible ? <Eye size={14} /> : <EyeSlash size={14} />}
               </div>
@@ -643,103 +686,15 @@ function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
         </div>
         
         <div className="flex items-center justify-between pt-3 border-t border-border">
-          <Button size="sm" variant="ghost" onClick={resetToDefaults}>
-            Reset to defaults
+          <Button size="sm" variant="ghost" onClick={() => setLocalWidgets(DEFAULT_WIDGETS)}>
+            Reset
           </Button>
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={() => onSave(localWidgets)}>
-              Save
-            </Button>
+            <Button size="sm" variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button size="sm" onClick={() => onSave(localWidgets)}>Save</Button>
           </div>
         </div>
       </div>
     </Modal>
-  )
-}
-
-// Enhanced Stat Card with hover effects
-function StatCard({ icon: Icon, label, value, color, onClick, badge }) {
-  const iconStyles = {
-    blue: 'icon-bg-blue',
-    violet: 'icon-bg-violet',
-    amber: 'icon-bg-amber',
-    emerald: 'icon-bg-emerald',
-    slate: 'icon-bg-slate',
-  }
-  
-  return (
-    <button 
-      onClick={onClick}
-      className="relative p-3.5 text-left group rounded-xl bg-bg-secondary border border-border/50 hover:border-border hover:shadow-lg transition-all duration-200"
-    >
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${iconStyles[color] || iconStyles.slate}`}>
-          <Icon size={20} weight="duotone" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-2xl font-bold text-text-primary tracking-tight tabular-nums">{value}</p>
-          <div className="flex items-center gap-2">
-            <p className="text-xs text-text-secondary">{label}</p>
-            {badge && <Badge variant="warning" size="sm" dot>{badge}</Badge>}
-          </div>
-        </div>
-        <CaretRight size={14} className="text-text-tertiary opacity-0 group-hover:opacity-60 transition-all group-hover:translate-x-0.5" />
-      </div>
-    </button>
-  )
-}
-
-// System Stat mini card - polished with icon animation
-function SystemStat({ icon: Icon, label, value, status }) {
-  return (
-    <div className={`px-3 py-2 rounded-lg border transition-all duration-200 group ${
-      status === 'online' 
-        ? 'stat-card-success' 
-        : 'stat-card-danger'
-    }`}>
-      <div className="flex items-center gap-2">
-        <div className={`w-5 h-5 rounded flex items-center justify-center transition-transform duration-200 group-hover:scale-110 ${
-          status === 'online' ? 'status-success-bg' : 'status-danger-bg'
-        }`}>
-          <Icon size={12} className={status === 'online' ? 'status-success-text' : 'status-danger-text'} weight="bold" />
-        </div>
-        <span className="text-2xs text-text-tertiary uppercase tracking-wide font-medium">{label}</span>
-      </div>
-      <p className={`text-xs font-semibold mt-1 ${
-        status === 'online' ? 'status-success-text' : 'status-danger-text'
-      }`}>{value}</p>
-    </div>
-  )
-}
-
-// Service Badge Component - theme-aware with subtle animation
-function ServiceBadge({ name, status }) {
-  const isOnline = status?.status === 'online' || status?.enabled
-  return (
-    <div className={`px-3 py-2.5 rounded-lg border text-center transition-all duration-200 group cursor-default ${
-      isOnline 
-        ? 'stat-card-success' 
-        : 'bg-bg-tertiary border-border hover:border-text-tertiary/30'
-    }`}>
-      <div className="flex items-center justify-center gap-2">
-        <div className={`w-2 h-2 rounded-full transition-transform duration-300 group-hover:scale-125 ${isOnline ? 'status-success-bg-solid animate-pulse' : 'bg-text-tertiary'}`} />
-        <span className={`text-xs font-semibold ${isOnline ? 'text-text-primary' : 'text-text-secondary'}`}>{name}</span>
-      </div>
-    </div>
-  )
-}
-
-// Empty Widget Component - polished empty state
-function EmptyWidget({ icon: Icon, text }) {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center text-text-tertiary py-8">
-      <div className="w-12 h-12 rounded-xl bg-bg-tertiary/50 flex items-center justify-center mb-3 border border-border/50">
-        <Icon size={24} className="opacity-50" />
-      </div>
-      <p className="text-xs font-medium opacity-70">{text}</p>
-    </div>
   )
 }
