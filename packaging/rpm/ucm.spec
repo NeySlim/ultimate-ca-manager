@@ -48,8 +48,24 @@ getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{_sharedstatedir}/
 %systemd_post %{name}.service
 echo "ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm" > /etc/sudoers.d/ucm-service
 chmod 440 /etc/sudoers.d/ucm-service
-chown -R %{name}:%{name} %{_sharedstatedir}/%{name}
-chown -R %{name}:%{name} %{_localstatedir}/log/%{name}
+
+# Create data directories
+mkdir -p /var/lib/%{name}/{ca,certs,private,sessions,backups}
+mkdir -p /var/log/%{name}
+chown -R %{name}:%{name} /var/lib/%{name}
+chown -R %{name}:%{name} /var/log/%{name}
+
+# Automatic migration from v1.8.x
+V1_DATA="/usr/share/%{name}/backend/data"
+V2_DATA="/var/lib/%{name}"
+if [ -f "$V1_DATA/ucm.db" ] && [ ! -f "$V2_DATA/ucm.db" ]; then
+    echo "Detected UCM v1.8.x - running automatic migration..."
+    if [ -x "/usr/share/%{name}/scripts/migrate-v1-to-v2.sh" ]; then
+        UCM_HOME="/usr/share/%{name}" UCM_DATA="$V2_DATA" /usr/share/%{name}/scripts/migrate-v1-to-v2.sh
+    elif [ -f "/usr/share/%{name}/backend/migrate_v1_to_v2.py" ]; then
+        python3 /usr/share/%{name}/backend/migrate_v1_to_v2.py /usr/share/%{name} 2>&1 | tee /var/log/%{name}/migration.log
+    fi
+fi
 
 %preun
 %systemd_preun %{name}.service

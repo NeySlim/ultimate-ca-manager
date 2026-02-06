@@ -9,6 +9,7 @@ UCM_GROUP="ucm"
 UCM_HOME="/opt/ucm"
 UCM_DATA="/opt/ucm/data"
 UCM_CONFIG="/etc/ucm"
+V1_DATA="/opt/ucm/backend/data"
 
 case "$1" in
     configure)
@@ -24,15 +25,28 @@ case "$1" in
         fi
         
         # Create directories
-        mkdir -p "$UCM_DATA"/{cas,certs,backups,sessions}
+        mkdir -p "$UCM_DATA"/{ca,certs,backups,sessions,private}
         mkdir -p "$UCM_CONFIG"
         mkdir -p /var/log/ucm
+        
+        # ============================================================
+        # AUTOMATIC MIGRATION FROM v1.8.x
+        # ============================================================
+        if [ -f "$V1_DATA/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
+            if [ -x "$UCM_HOME/scripts/migrate-v1-to-v2.sh" ]; then
+                "$UCM_HOME/scripts/migrate-v1-to-v2.sh"
+            elif [ -f "$UCM_HOME/backend/migrate_v1_to_v2.py" ]; then
+                echo "Running v1.8.x → v2.0.0 migration..."
+                python3 "$UCM_HOME/backend/migrate_v1_to_v2.py" "$UCM_HOME" 2>&1 | tee /var/log/ucm/migration.log
+            fi
+        fi
+        # ============================================================
         
         # Sudoers for service restart
         echo "ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm" > /etc/sudoers.d/ucm-service
         chmod 440 /etc/sudoers.d/ucm-service
         
-        # Create config if not exists
+        # Create config if not exists (fresh install)
         if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
             SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
             JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
