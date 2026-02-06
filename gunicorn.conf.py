@@ -3,6 +3,7 @@
 
 import multiprocessing
 import os
+import sys
 
 # Server socket
 bind = f"0.0.0.0:{os.getenv('UCM_HTTPS_PORT', '8443')}"
@@ -46,6 +47,10 @@ umask = 0
 user = None
 group = None
 tmp_upload_dir = None
+
+# Preload application to initialize DB before forking workers
+# This ensures DB tables are created ONCE by the master process
+preload_app = True
 
 # Server hooks
 def on_starting(server):
