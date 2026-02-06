@@ -17,6 +17,7 @@ import { Logo } from './Logo'
 import { WebSocketIndicator } from './WebSocketIndicator'
 import { useMobile } from '../contexts/MobileContext'
 import { certificatesService } from '../services'
+import { loadProModule } from '../proLoader.jsx'
 
 export function Sidebar({ activePage }) {
   const navigate = useNavigate()
@@ -55,7 +56,7 @@ export function Sidebar({ activePage }) {
   
   useEffect(() => {
     // Try to dynamically import Pro module
-    import('../pro')
+    loadProModule()
       .then(mod => {
         setProModule(mod)
         // Pro module loaded = Pro features enabled (no license check needed)
