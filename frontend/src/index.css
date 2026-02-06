@@ -477,6 +477,17 @@ html, body, #root {
 .status-yellow-text { color: var(--accent-warning); }
 .status-yellow-border { border-color: color-mix(in srgb, var(--accent-warning) 30%, transparent); }
 
+/* Dashboard widget */
+.dashboard-widget {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.dashboard-widget:hover {
+  border-color: color-mix(in srgb, var(--border) 70%, var(--text-tertiary));
+}
+
 /* Border left accent for Card */
 .border-l-accent-success { border-left-color: var(--accent-success); }
 .border-l-accent-warning { border-left-color: var(--accent-warning); }
