@@ -8,10 +8,17 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
-# Import sub-models
+# Import sub-models to ensure they are registered with SQLAlchemy
 from models.certificate_template import CertificateTemplate
 from models.truststore import TrustedCertificate
 from models.group import Group, GroupMember
+from models.email_notification import SMTPConfig, NotificationConfig, NotificationLog
+from models.acme_models import AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, AcmeNonce
+from models.api_key import APIKey
+from models.auth_certificate import AuthCertificate
+from models.crl import CRLMetadata
+from models.ocsp import OCSPResponse
+from models.webauthn import WebAuthnCredential, WebAuthnChallenge
 
 
 class UserSession(db.Model):

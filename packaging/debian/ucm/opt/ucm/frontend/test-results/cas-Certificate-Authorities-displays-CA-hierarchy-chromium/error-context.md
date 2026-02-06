@@ -1,0 +1,231 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - link "UCM Dashboard" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - link "Dashboard" [ref=e12] [cursor=pointer]:
+        - /url: /
+        - img [ref=e13]
+        - generic: Dashboard
+      - link "Certificates" [ref=e15] [cursor=pointer]:
+        - /url: /certificates
+        - img [ref=e16]
+        - generic: Certificates
+      - link "CAs" [ref=e18] [cursor=pointer]:
+        - /url: /cas
+        - img [ref=e19]
+        - generic: CAs
+      - link "CSRs" [ref=e22] [cursor=pointer]:
+        - /url: /csrs
+        - img [ref=e23]
+        - generic: CSRs
+      - link "Templates" [ref=e25] [cursor=pointer]:
+        - /url: /templates
+        - img [ref=e26]
+        - generic: Templates
+      - link "Users" [ref=e28] [cursor=pointer]:
+        - /url: /users
+        - img [ref=e29]
+        - generic: Users
+      - link "ACME" [ref=e31] [cursor=pointer]:
+        - /url: /acme
+        - img [ref=e32]
+        - generic: ACME
+      - link "SCEP" [ref=e34] [cursor=pointer]:
+        - /url: /scep
+        - img [ref=e35]
+        - generic: SCEP
+      - link "Import" [ref=e37] [cursor=pointer]:
+        - /url: /import
+        - img [ref=e38]
+        - generic: Import
+      - link "Audit" [ref=e40] [cursor=pointer]:
+        - /url: /audit
+        - img [ref=e41]
+        - generic: Audit
+      - link "Settings" [ref=e43] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e44]
+        - generic: Settings
+      - link "Groups" [ref=e47] [cursor=pointer]:
+        - /url: /groups
+        - img [ref=e48]
+        - generic:
+          - img
+          - text: Groups
+      - link "RBAC" [ref=e50] [cursor=pointer]:
+        - /url: /rbac
+        - img [ref=e51]
+        - generic:
+          - img
+          - text: RBAC
+      - link "SSO" [ref=e53] [cursor=pointer]:
+        - /url: /sso
+        - img [ref=e54]
+        - generic:
+          - img
+          - text: SSO
+      - link "HSM" [ref=e56] [cursor=pointer]:
+        - /url: /hsm
+        - img [ref=e57]
+        - generic:
+          - img
+          - text: HSM
+      - button "Theme" [ref=e59] [cursor=pointer]:
+        - img [ref=e60]
+        - generic: Theme
+      - button "admin" [ref=e62] [cursor=pointer]:
+        - img [ref=e63]
+        - generic: admin
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - heading "Certificate Authorities" [level=1] [ref=e69]
+        - generic [ref=e71]:
+          - img [ref=e72]
+          - textbox "Search..." [ref=e74]
+        - generic [ref=e75]:
+          - generic [ref=e76]:
+            - generic [ref=e77]:
+              - button [ref=e78] [cursor=pointer]:
+                - img [ref=e79]
+              - button [ref=e81] [cursor=pointer]:
+                - img [ref=e82]
+            - generic [ref=e84]:
+              - button "Create" [ref=e85] [cursor=pointer]:
+                - img [ref=e86]
+                - text: Create
+              - button "Import" [ref=e88] [cursor=pointer]:
+                - img [ref=e89]
+                - text: Import
+          - generic [ref=e92]:
+            - generic [ref=e93]:
+              - paragraph [ref=e94]:
+                - img [ref=e95]
+                - text: Root CAs (3)
+              - generic [ref=e97]:
+                - generic [ref=e99] [cursor=pointer]:
+                  - img [ref=e101]
+                  - generic [ref=e104]: TestCA
+                - generic [ref=e106] [cursor=pointer]:
+                  - img [ref=e108]
+                  - generic [ref=e111]: lan-AD-CA
+                - generic [ref=e112]:
+                  - generic [ref=e113] [cursor=pointer]:
+                    - button [ref=e114]:
+                      - img [ref=e115]
+                    - img [ref=e118]
+                    - generic [ref=e121]: lan.pew.pet
+                  - generic [ref=e124] [cursor=pointer]:
+                    - img [ref=e126]
+                    - generic [ref=e129]: Pew Pet Lan CA Intermediate CA
+            - generic [ref=e130]:
+              - paragraph [ref=e131]:
+                - img [ref=e132]
+                - text: Orphaned CAs (1)
+              - generic [ref=e136] [cursor=pointer]:
+                - img [ref=e138]
+                - generic [ref=e141]: R3 (ACME Client)
+        - generic [ref=e143]: 5 total CAs
+      - generic [ref=e144]:
+        - generic [ref=e146]:
+          - generic [ref=e148] [cursor=pointer]: CAs
+          - generic [ref=e149]:
+            - img [ref=e150]
+            - generic [ref=e152]: Pew Pet Lan CA Intermediate CA
+        - generic [ref=e154]:
+          - heading "Pew Pet Lan CA Intermediate CA" [level=2] [ref=e155]
+          - generic [ref=e156]:
+            - button "Edit" [ref=e157] [cursor=pointer]:
+              - img [ref=e158]
+              - text: Edit
+            - button "Export" [ref=e160] [cursor=pointer]:
+              - generic [ref=e161]:
+                - img [ref=e162]
+                - text: Export
+            - button "Delete" [ref=e164] [cursor=pointer]:
+              - img [ref=e165]
+              - text: Delete
+        - generic [ref=e168]:
+          - tablist [ref=e169]:
+            - tab "Overview" [selected] [ref=e170] [cursor=pointer]:
+              - img [ref=e172]
+              - generic [ref=e174]: Overview
+            - tab "Issued Certificates" [ref=e176] [cursor=pointer]:
+              - img [ref=e178]
+              - generic [ref=e180]: Issued Certificates
+            - tab "Settings" [ref=e182] [cursor=pointer]:
+              - generic [ref=e183]: Settings
+            - tab "Export" [ref=e185] [cursor=pointer]:
+              - generic [ref=e186]: Export
+            - tab "Raw Data" [ref=e188] [cursor=pointer]:
+              - generic [ref=e189]: Raw Data
+            - tab "OCSP" [ref=e191] [cursor=pointer]:
+              - img [ref=e193]
+              - generic [ref=e195]: OCSP
+          - tabpanel "Overview" [ref=e197]:
+            - generic [ref=e198]:
+              - generic [ref=e199]:
+                - generic [ref=e200]:
+                  - paragraph [ref=e201]: Type
+                  - generic [ref=e202]:
+                    - img [ref=e203]
+                    - generic [ref=e206]: Intermediate
+                - generic [ref=e207]:
+                  - paragraph [ref=e208]: Status
+                  - generic [ref=e209]: Active
+              - generic [ref=e210]:
+                - heading "Subject Information" [level=3] [ref=e211]
+                - generic [ref=e212]:
+                  - generic [ref=e213]:
+                    - paragraph [ref=e214]: Common Name (CN)
+                    - paragraph [ref=e215]: Pew Pet Lan CA Intermediate CA
+                  - generic [ref=e216]:
+                    - paragraph [ref=e217]: Organization (O)
+                    - paragraph [ref=e218]: Pew Pet Lan CA
+                  - generic [ref=e219]:
+                    - paragraph [ref=e220]: Country (C)
+                    - paragraph [ref=e221]: N/A
+                  - generic [ref=e222]:
+                    - paragraph [ref=e223]: State (ST)
+                    - paragraph [ref=e224]: N/A
+                  - generic [ref=e225]:
+                    - paragraph [ref=e226]: Locality (L)
+                    - paragraph [ref=e227]: N/A
+              - generic [ref=e228]:
+                - heading "Certificate Details" [level=3] [ref=e229]
+                - generic [ref=e230]:
+                  - generic [ref=e231]:
+                    - paragraph [ref=e232]: Serial Number
+                    - paragraph [ref=e233]: N/A
+                  - generic [ref=e234]:
+                    - paragraph [ref=e235]: Issued Certificates
+                    - paragraph [ref=e236]: 0 certificates
+                  - generic [ref=e237]:
+                    - paragraph [ref=e238]: Valid From
+                    - paragraph [ref=e239]: Dec 17, 2025
+                  - generic [ref=e240]:
+                    - paragraph [ref=e241]: Valid Until
+                    - paragraph [ref=e242]: Dec 15, 2035
+                  - generic [ref=e243]:
+                    - paragraph [ref=e244]: Key Algorithm
+                    - paragraph [ref=e245]: EC secp256r1
+                  - generic [ref=e246]:
+                    - paragraph [ref=e247]: Signature Algorithm
+                    - paragraph [ref=e248]: SHA-256WITHRSAENCRYPTION
+                  - generic [ref=e249]:
+                    - paragraph [ref=e250]: Private Key
+                    - generic [ref=e251]: Not Available
+                  - generic [ref=e252]:
+                    - paragraph [ref=e253]: Parent CA
+                    - paragraph [ref=e254]: e68e2c34-6879-40a2-9393-d782405b6aa6
+              - generic [ref=e255]:
+                - paragraph [ref=e256]: Full Subject DN
+                - paragraph [ref=e257]: CN=Pew Pet Lan CA Intermediate CA,O=Pew Pet Lan CA
+                - paragraph [ref=e258]: Issuer DN
+                - paragraph [ref=e259]: CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR
+  - region "Notifications (F8)":
+    - list
+```

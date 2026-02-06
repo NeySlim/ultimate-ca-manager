@@ -3,6 +3,7 @@ Ultimate CA Manager - Main Application
 Flask application with HTTPS-only enforcement
 """
 import os
+from os import environ
 import sys
 from pathlib import Path
 from flask import Flask, redirect, request
@@ -242,13 +243,15 @@ def create_app(config_name=None):
                     from models.pro.rbac import CustomRole, RolePermission
                     from models.pro.sso import SSOProvider, SSOSession
                     from models.pro.policy import CertificatePolicy, ApprovalRequest
+                    from models.pro.hsm import HSMProvider, HSMKey
                     
                     # Check if Pro tables exist, create if missing
                     inspector = inspect(db.engine)
                     tables = inspector.get_table_names()
                     pro_tables = ['pro_custom_roles', 'pro_role_permissions', 
                                   'pro_sso_providers', 'pro_sso_sessions',
-                                  'certificate_policies', 'approval_requests']
+                                  'certificate_policies', 'approval_requests',
+                                  'pro_hsm_providers', 'pro_hsm_keys']
                     missing_pro = [t for t in pro_tables if t not in tables]
                     
                     if missing_pro:
@@ -272,6 +275,15 @@ def create_app(config_name=None):
                     raise RuntimeError(f"Critical tables missing: {missing_tables}")
                 
                 app.logger.info(f"✓ All critical tables verified: {', '.join(critical_tables)}")
+                
+                # Run pending database migrations
+                app.logger.info("Checking for pending migrations...")
+                try:
+                    from migration_runner import run_all_migrations, get_db_path
+                    environ.setdefault('DATABASE_PATH', str(app.config.get('DATABASE_PATH', '/opt/ucm/data/ucm.db')))
+                    run_all_migrations(dry_run=False, verbose=False)
+                except Exception as e:
+                    app.logger.warning(f"Migration check skipped: {e}")
                 
                 # Run database health check and repair
                 app.logger.info("Running database health check...")
@@ -445,7 +457,6 @@ def create_app(config_name=None):
                 def do_shutdown():
                     import time
                     import sys
-                    import os
                     
                     print(f"🔄 Shutdown thread started, waiting 1 second...")
                     time.sleep(1)  # Wait for response to be sent
@@ -785,10 +796,9 @@ def init_database(app):
     # Generate self-signed HTTPS certificate if none exists
     try:
         from pathlib import Path
-        import os
-        data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
-        https_cert_path = Path(data_dir) / 'https_cert.pem'
-        https_key_path = Path(data_dir) / 'https_key.pem'
+        from config.settings import DATA_DIR
+        https_cert_path = DATA_DIR / 'https_cert.pem'
+        https_key_path = DATA_DIR / 'https_key.pem'
         
         if not https_cert_path.exists() or not https_key_path.exists():
             app.logger.info("No HTTPS certificate found, generating self-signed certificate...")
@@ -851,7 +861,6 @@ def init_database(app):
             ))
             
             # Set permissions
-            import os
             os.chmod(https_key_path, 0o600)
             os.chmod(https_cert_path, 0o644)
             
@@ -1056,7 +1065,6 @@ def main():
     # Check if mTLS is enabled and configure client cert verification
     from models import SystemConfig
     import tempfile
-    import os
     
     ca_cert_path = None
     with app.app_context():

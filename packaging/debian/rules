@@ -52,10 +52,10 @@ override_dh_auto_install:
 	chmod +x debian/ucm/opt/ucm/backend/app.py || true
 
 override_dh_installinit:
-	dh_installinit --name=ucm
+	# Skip - we install service manually
 
 override_dh_installsystemd:
-	dh_installsystemd --name=ucm
+	# Skip - we install service manually to /lib/systemd/system/
 
 override_dh_fixperms:
 	dh_fixperms

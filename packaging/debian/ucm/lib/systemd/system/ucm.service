@@ -1,0 +1,47 @@
+[Unit]
+Description=Ultimate CA Manager (UCM)
+Documentation=https://github.com/NeySlim/ultimate-ca-manager
+After=network.target
+
+[Service]
+Type=simple
+User=ucm
+Group=ucm
+WorkingDirectory=/opt/ucm
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ucm/data /opt/ucm/backend/data /var/lib/ucm /var/log/ucm /etc/ucm
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=512
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitInterval=60s
+StartLimitBurst=3
+
+# Execution - Uses wrapper script to load environment
+ExecStart=/opt/ucm/start-ucm.sh
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Standard output
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ucm
+
+[Install]
+WantedBy=multi-user.target

@@ -10,8 +10,8 @@ set +a
 
 # Set defaults if not defined
 : ${HTTPS_PORT:=8443}
-: ${HTTPS_CERT_PATH:=/etc/ucm/https_cert.pem}
-: ${HTTPS_KEY_PATH:=/etc/ucm/https_key.pem}
+: ${HTTPS_CERT_PATH:=/opt/ucm/data/https_cert.pem}
+: ${HTTPS_KEY_PATH:=/opt/ucm/data/https_key.pem}
 : ${LOG_LEVEL:=info}
 
 # Start Gunicorn with SSL

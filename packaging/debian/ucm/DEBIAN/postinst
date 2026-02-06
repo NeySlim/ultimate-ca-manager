@@ -1,0 +1,83 @@
+#!/bin/bash
+# UCM Post-Installation Script (non-interactive)
+
+set -e
+
+PACKAGE="ucm"
+UCM_USER="ucm"
+UCM_GROUP="ucm"
+UCM_HOME="/opt/ucm"
+UCM_DATA="/opt/ucm/data"
+UCM_CONFIG="/etc/ucm"
+
+case "$1" in
+    configure)
+        # Create user and group
+        if ! getent group "$UCM_GROUP" >/dev/null 2>&1; then
+            addgroup --system "$UCM_GROUP" >/dev/null
+        fi
+        
+        if ! getent passwd "$UCM_USER" >/dev/null 2>&1; then
+            adduser --system --home "$UCM_HOME" --no-create-home \
+                    --ingroup "$UCM_GROUP" --disabled-password \
+                    --shell /bin/false "$UCM_USER" >/dev/null
+        fi
+        
+        # Create directories
+        mkdir -p "$UCM_DATA"/{cas,certs,backups,sessions}
+        mkdir -p "$UCM_CONFIG"
+        mkdir -p /var/log/ucm
+        
+        # Sudoers for service restart
+        echo "ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm" > /etc/sudoers.d/ucm-service
+        chmod 440 /etc/sudoers.d/ucm-service
+        
+        # Create config if not exists
+        if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
+            SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+            JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+            ADMIN_PASS=$(python3 -c 'import secrets; print(secrets.token_hex(8))')
+            
+            cat > "$UCM_CONFIG/ucm.env" << ENVEOF
+# UCM Configuration
+SECRET_KEY=$SECRET_KEY
+JWT_SECRET_KEY=$JWT_SECRET
+ADMIN_PASSWORD=$ADMIN_PASS
+DATABASE_PATH=$UCM_DATA/ucm.db
+HTTPS_PORT=8443
+LOG_LEVEL=INFO
+ENVEOF
+            chmod 600 "$UCM_CONFIG/ucm.env"
+            
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo " UCM INSTALLED"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo " Admin password: $ADMIN_PASS"
+            echo " Config: $UCM_CONFIG/ucm.env"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        fi
+        
+        # Create venv if not exists
+        if [ ! -d "$UCM_HOME/venv" ]; then
+            echo "Creating Python virtual environment..."
+            python3 -m venv "$UCM_HOME/venv"
+            "$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
+            "$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
+        fi
+        
+        # Set permissions
+        chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_HOME"
+        chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_DATA"
+        chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_CONFIG"
+        chown -R "$UCM_USER":"$UCM_GROUP" /var/log/ucm
+        chmod 750 "$UCM_DATA"
+        
+        # Enable and start service
+        systemctl daemon-reload
+        systemctl enable ucm
+        systemctl start ucm || true
+        ;;
+esac
+
+exit 0
