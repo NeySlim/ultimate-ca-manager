@@ -5,6 +5,7 @@ Handles certificate generation, signing, revocation, and operations
 import base64
 import uuid
 import re
+import json
 from datetime import datetime
 from typing import Dict, List, Optional
 from pathlib import Path
@@ -353,14 +354,57 @@ class CertificateService:
         # Parse signed certificate
         cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
         
+        # Extract subject and SANs
+        subject_str = cert.subject.rfc4514_string() if cert.subject else None
+        
+        # Extract CN from subject
+        cn_value = None
+        if subject_str:
+            for part in subject_str.split(','):
+                if part.strip().upper().startswith('CN='):
+                    cn_value = part.strip()[3:]
+                    break
+        
+        # Extract SANs
+        san_dns_list = []
+        san_ip_list = []
+        san_email_list = []
+        try:
+            san_ext = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+            for name in san_ext.value:
+                if isinstance(name, x509.DNSName):
+                    san_dns_list.append(name.value)
+                elif isinstance(name, x509.IPAddress):
+                    san_ip_list.append(str(name.value))
+                elif isinstance(name, x509.RFC822Name):
+                    san_email_list.append(name.value)
+        except x509.ExtensionNotFound:
+            pass
+        
+        # Fallback: use first SAN DNS as CN for sorting if no CN in subject
+        if not cn_value and san_dns_list:
+            cn_value = san_dns_list[0]
+        if not cn_value and certificate.descr:
+            cn_value = certificate.descr
+        
         # Update certificate record
         certificate.caref = caref
         certificate.crt = base64.b64encode(cert_pem).decode('utf-8')
         certificate.cert_type = cert_type
+        certificate.subject = subject_str if subject_str else None
+        certificate.subject_cn = cn_value
         certificate.issuer = cert.issuer.rfc4514_string()
         certificate.serial_number = str(cert.serial_number)
         certificate.valid_from = cert.not_valid_before
         certificate.valid_to = cert.not_valid_after
+        
+        # Store SANs
+        if san_dns_list:
+            certificate.san_dns = json.dumps(san_dns_list)
+        if san_ip_list:
+            certificate.san_ip = json.dumps(san_ip_list)
+        if san_email_list:
+            certificate.san_email = json.dumps(san_email_list)
         
         # Increment CA serial
         ca.serial = (ca.serial or 0) + 1

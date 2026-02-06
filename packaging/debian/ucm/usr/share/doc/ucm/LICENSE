@@ -1,28 +1,105 @@
-BSD 3-Clause License
+UCM Pro - Source Available License
+Version 1.0, February 2026
 
-Copyright (c) 2026, NeySlim
+Copyright (c) 2026 NeySlim. All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
+================================================================================
+TERMS AND CONDITIONS
+================================================================================
 
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
+1. DEFINITIONS
 
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
+   "Software" means the UCM Pro source code, documentation, and associated files
+   in this repository.
+   
+   "Professional Use" means any use of the Software in a business, corporate,
+   governmental, or organizational context, regardless of whether that use is
+   for profit. This includes but is not limited to:
+   - Use by any company, business, or organization
+   - Use by employees during work hours or on work equipment
+   - Use in any professional capacity (consultants, freelancers, contractors)
+   - Use in non-profit organizations
+   - Use in government or public sector
+   - Use in educational institutions (staff/administrative use)
 
-3. Neither the name of the copyright holder nor the names of its
-   contributors may be used to endorse or promote products derived from
-   this software without specific prior written permission.
+   "Personal Use" means use strictly by an individual for:
+   - Personal home lab or hobby projects
+   - Self-education and learning
+   - Evaluation and testing (limited to 30 days)
+   
+2. GRANT OF RIGHTS
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+   Subject to the terms of this License, you are granted a non-exclusive,
+   non-transferable, limited license to:
+   
+   a) View and study the source code for educational purposes
+   b) Use the Software for Personal Use only
+   c) Evaluate the Software for up to 30 days before purchasing
+
+3. RESTRICTIONS
+
+   You may NOT, without a valid commercial license:
+   
+   a) Use the Software for any Professional Use
+   b) Use the Software in any business or organizational context
+   c) Distribute, sublicense, sell, or transfer the Software
+   d) Remove or alter any copyright, trademark, or attribution notices
+   e) Use the Software to provide services to third parties
+   f) Create derivative works
+   g) Deploy the Software on servers accessible by multiple users
+
+4. COMMERCIAL LICENSE REQUIRED
+
+   A commercial license is REQUIRED for:
+   
+   - Any business use (for-profit or non-profit)
+   - Any organizational use
+   - Any professional use
+   - Use beyond the 30-day evaluation period
+   
+   Contact: https://github.com/NeySlim or open an issue in this repository.
+
+5. FREE ALTERNATIVE
+
+   If you need a free certificate management solution for professional use,
+   please use UCM Community Edition, available at:
+   https://github.com/NeySlim/ultimate-ca-manager
+   
+   UCM Community is free for all uses including commercial (but cannot be resold).
+
+6. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+   
+   IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR
+   OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
+   ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+   OTHER DEALINGS IN THE SOFTWARE.
+
+7. TERMINATION
+
+   This License automatically terminates if you violate any of its terms.
+   Upon termination, you must destroy all copies of the Software in your
+   possession.
+
+================================================================================
+QUICK SUMMARY (not legally binding)
+================================================================================
+
+✅ You CAN (FREE):
+   - View and study the source code
+   - Use for personal home lab / hobby projects
+   - Evaluate for 30 days
+
+❌ You CANNOT (without paying):
+   - Use at work or for any business
+   - Use in any organization (even non-profit)
+   - Use professionally in any capacity
+   - Deploy for multiple users
+
+💼 Need it for work? → Buy a license
+🆓 Need it free for work? → Use UCM Community Edition
+
+================================================================================

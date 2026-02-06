@@ -216,6 +216,17 @@ class SCEPService:
             sender_nonce = attrs.get('senderNonce')
             challenge_pwd = attrs.get('challengePassword')
             
+            # Also check for challengePassword in CSR attributes (where scepclient puts it)
+            if not challenge_pwd:
+                try:
+                    from cryptography.x509.oid import AttributeOID
+                    for attr in csr.attributes:
+                        if attr.oid == AttributeOID.CHALLENGE_PASSWORD:
+                            challenge_pwd = attr.value
+                            break
+                except Exception as e:
+                    print(f"DEBUG: Could not extract challenge from CSR: {e}", flush=True)
+            
             print(f"DEBUG: Extracted attributes: txn_id={transaction_id}, msg_type={message_type}, challenge_pwd={'***' if challenge_pwd else None}", flush=True)
             
             if not transaction_id:
@@ -473,6 +484,16 @@ class SCEPService:
         except x509.ExtensionNotFound:
             pass  # No SAN extension
         
+        # Extract CN from subject, fallback to SAN DNS
+        cn_value = None
+        subject_str = subject.rfc4514_string()
+        for part in subject_str.split(','):
+            if part.strip().upper().startswith('CN='):
+                cn_value = part.strip()[3:]
+                break
+        if not cn_value and san_dns_list:
+            cn_value = san_dns_list[0]
+        
         # Save certificate to database
         cert_obj = Certificate(
             refid=cert_refid,
@@ -482,6 +503,7 @@ class SCEPService:
             prv=None,  # No private key (client has it)
             cert_type="server_cert",
             subject=subject.rfc4514_string(),
+            subject_cn=cn_value,
             issuer=cert.issuer.rfc4514_string(),
             serial_number=str(cert.serial_number),
             valid_from=cert.not_valid_before,
@@ -491,6 +513,7 @@ class SCEPService:
             san_ip=json.dumps(san_ip_list) if san_ip_list else None,
             san_email=json.dumps(san_email_list) if san_email_list else None,
             san_uri=json.dumps(san_uri_list) if san_uri_list else None,
+            source="scep",
             created_by="scep"
         )
         db.session.add(cert_obj)

@@ -6,20 +6,20 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Robot, Gear, CheckCircle, XCircle, Clock, Copy, ArrowsClockwise, 
   Eye, ShieldCheck, Plugs, Key, Warning, Info, FileText, Globe, Database, 
-  ListBullets, Question
+  ListBullets
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
   ResponsiveDataTable,
   Button, Input, Select, Card,
-  Badge, LoadingSpinner, Modal, Textarea, EmptyState, StatusIndicator, HelpCard,
+  Badge, LoadingSpinner, Modal, Textarea, EmptyState, HelpCard,
   CompactHeader, CompactSection, CompactGrid, CompactField, CompactStats
 } from '../components'
 import { scepService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { ERRORS, SUCCESS } from '../lib/messages'
 import { usePermission } from '../hooks'
-import { formatDate } from '../lib/utils'
+import { formatDate, cn } from '../lib/utils'
 
 export default function SCEPPage() {
   const { showSuccess, showError, showInfo } = useNotification()
@@ -133,22 +133,43 @@ export default function SCEPPage() {
   }
 
   const getStatusBadge = (status) => {
-    const variants = {
-      pending: 'warning',
-      approved: 'success',
-      rejected: 'danger',
-      issued: 'info'
+    const config = {
+      pending: { variant: 'orange', dot: true, pulse: true },
+      approved: { variant: 'success', dot: true, pulse: false },
+      rejected: { variant: 'danger', dot: true, pulse: false },
+      issued: { variant: 'primary', dot: true, pulse: false }
     }
-    return <Badge variant={variants[status] || 'default'}>{status}</Badge>
+    const { variant, dot, pulse } = config[status] || { variant: 'secondary', dot: false, pulse: false }
+    return <Badge variant={variant} size="sm" dot={dot} pulse={pulse}>{status}</Badge>
+  }
+
+  // Parse DN to extract CN and other fields
+  const parseDN = (dn) => {
+    if (!dn) return { cn: null, parts: {} }
+    const parts = {}
+    // Parse DN like "CN=scep-test-device,OU=MDM,O=UCM Test,C=FR"
+    const regex = /([A-Z]+)=([^,]+)/g
+    let match
+    while ((match = regex.exec(dn)) !== null) {
+      parts[match[1]] = match[2]
+    }
+    return { cn: parts.CN || null, parts }
   }
 
   // Tabs config
   const tabs = useMemo(() => [
-    { id: 'requests', label: 'Requests', badge: stats.pending > 0 ? stats.pending : null },
-    { id: 'config', label: 'Configuration' },
-    { id: 'challenge', label: 'Challenges' },
-    { id: 'info', label: 'Info' }
+    { id: 'requests', label: 'Requests', icon: ListBullets, badge: stats.pending > 0 ? stats.pending : null },
+    { id: 'config', label: 'Configuration', icon: Gear },
+    { id: 'challenge', label: 'Challenges', icon: Key },
+    { id: 'info', label: 'Info', icon: Info }
   ], [stats.pending])
+
+  // Get SCEP CA name from config
+  const scepCaName = useMemo(() => {
+    if (!config.ca_id) return null
+    const ca = cas.find(c => c.id === config.ca_id)
+    return ca?.cn || ca?.common_name || ca?.name || null
+  }, [config.ca_id, cas])
 
   // Stats for header
   const headerStats = useMemo(() => [
@@ -160,50 +181,107 @@ export default function SCEPPage() {
 
   // Request table columns
   const requestColumns = useMemo(() => [
-    { key: 'id', label: 'ID', width: '60px' },
+    { key: 'id', header: 'ID', width: '60px', hideOnMobile: true },
+    { 
+      key: 'subject', 
+      header: 'Subject', 
+      priority: 1,
+      // Desktop: Icon + CN as main text + O/OU as secondary
+      render: (v, row) => {
+        const { cn: commonName, parts } = parseDN(v)
+        return (
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+              row.status === 'pending' ? 'icon-bg-orange' : row.status === 'approved' ? 'icon-bg-emerald' : 'icon-bg-red'
+            )}>
+              <Robot size={14} weight="duotone" />
+            </div>
+            <div className="space-y-0.5 min-w-0">
+              <div className="font-medium text-text-primary truncate">
+                {commonName || `Request #${row.id}`}
+              </div>
+              {(parts.O || parts.OU) && (
+                <div className="text-xs text-text-secondary truncate">
+                  {[parts.O, parts.OU].filter(Boolean).join(' • ')}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      },
+      // Mobile: CN left + status badge right (same pattern as Certificates)
+      mobileRender: (v, row) => {
+        const { cn: commonName } = parseDN(v)
+        return (
+          <div className="flex items-center justify-between gap-2 w-full">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className={cn(
+                "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                row.status === 'pending' ? 'icon-bg-orange' : row.status === 'approved' ? 'icon-bg-emerald' : 'icon-bg-red'
+              )}>
+                <Robot size={14} weight="duotone" />
+              </div>
+              <span className="font-medium truncate">
+                {commonName || `Request #${row.id}`}
+              </span>
+            </div>
+            <div className="shrink-0">
+              {getStatusBadge(row.status)}
+            </div>
+          </div>
+        )
+      }
+    },
+    { 
+      key: 'status', 
+      header: 'Status', 
+      priority: 2,
+      hideOnMobile: true, // Status shown in subject mobileRender
+      render: (v) => getStatusBadge(v)
+    },
+    {
+      key: 'ca',
+      header: 'CA',
+      priority: 3,
+      hideOnMobile: true,
+      render: () => (
+        <span className="text-text-secondary truncate">
+          {scepCaName || <span className="text-text-tertiary italic">Not configured</span>}
+        </span>
+      )
+    },
     { 
       key: 'transaction_id', 
-      label: 'Transaction ID', 
+      header: 'Transaction ID', 
+      priority: 4,
+      hideOnMobile: true,
       render: (v) => (
         <code className="text-xs bg-bg-tertiary px-1.5 py-0.5 rounded">{v?.slice(0, 16)}...</code>
       )
     },
-    { key: 'subject', label: 'Subject', render: (v) => v || <span className="text-text-tertiary">-</span> },
-    { key: 'status', label: 'Status', render: (v) => getStatusBadge(v) },
-    { key: 'created_at', label: 'Requested', render: (v) => formatDate(v) }
-  ], [])
-
-  // Mobile card render for requests
-  const renderMobileCard = useCallback((req, isSelected) => (
-    <div className={`p-4 ${isSelected ? 'mobile-row-selected' : ''}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-text-primary truncate">
-              {req.subject || `Request #${req.id}`}
-            </span>
-            {getStatusBadge(req.status)}
+    { 
+      key: 'created_at', 
+      header: 'Requested', 
+      priority: 5,
+      render: (v) => formatDate(v),
+      // Mobile: CA + organization info + date
+      mobileRender: (v, row) => {
+        const { parts } = parseDN(row.subject)
+        return (
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            {scepCaName && (
+              <span><span className="text-text-tertiary">CA:</span> <span className="text-text-secondary">{scepCaName}</span></span>
+            )}
+            {parts.O && (
+              <span><span className="text-text-tertiary">Org:</span> <span className="text-text-secondary">{parts.O}</span></span>
+            )}
+            <span><span className="text-text-tertiary">Date:</span> <span className="text-text-secondary">{formatDate(v)}</span></span>
           </div>
-          <div className="text-xs text-text-secondary mt-1">
-            <code className="bg-bg-tertiary px-1 py-0.5 rounded">{req.transaction_id?.slice(0, 20)}...</code>
-          </div>
-          <div className="text-xs text-text-tertiary mt-1">
-            {formatDate(req.created_at)}
-          </div>
-        </div>
-        {req.status === 'pending' && hasPermission('write:scep') && (
-          <div className="flex gap-1">
-            <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); handleApprove(req); }}>
-              <CheckCircle size={14} />
-            </Button>
-            <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); setSelectedRequest(req); setShowRejectModal(true); }}>
-              <XCircle size={14} />
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  ), [hasPermission])
+        )
+      }
+    }
+  ], [scepCaName])
 
   // Help content
   const helpContent = (
@@ -224,7 +302,7 @@ export default function SCEPPage() {
             <p className="text-xs text-text-secondary">Approved</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-status-error">{stats.rejected}</p>
+            <p className="text-2xl font-bold text-status-danger">{stats.rejected}</p>
             <p className="text-xs text-text-secondary">Rejected</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
@@ -259,7 +337,7 @@ export default function SCEPPage() {
     <div className="p-3 space-y-3">
       <CompactHeader
         icon={Robot}
-        iconClass={selectedRequest.status === 'approved' ? "bg-status-success/20" : selectedRequest.status === 'rejected' ? "bg-status-error/20" : "bg-status-warning/20"}
+        iconClass={selectedRequest.status === 'approved' ? "bg-status-success/20" : selectedRequest.status === 'rejected' ? "bg-status-danger/20" : "bg-status-warning/20"}
         title={`Request #${selectedRequest.id}`}
         subtitle={selectedRequest.subject || 'SCEP Enrollment Request'}
         badge={getStatusBadge(selectedRequest.status)}
@@ -291,7 +369,7 @@ export default function SCEPPage() {
 
       {selectedRequest.csr_pem && (
         <CompactSection title="CSR Content" collapsible defaultOpen={false}>
-          <pre className="text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
+          <pre className="text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto">
             {selectedRequest.csr_pem}
           </pre>
         </CompactSection>
@@ -329,7 +407,7 @@ export default function SCEPPage() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         stats={activeTab === 'requests' ? headerStats : undefined}
-        helpContent={helpContent}
+        helpPageKey="scep"
         splitView={activeTab === 'requests'}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -367,7 +445,6 @@ export default function SCEPPage() {
             }
             selectedId={selectedRequest?.id}
             onRowClick={setSelectedRequest}
-            renderMobileCard={renderMobileCard}
             pagination={{
               page,
               total: requests.length,

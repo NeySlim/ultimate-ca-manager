@@ -97,17 +97,17 @@ export function CSRDetails({
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-[10px] text-text-tertiary">Key Type</div>
+          <div className="text-2xs text-text-tertiary">Key Type</div>
           <div className="text-xs font-medium text-text-primary">{csr.key_type || csr.key_algorithm || 'N/A'}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Hash size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-[10px] text-text-tertiary">Key Size</div>
+          <div className="text-2xs text-text-tertiary">Key Size</div>
           <div className="text-xs font-medium text-text-primary">{csr.key_size || 'N/A'}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <FileText size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-[10px] text-text-tertiary">Signature</div>
+          <div className="text-2xs text-text-tertiary">Signature</div>
           <div className="text-xs font-medium text-text-primary">{csr.signature_algorithm || 'N/A'}</div>
         </div>
       </div>
@@ -194,7 +194,7 @@ export function CSRDetails({
         <CompactSection title="CSR PEM" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
-              "text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
+              "text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
               !showFullPem && "max-h-24 overflow-hidden"
             )}>
               {csr.pem}

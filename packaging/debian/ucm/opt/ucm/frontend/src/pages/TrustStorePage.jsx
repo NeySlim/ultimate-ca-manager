@@ -3,7 +3,7 @@
  * Manage trusted CA certificates for chain validation
  * Uses ResponsiveLayout for unified UI
  */
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   ShieldCheck, Plus, Trash, Download, Certificate, Clock,
   CheckCircle, Warning, UploadSimple, ArrowsClockwise, Calendar,
@@ -13,6 +13,7 @@ import {
   Button, Input, Badge, Modal, Textarea, HelpCard,
   CompactSection, CompactGrid, CompactField, FormSelect
 } from '../components'
+import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { truststoreService } from '../services'
 import { useNotification } from '../contexts'
@@ -23,13 +24,14 @@ import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 export default function TrustStorePage() {
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
-  const { modals, open: openModal, close: closeModal } = useModals(['add', 'import'])
+  const { modals, open: openModal, close: closeModal } = useModals(['add'])
   
   const [loading, setLoading] = useState(true)
   const [certificates, setCertificates] = useState([])
   const [certStats, setCertStats] = useState({ total: 0, root_ca: 0, intermediate_ca: 0, expired: 0, valid: 0 })
   const [selectedCert, setSelectedCert] = useState(null)
   const [syncing, setSyncing] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   
   // Add modal state
   const [addForm, setAddForm] = useState({
@@ -40,11 +42,6 @@ export default function TrustStorePage() {
     notes: ''
   })
   const [adding, setAdding] = useState(false)
-  
-  // Import modal state
-  const [importFile, setImportFile] = useState(null)
-  const [importForm, setImportForm] = useState({ name: '', purpose: 'root_ca', description: '' })
-  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     loadCertificates()
@@ -95,30 +92,6 @@ export default function TrustStorePage() {
       showError(error.message || ERRORS.IMPORT_FAILED.TRUSTSTORE)
     } finally {
       setAdding(false)
-    }
-  }
-
-  const handleImport = async () => {
-    if (!importFile) {
-      showError('Please select a file to import')
-      return
-    }
-    
-    setImporting(true)
-    try {
-      const response = await truststoreService.importFile(importFile, importForm)
-      showSuccess(response.message || 'Certificate imported successfully')
-      closeModal('import')
-      setImportFile(null)
-      setImportForm({ name: '', purpose: 'root_ca', description: '' })
-      loadCertificates()
-      if (response.data) {
-        setSelectedCert(response.data)
-      }
-    } catch (error) {
-      showError(error.message || 'Failed to import certificate')
-    } finally {
-      setImporting(false)
     }
   }
 
@@ -181,54 +154,106 @@ export default function TrustStorePage() {
     { icon: CheckCircle, label: 'Total', value: certStats.total, variant: 'default' }
   ], [certStats])
 
+  // Toolbar actions - next to search bar
+  const toolbarActions = canWrite('truststore') && (
+    <div className="flex gap-2">
+      <Button size="sm" variant="secondary" onClick={handleSyncFromSystem} disabled={syncing}>
+        <ArrowsClockwise size={14} className={syncing ? 'animate-spin' : ''} />
+        <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync'}</span>
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
+        <UploadSimple size={14} />
+        <span className="hidden sm:inline">Import</span>
+      </Button>
+      <Button size="sm" onClick={() => openModal('add')}>
+        <Plus size={14} />
+        <span className="hidden sm:inline">Add</span>
+      </Button>
+    </div>
+  )
+
   // Columns
-  const columns = [
+  const columns = useMemo(() => [
     {
       key: 'name',
       header: 'Certificate',
+      priority: 1,
       sortable: true,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <Certificate size={16} className="text-accent-primary shrink-0" />
-          <div className="min-w-0">
-            <div className="font-medium truncate">{val}</div>
-            {row.subject_cn && row.subject_cn !== val && (
-              <div className="text-xs text-text-secondary truncate">{row.subject_cn}</div>
-            )}
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-blue">
+            <Certificate size={14} weight="duotone" />
           </div>
+          <span className="font-medium truncate">{val}</span>
         </div>
-      )
+      ),
+      mobileRender: (val, row) => {
+        const date = row.not_after ? new Date(row.not_after) : null
+        const isExpired = date && date < new Date()
+        const daysLeft = date ? Math.floor((date - new Date()) / (1000 * 60 * 60 * 24)) : null
+        const isExpiringSoon = daysLeft !== null && daysLeft > 0 && daysLeft <= 30
+        return (
+          <div className="flex items-center justify-between gap-2 w-full">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className={cn(
+                "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                isExpired ? 'icon-bg-red' : isExpiringSoon ? 'icon-bg-orange' : 'icon-bg-emerald'
+              )}>
+                <Certificate size={14} weight="duotone" />
+              </div>
+              <span className="font-medium truncate">{val}</span>
+            </div>
+            <Badge variant={isExpired ? 'danger' : isExpiringSoon ? 'orange' : 'success'} size="sm" dot>
+              {row.purpose?.replace('_', ' ') || 'custom'}
+            </Badge>
+          </div>
+        )
+      }
     },
     {
       key: 'purpose',
       header: 'Purpose',
+      priority: 2,
+      hideOnMobile: true,
       render: (val) => {
         const variants = {
-          root_ca: 'success',
+          root_ca: 'amber',
           intermediate_ca: 'primary',
-          client_auth: 'purple',
-          code_signing: 'warning',
-          system: 'secondary',
-          custom: 'default'
+          client_auth: 'violet',
+          code_signing: 'orange',
+          system: 'teal',
+          custom: 'secondary'
         }
-        return <Badge variant={variants[val] || 'default'} size="sm">{val?.replace('_', ' ')}</Badge>
+        return <Badge variant={variants[val] || 'secondary'} size="sm" dot>{val?.replace('_', ' ')}</Badge>
       }
     },
     {
       key: 'not_after',
       header: 'Expires',
+      priority: 2,
       render: (val) => {
         if (!val) return <span className="text-text-tertiary">—</span>
         const date = new Date(val)
         const isExpired = date < new Date()
+        const daysLeft = Math.floor((date - new Date()) / (1000 * 60 * 60 * 24))
+        const isExpiringSoon = daysLeft > 0 && daysLeft <= 30
         return (
-          <span className={isExpired ? 'text-status-danger' : ''}>
+          <Badge variant={isExpired ? 'danger' : isExpiringSoon ? 'orange' : 'success'} size="sm" dot pulse={isExpired || isExpiringSoon}>
             {formatDate(val)}
-          </span>
+          </Badge>
+        )
+      },
+      mobileRender: (val) => {
+        if (!val) return null
+        return (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-text-tertiary">Expires:</span>
+            <span className="text-text-secondary">{formatDate(val)}</span>
+          </div>
         )
       }
     }
-  ]
+  ], [])
 
   // Row actions
   const rowActions = (row) => [
@@ -257,9 +282,9 @@ export default function TrustStorePage() {
         <div className="flex items-start gap-3">
           <div className={cn(
             "p-2.5 rounded-lg shrink-0",
-            isExpired ? "bg-status-error/10" : "bg-accent-primary/10"
+            isExpired ? "bg-status-danger/10" : "bg-accent-primary/10"
           )}>
-            <Certificate size={24} className={isExpired ? "text-status-error" : "text-accent-primary"} />
+            <Certificate size={24} className={isExpired ? "text-status-danger" : "text-accent-primary"} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
@@ -281,19 +306,19 @@ export default function TrustStorePage() {
         {daysRemaining !== null && (
           <div className={cn(
             "flex items-center gap-2 px-3 py-2 rounded-lg",
-            isExpired && "bg-status-error/10",
+            isExpired && "bg-status-danger/10",
             isExpiring && "bg-status-warning/10",
             !isExpired && !isExpiring && "bg-status-success/10"
           )}>
             <Clock size={16} className={cn(
-              isExpired && "text-status-error",
+              isExpired && "text-status-danger",
               isExpiring && "text-status-warning",
               !isExpired && !isExpiring && "text-status-success"
             )} />
             <div>
               <div className={cn(
                 "text-sm font-medium",
-                isExpired && "text-status-error",
+                isExpired && "text-status-danger",
                 isExpiring && "text-status-warning",
                 !isExpired && !isExpiring && "text-status-success"
               )}>
@@ -311,17 +336,17 @@ export default function TrustStorePage() {
           <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
             <Key size={16} className="mx-auto text-text-tertiary mb-1" />
             <div className="text-xs font-medium text-text-primary">{selectedCert.key_type || 'RSA'}</div>
-            <div className="text-[10px] text-text-tertiary">Key Type</div>
+            <div className="text-2xs text-text-tertiary">Key Type</div>
           </div>
           <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
             <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
             <div className="text-xs font-medium text-text-primary truncate">{selectedCert.signature_algorithm || 'SHA256'}</div>
-            <div className="text-[10px] text-text-tertiary">Signature</div>
+            <div className="text-2xs text-text-tertiary">Signature</div>
           </div>
           <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
             <Certificate size={16} className="mx-auto text-text-tertiary mb-1" />
             <div className="text-xs font-medium text-text-primary">{selectedCert.is_ca ? 'CA' : 'End Entity'}</div>
-            <div className="text-[10px] text-text-tertiary">Type</div>
+            <div className="text-2xs text-text-tertiary">Type</div>
           </div>
         </div>
 
@@ -361,7 +386,7 @@ export default function TrustStorePage() {
         {/* Technical Details */}
         <CompactSection title="Technical Details" icon={Info}>
           <CompactGrid>
-            <CompactField icon={Hash} label="Serial" value={selectedCert.serial_number} mono />
+            <CompactField icon={Hash} label="Serial" value={selectedCert.serial_number} mono copyable />
             <CompactField icon={Key} label="Key Type" value={selectedCert.key_type} />
           </CompactGrid>
         </CompactSection>
@@ -410,8 +435,7 @@ export default function TrustStorePage() {
         subtitle={`${certificates.length} certificate${certificates.length !== 1 ? 's' : ''}`}
         icon={ShieldCheck}
         stats={stats}
-        helpContent={helpContent}
-        helpTitle="Trust Store Help"
+        helpPageKey="truststore"
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -450,22 +474,7 @@ export default function TrustStorePage() {
               ]
             }
           ]}
-          toolbarActions={canWrite('truststore') && (
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={handleSyncFromSystem} disabled={syncing}>
-                <ArrowsClockwise size={16} className={syncing ? 'animate-spin' : ''} />
-                <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync'}</span>
-              </Button>
-              <Button variant="secondary" onClick={() => openModal('import')}>
-                <UploadSimple size={16} />
-                <span className="hidden sm:inline">Import</span>
-              </Button>
-              <Button onClick={() => openModal('add')}>
-                <Plus size={16} />
-                <span className="hidden sm:inline">Add</span>
-              </Button>
-            </div>
-          )}
+          toolbarActions={toolbarActions}
           sortable
           defaultSort={{ key: 'name', direction: 'asc' }}
           pagination={true}
@@ -539,65 +548,15 @@ export default function TrustStorePage() {
         </form>
       </Modal>
 
-      {/* Import Certificate Modal */}
-      <Modal
-        open={modals.import}
-        onClose={() => closeModal('import')}
-        title="Import Certificate File"
-      >
-        <form className="p-4 space-y-4" onSubmit={(e) => { e.preventDefault(); handleImport() }}>
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">
-              Certificate File (PEM or DER)
-            </label>
-            <input
-              type="file"
-              accept=".pem,.crt,.cer,.der"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                setImportFile(file)
-                if (file && !importForm.name) {
-                  setImportForm(prev => ({ ...prev, name: file.name.replace(/\.(pem|crt|cer|der)$/i, '') }))
-                }
-              }}
-              className="w-full px-3 py-2 text-sm bg-bg-secondary border border-border rounded-md text-text-primary file:mr-3 file:py-1 file:px-3 file:border-0 file:rounded file:bg-accent-primary file:text-white file:cursor-pointer"
-            />
-          </div>
-          <Input
-            label="Name"
-            placeholder="Certificate name (auto-filled from filename)"
-            value={importForm.name}
-            onChange={(e) => setImportForm(prev => ({ ...prev, name: e.target.value }))}
-          />
-          <FormSelect
-            label="Purpose"
-            value={importForm.purpose}
-            onChange={(val) => setImportForm(prev => ({ ...prev, purpose: val }))}
-            options={[
-              { value: 'root_ca', label: 'Root CA' },
-              { value: 'intermediate_ca', label: 'Intermediate CA' },
-              { value: 'client_auth', label: 'Client Authentication' },
-              { value: 'code_signing', label: 'Code Signing' },
-              { value: 'custom', label: 'Custom' },
-            ]}
-            size="lg"
-          />
-          <Input
-            label="Description"
-            placeholder="Optional description"
-            value={importForm.description}
-            onChange={(e) => setImportForm(prev => ({ ...prev, description: e.target.value }))}
-          />
-          <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={() => closeModal('import')}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={importing || !importFile}>
-              {importing ? 'Importing...' : 'Import Certificate'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      {/* Smart Import Modal */}
+      <SmartImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={() => {
+          setShowImportModal(false)
+          loadCertificates()
+        }}
+      />
     </>
   )
 }

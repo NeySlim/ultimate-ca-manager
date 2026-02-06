@@ -3,25 +3,30 @@ Ultimate CA Manager - Configuration Management
 Handles all application settings with web UI configuration support
 """
 import os
+import secrets
 import subprocess
 from pathlib import Path
 from typing import Optional
 from datetime import timedelta
 from dotenv import load_dotenv
 
+# Load environment variables FIRST (before using them)
+# Try multiple locations for .env files
+load_dotenv("/etc/ucm/ucm.env")  # System config (DEB/RPM)
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")  # Local dev
+
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = BASE_DIR / "backend"
-# In /opt/ucm: data is at same level as backend/, not inside it
-DATA_DIR = BASE_DIR / "data"
 
-# Ensure data directories exist
-DATA_DIR.mkdir(exist_ok=True)
-# Don't create subdirectories at module import time (permission issues)
-# They will be created on-demand when needed
+# DATA_DIR is configurable via environment for RPM (/var/lib/ucm) vs DEB (/opt/ucm/data)
+DATA_DIR = Path(os.environ.get("DATA_DIR", str(BASE_DIR / "data")))
 
-# Load environment variables
-load_dotenv(BASE_DIR / ".env")
+# Ensure data directories exist (may fail for permission reasons - that's OK)
+try:
+    DATA_DIR.mkdir(exist_ok=True)
+except PermissionError:
+    pass  # Directory should already exist from package install
 
 
 def is_docker():
@@ -193,6 +198,8 @@ class Config:
     
     # JWT Authentication
     JWT_SECRET_KEY = _jwt_secret if _jwt_secret else "INSTALL_TIME_PLACEHOLDER"
+    # Previous JWT key for rotation - tokens signed with this are still valid during transition
+    JWT_SECRET_KEY_PREVIOUS = os.getenv("JWT_SECRET_KEY_PREVIOUS", "")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         seconds=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES", "3600"))
     )
@@ -268,7 +275,8 @@ class Config:
     # SCEP Configuration
     SCEP_ENABLED = os.getenv("SCEP_ENABLED", "true").lower() == "true"
     SCEP_CA_ID = os.getenv("SCEP_CA_ID")
-    SCEP_CHALLENGE_PASSWORD = os.getenv("SCEP_CHALLENGE_PASSWORD", "changeme")
+    # Generate random SCEP password if not configured (security: avoid weak defaults)
+    SCEP_CHALLENGE_PASSWORD = os.getenv("SCEP_CHALLENGE_PASSWORD") or secrets.token_urlsafe(16)
     SCEP_AUTO_APPROVE = os.getenv("SCEP_AUTO_APPROVE", "false").lower() == "true"
     SCEP_CERT_LIFETIME = int(os.getenv("SCEP_CERT_LIFETIME", "365"))
     SCEP_KEY_SIZE = int(os.getenv("SCEP_KEY_SIZE", "2048"))

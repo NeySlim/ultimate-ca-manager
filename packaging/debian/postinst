@@ -32,13 +32,41 @@ case "$1" in
         # ============================================================
         # AUTOMATIC MIGRATION FROM v1.8.x
         # ============================================================
-        if [ -f "$V1_DATA/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
-            if [ -x "$UCM_HOME/scripts/migrate-v1-to-v2.sh" ]; then
-                "$UCM_HOME/scripts/migrate-v1-to-v2.sh"
-            elif [ -f "$UCM_HOME/backend/migrate_v1_to_v2.py" ]; then
-                echo "Running v1.8.x → v2.0.0 migration..."
-                python3 "$UCM_HOME/backend/migrate_v1_to_v2.py" "$UCM_HOME" 2>&1 | tee /var/log/ucm/migration.log
+        # Check multiple possible v1.8.x data locations
+        V1_DB=""
+        if [ -f "$V1_DATA/ucm.db" ]; then
+            V1_DB="$V1_DATA/ucm.db"
+        elif [ -f "/var/lib/ucm/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
+            # v1.8.3 DEB package used /var/lib/ucm
+            V1_DB="/var/lib/ucm/ucm.db"
+        fi
+        
+        if [ -n "$V1_DB" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo " Detected UCM v1.8.x data"
+            echo " Migrating to v2.0.0..."
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            # Copy DB first
+            cp "$V1_DB" "$UCM_DATA/ucm.db"
+            chown "$UCM_USER":"$UCM_GROUP" "$UCM_DATA/ucm.db"
+            
+            # Copy files from v1.8.x data dir if exists
+            V1_DIR=$(dirname "$V1_DB")
+            for dir in ca certs private crl; do
+                if [ -d "$V1_DIR/$dir" ] && [ "$(ls -A $V1_DIR/$dir 2>/dev/null)" ]; then
+                    cp -r "$V1_DIR/$dir"/* "$UCM_DATA/$dir/" 2>/dev/null || true
+                fi
+            done
+            
+            # Update DATABASE_PATH in existing config if needed
+            if [ -f "$UCM_CONFIG/ucm.env" ]; then
+                sed -i "s|DATABASE_PATH=.*|DATABASE_PATH=$UCM_DATA/ucm.db|" "$UCM_CONFIG/ucm.env"
             fi
+            
+            # Schema migrations are run automatically at app startup
+            echo "✓ Migration complete (schema migrations will run at first startup)"
         fi
         # ============================================================
         
@@ -117,14 +145,21 @@ ENVEOF
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         fi
         
-        # Create or update venv
-        if [ ! -f "$UCM_HOME/venv/bin/gunicorn" ]; then
-            echo "Creating Python virtual environment..."
-            rm -rf "$UCM_HOME/venv" 2>/dev/null || true
-            python3 -m venv "$UCM_HOME/venv"
-            "$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
-            "$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
+        # Always ensure config has correct paths (for upgrades from older versions)
+        if [ -f "$UCM_CONFIG/ucm.env" ]; then
+            # Update DATABASE_PATH if pointing to old location
+            sed -i "s|DATABASE_PATH=/var/lib/ucm/ucm.db|DATABASE_PATH=$UCM_DATA/ucm.db|" "$UCM_CONFIG/ucm.env"
+            # Ensure DATA_DIR is set
+            grep -q "^DATA_DIR=" "$UCM_CONFIG/ucm.env" || echo "DATA_DIR=$UCM_DATA" >> "$UCM_CONFIG/ucm.env"
         fi
+        
+        # Always recreate venv to ensure correct dependencies
+        # This handles both fresh install and upgrades
+        echo "Creating/updating Python virtual environment..."
+        rm -rf "$UCM_HOME/venv" 2>/dev/null || true
+        python3 -m venv "$UCM_HOME/venv"
+        "$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
+        "$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
         
         # Set permissions
         chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_HOME"

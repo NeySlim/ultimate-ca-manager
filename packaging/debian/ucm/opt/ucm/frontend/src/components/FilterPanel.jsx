@@ -36,7 +36,7 @@
  * />
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { X, Funnel, Eraser, CaretDown, Check } from '@phosphor-icons/react'
+import { X, Funnel, Eraser, Check } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { useMobile } from '../contexts'
 import { Button } from './Button'
@@ -205,7 +205,7 @@ export function FilterPanel({
       <div key={key} className={cn(isMobile ? "space-y-2" : "space-y-1.5")}>
         <label className={cn(
           "font-medium text-text-secondary uppercase tracking-wider",
-          isMobile ? "text-xs" : "text-[11px]"
+          isMobile ? "text-xs" : "text-2xs"
         )}>
           {label}
         </label>
@@ -279,7 +279,7 @@ export function FilterPanel({
               </p>
               <p className={cn(
                 "text-text-tertiary",
-                isMobile ? "text-xs" : "text-[10px]"
+                isMobile ? "text-xs" : "text-2xs"
               )}>
                 {stat.label}
               </p>
@@ -300,7 +300,7 @@ export function FilterPanel({
       <div className="space-y-1.5">
         <label className={cn(
           "font-medium text-text-secondary uppercase tracking-wider",
-          isMobile ? "text-xs" : "text-[11px]"
+          isMobile ? "text-xs" : "text-2xs"
         )}>
           Quick Filters
         </label>

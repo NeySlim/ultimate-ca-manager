@@ -3,6 +3,7 @@ Ultimate CA Manager - Main Application
 Flask application with HTTPS-only enforcement
 """
 import os
+from os import environ
 import sys
 from pathlib import Path
 from flask import Flask, redirect, request
@@ -77,6 +78,17 @@ def create_app(config_name=None):
             config.HTTPS_KEY_PATH,
             auto_generate=True
         )
+    
+    # Run schema migrations BEFORE SQLAlchemy init (critical for upgrades)
+    # This ensures columns/tables exist before models are mapped
+    try:
+        from migration_runner import run_all_migrations
+        db_path = config.DATABASE_PATH
+        if db_path and os.path.exists(db_path):
+            os.environ.setdefault('DATABASE_PATH', str(db_path))
+            run_all_migrations(dry_run=False, verbose=False)
+    except Exception as e:
+        app.logger.warning(f"Pre-init migration check: {e}")
     
     # Initialize extensions
     db.init_app(app)
@@ -242,13 +254,15 @@ def create_app(config_name=None):
                     from models.pro.rbac import CustomRole, RolePermission
                     from models.pro.sso import SSOProvider, SSOSession
                     from models.pro.policy import CertificatePolicy, ApprovalRequest
+                    from models.pro.hsm import HSMProvider, HSMKey
                     
                     # Check if Pro tables exist, create if missing
                     inspector = inspect(db.engine)
                     tables = inspector.get_table_names()
                     pro_tables = ['pro_custom_roles', 'pro_role_permissions', 
                                   'pro_sso_providers', 'pro_sso_sessions',
-                                  'certificate_policies', 'approval_requests']
+                                  'certificate_policies', 'approval_requests',
+                                  'pro_hsm_providers', 'pro_hsm_keys']
                     missing_pro = [t for t in pro_tables if t not in tables]
                     
                     if missing_pro:
@@ -272,6 +286,8 @@ def create_app(config_name=None):
                     raise RuntimeError(f"Critical tables missing: {missing_tables}")
                 
                 app.logger.info(f"✓ All critical tables verified: {', '.join(critical_tables)}")
+                
+                # Migrations already run at startup before SQLAlchemy init
                 
                 # Run database health check and repair
                 app.logger.info("Running database health check...")
@@ -445,7 +461,6 @@ def create_app(config_name=None):
                 def do_shutdown():
                     import time
                     import sys
-                    import os
                     
                     print(f"🔄 Shutdown thread started, waiting 1 second...")
                     time.sleep(1)  # Wait for response to be sent
@@ -504,12 +519,17 @@ def init_database(app):
                 ('totp_secret', 'VARCHAR(32)', None),
                 ('totp_confirmed', 'BOOLEAN', '0'),
                 ('backup_codes', 'TEXT', None),
+                ('failed_logins', 'INTEGER', '0'),
+                ('locked_until', 'DATETIME', None),
+                ('login_count', 'INTEGER', '0'),
             ],
             'certificates': [
                 ('archived', 'BOOLEAN', '0'),
                 ('source', 'VARCHAR(50)', None),
                 ('template_id', 'INTEGER', None),
                 ('owner_group_id', 'INTEGER', None),
+                ('key_algo', 'VARCHAR(20)', None),
+                ('subject_cn', 'VARCHAR(255)', None),
             ],
             'certificate_authorities': [
                 ('cdp_enabled', 'BOOLEAN', '0'),
@@ -517,12 +537,15 @@ def init_database(app):
                 ('ocsp_enabled', 'BOOLEAN', '0'),
                 ('ocsp_url', 'VARCHAR(512)', None),
                 ('owner_group_id', 'INTEGER', None),
+                ('serial_number', 'VARCHAR(64)', None),
             ],
             'groups': [
                 ('description', 'TEXT', None),
             ],
             'audit_logs': [
                 ('resource_name', 'VARCHAR(255)', None),
+                ('entry_hash', 'VARCHAR(64)', None),
+                ('prev_hash', 'VARCHAR(64)', None),
             ],
         }
         
@@ -785,10 +808,9 @@ def init_database(app):
     # Generate self-signed HTTPS certificate if none exists
     try:
         from pathlib import Path
-        import os
-        data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
-        https_cert_path = Path(data_dir) / 'https_cert.pem'
-        https_key_path = Path(data_dir) / 'https_key.pem'
+        from config.settings import DATA_DIR
+        https_cert_path = DATA_DIR / 'https_cert.pem'
+        https_key_path = DATA_DIR / 'https_key.pem'
         
         if not https_cert_path.exists() or not https_key_path.exists():
             app.logger.info("No HTTPS certificate found, generating self-signed certificate...")
@@ -851,7 +873,6 @@ def init_database(app):
             ))
             
             # Set permissions
-            import os
             os.chmod(https_key_path, 0o600)
             os.chmod(https_cert_path, 0o644)
             
@@ -898,11 +919,39 @@ def init_database(app):
         if CustomRole.query.count() == 0:
             app.logger.info("Creating default Pro roles...")
             
-            default_roles = [
+            # System roles (built-in, cannot be deleted)
+            system_roles = [
+                {
+                    "name": "Administrator",
+                    "description": "Full system access with all permissions",
+                    "is_system": True,
+                    "permissions": ["*"]  # Wildcard = all permissions
+                },
+                {
+                    "name": "Operator",
+                    "description": "Day-to-day certificate operations",
+                    "is_system": True,
+                    "permissions": [
+                        "read:dashboard", "read:cas", "read:certificates", "write:certificates",
+                        "read:csrs", "write:csrs", "read:templates", "read:crl", "write:crl",
+                        "read:scep", "read:acme", "read:truststore", "write:truststore"
+                    ]
+                },
+                {
+                    "name": "User",
+                    "description": "Basic read access to certificates",
+                    "is_system": True,
+                    "permissions": [
+                        "read:dashboard", "read:certificates", "read:cas", "read:templates"
+                    ]
+                }
+            ]
+            
+            # Custom roles (can be modified/deleted)
+            custom_roles = [
                 {
                     "name": "Certificate Manager",
                     "description": "Full certificate lifecycle management",
-                    "base_role": "operator",
                     "permissions": [
                         "read:certificates", "write:certificates", "delete:certificates",
                         "read:csrs", "write:csrs", "delete:csrs",
@@ -912,7 +961,6 @@ def init_database(app):
                 {
                     "name": "CA Administrator",
                     "description": "Certificate Authority management",
-                    "base_role": "operator",
                     "permissions": [
                         "read:cas", "write:cas", "delete:cas",
                         "read:certificates", "write:certificates",
@@ -922,7 +970,6 @@ def init_database(app):
                 {
                     "name": "Security Auditor",
                     "description": "Read-only audit and compliance access",
-                    "base_role": "viewer",
                     "permissions": [
                         "read:audit", "read:dashboard", "read:certificates",
                         "read:cas", "read:users", "read:settings"
@@ -930,21 +977,28 @@ def init_database(app):
                 }
             ]
             
-            for role_data in default_roles:
+            # Create system roles first
+            for role_data in system_roles:
                 role = CustomRole(
                     name=role_data["name"],
                     description=role_data["description"],
-                    base_role=role_data.get("base_role")
+                    permissions=role_data["permissions"],
+                    is_system=True
                 )
                 db.session.add(role)
-                db.session.flush()  # Get the ID
-                
-                # Add permissions
-                for perm in role_data["permissions"]:
-                    db.session.add(RolePermission(role_id=role.id, permission=perm))
+            
+            # Create custom roles
+            for role_data in custom_roles:
+                role = CustomRole(
+                    name=role_data["name"],
+                    description=role_data["description"],
+                    permissions=role_data["permissions"],
+                    is_system=False
+                )
+                db.session.add(role)
             
             db.session.commit()
-            app.logger.info(f"✓ Created {len(default_roles)} default Pro roles")
+            app.logger.info(f"✓ Created {len(system_roles)} system roles and {len(custom_roles)} custom roles")
     
     except ImportError:
         pass  # Pro not available
@@ -987,6 +1041,14 @@ def register_blueprints(app):
     app.register_blueprint(scep_protocol_bp)               # SCEP Protocol (/scep)
     app.register_blueprint(health_bp)  # Health check endpoints (no auth)
     
+    # ACME Protocol (RFC 8555) - /acme/*
+    try:
+        from api.acme import acme_bp
+        app.register_blueprint(acme_bp)
+        app.logger.info("✓ ACME protocol enabled (/acme)")
+    except ImportError as e:
+        app.logger.warning(f"⚠️ ACME protocol not available: {e}")
+    
     # EST Protocol (RFC 7030) - /.well-known/est/*
     try:
         from api.est_protocol import bp as est_bp
@@ -1015,7 +1077,6 @@ def main():
     # Check if mTLS is enabled and configure client cert verification
     from models import SystemConfig
     import tempfile
-    import os
     
     ca_cert_path = None
     with app.app_context():

@@ -229,6 +229,11 @@ class AcmeService:
             )
             order.authorizations.append(auth)
         
+        # Check if all authorizations are already valid (reuse case)
+        # If so, set order to "ready" immediately
+        if order.authorizations and all(a.status == "valid" for a in order.authorizations):
+            order.status = "ready"
+        
         db.session.commit()
         
         return order
@@ -673,6 +678,7 @@ class AcmeService:
             caref=ca.refid,
             csr=base64.b64encode(csr_pem.encode()).decode('utf-8'),
             cert_type='server_cert',
+            source='acme',
             created_by='acme'
         )
         db.session.add(cert)

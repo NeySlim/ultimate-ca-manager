@@ -7,20 +7,23 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   Certificate, Download, Trash, X, Plus, Info,
-  CheckCircle, Warning, UploadSimple, Clock, XCircle
+  CheckCircle, Warning, UploadSimple, Clock, XCircle, ArrowClockwise, LinkBreak, Star, ArrowsLeftRight
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Select, Input, Textarea, HelpCard,
-  CertificateDetails, KeyIndicator
+  CertificateDetails, CertificateCompareModal, KeyIndicator
 } from '../components'
+import { SmartImportModal } from '../components/SmartImport'
 import { certificatesService, casService } from '../services'
 import { useNotification, useMobile } from '../contexts'
-import { ERRORS, SUCCESS, LABELS, CONFIRM, BUTTONS } from '../lib/messages'
-import { usePermission } from '../hooks'
-import { formatDate, extractCN } from '../lib/utils'
+import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
+import { usePermission, useRecentHistory, useFavorites } from '../hooks'
+import { formatDate, extractCN, cn } from '../lib/utils'
 
 export default function CertificatesPage() {
   const { isMobile } = useMobile()
+  const { addToHistory } = useRecentHistory('certificates')
+  const { isFavorite, toggleFavorite } = useFavorites('certificates')
   
   // Data
   const [certificates, setCertificates] = useState([])
@@ -31,7 +34,9 @@ export default function CertificatesPage() {
   // Selection
   const [selectedCert, setSelectedCert] = useState(null)
   const [showIssueModal, setShowIssueModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [showKeyModal, setShowKeyModal] = useState(false)
+  const [showCompareModal, setShowCompareModal] = useState(false)
   const [keyPem, setKeyPem] = useState('')
   const [keyPassphrase, setKeyPassphrase] = useState('')
   
@@ -40,27 +45,62 @@ export default function CertificatesPage() {
   const [perPage, setPerPage] = useState(25)
   const [total, setTotal] = useState(0)
   
+  // Sorting (server-side)
+  const [sortBy, setSortBy] = useState('subject')
+  const [sortOrder, setSortOrder] = useState('asc')
+  
   // Filters
   const [filterStatus, setFilterStatus] = useState('')
   const [filterCA, setFilterCA] = useState('')
   
+  // Apply filter preset callback
+  const handleApplyFilterPreset = useCallback((filters) => {
+    setPage(1) // Reset to first page when applying preset
+    if (filters.status) setFilterStatus(filters.status)
+    else setFilterStatus('')
+    if (filters.ca) setFilterCA(filters.ca)
+    else setFilterCA('')
+  }, [])
+  
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
 
-  // Load data
+  // Load data - reload when filters or sort change
   useEffect(() => {
     loadData()
-  }, [page, perPage])
+  }, [page, perPage, filterStatus, filterCA, sortBy, sortOrder])
 
   const loadData = async () => {
     try {
       setLoading(true)
+      
+      // Build query params with filters and sort
+      const params = { 
+        page, 
+        per_page: perPage,
+        sort_by: sortBy,
+        sort_order: sortOrder
+      }
+      if (filterStatus && filterStatus !== 'orphan') {
+        params.status = filterStatus
+      }
+      if (filterCA) {
+        params.ca_id = filterCA
+      }
+      
       const [certsRes, casRes, statsRes] = await Promise.all([
-        certificatesService.getAll({ page, per_page: perPage }),
+        certificatesService.getAll(params),
         casService.getAll(),
         certificatesService.getStats()
       ])
-      const certs = certsRes.data || []
+      let certs = certsRes.data || []
+      
+      // Handle orphan filter client-side (no CA or CA not in our list)
+      if (filterStatus === 'orphan' && cas.length > 0) {
+        const caIds = new Set(cas.map(ca => ca.id))
+        certs = certs.filter(c => c.ca_id && !caIds.has(c.ca_id) && !caIds.has(Number(c.ca_id)))
+      }
+      
       setCertificates(certs)
       setTotal(certsRes.meta?.total || certsRes.pagination?.total || certs.length)
       setCas(casRes.data || [])
@@ -80,21 +120,38 @@ export default function CertificatesPage() {
     }
     try {
       const res = await certificatesService.getById(cert.id)
-      setSelectedCert(res.data || cert)
+      const fullCert = res.data || cert
+      setSelectedCert(fullCert)
+      // Add to recent history
+      addToHistory({
+        id: fullCert.id,
+        name: fullCert.common_name || extractCN(fullCert.subject) || `Certificate ${fullCert.id}`,
+        subtitle: fullCert.issuer ? extractCN(fullCert.issuer) : ''
+      })
     } catch {
       setSelectedCert(cert)
     }
-  }, [])
+  }, [addToHistory])
 
   // Export certificate
   const handleExport = async (format) => {
     if (!selectedCert) return
+    
+    // PKCS12/PFX need password - show password modal
+    if ((format === 'pkcs12' || format === 'pfx') && selectedCert.has_private_key) {
+      setP12Cert(selectedCert)
+      setP12Format(format)
+      setShowP12Modal(true)
+      return
+    }
+    
     try {
       const blob = await certificatesService.export(selectedCert.id, format)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${selectedCert.common_name || 'certificate'}.${format}`
+      const ext = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12', pfx: 'pfx' }[format] || format
+      a.download = `${selectedCert.common_name || 'certificate'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
       showSuccess(SUCCESS.EXPORT.CERTIFICATE)
@@ -118,6 +175,27 @@ export default function CertificatesPage() {
       setSelectedCert(null)
     } catch {
       showError(ERRORS.REVOKE_FAILED.CERTIFICATE)
+    }
+  }
+
+  // Renew certificate
+  const handleRenew = async (id) => {
+    const confirmed = await showConfirm(
+      'This will create a new certificate with the same subject and extended validity. The current certificate will remain valid until revoked.',
+      {
+        title: 'Renew Certificate',
+        confirmText: 'Renew',
+        variant: 'primary'
+      }
+    )
+    if (!confirmed) return
+    try {
+      await certificatesService.renew(id)
+      showSuccess('Certificate renewed successfully')
+      loadData()
+      setSelectedCert(null)
+    } catch (error) {
+      showError(error.message || 'Failed to renew certificate')
     }
   }
 
@@ -163,12 +241,15 @@ export default function CertificatesPage() {
     }
   }
 
-  // Normalize and filter data
+  // Normalize and filter data - detect orphans (cert without existing CA)
   const filteredCerts = useMemo(() => {
+    const caIds = new Set(cas.map(ca => ca.id))
+    
     let result = certificates.map(cert => ({
       ...cert,
       status: cert.revoked ? 'revoked' : cert.status,
-      cn: extractCN(cert.subject) || cert.common_name || 'Certificate'
+      cn: cert.cn || cert.common_name || extractCN(cert.subject) || cert.descr || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate',
+      isOrphan: cert.ca_id && !caIds.has(cert.ca_id) && !caIds.has(Number(cert.ca_id))
     }))
     
     if (filterStatus) {
@@ -180,18 +261,83 @@ export default function CertificatesPage() {
     }
     
     return result
-  }, [certificates, filterStatus, filterCA])
+  }, [certificates, cas, filterStatus, filterCA])
+
+  // Count orphans for stats
+  const orphanCount = useMemo(() => {
+    const caIds = new Set(cas.map(ca => ca.id))
+    return certificates.filter(c => c.ca_id && !caIds.has(c.ca_id) && !caIds.has(Number(c.ca_id))).length
+  }, [certificates, cas])
 
   // Stats - from backend API for accurate counts
-  const stats = useMemo(() => [
-    { icon: CheckCircle, label: 'Valid', value: certStats.valid, variant: 'success' },
-    { icon: Warning, label: 'Expiring', shortLabel: 'Exp.', value: certStats.expiring, variant: 'warning' },
-    { icon: Clock, label: 'Expired', value: certStats.expired, variant: 'neutral' },
-    { icon: X, label: 'Revoked', shortLabel: 'Rev.', value: certStats.revoked, variant: 'danger' },
-    { icon: Certificate, label: 'Total', value: certStats.total, variant: 'primary' }
-  ], [certStats])
+  // Each stat is clickable to filter the table
+  const stats = useMemo(() => {
+    const baseStats = [
+      { icon: CheckCircle, label: 'Valid', value: certStats.valid, variant: 'success', filterValue: 'valid' },
+      { icon: Warning, label: 'Expiring', shortLabel: 'Exp.', value: certStats.expiring, variant: 'warning', filterValue: 'expiring' },
+      { icon: Clock, label: 'Expired', value: certStats.expired, variant: 'neutral', filterValue: 'expired' },
+      { icon: X, label: 'Revoked', shortLabel: 'Rev.', value: certStats.revoked, variant: 'danger', filterValue: 'revoked' }
+    ]
+    // Add orphan stat if there are any
+    if (orphanCount > 0) {
+      baseStats.push({ icon: LinkBreak, label: 'Orphan', value: orphanCount, variant: 'warning', filterValue: 'orphan' })
+    }
+    baseStats.push({ icon: Certificate, label: 'Total', value: certStats.total, variant: 'primary', filterValue: '' })
+    return baseStats
+  }, [certStats, orphanCount])
+  
+  // Handle stat click to filter
+  const handleStatClick = useCallback((filterValue) => {
+    setPage(1) // Reset to first page when filtering
+    if (filterValue === filterStatus) {
+      setFilterStatus('') // Toggle off if same
+    } else {
+      setFilterStatus(filterValue)
+    }
+  }, [filterStatus])
+  
+  // Handle sort change (server-side)
+  const handleSortChange = useCallback((newSort) => {
+    setPage(1) // Reset to first page when sorting
+    if (newSort) {
+      // Map frontend column keys to backend field names
+      const keyMap = {
+        'cn': 'subject',
+        'common_name': 'subject',
+        'status': 'status', // Backend handles with CASE (groups by type)
+        'issuer': 'issuer',
+        'expires': 'valid_to',
+        'valid_to': 'valid_to',
+        'key_type': 'key_algo',
+        'created_at': 'created_at'
+      }
+      const backendKey = keyMap[newSort.key]
+      if (backendKey) {
+        setSortBy(backendKey)
+        setSortOrder(newSort.direction)
+      }
+    } else {
+      setSortBy('subject')
+      setSortOrder('asc')
+    }
+  }, [])
 
   // Table columns
+  // Status badge helper for mobile
+  const getStatusBadge = (row) => {
+    const isRevoked = row.revoked
+    const status = isRevoked ? 'revoked' : row.status || 'unknown'
+    const config = {
+      valid: { variant: 'success', icon: CheckCircle, label: 'Valid', pulse: true },
+      expiring: { variant: 'warning', icon: Clock, label: 'Expiring', pulse: true },
+      expired: { variant: 'danger', icon: XCircle, label: 'Expired', pulse: false },
+      revoked: { variant: 'danger', icon: X, label: 'Revoked', pulse: false },
+      unknown: { variant: 'secondary', icon: Info, label: 'Unknown', pulse: false }
+    }
+    const { variant, icon, label, pulse } = config[status] || config.unknown
+    return <Badge variant={variant} size="sm" icon={icon} dot pulse={pulse}>{label}</Badge>
+  }
+
   const columns = useMemo(() => [
     {
       key: 'cn',
@@ -200,11 +346,35 @@ export default function CertificatesPage() {
       sortable: true,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <Certificate size={16} className="text-accent-primary shrink-0" />
+          <div className={cn(
+            "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+            row.has_private_key ? "icon-bg-emerald" : "icon-bg-blue"
+          )}>
+            <Certificate size={14} weight="duotone" />
+          </div>
           <span className="font-medium truncate">{val}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
-          {row.source === 'acme' && <Badge variant="info" size="sm">ACME</Badge>}
-          {row.source === 'scep' && <Badge variant="warning" size="sm">SCEP</Badge>}
+          {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak} title="CA not found">Orphan</Badge>}
+          {row.source === 'acme' && <Badge variant="cyan" size="sm" dot>ACME</Badge>}
+          {row.source === 'scep' && <Badge variant="orange" size="sm" dot>SCEP</Badge>}
+        </div>
+      ),
+      // Mobile: Icon + CN left + status badge right
+      mobileRender: (val, row) => (
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className={cn(
+              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+              row.has_private_key ? "icon-bg-emerald" : "icon-bg-blue"
+            )}>
+              <Certificate size={14} weight="duotone" />
+            </div>
+            <span className="font-medium truncate">{val || row.cn || row.common_name || 'Certificate'}</span>
+            <KeyIndicator hasKey={row.has_private_key} size={12} />
+          </div>
+          <div className="shrink-0">
+            {getStatusBadge(row)}
+          </div>
         </div>
       )
     },
@@ -212,20 +382,21 @@ export default function CertificatesPage() {
       key: 'status',
       header: 'Status',
       priority: 2,
-      sortable: true,
+      sortable: true, // Groups by status type, then alphabetically
+      hideOnMobile: true, // Status shown in CN mobileRender
       render: (val, row) => {
         const isRevoked = row.revoked
         const status = isRevoked ? 'revoked' : val || 'unknown'
         const config = {
-          valid: { variant: 'success', icon: CheckCircle, label: 'Valid' },
-          expiring: { variant: 'warning', icon: Clock, label: 'Expiring' },
-          expired: { variant: 'danger', icon: XCircle, label: 'Expired' },
-          revoked: { variant: 'danger', icon: X, label: 'Revoked' },
-          unknown: { variant: 'secondary', icon: Info, label: 'Unknown' }
+          valid: { variant: 'success', icon: CheckCircle, label: 'Valid', pulse: true },
+          expiring: { variant: 'warning', icon: Clock, label: 'Expiring', pulse: true },
+          expired: { variant: 'danger', icon: XCircle, label: 'Expired', pulse: false },
+          revoked: { variant: 'danger', icon: X, label: 'Revoked', pulse: false },
+          unknown: { variant: 'secondary', icon: Info, label: 'Unknown', pulse: false }
         }
-        const { variant, icon, label } = config[status] || config.unknown
+        const { variant, icon, label, pulse } = config[status] || config.unknown
         return (
-          <Badge variant={variant} size="sm" icon={icon}>
+          <Badge variant={variant} size="sm" icon={icon} dot pulse={pulse}>
             {label}
           </Badge>
         )
@@ -235,31 +406,51 @@ export default function CertificatesPage() {
       key: 'issuer',
       header: 'Issuer',
       priority: 3,
-      hideOnMobile: true,
+      sortable: true,
       render: (val, row) => (
         <span className="text-text-secondary truncate">
           {extractCN(val) || row.issuer_name || '—'}
         </span>
+      ),
+      // Mobile: labeled CA info
+      mobileRender: (val, row) => (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-text-tertiary">CA:</span>
+          <span className="text-text-secondary truncate">{extractCN(val) || row.issuer_name || '—'}</span>
+        </div>
       )
     },
     {
       key: 'valid_to',
       header: 'Expires',
-      hideOnMobile: true,
+      priority: 4, // Show on mobile as tertiary
       sortable: true,
       render: (val) => (
         <span className="text-xs text-text-secondary whitespace-nowrap">
           {formatDate(val)}
         </span>
+      ),
+      // Mobile: labeled expiration with badges
+      mobileRender: (val, row) => (
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-text-tertiary">Exp:</span>
+            <span className="text-text-secondary">{formatDate(val)}</span>
+          </div>
+          {row.isOrphan && <Badge variant="warning" size="xs" icon={LinkBreak}>Orphan</Badge>}
+          {row.source === 'acme' && <Badge variant="cyan" size="xs" dot>ACME</Badge>}
+          {row.source === 'scep' && <Badge variant="orange" size="xs" dot>SCEP</Badge>}
+        </div>
       )
     },
     {
       key: 'key_type',
       header: 'Key',
       hideOnMobile: true,
+      sortable: true,
       render: (val, row) => (
         <span className="text-xs font-mono text-text-secondary">
-          {row.key_algorithm || val || 'RSA'}
+          {row.key_algorithm || row.key_algo || val || 'RSA'}
         </span>
       )
     }
@@ -269,6 +460,10 @@ export default function CertificatesPage() {
   const rowActions = useCallback((row) => [
     { label: 'View Details', icon: Info, onClick: () => handleSelectCert(row) },
     { label: 'Export PEM', icon: Download, onClick: () => handleExportRow(row, 'pem') },
+    { label: 'Export PKCS#12', icon: Download, onClick: () => handleExportRow(row, 'p12') },
+    ...(canWrite('certificates') && !row.revoked && row.has_private_key ? [
+      { label: 'Renew', icon: ArrowClockwise, onClick: () => handleRenew(row.id) }
+    ] : []),
     ...(canWrite('certificates') && !row.revoked ? [
       { label: 'Revoke', icon: X, variant: 'danger', onClick: () => handleRevoke(row.id) }
     ] : []),
@@ -277,8 +472,26 @@ export default function CertificatesPage() {
     ] : [])
   ], [canWrite, canDelete])
 
+  // State for P12 password modal
+  const [showP12Modal, setShowP12Modal] = useState(false)
+  const [p12Password, setP12Password] = useState('')
+  const [p12Cert, setP12Cert] = useState(null)
+  const [p12Format, setP12Format] = useState('pkcs12')
+
   // Export from row
   const handleExportRow = async (cert, format) => {
+    // For P12, we need a password - show modal
+    if (format === 'p12' || format === 'pkcs12') {
+      if (!cert.has_private_key) {
+        showError('Certificate has no private key for PKCS#12 export')
+        return
+      }
+      setP12Cert(cert)
+      setP12Password('')
+      setShowP12Modal(true)
+      return
+    }
+    
     try {
       const blob = await certificatesService.export(cert.id, format)
       const url = URL.createObjectURL(blob)
@@ -290,6 +503,31 @@ export default function CertificatesPage() {
       showSuccess(SUCCESS.EXPORT.CERTIFICATE)
     } catch {
       showError(ERRORS.EXPORT_FAILED.CERTIFICATE)
+    }
+  }
+
+  // Export P12/PFX with password
+  const handleExportP12 = async () => {
+    if (!p12Password || p12Password.length < 4) {
+      showError('Password must be at least 4 characters')
+      return
+    }
+    try {
+      const blob = await certificatesService.export(p12Cert.id, p12Format, { password: p12Password })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const ext = p12Format === 'pfx' ? 'pfx' : 'p12'
+      a.download = `${p12Cert.common_name || p12Cert.cn || 'certificate'}.${ext}`
+      a.click()
+      URL.revokeObjectURL(url)
+      showSuccess(`Certificate exported as ${p12Format.toUpperCase()}`)
+      setShowP12Modal(false)
+      setP12Password('')
+      setP12Cert(null)
+      setP12Format('pkcs12')
+    } catch (error) {
+      showError(error.message || 'Failed to export certificate')
     }
   }
 
@@ -327,22 +565,46 @@ export default function CertificatesPage() {
 
   // Help content
   const helpContent = (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Quick Stats */}
+      <div className="visual-section">
+        <div className="visual-section-header">
+          <Certificate size={16} className="status-primary-text" />
+          Certificate Statistics
+        </div>
+        <div className="visual-section-body">
+          <div className="quick-info-grid">
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-success">{stats.find(s => s.label === 'Valid')?.value || 0}</div>
+              <div className="help-stat-label">Valid</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-warning">{stats.find(s => s.label === 'Expiring')?.value || 0}</div>
+              <div className="help-stat-label">Expiring</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-danger">{stats.find(s => s.label === 'Expired')?.value || 0}</div>
+              <div className="help-stat-label">Expired</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <HelpCard title="About Certificates" variant="info">
         Digital certificates authenticate identities and enable encrypted communications using PKI.
       </HelpCard>
       <HelpCard title="Status Legend" variant="info">
-        <div className="space-y-1 mt-2">
+        <div className="space-y-1.5 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="success" size="sm">Valid</Badge>
+            <Badge variant="success" size="sm" dot>Valid</Badge>
             <span className="text-xs">Active and trusted</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm">Expiring</Badge>
+            <Badge variant="warning" size="sm" dot>Expiring</Badge>
             <span className="text-xs">Expires within 30 days</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="danger" size="sm">Revoked</Badge>
+            <Badge variant="danger" size="sm" dot>Revoked</Badge>
             <span className="text-xs">No longer valid</span>
           </div>
         </div>
@@ -359,6 +621,7 @@ export default function CertificatesPage() {
       certificate={selectedCert}
       onExport={handleExport}
       onRevoke={() => handleRevoke(selectedCert.id)}
+      onRenew={selectedCert.has_private_key && !selectedCert.revoked ? () => handleRenew(selectedCert.id) : null}
       onDelete={() => handleDelete(selectedCert.id)}
       onUploadKey={() => setShowKeyModal(true)}
       canWrite={canWrite('certificates')}
@@ -373,8 +636,9 @@ export default function CertificatesPage() {
         subtitle={`${total} certificate${total !== 1 ? 's' : ''}`}
         icon={Certificate}
         stats={stats}
-        helpContent={helpContent}
-        helpTitle="Certificates Help"
+        onStatClick={handleStatClick}
+        activeStatFilter={filterStatus}
+        helpPageKey="certificates"
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -388,6 +652,24 @@ export default function CertificatesPage() {
         slideOverTitle={selectedCert?.cn || selectedCert?.common_name || 'Certificate Details'}
         slideOverContent={slideOverContent}
         slideOverWidth="wide"
+        slideOverActions={selectedCert && (
+          <button
+            onClick={() => toggleFavorite({
+              id: selectedCert.id,
+              name: selectedCert.common_name || extractCN(selectedCert.subject),
+              subtitle: selectedCert.issuer ? extractCN(selectedCert.issuer) : ''
+            })}
+            className={cn(
+              'p-1.5 rounded-md transition-colors',
+              isFavorite(selectedCert.id)
+                ? 'text-status-warning hover:text-status-warning bg-status-warning/10'
+                : 'text-text-tertiary hover:text-status-warning hover:bg-status-warning/10'
+            )}
+            title={isFavorite(selectedCert.id) ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Star size={16} weight={isFavorite(selectedCert.id) ? 'fill' : 'regular'} />
+          </button>
+        )}
         onSlideOverClose={() => setSelectedCert(null)}
       >
         <ResponsiveDataTable
@@ -400,6 +682,11 @@ export default function CertificatesPage() {
           searchable
           searchPlaceholder="Search certificates..."
           searchKeys={['cn', 'common_name', 'subject', 'issuer', 'serial']}
+          columnStorageKey="ucm-certs-columns"
+          filterPresetsKey="ucm-certs-presets"
+          onApplyFilterPreset={handleApplyFilterPreset}
+          exportEnabled
+          exportFilename="certificates"
           toolbarFilters={[
             {
               key: 'status',
@@ -424,20 +711,42 @@ export default function CertificatesPage() {
               }))
             }
           ]}
-          toolbarActions={canWrite('certificates') && (
-            isMobile ? (
-              <Button size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
-                <Plus size={22} weight="bold" />
-              </Button>
-            ) : (
-              <Button size="sm" onClick={() => setShowIssueModal(true)}>
-                <Plus size={14} weight="bold" />
-                Issue
-              </Button>
-            )
-          )}
+          toolbarActions={
+            <div className="flex items-center gap-2">
+              {!isMobile && (
+                <Button size="sm" variant="secondary" onClick={() => setShowCompareModal(true)}>
+                  <ArrowsLeftRight size={14} />
+                  Compare
+                </Button>
+              )}
+              {canWrite('certificates') && (
+                isMobile ? (
+                  <>
+                    <Button size="lg" variant="secondary" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
+                      <UploadSimple size={22} weight="bold" />
+                    </Button>
+                    <Button size="lg" onClick={() => setShowIssueModal(true)} className="w-11 h-11 p-0">
+                      <Plus size={22} weight="bold" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
+                      <UploadSimple size={14} />
+                      Import
+                    </Button>
+                    <Button size="sm" onClick={() => setShowIssueModal(true)}>
+                      <Plus size={14} weight="bold" />
+                      Issue
+                    </Button>
+                  </>
+                )
+              )}
+            </div>
+          }
           sortable
           defaultSort={{ key: 'cn', direction: 'asc' }}
+          onSortChange={handleSortChange}
           pagination={{
             page,
             total,
@@ -516,6 +825,63 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
           </div>
         </div>
       </Modal>
+
+      {/* PKCS#12 Export Modal */}
+      <Modal
+        open={showP12Modal}
+        onClose={() => { setShowP12Modal(false); setP12Password(''); setP12Cert(null) }}
+        title="Export PKCS#12"
+      >
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-text-secondary">
+            Enter a password to protect the PKCS#12 file. This password will be required when importing the certificate.
+          </p>
+          <Input
+            label="Password"
+            type="password"
+            value={p12Password}
+            onChange={(e) => setP12Password(e.target.value)}
+            placeholder="Minimum 4 characters"
+            autoFocus
+          />
+          <Input
+            label="Confirm Password"
+            type="password"
+            placeholder="Re-enter password"
+            onBlur={(e) => {
+              if (e.target.value && e.target.value !== p12Password) {
+                showError('Passwords do not match')
+              }
+            }}
+          />
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
+            <Button variant="secondary" onClick={() => { setShowP12Modal(false); setP12Password(''); setP12Cert(null) }}>
+              Cancel
+            </Button>
+            <Button onClick={handleExportP12} disabled={!p12Password || p12Password.length < 4}>
+              <Download size={16} /> Export PKCS#12
+            </Button>
+          </div>
+        </div>
+      </Modal>
+      
+      {/* Certificate Compare Modal */}
+      <CertificateCompareModal
+        open={showCompareModal}
+        onClose={() => setShowCompareModal(false)}
+        certificates={certificates}
+        initialCert={selectedCert}
+      />
+
+      {/* Smart Import Modal */}
+      <SmartImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={() => {
+          setShowImportModal(false)
+          loadData()
+        }}
+      />
     </>
   )
 }

@@ -8,7 +8,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
-  User, Users, Plus, Trash, PencilSimple, Key, 
+  User, Users, UsersThree, Plus, Trash, PencilSimple, Key, 
   CheckCircle, XCircle, Crown, Clock, ShieldCheck, UserCircle
 } from '@phosphor-icons/react'
 import {
@@ -280,40 +280,113 @@ export default function UsersGroupsPage() {
       header: 'User',
       priority: 1,
       sortable: true,
-      render: (val, row) => (
-        <div className="flex items-center gap-3">
-          <div className={cn(
-            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
-            row.active ? "bg-accent-primary/10 text-accent-primary" : "bg-text-muted/10 text-text-muted"
-          )}>
-            {val?.charAt(0)?.toUpperCase() || '?'}
+      render: (val, row) => {
+        // Color avatar based on role AND status - theme-aware
+        const avatarColors = {
+          admin: 'icon-bg-violet',
+          operator: 'icon-bg-blue',
+          viewer: 'icon-bg-teal'
+        }
+        // Override with orange for disabled users
+        const colorClass = row.active 
+          ? (avatarColors[row.role] || avatarColors.viewer)
+          : 'icon-bg-orange'
+        return (
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ring-1 ring-white/10",
+              colorClass
+            )}>
+              {val?.charAt(0)?.toUpperCase() || '?'}
+            </div>
+            <div className="min-w-0">
+              <div className="font-medium text-text-primary truncate">{val || '—'}</div>
+              <div className="text-xs text-text-secondary truncate">{row.email || '—'}</div>
+            </div>
           </div>
-          <div className="min-w-0">
-            <div className="font-medium text-text-primary truncate">{val || '—'}</div>
-            <div className="text-xs text-text-secondary truncate">{row.email || '—'}</div>
+        )
+      },
+      // Mobile: Avatar + Username left, Status badge right
+      mobileRender: (val, row) => {
+        const avatarColors = {
+          admin: 'icon-bg-violet',
+          operator: 'icon-bg-blue',
+          viewer: 'icon-bg-teal'
+        }
+        const colorClass = row.active 
+          ? (avatarColors[row.role] || avatarColors.viewer)
+          : 'icon-bg-orange'
+        return (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className={cn(
+                "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
+                colorClass
+              )}>
+                {val?.charAt(0)?.toUpperCase() || '?'}
+              </div>
+              <span className="font-medium truncate">{val || '—'}</span>
+            </div>
+            <Badge variant={row.active ? 'success' : 'orange'} size="sm" dot>
+              {row.active ? 'Active' : 'Disabled'}
+            </Badge>
           </div>
-        </div>
-      )
+        )
+      }
     },
     {
       key: 'role',
       header: 'Role',
       priority: 2,
       sortable: true,
-      render: (val, row) => (
-        <Badge variant={val === 'admin' ? 'primary' : val === 'operator' ? 'secondary' : 'outline'} size="sm">
-          {val === 'admin' && <Crown weight="fill" className="h-3 w-3 mr-1" />}
-          {val || 'viewer'}
-        </Badge>
-      )
+      render: (val, row) => {
+        // Colorful role badges for ALL roles
+        const roleConfig = {
+          admin: { variant: 'violet', dot: true },
+          operator: { variant: 'primary', dot: false },
+          viewer: { variant: 'teal', dot: false }
+        }
+        const config = roleConfig[val] || roleConfig.viewer
+        return (
+          <Badge variant={config.variant} size="sm" dot={config.dot}>
+            {val === 'admin' && <Crown weight="fill" className="h-3 w-3 mr-1" />}
+            {val || 'viewer'}
+          </Badge>
+        )
+      },
+      // Mobile: show email + role badge (status already shown in username row)
+      mobileRender: (val, row) => {
+        const roleConfig = {
+          admin: { variant: 'violet', dot: true },
+          operator: { variant: 'primary', dot: false },
+          viewer: { variant: 'teal', dot: false }
+        }
+        const config = roleConfig[val] || roleConfig.viewer
+        return (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-text-secondary truncate">{row.email || '—'}</span>
+            <Badge variant={config.variant} size="xs" dot={config.dot}>
+              {val === 'admin' && <Crown weight="fill" className="h-2.5 w-2.5 mr-0.5" />}
+              {val || 'viewer'}
+            </Badge>
+          </div>
+        )
+      }
     },
     {
       key: 'active',
       header: 'Status',
       priority: 3,
+      hideOnMobile: true,
       sortable: true,
       render: (val) => (
-        <Badge variant={val ? 'success' : 'secondary'} size="sm" icon={val ? CheckCircle : XCircle}>
+        <Badge 
+          variant={val ? 'success' : 'orange'} 
+          size="sm" 
+          icon={val ? CheckCircle : XCircle} 
+          dot 
+          pulse={val}
+        >
           {val ? 'Active' : 'Disabled'}
         </Badge>
       )
@@ -337,12 +410,20 @@ export default function UsersGroupsPage() {
       header: 'Group',
       priority: 1,
       sortable: true,
-      render: (val) => (
-        <div className="flex items-center gap-2">
-          <Users size={16} className="text-accent-primary shrink-0" />
-          <span className="font-medium">{val}</span>
-        </div>
-      )
+      render: (val, row) => {
+        const memberCount = row.members?.length || row.member_count || 0
+        return (
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+              memberCount > 0 ? "icon-bg-blue" : "icon-bg-teal"
+            )}>
+              <UsersThree size={14} weight="duotone" />
+            </div>
+            <span className="font-medium">{val}</span>
+          </div>
+        )
+      }
     },
     {
       key: 'description',
@@ -361,7 +442,7 @@ export default function UsersGroupsPage() {
       render: (val, row) => {
         const count = row.members?.length || val || 0
         return (
-          <Badge variant="outline" size="sm">
+          <Badge variant={count > 0 ? 'primary' : 'secondary'} size="sm" dot>
             {count} {count === 1 ? 'member' : 'members'}
           </Badge>
         )
@@ -390,22 +471,63 @@ export default function UsersGroupsPage() {
   // ============= HELP CONTENT =============
   
   const helpContent = (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Quick Stats */}
+      <div className="visual-section">
+        <div className="visual-section-header">
+          <Users size={16} className="status-primary-text" />
+          {activeTab === 'users' ? 'User Statistics' : 'Group Statistics'}
+        </div>
+        <div className="visual-section-body">
+          {activeTab === 'users' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="help-stat-card">
+                <div className="help-stat-value help-stat-value-success">{users.filter(u => u.active).length}</div>
+                <div className="help-stat-label">Active</div>
+              </div>
+              <div className="help-stat-card">
+                <div className="help-stat-value">{users.filter(u => !u.active).length}</div>
+                <div className="help-stat-label">Disabled</div>
+              </div>
+              <div className="help-stat-card">
+                <div className="help-stat-value help-stat-value-primary">{users.filter(u => u.role === 'admin').length}</div>
+                <div className="help-stat-label">Admins</div>
+              </div>
+              <div className="help-stat-card">
+                <div className="help-stat-value">{users.length}</div>
+                <div className="help-stat-label">Total</div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="help-stat-card">
+                <div className="help-stat-value help-stat-value-primary">{groups.length}</div>
+                <div className="help-stat-label">Groups</div>
+              </div>
+              <div className="help-stat-card">
+                <div className="help-stat-value">{users.length}</div>
+                <div className="help-stat-label">Users</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <HelpCard title="User Management" variant="info">
         Create and manage user accounts. Assign roles to control access levels.
       </HelpCard>
       <HelpCard title="Roles" variant="tip">
-        <div className="space-y-1 mt-2">
+        <div className="space-y-1.5 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="primary" size="sm">{LABELS.ROLES.ADMIN}</Badge>
+            <Badge variant="primary" size="sm" dot>{LABELS.ROLES.ADMIN}</Badge>
             <span className="text-xs">Full access</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" size="sm">{LABELS.ROLES.OPERATOR}</Badge>
+            <Badge variant="warning" size="sm" dot>{LABELS.ROLES.OPERATOR}</Badge>
             <span className="text-xs">Manage certificates</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" size="sm">{LABELS.ROLES.VIEWER}</Badge>
+            <Badge variant="secondary" size="sm" dot>{LABELS.ROLES.VIEWER}</Badge>
             <span className="text-xs">Read-only access</span>
           </div>
         </div>
@@ -446,13 +568,13 @@ export default function UsersGroupsPage() {
           </>
         )}
         {canDelete('users') && (
-          <Button size="sm" variant="danger" onClick={() => handleDeleteUser(selectedUser)}>
+          <Button size="sm" variant="danger-soft" onClick={() => handleDeleteUser(selectedUser)}>
             <Trash size={14} /> Delete
           </Button>
         )}
       </div>
 
-      <CompactSection title="User Information" icon={UserCircle}>
+      <CompactSection title="User Information" icon={UserCircle} iconClass="icon-bg-blue">
         <CompactGrid columns={1}>
           <CompactField label="Full Name" value={selectedUser.full_name || '—'} />
           <CompactField label="Email" value={selectedUser.email} />
@@ -460,7 +582,7 @@ export default function UsersGroupsPage() {
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title="Activity" icon={Clock}>
+      <CompactSection title="Activity" icon={Clock} iconClass="icon-bg-green">
         <CompactGrid columns={1}>
           <CompactField label="Created" value={formatDate(selectedUser.created_at)} />
           <CompactField label="Last Login" value={selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never'} />
@@ -468,7 +590,7 @@ export default function UsersGroupsPage() {
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title="Security" icon={ShieldCheck}>
+      <CompactSection title="Security" icon={ShieldCheck} iconClass="icon-bg-purple">
         <CompactGrid columns={1}>
           <CompactField label="MFA Enabled" value={selectedUser.mfa_enabled ? 'Yes' : 'No'} />
           <CompactField label="TOTP Configured" value={selectedUser.totp_confirmed ? 'Yes' : 'No'} />
@@ -494,13 +616,13 @@ export default function UsersGroupsPage() {
           </Button>
         )}
         {canDelete('users') && (
-          <Button size="sm" variant="danger" onClick={() => handleDeleteGroup(selectedGroup)}>
+          <Button size="sm" variant="danger-soft" onClick={() => handleDeleteGroup(selectedGroup)}>
             <Trash size={14} /> Delete
           </Button>
         )}
       </div>
 
-      <CompactSection title="Group Information">
+      <CompactSection title="Group Information" icon={Users} iconClass="icon-bg-orange">
         <CompactGrid columns={1}>
           <CompactField label="Name" value={selectedGroup.name} />
           <CompactField label="Description" value={selectedGroup.description || '—'} />

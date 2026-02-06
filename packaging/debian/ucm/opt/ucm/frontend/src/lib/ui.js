@@ -267,3 +267,55 @@ export function formatNumber(num) {
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`
   return String(num)
 }
+
+// =============================================================================
+// UI DENSITY SYSTEM
+// =============================================================================
+
+/**
+ * Density presets for consistent spacing across the app
+ * Use these in layouts, tables, cards, and forms
+ */
+export const DENSITY = {
+  compact: {
+    gap: 'gap-2',        // 8px
+    padding: 'p-3',      // 12px
+    space: 'space-y-2',  // 8px vertical
+    iconSize: 'table',   // 28px container, 14px icon
+  },
+  default: {
+    gap: 'gap-3',        // 12px
+    padding: 'p-4',      // 16px
+    space: 'space-y-3',  // 12px vertical
+    iconSize: 'sm',      // 32px container, 16px icon
+  },
+  comfortable: {
+    gap: 'gap-4',        // 16px
+    padding: 'p-6',      // 24px
+    space: 'space-y-4',  // 16px vertical
+    iconSize: 'md',      // 40px container, 20px icon
+  }
+}
+
+/**
+ * Icon size scale - matches IconBadge sizes
+ * Use for consistent icon sizing across all components
+ */
+export const ICON_SCALE = {
+  table: { container: 'w-7 h-7', size: 14, rounded: 'rounded-lg' },   // 28px - dense tables
+  xs: { container: 'w-6 h-6', size: 12, rounded: 'rounded-md' },      // 24px
+  sm: { container: 'w-8 h-8', size: 16, rounded: 'rounded-lg' },      // 32px
+  md: { container: 'w-10 h-10', size: 20, rounded: 'rounded-xl' },    // 40px - cards/mobile
+  lg: { container: 'w-12 h-12', size: 24, rounded: 'rounded-xl' },    // 48px
+  xl: { container: 'w-14 h-14', size: 28, rounded: 'rounded-2xl' },   // 56px - hero/empty states
+}
+
+/**
+ * Get density-appropriate icon scale
+ * @param {string} density - 'compact' | 'default' | 'comfortable'
+ * @returns {object} - Icon scale object with container, size, rounded
+ */
+export function getIconScale(density = 'default') {
+  const iconSize = DENSITY[density]?.iconSize || 'sm'
+  return ICON_SCALE[iconSize]
+}

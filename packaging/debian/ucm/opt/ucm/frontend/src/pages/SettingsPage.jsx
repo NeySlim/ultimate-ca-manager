@@ -8,36 +8,39 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
-  Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop
+  Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop, Info,
+  Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise
 } from '@phosphor-icons/react'
 import {
-  Button, Input, Select, Badge, Card,
-  LoadingSpinner, FileUpload, Modal, HelpCard, HelpModal,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
-  UnifiedPageHeader
+  ResponsiveLayout,
+  Button, Input, Select, Badge,
+  LoadingSpinner, FileUpload, Modal, HelpCard,
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate, cn } from '../lib/utils'
-import { ERRORS, SUCCESS, LABELS } from '../lib/messages'
+import { formatDate } from '../lib/utils'
+import { ERRORS, SUCCESS } from '../lib/messages'
 import { useTheme } from '../contexts/ThemeContext'
 
 // Base settings categories (Community)
+// Settings categories with colors for visual distinction
 const BASE_SETTINGS_CATEGORIES = [
-  { id: 'general', label: 'General', icon: Gear },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
-  { id: 'email', label: 'Email', icon: EnvelopeSimple },
-  { id: 'security', label: 'Security', icon: ShieldCheck },
-  { id: 'backup', label: 'Backup', icon: Database },
-  { id: 'audit', label: 'Audit', icon: ListBullets },
-  { id: 'database', label: 'Database', icon: HardDrives },
-  { id: 'https', label: 'HTTPS', icon: Lock },
+  { id: 'general', label: 'General', icon: Gear, color: 'icon-bg-blue' },
+  { id: 'appearance', label: 'Appearance', icon: Palette, color: 'icon-bg-violet' },
+  { id: 'email', label: 'Email', icon: EnvelopeSimple, color: 'icon-bg-teal' },
+  { id: 'security', label: 'Security', icon: ShieldCheck, color: 'icon-bg-amber' },
+  { id: 'backup', label: 'Backup', icon: Database, color: 'icon-bg-emerald' },
+  { id: 'audit', label: 'Audit', icon: ListBullets, color: 'icon-bg-orange' },
+  { id: 'database', label: 'Database', icon: HardDrives, color: 'icon-bg-blue' },
+  { id: 'https', label: 'HTTPS', icon: Lock, color: 'icon-bg-emerald' },
 ]
 
 // Appearance Settings Component
 function AppearanceSettings() {
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
+  const { forceDesktop, setForceDesktop, screenWidth, breakpoints } = useMobile()
   
   const modeOptions = [
     { id: 'system', label: 'Follow System', icon: Desktop, description: 'Automatically switch based on your OS settings' },
@@ -47,7 +50,7 @@ function AppearanceSettings() {
   
   return (
     <DetailContent>
-      <DetailHeader
+      <DetailHeader compact
         icon={Palette}
         title="Appearance"
         subtitle="Customize the look and feel of UCM"
@@ -131,6 +134,56 @@ function AppearanceSettings() {
         </div>
       </DetailSection>
       
+      <DetailSection title="Layout Mode">
+        <p className="text-sm text-text-secondary mb-4">
+          Control responsive layout behavior for smaller windows
+        </p>
+        <button
+          onClick={() => setForceDesktop(!forceDesktop)}
+          className={`
+            w-full p-4 rounded-lg border-2 transition-all text-left flex items-center gap-4
+            ${forceDesktop 
+              ? 'border-accent-primary bg-accent-primary/10' 
+              : 'border-border hover:border-text-tertiary bg-bg-tertiary/50'
+            }
+          `}
+        >
+          <div className={`
+            w-10 h-10 rounded-lg flex items-center justify-center
+            ${forceDesktop ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}
+          `}>
+            <Desktop size={20} weight={forceDesktop ? 'fill' : 'regular'} />
+          </div>
+          <div className="flex-1">
+            <div className="font-medium text-text-primary">Force Desktop Layout</div>
+            <div className="text-xs text-text-tertiary">
+              {forceDesktop 
+                ? 'Desktop layout always enabled' 
+                : `Mobile layout activates below ${breakpoints.lg}px (current: ${screenWidth}px)`
+              }
+            </div>
+          </div>
+          <div className={`
+            w-12 h-6 rounded-full transition-colors relative
+            ${forceDesktop ? 'bg-accent-primary' : 'bg-bg-secondary border border-border'}
+          `}>
+            <div className={`
+              absolute top-1 w-4 h-4 rounded-full transition-transform
+              ${forceDesktop 
+                ? 'bg-white translate-x-6' 
+                : 'bg-text-tertiary translate-x-1'
+              }
+            `} />
+          </div>
+        </button>
+        {forceDesktop && (
+          <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1">
+            <Info size={12} />
+            This setting is saved in your browser and persists across sessions.
+          </p>
+        )}
+      </DetailSection>
+      
       <DetailSection title="Preview">
         <div className="p-4 rounded-lg bg-bg-tertiary border border-border">
           <p className="text-sm text-text-secondary mb-2">Current settings:</p>
@@ -140,6 +193,12 @@ function AppearanceSettings() {
             <span className="text-text-secondary">
               {mode === 'system' ? 'Following system preference' : mode === 'dark' ? 'Dark mode' : 'Light mode'}
             </span>
+            {forceDesktop && (
+              <>
+                {' · '}
+                <span className="text-accent-primary">Desktop forced</span>
+              </>
+            )}
           </p>
         </div>
       </DetailSection>
@@ -501,7 +560,7 @@ export default function SettingsPage() {
       case 'general':
         return (
           <DetailContent>
-            <DetailHeader
+            <DetailHeader compact
               icon={Gear}
               title="General Settings"
               subtitle="System name, URL, timezone configuration"
@@ -509,7 +568,7 @@ export default function SettingsPage() {
                 { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('general'), disabled: saving }
               ] : []}
             />
-            <DetailSection title="System Configuration">
+            <DetailSection title="System Configuration" icon={Gear} iconClass="icon-bg-blue">
               <div className="space-y-4">
                 <Input
                   label="System Name"
@@ -526,7 +585,7 @@ export default function SettingsPage() {
                 />
               </div>
             </DetailSection>
-            <DetailSection title="Session & Timezone">
+            <DetailSection title="Session & Timezone" icon={Clock} iconClass="icon-bg-teal">
               <div className="space-y-4">
                 <Input
                   label="Session Timeout (minutes)"
@@ -558,7 +617,7 @@ export default function SettingsPage() {
       case 'email':
         return (
           <DetailContent>
-            <DetailHeader
+            <DetailHeader compact
               icon={EnvelopeSimple}
               title="Email Settings"
               subtitle="SMTP server configuration for notifications"
@@ -567,7 +626,7 @@ export default function SettingsPage() {
                 { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('email'), disabled: saving }
               ] : []}
             />
-            <DetailSection title="SMTP Server">
+            <DetailSection title="SMTP Server" icon={Envelope} iconClass="icon-bg-violet">
               <DetailGrid>
                 <div className="col-span-full md:col-span-1">
                   <Input
@@ -587,7 +646,7 @@ export default function SettingsPage() {
                 </div>
               </DetailGrid>
             </DetailSection>
-            <DetailSection title="Authentication">
+            <DetailSection title="Authentication" icon={Key} iconClass="icon-bg-amber">
               <div className="space-y-4">
                 <Input
                   label="SMTP Username"
@@ -603,7 +662,7 @@ export default function SettingsPage() {
                 />
               </div>
             </DetailSection>
-            <DetailSection title="Email Options">
+            <DetailSection title="Email Options" icon={EnvelopeSimple} iconClass="icon-bg-blue">
               <div className="space-y-4">
                 <Input
                   label="From Email"
@@ -629,7 +688,7 @@ export default function SettingsPage() {
       case 'security':
         return (
           <DetailContent>
-            <DetailHeader
+            <DetailHeader compact
               icon={ShieldCheck}
               title="Security Settings"
               subtitle="Password, 2FA, sessions configuration"
@@ -637,7 +696,7 @@ export default function SettingsPage() {
                 { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('security'), disabled: saving }
               ] : []}
             />
-            <DetailSection title="Two-Factor Authentication">
+            <DetailSection title="Two-Factor Authentication" icon={ShieldCheck} iconClass="icon-bg-emerald">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -651,7 +710,7 @@ export default function SettingsPage() {
                 </div>
               </label>
             </DetailSection>
-            <DetailSection title="Password Policy">
+            <DetailSection title="Password Policy" icon={Lock} iconClass="icon-bg-violet">
               <div className="space-y-4">
                 <Input
                   label="Minimum Password Length"
@@ -692,7 +751,7 @@ export default function SettingsPage() {
                 </div>
               </div>
             </DetailSection>
-            <DetailSection title="Session & Rate Limits">
+            <DetailSection title="Session & Rate Limits" icon={Timer} iconClass="icon-bg-teal">
               <DetailGrid>
                 <div className="col-span-full md:col-span-1">
                   <Input
@@ -722,7 +781,7 @@ export default function SettingsPage() {
       case 'backup':
         return (
           <DetailContent>
-            <DetailHeader
+            <DetailHeader compact
               icon={Database}
               title="Backup & Restore"
               subtitle="Data backup and recovery options"
@@ -730,7 +789,7 @@ export default function SettingsPage() {
                 { label: 'Create Backup', icon: Database, onClick: () => setShowBackupModal(true) }
               ] : []}
             />
-            <DetailSection title="Automatic Backups">
+            <DetailSection title="Automatic Backups" icon={Database} iconClass="icon-bg-emerald">
               <div className="space-y-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -785,7 +844,7 @@ export default function SettingsPage() {
               </div>
             </DetailSection>
 
-            <DetailSection title="Available Backups">
+            <DetailSection title="Available Backups" icon={Download} iconClass="icon-bg-blue">
               {backups.length === 0 ? (
                 <div className="p-6 text-center">
                   <p className="text-sm text-text-secondary">No backups found</p>
@@ -816,7 +875,7 @@ export default function SettingsPage() {
               )}
             </DetailSection>
 
-            <DetailSection title="Restore from Backup">
+            <DetailSection title="Restore from Backup" icon={UploadSimple} iconClass="icon-bg-orange">
               <div>
                 <p className="text-xs text-text-secondary mb-4">Upload a .ucmbkp file to restore all data</p>
                 <FileUpload
@@ -832,7 +891,7 @@ export default function SettingsPage() {
       case 'audit':
         return (
           <DetailContent>
-            <DetailHeader
+            <DetailHeader compact
               icon={ListBullets}
               title="Audit Log Settings"
               subtitle="Logging configuration and retention"
@@ -840,7 +899,7 @@ export default function SettingsPage() {
                 { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('audit'), disabled: saving }
               ] : []}
             />
-            <DetailSection title="Audit Logging">
+            <DetailSection title="Audit Logging" icon={ListBullets} iconClass="icon-bg-orange">
               <div className="space-y-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -866,7 +925,7 @@ export default function SettingsPage() {
                 />
               </div>
             </DetailSection>
-            <DetailSection title="Events to Log">
+            <DetailSection title="Events to Log" icon={Eye} iconClass="icon-bg-blue">
               <div className="space-y-2">
                 {[
                   'User Login/Logout',
@@ -893,12 +952,12 @@ export default function SettingsPage() {
       case 'database':
         return (
           <DetailContent>
-            <DetailHeader
+            <DetailHeader compact
               icon={HardDrives}
               title="Database Management"
               subtitle="Database statistics and maintenance"
             />
-            <DetailSection title="Database Statistics">
+            <DetailSection title="Database Statistics" icon={HardDrives} iconClass="icon-bg-blue">
               <DetailGrid>
                 <DetailField
                   label="Total Certificates"
@@ -919,7 +978,7 @@ export default function SettingsPage() {
               </DetailGrid>
             </DetailSection>
 
-            <DetailSection title="Maintenance">
+            <DetailSection title="Maintenance" icon={Gear} iconClass="icon-bg-teal">
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-3">
                   <Button size="sm" variant="secondary" onClick={handleOptimizeDb}>
@@ -938,9 +997,9 @@ export default function SettingsPage() {
               </div>
             </DetailSection>
 
-            <DetailSection title="Danger Zone" className="mt-4">
+            <DetailSection title="Danger Zone" icon={WarningCircle} iconClass="icon-bg-orange" className="mt-4">
               <div className="p-4 status-danger-bg status-danger-border border rounded-lg">
-                <h4 className="text-sm font-semibold text-red-400 mb-2">⚠️ Database Reset</h4>
+                <h4 className="text-sm font-semibold text-status-danger mb-2">⚠️ Database Reset</h4>
                 <p className="text-xs text-text-secondary mb-3">
                   Reset database to initial state. This will DELETE ALL certificates, CAs, users, and settings.
                 </p>
@@ -956,7 +1015,7 @@ export default function SettingsPage() {
       case 'https':
         return (
           <DetailContent>
-            <DetailHeader
+            <DetailHeader compact
               icon={Lock}
               title="HTTPS Certificate Management"
               subtitle="SSL/TLS certificate for secure connections"
@@ -966,7 +1025,7 @@ export default function SettingsPage() {
                 </Badge>
               )}
             />
-            <DetailSection title="Current Certificate">
+            <DetailSection title="Current Certificate" icon={Certificate} iconClass="icon-bg-blue">
               <DetailGrid>
                 <DetailField
                   label="Common Name"
@@ -994,7 +1053,7 @@ export default function SettingsPage() {
               </DetailGrid>
             </DetailSection>
 
-            <DetailSection title="Use UCM Certificate">
+            <DetailSection title="Use UCM Certificate" icon={Certificate} iconClass="icon-bg-violet">
               <div className="space-y-4">
                 <p className="text-xs text-text-secondary">
                   Apply an existing certificate from UCM as the HTTPS certificate. Only valid certificates with private keys are shown.
@@ -1026,7 +1085,7 @@ export default function SettingsPage() {
               </div>
             </DetailSection>
 
-            <DetailSection title="Regenerate Certificate">
+            <DetailSection title="Regenerate Certificate" icon={ArrowsClockwise} iconClass="icon-bg-emerald">
               <div className="space-y-3">
                 <p className="text-xs text-text-secondary">
                   Generate a new self-signed HTTPS certificate. The server will restart automatically.
@@ -1038,7 +1097,7 @@ export default function SettingsPage() {
               </div>
             </DetailSection>
 
-            <DetailSection title="Apply Custom Certificate">
+            <DetailSection title="Apply Custom Certificate" icon={Lock} iconClass="icon-bg-amber">
               <div className="space-y-3">
                 <p className="text-xs text-text-secondary">
                   Upload your own certificate and private key (PEM format).
@@ -1101,9 +1160,6 @@ export default function SettingsPage() {
     </div>
   )
 
-  const [helpOpen, setHelpOpen] = useState(false)
-  const { isMobile } = useMobile()
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -1117,41 +1173,25 @@ export default function SettingsPage() {
     id: cat.id,
     label: cat.label,
     icon: cat.icon,
+    color: cat.color,
     badge: cat.pro ? { label: 'Pro', variant: 'info' } : undefined
   }))
 
   return (
     <>
-      <div className="flex flex-col h-full w-full">
-        {/* Header with tabs - using UnifiedPageHeader */}
-        <UnifiedPageHeader
-          icon={Gear}
-          title="Settings"
-          subtitle="System configuration"
-          tabs={tabs}
-          activeTab={selectedCategory}
-          onTabChange={handleCategoryChange}
-          showHelp={true}
-          onHelpClick={() => setHelpOpen(true)}
-          isMobile={isMobile}
-        />
-        
-        {/* Content area */}
-        <div className="flex-1 overflow-auto">
-          <div className="max-w-4xl mx-auto p-4 md:p-6">
-            {renderCategoryContent()}
-          </div>
-        </div>
-      </div>
-      
-      {/* Help Modal */}
-      <HelpModal
-        open={helpOpen}
-        onClose={() => setHelpOpen(false)}
-        title="Settings Help"
+      <ResponsiveLayout
+        title="Settings"
+        subtitle="System configuration"
+        icon={Gear}
+        tabs={tabs}
+        activeTab={selectedCategory}
+        onTabChange={handleCategoryChange}
+        helpPageKey="settings"
       >
-        {helpContent}
-      </HelpModal>
+        <div className="max-w-4xl mx-auto p-4 md:p-6">
+          {renderCategoryContent()}
+        </div>
+      </ResponsiveLayout>
 
       {/* Backup Password Modal */}
       <Modal

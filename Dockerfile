@@ -1,9 +1,9 @@
 # Multi-stage Dockerfile for Ultimate CA Manager
-# Version: 2.0.0
+# Version: 2.0.0-beta1
 # Optimized for production with security and minimal size
 
 # Stage 1: Builder - Install dependencies and build environment
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.13-slim-bookworm AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,11 +25,11 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Stage 2: Runtime - Minimal production image
-FROM python:3.11-slim-bookworm
+FROM python:3.13-slim-bookworm
 
 LABEL maintainer="NeySlim <https://github.com/NeySlim>" \
       description="Ultimate CA Manager - Certificate Authority Management System" \
-      version="2.0.0" \
+      version="2.0.0-beta1" \
       org.opencontainers.image.source="https://github.com/NeySlim/ultimate-ca-manager"
 
 # Install only runtime dependencies
@@ -75,7 +75,7 @@ EXPOSE 8443
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f -k https://127.0.0.1:8443/api/health || exit 1
+    CMD curl -f -k https://127.0.0.1:8443/health || exit 1
 
 # Copy Gunicorn configuration and entrypoint before switching user
 COPY --chown=ucm:ucm gunicorn.conf.py /app/gunicorn.conf.py

@@ -8,10 +8,43 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
-# Import sub-models
+# Import sub-models to ensure they are registered with SQLAlchemy
 from models.certificate_template import CertificateTemplate
 from models.truststore import TrustedCertificate
 from models.group import Group, GroupMember
+from models.email_notification import SMTPConfig, NotificationConfig, NotificationLog
+from models.acme_models import AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, AcmeNonce
+from models.api_key import APIKey
+from models.auth_certificate import AuthCertificate
+from models.crl import CRLMetadata
+from models.ocsp import OCSPResponse
+from models.webauthn import WebAuthnCredential, WebAuthnChallenge
+
+
+class UserSession(db.Model):
+    """Track active user sessions for session management"""
+    __tablename__ = "user_sessions"
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    session_id = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    ip_address = db.Column(db.String(45))  # IPv6-compatible
+    user_agent = db.Column(db.String(500))
+    auth_method = db.Column(db.String(50), default='password')  # password, webauthn, mtls
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_activity = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ip_address': self.ip_address,
+            'user_agent': self.user_agent,
+            'auth_method': self.auth_method,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_activity': self.last_activity.isoformat() if self.last_activity else None,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None
+        }
 
 
 class User(db.Model):
@@ -37,6 +70,7 @@ class User(db.Model):
     last_login = db.Column(db.DateTime)
     login_count = db.Column(db.Integer, default=0)  # Total successful logins
     failed_logins = db.Column(db.Integer, default=0)  # Failed login attempts
+    locked_until = db.Column(db.DateTime, nullable=True)  # Account lockout timestamp
     
     def set_password(self, password: str):
         """Hash and set password"""
@@ -105,6 +139,7 @@ class CA(db.Model):
     # Certificate details (parsed from crt)
     subject = db.Column(db.Text)
     issuer = db.Column(db.Text)
+    serial_number = db.Column(db.String(100))  # Certificate serial number for duplicate detection
     valid_from = db.Column(db.DateTime)
     valid_to = db.Column(db.DateTime)
     
@@ -336,10 +371,12 @@ class Certificate(db.Model):
     # Certificate details
     cert_type = db.Column(db.String(50))  # client_cert, server_cert, combined_cert, ca_cert
     subject = db.Column(db.Text)
+    subject_cn = db.Column(db.String(255))  # Extracted CN for sorting
     issuer = db.Column(db.Text)
     serial_number = db.Column(db.String(100))
     valid_from = db.Column(db.DateTime)
     valid_to = db.Column(db.DateTime)
+    key_algo = db.Column(db.String(50))  # RSA 2048, EC P-256, etc. (for sorting)
     
     # Subject Alternative Names (SAN)
     san_dns = db.Column(db.Text)  # JSON array of DNS names
@@ -461,13 +498,23 @@ class Certificate(db.Model):
     
     @property
     def common_name(self) -> str:
-        """Extract Common Name from subject"""
-        if not self.subject:
-            return ""
-        # Subject format: "CN=example.com,O=Company,..."
-        for part in self.subject.split(','):
-            if part.strip().startswith('CN='):
-                return part.strip()[3:]
+        """Extract Common Name from subject, or fallback to first SAN DNS"""
+        if self.subject:
+            # Subject format: "CN=example.com,O=Company,..."
+            for part in self.subject.split(','):
+                if part.strip().startswith('CN='):
+                    return part.strip()[3:]
+        # Fallback: use first SAN DNS if available
+        if self.san_dns:
+            try:
+                dns_list = json.loads(self.san_dns) if self.san_dns.startswith('[') else [self.san_dns]
+                if dns_list:
+                    return dns_list[0]
+            except (json.JSONDecodeError, TypeError):
+                pass
+        # Last fallback: use descr
+        if self.descr:
+            return self.descr
         return ""
     
     @property
@@ -728,6 +775,7 @@ class Certificate(db.Model):
             "status": status,
             # Key and signature info
             "key_type": self.key_type,
+            "key_algo": self.key_algo,  # Stored value for sorting
             "key_algorithm": self.key_algorithm,
             "key_size": self.key_size,
             "signature_algorithm": self.signature_algorithm,
@@ -842,6 +890,15 @@ class AuditLog(db.Model):
     ip_address = db.Column(db.String(45))
     user_agent = db.Column(db.String(255))
     success = db.Column(db.Boolean, default=True)
+    # Tamper-evident hash chain: SHA-256(prev_hash + this_entry)
+    prev_hash = db.Column(db.String(64))  # Hash of previous log entry
+    entry_hash = db.Column(db.String(64))  # Hash of this entry (includes prev_hash)
+    
+    def compute_hash(self, prev_hash: str = None) -> str:
+        """Compute SHA-256 hash of this entry for tamper detection"""
+        import hashlib
+        data = f"{self.id}|{self.timestamp}|{self.username}|{self.action}|{self.resource_type}|{self.resource_id}|{self.details}|{self.success}|{prev_hash or ''}"
+        return hashlib.sha256(data.encode()).hexdigest()
     
     def to_dict(self):
         """Convert to dictionary"""
@@ -857,6 +914,8 @@ class AuditLog(db.Model):
             "ip_address": self.ip_address,
             "user_agent": self.user_agent,
             "success": self.success,
+            "entry_hash": self.entry_hash,
+            "prev_hash": self.prev_hash,
         }
 
 

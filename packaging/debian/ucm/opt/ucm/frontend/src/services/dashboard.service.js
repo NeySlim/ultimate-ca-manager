@@ -22,6 +22,10 @@ export const dashboardService = {
     return apiClient.get(`/dashboard/activity?limit=${limit}&offset=${offset}`)
   },
 
+  async getCertificateTrend(days = 7) {
+    return apiClient.get(`/dashboard/certificate-trend?days=${days}`)
+  },
+
   async getSystemStatus() {
     return apiClient.get('/dashboard/system-status')
   }

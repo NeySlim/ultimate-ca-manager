@@ -2,7 +2,7 @@
  * HSM Page - UCM Pro
  * Hardware Security Module management
  * 
- * Uses UnifiedManagementLayout for consistent UX with UsersPage
+ * Migrated to ResponsiveLayout for consistent UX
  */
 import { useState, useEffect, useMemo } from 'react'
 import { 
@@ -10,10 +10,11 @@ import {
   Cloud, HardDrive, ArrowsClockwise, Lock, Warning
 } from '@phosphor-icons/react'
 import { 
-  UnifiedManagementLayout, Button, Badge, FormModal, Input, Select, HelpCard,
+  Badge, Button, FormModal, Input, Select, HelpCard,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../../components'
-import { useNotification } from '../../contexts/NotificationContext'
+import { ResponsiveLayout, ResponsiveDataTable } from '../../components/ui/responsive'
+import { useNotification, useMobile } from '../../contexts'
 import { apiClient } from '../../services/apiClient'
 import { ERRORS, SUCCESS, CONFIRM } from '../../lib/messages'
 
@@ -40,7 +41,10 @@ export default function HSMPage() {
   const [modalMode, setModalMode] = useState('create')
   const [showKeyModal, setShowKeyModal] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [filterType, setFilterType] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const { showSuccess, showError } = useNotification()
+  const { isMobile } = useMobile()
 
   useEffect(() => {
     loadData()
@@ -86,7 +90,6 @@ export default function HSMPage() {
 
   const handleDelete = async (provider) => {
     if (!confirm(CONFIRM.HSM.DELETE_PROVIDER.replace('{name}', provider.name))) return
-    
     try {
       await apiClient.delete(`/hsm/providers/${provider.id}`)
       showSuccess(SUCCESS.DELETE.PROVIDER)
@@ -143,7 +146,6 @@ export default function HSMPage() {
 
   const handleDeleteKey = async (key) => {
     if (!confirm(CONFIRM.HSM.DELETE_KEY.replace('{name}', key.key_label))) return
-    
     try {
       await apiClient.delete(`/hsm/keys/${key.id}`)
       showSuccess(SUCCESS.DELETE.KEY)
@@ -153,17 +155,41 @@ export default function HSMPage() {
     }
   }
 
-  // Table columns
+  // Table columns with icon-bg classes
   const columns = [
     {
       key: 'name',
       header: 'Provider Name',
+      priority: 1,
+      sortable: true,
       render: (val, row) => {
         const Icon = PROVIDER_ICONS[row.provider_type] || Lock
         return (
           <div className="flex items-center gap-2">
-            <Icon size={16} className={row.enabled ? 'status-purple-text' : 'text-text-tertiary'} />
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+              row.enabled ? 'icon-bg-violet' : 'icon-bg-gray'
+            }`}>
+              <Icon size={14} weight="duotone" />
+            </div>
             <span className="font-medium truncate">{val}</span>
+          </div>
+        )
+      },
+      mobileRender: (val, row) => {
+        const Icon = PROVIDER_ICONS[row.provider_type] || Lock
+        return (
+          <div className="flex items-center justify-between gap-2 w-full">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                row.enabled ? 'icon-bg-violet' : 'icon-bg-gray'
+              }`}>
+                <Icon size={14} weight="duotone" />
+              </div>
+              <span className="font-medium truncate">{val}</span>
+            </div>
+            <Badge variant={row.enabled ? 'success' : 'secondary'} size="sm" dot pulse={row.enabled}>
+              {row.enabled ? 'Enabled' : 'Disabled'}
+            </Badge>
           </div>
         )
       }
@@ -171,16 +197,37 @@ export default function HSMPage() {
     {
       key: 'provider_type',
       header: 'Type',
+      priority: 2,
+      sortable: true,
+      hideOnMobile: true,
       render: (val) => {
         const type = PROVIDER_TYPES.find(t => t.value === val)
-        return <span className="text-xs text-text-secondary">{type?.label.split(' ')[0] || val}</span>
+        const isCloud = val !== 'pkcs11'
+        return (
+          <Badge variant={isCloud ? 'cyan' : 'secondary'} size="sm" icon={isCloud ? Cloud : HardDrive}>
+            {type?.label.split(' ')[0] || val}
+          </Badge>
+        )
+      },
+      mobileRender: (val) => {
+        const type = PROVIDER_TYPES.find(t => t.value === val)
+        const isCloud = val !== 'pkcs11'
+        return (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-text-tertiary">Type:</span>
+            <span className="text-text-secondary">{type?.label.split(' ')[0] || val}</span>
+          </div>
+        )
       }
     },
     {
       key: 'enabled',
       header: 'Status',
+      priority: 1,
+      sortable: true,
+      hideOnMobile: true,
       render: (val) => (
-        <Badge variant={val ? 'success' : 'secondary'} size="sm">
+        <Badge variant={val ? 'success' : 'secondary'} size="sm" dot pulse={val}>
           {val ? 'Enabled' : 'Disabled'}
         </Badge>
       )
@@ -188,39 +235,58 @@ export default function HSMPage() {
     {
       key: 'key_count',
       header: 'Keys',
-      render: (val) => val || 0
+      priority: 2,
+      hideOnMobile: true,
+      render: (val) => (
+        <Badge variant={val > 0 ? 'purple' : 'secondary'} size="sm" icon={Key}>
+          {val || 0}
+        </Badge>
+      )
     }
   ]
 
-  // Row actions
   const rowActions = (row) => [
     { label: 'Test', icon: TestTube, onClick: () => handleTest(row) },
     { label: 'Edit', icon: PencilSimple, onClick: () => handleEdit(row) },
     { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }
   ]
 
-  // Stats
   const stats = useMemo(() => {
     const enabledCount = providers.filter(p => p.enabled).length
+    const disabledCount = providers.filter(p => !p.enabled).length
     const totalKeys = providers.reduce((acc, p) => acc + (p.key_count || 0), 0)
+    const cloudCount = providers.filter(p => p.provider_type !== 'pkcs11').length
     return [
-      { label: 'Providers', value: providers.length, icon: Lock },
+      { label: 'Providers', value: providers.length, icon: Lock, variant: 'primary' },
       { label: 'Enabled', value: enabledCount, icon: CheckCircle, variant: 'success' },
-      { label: 'Keys', value: totalKeys, icon: Key, variant: 'primary' },
+      { label: 'Disabled', value: disabledCount, icon: XCircle, variant: 'neutral' },
+      { label: 'Keys', value: totalKeys, icon: Key, variant: 'purple' },
+      { label: 'Cloud', value: cloudCount, icon: Cloud, variant: 'cyan' },
     ]
   }, [providers])
 
-  // Render details panel
+  // Help content
+  const helpContent = (
+    <div className="space-y-4">
+      <HelpCard title="Security" variant="warning">
+        HSM keys are in tamper-resistant hardware. Destroying a key is irreversible.
+      </HelpCard>
+      <HelpCard title="Best Practice" variant="info">
+        Use HSM for all CA signing keys. Test connections regularly.
+      </HelpCard>
+    </div>
+  )
+
+  // Details panel content
   const renderDetails = (provider) => {
     const Icon = PROVIDER_ICONS[provider.provider_type] || Lock
     const typeLabel = PROVIDER_TYPES.find(t => t.value === provider.provider_type)?.label || provider.provider_type
 
     return (
       <div className="p-3 space-y-3">
-        {/* Header */}
         <CompactHeader
           icon={Icon}
-          iconClass={provider.enabled ? 'status-purple-bg' : 'bg-bg-tertiary'}
+          iconClass={provider.enabled ? 'icon-bg-violet' : 'bg-bg-tertiary'}
           title={provider.name}
           subtitle={typeLabel}
           badge={
@@ -230,21 +296,13 @@ export default function HSMPage() {
           }
         />
 
-        {/* Stats */}
         <CompactStats stats={[
           { icon: Key, value: `${provider.key_count || 0} keys` },
           { icon: CheckCircle, value: provider.last_connected_at ? 'Connected' : 'Never' },
         ]} />
 
-        {/* Actions */}
         <div className="flex gap-2">
-          <Button 
-            size="sm" 
-            variant="secondary"
-            className="flex-1"
-            onClick={() => handleTest(provider)}
-            disabled={testing}
-          >
+          <Button size="sm" variant="secondary" className="flex-1" onClick={() => handleTest(provider)} disabled={testing}>
             {testing ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
             {testing ? 'Testing...' : 'Test'}
           </Button>
@@ -256,18 +314,16 @@ export default function HSMPage() {
           </Button>
         </div>
 
-        {/* Connection Error */}
         {provider.last_error && (
           <div className="p-3 rounded-lg bg-status-danger/10 border border-status-danger/30">
             <div className="flex items-center gap-2 text-status-danger text-xs">
               <Warning size={14} />
               <span className="font-medium">Connection Error</span>
             </div>
-            <p className="text-[10px] text-text-secondary mt-1">{provider.last_error}</p>
+            <p className="text-2xs text-text-secondary mt-1">{provider.last_error}</p>
           </div>
         )}
 
-        {/* Configuration */}
         <CompactSection title="Configuration">
           {provider.provider_type === 'pkcs11' && (
             <>
@@ -277,13 +333,12 @@ export default function HSMPage() {
               </CompactGrid>
               <div className="mt-2 text-xs">
                 <span className="text-text-tertiary block mb-0.5">Library Path:</span>
-                <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
+                <p className="font-mono text-2xs text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
                   {provider.pkcs11_library_path || '-'}
                 </p>
               </div>
             </>
           )}
-          
           {provider.provider_type === 'aws-cloudhsm' && (
             <CompactGrid>
               <CompactField label="Cluster" value={provider.aws_cluster_id} mono />
@@ -291,12 +346,11 @@ export default function HSMPage() {
               <CompactField label="User" value={provider.aws_crypto_user} />
             </CompactGrid>
           )}
-          
           {provider.provider_type === 'azure-keyvault' && (
             <>
               <div className="text-xs mb-2">
                 <span className="text-text-tertiary block mb-0.5">Vault URL:</span>
-                <p className="font-mono text-[10px] text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
+                <p className="font-mono text-2xs text-text-secondary break-all bg-bg-tertiary/50 p-1.5 rounded">
                   {provider.azure_vault_url || '-'}
                 </p>
               </div>
@@ -306,7 +360,6 @@ export default function HSMPage() {
               </CompactGrid>
             </>
           )}
-          
           {provider.provider_type === 'google-kms' && (
             <CompactGrid>
               <CompactField label="Project" value={provider.gcp_project_id} />
@@ -316,25 +369,19 @@ export default function HSMPage() {
           )}
         </CompactSection>
 
-        {/* Keys */}
         <CompactSection title="HSM Keys">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs text-text-tertiary">{keys.length} keys in this HSM</span>
             <Button size="sm" variant="secondary" onClick={() => setShowKeyModal(true)}>
-              <Plus size={12} />
-              Generate
+              <Plus size={12} /> Generate
             </Button>
           </div>
-          
           {keys.length === 0 ? (
             <p className="text-xs text-text-tertiary text-center py-4">No keys in this HSM</p>
           ) : (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {keys.map(key => (
-                <div 
-                  key={key.id} 
-                  className="flex items-center justify-between p-2 bg-bg-tertiary/50 rounded text-xs"
-                >
+                <div key={key.id} className="flex items-center justify-between p-2 bg-bg-tertiary/50 rounded text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <Key size={14} className="text-text-tertiary flex-shrink-0" />
                     <div className="min-w-0">
@@ -359,49 +406,16 @@ export default function HSMPage() {
     )
   }
 
-  // Help content
-  const helpContent = (
-    <div className="space-y-4">
-      <HelpCard title="Security" variant="warning">
-        HSM keys are in tamper-resistant hardware. Destroying a key is irreversible.
-      </HelpCard>
-      <HelpCard title="Best Practice" variant="info">
-        Use HSM for all CA signing keys. Test connections regularly.
-      </HelpCard>
-    </div>
-  )
-
-  // Table filters
-  const tableFilters = [
-    {
-      key: 'enabled',
-      label: 'Status',
-      options: [
-        { value: true, label: 'Enabled' },
-        { value: false, label: 'Disabled' }
-      ]
-    },
-    {
-      key: 'provider_type',
-      label: 'Type',
-      options: PROVIDER_TYPES.map(t => ({ value: t.value, label: t.label.split(' ')[0] }))
-    }
-  ]
-
   return (
     <>
-      <UnifiedManagementLayout
+      <ResponsiveLayout
         title="HSM Management"
-        stats={stats}
-        data={providers}
-        columns={columns}
-        loading={loading}
-        selectedItem={selectedProvider}
-        onSelectItem={setSelectedProvider}
-        renderDetails={renderDetails}
-        detailsTitle="Provider Details"
-        icon={Key}
         subtitle={`${providers.length} provider${providers.length !== 1 ? 's' : ''}`}
+        icon={Key}
+        stats={stats}
+        helpContent={helpContent}
+        helpTitle="HSM Management"
+        helpPageKey="hsm"
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -411,29 +425,64 @@ export default function HSMPage() {
             <p className="text-sm text-text-secondary">Select a provider to view details</p>
           </div>
         }
-        searchable
-        searchPlaceholder="Search providers..."
-        searchKeys={['name', 'provider_type']}
-        sortable
-        defaultSort={{ key: 'name', direction: 'asc' }}
-        paginated={false}
-        rowActions={rowActions}
-        filters={tableFilters}
-        emptyIcon={Lock}
-        emptyTitle="No HSM providers"
-        emptyDescription="Configure hardware security modules for key storage"
-        emptyAction={
-          <Button onClick={handleCreate}>
-            <Plus size={16} /> New Provider
-          </Button>
-        }
-        helpContent={helpContent}
-        actions={
-          <Button size="sm" onClick={handleCreate}>
-            <Plus size={16} /> New Provider
-          </Button>
-        }
-      />
+        slideOverOpen={!!selectedProvider}
+        slideOverTitle={selectedProvider?.name || 'Provider Details'}
+        slideOverContent={selectedProvider && renderDetails(selectedProvider)}
+        slideOverWidth="lg"
+        onSlideOverClose={() => setSelectedProvider(null)}
+      >
+        <div className="flex flex-col h-full min-h-0">
+          <ResponsiveDataTable
+            data={providers}
+            columns={columns}
+            loading={loading}
+            onRowClick={setSelectedProvider}
+            selectedId={selectedProvider?.id}
+            rowActions={rowActions}
+            searchable
+            searchPlaceholder="Search providers..."
+            searchKeys={['name', 'provider_type']}
+            toolbarFilters={[
+              {
+                key: 'enabled',
+                value: filterStatus,
+                onChange: setFilterStatus,
+                placeholder: 'All Status',
+                options: [
+                  { value: 'true', label: 'Enabled' },
+                  { value: 'false', label: 'Disabled' }
+                ]
+              },
+              {
+                key: 'provider_type',
+                value: filterType,
+                onChange: setFilterType,
+                placeholder: 'All Types',
+                options: PROVIDER_TYPES.map(t => ({ value: t.value, label: t.label.split(' ')[0] }))
+              }
+            ]}
+            toolbarActions={
+              isMobile ? (
+                <Button size="lg" onClick={handleCreate} className="w-11 h-11 p-0">
+                  <Plus size={22} weight="bold" />
+                </Button>
+              ) : (
+                <Button size="sm" onClick={handleCreate}>
+                  <Plus size={16} /> New Provider
+                </Button>
+              )
+            }
+            emptyIcon={Lock}
+            emptyTitle="No HSM providers"
+            emptyDescription="Configure hardware security modules for key storage"
+            emptyAction={
+              <Button onClick={handleCreate}>
+                <Plus size={16} /> New Provider
+              </Button>
+            }
+          />
+        </div>
+      </ResponsiveLayout>
 
       {showModal && (
         <ProviderModal
@@ -480,14 +529,7 @@ function ProviderModal({ provider, onSave, onClose }) {
     gcp_credentials_json: '',
   })
 
-  const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    onSave(formData)
-  }
+  const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }))
 
   return (
     <FormModal
@@ -581,7 +623,6 @@ function KeyModal({ provider, onSave, onClose }) {
       submitLabel="Generate Key"
     >
       <Input label="Key Label" value={formData.key_label} onChange={e => setFormData({...formData, key_label: e.target.value})} required placeholder="my-signing-key" />
-      
       <div className="grid grid-cols-2 gap-4">
         <Select label="Key Type" value={formData.key_type} onChange={value => setFormData({...formData, key_type: value})} options={[{ value: 'rsa', label: 'RSA' }, { value: 'ec', label: 'ECDSA' }, { value: 'aes', label: 'AES' }]} />
         <Select
@@ -597,7 +638,6 @@ function KeyModal({ provider, onSave, onClose }) {
           }
         />
       </div>
-
       <Select label="Purpose" value={formData.purpose} onChange={value => setFormData({...formData, purpose: value})} options={[{ value: 'general', label: 'General Purpose' }, { value: 'ca_signing', label: 'CA Signing' }, { value: 'code_signing', label: 'Code Signing' }, { value: 'encryption', label: 'Encryption' }]} />
     </FormModal>
   )

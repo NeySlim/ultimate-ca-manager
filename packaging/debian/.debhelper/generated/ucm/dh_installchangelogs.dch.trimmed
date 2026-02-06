@@ -1,3 +1,16 @@
+ucm (2.0.0~beta1) stable; urgency=medium
+
+  * First beta release of UCM 2.0
+  * Complete UI redesign with responsive layout
+  * New security features: TOTP MFA, WebAuthn, password policies
+  * Database migration system for v1.8.x upgrades
+  * Groups and user management
+  * ACME, SCEP, OCSP support
+  * Certificate templates
+  * Improved audit logging with hash chain
+
+ -- UCM Team <support@ucm.local>  Thu, 06 Feb 2026 09:00:00 +0100
+
 ucm (2.0.0) stable; urgency=medium
 
   * Version 2.0.0 - Major Release

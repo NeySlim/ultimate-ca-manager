@@ -35,7 +35,7 @@ export function ProBadge({ compact = false }) {
       <div className="flex-1">
         <p className={`text-xs font-semibold ${textClass}`}>{label}</p>
         {expiresAt && (
-          <p className="text-[10px] text-text-tertiary">
+          <p className="text-2xs text-text-tertiary">
             Expires {new Date(expiresAt).toLocaleDateString()}
           </p>
         )}

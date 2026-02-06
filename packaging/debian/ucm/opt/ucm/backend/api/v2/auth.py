@@ -21,6 +21,13 @@ try:
 except ImportError:
     HAS_CSRF = False
 
+# Import anomaly detection
+try:
+    from security.anomaly_detection import get_anomaly_detector
+    HAS_ANOMALY = True
+except ImportError:
+    HAS_ANOMALY = False
+
 bp = Blueprint('auth_v2', __name__)
 
 # Import limiter for rate limiting login attempts
@@ -30,38 +37,40 @@ try:
 except ImportError:
     HAS_LIMITER = False
 
-# Track failed login attempts for account lockout
-_failed_attempts = {}  # {username: {'count': int, 'locked_until': datetime}}
+# Track failed login attempts for account lockout (now persisted in DB)
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_DURATION_MINUTES = 15
 
 
 def _check_account_lockout(username):
-    """Check if account is locked due to failed attempts"""
-    if username not in _failed_attempts:
+    """Check if account is locked due to failed attempts (DB-persisted)"""
+    user = User.query.filter_by(username=username).first()
+    if not user:
         return False
     
-    info = _failed_attempts[username]
-    if info.get('locked_until'):
-        if datetime.utcnow() < info['locked_until']:
+    if user.locked_until:
+        if datetime.utcnow() < user.locked_until:
             return True
         else:
             # Lockout expired, reset
-            del _failed_attempts[username]
+            user.locked_until = None
+            user.failed_logins = 0
+            db.session.commit()
             return False
     return False
 
 
 def _record_failed_attempt(username):
-    """Record a failed login attempt"""
-    if username not in _failed_attempts:
-        _failed_attempts[username] = {'count': 0, 'locked_until': None}
+    """Record a failed login attempt (DB-persisted)"""
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return
     
-    _failed_attempts[username]['count'] += 1
+    user.failed_logins = (user.failed_logins or 0) + 1
     
-    if _failed_attempts[username]['count'] >= MAX_FAILED_ATTEMPTS:
+    if user.failed_logins >= MAX_FAILED_ATTEMPTS:
         from datetime import timedelta
-        _failed_attempts[username]['locked_until'] = datetime.utcnow() + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
+        user.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_DURATION_MINUTES)
         current_app.logger.warning(f"Account locked for {username} after {MAX_FAILED_ATTEMPTS} failed attempts")
         
         # Send security alert notification
@@ -75,12 +84,17 @@ def _record_failed_attempt(username):
             )
         except Exception:
             pass  # Non-blocking
+    
+    db.session.commit()
 
 
 def _clear_failed_attempts(username):
-    """Clear failed attempts on successful login"""
-    if username in _failed_attempts:
-        del _failed_attempts[username]
+    """Clear failed attempts after successful login (DB-persisted)"""
+    user = User.query.filter_by(username=username).first()
+    if user and (user.failed_logins or user.locked_until):
+        user.failed_logins = 0
+        user.locked_until = None
+        db.session.commit()
 
 
 @bp.route('/api/v2/auth/login', methods=['POST'])
@@ -113,20 +127,35 @@ def login():
     if _check_account_lockout(username):
         return error_response('Account temporarily locked. Try again later.', 429)
     
+    # Get client info for anomaly detection
+    client_ip = request.remote_addr or 'unknown'
+    user_agent = request.headers.get('User-Agent', 'unknown')
+    
     # Find user
     user = User.query.filter_by(username=username).first()
     
     if not user or not user.active:
         _record_failed_attempt(username)
+        # Record failed login for anomaly detection
+        if HAS_ANOMALY:
+            get_anomaly_detector().record_login(0, client_ip, user_agent, success=False)
         return error_response('Invalid credentials', 401)
     
     # Verify password (assumes User has check_password method)
     if not user.check_password(password):
         _record_failed_attempt(username)
+        # Record failed login for anomaly detection
+        if HAS_ANOMALY:
+            get_anomaly_detector().record_login(user.id, client_ip, user_agent, success=False)
         return error_response('Invalid credentials', 401)
     
     # Clear failed attempts on success
     _clear_failed_attempts(username)
+    
+    # Record successful login for anomaly detection
+    anomalies = []
+    if HAS_ANOMALY:
+        anomalies = get_anomaly_detector().record_login(user.id, client_ip, user_agent, success=True)
     
     # Check if JWT requested
     accept_header = request.headers.get('Accept', '')
@@ -151,7 +180,8 @@ def login():
                     'id': user.id,
                     'username': user.username
                 },
-                'csrf_token': csrf_token
+                'csrf_token': csrf_token,
+                'security_alerts': [a['message'] for a in anomalies if a.get('severity') in ('medium', 'high')]
             },
             message='Login successful'
         )

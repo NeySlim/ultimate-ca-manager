@@ -1,0 +1,340 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - link:
+                - /url: /
+              - link:
+                - /url: /
+                - img
+                - generic: Dashboard
+              - link:
+                - /url: /certificates
+                - img
+                - generic: Certificates
+              - link:
+                - /url: /cas
+                - img
+                - generic: CAs
+              - link:
+                - /url: /csrs
+                - img
+                - generic: CSRs
+              - link:
+                - /url: /templates
+                - img
+                - generic: Templates
+              - link:
+                - /url: /users
+                - img
+                - generic: Users
+              - link:
+                - /url: /acme
+                - img
+                - generic: ACME
+              - link:
+                - /url: /scep-config
+                - img
+                - generic: SCEP
+              - link:
+                - /url: /crl-ocsp
+                - img
+                - generic: CRL/OCSP
+              - link:
+                - /url: /truststore
+                - img
+                - generic: Trust Store
+              - link:
+                - /url: /import
+                - img
+                - generic: Import
+              - link:
+                - /url: /tools
+                - img
+                - generic: Tools
+              - link:
+                - /url: /audit
+                - img
+                - generic: Audit
+              - link:
+                - /url: /settings
+                - img
+                - generic: Settings
+              - link:
+                - /url: /rbac
+                - img
+                - generic:
+                  - img
+                  - text: RBAC
+              - link:
+                - /url: /hsm
+                - img
+                - generic:
+                  - img
+                  - text: HSM
+              - link:
+                - /url: /security
+                - img
+                - generic:
+                  - img
+                  - text: Security
+              - button:
+                - img
+                - generic: Theme
+              - button:
+                - img
+              - button:
+                - img
+                - generic: admin
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                    - generic:
+                      - heading [level=1]: Certificate Authorities
+                      - paragraph: 6 CAs
+                  - generic:
+                    - button:
+                      - img
+                      - generic: Help
+              - generic:
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "4"
+                    - generic: Root
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "2"
+                    - generic: Intermediate
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "5"
+                    - generic: Active
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "1"
+                    - generic: Expired
+              - generic:
+                - main:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - textbox:
+                            - /placeholder: Search CAs...
+                        - generic:
+                          - button:
+                            - img
+                          - button:
+                            - img
+                        - generic:
+                          - combobox:
+                            - generic: All Types
+                            - generic:
+                              - img
+                        - generic:
+                          - combobox:
+                            - generic: All Status
+                            - generic:
+                              - img
+                        - button:
+                          - img
+                          - text: Create
+                        - button:
+                          - img
+                          - text: Import
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic: Certificate Authority
+                          - generic: Type
+                          - generic: Certs
+                          - generic: Expires
+                          - generic: Status
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - img
+                              - generic:
+                                - generic: "Imported: QA Test Root CA"
+                                - generic: CN=QA Test Root CA
+                              - generic:
+                                - generic: Root
+                              - generic:
+                                - generic: —
+                              - generic:
+                                - generic: 12mo
+                              - generic:
+                                - generic: Active
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - img
+                              - generic:
+                                - generic: QA Test Root CA
+                                - generic: CN=QA Test Root CA
+                              - generic:
+                                - generic: Root
+                              - generic:
+                                - generic: —
+                              - generic:
+                                - generic: 12mo
+                              - generic:
+                                - generic: Active
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - img
+                              - generic:
+                                - generic: R3 (ACME Client)
+                                - generic: CN=R3
+                              - generic:
+                                - generic: Intermediate
+                              - generic:
+                                - generic: —
+                              - generic:
+                                - generic: Expired
+                              - generic:
+                                - generic: Expired
+                          - generic:
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - img
+                              - generic:
+                                - generic: lan-AD-CA
+                                - generic: CN=lan-AD-CA
+                              - generic:
+                                - generic: Root
+                              - generic:
+                                - generic:
+                                  - img
+                                  - generic: "2"
+                              - generic:
+                                - generic: Nov 72
+                              - generic:
+                                - generic: Active
+                          - generic:
+                            - generic:
+                              - generic:
+                                - button:
+                                  - img
+                                - generic:
+                                  - img
+                              - generic:
+                                - generic: lan.pew.pet
+                                - generic: CN=lan.pew.pet
+                              - generic:
+                                - generic: Root
+                              - generic:
+                                - generic:
+                                  - img
+                                  - generic: "23"
+                              - generic:
+                                - generic: Sep 66
+                              - generic:
+                                - generic: Active
+                            - generic:
+                              - generic:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - img
+                                  - generic:
+                                    - generic: inter-ca
+                                    - generic: CN=Pew Pet Lan CA Intermediate CA
+                                  - generic:
+                                    - generic: Intermediate
+                                  - generic:
+                                    - generic: —
+                                  - generic:
+                                    - generic: Dec 35
+                                  - generic:
+                                    - generic: Active
+                - complementary:
+                  - generic:
+                    - generic:
+                      - img
+                    - paragraph: Select a CA to view details
+    - list
+  - dialog "Create Certificate Authority" [ref=e2]:
+    - generic [ref=e3]:
+      - heading "Create Certificate Authority" [level=2] [ref=e4]
+      - button [active] [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Subject Information" [level=3] [ref=e11]
+        - generic [ref=e12]:
+          - generic [ref=e13]: Common Name (CN)*
+          - textbox "My Certificate Authority" [ref=e15]
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - generic [ref=e18]: Organization (O)
+            - textbox "My Company" [ref=e20]
+          - generic [ref=e21]:
+            - generic [ref=e22]: Country (C)
+            - textbox "US" [ref=e24]
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - generic [ref=e27]: State/Province (ST)
+            - textbox "California" [ref=e29]
+          - generic [ref=e30]:
+            - generic [ref=e31]: City/Locality (L)
+            - textbox "San Francisco" [ref=e33]
+      - generic [ref=e34]:
+        - heading "Key Configuration" [level=3] [ref=e35]
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - generic [ref=e38]: Key Algorithm
+            - combobox [ref=e39] [cursor=pointer]:
+              - generic: Select...
+              - img [ref=e41]
+            - combobox [ref=e43]
+          - generic [ref=e44]:
+            - generic [ref=e45]: Key Size
+            - combobox [ref=e46] [cursor=pointer]:
+              - generic: Select...
+              - img [ref=e48]
+            - combobox [ref=e50]
+      - generic [ref=e51]:
+        - heading "Validity" [level=3] [ref=e52]
+        - generic [ref=e53]:
+          - generic [ref=e54]: Validity Period
+          - combobox [ref=e55] [cursor=pointer]:
+            - generic: Select...
+            - img [ref=e57]
+          - combobox [ref=e59]
+      - generic [ref=e60]:
+        - heading "CA Type" [level=3] [ref=e61]
+        - generic [ref=e62]:
+          - generic [ref=e63]: Type
+          - combobox [ref=e64] [cursor=pointer]:
+            - generic: Root CA (Self-signed)
+            - img [ref=e66]
+          - combobox [ref=e68]
+      - generic [ref=e69]:
+        - button "Cancel" [ref=e70] [cursor=pointer]
+        - button "Create CA" [ref=e71] [cursor=pointer]
+```

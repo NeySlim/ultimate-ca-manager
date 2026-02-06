@@ -1,2 +1,80 @@
-Flask-Caching==2.3.1
-Flask-Session>=0.8.0
+# Ultimate CA Manager - Backend Dependencies
+# Updated: 2026-02-02 - Compatible with Python 3.13
+
+# Flask Core
+Flask==3.1.2
+Flask-RESTX==1.3.2
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.1.0
+Flask-JWT-Extended==4.7.1
+Flask-CORS==6.0.2
+Flask-Limiter==4.1.1
+Flask-Caching==2.3.0
+Flask-Session==0.8.0
+
+# Cryptography & OpenSSL
+cryptography==46.0.3
+pyOpenSSL==25.3.0
+asn1crypto==1.5.1
+
+# WebAuthn/FIDO2 Support
+webauthn==2.7.0
+cbor2==5.8.0
+
+# SCEP Support
+pycryptodome==3.23.0
+pyasn1==0.6.1
+pyasn1-modules==0.4.1
+
+# ACME Support
+josepy==1.14.0
+dnspython==2.8.0
+
+# HTTP & Utils
+requests==2.32.5
+python-dotenv==1.2.1
+python-dateutil==2.9.0.post0
+marshmallow==4.2.0
+psutil==7.2.1
+
+# Password Hashing
+bcrypt==5.0.0
+
+# Production Server
+gunicorn==23.0.0
+
+# Email validation
+email-validator==2.3.0
+
+# API Documentation
+flasgger>=0.9.7
+
+# ============ PRO FEATURES ============
+# LDAP/Active Directory Integration
+ldap3>=2.9.1
+
+# SSO/SAML Support
+python3-saml>=1.16.0
+python-jose>=3.3.0
+
+# HSM/PKCS#11 Support
+PyKCS11>=1.5.12
+
+# ============ HIGH AVAILABILITY ============
+# PostgreSQL support (optional, install with: pip install psycopg2-binary)
+# psycopg2-binary>=2.9.9
+
+# Redis session store (optional, install with: pip install redis)
+# redis>=5.0.0
+
+# Development & Testing
+pytest==9.0.2
+pytest-cov==7.0.0
+black==25.12.0
+flake8==7.3.0
+
+# WebSocket Support
+flask-socketio==5.3.7
+python-socketio==5.11.0
+gevent==24.11.1
+gevent-websocket==0.10.1

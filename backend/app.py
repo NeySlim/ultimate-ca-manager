@@ -79,6 +79,17 @@ def create_app(config_name=None):
             auto_generate=True
         )
     
+    # Run schema migrations BEFORE SQLAlchemy init (critical for upgrades)
+    # This ensures columns/tables exist before models are mapped
+    try:
+        from migration_runner import run_all_migrations
+        db_path = config.DATABASE_PATH
+        if db_path and os.path.exists(db_path):
+            os.environ.setdefault('DATABASE_PATH', str(db_path))
+            run_all_migrations(dry_run=False, verbose=False)
+    except Exception as e:
+        app.logger.warning(f"Pre-init migration check: {e}")
+    
     # Initialize extensions
     db.init_app(app)
     migrate = Migrate(app, db)
@@ -276,14 +287,7 @@ def create_app(config_name=None):
                 
                 app.logger.info(f"✓ All critical tables verified: {', '.join(critical_tables)}")
                 
-                # Run pending database migrations
-                app.logger.info("Checking for pending migrations...")
-                try:
-                    from migration_runner import run_all_migrations, get_db_path
-                    environ.setdefault('DATABASE_PATH', str(app.config.get('DATABASE_PATH', '/opt/ucm/data/ucm.db')))
-                    run_all_migrations(dry_run=False, verbose=False)
-                except Exception as e:
-                    app.logger.warning(f"Migration check skipped: {e}")
+                # Migrations already run at startup before SQLAlchemy init
                 
                 # Run database health check and repair
                 app.logger.info("Running database health check...")

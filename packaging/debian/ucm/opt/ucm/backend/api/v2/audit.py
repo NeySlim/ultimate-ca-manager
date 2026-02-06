@@ -210,3 +210,29 @@ def cleanup_logs():
         data={'deleted': deleted},
         message=f'Cleaned up {deleted} old audit logs'
     )
+
+
+@bp.route('/api/v2/audit/verify', methods=['GET'])
+@require_auth(['read:audit'])
+def verify_integrity():
+    """
+    Verify audit log integrity using hash chain.
+    
+    Query params:
+        start_id: First log ID to check (optional)
+        end_id: Last log ID to check (optional)
+    
+    Returns:
+        valid: Boolean - True if all hashes are valid
+        checked: Number of entries verified
+        errors: List of any integrity violations found
+    """
+    start_id = request.args.get('start_id', type=int)
+    end_id = request.args.get('end_id', type=int)
+    
+    result = AuditService.verify_integrity(start_id=start_id, end_id=end_id)
+    
+    return success_response(
+        data=result,
+        message='Integrity check passed' if result['valid'] else f"Found {len(result['errors'])} integrity violations"
+    )
