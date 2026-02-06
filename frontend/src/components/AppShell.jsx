@@ -18,6 +18,7 @@ import { Logo } from './Logo'
 import { useTheme } from '../contexts/ThemeContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { certificatesService } from '../services'
+import { loadProModule } from '../proLoader.jsx'
 
 // Mobile navigation items (grid menu)
 const mobileNavItems = [
@@ -89,7 +90,7 @@ export function AppShell() {
 
   // Check for Pro module
   useEffect(() => {
-    import('../pro')
+    loadProModule()
       .then(() => setIsPro(true))
       .catch(() => setIsPro(false))
   }, [])

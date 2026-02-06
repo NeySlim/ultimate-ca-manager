@@ -23,6 +23,7 @@ import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
 import { useTheme } from '../contexts/ThemeContext'
+import { loadProSettings } from '../proLoader.jsx'
 
 // Base settings categories (Community)
 // Settings categories with colors for visual distinction
@@ -250,9 +251,7 @@ export default function SettingsPage() {
 
   // Dynamically load Pro settings categories
   useEffect(() => {
-    import('../pro/settings')
-      .then(module => setProCategories(module.proSettingsCategories || []))
-      .catch(() => {}) // Pro module not available - Community edition
+    loadProSettings().then(setProCategories)
   }, [])
 
   // Merge base + Pro categories
