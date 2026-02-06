@@ -25,8 +25,18 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
+          // Core React libraries
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          radix: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
+          // UI component library
+          radix: [
+            '@radix-ui/react-dialog', 
+            '@radix-ui/react-dropdown-menu', 
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-select',
+          ],
+          // Charts - only loaded by Dashboard
+          charts: ['recharts'],
         },
       },
     },
