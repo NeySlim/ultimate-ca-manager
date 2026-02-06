@@ -68,6 +68,12 @@ export function ResponsiveDataTable({
   // Loading
   loading = false,
   
+  // Density - affects row height, padding, gaps
+  // 'compact': Dense rows (py-1, gap-2) - default for tables
+  // 'default': Standard rows (py-1.5, gap-3)
+  // 'comfortable': Spacious rows (py-2, gap-4)
+  density = 'compact',
+  
   // Custom class
   className
 }) {
@@ -536,6 +542,7 @@ export function ResponsiveDataTable({
           onRowClick={onRowClick}
           rowActions={rowActions}
           loading={loading}
+          density={density}
         />
       ) : (
         <DesktopTable
@@ -551,6 +558,7 @@ export function ResponsiveDataTable({
           setOpenActionMenu={setOpenActionMenu}
           actionMenuRef={actionMenuRef}
           loading={loading}
+          density={density}
         />
       )}
       
@@ -957,8 +965,17 @@ function DesktopTable({
   openActionMenu,
   setOpenActionMenu,
   actionMenuRef,
-  loading
+  loading,
+  density = 'compact'
 }) {
+  // Density-based padding for rows
+  const densityStyles = {
+    compact: { cell: 'px-4 py-1', header: 'px-4 py-1.5' },
+    default: { cell: 'px-4 py-1.5', header: 'px-4 py-2' },
+    comfortable: { cell: 'px-4 py-2.5', header: 'px-4 py-2.5' }
+  }
+  const dStyle = densityStyles[density] || densityStyles.compact
+  
   // Calculate column flex styles based on content type
   const getColStyle = (col) => {
     if (col.width) return { width: col.width, minWidth: col.width, maxWidth: col.width }
@@ -985,7 +1002,8 @@ function DesktopTable({
                   onClick={() => sortable && col.sortable !== false && onSort(col.key)}
                   style={style}
                   className={cn(
-                    'text-left px-4 py-1.5 text-2xs font-medium text-text-tertiary tracking-wide',
+                    'text-left text-2xs font-medium text-text-tertiary tracking-wide',
+                    dStyle.header,
                     'transition-colors duration-200',
                     sortable && col.sortable !== false && 'cursor-pointer hover:text-text-secondary',
                     sort?.key === col.key && 'text-accent-primary'
@@ -1035,7 +1053,8 @@ function DesktopTable({
                       key={col.key}
                       style={style}
                       className={cn(
-                        "px-4 py-1.5 transition-colors duration-200",
+                        dStyle.cell,
+                        "transition-colors duration-200",
                         col.className
                       )}
                     >
@@ -1055,7 +1074,7 @@ function DesktopTable({
                   )
                 })}
                 {rowActions && (
-                  <td className="px-2 py-1.5 relative">
+                  <td className={cn("px-2 relative", density === 'compact' ? 'py-1' : density === 'comfortable' ? 'py-2.5' : 'py-1.5')}>
                     <RowActionMenu
                       row={row}
                       idx={idx}

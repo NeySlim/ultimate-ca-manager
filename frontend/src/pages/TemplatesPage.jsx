@@ -223,6 +223,23 @@ export default function TemplatesPage() {
             <span className="font-medium truncate">{val || 'Unnamed'}</span>
           </div>
         )
+      },
+      mobileRender: (val, row) => {
+        const type = getTemplateType(row)
+        const iconClass = type === 'ca' ? 'icon-bg-amber' : 'icon-bg-blue'
+        return (
+          <div className="flex items-center justify-between gap-2 w-full">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
+                {type === 'ca' ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
+              </div>
+              <span className="font-medium truncate">{val || 'Unnamed'}</span>
+            </div>
+            <Badge variant={type === 'ca' ? 'amber' : 'primary'} size="sm" dot>
+              {type === 'ca' ? 'CA' : 'Cert'}
+            </Badge>
+          </div>
+        )
       }
     },
     {
@@ -230,6 +247,7 @@ export default function TemplatesPage() {
       header: 'Type',
       priority: 2,
       sortable: true,
+      hideOnMobile: true,
       render: (val) => (
         <Badge variant={val === 'ca' ? 'amber' : 'primary'} size="sm" dot>
           {val === 'ca' ? 'CA' : 'Certificate'}
@@ -246,6 +264,12 @@ export default function TemplatesPage() {
         <span className="text-sm text-text-secondary">
           {val || 365} days
         </span>
+      ),
+      mobileRender: (val) => (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-text-tertiary">Validity:</span>
+          <span className="text-text-secondary">{val || 365}d</span>
+        </div>
       )
     },
     {

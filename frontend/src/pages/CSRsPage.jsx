@@ -238,6 +238,18 @@ export default function CSRsPage() {
           <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
         </div>
+      ),
+      mobileRender: (val, row) => (
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-orange">
+              <FileText size={14} weight="duotone" />
+            </div>
+            <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
+            <KeyIndicator hasKey={row.has_private_key} size={12} />
+          </div>
+          <Badge variant="warning" size="sm" dot>Pending</Badge>
+        </div>
       )
     },
     {
@@ -290,16 +302,35 @@ export default function CSRsPage() {
             <Badge variant="purple" size="sm">SCEP</Badge>
           )}
         </div>
+      ),
+      mobileRender: (val, row) => (
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
+              <Certificate size={14} weight="duotone" />
+            </div>
+            <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
+            <KeyIndicator hasKey={row.has_private_key} size={12} />
+          </div>
+          <Badge variant="success" size="sm" dot>Signed</Badge>
+        </div>
       )
     },
     {
       key: 'signed_by',
       header: 'Signed By',
       priority: 2,
+      hideOnMobile: true,
       render: (val, row) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <Stamp size={14} className="text-accent-primary" />
           <span className="text-sm text-text-primary truncate">{val || row.issuer_name || '—'}</span>
+        </div>
+      ),
+      mobileRender: (val, row) => (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-text-tertiary">CA:</span>
+          <span className="text-text-secondary truncate">{val || row.issuer_name || '—'}</span>
         </div>
       )
     },
