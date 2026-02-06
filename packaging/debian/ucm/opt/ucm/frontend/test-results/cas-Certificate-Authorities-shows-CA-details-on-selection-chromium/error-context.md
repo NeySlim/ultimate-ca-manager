@@ -2,230 +2,220 @@
 
 ```yaml
 - generic [ref=e2]:
-  - generic [ref=e3]:
-    - generic [ref=e5]:
-      - link "UCM Dashboard" [ref=e6] [cursor=pointer]:
+  - generic [ref=e5]:
+    - generic [ref=e7]:
+      - link "UCM Dashboard" [ref=e8] [cursor=pointer]:
         - /url: /
-      - link "Dashboard" [ref=e12] [cursor=pointer]:
+      - link "Dashboard" [ref=e14] [cursor=pointer]:
         - /url: /
-        - img [ref=e13]
+        - img [ref=e15]
         - generic: Dashboard
-      - link "Certificates" [ref=e15] [cursor=pointer]:
+      - link "Certificates" [ref=e17] [cursor=pointer]:
         - /url: /certificates
-        - img [ref=e16]
+        - img [ref=e18]
         - generic: Certificates
-      - link "CAs" [ref=e18] [cursor=pointer]:
+      - link "CAs" [ref=e20] [cursor=pointer]:
         - /url: /cas
-        - img [ref=e19]
+        - img [ref=e21]
         - generic: CAs
-      - link "CSRs" [ref=e22] [cursor=pointer]:
+      - link "CSRs" [ref=e24] [cursor=pointer]:
         - /url: /csrs
-        - img [ref=e23]
+        - img [ref=e25]
         - generic: CSRs
-      - link "Templates" [ref=e25] [cursor=pointer]:
+      - link "Templates" [ref=e27] [cursor=pointer]:
         - /url: /templates
-        - img [ref=e26]
+        - img [ref=e28]
         - generic: Templates
-      - link "Users" [ref=e28] [cursor=pointer]:
+      - link "Users" [ref=e30] [cursor=pointer]:
         - /url: /users
-        - img [ref=e29]
+        - img [ref=e31]
         - generic: Users
-      - link "ACME" [ref=e31] [cursor=pointer]:
+      - link "ACME" [ref=e33] [cursor=pointer]:
         - /url: /acme
-        - img [ref=e32]
+        - img [ref=e34]
         - generic: ACME
-      - link "SCEP" [ref=e34] [cursor=pointer]:
-        - /url: /scep
-        - img [ref=e35]
+      - link "SCEP" [ref=e36] [cursor=pointer]:
+        - /url: /scep-config
+        - img [ref=e37]
         - generic: SCEP
-      - link "Import" [ref=e37] [cursor=pointer]:
+      - link "CRL/OCSP" [ref=e39] [cursor=pointer]:
+        - /url: /crl-ocsp
+        - img [ref=e40]
+        - generic: CRL/OCSP
+      - link "Trust Store" [ref=e42] [cursor=pointer]:
+        - /url: /truststore
+        - img [ref=e43]
+        - generic: Trust Store
+      - link "Import" [ref=e45] [cursor=pointer]:
         - /url: /import
-        - img [ref=e38]
+        - img [ref=e46]
         - generic: Import
-      - link "Audit" [ref=e40] [cursor=pointer]:
+      - link "Tools" [ref=e48] [cursor=pointer]:
+        - /url: /tools
+        - img [ref=e49]
+        - generic: Tools
+      - link "Audit" [ref=e51] [cursor=pointer]:
         - /url: /audit
-        - img [ref=e41]
+        - img [ref=e52]
         - generic: Audit
-      - link "Settings" [ref=e43] [cursor=pointer]:
+      - link "Settings" [ref=e54] [cursor=pointer]:
         - /url: /settings
-        - img [ref=e44]
+        - img [ref=e55]
         - generic: Settings
-      - link "Groups" [ref=e47] [cursor=pointer]:
-        - /url: /groups
-        - img [ref=e48]
-        - generic:
-          - img
-          - text: Groups
-      - link "RBAC" [ref=e50] [cursor=pointer]:
+      - link "RBAC" [ref=e58] [cursor=pointer]:
         - /url: /rbac
-        - img [ref=e51]
+        - img [ref=e59]
         - generic:
           - img
           - text: RBAC
-      - link "SSO" [ref=e53] [cursor=pointer]:
-        - /url: /sso
-        - img [ref=e54]
-        - generic:
-          - img
-          - text: SSO
-      - link "HSM" [ref=e56] [cursor=pointer]:
+      - link "HSM" [ref=e61] [cursor=pointer]:
         - /url: /hsm
-        - img [ref=e57]
+        - img [ref=e62]
         - generic:
           - img
           - text: HSM
-      - button "Theme" [ref=e59] [cursor=pointer]:
-        - img [ref=e60]
+      - link "Security" [ref=e64] [cursor=pointer]:
+        - /url: /security
+        - img [ref=e65]
+        - generic:
+          - img
+          - text: Security
+      - button "Theme" [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
         - generic: Theme
-      - button "admin" [ref=e62] [cursor=pointer]:
-        - img [ref=e63]
+      - button "Real-time updates active" [ref=e70] [cursor=pointer]:
+        - img [ref=e71]
+      - button "admin" [ref=e73] [cursor=pointer]:
+        - img [ref=e74]
         - generic: admin
-    - generic [ref=e65]:
-      - generic [ref=e66]:
-        - heading "Certificate Authorities" [level=1] [ref=e69]
-        - generic [ref=e71]:
-          - img [ref=e72]
-          - textbox "Search..." [ref=e74]
-        - generic [ref=e75]:
-          - generic [ref=e76]:
-            - generic [ref=e77]:
-              - button [ref=e78] [cursor=pointer]:
-                - img [ref=e79]
-              - button [ref=e81] [cursor=pointer]:
-                - img [ref=e82]
-            - generic [ref=e84]:
-              - button "Create" [ref=e85] [cursor=pointer]:
-                - img [ref=e86]
+    - generic [ref=e77]:
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - img [ref=e82]
+          - generic [ref=e84]:
+            - heading "Certificate Authorities" [level=1] [ref=e85]
+            - paragraph [ref=e86]: 6 CAs
+        - button "Help" [ref=e88] [cursor=pointer]:
+          - img [ref=e89]
+          - generic [ref=e91]: Help
+      - generic [ref=e92]:
+        - generic [ref=e93]:
+          - img [ref=e95]
+          - generic [ref=e98]:
+            - generic [ref=e99]: "4"
+            - generic [ref=e100]: Root
+        - generic [ref=e101]:
+          - img [ref=e103]
+          - generic [ref=e106]:
+            - generic [ref=e107]: "2"
+            - generic [ref=e108]: Intermediate
+        - generic [ref=e109]:
+          - img [ref=e111]
+          - generic [ref=e114]:
+            - generic [ref=e115]: "5"
+            - generic [ref=e116]: Active
+        - generic [ref=e117]:
+          - img [ref=e119]
+          - generic [ref=e122]:
+            - generic [ref=e123]: "1"
+            - generic [ref=e124]: Expired
+      - generic [ref=e125]:
+        - main [ref=e126]:
+          - generic [ref=e127]:
+            - generic [ref=e129]:
+              - textbox "Search CAs..." [ref=e131]
+              - generic [ref=e132]:
+                - button "Hierarchical view" [ref=e133] [cursor=pointer]:
+                  - img [ref=e134]
+                - button "List view" [ref=e136] [cursor=pointer]:
+                  - img [ref=e137]
+              - combobox [ref=e141] [cursor=pointer]:
+                - generic: All Types
+                - img [ref=e143]
+              - combobox [ref=e146] [cursor=pointer]:
+                - generic: All Status
+                - img [ref=e148]
+              - button "Create" [ref=e150] [cursor=pointer]:
+                - img [ref=e151]
                 - text: Create
-              - button "Import" [ref=e88] [cursor=pointer]:
-                - img [ref=e89]
+              - button "Import" [ref=e153] [cursor=pointer]:
+                - img [ref=e154]
                 - text: Import
-          - generic [ref=e92]:
-            - generic [ref=e93]:
-              - paragraph [ref=e94]:
-                - img [ref=e95]
-                - text: Root CAs (3)
-              - generic [ref=e97]:
-                - generic [ref=e99] [cursor=pointer]:
-                  - img [ref=e101]
-                  - generic [ref=e104]: TestCA
-                - generic [ref=e106] [cursor=pointer]:
-                  - img [ref=e108]
-                  - generic [ref=e111]: lan-AD-CA
-                - generic [ref=e112]:
-                  - generic [ref=e113] [cursor=pointer]:
-                    - button [ref=e114]:
-                      - img [ref=e115]
-                    - img [ref=e118]
-                    - generic [ref=e121]: lan.pew.pet
-                  - generic [ref=e124] [cursor=pointer]:
-                    - img [ref=e126]
-                    - generic [ref=e129]: Pew Pet Lan CA Intermediate CA
-            - generic [ref=e130]:
-              - paragraph [ref=e131]:
-                - img [ref=e132]
-                - text: Orphaned CAs (1)
-              - generic [ref=e136] [cursor=pointer]:
-                - img [ref=e138]
-                - generic [ref=e141]: R3 (ACME Client)
-        - generic [ref=e143]: 5 total CAs
-      - generic [ref=e144]:
-        - generic [ref=e146]:
-          - generic [ref=e148] [cursor=pointer]: CAs
-          - generic [ref=e149]:
-            - img [ref=e150]
-            - generic [ref=e152]: Pew Pet Lan CA Intermediate CA
-        - generic [ref=e154]:
-          - heading "Pew Pet Lan CA Intermediate CA" [level=2] [ref=e155]
-          - generic [ref=e156]:
-            - button "Edit" [ref=e157] [cursor=pointer]:
-              - img [ref=e158]
-              - text: Edit
-            - button "Export" [ref=e160] [cursor=pointer]:
-              - generic [ref=e161]:
-                - img [ref=e162]
-                - text: Export
-            - button "Delete" [ref=e164] [cursor=pointer]:
-              - img [ref=e165]
-              - text: Delete
-        - generic [ref=e168]:
-          - tablist [ref=e169]:
-            - tab "Overview" [selected] [ref=e170] [cursor=pointer]:
-              - img [ref=e172]
-              - generic [ref=e174]: Overview
-            - tab "Issued Certificates" [ref=e176] [cursor=pointer]:
-              - img [ref=e178]
-              - generic [ref=e180]: Issued Certificates
-            - tab "Settings" [ref=e182] [cursor=pointer]:
-              - generic [ref=e183]: Settings
-            - tab "Export" [ref=e185] [cursor=pointer]:
-              - generic [ref=e186]: Export
-            - tab "Raw Data" [ref=e188] [cursor=pointer]:
-              - generic [ref=e189]: Raw Data
-            - tab "OCSP" [ref=e191] [cursor=pointer]:
-              - img [ref=e193]
-              - generic [ref=e195]: OCSP
-          - tabpanel "Overview" [ref=e197]:
-            - generic [ref=e198]:
-              - generic [ref=e199]:
-                - generic [ref=e200]:
-                  - paragraph [ref=e201]: Type
-                  - generic [ref=e202]:
-                    - img [ref=e203]
-                    - generic [ref=e206]: Intermediate
-                - generic [ref=e207]:
-                  - paragraph [ref=e208]: Status
-                  - generic [ref=e209]: Active
-              - generic [ref=e210]:
-                - heading "Subject Information" [level=3] [ref=e211]
-                - generic [ref=e212]:
-                  - generic [ref=e213]:
-                    - paragraph [ref=e214]: Common Name (CN)
-                    - paragraph [ref=e215]: Pew Pet Lan CA Intermediate CA
-                  - generic [ref=e216]:
-                    - paragraph [ref=e217]: Organization (O)
-                    - paragraph [ref=e218]: Pew Pet Lan CA
-                  - generic [ref=e219]:
-                    - paragraph [ref=e220]: Country (C)
-                    - paragraph [ref=e221]: N/A
-                  - generic [ref=e222]:
-                    - paragraph [ref=e223]: State (ST)
-                    - paragraph [ref=e224]: N/A
-                  - generic [ref=e225]:
-                    - paragraph [ref=e226]: Locality (L)
-                    - paragraph [ref=e227]: N/A
-              - generic [ref=e228]:
-                - heading "Certificate Details" [level=3] [ref=e229]
-                - generic [ref=e230]:
-                  - generic [ref=e231]:
-                    - paragraph [ref=e232]: Serial Number
-                    - paragraph [ref=e233]: N/A
-                  - generic [ref=e234]:
-                    - paragraph [ref=e235]: Issued Certificates
-                    - paragraph [ref=e236]: 0 certificates
-                  - generic [ref=e237]:
-                    - paragraph [ref=e238]: Valid From
-                    - paragraph [ref=e239]: Dec 17, 2025
-                  - generic [ref=e240]:
-                    - paragraph [ref=e241]: Valid Until
-                    - paragraph [ref=e242]: Dec 15, 2035
-                  - generic [ref=e243]:
-                    - paragraph [ref=e244]: Key Algorithm
-                    - paragraph [ref=e245]: EC secp256r1
-                  - generic [ref=e246]:
-                    - paragraph [ref=e247]: Signature Algorithm
-                    - paragraph [ref=e248]: SHA-256WITHRSAENCRYPTION
-                  - generic [ref=e249]:
-                    - paragraph [ref=e250]: Private Key
-                    - generic [ref=e251]: Not Available
-                  - generic [ref=e252]:
-                    - paragraph [ref=e253]: Parent CA
-                    - paragraph [ref=e254]: e68e2c34-6879-40a2-9393-d782405b6aa6
-              - generic [ref=e255]:
-                - paragraph [ref=e256]: Full Subject DN
-                - paragraph [ref=e257]: CN=Pew Pet Lan CA Intermediate CA,O=Pew Pet Lan CA
-                - paragraph [ref=e258]: Issuer DN
-                - paragraph [ref=e259]: CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR
+            - generic [ref=e157]:
+              - generic [ref=e158]:
+                - generic [ref=e159]: Certificate Authority
+                - generic [ref=e160]: Type
+                - generic [ref=e161]: Certs
+                - generic [ref=e162]: Expires
+                - generic [ref=e163]: Status
+              - generic [ref=e164]:
+                - generic [ref=e166] [cursor=pointer]:
+                  - img [ref=e169]
+                  - generic [ref=e172]:
+                    - generic [ref=e173]: "Imported: QA Test Root CA"
+                    - generic [ref=e174]: CN=QA Test Root CA
+                  - generic [ref=e176]: Root
+                  - generic [ref=e178]: —
+                  - generic [ref=e180]: 12mo
+                  - generic [ref=e182]: Active
+                - generic [ref=e185] [cursor=pointer]:
+                  - img [ref=e188]
+                  - generic [ref=e191]:
+                    - generic [ref=e192]: QA Test Root CA
+                    - generic [ref=e193]: CN=QA Test Root CA
+                  - generic [ref=e195]: Root
+                  - generic [ref=e197]: —
+                  - generic [ref=e199]: 12mo
+                  - generic [ref=e201]: Active
+                - generic [ref=e204] [cursor=pointer]:
+                  - img [ref=e207]
+                  - generic [ref=e210]:
+                    - generic [ref=e211]: R3 (ACME Client)
+                    - generic [ref=e212]: CN=R3
+                  - generic [ref=e214]: Intermediate
+                  - generic [ref=e216]: —
+                  - generic [ref=e218]: Expired
+                  - generic [ref=e220]: Expired
+                - generic [ref=e223] [cursor=pointer]:
+                  - img [ref=e226]
+                  - generic [ref=e229]:
+                    - generic [ref=e230]: lan-AD-CA
+                    - generic [ref=e231]: CN=lan-AD-CA
+                  - generic [ref=e233]: Root
+                  - generic [ref=e235]:
+                    - img [ref=e236]
+                    - generic [ref=e239]: "2"
+                  - generic [ref=e241]: Nov 72
+                  - generic [ref=e243]: Active
+                - generic [ref=e245]:
+                  - generic [ref=e246] [cursor=pointer]:
+                    - generic [ref=e247]:
+                      - button [ref=e248]:
+                        - img [ref=e249]
+                      - img [ref=e252]
+                    - generic [ref=e255]:
+                      - generic [ref=e256]: lan.pew.pet
+                      - generic [ref=e257]: CN=lan.pew.pet
+                    - generic [ref=e259]: Root
+                    - generic [ref=e261]:
+                      - img [ref=e262]
+                      - generic [ref=e265]: "23"
+                    - generic [ref=e267]: Sep 66
+                    - generic [ref=e269]: Active
+                  - generic [ref=e273] [cursor=pointer]:
+                    - img [ref=e278]
+                    - generic [ref=e281]:
+                      - generic [ref=e282]: inter-ca
+                      - generic [ref=e283]: CN=Pew Pet Lan CA Intermediate CA
+                    - generic [ref=e285]: Intermediate
+                    - generic [ref=e287]: —
+                    - generic [ref=e289]: Dec 35
+                    - generic [ref=e291]: Active
+        - complementary [ref=e293]:
+          - generic "Drag to resize panel" [ref=e294]
+          - generic [ref=e296]:
+            - img [ref=e298]
+            - paragraph [ref=e300]: Select a CA to view details
   - region "Notifications (F8)":
     - list
 ```

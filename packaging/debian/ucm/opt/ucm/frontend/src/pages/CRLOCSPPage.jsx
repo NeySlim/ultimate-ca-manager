@@ -4,27 +4,29 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
-  FileX, ShieldCheck, ArrowsClockwise, Download, Globe, Copy,
-  Database, Pulse, Calendar, Hash, CheckCircle, XCircle, Eye,
-  Info, Link as LinkIcon
+  FileX, ShieldCheck, ArrowsClockwise, Download, Copy,
+  Database, Pulse, Calendar, Hash, XCircle,
+  Info as LinkIcon
 } from '@phosphor-icons/react'
+import * as Switch from '@radix-ui/react-switch'
 import {
   ResponsiveLayout,
   ResponsiveDataTable,
   Button, Card, Badge, 
-  LoadingSpinner, EmptyState, StatusIndicator, HelpCard,
+  LoadingSpinner, StatusIndicator, HelpCard,
   CompactSection, CompactGrid, CompactField
 } from '../components'
 import { casService, crlService, apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate } from '../lib/utils'
-import { ERRORS, SUCCESS, LABELS } from '../lib/messages'
+import { formatDate, cn } from '../lib/utils'
+import { ERRORS, SUCCESS } from '../lib/messages'
 
 // Extended CRL service methods
 const crlApi = {
   ...crlService,
   regenerate: (caId) => apiClient.post(`/crl/${caId}/regenerate`),
+  toggleAutoRegen: (caId, enabled) => apiClient.post(`/crl/${caId}/auto-regen`, { enabled }),
   getOcspStatus: () => apiClient.get('/ocsp/status'),
   getOcspStats: () => apiClient.get('/ocsp/stats'),
 }
@@ -102,6 +104,20 @@ export default function CRLOCSPPage() {
     }
   }
 
+  const handleToggleAutoRegen = async (ca) => {
+    try {
+      const result = await crlApi.toggleAutoRegen(ca.id, !ca.cdp_enabled)
+      showSuccess(`Auto-regeneration ${result.data.cdp_enabled ? 'enabled' : 'disabled'} for ${ca.descr}`)
+      // Update local state
+      setCas(prev => prev.map(c => c.id === ca.id ? { ...c, cdp_enabled: result.data.cdp_enabled } : c))
+      if (selectedCA?.id === ca.id) {
+        setSelectedCA(prev => ({ ...prev, cdp_enabled: result.data.cdp_enabled }))
+      }
+    } catch (error) {
+      showError(error.message || 'Failed to toggle auto-regeneration')
+    }
+  }
+
   const handleDownloadCRL = () => {
     if (!selectedCRL?.crl_pem) return
     
@@ -161,81 +177,95 @@ export default function CRLOCSPPage() {
   const columns = useMemo(() => [
     {
       key: 'descr',
-      label: 'CA Name',
+      header: 'CA Name',
+      priority: 1,
+      sortable: true,
       render: (v, row) => (
         <div className="flex items-center gap-2">
-          <FileX size={14} className={row.has_crl ? 'status-success-text' : 'text-text-tertiary'} />
-          <span className="font-medium">{v || row.name}</span>
+          <div className={cn(
+            "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+            row.has_crl ? 'icon-bg-emerald' : 'icon-bg-orange'
+          )}>
+            <FileX size={14} weight="duotone" />
+          </div>
+          <span className="font-medium truncate">{v || row.name}</span>
+        </div>
+      ),
+      mobileRender: (v, row) => (
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className={cn(
+              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+              row.has_crl ? 'icon-bg-emerald' : 'icon-bg-orange'
+            )}>
+              <FileX size={14} weight="duotone" />
+            </div>
+            <span className="font-medium truncate">{v || row.name}</span>
+          </div>
+          <Badge variant={row.has_crl ? 'success' : 'orange'} size="sm" dot pulse={!row.has_crl}>
+            {row.has_crl ? 'Active' : 'No CRL'}
+          </Badge>
         </div>
       )
     },
     {
       key: 'has_crl',
-      label: 'Status',
-      width: '100px',
-      render: (v, row) => (
-        <Badge variant={v ? 'success' : 'secondary'} size="sm">
+      header: 'Status',
+      priority: 2,
+      hideOnMobile: true,
+      render: (v) => (
+        <Badge variant={v ? 'success' : 'orange'} size="sm" dot pulse={!v}>
           {v ? 'Active' : 'No CRL'}
         </Badge>
       )
     },
     {
+      key: 'cdp_enabled',
+      header: 'Auto',
+      priority: 3,
+      hideOnMobile: true,
+      render: (v, row) => (
+        <Switch.Root
+          checked={v}
+          onCheckedChange={() => handleToggleAutoRegen(row)}
+          disabled={!row.has_private_key || !canWrite('crl')}
+          className="w-9 h-5 bg-bg-tertiary rounded-full relative data-[state=checked]:bg-accent-success transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Switch.Thumb className="block w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-100 translate-x-0.5 data-[state=checked]:translate-x-[18px]" />
+        </Switch.Root>
+      )
+    },
+    {
       key: 'revoked_count',
-      label: 'Revoked',
-      width: '80px',
+      header: 'Revoked',
+      priority: 2,
       render: (v) => (
-        <span className={v > 0 ? 'status-danger-text font-medium' : 'text-text-secondary'}>
+        <Badge variant={v > 0 ? 'danger' : 'secondary'} size="sm" dot={v > 0}>
           {v || 0}
-        </span>
+        </Badge>
+      ),
+      mobileRender: (v) => (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-text-tertiary">Revoked:</span>
+          <Badge variant={v > 0 ? 'danger' : 'secondary'} size="sm" dot={v > 0}>
+            {v || 0}
+          </Badge>
+        </div>
       )
     },
     {
       key: 'crl_updated',
-      label: 'Updated',
-      width: '120px',
+      header: 'Updated',
+      priority: 3,
+      hideOnMobile: true,
       render: (v) => (
-        <span className="text-text-secondary text-xs">
-          {v ? formatDate(v, 'short') : '-'}
+        <span className="text-text-secondary">
+          {v ? formatDate(v, 'short') : '—'}
         </span>
       )
     }
-  ], [])
-
-  // Mobile card render
-  const renderMobileCard = useCallback((ca, isSelected) => {
-    return (
-      <div className={`p-4 ${isSelected ? 'mobile-row-selected' : ''}`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              ca.has_crl ? 'status-success-bg' : 'bg-bg-tertiary'
-            }`}>
-              <FileX size={20} className={ca.has_crl ? 'status-success-text' : 'text-text-tertiary'} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-text-primary truncate">{ca.descr || ca.name}</span>
-                <Badge variant={ca.has_crl ? 'success' : 'secondary'} size="sm">
-                  {ca.has_crl ? 'Active' : 'No CRL'}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-text-secondary mt-0.5">
-                {ca.has_crl ? (
-                  <>
-                    <span>{ca.revoked_count || 0} revoked</span>
-                    <span>•</span>
-                    <span>CRL #{ca.crl_number || '-'}</span>
-                  </>
-                ) : (
-                  <span>{ca.has_private_key === false ? 'Read-only (no key)' : 'Not generated'}</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }, [])
+  ], [canWrite, handleToggleAutoRegen])
 
   // Help content
   const helpContent = (
@@ -252,7 +282,7 @@ export default function CRLOCSPPage() {
             <p className="text-xs text-text-secondary">Active CRLs</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
-            <p className="text-2xl font-bold text-status-error">{totalRevoked}</p>
+            <p className="text-2xl font-bold text-status-danger">{totalRevoked}</p>
             <p className="text-xs text-text-secondary">Revoked Certs</p>
           </div>
         </div>
@@ -316,7 +346,7 @@ export default function CRLOCSPPage() {
             <p className="text-xs text-text-secondary">CRL & OCSP Configuration</p>
           </div>
         </div>
-        <Badge variant={selectedCRL ? 'success' : 'secondary'} size="sm">
+        <Badge variant={selectedCRL ? 'success' : 'warning'} size="sm" dot>
           {selectedCRL ? 'Active' : 'No CRL'}
         </Badge>
       </div>
@@ -326,17 +356,17 @@ export default function CRLOCSPPage() {
         <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
           <Hash size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.crl_number || '-'}</div>
-          <div className="text-[10px] text-text-tertiary">CRL #</div>
+          <div className="text-2xs text-text-tertiary">CRL #</div>
         </div>
         <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
           <XCircle size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.revoked_count || 0}</div>
-          <div className="text-[10px] text-text-tertiary">Revoked</div>
+          <div className="text-2xs text-text-tertiary">Revoked</div>
         </div>
         <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
           <Calendar size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-'}</div>
-          <div className="text-[10px] text-text-tertiary">Updated</div>
+          <div className="text-2xs text-text-tertiary">Updated</div>
         </div>
       </div>
 
@@ -363,7 +393,7 @@ export default function CRLOCSPPage() {
       </div>
 
       {/* CRL Configuration */}
-      <CompactSection title="CRL Configuration" icon={Info}>
+      <CompactSection title="CRL Configuration" icon={LinkIcon}>
         <CompactGrid cols={2}>
           <CompactField label="CA Name" value={selectedCA.descr || selectedCA.name} />
           <CompactField label="Status" value={selectedCRL ? 'Active' : 'Not Generated'} />
@@ -446,7 +476,7 @@ export default function CRLOCSPPage() {
       icon={FileX}
       subtitle={`${crls.length} active CRLs`}
       stats={headerStats}
-      helpContent={helpContent}
+      helpPageKey="crlocsp"
       splitView={true}
       splitEmptyContent={
         <div className="h-full flex flex-col items-center justify-center p-6 text-center">

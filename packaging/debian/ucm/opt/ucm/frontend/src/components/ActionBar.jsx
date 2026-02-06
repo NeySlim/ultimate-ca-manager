@@ -280,7 +280,7 @@ export function HeaderBar({
                   {Icon && <Icon size={16} />}
                   {tab.label}
                   {tab.badge && (
-                    <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-accent-primary/20 rounded-full">
+                    <span className="ml-1 px-1.5 py-0.5 text-2xs bg-accent-primary/20 rounded-full">
                       {tab.badge}
                     </span>
                   )}
@@ -346,7 +346,7 @@ export function HeaderBar({
                     {Icon && <Icon size={14} />}
                     {tab.label}
                     {tab.badge && (
-                      <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-accent-primary/20 rounded-full">
+                      <span className="ml-1 px-1.5 py-0.5 text-2xs bg-accent-primary/20 rounded-full">
                         {tab.badge}
                       </span>
                     )}

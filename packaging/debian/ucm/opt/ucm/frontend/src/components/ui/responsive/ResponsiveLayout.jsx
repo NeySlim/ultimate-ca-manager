@@ -19,11 +19,12 @@
  * MOBILE: Touch targets 44px+, swipe gestures, full-screen panels
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, ArrowLeft, CaretDown, Question } from '@phosphor-icons/react'
+import { X, ArrowLeft, Question } from '@phosphor-icons/react'
 import { useMobile } from '../../../contexts'
 import { cn } from '../../../lib/utils'
 import { UnifiedPageHeader } from '../UnifiedPageHeader'
 import { FilterSelect } from '../Select'
+import { HelpModal } from '../HelpModal'
 
 // =============================================================================
 // PANEL WIDTH CONSTANTS
@@ -51,15 +52,20 @@ export function ResponsiveLayout({
   // Actions (top-right buttons)
   actions,
   
-  // Stats bar (optional - array of { icon, label, value, variant })
+  // Stats bar (optional - array of { icon, label, value, variant, filterValue })
   stats,
+  // Stats clicking - when stats are clickable for filtering
+  activeStatFilter, // currently active stat filter value
+  onStatClick, // (stat) => void - called when stat is clicked
   
   // Filters (optional - for filter drawer/panel)
   filters,
   activeFilters = 0, // count of active filters
   onClearFilters,
   
-  // Help (optional - help content for help panel)
+  // Help - pass pageKey to show contextual help modal
+  helpPageKey, // e.g., 'cas', 'certificates', 'settings'
+  // Legacy support - JSX content (deprecated)
   helpContent,
   helpTitle = 'Help',
   
@@ -68,6 +74,7 @@ export function ResponsiveLayout({
   slideOverTitle,
   slideOverContent,
   slideOverWidth = 'default', // 'narrow' | 'default' | 'wide'
+  slideOverActions, // ReactNode - actions to show in slide-over header (e.g., favorite button)
   onSlideOverClose,
   
   // Split view (xl+ screens) - panel always visible
@@ -83,7 +90,10 @@ export function ResponsiveLayout({
   // Custom class
   className
 }) {
-  const { isMobile, isDesktop, isTouch, isLargeScreen } = useMobile()
+  const { isMobile, isTablet, isDesktop, isTouch, isLargeScreen, screenWidth } = useMobile()
+  
+  // Show inline header when sidebar is visible (matches AppShell's breakpoint)
+  const showInlineHeader = screenWidth >= 768
   
   // Local state for filter/help drawers (mobile only)
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
@@ -174,27 +184,70 @@ export function ResponsiveLayout({
       'flex flex-col h-full w-full overflow-hidden',
       className
     )}>
-      {/* HEADER - Using UnifiedPageHeader for consistency */}
-      <UnifiedPageHeader
-        title={title}
-        subtitle={subtitle}
-        icon={Icon}
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-        filters={filters}
-        activeFilters={activeFilters}
-        onClearFilters={onClearFilters}
-        onOpenFilters={() => setFilterDrawerOpen(true)}
-        actions={actions}
-        showHelp={!!helpContent}
-        onHelpClick={() => setHelpDrawerOpen(true)}
-        isMobile={isMobile}
-      />
+      {/* HEADER - Show when sidebar is visible (>= 768px) */}
+      {showInlineHeader && (
+        <UnifiedPageHeader
+          title={title}
+          subtitle={subtitle}
+          icon={Icon}
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+          filters={filters}
+          activeFilters={activeFilters}
+          onClearFilters={onClearFilters}
+          onOpenFilters={() => setFilterDrawerOpen(true)}
+          actions={actions}
+          showHelp={!!helpPageKey || !!helpContent}
+          onHelpClick={() => setHelpDrawerOpen(true)}
+          isMobile={false}
+        />
+      )}
+      
+      {/* MOBILE ONLY (< 768px): Tabs bar */}
+      {!showInlineHeader && tabs && tabs.length > 0 && (
+        <div className="shrink-0 border-b border-border/50 bg-bg-secondary/50 overflow-x-auto scrollbar-hide px-2">
+          <div className="flex gap-0.5 min-w-max">
+            {tabs.map((tab) => {
+              const TabIcon = tab.icon
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => onTabChange?.(tab.id)}
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-all",
+                    "border-b-2 -mb-px",
+                    isActive
+                      ? "border-accent-primary text-accent-primary"
+                      : "border-transparent text-text-secondary"
+                  )}
+                >
+                  {TabIcon && <TabIcon size={14} weight={isActive ? "fill" : "regular"} />}
+                  <span>{tab.label}</span>
+                  {tab.count !== undefined && (
+                    <span className={cn(
+                      'px-1 py-0.5 rounded text-2xs',
+                      isActive ? 'bg-accent-primary/15' : 'bg-bg-tertiary'
+                    )}>
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
       
       {/* STATS BAR (if provided) */}
       {stats && stats.length > 0 && (
-        <StatsBar stats={stats} isMobile={isMobile} />
+        <StatsBar 
+          stats={stats} 
+          isMobile={isMobile} 
+          onStatClick={onStatClick}
+          activeStatFilter={activeStatFilter}
+        />
       )}
       
       {/* MAIN AREA - Content + SlideOver/SplitPanel */}
@@ -237,12 +290,17 @@ export function ResponsiveLayout({
             {slideOverOpen && slideOverContent ? (
               <div className="h-full flex flex-col overflow-hidden">
                 {/* Panel header */}
-                <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-text-primary truncate">{slideOverTitle}</h3>
+                <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-text-primary truncate flex-1">{slideOverTitle}</h3>
+                  {slideOverActions && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      {slideOverActions}
+                    </div>
+                  )}
                   {onSlideOverClose && (
                     <button
                       onClick={onSlideOverClose}
-                      className="p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                      className="p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary shrink-0"
                     >
                       <X size={16} />
                     </button>
@@ -313,8 +371,17 @@ export function ResponsiveLayout({
         </MobileDrawer>
       )}
       
-      {/* HELP DRAWER - Mobile: bottom sheet, Desktop: slide-over */}
-      {helpContent && (
+      {/* HELP MODAL - New contextual help system */}
+      {helpPageKey && (
+        <HelpModal
+          isOpen={helpDrawerOpen}
+          onClose={() => setHelpDrawerOpen(false)}
+          pageKey={helpPageKey}
+        />
+      )}
+      
+      {/* LEGACY HELP DRAWER - For backwards compatibility with JSX content */}
+      {!helpPageKey && helpContent && (
         isMobile ? (
           <MobileDrawer
             open={helpDrawerOpen}
@@ -337,57 +404,90 @@ export function ResponsiveLayout({
 }
 
 // =============================================================================
-// STATS BAR
+// STATS BAR - Enhanced with rich visual styling like Dashboard
 // =============================================================================
 
-function StatsBar({ stats, isMobile }) {
-  const variants = {
-    primary: 'text-accent-primary',
-    success: 'status-success-text',
-    warning: 'status-warning-text',
-    danger: 'status-danger-text',
-    info: 'status-primary-text'
+function StatsBar({ stats, isMobile, onStatClick, activeStatFilter }) {
+  const iconVariants = {
+    primary: 'rich-stat-icon-primary',
+    success: 'rich-stat-icon-success',
+    warning: 'rich-stat-icon-warning',
+    danger: 'rich-stat-icon-danger',
+    info: 'rich-stat-icon-primary',
+    secondary: 'rich-stat-icon-neutral',
+    default: 'rich-stat-icon-neutral'
   }
   
   if (isMobile) {
-    // Mobile: horizontal scroll with larger items
+    // Mobile: Premium pill-style stats with colored backgrounds
     return (
-      <div className="shrink-0 border-b border-border/60 bg-bg-secondary/30 flex overflow-x-auto scrollbar-none gap-4 px-4 py-2.5">
+      <div className="flex items-center gap-1.5 px-3 py-2 overflow-x-auto scrollbar-none border-b border-border/30 bg-bg-secondary/20">
         {stats.map((stat, i) => {
-          const Icon = stat.icon
-          const colorClass = variants[stat.variant] || variants.primary
+          const isActive = activeStatFilter && stat.filterValue === activeStatFilter
+          const isClickable = onStatClick && stat.filterValue !== undefined
           const displayLabel = stat.shortLabel || stat.label
           
+          // Premium colored pills
+          const pillColors = {
+            success: 'stats-inline-item stats-success',
+            warning: 'stats-inline-item stats-warning', 
+            danger: 'stats-inline-item stats-danger',
+            primary: 'stats-inline-item stats-primary',
+            info: 'stats-inline-item stats-primary',
+            secondary: 'stats-inline-item',
+            default: 'stats-inline-item'
+          }
+          const pillClass = pillColors[stat.variant] || pillColors.default
+          
           return (
-            <div key={i} className="flex items-center gap-2 shrink-0 whitespace-nowrap transition-all duration-200">
-              {Icon && (
-                <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', `${colorClass} bg-current/10`)}>
-                  <Icon size={16} weight="bold" className={colorClass} />
-                </div>
+            <button
+              key={i}
+              onClick={() => isClickable && onStatClick(stat.filterValue)}
+              disabled={!isClickable}
+              className={cn(
+                pillClass,
+                isActive && "ring-2 ring-offset-1 ring-offset-bg-primary ring-current",
+                !isClickable && "cursor-default opacity-80"
               )}
-              <div>
-                <p className="font-bold text-base text-text-primary">{stat.value}</p>
-                <p className="text-xs text-text-secondary whitespace-nowrap">{displayLabel}</p>
-              </div>
-            </div>
+            >
+              <span className="font-bold">{stat.value}</span>
+              <span className="opacity-80">{displayLabel}</span>
+            </button>
           )
         })}
       </div>
     )
   }
   
-  // Desktop: compact inline stats
+  // Desktop: Enhanced card-style stats with gradient icons
   return (
-    <div className="shrink-0 border-b border-border/60 bg-bg-secondary/20 flex items-center gap-5 px-5 py-1.5 shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)]">
+    <div className="rich-stats-bar py-2.5">
       {stats.map((stat, i) => {
         const Icon = stat.icon
-        const colorClass = variants[stat.variant] || variants.primary
+        const iconClass = iconVariants[stat.variant] || iconVariants.primary
+        const isActive = activeStatFilter && stat.filterValue === activeStatFilter
+        const isClickable = onStatClick && stat.filterValue !== undefined
         
         return (
-          <div key={i} className="flex items-center gap-1.5 transition-all duration-200 hover:opacity-80">
-            {Icon && <Icon size={14} weight="bold" className={colorClass} />}
-            <span className="font-semibold text-xs text-text-primary">{stat.value}</span>
-            <span className="text-xs text-text-secondary">{stat.label}</span>
+          <div 
+            key={i} 
+            className={cn(
+              "rich-stat-item",
+              isClickable && "cursor-pointer hover:bg-bg-tertiary/50 rounded-lg transition-colors",
+              isActive && "ring-2 ring-accent-primary/50 bg-accent-primary/10"
+            )}
+            onClick={() => isClickable && onStatClick(stat.filterValue)}
+            title={isClickable ? `Click to filter by ${stat.label}` : undefined}
+          >
+            {Icon && (
+              <div className={cn('rich-stat-icon', iconClass)}>
+                <Icon size={16} weight="duotone" />
+              </div>
+            )}
+            <div className="rich-stat-content">
+              <span className="rich-stat-value text-sm">{stat.value}</span>
+              <span className="rich-stat-label">{stat.label}</span>
+            </div>
           </div>
         )
       })}

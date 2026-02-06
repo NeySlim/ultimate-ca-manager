@@ -2,10 +2,10 @@
   "cookies": [
     {
       "name": "session",
-      "value": "J-mzqn9a7BfN3vaVCs1iQaYty64aezxNhL1PZBmwHho",
+      "value": "_ovqT5aaN3MYQ7napMN4Nz6-1hRe-iCTha82uKV6w5s",
       "domain": "localhost",
       "path": "/",
-      "expires": 1769806080.399538,
+      "expires": 1770447688.280925,
       "httpOnly": true,
       "secure": true,
       "sameSite": "Lax"
@@ -20,8 +20,12 @@
           "value": "admin"
         },
         {
-          "name": "ucm-theme",
-          "value": "dark"
+          "name": "ucm-theme-mode",
+          "value": "system"
+        },
+        {
+          "name": "ucm-theme-family",
+          "value": "gray"
         }
       ]
     }

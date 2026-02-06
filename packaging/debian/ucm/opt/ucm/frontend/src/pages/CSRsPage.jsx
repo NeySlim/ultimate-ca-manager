@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { 
   FileText, Upload, SignIn, Trash, Download, 
-  Clock, Key, UploadSimple, CheckCircle, Warning, X,
+  Clock, Key, UploadSimple, CheckCircle, Warning,
   ClockCounterClockwise, Certificate, Stamp, ClipboardText
 } from '@phosphor-icons/react'
 import {
@@ -13,6 +13,7 @@ import {
   CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats,
   KeyIndicator
 } from '../components'
+import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { csrsService, casService } from '../services'
 import { useNotification } from '../contexts'
@@ -20,7 +21,7 @@ import { usePermission, useModals } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
 import { VALIDITY } from '../constants/config'
-import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
+import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 
 // Tab definitions
 const TABS = [
@@ -46,6 +47,7 @@ export default function CSRsPage() {
   
   // Selection & modals
   const [selectedCSR, setSelectedCSR] = useState(null)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [signCA, setSignCA] = useState('')
   const [validityDays, setValidityDays] = useState(VALIDITY.DEFAULT_DAYS)
   
@@ -230,9 +232,23 @@ export default function CSRsPage() {
       priority: 1,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <FileText size={16} className="text-accent-warning shrink-0" />
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-orange">
+            <FileText size={14} weight="duotone" />
+          </div>
           <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
+        </div>
+      ),
+      mobileRender: (val, row) => (
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-orange">
+              <FileText size={14} weight="duotone" />
+            </div>
+            <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
+            <KeyIndicator hasKey={row.has_private_key} size={12} />
+          </div>
+          <Badge variant="warning" size="sm" dot>Pending</Badge>
         </div>
       )
     },
@@ -274,7 +290,9 @@ export default function CSRsPage() {
       priority: 1,
       render: (val, row) => (
         <div className="flex items-center gap-2">
-          <Certificate size={16} className="text-accent-success shrink-0" />
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
+            <Certificate size={14} weight="duotone" />
+          </div>
           <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
           {row.source === 'acme' && (
@@ -284,16 +302,35 @@ export default function CSRsPage() {
             <Badge variant="purple" size="sm">SCEP</Badge>
           )}
         </div>
+      ),
+      mobileRender: (val, row) => (
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
+              <Certificate size={14} weight="duotone" />
+            </div>
+            <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
+            <KeyIndicator hasKey={row.has_private_key} size={12} />
+          </div>
+          <Badge variant="success" size="sm" dot>Signed</Badge>
+        </div>
       )
     },
     {
       key: 'signed_by',
       header: 'Signed By',
       priority: 2,
+      hideOnMobile: true,
       render: (val, row) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <Stamp size={14} className="text-accent-primary" />
           <span className="text-sm text-text-primary truncate">{val || row.issuer_name || '—'}</span>
+        </div>
+      ),
+      mobileRender: (val, row) => (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-text-tertiary">CA:</span>
+          <span className="text-text-secondary truncate">{val || row.issuer_name || '—'}</span>
         </div>
       )
     },
@@ -343,24 +380,48 @@ export default function CSRsPage() {
 
   // Help content
   const helpContent = (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Quick Stats */}
+      <div className="visual-section">
+        <div className="visual-section-header">
+          <FileText size={16} className="status-primary-text" />
+          CSR Statistics
+        </div>
+        <div className="visual-section-body">
+          <div className="quick-info-grid">
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-warning">{pendingCSRs.length}</div>
+              <div className="help-stat-label">Pending</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-success">{historyCSRs.length}</div>
+              <div className="help-stat-label">Signed</div>
+            </div>
+            <div className="help-stat-card">
+              <div className="help-stat-value help-stat-value-primary">{pendingCSRs.length + historyCSRs.length}</div>
+              <div className="help-stat-label">Total</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <HelpCard title="About CSRs" variant="info">
         A Certificate Signing Request contains the public key and identity information needed to issue a certificate.
       </HelpCard>
-      <HelpCard title="Tabs" variant="info">
-        <div className="space-y-1 mt-2">
+      <HelpCard title="Status" variant="info">
+        <div className="space-y-1.5 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm">Pending</Badge>
+            <Badge variant="warning" size="sm" dot>Pending</Badge>
             <span className="text-xs">CSRs awaiting signature</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="success" size="sm">History</Badge>
+            <Badge variant="success" size="sm" dot>Signed</Badge>
             <span className="text-xs">Previously signed CSRs</span>
           </div>
         </div>
       </HelpCard>
       <HelpCard title="Workflow" variant="tip">
-        1. Upload CSR → 2. Review details → 3. Sign with CA → 4. Certificate appears in History
+        1. Upload CSR → 2. Review details → 3. Sign with CA → 4. Certificate issued
       </HelpCard>
     </div>
   )
@@ -378,7 +439,7 @@ export default function CSRsPage() {
         subtitle={`${pendingCSRs.length} pending, ${historyCSRs.length} signed`}
         icon={FileText}
         stats={stats}
-        helpContent={helpContent}
+        helpPageKey="csrs"
         tabs={tabsWithCounts}
         activeTab={activeTab}
         onTabChange={handleTabChange}
@@ -426,15 +487,16 @@ export default function CSRsPage() {
           searchable
           searchPlaceholder={activeTab === 'pending' ? 'Search pending CSRs...' : 'Search signed certificates...'}
           searchKeys={['cn', 'common_name', 'subject', 'organization', 'signed_by']}
+          columnStorageKey={`ucm-csrs-${activeTab}-columns`}
           toolbarActions={activeTab === 'pending' && canWrite('csrs') && (
             isMobile ? (
-              <Button size="lg" onClick={() => openModal('upload')} className="w-11 h-11 p-0">
+              <Button size="lg" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0">
                 <UploadSimple size={22} weight="bold" />
               </Button>
             ) : (
-              <Button size="sm" onClick={() => openModal('upload')}>
+              <Button size="sm" onClick={() => setShowImportModal(true)}>
                 <UploadSimple size={14} weight="bold" />
-                Upload
+                Import
               </Button>
             )
           )}
@@ -452,8 +514,8 @@ export default function CSRsPage() {
             ? 'Upload a CSR to get started' 
             : 'Sign a CSR to see it here'}
           emptyAction={activeTab === 'pending' && canWrite('csrs') && (
-            <Button onClick={() => openModal('upload')}>
-              <UploadSimple size={16} /> Upload CSR
+            <Button onClick={() => setShowImportModal(true)}>
+              <UploadSimple size={16} /> Import CSR
             </Button>
           )}
         />
@@ -604,6 +666,16 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
           </div>
         </div>
       </Modal>
+
+      {/* Smart Import Modal */}
+      <SmartImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={() => {
+          setShowImportModal(false)
+          loadData()
+        }}
+      />
     </>
   )
 }
@@ -783,7 +855,7 @@ function SignedCSRDetailsPanel({ cert, onDownload }) {
         <CompactGrid>
           <CompactField label="Algorithm" value={cert.key_algorithm || 'RSA'} />
           <CompactField label="Key Size" value={cert.key_size} />
-          <CompactField label="Serial" value={cert.serial_number} className="col-span-2" />
+          <CompactField label="Serial" value={cert.serial_number} copyable mono className="col-span-2" />
         </CompactGrid>
       </CompactSection>
 

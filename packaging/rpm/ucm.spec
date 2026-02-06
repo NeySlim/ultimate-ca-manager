@@ -1,5 +1,5 @@
 Name:           ucm
-Version:        2.0.0
+Version:        2.0.0~beta1
 Release:        1%{?dist}
 Summary:        Ultimate CA Manager - Complete PKI Management Platform
 
@@ -58,6 +58,26 @@ UCM_CONFIG=/etc/%{name}
 
 mkdir -p $UCM_DATA/{ca,certs,private,sessions,backups}
 mkdir -p /var/log/%{name}
+
+# Check for v1.8.x data to migrate
+V1_DB=""
+if [ -f "$UCM_HOME/backend/data/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
+    V1_DB="$UCM_HOME/backend/data/ucm.db"
+elif [ -f "/var/lib/ucm/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
+    V1_DB="/var/lib/ucm/ucm.db"
+fi
+
+if [ -n "$V1_DB" ]; then
+    echo "Migrating v1.8.x data to v2.0..."
+    cp "$V1_DB" "$UCM_DATA/ucm.db"
+    V1_DIR=$(dirname "$V1_DB")
+    for dir in ca certs private crl; do
+        [ -d "$V1_DIR/$dir" ] && cp -r "$V1_DIR/$dir"/* "$UCM_DATA/$dir/" 2>/dev/null || true
+    done
+    # Update config if exists
+    [ -f "$UCM_CONFIG/ucm.env" ] && sed -i "s|DATABASE_PATH=.*|DATABASE_PATH=$UCM_DATA/ucm.db|" "$UCM_CONFIG/ucm.env"
+    echo "✓ Migration complete"
+fi
 
 # Generate secrets
 ADMIN_PASS=$(openssl rand -hex 8)

@@ -1,22 +1,21 @@
 /**
  * Components - Centralized exports
+ * 
+ * Main components: ResponsiveLayout + ResponsiveDataTable
+ * Detail panels: CompactHeader, CompactSection, CompactGrid, CompactField, CompactStats
  */
 
 // Layout
 export { AppShell } from './AppShell'
 export { Sidebar } from './Sidebar'
-export { PageLayout, ContentSection, FocusItem } from './PageLayout'
-export { ExplorerPanel, ExplorerPanel as FocusPanel } from './ExplorerPanel'
-export { DetailsPanel, DetailsPanel as ContentPanel } from './DetailsPanel'
 export { BottomSheet } from './BottomSheet'
 export { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 
 // UI Components
 export { Card } from './Card'
 export { Button } from './Button'
-export { Badge } from './Badge'
-export { Table } from './Table'
-export { AutoTable } from './AutoTable'
+export { Badge, CATypeIcon } from './Badge'
+export { IconBadge, IconAvatar } from './IconBadge'
 export { TreeView } from './TreeView'
 export { SearchBar } from './SearchBar'
 export { Modal } from './Modal'
@@ -34,7 +33,7 @@ export { ExportDropdown } from './ExportDropdown'
 export { TabsComponent as Tabs } from './Tabs'
 export { TooltipComponent as Tooltip, HelpTooltip } from './Tooltip'
 export { HelpCard } from './HelpCard'
-export { HelpModal } from './HelpModal'
+export { HelpModal } from './ui/HelpModal'
 export { StatusIndicator } from './StatusIndicator'
 export { LoadingSpinner } from './LoadingSpinner'
 export { EmptyState } from './EmptyState'
@@ -42,26 +41,13 @@ export { Pagination } from './Pagination'
 export { Logo } from './Logo'
 export { PermissionsDisplay } from './PermissionsDisplay'
 export { ErrorBoundary } from './ErrorBoundary'
-export { ExplorerItem, ExplorerSection, ExplorerStat, ExplorerInfo } from './ExplorerItem'
 export { KeyIndicator } from './ui/KeyIndicator'
+export { WebSocketIndicator } from './WebSocketIndicator'
 
 // Hooks
 export { useAutoPageSize } from '../hooks/useAutoPageSize'
 
-// Responsive Content Components
-export { 
-  ContentHeader, 
-  ContentBody, 
-  ContentSection as ResponsiveContentSection, 
-  DataGrid, 
-  DataField, 
-  InfoCard, 
-  ActionBar,
-  TabsResponsive,
-  DetailView 
-} from './ResponsiveContent'
-
-// Detail Card Components (Mix Header A + Sections B)
+// Detail Card Components - for slide-over panels
 export { 
   DetailHeader, 
   DetailSection, 
@@ -70,7 +56,6 @@ export {
   DetailDivider,
   DetailContent,
   DetailTabs,
-  // Compact components for slide-over panels
   CompactSection,
   CompactGrid,
   CompactField,
@@ -81,40 +66,21 @@ export {
 
 // Certificate Details (reusable)
 export { CertificateDetails } from './CertificateDetails'
+export { CertificateCompareModal } from './CertificateCompareModal'
+export { TemplatePreviewModal } from './TemplatePreviewModal'
 export { CADetails } from './CADetails'
 export { CSRDetails } from './CSRDetails'
 export { TrustCertDetails } from './TrustCertDetails'
 
-// Data Table Components
-export { DataTable, SimpleTable, CardGrid } from './DataTable'
+// Filter components
+export { FilterPanel, FilterChips, FilterButton } from './FilterPanel'
+export { ActionBar, HeaderBar } from './ActionBar'
 
-// List Page Layout (DataTable + Details Panel)
-export { ListPageLayout } from './ListPageLayout'
-
-// Management Layout (Item list + Details for admin pages)
-export { ManagementLayout } from './ManagementLayout'
-export { TablePageLayout } from './TablePageLayout'
-export { UnifiedManagementLayout } from './UnifiedManagementLayout'
-export { SlideOverPanel, useSlideOver } from './SlideOverPanel'
-
-// New Responsive Components (Phase 10 - Mobile/Desktop unified)
-export { 
-  SlideOver, 
-  SlideOverSection, 
-  SlideOverRow, 
-  SlideOverBadges,
-  SlideOverActions 
-} from './SlideOver'
-export { 
-  FilterPanel, 
-  FilterChips, 
-  FilterButton 
-} from './FilterPanel'
-export { 
-  ActionBar as ResponsiveActionBar, 
-  HeaderBar 
-} from './ActionBar'
-
-// NEW: Phase 10 FROM SCRATCH - Unified responsive components
+// Responsive Components - MAIN BUILDING BLOCKS
 export { ResponsiveLayout, ResponsiveDataTable } from './ui/responsive'
+export { MobileCard, SimpleMobileCard } from './ui/MobileCard'
 export { UnifiedPageHeader } from './ui/UnifiedPageHeader'
+export { RichStatsBar } from './ui/RichStatsBar'
+
+// Dashboard charts
+export { CertificateTrendChart, StatusPieChart, MiniSparkline } from './DashboardChart'

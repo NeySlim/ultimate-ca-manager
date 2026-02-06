@@ -45,6 +45,17 @@ export const casService = {
     })
   },
 
+  async exportAll(format = 'pem', options = {}) {
+    const params = new URLSearchParams()
+    params.append('format', format)
+    if (options.includeChain) params.append('include_chain', 'true')
+    if (options.password) params.append('password', options.password)
+    
+    return apiClient.get(`/cas/export?${params.toString()}`, {
+      responseType: 'blob'
+    })
+  },
+
   async getCertificates(id, filters = {}) {
     const params = new URLSearchParams()
     if (filters.page) params.append('page', filters.page)

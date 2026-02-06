@@ -88,6 +88,44 @@ def regenerate_crl(ca_id):
         return error_response(f"Failed to regenerate CRL: {str(e)}", 500)
 
 
+@bp.route('/api/v2/crl/<int:ca_id>/auto-regen', methods=['POST'])
+@require_auth(['write:crl'])
+def toggle_auto_regen(ca_id):
+    """Enable/disable automatic CRL regeneration for a CA"""
+    ca = CA.query.get(ca_id)
+    if not ca:
+        return error_response('CA not found', 404)
+    
+    data = request.get_json() or {}
+    enabled = data.get('enabled', not ca.cdp_enabled)  # Toggle if not specified
+    
+    try:
+        ca.cdp_enabled = enabled
+        
+        # Audit log
+        username = getattr(g, 'user', {}).get('username', 'admin') if hasattr(g, 'user') else 'admin'
+        audit = AuditLog(
+            action='crl_auto_regen_toggle',
+            resource_type='ca',
+            resource_id=str(ca.id),
+            resource_name=ca.descr,
+            username=username,
+            details=f"{'Enabled' if enabled else 'Disabled'} automatic CRL regeneration",
+            ip_address=request.remote_addr,
+            success=True
+        )
+        db.session.add(audit)
+        db.session.commit()
+        
+        return success_response(
+            data={'cdp_enabled': ca.cdp_enabled},
+            message=f"Automatic CRL regeneration {'enabled' if enabled else 'disabled'}"
+        )
+    except Exception as e:
+        db.session.rollback()
+        return error_response(f"Failed to update: {str(e)}", 500)
+
+
 @bp.route('/api/v2/ocsp/status', methods=['GET'])
 @require_auth(['read:certificates'])
 def get_ocsp_status():

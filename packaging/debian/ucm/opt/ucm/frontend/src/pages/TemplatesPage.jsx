@@ -8,11 +8,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { 
   FileText, Plus, Copy, Trash, Download, FileArrowUp, PencilSimple,
-  Certificate, ShieldCheck, Clock
+  Certificate, ShieldCheck, Clock, Eye
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select, Textarea,
-  HelpCard, LoadingSpinner,
+  HelpCard, LoadingSpinner, TemplatePreviewModal,
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { templatesService } from '../services'
@@ -37,6 +37,7 @@ export default function TemplatesPage() {
   // Modals
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
   
   // Pagination
@@ -209,20 +210,46 @@ export default function TemplatesPage() {
       header: 'Template',
       priority: 1,
       sortable: true,
-      render: (val, row) => (
-        <div className="flex items-center gap-2">
-          <FileText size={16} className="text-accent-primary shrink-0" />
-          <span className="font-medium truncate">{val || 'Unnamed'}</span>
-        </div>
-      )
+      render: (val, row) => {
+        const type = getTemplateType(row)
+        const iconClass = type === 'ca' 
+          ? 'icon-bg-amber' 
+          : 'icon-bg-blue'
+        return (
+          <div className="flex items-center gap-2">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
+              {type === 'ca' ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
+            </div>
+            <span className="font-medium truncate">{val || 'Unnamed'}</span>
+          </div>
+        )
+      },
+      mobileRender: (val, row) => {
+        const type = getTemplateType(row)
+        const iconClass = type === 'ca' ? 'icon-bg-amber' : 'icon-bg-blue'
+        return (
+          <div className="flex items-center justify-between gap-2 w-full">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
+                {type === 'ca' ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
+              </div>
+              <span className="font-medium truncate">{val || 'Unnamed'}</span>
+            </div>
+            <Badge variant={type === 'ca' ? 'amber' : 'primary'} size="sm" dot>
+              {type === 'ca' ? 'CA' : 'Cert'}
+            </Badge>
+          </div>
+        )
+      }
     },
     {
       key: 'type',
       header: 'Type',
       priority: 2,
       sortable: true,
+      hideOnMobile: true,
       render: (val) => (
-        <Badge variant={val === 'ca' ? 'violet' : 'secondary'} size="sm">
+        <Badge variant={val === 'ca' ? 'amber' : 'primary'} size="sm" dot>
           {val === 'ca' ? 'CA' : 'Certificate'}
         </Badge>
       )
@@ -237,6 +264,12 @@ export default function TemplatesPage() {
         <span className="text-sm text-text-secondary">
           {val || 365} days
         </span>
+      ),
+      mobileRender: (val) => (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-text-tertiary">Validity:</span>
+          <span className="text-text-secondary">{val || 365}d</span>
+        </div>
       )
     },
     {
@@ -284,11 +317,11 @@ export default function TemplatesPage() {
       <HelpCard title="Template Types" variant="tip">
         <div className="space-y-1 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" size="sm">Certificate</Badge>
+            <Badge variant="primary" size="sm">Certificate</Badge>
             <span className="text-xs">End-entity certs (servers, users)</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="violet" size="sm">CA</Badge>
+            <Badge variant="warning" size="sm">CA</Badge>
             <span className="text-xs">Intermediate CAs</span>
           </div>
         </div>
@@ -305,11 +338,11 @@ export default function TemplatesPage() {
     <div className="p-3 space-y-4">
       <CompactHeader
         icon={FileText}
-        iconClass={selectedTemplate.type === 'ca' ? "bg-violet-500/20" : "bg-accent-primary/20"}
+        iconClass={selectedTemplate.type === 'ca' ? "bg-accent-warning/20" : "bg-accent-primary/20"}
         title={selectedTemplate.name}
         subtitle={`${selectedTemplate.usage_count || 0} certificates issued`}
         badge={
-          <Badge variant={selectedTemplate.type === 'ca' ? 'violet' : 'secondary'} size="sm">
+          <Badge variant={selectedTemplate.type === 'ca' ? 'warning' : 'primary'} size="sm">
             {selectedTemplate.type === 'ca' ? 'CA' : 'Certificate'}
           </Badge>
         }
@@ -317,6 +350,9 @@ export default function TemplatesPage() {
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="secondary" onClick={() => setShowPreviewModal(true)}>
+          <Eye size={14} /> Preview
+        </Button>
         {canWrite('templates') && (
           <>
             <Button size="sm" variant="secondary" onClick={() => { setEditingTemplate(selectedTemplate); setShowTemplateModal(true) }}>
@@ -385,8 +421,7 @@ export default function TemplatesPage() {
         subtitle={`${templates.length} template${templates.length !== 1 ? 's' : ''}`}
         icon={FileText}
         stats={stats}
-        helpContent={helpContent}
-        helpTitle="Templates Help"
+        helpPageKey="templates"
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -525,6 +560,13 @@ export default function TemplatesPage() {
           </div>
         </div>
       </Modal>
+      
+      {/* Template Preview Modal */}
+      <TemplatePreviewModal
+        open={showPreviewModal}
+        onClose={() => setShowPreviewModal(false)}
+        template={selectedTemplate}
+      />
     </>
   )
 }

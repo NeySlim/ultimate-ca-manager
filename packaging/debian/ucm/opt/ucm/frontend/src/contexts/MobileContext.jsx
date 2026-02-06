@@ -2,25 +2,29 @@
  * Mobile Context - Manages responsive layout state
  * 
  * Breakpoints:
- * - Mobile: < 768px (phones)
- * - Tablet: 768px - 1023px (tablets, small laptops)
- * - Desktop: 1024px - 1439px (standard laptops)
- * - Large: >= 1440px (large monitors)
+ * - Mobile: < 640px (phones)
+ * - Tablet: 640px - 899px (tablets, small windows)
+ * - Desktop: >= 900px (laptops, desktops)
+ * - Large: >= 1280px (large monitors)
  * 
  * Touch detection for input method
+ * Force Desktop Mode: User preference to disable responsive mobile layout
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
 const MobileContext = createContext(null)
 
-// Breakpoint values (matching Tailwind defaults)
+// Breakpoint values (adjusted for better PC experience)
 const BREAKPOINTS = {
-  sm: 640,
-  md: 768,
-  lg: 1024,
+  sm: 640,   // Mobile threshold
+  md: 768,   // Tailwind md
+  lg: 900,   // Desktop threshold (lowered from 1024)
   xl: 1280,
   '2xl': 1536
 }
+
+// LocalStorage key for force desktop preference
+const FORCE_DESKTOP_KEY = 'ucm-force-desktop-mode'
 
 export function MobileProvider({ children }) {
   const [screenSize, setScreenSize] = useState({
@@ -29,6 +33,26 @@ export function MobileProvider({ children }) {
   })
   const [isTouch, setIsTouch] = useState(false)
   const [explorerOpen, setExplorerOpen] = useState(false)
+  
+  // Force desktop mode preference
+  const [forceDesktop, setForceDesktopState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(FORCE_DESKTOP_KEY) === 'true'
+    }
+    return false
+  })
+
+  // Toggle force desktop mode with persistence
+  const setForceDesktop = useCallback((value) => {
+    setForceDesktopState(value)
+    if (typeof window !== 'undefined') {
+      if (value) {
+        localStorage.setItem(FORCE_DESKTOP_KEY, 'true')
+      } else {
+        localStorage.removeItem(FORCE_DESKTOP_KEY)
+      }
+    }
+  }, [])
 
   // Detect touch device
   useEffect(() => {
@@ -50,7 +74,7 @@ export function MobileProvider({ children }) {
       setScreenSize({ width, height })
       
       // Auto-close explorer when switching to desktop
-      if (width >= BREAKPOINTS.lg) {
+      if (width >= BREAKPOINTS.lg || forceDesktop) {
         setExplorerOpen(false)
       }
     }
@@ -58,12 +82,12 @@ export function MobileProvider({ children }) {
     handleResize()
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  }, [forceDesktop])
 
-  // Computed values
-  const isMobile = screenSize.width < BREAKPOINTS.lg  // < 1024px
-  const isTablet = screenSize.width >= BREAKPOINTS.md && screenSize.width < BREAKPOINTS.lg  // 768-1023px
-  const isDesktop = screenSize.width >= BREAKPOINTS.lg  // >= 1024px
+  // Computed values - forceDesktop overrides responsive behavior
+  const isMobile = forceDesktop ? false : screenSize.width < BREAKPOINTS.lg  // < 900px
+  const isTablet = forceDesktop ? false : screenSize.width >= BREAKPOINTS.sm && screenSize.width < BREAKPOINTS.lg  // 640-899px
+  const isDesktop = forceDesktop ? true : screenSize.width >= BREAKPOINTS.lg  // >= 900px
   const isLargeScreen = screenSize.width >= BREAKPOINTS.xl  // >= 1280px
   const isExtraLarge = screenSize.width >= BREAKPOINTS['2xl']  // >= 1536px
 
@@ -94,12 +118,17 @@ export function MobileProvider({ children }) {
     screenHeight: screenSize.height,
     
     // Device type flags
-    isMobile,       // < 1024px (phones + tablets)
-    isTablet,       // 768px - 1023px
-    isDesktop,      // >= 1024px
+    isMobile,       // < 900px (phones + tablets) - unless forceDesktop
+    isTablet,       // 640px - 899px - unless forceDesktop
+    isDesktop,      // >= 900px OR forceDesktop
     isLargeScreen,  // >= 1280px
     isExtraLarge,   // >= 1536px
     isTouch,        // Touch-capable device
+    
+    // Force desktop mode
+    forceDesktop,
+    setForceDesktop,
+    toggleForceDesktop: () => setForceDesktop(!forceDesktop),
     
     // Explorer state (mobile menu)
     explorerOpen,
@@ -133,6 +162,9 @@ export function useMobile() {
       isLargeScreen: false,
       isExtraLarge: false,
       isTouch: false,
+      forceDesktop: false,
+      setForceDesktop: () => {},
+      toggleForceDesktop: () => {},
       explorerOpen: false,
       openExplorer: () => {},
       closeExplorer: () => {},

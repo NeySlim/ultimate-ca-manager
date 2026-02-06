@@ -1,8 +1,8 @@
 Package: ucm
-Version: 2.0.0
+Version: 2.0.0~beta1
 Architecture: all
 Maintainer: UCM Development Team <dev@ucm-project.org>
-Installed-Size: 177322
+Installed-Size: 208394
 Depends: python3 (>= 3.10), python3-flask (>= 2.3.0), python3-cryptography (>= 41.0.0), python3-sqlalchemy (>= 2.0.0), python3-jwt, python3-flask-cors, python3-bcrypt, python3-werkzeug, openssl (>= 1.1.1), adduser, systemd
 Recommends: python3-flask-caching, python3-redis
 Suggests: nginx | apache2, certbot, python3-gunicorn

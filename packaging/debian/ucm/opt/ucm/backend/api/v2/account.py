@@ -620,8 +620,9 @@ def get_activity_log():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     
-    query = AuditLog.query.filter_by(user_id=g.current_user.id)
-    query = query.order_by(AuditLog.created_at.desc())
+    # Filter by username (AuditLog doesn't have user_id, uses username)
+    query = AuditLog.query.filter_by(username=g.current_user.username)
+    query = query.order_by(AuditLog.timestamp.desc())
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     
     return success_response(

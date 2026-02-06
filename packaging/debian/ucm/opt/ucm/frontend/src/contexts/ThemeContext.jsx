@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
-// Theme families - each has dark and light variant
+// Theme families with integrated icon colors
+// Icon colors are theme-aware to avoid "ton sur ton" conflicts
 const themeFamilies = {
   gray: {
     id: 'gray',
@@ -33,6 +34,19 @@ const themeFamilies = {
       'detail-section-border': '#3A4555',
       'detail-field-bg': 'rgba(255,255,255,0.02)',
       'detail-field-border': 'rgba(255,255,255,0.05)',
+      // Icon colors - standard
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.15)',
+      'icon-orange-text': '#FB923C',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.15)',
+      'icon-amber-text': '#FBBF24',
+      'icon-emerald-bg': 'rgba(52, 211, 153, 0.15)',
+      'icon-emerald-text': '#34D399',
+      'icon-blue-bg': 'rgba(79, 142, 247, 0.15)',
+      'icon-blue-text': '#60A5FA',
+      'icon-violet-bg': 'rgba(139, 92, 246, 0.15)',
+      'icon-violet-text': '#A78BFA',
+      'icon-teal-bg': 'rgba(20, 184, 166, 0.15)',
+      'icon-teal-text': '#2DD4BF',
     },
     light: {
       'bg-primary': '#F7F8FA',
@@ -61,6 +75,19 @@ const themeFamilies = {
       'detail-section-border': '#E2E8F0',
       'detail-field-bg': 'rgba(0,0,0,0.02)',
       'detail-field-border': 'rgba(0,0,0,0.06)',
+      // Icon colors - stronger opacity for light mode visibility
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.35)',
+      'icon-orange-text': '#EA580C',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.35)',
+      'icon-amber-text': '#D97706',
+      'icon-emerald-bg': 'rgba(16, 185, 129, 0.35)',
+      'icon-emerald-text': '#059669',
+      'icon-blue-bg': 'rgba(59, 130, 246, 0.35)',
+      'icon-blue-text': '#2563EB',
+      'icon-violet-bg': 'rgba(139, 92, 246, 0.35)',
+      'icon-violet-text': '#7C3AED',
+      'icon-teal-bg': 'rgba(20, 184, 166, 0.35)',
+      'icon-teal-text': '#0D9488',
     }
   },
   ocean: {
@@ -94,6 +121,19 @@ const themeFamilies = {
       'detail-section-border': '#1E3A5F',
       'detail-field-bg': 'rgba(255,255,255,0.02)',
       'detail-field-border': 'rgba(255,255,255,0.05)',
+      // Icon colors - avoid blue/teal, use warm colors
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.35)',
+      'icon-orange-text': '#FB923C',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.35)',
+      'icon-amber-text': '#FBBF24',
+      'icon-emerald-bg': 'rgba(52, 211, 153, 0.15)',
+      'icon-emerald-text': '#34D399',
+      'icon-blue-bg': 'rgba(249, 115, 22, 0.15)',  // Orange instead of blue
+      'icon-blue-text': '#FB923C',
+      'icon-violet-bg': 'rgba(236, 72, 153, 0.15)', // Pink
+      'icon-violet-text': '#F472B6',
+      'icon-teal-bg': 'rgba(249, 115, 22, 0.15)',  // Orange instead of teal
+      'icon-teal-text': '#FB923C',
     },
     light: {
       'bg-primary': '#F0F9FF',
@@ -122,6 +162,19 @@ const themeFamilies = {
       'detail-section-border': '#BAE6FD',
       'detail-field-bg': 'rgba(14,165,233,0.03)',
       'detail-field-border': 'rgba(14,165,233,0.1)',
+      // Icon colors - avoid blue/teal
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.15)',
+      'icon-orange-text': '#EA580C',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.15)',
+      'icon-amber-text': '#D97706',
+      'icon-emerald-bg': 'rgba(16, 185, 129, 0.35)',
+      'icon-emerald-text': '#059669',
+      'icon-blue-bg': 'rgba(249, 115, 22, 0.35)',  // Orange
+      'icon-blue-text': '#EA580C',
+      'icon-violet-bg': 'rgba(236, 72, 153, 0.35)',
+      'icon-violet-text': '#DB2777',
+      'icon-teal-bg': 'rgba(249, 115, 22, 0.35)',  // Orange
+      'icon-teal-text': '#EA580C',
     }
   },
   purple: {
@@ -155,6 +208,19 @@ const themeFamilies = {
       'detail-section-border': '#442B66',
       'detail-field-bg': 'rgba(255,255,255,0.02)',
       'detail-field-border': 'rgba(255,255,255,0.05)',
+      // Icon colors - avoid violet/pink, use teal/cyan
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.35)',
+      'icon-orange-text': '#FB923C',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.35)',
+      'icon-amber-text': '#FBBF24',
+      'icon-emerald-bg': 'rgba(52, 211, 153, 0.15)',
+      'icon-emerald-text': '#34D399',
+      'icon-blue-bg': 'rgba(20, 184, 166, 0.15)',  // Teal instead
+      'icon-blue-text': '#2DD4BF',
+      'icon-violet-bg': 'rgba(20, 184, 166, 0.15)', // Teal instead
+      'icon-violet-text': '#2DD4BF',
+      'icon-teal-bg': 'rgba(52, 211, 153, 0.15)',  // Green
+      'icon-teal-text': '#34D399',
     },
     light: {
       'bg-primary': '#FAF5FF',
@@ -183,6 +249,19 @@ const themeFamilies = {
       'detail-section-border': '#E9D5FF',
       'detail-field-bg': 'rgba(168,85,247,0.03)',
       'detail-field-border': 'rgba(168,85,247,0.1)',
+      // Icon colors - avoid violet/pink
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.15)',
+      'icon-orange-text': '#EA580C',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.15)',
+      'icon-amber-text': '#D97706',
+      'icon-emerald-bg': 'rgba(16, 185, 129, 0.35)',
+      'icon-emerald-text': '#059669',
+      'icon-blue-bg': 'rgba(20, 184, 166, 0.35)',  // Teal
+      'icon-blue-text': '#0D9488',
+      'icon-violet-bg': 'rgba(20, 184, 166, 0.35)', // Teal
+      'icon-violet-text': '#0D9488',
+      'icon-teal-bg': 'rgba(16, 185, 129, 0.35)',
+      'icon-teal-text': '#059669',
     }
   },
   forest: {
@@ -216,6 +295,19 @@ const themeFamilies = {
       'detail-section-border': '#1E4D2B',
       'detail-field-bg': 'rgba(255,255,255,0.02)',
       'detail-field-border': 'rgba(255,255,255,0.05)',
+      // Icon colors - avoid green/teal, use violet/pink
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.35)',
+      'icon-orange-text': '#FB923C',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.35)',
+      'icon-amber-text': '#FBBF24',
+      'icon-emerald-bg': 'rgba(139, 92, 246, 0.15)', // Violet instead
+      'icon-emerald-text': '#A78BFA',
+      'icon-blue-bg': 'rgba(59, 130, 246, 0.15)',
+      'icon-blue-text': '#60A5FA',
+      'icon-violet-bg': 'rgba(236, 72, 153, 0.15)', // Pink
+      'icon-violet-text': '#F472B6',
+      'icon-teal-bg': 'rgba(139, 92, 246, 0.15)',  // Violet instead
+      'icon-teal-text': '#A78BFA',
     },
     light: {
       'bg-primary': '#F0FDF4',
@@ -244,6 +336,19 @@ const themeFamilies = {
       'detail-section-border': '#BBF7D0',
       'detail-field-bg': 'rgba(16,185,129,0.03)',
       'detail-field-border': 'rgba(16,185,129,0.1)',
+      // Icon colors - avoid green/teal
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.15)',
+      'icon-orange-text': '#EA580C',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.15)',
+      'icon-amber-text': '#D97706',
+      'icon-emerald-bg': 'rgba(139, 92, 246, 0.35)', // Violet
+      'icon-emerald-text': '#7C3AED',
+      'icon-blue-bg': 'rgba(59, 130, 246, 0.35)',
+      'icon-blue-text': '#2563EB',
+      'icon-violet-bg': 'rgba(236, 72, 153, 0.35)', // Pink
+      'icon-violet-text': '#DB2777',
+      'icon-teal-bg': 'rgba(139, 92, 246, 0.35)',  // Violet
+      'icon-teal-text': '#7C3AED',
     }
   },
   sunset: {
@@ -277,6 +382,19 @@ const themeFamilies = {
       'detail-section-border': '#4D2815',
       'detail-field-bg': 'rgba(255,255,255,0.02)',
       'detail-field-border': 'rgba(255,255,255,0.05)',
+      // Icon colors - avoid orange/amber, use blue/teal
+      'icon-orange-bg': 'rgba(59, 130, 246, 0.15)',  // Blue instead
+      'icon-orange-text': '#60A5FA',
+      'icon-amber-bg': 'rgba(20, 184, 166, 0.15)',  // Teal instead
+      'icon-amber-text': '#2DD4BF',
+      'icon-emerald-bg': 'rgba(52, 211, 153, 0.15)',
+      'icon-emerald-text': '#34D399',
+      'icon-blue-bg': 'rgba(59, 130, 246, 0.15)',
+      'icon-blue-text': '#60A5FA',
+      'icon-violet-bg': 'rgba(139, 92, 246, 0.15)',
+      'icon-violet-text': '#A78BFA',
+      'icon-teal-bg': 'rgba(20, 184, 166, 0.15)',
+      'icon-teal-text': '#2DD4BF',
     },
     light: {
       'bg-primary': '#FFF7ED',
@@ -305,6 +423,19 @@ const themeFamilies = {
       'detail-section-border': '#FED7AA',
       'detail-field-bg': 'rgba(249,115,22,0.03)',
       'detail-field-border': 'rgba(249,115,22,0.1)',
+      // Icon colors - avoid orange/amber
+      'icon-orange-bg': 'rgba(59, 130, 246, 0.35)',  // Blue
+      'icon-orange-text': '#2563EB',
+      'icon-amber-bg': 'rgba(20, 184, 166, 0.35)',  // Teal
+      'icon-amber-text': '#0D9488',
+      'icon-emerald-bg': 'rgba(16, 185, 129, 0.35)',
+      'icon-emerald-text': '#059669',
+      'icon-blue-bg': 'rgba(59, 130, 246, 0.35)',
+      'icon-blue-text': '#2563EB',
+      'icon-violet-bg': 'rgba(139, 92, 246, 0.35)',
+      'icon-violet-text': '#7C3AED',
+      'icon-teal-bg': 'rgba(20, 184, 166, 0.35)',
+      'icon-teal-text': '#0D9488',
     }
   },
   cyber: {
@@ -312,32 +443,45 @@ const themeFamilies = {
     name: 'Cyber Pink',
     accent: '#EC4899',
     dark: {
-      'bg-primary': '#0D0221',
-      'bg-secondary': '#190933',
-      'bg-tertiary': '#240B3E',
-      'text-primary': '#FFE5F8',
-      'text-secondary': '#D89FCC',
-      'text-tertiary': '#B87DAA',
+      'bg-primary': '#1A0A1A',
+      'bg-secondary': '#2A1430',
+      'bg-tertiary': '#3A1E40',
+      'text-primary': '#FDF2F8',
+      'text-secondary': '#F9A8D4',
+      'text-tertiary': '#DB2777',
       'accent-primary': '#EC4899',
       'accent-success': '#22C55E',
       'accent-warning': '#F59E0B',
-      'accent-danger': '#F43F5E',
-      'accent-pro': '#8B5CF6',
-      'border': '#3D1754',
+      'accent-danger': '#EF4444',
+      'accent-pro': '#A855F7',
+      'border': '#4C1D40',
       'gradient-from': '#EC4899',
-      'gradient-to': '#F472B6',
-      'gradient-accent': 'linear-gradient(135deg, #EC4899 0%, #F472B6 100%)',
-      'gradient-bg': 'linear-gradient(135deg, #3d1854 0%, #5a1359 100%)',
-      'detail-header-bg': 'linear-gradient(135deg, rgba(236,72,153,0.08), rgba(244,114,182,0.04), transparent)',
+      'gradient-to': '#8B5CF6',
+      'gradient-accent': 'linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)',
+      'gradient-bg': 'linear-gradient(135deg, #3d1a38 0%, #2d1d4a 100%)',
+      'detail-header-bg': 'linear-gradient(135deg, rgba(236,72,153,0.08), rgba(139,92,246,0.04), transparent)',
       'detail-header-border': 'rgba(255,255,255,0.06)',
       'detail-header-shadow': 'inset 0 1px 0 0 rgba(255,255,255,0.04)',
       'detail-icon-bg': 'linear-gradient(135deg, #EC4899, rgba(236,72,153,0.7))',
       'detail-icon-shadow': '0 4px 12px rgba(236,72,153,0.25)',
       'detail-stats-border': 'rgba(255,255,255,0.06)',
-      'detail-section-bg': 'rgba(25,9,51,0.6)',
-      'detail-section-border': '#3D1754',
+      'detail-section-bg': 'rgba(42,20,48,0.6)',
+      'detail-section-border': '#4C1D40',
       'detail-field-bg': 'rgba(255,255,255,0.02)',
       'detail-field-border': 'rgba(255,255,255,0.05)',
+      // Icon colors - avoid pink/violet, use green/teal
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.35)',
+      'icon-orange-text': '#FB923C',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.35)',
+      'icon-amber-text': '#FBBF24',
+      'icon-emerald-bg': 'rgba(52, 211, 153, 0.15)',
+      'icon-emerald-text': '#34D399',
+      'icon-blue-bg': 'rgba(20, 184, 166, 0.15)',  // Teal instead
+      'icon-blue-text': '#2DD4BF',
+      'icon-violet-bg': 'rgba(52, 211, 153, 0.15)', // Green instead
+      'icon-violet-text': '#34D399',
+      'icon-teal-bg': 'rgba(52, 211, 153, 0.15)',
+      'icon-teal-text': '#34D399',
     },
     light: {
       'bg-primary': '#FDF2F8',
@@ -349,23 +493,36 @@ const themeFamilies = {
       'accent-primary': '#EC4899',
       'accent-success': '#22C55E',
       'accent-warning': '#F59E0B',
-      'accent-danger': '#F43F5E',
-      'accent-pro': '#8B5CF6',
+      'accent-danger': '#EF4444',
+      'accent-pro': '#A855F7',
       'border': '#FBCFE8',
       'gradient-from': '#EC4899',
-      'gradient-to': '#F472B6',
-      'gradient-accent': 'linear-gradient(135deg, #EC4899 0%, #F472B6 100%)',
+      'gradient-to': '#8B5CF6',
+      'gradient-accent': 'linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)',
       'gradient-bg': 'linear-gradient(145deg, #FDF2F8 0%, #FCE7F3 50%, #FDF2F8 100%)',
-      'detail-header-bg': 'linear-gradient(135deg, rgba(236,72,153,0.1), rgba(244,114,182,0.05), rgba(255,255,255,0.9))',
+      'detail-header-bg': 'linear-gradient(135deg, rgba(236,72,153,0.1), rgba(139,92,246,0.05), rgba(255,255,255,0.9))',
       'detail-header-border': 'rgba(236,72,153,0.15)',
       'detail-header-shadow': '0 1px 3px rgba(236,72,153,0.1)',
-      'detail-icon-bg': 'linear-gradient(135deg, #EC4899, #F472B6)',
+      'detail-icon-bg': 'linear-gradient(135deg, #EC4899, #DB2777)',
       'detail-icon-shadow': '0 4px 12px rgba(236,72,153,0.25)',
       'detail-stats-border': 'rgba(236,72,153,0.15)',
       'detail-section-bg': 'rgba(252,231,243,0.5)',
       'detail-section-border': '#FBCFE8',
       'detail-field-bg': 'rgba(236,72,153,0.03)',
       'detail-field-border': 'rgba(236,72,153,0.1)',
+      // Icon colors - avoid pink/violet
+      'icon-orange-bg': 'rgba(249, 115, 22, 0.15)',
+      'icon-orange-text': '#EA580C',
+      'icon-amber-bg': 'rgba(245, 158, 11, 0.15)',
+      'icon-amber-text': '#D97706',
+      'icon-emerald-bg': 'rgba(16, 185, 129, 0.35)',
+      'icon-emerald-text': '#059669',
+      'icon-blue-bg': 'rgba(20, 184, 166, 0.35)',  // Teal
+      'icon-blue-text': '#0D9488',
+      'icon-violet-bg': 'rgba(16, 185, 129, 0.35)', // Green
+      'icon-violet-text': '#059669',
+      'icon-teal-bg': 'rgba(16, 185, 129, 0.35)',
+      'icon-teal-text': '#059669',
     }
   }
 }
@@ -373,11 +530,8 @@ const themeFamilies = {
 const ThemeContext = createContext()
 
 export function ThemeProvider({ children }) {
-  // Theme family (gray, ocean, purple, etc.)
   const [themeFamily, setThemeFamily] = useState('gray')
-  // Mode: 'system' | 'dark' | 'light'
   const [mode, setMode] = useState('system')
-  // Resolved dark/light based on mode and system preference
   const [resolvedMode, setResolvedMode] = useState('dark')
 
   // Listen to system preference changes
@@ -418,16 +572,13 @@ export function ThemeProvider({ children }) {
       Object.entries(colors).forEach(([key, value]) => {
         document.documentElement.style.setProperty(`--${key}`, value)
       })
-      // Save preferences
       localStorage.setItem('ucm-theme-family', themeFamily)
       localStorage.setItem('ucm-theme-mode', mode)
     }
   }, [themeFamily, resolvedMode, mode])
 
-  // For backwards compatibility
   const currentTheme = `${themeFamily}-${resolvedMode}`
   const setCurrentTheme = useCallback((themeId) => {
-    // Handle old theme IDs (dark, light, ocean, purple, etc.)
     if (themeFamilies[themeId]) {
       setThemeFamily(themeId)
     } else if (themeId === 'dark') {
@@ -439,14 +590,11 @@ export function ThemeProvider({ children }) {
     }
   }, [])
 
-  // Expose theme families as array for UI
   const themes = Object.values(themeFamilies)
-  
   const isLight = resolvedMode === 'light'
 
   return (
     <ThemeContext.Provider value={{ 
-      // New API
       themeFamily,
       setThemeFamily,
       mode,
@@ -455,7 +603,6 @@ export function ThemeProvider({ children }) {
       isLight,
       themes,
       themeFamilies,
-      // Legacy API
       currentTheme,
       setCurrentTheme
     }}>

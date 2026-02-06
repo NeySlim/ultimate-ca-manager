@@ -28,6 +28,9 @@ from api.v2.mtls import bp as mtls_bp
 from api.v2.audit import bp as audit_bp
 from api.v2.websocket import websocket_bp
 from api.v2.groups import bp as groups_bp
+from api.v2.search import bp as search_bp
+from api.v2.smart_import import bp as smart_import_bp
+from api.v2.tools import tools_bp
 
 # List of all core blueprints to register
 # Pro features are loaded separately via pro/__init__.py in app.py
@@ -54,6 +57,9 @@ API_V2_BLUEPRINTS = [
     audit_bp,
     websocket_bp,
     groups_bp,
+    search_bp,
+    smart_import_bp,
+    tools_bp,
 ]
 
 

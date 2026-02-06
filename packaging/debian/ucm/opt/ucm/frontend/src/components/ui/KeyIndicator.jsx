@@ -15,7 +15,7 @@ export function KeyIndicator({ hasKey, size = 14, showTooltip = true }) {
         <Key 
           size={size} 
           weight="regular"
-          className="text-amber-500 dark:text-amber-400"
+          className="text-status-warning"
         />
       </span>
     )

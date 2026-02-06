@@ -49,7 +49,7 @@ export class ErrorBoundary extends Component {
             An unexpected error occurred. Please try again or refresh the page.
           </p>
           {import.meta.env.DEV && this.state.error && (
-            <pre className="text-xs text-left bg-bg-tertiary p-3 rounded-md mb-4 max-w-lg overflow-auto text-red-400">
+            <pre className="text-xs text-left bg-bg-tertiary p-3 rounded-md mb-4 max-w-lg overflow-auto text-status-danger">
               {this.state.error.toString()}
             </pre>
           )}

@@ -51,23 +51,30 @@ export function UnifiedPageHeader({
       'shrink-0 border-b border-border/60 bg-bg-secondary shadow-[inset_0_-1px_0_rgba(255,255,255,0.03)]',
       className
     )}>
-      {/* Title row */}
+      {/* Title row - HIDDEN on mobile (title already in AppShell navbar) */}
+      {!isMobile && (
       <div className={cn(
         'flex items-center justify-between',
-        isMobile ? 'px-4 py-3' : 'px-6 py-3'
+        isMobile ? 'px-3 py-2' : 'px-6 py-3'
       )}>
         {/* Left: Icon + Title */}
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           {Icon && (
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center shrink-0 shadow-sm">
-              <Icon size={18} weight="bold" className="text-white" />
+            <div className={cn(
+              "rounded-lg bg-gradient-to-br from-accent-primary to-accent-primary/70 flex items-center justify-center shrink-0 shadow-sm",
+              isMobile ? "w-7 h-7" : "w-9 h-9"
+            )}>
+              <Icon size={isMobile ? 14 : 18} weight="bold" className="text-white" />
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-text-primary truncate">
+            <h1 className={cn(
+              "font-semibold text-text-primary truncate",
+              isMobile ? "text-sm" : "text-lg"
+            )}>
               {title}
             </h1>
-            {subtitle && (
+            {subtitle && !isMobile && (
               <p className="text-sm text-text-secondary truncate">
                 {subtitle}
               </p>
@@ -76,7 +83,7 @@ export function UnifiedPageHeader({
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Desktop: Inline filters */}
           {!isMobile && hasFilters && (
             <div className="flex items-center gap-2">
@@ -108,13 +115,13 @@ export function UnifiedPageHeader({
               className={cn(
                 'relative flex items-center justify-center rounded-lg',
                 'bg-bg-tertiary hover:bg-bg-hover border border-border',
-                'h-11 w-11',
+                'h-8 w-8',
                 'transition-colors'
               )}
             >
-              <Funnel size={20} className="text-text-secondary" />
+              <Funnel size={16} className="text-text-secondary" />
               {activeFilters > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-primary text-white text-xs flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent-primary text-white text-2xs flex items-center justify-center">
                   {activeFilters}
                 </span>
               )}
@@ -132,11 +139,11 @@ export function UnifiedPageHeader({
                 className={cn(
                   'flex items-center justify-center rounded-lg',
                   'bg-bg-tertiary hover:bg-bg-hover border border-border',
-                  'h-11 w-11',
+                  'h-8 w-8',
                   'transition-colors'
                 )}
               >
-                <Question size={20} className="text-text-secondary" />
+                <Question size={16} className="text-text-secondary" />
               </button>
             ) : (
               <button
@@ -155,14 +162,15 @@ export function UnifiedPageHeader({
           )}
         </div>
       </div>
+      )}
 
       {/* Tabs row (if provided) */}
       {hasTabs && (
         <div className={cn(
           'overflow-x-auto scrollbar-hide',
-          isMobile ? 'px-4' : 'px-6'
+          isMobile ? 'px-3' : 'px-6'
         )}>
-          <div className="flex gap-1 min-w-max pb-0">
+          <div className="flex gap-0.5 min-w-max pb-0">
             {tabs.map((tab) => {
               const TabIcon = tab.icon
               const isActive = activeTab === tab.id
@@ -171,23 +179,26 @@ export function UnifiedPageHeader({
                   key={tab.id}
                   onClick={() => onTabChange?.(tab.id)}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 rounded-t-lg text-sm font-medium transition-all",
+                    "flex items-center gap-1.5 rounded-t-lg text-sm font-medium transition-all",
                     "border-b-2 -mb-px",
+                    isMobile ? "px-2.5 py-1.5" : "px-3 py-2",
                     isActive
                       ? "border-accent-primary text-accent-primary bg-bg-primary"
                       : "border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50"
                   )}
                 >
-                  {TabIcon && <TabIcon size={16} weight={isActive ? "fill" : "regular"} />}
+                  {TabIcon && (
+                    <TabIcon size={isMobile ? 14 : 16} weight={isActive ? "fill" : "regular"} />
+                  )}
                   <span className={isMobile && !isActive ? "hidden" : ""}>
                     {tab.label}
                   </span>
                   {tab.count !== undefined && (
                     <span className={cn(
-                      'px-1.5 py-0.5 rounded text-xs',
+                      'px-1.5 py-0.5 rounded-full text-2xs font-medium',
                       isActive
                         ? 'bg-accent-primary/15 text-accent-primary'
-                        : 'bg-bg-tertiary text-text-secondary'
+                        : 'bg-bg-tertiary text-text-tertiary'
                     )}>
                       {tab.count}
                     </span>

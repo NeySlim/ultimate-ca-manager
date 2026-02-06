@@ -122,11 +122,11 @@ class CRLSchedulerTask:
         try:
             logger.debug("Starting CRL regeneration check")
             
-            # Get all CAs with private keys
-            cas_with_keys = CA.query.filter_by(has_private_key=True).all()
+            # Get all CAs with private keys AND CDP enabled (auto-regen)
+            cas_with_keys = CA.query.filter_by(has_private_key=True, cdp_enabled=True).all()
             
             if not cas_with_keys:
-                logger.debug("No CAs with private keys found")
+                logger.debug("No CAs with CDP enabled found")
                 return
             
             regenerated_count = 0

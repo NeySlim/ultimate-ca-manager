@@ -1,4 +1,5 @@
 import { cn } from '../lib/utils'
+import { Crown, ShieldCheck } from '@phosphor-icons/react'
 
 export function Badge({ 
   children, 
@@ -25,9 +26,12 @@ export function Badge({
     red: 'status-danger-bg status-danger-text border-transparent',
     blue: 'status-primary-bg status-primary-text border-transparent',
     yellow: 'status-warning-bg status-warning-text border-transparent',
-    purple: 'status-primary-bg status-primary-text border-transparent',
-    orange: 'status-warning-bg status-warning-text border-transparent',
-    cyan: 'status-primary-bg status-primary-text border-transparent',
+    purple: 'icon-bg-violet border-transparent',
+    violet: 'icon-bg-violet border-transparent',
+    amber: 'status-warning-bg status-warning-text border-transparent',
+    orange: 'icon-bg-orange border-transparent',
+    cyan: 'icon-bg-teal border-transparent',
+    teal: 'icon-bg-teal border-transparent',
     gray: 'bg-bg-tertiary/60 text-text-secondary border-transparent',
   }
   
@@ -38,11 +42,17 @@ export function Badge({
     warning: 'status-warning-bg-solid',
     danger: 'status-danger-bg-solid',
     info: 'status-primary-bg-solid',
+    violet: 'bg-accent-pro',
+    purple: 'bg-accent-pro',
+    cyan: 'bg-accent-primary',
+    teal: 'bg-accent-success',
+    orange: 'bg-status-warning',
+    amber: 'bg-status-warning',
   }
   
   // Sizes: sm is pill-shaped, others are rounded
   const sizes = {
-    sm: 'px-2 py-px text-[10px] gap-1 rounded-full',
+    sm: 'px-2 py-px text-2xs gap-1 rounded-full',
     default: 'px-2.5 py-0.5 text-xs gap-1.5 rounded-md',
     lg: 'px-3 py-1 text-sm gap-2 rounded-md',
   }
@@ -74,5 +84,36 @@ export function Badge({
       {Icon && <Icon size={iconSizes[size]} weight="bold" className="shrink-0" />}
       {children}
     </span>
+  )
+}
+
+/**
+ * CATypeIcon - Consistent icon for Root/Intermediate CA
+ * Reusable across CAsPage tree view and CADetails panel
+ * Uses global CSS classes for theme-aware colors
+ */
+
+export function CATypeIcon({ isRoot, size = 'md', className }) {
+  const sizes = {
+    sm: { container: 'w-5 h-5', icon: 14 },
+    md: { container: 'w-7 h-7', icon: 16 },
+    lg: { container: 'w-8 h-8', icon: 18 }
+  }
+  
+  const { container, icon } = sizes[size] || sizes.md
+  
+  return (
+    <div className={cn(
+      container,
+      'rounded-lg flex items-center justify-center shrink-0',
+      isRoot ? 'ca-icon-root' : 'ca-icon-intermediate',
+      className
+    )}>
+      {isRoot ? (
+        <Crown size={icon} weight="duotone" />
+      ) : (
+        <ShieldCheck size={icon} weight="duotone" />
+      )}
+    </div>
   )
 }

@@ -40,7 +40,7 @@ import {
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
-import { CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats } from './DetailCard'
+import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { cn } from '../lib/utils'
 
 // Status badge config
@@ -84,27 +84,30 @@ function formatDate(dateStr, format = 'full') {
 function ExpiryIndicator({ daysRemaining, validTo }) {
   let color = 'text-status-success'
   let bgColor = 'bg-status-success/10'
-  let label = `${daysRemaining} days remaining`
+  let label = `${daysRemaining}d`
   
   if (daysRemaining <= 0) {
-    color = 'text-status-error'
-    bgColor = 'bg-status-error/10'
+    color = 'text-status-danger'
+    bgColor = 'bg-status-danger/10'
     label = 'Expired'
   } else if (daysRemaining <= 7) {
-    color = 'text-status-error'
-    bgColor = 'bg-status-error/10'
-    label = `${daysRemaining} days remaining`
+    color = 'text-status-danger'
+    bgColor = 'bg-status-danger/10'
+    label = `${daysRemaining}d left`
   } else if (daysRemaining <= 30) {
     color = 'text-status-warning'
     bgColor = 'bg-status-warning/10'
+    label = `${daysRemaining}d left`
+  } else {
+    label = `${daysRemaining}d left`
   }
   
   return (
-    <div className={cn("flex items-center gap-2 px-3 py-2 rounded-lg", bgColor)}>
-      <Clock size={16} className={color} />
+    <div className={cn("flex items-center gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg", bgColor)}>
+      <Clock size={14} className={cn("sm:w-4 sm:h-4", color)} />
       <div>
-        <div className={cn("text-sm font-medium", color)}>{label}</div>
-        <div className="text-xs text-text-tertiary">Expires {formatDate(validTo, 'short')}</div>
+        <div className={cn("text-xs sm:text-sm font-medium", color)}>{label}</div>
+        <div className="text-2xs sm:text-xs text-text-tertiary">Exp: {formatDate(validTo, 'short')}</div>
       </div>
     </div>
   )
@@ -134,24 +137,24 @@ export function CertificateDetails({
   const sourceBadge = sourceConfig[cert.source] || null
   
   return (
-    <div className={cn("space-y-4 p-4", compact && "space-y-3 p-3")}>
+    <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", compact && "space-y-2 p-2")}>
       {/* Header */}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2 sm:gap-3">
         <div className={cn(
-          "p-2.5 rounded-lg shrink-0",
-          cert.revoked ? "bg-status-error/10" : "bg-accent-primary/10"
+          "p-2 sm:p-2.5 rounded-lg shrink-0",
+          cert.revoked ? "bg-status-danger/10" : "bg-accent-primary/10"
         )}>
-          <Certificate size={24} className={cert.revoked ? "text-status-error" : "text-accent-primary"} />
+          <Certificate size={20} className={cn("sm:w-6 sm:h-6", cert.revoked ? "text-status-danger" : "text-accent-primary")} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-lg font-semibold text-text-primary truncate">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <h3 className="text-base sm:text-lg font-semibold text-text-primary truncate">
               {cert.cn || cert.common_name || cert.descr || 'Certificate'}
             </h3>
             <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
             {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
           </div>
-          <p className="text-xs text-text-tertiary truncate mt-0.5">{cert.subject}</p>
+          <p className="text-2xs sm:text-xs text-text-tertiary truncate mt-0.5">{cert.subject}</p>
         </div>
       </div>
       
@@ -161,70 +164,66 @@ export function CertificateDetails({
       )}
       
       {/* Quick stats */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
-          <Key size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-xs font-medium text-text-primary">{cert.key_algorithm || 'RSA'}</div>
-          <div className="text-[10px] text-text-tertiary">{cert.key_size ? `${cert.key_size} bits` : '—'}</div>
+      <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
+        <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
+          <Key size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
+          <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.key_algorithm || 'RSA'}</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">{cert.key_size ? `${cert.key_size} bits` : '—'}</div>
         </div>
-        <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
-          <Lock size={16} className={cn("mx-auto mb-1", cert.has_private_key ? "text-status-success" : "text-text-tertiary")} />
-          <div className="text-xs font-medium text-text-primary">{cert.has_private_key ? 'Has Key' : 'No Key'}</div>
-          {cert.has_private_key ? (
-            <div className="text-[10px] text-text-tertiary">{cert.private_key_location || '—'}</div>
-          ) : onUploadKey && canWrite ? (
-            <button 
-              onClick={onUploadKey}
-              className="text-[10px] text-accent-primary hover:underline cursor-pointer"
-            >
-              Upload Key
-            </button>
-          ) : (
-            <div className="text-[10px] text-text-tertiary">—</div>
-          )}
+        <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
+          <Lock size={14} className={cn("mx-auto mb-0.5 sm:mb-1 sm:w-4 sm:h-4", cert.has_private_key ? "text-status-success" : "text-text-tertiary")} />
+          <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.has_private_key ? 'Key' : 'No Key'}</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">
+            {cert.has_private_key ? (cert.private_key_location || '—') : '—'}
+          </div>
         </div>
-        <div className="bg-bg-tertiary/50 rounded-lg p-2.5 text-center">
-          <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-xs font-medium text-text-primary truncate">{cert.signature_algorithm || '—'}</div>
-          <div className="text-[10px] text-text-tertiary">Signature</div>
+        <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
+          <ShieldCheck size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
+          <div className="text-2xs sm:text-xs font-medium text-text-primary truncate">{cert.signature_algorithm?.split('-')[0] || '—'}</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">Signature</div>
         </div>
       </div>
       
-      {/* Actions */}
+      {/* Actions - compact on mobile */}
       {showActions && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
+          {/* Export buttons grouped */}
           {onExport && (
-            <>
-              <Button size="sm" variant="secondary" onClick={() => onExport('pem')}>
-                <Download size={14} /> PEM
+            <div className="flex flex-wrap gap-1 p-1 rounded-lg bg-bg-tertiary/50">
+              <Button size="xs" variant="ghost" onClick={() => onExport('pem')} className="!px-2 hover:bg-bg-secondary">
+                <Download size={12} /> PEM
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => onExport('der')}>
-                <Download size={14} /> DER
+              <Button size="xs" variant="ghost" onClick={() => onExport('der')} className="!px-2 hover:bg-bg-secondary">
+                <Download size={12} /> DER
+              </Button>
+              <Button size="xs" variant="ghost" onClick={() => onExport('pkcs7')} className="!px-2 hover:bg-bg-secondary">
+                <Download size={12} /> P7B
               </Button>
               {cert.has_private_key && (
-                <Button size="sm" variant="secondary" onClick={() => onExport('p12')}>
-                  <Download size={14} /> PKCS#12
-                </Button>
+                <>
+                  <Button size="xs" variant="ghost" onClick={() => onExport('pkcs12')} className="!px-2 hover:bg-bg-secondary">
+                    <Download size={12} /> P12
+                  </Button>
+                  <Button size="xs" variant="ghost" onClick={() => onExport('pfx')} className="!px-2 hover:bg-bg-secondary">
+                    <Download size={12} /> PFX
+                  </Button>
+                </>
               )}
-            </>
+            </div>
           )}
-          {onUploadKey && canWrite && !cert.has_private_key && (
-            <Button size="sm" variant="secondary" onClick={onUploadKey}>
-              <UploadSimple size={14} /> Upload Key
-            </Button>
-          )}
+          {/* Action buttons */}
           {onRenew && canWrite && !cert.revoked && (
-            <Button size="sm" variant="secondary" onClick={onRenew}>
-              <ArrowsClockwise size={14} /> Renew
+            <Button size="xs" variant="secondary" onClick={onRenew} title="Renew">
+              <ArrowsClockwise size={14} />
             </Button>
           )}
           {onRevoke && canWrite && !cert.revoked && (
-            <Button size="sm" variant="danger" onClick={onRevoke}>
-              <X size={14} /> Revoke
+            <Button size="xs" variant="warning-soft" onClick={onRevoke} title="Revoke">
+              <X size={14} />
             </Button>
           )}
           {onDelete && canDelete && (
-            <Button size="sm" variant="danger" onClick={onDelete}>
+            <Button size="xs" variant="danger-soft" onClick={onDelete} title="Delete">
               <Trash size={14} />
             </Button>
           )}
@@ -232,7 +231,7 @@ export function CertificateDetails({
       )}
       
       {/* Subject Information */}
-      <CompactSection title="Subject">
+      <CompactSection title="Subject" icon={Globe} iconClass="icon-bg-blue">
         <CompactGrid>
           <CompactField icon={Globe} label="Common Name" value={cert.cn || cert.common_name} />
           <CompactField icon={Buildings} label="Organization" value={cert.organization} />
@@ -245,7 +244,7 @@ export function CertificateDetails({
       </CompactSection>
       
       {/* Validity Period */}
-      <CompactSection title="Validity">
+      <CompactSection title="Validity" icon={Calendar} iconClass="icon-bg-green">
         <CompactGrid>
           <CompactField icon={Calendar} label="Valid From" value={formatDate(cert.valid_from)} />
           <CompactField icon={Calendar} label="Valid Until" value={formatDate(cert.valid_to)} />
@@ -253,7 +252,7 @@ export function CertificateDetails({
       </CompactSection>
       
       {/* Technical Details */}
-      <CompactSection title="Technical Details">
+      <CompactSection title="Technical Details" icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
           <CompactField icon={Hash} label="Serial" value={cert.serial_number} mono copyable />
           <CompactField autoIcon label="Key Type" value={cert.key_type} />
@@ -264,7 +263,7 @@ export function CertificateDetails({
       
       {/* SANs */}
       {cert.san_combined && (
-        <CompactSection title="Subject Alternative Names">
+        <CompactSection title="Subject Alternative Names" icon={Globe} iconClass="icon-bg-cyan">
           <div className="text-xs font-mono text-text-primary break-all bg-bg-tertiary/30 p-2 rounded border border-border/50">
             {cert.san_combined}
           </div>
@@ -272,7 +271,7 @@ export function CertificateDetails({
       )}
       
       {/* Issuer */}
-      <CompactSection title="Issuer">
+      <CompactSection title="Issuer" icon={ShieldCheck} iconClass="icon-bg-orange">
         <CompactGrid cols={1}>
           <CompactField autoIcon label="Issuer" value={cert.issuer} mono />
           <CompactField autoIcon label="CA" value={cert.issuer_name} />
@@ -281,7 +280,7 @@ export function CertificateDetails({
       </CompactSection>
       
       {/* Thumbprints */}
-      <CompactSection title="Fingerprints" collapsible defaultOpen={false}>
+      <CompactSection title="Fingerprints" icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
         <CompactGrid cols={1}>
           <CompactField autoIcon label="SHA-1" value={cert.thumbprint_sha1} mono copyable />
           <CompactField autoIcon label="SHA-256" value={cert.thumbprint_sha256} mono copyable />
@@ -290,10 +289,10 @@ export function CertificateDetails({
       
       {/* PEM */}
       {showPem && cert.pem && (
-        <CompactSection title="PEM Certificate" collapsible defaultOpen={false}>
+        <CompactSection title="PEM Certificate" icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
-              "text-[10px] font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto border border-border/30",
+              "text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto border border-border/30",
               !showFullPem && "max-h-24 overflow-hidden"
             )}>
               {cert.pem}
@@ -335,8 +334,8 @@ export function CertificateDetails({
       {/* Revocation info */}
       {cert.revoked && (
         <CompactSection title="Revocation Details">
-          <div className="bg-status-error/10 border border-status-error/20 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-status-error mb-2">
+          <div className="bg-status-danger/10 border border-status-danger/20 rounded-lg p-3">
+            <div className="flex items-center gap-2 text-status-danger mb-2">
               <X size={16} />
               <span className="font-medium">This certificate has been revoked</span>
             </div>

@@ -57,11 +57,31 @@ def list_certificates():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     status = request.args.get('status')  # valid, revoked, expired, expiring
+    ca_id = request.args.get('ca_id', type=int)  # Filter by CA
     search = request.args.get('search', '').strip()
     sort_by = request.args.get('sort_by', 'subject')  # Default sort by subject (common_name)
     sort_order = request.args.get('sort_order', 'asc')  # Default ascending (A-Z)
     
+    # Whitelist of allowed sort columns
+    ALLOWED_SORT_COLUMNS = {
+        'subject': Certificate.subject_cn,  # Sort by CN, not full DN
+        'subject_cn': Certificate.subject_cn,
+        'issuer': Certificate.issuer,
+        'valid_to': Certificate.valid_to,
+        'valid_from': Certificate.valid_from,
+        'created_at': Certificate.created_at,
+        'serial_number': Certificate.serial_number,
+        'revoked': Certificate.revoked,
+        'descr': Certificate.descr,
+        'key_algo': Certificate.key_algo,
+        'status': 'special'  # Handled separately with CASE
+    }
+    
     query = Certificate.query
+    
+    # Apply CA filter
+    if ca_id:
+        query = query.filter_by(ca_id=ca_id)
     
     # Apply status filter
     if status == 'revoked':
@@ -89,12 +109,33 @@ def list_certificates():
             )
         )
     
-    # Apply sorting BEFORE pagination
-    sort_column = getattr(Certificate, sort_by, Certificate.valid_to)
-    if sort_order == 'desc':
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
+    # Apply sorting BEFORE pagination (use whitelist)
+    sort_column = ALLOWED_SORT_COLUMNS.get(sort_by, Certificate.subject)
+    
+    if sort_by == 'status':
+        # Special handling: sort by computed status (revoked > expired > expiring > valid)
+        # Then alphabetically by subject within each group
+        from sqlalchemy import case
+        now = datetime.utcnow()
+        expiry_threshold = now + timedelta(days=30)
+        
+        # Status priority: 1=revoked, 2=expired, 3=expiring, 4=valid
+        status_order = case(
+            (Certificate.revoked == True, 1),
+            (Certificate.valid_to <= now, 2),
+            (Certificate.valid_to <= expiry_threshold, 3),
+            else_=4
+        )
+        
+        if sort_order == 'desc':
+            query = query.order_by(status_order.desc(), Certificate.subject.asc())
+        else:
+            query = query.order_by(status_order.asc(), Certificate.subject.asc())
+    elif sort_column != 'special':
+        if sort_order == 'desc':
+            query = query.order_by(sort_column.desc())
+        else:
+            query = query.order_by(sort_column.asc())
     
     # Paginate
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -447,6 +488,71 @@ def delete_certificate(cert_id):
     return no_content_response()
 
 
+@bp.route('/api/v2/certificates/export', methods=['GET'])
+@require_auth(['read:certificates'])
+def export_all_certificates():
+    """Export all certificates in various formats"""
+    from flask import Response
+    from models import Certificate, CA
+    import base64
+    import subprocess
+    import tempfile
+    import os
+    
+    export_format = request.args.get('format', 'pem').lower()
+    include_chain = request.args.get('include_chain', 'false').lower() == 'true'
+    
+    certificates = Certificate.query.filter(Certificate.crt.isnot(None)).all()
+    if not certificates:
+        return error_response('No certificates to export', 404)
+    
+    try:
+        if export_format == 'pem':
+            # Concatenate all PEM certificates
+            pem_data = b''
+            for cert in certificates:
+                if cert.crt:
+                    pem_data += base64.b64decode(cert.crt)
+                    if not pem_data.endswith(b'\n'):
+                        pem_data += b'\n'
+            
+            return Response(
+                pem_data,
+                mimetype='application/x-pem-file',
+                headers={'Content-Disposition': 'attachment; filename="certificates.pem"'}
+            )
+        
+        elif export_format == 'pkcs7' or export_format == 'p7b':
+            # Create temp file with all PEM certs
+            with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
+                for cert in certificates:
+                    if cert.crt:
+                        f.write(base64.b64decode(cert.crt))
+                        f.write(b'\n')
+                pem_file = f.name
+            
+            try:
+                p7b_output = subprocess.check_output([
+                    'openssl', 'crl2pkcs7', '-nocrl',
+                    '-certfile', pem_file,
+                    '-outform', 'DER'
+                ], stderr=subprocess.DEVNULL)
+                
+                return Response(
+                    p7b_output,
+                    mimetype='application/x-pkcs7-certificates',
+                    headers={'Content-Disposition': 'attachment; filename="certificates.p7b"'}
+                )
+            finally:
+                os.unlink(pem_file)
+        
+        else:
+            return error_response(f'Bulk export only supports PEM and P7B formats. Use individual export for DER/PKCS12/PFX', 400)
+    
+    except Exception as e:
+        return error_response(f'Export failed: {str(e)}', 500)
+
+
 @bp.route('/api/v2/certificates/<int:cert_id>/export', methods=['GET'])
 @require_auth(['read:certificates'])
 def export_certificate(cert_id):
@@ -571,6 +677,90 @@ def export_certificate(cert_id):
                 p12_bytes,
                 mimetype='application/x-pkcs12',
                 headers={'Content-Disposition': f'attachment; filename="{certificate.descr or certificate.refid}.p12"'}
+            )
+        
+        elif export_format == 'pkcs7' or export_format == 'p7b':
+            import subprocess
+            import tempfile
+            import os
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            
+            # Create temporary PEM file
+            with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
+                f.write(cert_pem)
+                # Include CA chain if requested
+                if include_chain and certificate.caref:
+                    ca = CA.query.filter_by(refid=certificate.caref).first()
+                    while ca:
+                        if ca.crt:
+                            f.write(b'\n')
+                            f.write(base64.b64decode(ca.crt))
+                        if ca.caref:
+                            ca = CA.query.filter_by(refid=ca.caref).first()
+                        else:
+                            break
+                pem_file = f.name
+            
+            try:
+                # Convert to PKCS7 using OpenSSL
+                p7b_output = subprocess.check_output([
+                    'openssl', 'crl2pkcs7', '-nocrl',
+                    '-certfile', pem_file,
+                    '-outform', 'DER'
+                ], stderr=subprocess.DEVNULL)
+                
+                return Response(
+                    p7b_output,
+                    mimetype='application/x-pkcs7-certificates',
+                    headers={'Content-Disposition': f'attachment; filename="{certificate.descr or certificate.refid}.p7b"'}
+                )
+            finally:
+                os.unlink(pem_file)
+        
+        elif export_format == 'pfx':
+            # PFX is same as PKCS12
+            if not password:
+                return error_response('Password required for PFX export', 400)
+            if not certificate.prv:
+                return error_response('Certificate has no private key for PFX export', 400)
+            
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.primitives.serialization import pkcs12
+            
+            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+            key_pem = base64.b64decode(certificate.prv)
+            private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+            
+            # Build CA chain
+            ca_certs = []
+            if certificate.caref:
+                ca = CA.query.filter_by(refid=certificate.caref).first()
+                while ca:
+                    if ca.crt:
+                        ca_cert = x509.load_pem_x509_certificate(
+                            base64.b64decode(ca.crt), default_backend()
+                        )
+                        ca_certs.append(ca_cert)
+                    if ca.caref:
+                        ca = CA.query.filter_by(refid=ca.caref).first()
+                    else:
+                        break
+            
+            p12_bytes = pkcs12.serialize_key_and_certificates(
+                name=(certificate.descr or certificate.refid).encode(),
+                key=private_key,
+                cert=cert,
+                cas=ca_certs if ca_certs else None,
+                encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
+            )
+            
+            return Response(
+                p12_bytes,
+                mimetype='application/x-pkcs12',
+                headers={'Content-Disposition': f'attachment; filename="{certificate.descr or certificate.refid}.pfx"'}
             )
         
         else:
