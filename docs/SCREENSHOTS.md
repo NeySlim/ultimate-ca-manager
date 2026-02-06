@@ -4,6 +4,12 @@
 
 UCM v2.0.0 features a completely redesigned interface built with React 18 and Radix UI components.
 
+## Authentication
+
+### Login Page
+![Login](screenshots/login.png)
+*Modern login with session memory and multiple auth methods*
+
 ## Dashboard
 ![Dashboard](screenshots/dashboard.png)
 *Modern dashboard with real-time statistics, activity feed, and system health*
@@ -25,9 +31,29 @@ UCM v2.0.0 features a completely redesigned interface built with React 18 and Ra
 ![CSRs](screenshots/csrs.png)
 *Review and sign pending certificate requests*
 
-### Groups
-![Groups](screenshots/groups.png)
-*Organize certificates into custom groups*
+### Templates
+![Templates](screenshots/templates.png)
+*Predefined certificate configurations for quick issuance*
+
+## Tools & Utilities
+
+### Certificate Tools
+![Certificate Tools](screenshots/certificate-tools.png)
+*SSL Checker, CSR Decoder, Certificate Decoder, Key Matcher, Format Converter*
+
+### Import/Export
+![Import Export](screenshots/import-export.png)
+*Smart import with auto-detection and batch processing*
+
+### Trust Store
+![Trust Store](screenshots/truststore.png)
+*Manage trusted CA certificates*
+
+## User Management
+
+### Users & Groups
+![Users Groups](screenshots/users-groups.png)
+*Organize users with roles and permissions*
 
 ## Protocol Support
 
