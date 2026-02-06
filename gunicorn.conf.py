@@ -23,8 +23,9 @@ limit_request_field_size = 8190
 # SSL/TLS
 # Support both Docker (/app) and production (/opt/ucm) paths
 base_path = os.getenv('UCM_BASE_PATH', '/opt/ucm')
-certfile = f'{base_path}/backend/data/https_cert.pem'
-keyfile = f'{base_path}/backend/data/https_key.pem'
+data_path = os.getenv('DATA_DIR', f'{base_path}/data')
+certfile = f'{data_path}/https_cert.pem'
+keyfile = f'{data_path}/https_key.pem'
 ssl_version = 'TLSv1_2'
 cert_reqs = 0  # Don't require client certificate
 do_handshake_on_connect = True

@@ -1,0 +1,28 @@
+ucm (2.0.0) stable; urgency=medium
+
+  * Version 2.0.0 - Major Release
+  
+  * Features:
+    - Complete UI redesign with 8 themes
+    - Pro: HSM integration page
+    - Pro: SSO/SAML/OIDC integration
+    - Pro: RBAC with role inheritance
+    - Pro: Group management with hierarchies
+    - ACME protocol support (Let's Encrypt compatible)
+    - WebAuthn/FIDO2 passwordless authentication
+    - mTLS client certificate authentication
+    - EST protocol support (RFC 7030)
+    - Auto-renewal service
+    - Webhook notifications
+    - Certificate templates
+    - WebAuthn multi-key registration (platform + cross-platform)
+    - HTTPS certificate selection from managed certs
+
+  * Bug fixes:
+    - Fixed WebAuthn registration for multiple authenticators
+    - Fixed Radix Select empty value handling
+    - Fixed database auto-migration
+    - Fixed HTTPS certificate apply and service restart
+    - Fixed cross-platform DATA_DIR paths
+
+ -- UCM Development Team <dev@ucm-project.org>  Mon, 03 Feb 2026 14:00:00 +0100

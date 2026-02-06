@@ -1,0 +1,259 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - link:
+            - /url: /
+          - link:
+            - /url: /
+            - img
+            - generic: Dashboard
+          - link:
+            - /url: /certificates
+            - img
+            - generic: Certificates
+          - link:
+            - /url: /cas
+            - img
+            - generic: CAs
+          - link:
+            - /url: /csrs
+            - img
+            - generic: CSRs
+          - link:
+            - /url: /templates
+            - img
+            - generic: Templates
+          - link:
+            - /url: /users
+            - img
+            - generic: Users
+          - link:
+            - /url: /acme
+            - img
+            - generic: ACME
+          - link:
+            - /url: /scep
+            - img
+            - generic: SCEP
+          - link:
+            - /url: /import
+            - img
+            - generic: Import
+          - link:
+            - /url: /audit
+            - img
+            - generic: Audit
+          - link:
+            - /url: /settings
+            - img
+            - generic: Settings
+          - link:
+            - /url: /groups
+            - img
+            - generic:
+              - img
+              - text: Groups
+          - link:
+            - /url: /rbac
+            - img
+            - generic:
+              - img
+              - text: RBAC
+          - link:
+            - /url: /sso
+            - img
+            - generic:
+              - img
+              - text: SSO
+          - link:
+            - /url: /hsm
+            - img
+            - generic:
+              - img
+              - text: HSM
+          - button:
+            - img
+            - generic: Theme
+          - button:
+            - img
+            - generic: admin
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - heading [level=1]: operator
+          - generic:
+            - generic:
+              - button: Edit
+              - button:
+                - img
+                - text: Disable
+              - button:
+                - img
+                - text: Reset Password
+              - button:
+                - img
+                - text: Delete
+          - generic:
+            - generic:
+              - generic:
+                - heading [level=3]: Basic Information
+                - generic:
+                  - generic:
+                    - generic: Username
+                    - generic:
+                      - textbox [disabled]: operator
+                  - generic:
+                    - generic: Email
+                    - generic:
+                      - textbox [disabled]: op@pew.pet
+                  - generic:
+                    - generic: Full Name
+                    - generic:
+                      - textbox [disabled]: opé rator
+                  - generic:
+                    - generic:
+                      - checkbox [checked] [disabled]
+                      - generic: Active
+              - generic:
+                - heading [level=3]: Role & Permissions
+                - generic:
+                  - generic:
+                    - generic: Role
+                    - combobox [disabled]:
+                      - generic: Operator
+                      - generic:
+                        - img
+                  - generic:
+                    - paragraph: Permissions
+                    - generic:
+                      - paragraph: Issue and manage certificates
+              - generic:
+                - heading [level=3]: Security
+                - generic:
+                  - generic:
+                    - paragraph: 2FA Status
+                    - generic: Disabled
+                  - generic:
+                    - paragraph: Last Password Change
+                    - paragraph: Never
+              - generic:
+                - heading [level=3]: Activity
+                - generic:
+                  - generic:
+                    - paragraph: Last Login
+                    - paragraph: Never
+                  - generic:
+                    - paragraph: Created
+                    - paragraph: 1/28/2026
+                  - generic:
+                    - paragraph: Login Count
+                    - paragraph: "0"
+                  - generic:
+                    - paragraph: Failed Logins
+                    - paragraph: "0"
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic: Users
+              - generic:
+                - img
+                - generic: 3 users
+          - generic:
+            - generic:
+              - heading [level=2]: Users
+          - generic:
+            - generic:
+              - generic:
+                - generic: Filter by Role
+                - combobox:
+                  - generic: All Roles
+                  - generic:
+                    - img
+              - button:
+                - img
+                - text: Create User
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - table:
+                      - rowgroup:
+                        - row:
+                          - columnheader:
+                            - generic:
+                              - generic: Username
+                          - columnheader:
+                            - generic:
+                              - generic: Email
+                          - columnheader:
+                            - generic:
+                              - generic: Role
+                          - columnheader:
+                            - generic:
+                              - generic: Status
+                          - columnheader:
+                            - generic:
+                              - generic: Last Login
+                      - rowgroup:
+                        - row:
+                          - cell: operator
+                          - cell: op@pew.pet
+                          - cell:
+                            - generic: operator
+                          - cell:
+                            - generic:
+                              - generic: Active
+                          - cell: Never
+                        - row:
+                          - cell: viewor
+                          - cell: view@vor.com
+                          - cell:
+                            - generic: viewer
+                          - cell:
+                            - generic:
+                              - generic: Active
+                          - cell: Never
+                        - row:
+                          - cell: admin
+                          - cell: admin@ucm.local
+                          - cell:
+                            - generic: admin
+                          - cell:
+                            - generic:
+                              - generic: Active
+                          - cell: 1/29/2026, 8:48:00 PM
+    - list
+  - dialog "Create New User" [ref=e2]:
+    - generic [ref=e3]:
+      - heading "Create New User" [level=2] [ref=e4]
+      - button [active] [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: Username*
+        - textbox [ref=e13]
+      - generic [ref=e14]:
+        - generic [ref=e15]: Email*
+        - textbox [ref=e17]
+      - generic [ref=e18]:
+        - generic [ref=e19]: Full Name
+        - textbox [ref=e21]
+      - generic [ref=e22]:
+        - generic [ref=e23]: Password*
+        - textbox [ref=e25]
+      - generic [ref=e26]:
+        - generic [ref=e27]: Role
+        - combobox [ref=e28] [cursor=pointer]:
+          - img [ref=e30]
+        - combobox [ref=e32]
+      - generic [ref=e33]:
+        - button "Create User" [ref=e34] [cursor=pointer]
+        - button "Cancel" [ref=e35] [cursor=pointer]
+```

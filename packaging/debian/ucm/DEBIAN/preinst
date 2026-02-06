@@ -1,0 +1,63 @@
+#!/bin/bash
+# UCM Pre-Installation Script
+# Handles checks and backups before installation
+
+set -e
+
+case "$1" in
+    install|upgrade)
+        # Check Python version
+        if ! command -v python3 >/dev/null 2>&1; then
+            echo "Error: Python 3 is required but not installed" >&2
+            exit 1
+        fi
+        
+        PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
+        PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
+        PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
+        
+        if [ "$PYTHON_MAJOR" -lt 3 ] || { [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 10 ]; }; then
+            echo "Error: Python 3.10 or higher is required (found $PYTHON_VERSION)" >&2
+            exit 1
+        fi
+        
+        # Check OpenSSL
+        if ! command -v openssl >/dev/null 2>&1; then
+            echo "Error: OpenSSL is required but not installed" >&2
+            exit 1
+        fi
+        
+        # On upgrade, backup existing database and config
+        if [ "$1" = "upgrade" ]; then
+            BACKUP_DIR="/var/lib/ucm/backups"
+            mkdir -p "$BACKUP_DIR"
+            
+            # Backup database
+            if [ -f "/var/lib/ucm/ucm.db" ]; then
+                echo "Creating backup of existing database..."
+                BACKUP_FILE="$BACKUP_DIR/ucm-pre-upgrade-$(date +%Y%m%d-%H%M%S).db"
+                cp "/var/lib/ucm/ucm.db" "$BACKUP_FILE"
+                echo "✓ Database backup: $BACKUP_FILE"
+            fi
+            
+            # Backup configuration
+            if [ -f "/etc/ucm/ucm.env" ]; then
+                echo "Creating backup of configuration..."
+                BACKUP_FILE="$BACKUP_DIR/ucm.env-pre-upgrade-$(date +%Y%m%d-%H%M%S)"
+                cp "/etc/ucm/ucm.env" "$BACKUP_FILE"
+                echo "✓ Config backup: $BACKUP_FILE"
+            fi
+        fi
+        
+        ;;
+        
+    abort-upgrade)
+        ;;
+        
+    *)
+        echo "preinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

@@ -1,0 +1,104 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - link "UCM Dashboard" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - link "Dashboard" [ref=e12] [cursor=pointer]:
+        - /url: /
+        - img [ref=e13]
+        - generic: Dashboard
+      - link "Certificates" [ref=e15] [cursor=pointer]:
+        - /url: /certificates
+        - img [ref=e16]
+        - generic: Certificates
+      - link "CAs" [ref=e18] [cursor=pointer]:
+        - /url: /cas
+        - img [ref=e19]
+        - generic: CAs
+      - link "CSRs" [ref=e21] [cursor=pointer]:
+        - /url: /csrs
+        - img [ref=e22]
+        - generic: CSRs
+      - link "Templates" [ref=e24] [cursor=pointer]:
+        - /url: /templates
+        - img [ref=e25]
+        - generic: Templates
+      - link "Users" [ref=e27] [cursor=pointer]:
+        - /url: /users
+        - img [ref=e28]
+        - generic: Users
+      - link "ACME" [ref=e30] [cursor=pointer]:
+        - /url: /acme
+        - img [ref=e31]
+        - generic: ACME
+      - link "SCEP" [ref=e33] [cursor=pointer]:
+        - /url: /scep
+        - img [ref=e34]
+        - generic: SCEP
+      - link "Import" [ref=e36] [cursor=pointer]:
+        - /url: /import
+        - img [ref=e37]
+        - generic: Import
+      - link "Audit" [ref=e39] [cursor=pointer]:
+        - /url: /audit
+        - img [ref=e40]
+        - generic: Audit
+      - link "Settings" [ref=e42] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e43]
+        - generic: Settings
+      - link "Groups" [ref=e46] [cursor=pointer]:
+        - /url: /groups
+        - img [ref=e47]
+        - generic:
+          - img
+          - text: Groups
+      - link "RBAC" [ref=e50] [cursor=pointer]:
+        - /url: /rbac
+        - img [ref=e51]
+        - generic:
+          - img
+          - text: RBAC
+      - link "SSO" [ref=e53] [cursor=pointer]:
+        - /url: /sso
+        - img [ref=e54]
+        - generic:
+          - img
+          - text: SSO
+      - link "HSM" [ref=e56] [cursor=pointer]:
+        - /url: /hsm
+        - img [ref=e57]
+        - generic:
+          - img
+          - text: HSM
+      - button "Theme" [ref=e59] [cursor=pointer]:
+        - img [ref=e60]
+        - generic: Theme
+      - button "admin" [ref=e62] [cursor=pointer]:
+        - img [ref=e63]
+        - generic: admin
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - heading "Groups" [level=1] [ref=e69]
+        - button "New" [ref=e72] [cursor=pointer]:
+          - img [ref=e73]
+          - text: New
+        - generic [ref=e75]:
+          - generic [ref=e77]:
+            - img [ref=e79]
+            - textbox "Search groups..." [ref=e81]
+          - generic [ref=e82]:
+            - img [ref=e84]
+            - heading "No groups" [level=3] [ref=e87]
+            - paragraph [ref=e88]: Create your first group
+        - generic [ref=e90]: 0 groups
+      - generic [ref=e94]:
+        - img [ref=e96]
+        - heading "Select a group" [level=3] [ref=e99]
+        - paragraph [ref=e100]: Choose a group from the list to view details
+  - region "Notifications (F8)":
+    - list
+```

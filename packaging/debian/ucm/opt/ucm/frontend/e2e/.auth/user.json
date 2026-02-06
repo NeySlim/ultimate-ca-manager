@@ -1,0 +1,29 @@
+{
+  "cookies": [
+    {
+      "name": "session",
+      "value": "J-mzqn9a7BfN3vaVCs1iQaYty64aezxNhL1PZBmwHho",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1769806080.399538,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://localhost:8443",
+      "localStorage": [
+        {
+          "name": "ucm_last_username",
+          "value": "admin"
+        },
+        {
+          "name": "ucm-theme",
+          "value": "dark"
+        }
+      ]
+    }
+  ]
+}

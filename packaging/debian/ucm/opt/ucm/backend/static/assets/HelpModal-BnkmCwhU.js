@@ -1,0 +1,1 @@
+import{j as o}from"./radix-B6Y-MRu0.js";import{M as i}from"./Modal-7_eTIvz3.js";function n({open:s,onClose:r,title:a="Help & Information",children:e}){return o.jsx(i,{open:s,onClose:r,title:a,size:"md",children:o.jsx("div",{className:"space-y-4",children:e})})}export{n as H};

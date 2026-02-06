@@ -1,40 +1,18 @@
 #!/bin/bash
-# UCM Post-Installation Script
-# Handles configuration and service setup after package installation
+# UCM Post-Installation Script (non-interactive)
 
 set -e
 
-# Source debconf library
-. /usr/share/debconf/confmodule
-
-# Package information
 PACKAGE="ucm"
 UCM_USER="ucm"
 UCM_GROUP="ucm"
 UCM_HOME="/opt/ucm"
-UCM_DATA="/var/lib/ucm"
+UCM_DATA="/opt/ucm/data"
 UCM_CONFIG="/etc/ucm"
-UCM_LOG="/var/log/ucm"
 
 case "$1" in
     configure)
-        # Get configuration from debconf
-        db_get ucm/fqdn
-        FQDN="$RET"
-        
-        db_get ucm/https_port
-        HTTPS_PORT="$RET"
-        
-        db_get ucm/admin_username
-        ADMIN_USER="$RET"
-        
-        db_get ucm/admin_password
-        ADMIN_PASS="$RET"
-        
-        db_get ucm/smtp_enable
-        SMTP_ENABLED="$RET"
-        
-        # Create UCM user and group if they don't exist
+        # Create user and group
         if ! getent group "$UCM_GROUP" >/dev/null 2>&1; then
             addgroup --system "$UCM_GROUP" >/dev/null
         fi
@@ -46,282 +24,105 @@ case "$1" in
         fi
         
         # Create directories
-        mkdir -p "$UCM_DATA"/{cas,certs,backups,logs,temp}
+        mkdir -p "$UCM_DATA"/{cas,certs,backups,sessions}
         mkdir -p "$UCM_CONFIG"
-        mkdir -p "$UCM_LOG"
+        mkdir -p /var/log/ucm
+        
+        # Sudoers for service restart
+        echo "ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm" > /etc/sudoers.d/ucm-service
+        chmod 440 /etc/sudoers.d/ucm-service
+        
+        # Create config if not exists
+        if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
+            SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+            JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+            ADMIN_PASS=$(python3 -c 'import secrets; print(secrets.token_hex(8))')
+            
+            cat > "$UCM_CONFIG/ucm.env" << ENVEOF
+# ============================================================
+# UCM Configuration File
+# ============================================================
+# This file is sourced by the UCM service at startup.
+# Edit values below and restart UCM: systemctl restart ucm
+
+# ============ REQUIRED (auto-generated) ============
+SECRET_KEY=$SECRET_KEY
+JWT_SECRET_KEY=$JWT_SECRET
+DATABASE_PATH=$UCM_DATA/ucm.db
+
+# ============ NETWORK ============
+HTTPS_PORT=8443
+# HTTP_PORT=8080
+# HTTP_REDIRECT=true
+# FQDN=ucm.example.com
+
+# ============ LOGGING ============
+LOG_LEVEL=INFO
+
+# ============ SECURITY ============
+# SESSION_TIMEOUT=3600
+# JWT_ACCESS_TOKEN_EXPIRES=900
+# JWT_REFRESH_TOKEN_EXPIRES=604800
+# RATE_LIMIT_ENABLED=true
+# RATE_LIMIT_PER_MINUTE=60
+# RATE_LIMIT_PER_HOUR=1000
+
+# ============ HTTPS CERTIFICATES ============
+# HTTPS_CERT_PATH=/opt/ucm/data/https_cert.pem
+# HTTPS_KEY_PATH=/opt/ucm/data/https_key.pem
+# HTTPS_AUTO_GENERATE=true
+
+# ============ INITIAL ADMIN (first start only) ============
+INITIAL_ADMIN_PASSWORD=$ADMIN_PASS
+# INITIAL_ADMIN_USERNAME=admin
+# INITIAL_ADMIN_EMAIL=admin@ucm.local
+
+# ============ SCEP (optional) ============
+# SCEP_ENABLED=false
+# SCEP_CHALLENGE_PASSWORD=
+# SCEP_CA_ID=
+# SCEP_AUTO_APPROVE=false
+
+# ============ DATABASE POOL (advanced) ============
+# DB_POOL_SIZE=10
+# DB_POOL_TIMEOUT=30
+# DB_POOL_RECYCLE=3600
+# DB_MAX_OVERFLOW=20
+
+# ============ REDIS (optional, for HA) ============
+# REDIS_URL=redis://localhost:6379/0
+ENVEOF
+            chmod 600 "$UCM_CONFIG/ucm.env"
+            
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo " UCM INSTALLED"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo " Admin password: $ADMIN_PASS"
+            echo " Config: $UCM_CONFIG/ucm.env"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        fi
+        
+        # Create venv if not exists
+        if [ ! -d "$UCM_HOME/venv" ]; then
+            echo "Creating Python virtual environment..."
+            python3 -m venv "$UCM_HOME/venv"
+            "$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
+            "$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
+        fi
         
         # Set permissions
         chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_HOME"
         chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_DATA"
         chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_CONFIG"
-        chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_LOG"
-        
+        chown -R "$UCM_USER":"$UCM_GROUP" /var/log/ucm
         chmod 750 "$UCM_DATA"
-        chmod 700 "$UCM_DATA"/{cas,certs,backups}
-        chmod 755 "$UCM_LOG"
         
-        # Allow ucm user to restart service (for HTTPS cert apply)
-        echo "ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm" > /etc/sudoers.d/ucm-service
-        chmod 440 /etc/sudoers.d/ucm-service
-        
-        # Handle configuration file - preserve keys on upgrade
-        if [ -f "$UCM_CONFIG/ucm.env" ]; then
-            echo "Existing configuration found, preserving SECRET_KEY and JWT_SECRET_KEY..."
-            
-            # Extract existing keys
-            if grep -q "^SECRET_KEY=" "$UCM_CONFIG/ucm.env" 2>/dev/null; then
-                SECRET_KEY=$(grep "^SECRET_KEY=" "$UCM_CONFIG/ucm.env" | cut -d= -f2)
-                echo "✓ Preserved existing SECRET_KEY"
-            else
-                SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
-                echo "✓ Generated new SECRET_KEY (was missing)"
-            fi
-            
-            if grep -q "^JWT_SECRET_KEY=" "$UCM_CONFIG/ucm.env" 2>/dev/null; then
-                JWT_SECRET=$(grep "^JWT_SECRET_KEY=" "$UCM_CONFIG/ucm.env" | cut -d= -f2)
-                echo "✓ Preserved existing JWT_SECRET_KEY"
-            else
-                JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
-                echo "✓ Generated new JWT_SECRET_KEY (was missing)"
-            fi
-            
-            # Backup existing config
-            BACKUP_FILE="$UCM_CONFIG/ucm.env.backup-$(date +%Y%m%d-%H%M%S)"
-            cp "$UCM_CONFIG/ucm.env" "$BACKUP_FILE"
-            echo "✓ Backup created: $BACKUP_FILE"
-        else
-            echo "First installation, generating new security keys..."
-            # Generate new secrets
-            SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
-            JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
-        fi
-        
-        # Create/update .env configuration file
-        cat > "$UCM_CONFIG/ucm.env" <<EOF
-# UCM Configuration
-# Generated by Debian package installer on $(date)
-
-# Core Settings
-FQDN=$FQDN
-HTTPS_PORT=$HTTPS_PORT
-HTTP_PORT=8080
-DEBUG=false
-LOG_LEVEL=INFO
-
-# Security
-SECRET_KEY=$SECRET_KEY
-JWT_SECRET_KEY=$JWT_SECRET
-SESSION_TIMEOUT=3600
-JWT_EXPIRATION=86400
-
-# Database
-DATABASE_PATH=$UCM_DATA/ucm.db
-BACKUP_ENABLED=true
-BACKUP_RETENTION_DAYS=30
-
-# HTTPS Certificate
-HTTPS_CERT_PATH=$UCM_CONFIG/https_cert.pem
-HTTPS_KEY_PATH=$UCM_CONFIG/https_key.pem
-HTTPS_AUTO_GENERATE=true
-
-# Initial Admin User
-INITIAL_ADMIN_USERNAME=$ADMIN_USER
-INITIAL_ADMIN_PASSWORD=$ADMIN_PASS
-INITIAL_ADMIN_EMAIL=admin@$FQDN
-
-# Caching
-CACHE_ENABLED=true
-CACHE_TYPE=simple
-CACHE_DEFAULT_TIMEOUT=300
-
-# Protocols
-ACME_ENABLED=true
-SCEP_ENABLED=true
-
-# Logging
-LOG_FILE=$UCM_LOG/ucm.log
-AUDIT_LOG_FILE=$UCM_LOG/audit.log
-EOF
-
-        # Add SMTP configuration if enabled
-        if [ "$SMTP_ENABLED" = "true" ]; then
-            db_get ucm/smtp_server
-            SMTP_SERVER="$RET"
-            db_get ucm/smtp_port
-            SMTP_PORT="$RET"
-            db_get ucm/smtp_username
-            SMTP_USER="$RET"
-            db_get ucm/smtp_password
-            SMTP_PASS="$RET"
-            db_get ucm/smtp_from
-            SMTP_FROM="$RET"
-            
-            cat >> "$UCM_CONFIG/ucm.env" <<EOF
-
-# SMTP Configuration
-SMTP_ENABLED=true
-SMTP_SERVER=$SMTP_SERVER
-SMTP_PORT=$SMTP_PORT
-SMTP_USERNAME=$SMTP_USER
-SMTP_PASSWORD=$SMTP_PASS
-SMTP_FROM=$SMTP_FROM
-SMTP_TLS=true
-EOF
-        else
-            cat >> "$UCM_CONFIG/ucm.env" <<EOF
-
-# SMTP Configuration
-SMTP_ENABLED=false
-EOF
-        fi
-        
-        # Secure the configuration file
-        chmod 600 "$UCM_CONFIG/ucm.env"
-        chown "$UCM_USER":"$UCM_GROUP" "$UCM_CONFIG/ucm.env"
-        
-        # Create symlink from /opt/ucm to config
-        ln -sf "$UCM_CONFIG/ucm.env" "$UCM_HOME/.env" 2>/dev/null || true
-        
-        # Generate HTTPS certificate if requested
-        db_get ucm/generate_https_cert
-        if [ "$RET" = "true" ]; then
-            if [ ! -f "$UCM_CONFIG/https_cert.pem" ]; then
-                echo "Generating self-signed HTTPS certificate..."
-                
-                # Create OpenSSL config with SAN
-                cat > /tmp/ucm-ssl.cnf <<SSLEOF
-[req]
-distinguished_name = req_distinguished_name
-x509_extensions = v3_req
-prompt = no
-
-[req_distinguished_name]
-C = US
-ST = State
-L = City
-O = Ultimate CA Manager
-OU = IT
-CN = $FQDN
-
-[v3_req]
-keyUsage = keyEncipherment, dataEncipherment
-extendedKeyUsage = serverAuth
-subjectAltName = @alt_names
-
-[alt_names]
-DNS.1 = $FQDN
-DNS.2 = localhost
-IP.1 = 127.0.0.1
-SSLEOF
-                
-                openssl req -x509 -newkey rsa:4096 -nodes \
-                    -keyout "$UCM_CONFIG/https_key.pem" \
-                    -out "$UCM_CONFIG/https_cert.pem" \
-                    -days 365 \
-                    -config /tmp/ucm-ssl.cnf \
-                    -extensions v3_req \
-                    2>/dev/null
-                
-                rm /tmp/ucm-ssl.cnf
-                
-                chmod 600 "$UCM_CONFIG/https_key.pem"
-                chmod 644 "$UCM_CONFIG/https_cert.pem"
-                chown "$UCM_USER":"$UCM_GROUP" "$UCM_CONFIG/https_key.pem"
-                chown "$UCM_USER":"$UCM_GROUP" "$UCM_CONFIG/https_cert.pem"
-                
-                echo "✓ HTTPS certificate generated"
-            fi
-        fi
-        
-        # Create Python virtual environment and install dependencies
-        if [ ! -d "$UCM_HOME/venv" ]; then
-            echo "Creating Python virtual environment..."
-            cd "$UCM_HOME"
-            sudo -u "$UCM_USER" python3 -m venv venv
-            sudo -u "$UCM_USER" "$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
-            sudo -u "$UCM_USER" "$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
-            echo "✓ Virtual environment created"
-        fi
-        
-        # Initialize database if it doesn't exist
-        if [ ! -f "$UCM_DATA/ucm.db" ]; then
-            echo "Initializing database..."
-            cd "$UCM_HOME"
-            # Load environment variables before running init_db
-            set -a
-            [ -f "$UCM_CONFIG/ucm.env" ] && . "$UCM_CONFIG/ucm.env"
-            set +a
-            sudo -u "$UCM_USER" -E "$UCM_HOME/venv/bin/python" "$UCM_HOME/backend/init_db.py"
-            echo "✓ Database initialized"
-        fi
-        
-        # Reload systemd and force service file update
-        # Always copy the new service file to ensure updates are applied
-        if [ -f /opt/ucm/packaging/debian/ucm.service ]; then
-            cp -f /opt/ucm/packaging/debian/ucm.service /etc/systemd/system/ucm.service
-            echo "✓ Updated systemd service file"
-        fi
-        systemctl daemon-reload >/dev/null 2>&1 || true
-        
-        # Enable and start service if requested
-        db_get ucm/autostart
-        if [ "$RET" = "true" ]; then
-            systemctl enable ucm.service >/dev/null 2>&1 || true
-            
-            if systemctl is-active --quiet ucm.service; then
-                systemctl restart ucm.service >/dev/null 2>&1 || true
-            else
-                systemctl start ucm.service >/dev/null 2>&1 || true
-            fi
-            
-            # Wait for service to start
-            sleep 2
-            
-            if systemctl is-active --quiet ucm.service; then
-                echo "✓ UCM service started successfully"
-            else
-                echo "⚠ UCM service failed to start. Check logs: journalctl -u ucm"
-            fi
-        fi
-        
-        # Display completion message
-        db_subst ucm/configuration_complete fqdn "$FQDN"
-        db_subst ucm/configuration_complete port "$HTTPS_PORT"
-        db_subst ucm/configuration_complete admin_username "$ADMIN_USER"
-        db_input high ucm/configuration_complete || true
-        db_go || true
-        
-        # Clean up debconf database (keep FQDN for reconfiguration)
-        db_reset ucm/admin_password
-        db_reset ucm/smtp_password
-        
-        echo ""
-        echo "╔════════════════════════════════════════╗"
-        echo "║   UCM Installation Complete! 🎉       ║"
-        echo "╚════════════════════════════════════════╝"
-        echo ""
-        echo "Access: https://$FQDN:$HTTPS_PORT"
-        echo "Login:  $ADMIN_USER / (your password)"
-        echo ""
-        echo "Configuration: $UCM_CONFIG/ucm.env"
-        echo "Logs:          journalctl -u ucm -f"
-        echo "Service:       systemctl status ucm"
-        echo ""
-        echo "To reconfigure: dpkg-reconfigure ucm"
-        echo ""
-        
-        ;;
-        
-    abort-upgrade|abort-remove|abort-deconfigure)
-        ;;
-        
-    *)
-        echo "postinst called with unknown argument \`$1'" >&2
-        exit 1
+        # Enable and start service
+        systemctl daemon-reload
+        systemctl enable ucm
+        systemctl start ucm || true
         ;;
 esac
-
-# Stop debconf
-db_stop
 
 exit 0
