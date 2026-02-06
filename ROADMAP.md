@@ -1,110 +1,87 @@
 # 🗺️ UCM Roadmap
 
-**Current Version:** v2.0.0 (2026-02-02)  
-**Status:** Production Ready
+**Current Version:** v2.0.0-beta1  
+**Status:** Beta Testing
 
 ---
 
-## ✅ v2.0.0 - Complete Enterprise PKI Platform (CURRENT)
+## ✅ v2.0.0-beta1 - Complete UI Rewrite (CURRENT)
 
-### Complete Frontend Rewrite ✅
-- ✅ **React 18 + Vite** - Modern SPA replacing HTMX/Alpine.js
-- ✅ **Radix UI Components** - Accessible, professional UI primitives
-- ✅ **6 Gradient Themes** - Dark Gray, Blue Ocean, Purple Night, Green Forest, Orange Sunset, Cyber Pink
-- ✅ **Split-View Layout** - 56px sidebar | 320px explorer | flex details
+### Frontend Rewrite ✅
+- ✅ **React 18 + Vite** - Modern SPA replacing HTMX
+- ✅ **Radix UI Components** - Accessible, professional UI
+- ✅ **12 Theme Variants** - 6 colors × Light/Dark modes
+- ✅ **Split-View Layout** - Sidebar, explorer, details panels
+- ✅ **Responsive Design** - Mobile-first, works on all devices
 
-### Import/Export System ✅
-- ✅ **Multi-format Import** - PEM, DER, PKCS12, PKCS7 auto-detection
-- ✅ **Paste PEM/JSON** - Direct paste in import modals
-- ✅ **Copy PEM** - One-click copy from detail views
-- ✅ **Auto-Routing** - CA certs (CA:TRUE) → CAs table
-
-### Authentication ✅
-- ✅ **WebAuthn/FIDO2** - Hardware security key support
-- ✅ **2FA TOTP** - Google Authenticator with QR setup
-- ✅ **mTLS** - Client certificate authentication
-- ✅ **Cascade Auth** - Automatic method detection
-
-### RBAC & Groups ✅
-- ✅ **Custom Roles** - Create/edit roles with fine-grained permissions
-- ✅ **44 Permissions** - Full coverage (CAs, Certs, Users, Groups, HSM, SSO, etc.)
-- ✅ **User Groups** - Teams, departments organization
-- ✅ **Group-based Permissions** - Assign roles to groups
-
-### SSO Integration ✅
-- ✅ **SAML 2.0** - Okta, Azure AD, OneLogin
-- ✅ **OAuth2/OIDC** - Google, GitHub, custom providers
-- ✅ **LDAP/Active Directory** - Enterprise directory integration
-- ✅ **Auto-provisioning** - Create users on first login
-
-### HSM Integration ✅
-- ✅ **PKCS#11 Support** - Generic HSM interface
-- ✅ **AWS CloudHSM** - Cloud HSM integration
-- ✅ **Azure Key Vault** - Microsoft cloud key management
-- ✅ **Google Cloud KMS** - GCP key management
-
-### High Availability ✅
-- ✅ **PostgreSQL Support** - Production database with migrations
-- ✅ **Redis Session Store** - Distributed sessions
-- ✅ **Load Balancer Ready** - X-Forwarded-* headers support
+### Core Features ✅
+- ✅ **Certificate Management** - Full lifecycle (create, sign, revoke, renew)
+- ✅ **CA Hierarchy** - Root, Intermediate, Issuing CAs
+- ✅ **Certificate Templates** - Predefined configurations
+- ✅ **User Groups** - Permission-based organization
+- ✅ **Audit Logs** - Complete action logging with export
 
 ### Protocols ✅
-- ✅ **EST (RFC 7030)** - Enrollment over Secure Transport
-- ✅ **SCEP** - Simple Certificate Enrollment Protocol
-- ✅ **ACME** - Let's Encrypt compatible server
-- ✅ **OCSP** - Online Certificate Status Protocol
+- ✅ **SCEP** - RFC 8894 device enrollment
+- ✅ **OCSP** - RFC 6960 status checking
+- ✅ **ACME** - Let's Encrypt compatible (certbot, acme.sh)
+- ✅ **CRL/CDP** - Certificate revocation distribution
 
-### Compliance (Backend) ✅
-- ✅ **Certificate Policies** - Define issuance rules
-- ✅ **Approval Workflows** - Multi-step approval
-- ✅ **Scheduled Reports** - Automated report generation
-- ✅ **Webhooks** - Event notifications
-- ✅ **Audit Logging** - Complete audit trail with export
+### Authentication ✅
+- ✅ **Username/Password** - Standard login
+- ✅ **WebAuthn/FIDO2** - Hardware security keys
+- ✅ **TOTP 2FA** - Google Authenticator compatible
+- ✅ **mTLS** - Client certificate authentication
 
-### Testing ✅
-- ✅ **Vitest** - 77 frontend unit tests
-- ✅ **Pytest** - 12 backend unit tests
-- ✅ **Playwright** - 26 E2E tests
-
-### Pages ✅
-- ✅ Dashboard, CAs, Certificates, CSRs, Templates
-- ✅ Users & Groups, ACME, SCEP, Settings, Account
-- ✅ Import/Export, TrustStore, CRL/OCSP, Audit Logs
-- ✅ RBAC, HSM, SSO (Pro)
+### Deployment ✅
+- ✅ **DEB Package** - Debian/Ubuntu
+- ✅ **RPM Package** - RHEL/Fedora
+- ✅ **Docker** - Multi-arch images
+- ✅ **Auto-migration** - From v1.8.x
 
 ---
 
-## 🚀 v2.0.1 - UI Completion (PLANNED)
+## 🚀 v2.0.0 Stable (PLANNED)
+
+### Polish & Stability
+- [ ] Docker image published to GHCR
+- [ ] Extended E2E test coverage
+- [ ] Performance optimization
+- [ ] Documentation updates
+
+### Bug Fixes
+- [ ] Address beta feedback
+- [ ] Cross-browser testing
+- [ ] Accessibility audit
+
+---
+
+## 🔮 v2.1.0 - Pro Features (FUTURE)
 
 ### Pro Feature UIs
-- [ ] **PoliciesPage.jsx** - Certificate policy management UI
-- [ ] **ApprovalsPage.jsx** - Approval workflow UI
-- [ ] **WebhooksPage.jsx** - Webhook configuration UI
-- [ ] **ReportsPage.jsx** - Report generation and scheduling UI
+- [ ] **Policies Page** - Certificate policy management
+- [ ] **Approval Workflows** - Multi-approver requests
+- [ ] **Webhooks Page** - Event notifications
+- [ ] **Reports Page** - Scheduled reports
 
-### UI Enhancements
-- [ ] Certificate chain visualization
-- [ ] Drag & drop CA hierarchy
-- [ ] Bulk operations UI
-- [ ] Custom dashboard widgets
+### Enterprise Integration (Pro)
+- [ ] **SSO** - SAML, OAuth2, LDAP (backend ready)
+- [ ] **HSM** - PKCS#11, Cloud HSM (backend ready)
+- [ ] **RBAC** - Custom roles (backend ready)
+
+### High Availability (Pro)
+- [ ] **PostgreSQL** - External database (code ready)
+- [ ] **Redis Sessions** - Distributed sessions (code ready)
 
 ---
 
-## 🌟 v2.0.2 - Integrations (FUTURE)
+## 🌟 v2.2.0+ - Future Ideas
 
-### Kubernetes & Cloud
 - [ ] Kubernetes cert-manager issuer
 - [ ] HashiCorp Vault connector
-- [ ] Terraform provider (full)
-
-### Additional Protocols
-- [ ] CMPv2 (RFC 4210)
+- [ ] EST Protocol (RFC 7030)
 - [ ] Certificate Transparency logs
-
-### Security
-- [ ] Encrypted database at rest
-- [ ] Key ceremony support
-- [ ] Air-gapped mode
+- [ ] CMPv2 (RFC 4210)
 
 ---
 
@@ -112,26 +89,11 @@
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| v2.0.0  | 2026-02-02 | React 18, Radix UI, HSM, SSO, RBAC, Groups, EST, PostgreSQL, Redis, 26 E2E tests |
-| v1.9.0  | 2026-01-16 | UI modernization, scheduler, CRL auto-regen |
-| v1.8.0  | 2026-01-09 | mTLS auth, REST API, OPNsense import |
-| v1.7.0  | 2026-01-08 | ACME server, WebAuthn, email notifications |
-| v1.0.0  | 2025-12-15 | First public release |
+| v2.0.0-beta1 | 2026-02-06 | React 18 UI, 12 themes, templates, groups |
+| v1.8.3 | 2026-01-10 | Standalone mode, packaging fixes |
+| v1.7.0 | 2026-01-08 | ACME, WebAuthn |
+| v1.0.0 | 2025-12-15 | Initial release |
 
 ---
 
-## 📁 Pro Feature Status
-
-| Feature | Backend | Frontend | Status |
-|---------|---------|----------|--------|
-| RBAC | ✅ | ✅ `RBACPage.jsx` | Complete |
-| Groups | ✅ | ✅ `GroupsPage.jsx` | Complete |
-| SSO | ✅ | ✅ `SSOPage.jsx` | Complete |
-| HSM | ✅ | ✅ `HSMPage.jsx` | Complete |
-| Policies | ✅ | ❌ Planned | v2.0.1 |
-| Webhooks | ✅ | ❌ Planned | v2.0.1 |
-| Reports | ✅ | ❌ Planned | v2.0.1 |
-
----
-
-**Last Updated:** 2026-02-02
+**Last Updated:** 2026-02-06
