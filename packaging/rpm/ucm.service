@@ -1,16 +1,19 @@
 [Unit]
-Description=Ultimate CA Manager - PKI Management Platform
-Documentation=https://github.com/kerberosmansour/ultimate-ca-manager
+Description=Ultimate CA Manager (UCM)
+Documentation=https://github.com/NeySlim/ultimate-ca-manager
 After=network.target
 
 [Service]
 Type=exec
 User=ucm
 Group=ucm
-WorkingDirectory=/usr/share/ucm
+WorkingDirectory=/usr/share/ucm/backend
 
 # Environment
-EnvironmentFile=/etc/ucm/.env
+EnvironmentFile=-/etc/ucm/ucm.env
+
+# Start script handles cert generation
+ExecStart=/usr/share/ucm/start-ucm.sh
 
 # Security hardening
 NoNewPrivileges=true
@@ -29,16 +32,6 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 # Resource limits
 LimitNOFILE=65536
 LimitNPROC=512
-
-# Startup
-ExecStart=/usr/share/ucm/venv/bin/gunicorn \
-    --config /usr/share/ucm/gunicorn.conf.py \
-    --bind 0.0.0.0:${HTTPS_PORT:-8443} \
-    --certfile ${HTTPS_CERT_PATH:-/etc/ucm/https_cert.pem} \
-    --keyfile ${HTTPS_KEY_PATH:-/etc/ucm/https_key.pem} \
-    --access-logfile /var/log/ucm/access.log \
-    --error-logfile /var/log/ucm/error.log \
-    wsgi:app
 
 # Restart policy
 Restart=always

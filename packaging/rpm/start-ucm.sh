@@ -1,18 +1,21 @@
 #!/bin/bash
-# UCM Start Wrapper - Loads environment and starts Gunicorn
-# This script is executed by systemd to properly load environment variables
-# before starting the Gunicorn WSGI server.
+# UCM Start Wrapper for RPM - Loads environment and starts Gunicorn
+# RPM paths differ from DEB: /usr/share/ucm vs /opt/ucm
 
 # Load environment variables from config file
 set -a
 [ -f /etc/ucm/ucm.env ] && source /etc/ucm/ucm.env
 set +a
 
-# Set defaults if not defined
+# Set defaults - RPM uses /var/lib/ucm for data
 : ${HTTPS_PORT:=8443}
-: ${HTTPS_CERT_PATH:=/opt/ucm/data/https_cert.pem}
-: ${HTTPS_KEY_PATH:=/opt/ucm/data/https_key.pem}
+: ${UCM_DATA:=/var/lib/ucm}
+: ${HTTPS_CERT_PATH:=$UCM_DATA/https_cert.pem}
+: ${HTTPS_KEY_PATH:=$UCM_DATA/https_key.pem}
 : ${LOG_LEVEL:=info}
+
+export DATABASE_PATH="${DATABASE_PATH:-$UCM_DATA/ucm.db}"
+export DATA_DIR="$UCM_DATA"
 
 # Generate self-signed HTTPS cert if not exists
 if [ ! -f "$HTTPS_CERT_PATH" ] || [ ! -f "$HTTPS_KEY_PATH" ]; then
@@ -27,8 +30,8 @@ if [ ! -f "$HTTPS_CERT_PATH" ] || [ ! -f "$HTTPS_KEY_PATH" ]; then
 fi
 
 # Start Gunicorn with SSL
-cd /opt/ucm/backend
-exec /opt/ucm/venv/bin/gunicorn \
+cd /usr/share/ucm/backend
+exec /usr/share/ucm/venv/bin/gunicorn \
     --bind "0.0.0.0:${HTTPS_PORT}" \
     --workers 4 \
     --worker-class sync \
@@ -38,5 +41,5 @@ exec /opt/ucm/venv/bin/gunicorn \
     --log-level "${LOG_LEVEL}" \
     --certfile "${HTTPS_CERT_PATH}" \
     --keyfile "${HTTPS_KEY_PATH}" \
-    --chdir /opt/ucm/backend \
+    --chdir /usr/share/ucm/backend \
     wsgi:app

@@ -10,19 +10,23 @@ from typing import Optional
 from datetime import timedelta
 from dotenv import load_dotenv
 
+# Load environment variables FIRST (before using them)
+# Try multiple locations for .env files
+load_dotenv("/etc/ucm/ucm.env")  # System config (DEB/RPM)
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")  # Local dev
+
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 BACKEND_DIR = BASE_DIR / "backend"
-# In /opt/ucm: data is at same level as backend/, not inside it
-DATA_DIR = BASE_DIR / "data"
 
-# Ensure data directories exist
-DATA_DIR.mkdir(exist_ok=True)
-# Don't create subdirectories at module import time (permission issues)
-# They will be created on-demand when needed
+# DATA_DIR is configurable via environment for RPM (/var/lib/ucm) vs DEB (/opt/ucm/data)
+DATA_DIR = Path(os.environ.get("DATA_DIR", str(BASE_DIR / "data")))
 
-# Load environment variables
-load_dotenv(BASE_DIR / ".env")
+# Ensure data directories exist (may fail for permission reasons - that's OK)
+try:
+    DATA_DIR.mkdir(exist_ok=True)
+except PermissionError:
+    pass  # Directory should already exist from package install
 
 
 def is_docker():

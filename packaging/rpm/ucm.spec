@@ -31,14 +31,14 @@ install -d %{buildroot}%{_bindir}
 
 cp -r backend %{buildroot}%{_datadir}/%{name}/
 cp -r frontend %{buildroot}%{_datadir}/%{name}/
-cp -r scripts %{buildroot}%{_datadir}/%{name}/
+cp -r packaging/scripts %{buildroot}%{_datadir}/%{name}/
 find %{buildroot}%{_datadir}/%{name} -name '.env*' -delete
 
-install -m 644 requirements.txt %{buildroot}%{_datadir}/%{name}/
+install -m 644 backend/requirements.txt %{buildroot}%{_datadir}/%{name}/requirements.txt
 install -m 644 gunicorn.conf.py %{buildroot}%{_datadir}/%{name}/
-install -m 755 wsgi.py %{buildroot}%{_datadir}/%{name}/
+install -m 644 backend/wsgi.py %{buildroot}%{_datadir}/%{name}/wsgi.py
+install -m 755 packaging/rpm/start-ucm.sh %{buildroot}%{_datadir}/%{name}/start-ucm.sh
 install -m 644 packaging/rpm/ucm.service %{buildroot}%{_unitdir}/%{name}.service
-install -m 755 packaging/scripts/ucm-configure %{buildroot}%{_bindir}/ucm-configure
 
 %pre
 getent group %{name} >/dev/null || groupadd -r %{name}
@@ -50,22 +50,79 @@ echo "ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl
 chmod 440 /etc/sudoers.d/ucm-service
 
 # Create data directories
-mkdir -p /var/lib/%{name}/{ca,certs,private,sessions,backups}
+UCM_DATA=/var/lib/%{name}
+mkdir -p $UCM_DATA/{ca,certs,private,sessions,backups}
 mkdir -p /var/log/%{name}
-chown -R %{name}:%{name} /var/lib/%{name}
+
+# Generate secrets
+ADMIN_PASS=$(openssl rand -hex 8)
+SECRET_KEY=$(openssl rand -hex 32)
+JWT_SECRET=$(openssl rand -hex 32)
+
+# Create config if not exists
+if [ ! -f /etc/%{name}/ucm.env ]; then
+    cat > /etc/%{name}/ucm.env << ENVEOF
+# UCM Configuration - Generated on install
+DATABASE_PATH=/var/lib/ucm/ucm.db
+DATA_DIR=/var/lib/ucm
+HTTPS_PORT=8443
+LOG_LEVEL=INFO
+
+# Security (auto-generated - keep secret)
+SECRET_KEY=$SECRET_KEY
+JWT_SECRET_KEY=$JWT_SECRET
+INITIAL_ADMIN_PASSWORD=$ADMIN_PASS
+ENVEOF
+    chmod 600 /etc/%{name}/ucm.env
+    
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo " UCM INSTALLED"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo " Admin password: $ADMIN_PASS"
+    echo " Config: /etc/%{name}/ucm.env"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+fi
+
+# Create venv if gunicorn not found
+if [ ! -f /usr/share/%{name}/venv/bin/gunicorn ]; then
+    echo "Creating Python virtual environment..."
+    rm -rf /usr/share/%{name}/venv 2>/dev/null || true
+    python3 -m venv /usr/share/%{name}/venv
+    /usr/share/%{name}/venv/bin/pip install --quiet --upgrade pip
+    /usr/share/%{name}/venv/bin/pip install --quiet -r /usr/share/%{name}/requirements.txt
+fi
+
+# Set permissions
+chown -R %{name}:%{name} $UCM_DATA
 chown -R %{name}:%{name} /var/log/%{name}
+chown -R %{name}:%{name} /etc/%{name}
+
+# Generate HTTPS cert if not exists
+if [ ! -f "$UCM_DATA/https_cert.pem" ]; then
+    echo "Generating HTTPS certificate..."
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "$UCM_DATA/https_key.pem" \
+        -out "$UCM_DATA/https_cert.pem" \
+        -subj "/CN=ucm/O=UCM/OU=PKI" 2>/dev/null
+    chown %{name}:%{name} "$UCM_DATA"/https_*.pem
+    chmod 600 "$UCM_DATA/https_key.pem"
+    chmod 644 "$UCM_DATA/https_cert.pem"
+fi
 
 # Automatic migration from v1.8.x
 V1_DATA="/usr/share/%{name}/backend/data"
-V2_DATA="/var/lib/%{name}"
-if [ -f "$V1_DATA/ucm.db" ] && [ ! -f "$V2_DATA/ucm.db" ]; then
+if [ -f "$V1_DATA/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
     echo "Detected UCM v1.8.x - running automatic migration..."
-    if [ -x "/usr/share/%{name}/scripts/migrate-v1-to-v2.sh" ]; then
-        UCM_HOME="/usr/share/%{name}" UCM_DATA="$V2_DATA" /usr/share/%{name}/scripts/migrate-v1-to-v2.sh
-    elif [ -f "/usr/share/%{name}/backend/migrate_v1_to_v2.py" ]; then
+    if [ -f "/usr/share/%{name}/backend/migrate_v1_to_v2.py" ]; then
         python3 /usr/share/%{name}/backend/migrate_v1_to_v2.py /usr/share/%{name} 2>&1 | tee /var/log/%{name}/migration.log
     fi
 fi
+
+# Start service
+systemctl daemon-reload
+systemctl enable %{name}
+systemctl start %{name} || true
 
 %preun
 %systemd_preun %{name}.service
@@ -75,11 +132,10 @@ fi
 
 %files
 %{_datadir}/%{name}/
-%{_sysconfdir}/%{name}/
-%{_sharedstatedir}/%{name}/
-%{_localstatedir}/log/%{name}/
+%dir %{_sysconfdir}/%{name}/
+%dir %{_sharedstatedir}/%{name}/
+%dir %{_localstatedir}/log/%{name}/
 %{_unitdir}/%{name}.service
-%{_bindir}/ucm-configure
 
 %changelog
 * Mon Feb 03 2026 UCM Team <dev@ucm.local> - 2.0.0-1
