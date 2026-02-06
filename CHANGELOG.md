@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0-beta1] - 2026-02-06
+
+### 🎨 Complete UI Redesign
+
+Major release with a completely new React 18 frontend replacing the legacy HTMX UI.
+
+#### New Frontend Stack
+- **React 18** with Vite for fast builds
+- **Radix UI** for accessible components
+- **Tailwind CSS** for styling
+- **Split-View Layout** with responsive design
+
+#### New Features
+- **12 Theme Variants** - 6 color themes (Gray, Ocean, Purple, Forest, Sunset, Cyber) × Light/Dark modes
+- **Certificate Groups** - Organize certificates into custom groups
+- **Smart Import** - Intelligent parser for certs, keys, CSRs (like SSLShopper)
+- **Certificate Tools** - Format conversion, validation, chain building
+- **Global Search** - Ctrl+K command palette with database search
+- **ACME History** - Complete order and certificate history tracking
+- **Audit Trail** - Full action logging with hash chain verification
+- **Security Dashboard** (Pro) - Secrets status, anomaly detection
+- **Filter Presets** - Save and reuse table filters
+- **Customizable Columns** - Show/hide table columns per preference
+- **Server-side Sorting** - Efficient sorting for large datasets
+- **Orphan Certificate Badge** - Visual indicator for certs without CA
+- **Recent History & Favorites** - Quick access to frequently used items
+
+#### UI Improvements
+- **Responsive Design** - Mobile-first with adaptive layouts
+- **Mobile Navigation** - Grid menu, swipe gestures
+- **Keyboard Navigation** - Full keyboard support
+- **Real-time Updates** - Live data refresh
+- **Geist + JetBrains Mono** fonts
+- **Unified Icon System** - Custom UCM SVG icons with gradient colors
+- **Premium Help Modals** - Contextual help for every page
+
+#### Backend Improvements
+- **API v2** - RESTful JSON API under `/api/v2/`
+- **Unified Paths** - Same structure for DEB/RPM/Docker (`/opt/ucm/`)
+- **Auto-migration** - Seamless v1.8.x → v2.0.0 upgrade
+- **CRL Auto-regeneration** - Background scheduler
+- **Health Check API** - System monitoring endpoints
+- **Database Optimization** - Automated VACUUM
+- **Log Rotation** - Automatic log management
+
+#### Deployment
+- **Dynamic Pro Loader** - No stubs needed for Community builds
+- **Unified CI/CD** - Single workflow for DEB/RPM/Docker
+- **Tested Packages** - Both DEB and RPM verified
+
+---
+
 ## [2.0.0] - 2026-02-03
 
 ### 🎉 Major Release: Production Ready
