@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0-beta2] - 2026-02-07
+
+### 🔐 Security Enhancements
+
+- **Password Show/Hide Toggle** - All password fields now have visibility toggle
+- **Password Strength Indicator** - Visual strength meter with 5 levels (Weak → Strong)
+- **Forgot Password Flow** - Email-based password reset with secure tokens
+- **Force Password Change** - Admin can require password change on next login
+- **Session Timeout Warning** - 5-minute warning before session expires with extend option
+
+### 🎨 Dashboard Improvements
+
+- **Dynamic Version Display** - Shows current version with Pro/Community badge
+- **Update Available Indicator** - Visual notification when updates are available
+- **Fixed Layout** - Proper padding and spacing in all dashboard widgets
+
+### 🐛 Bug Fixes
+
+- Fixed dashboard scroll issues
+- Fixed padding in System Health widget
+- Fixed padding in Certificate Activity charts
+- Restored hierarchical CA view
+
+---
+
 ## [2.0.0-beta1] - 2026-02-06
 
 ### 🎨 Complete UI Redesign
