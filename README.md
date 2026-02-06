@@ -1,9 +1,11 @@
 # Ultimate CA Manager
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.0--beta1-orange.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-success.svg)
+
+> ⚠️ **v2.0.0-beta1** - Major release with new React UI. [Report issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
 
 **Ultimate CA Manager (UCM)** is a comprehensive Certificate Authority management platform with full PKI protocol support (SCEP, OCSP, ACME, CRL/CDP), multi-factor authentication, and complete certificate lifecycle management.
 
@@ -104,18 +106,41 @@ wget -qO- https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/pac
 ✅ **Smart:** Uses native packages (DEB/RPM) when available, otherwise installs from source  
 ✅ **Zero dependencies:** Only requires bash
 
-### Docker (Recommended)
+### Debian/Ubuntu Package
+
+```bash
+# Download latest release
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta1/ucm_2.0.0.beta1_all.deb
+
+# Install
+sudo apt install -y python3-venv python3-pip  # Required dependencies
+sudo dpkg -i ucm_2.0.0.beta1_all.deb
+sudo systemctl enable --now ucm
+```
+
+### RHEL/Rocky/Fedora Package
+
+```bash
+# Download latest release
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta1/ucm-2.0.0.beta1-1.fc43.noarch.rpm
+
+# Install
+sudo dnf install ./ucm-2.0.0.beta1-1.fc43.noarch.rpm
+sudo systemctl enable --now ucm
+```
+
+### Docker (Coming Soon)
 
 ```bash
 docker run -d \
   --name ucm \
   -p 8443:8443 \
-  -v ucm-data:/app/backend/data \
-  ghcr.io/neyslim/ultimate-ca-manager:1.8.3
+  -v ucm-data:/opt/ucm/data \
+  ghcr.io/neyslim/ultimate-ca-manager:2.0.0-beta1
 ```
 
 **Access:** https://localhost:8443  
-**Credentials:** admin / changeme123 ⚠️ **CHANGE IMMEDIATELY!**
+**Credentials:** admin / (shown during install or in `/etc/ucm/ucm.env`) ⚠️ **CHANGE IMMEDIATELY!**
 
 ### Docker Compose
 
@@ -123,39 +148,16 @@ docker run -d \
 version: '3.8'
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:1.8.3
+    image: ghcr.io/neyslim/ultimate-ca-manager:2.0.0-beta1
     container_name: ucm
     ports:
       - "8443:8443"
     volumes:
-      - ./data:/app/backend/data
+      - ./data:/opt/ucm/data
     environment:
       - UCM_FQDN=ucm.example.com
       - UCM_ACME_ENABLED=true
-      - UCM_SMTP_ENABLED=false
     restart: unless-stopped
-```
-
-### Debian/Ubuntu Package
-
-```bash
-# Download latest release
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.3/ucm_1.8.3_all.deb
-
-# Install (nginx optional!)
-sudo dpkg -i ucm_1.8.3_all.deb
-sudo systemctl enable --now ucm
-```
-
-### RHEL/Rocky/Alma Package
-
-```bash
-# Download latest release (⚠️ UNTESTED)
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v1.8.3/ucm-1.8.3-1.el9.noarch.rpm
-
-# Install
-sudo dnf install ucm-1.8.3-1.el9.noarch.rpm
-sudo systemctl enable --now ucm
 ```
 
 ---
@@ -274,40 +276,46 @@ Edit `/etc/ucm/config.json` or use the web interface at **Settings → System Co
 
 ---
 
-## 📦 Package Locations
+## 📦 Package Locations (v2.0.0+)
 
-### Docker
-- **Data:** `/app/backend/data`
-- **Config:** `/app/.env` (auto-generated)
-- **Logs:** stdout/stderr
-
-### DEB/RPM
-- **Data:** `/opt/ucm/backend/data`
-- **Config:** `/etc/ucm/config.json`
+### DEB/RPM (Harmonized)
+- **Application:** `/opt/ucm/` (backend, frontend, venv)
+- **Data:** `/opt/ucm/data/` (database, certificates)
+- **Config:** `/etc/ucm/ucm.env`
 - **Logs:** `/var/log/ucm/`
 - **Service:** `systemctl status ucm`
+
+### Docker
+- **Application:** `/opt/ucm/`
+- **Data:** `/opt/ucm/data/`
+- **Config:** Environment variables
+- **Logs:** stdout/stderr
 
 ---
 
 ## 🔄 Upgrade
 
-### Docker
+### Upgrading from v1.8.x to v2.0.0-beta1
+
+Data and configuration are **automatically migrated**. A backup is created in `/opt/ucm/data/backups/`.
 
 ```bash
-docker pull ghcr.io/neyslim/ultimate-ca-manager:1.8.3
-docker stop ucm
-docker rm ucm
-# Recreate container with same volume
-```
+# Debian/Ubuntu
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta1/ucm_2.0.0.beta1_all.deb
+sudo apt install -y python3-venv python3-pip
+sudo dpkg -i ucm_2.0.0.beta1_all.deb
+sudo systemctl restart ucm
 
-### DEB/RPM
-
-```bash
-# Download new package
-sudo dpkg -i ucm_1.8.3_all.deb  # Debian/Ubuntu
-sudo dnf upgrade ucm-1.8.3-1.el9.noarch.rpm  # RHEL/Rocky/Alma
+# RHEL/Rocky/Fedora
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta1/ucm-2.0.0.beta1-1.fc43.noarch.rpm
+sudo dnf install ./ucm-2.0.0.beta1-1.fc43.noarch.rpm
 sudo systemctl restart ucm
 ```
+
+### What Gets Migrated
+- Database (with schema updates)
+- Certificates and CA files
+- Configuration file
 
 ---
 
@@ -389,5 +397,26 @@ Comprehensive technical documentation is available in the [`/docs`](/docs) direc
 - **[API Wiring Audit](/docs/API-WIRING-AUDIT.md)** - Frontend/backend integration audit and bug reports
 - **[Documentation Overview](/docs/README.md)** - Architecture, conventions, and contribution guidelines
 
-**Current Status:** ✅ Production Ready - v2.0.0 with React frontend
+**Current Status:** 🚧 **Beta** - v2.0.0-beta1 with new React frontend
+
+## ⚡ What's New in v2.0.0
+
+### Complete UI Redesign
+- **Modern React 18 UI** - Responsive, accessible, mobile-friendly
+- **12 Theme Variants** - 6 color themes × Light/Dark modes
+- **Split-View Layout** - Master-detail navigation
+- **Keyboard Navigation** - Cmd+K command palette
+
+### New Features
+- **Groups** - Organize certificates into custom groups
+- **ACME Management** - Full ACME account and order tracking
+- **Enhanced Dashboard** - Real-time statistics and charts
+- **Audit Trail** - Complete action logging
+- **API v2** - RESTful JSON API with OpenAPI docs
+
+### Improvements
+- **Unified Installation** - Same paths for DEB/RPM/Docker
+- **Auto-migration** - Seamless v1.8.x → v2.0 upgrade
+- **Better Security** - JWT tokens, key encryption support
+- **Performance** - Faster loading, optimized queries
 
