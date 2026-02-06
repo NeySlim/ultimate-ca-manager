@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, useAuth } from './contexts'
-import { AppShell, ErrorBoundary, LoadingSpinner } from './components'
+import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange } from './components'
 
 // Lazy load pages for code splitting
 const LoginPage = lazy(() => import('./pages/LoginPage'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const CertificatesPage = lazy(() => import('./pages/CertificatesPage'))
 const CAsPage = lazy(() => import('./pages/CAsPage'))
@@ -44,15 +46,25 @@ function ProtectedRoute({ children }) {
 }
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, forcePasswordChange, clearForcePasswordChange, logout } = useAuth()
   
   return (
     <Suspense fallback={<PageLoader />}>
+      {/* Global session warning (when logged in) */}
+      {isAuthenticated && <SessionWarning onLogout={logout} />}
+      
+      {/* Force password change modal */}
+      {isAuthenticated && forcePasswordChange && (
+        <ForcePasswordChange onComplete={clearForcePasswordChange} />
+      )}
+      
       <Routes>
         <Route 
           path="/login" 
           element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} 
         />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         
         <Route element={<AppShell />}>
           <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

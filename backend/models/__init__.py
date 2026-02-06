@@ -65,6 +65,11 @@ class User(db.Model):
     totp_confirmed = db.Column(db.Boolean, default=False)  # TOTP setup confirmed
     backup_codes = db.Column(db.Text)  # JSON array of backup codes (hashed)
     
+    # Password management
+    force_password_change = db.Column(db.Boolean, default=False)  # Must change on next login
+    password_reset_token = db.Column(db.String(128), nullable=True)  # For forgot password
+    password_reset_expires = db.Column(db.DateTime, nullable=True)  # Token expiry
+    
     # Login tracking
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
@@ -92,6 +97,7 @@ class User(db.Model):
             "mfa_enabled": self.mfa_enabled,
             "totp_enabled": self.totp_confirmed,  # Legacy compatibility
             "two_factor_enabled": self.totp_confirmed,  # For frontend
+            "force_password_change": self.force_password_change or False,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "last_login": self.last_login.isoformat() if self.last_login else None,
             "login_count": self.login_count or 0,
