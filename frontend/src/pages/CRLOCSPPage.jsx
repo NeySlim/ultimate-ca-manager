@@ -19,7 +19,7 @@ import {
 import { casService, crlService, apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
-import { formatDate } from '../lib/utils'
+import { formatDate, cn } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
 
 // Extended CRL service methods
@@ -177,21 +177,43 @@ export default function CRLOCSPPage() {
   const columns = useMemo(() => [
     {
       key: 'descr',
-      label: 'CA Name',
+      header: 'CA Name',
+      priority: 1,
+      sortable: true,
       render: (v, row) => (
         <div className="flex items-center gap-2">
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${row.has_crl ? 'icon-bg-emerald' : 'icon-bg-orange'}`}>
+          <div className={cn(
+            "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+            row.has_crl ? 'icon-bg-emerald' : 'icon-bg-orange'
+          )}>
             <FileX size={14} weight="duotone" />
           </div>
-          <span className="font-medium">{v || row.name}</span>
+          <span className="font-medium truncate">{v || row.name}</span>
+        </div>
+      ),
+      mobileRender: (v, row) => (
+        <div className="flex items-center justify-between gap-2 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className={cn(
+              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+              row.has_crl ? 'icon-bg-emerald' : 'icon-bg-orange'
+            )}>
+              <FileX size={14} weight="duotone" />
+            </div>
+            <span className="font-medium truncate">{v || row.name}</span>
+          </div>
+          <Badge variant={row.has_crl ? 'success' : 'orange'} size="sm" dot pulse={!row.has_crl}>
+            {row.has_crl ? 'Active' : 'No CRL'}
+          </Badge>
         </div>
       )
     },
     {
       key: 'has_crl',
-      label: 'Status',
-      width: '100px',
-      render: (v, row) => (
+      header: 'Status',
+      priority: 2,
+      hideOnMobile: true,
+      render: (v) => (
         <Badge variant={v ? 'success' : 'orange'} size="sm" dot pulse={!v}>
           {v ? 'Active' : 'No CRL'}
         </Badge>
@@ -199,8 +221,9 @@ export default function CRLOCSPPage() {
     },
     {
       key: 'cdp_enabled',
-      label: 'Auto',
-      width: '70px',
+      header: 'Auto',
+      priority: 3,
+      hideOnMobile: true,
       render: (v, row) => (
         <Switch.Root
           checked={v}
@@ -215,61 +238,34 @@ export default function CRLOCSPPage() {
     },
     {
       key: 'revoked_count',
-      label: 'Revoked',
-      width: '80px',
+      header: 'Revoked',
+      priority: 2,
       render: (v) => (
         <Badge variant={v > 0 ? 'danger' : 'secondary'} size="sm" dot={v > 0}>
           {v || 0}
         </Badge>
+      ),
+      mobileRender: (v) => (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-text-tertiary">Revoked:</span>
+          <Badge variant={v > 0 ? 'danger' : 'secondary'} size="sm" dot={v > 0}>
+            {v || 0}
+          </Badge>
+        </div>
       )
     },
     {
       key: 'crl_updated',
-      label: 'Updated',
-      width: '120px',
+      header: 'Updated',
+      priority: 3,
+      hideOnMobile: true,
       render: (v) => (
-        <span className="text-text-secondary text-xs">
-          {v ? formatDate(v, 'short') : '-'}
+        <span className="text-text-secondary">
+          {v ? formatDate(v, 'short') : '—'}
         </span>
       )
     }
   ], [canWrite, handleToggleAutoRegen])
-
-  // Mobile card render
-  const renderMobileCard = useCallback((ca, isSelected) => {
-    return (
-      <div className={`p-4 ${isSelected ? 'mobile-row-selected' : ''}`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              ca.has_crl ? 'status-success-bg' : 'status-warning-bg'
-            }`}>
-              <FileX size={20} className={ca.has_crl ? 'status-success-text' : 'status-warning-text'} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-text-primary truncate">{ca.descr || ca.name}</span>
-                <Badge variant={ca.has_crl ? 'success' : 'warning'} size="sm" dot>
-                  {ca.has_crl ? 'Active' : 'No CRL'}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-text-secondary mt-0.5">
-                {ca.has_crl ? (
-                  <>
-                    <span>{ca.revoked_count || 0} revoked</span>
-                    <span>•</span>
-                    <span>CRL #{ca.crl_number || '-'}</span>
-                  </>
-                ) : (
-                  <span>{ca.has_private_key === false ? 'Read-only (no key)' : 'Not generated'}</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }, [])
 
   // Help content
   const helpContent = (
@@ -397,7 +393,7 @@ export default function CRLOCSPPage() {
       </div>
 
       {/* CRL Configuration */}
-      <CompactSection title="CRL Configuration" icon={Info}>
+      <CompactSection title="CRL Configuration" icon={LinkIcon}>
         <CompactGrid cols={2}>
           <CompactField label="CA Name" value={selectedCA.descr || selectedCA.name} />
           <CompactField label="Status" value={selectedCRL ? 'Active' : 'Not Generated'} />

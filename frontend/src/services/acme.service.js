@@ -54,5 +54,10 @@ export const acmeService = {
 
   async getChallenges(accountId) {
     return apiClient.get(`/acme/accounts/${accountId}/challenges`)
+  },
+
+  // History
+  async getHistory() {
+    return apiClient.get('/acme/history')
   }
 }

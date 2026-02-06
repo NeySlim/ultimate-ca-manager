@@ -173,28 +173,48 @@ export default function TrustStorePage() {
   )
 
   // Columns
-  const columns = [
+  const columns = useMemo(() => [
     {
       key: 'name',
       header: 'Certificate',
+      priority: 1,
       sortable: true,
       render: (val, row) => (
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-blue">
             <Certificate size={14} weight="duotone" />
           </div>
-          <div className="min-w-0">
-            <div className="font-medium truncate">{val}</div>
-            {row.subject_cn && row.subject_cn !== val && (
-              <div className="text-xs text-text-secondary truncate">{row.subject_cn}</div>
-            )}
-          </div>
+          <span className="font-medium truncate">{val}</span>
         </div>
-      )
+      ),
+      mobileRender: (val, row) => {
+        const date = row.not_after ? new Date(row.not_after) : null
+        const isExpired = date && date < new Date()
+        const daysLeft = date ? Math.floor((date - new Date()) / (1000 * 60 * 60 * 24)) : null
+        const isExpiringSoon = daysLeft !== null && daysLeft > 0 && daysLeft <= 30
+        return (
+          <div className="flex items-center justify-between gap-2 w-full">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className={cn(
+                "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                isExpired ? 'icon-bg-red' : isExpiringSoon ? 'icon-bg-orange' : 'icon-bg-emerald'
+              )}>
+                <Certificate size={14} weight="duotone" />
+              </div>
+              <span className="font-medium truncate">{val}</span>
+            </div>
+            <Badge variant={isExpired ? 'danger' : isExpiringSoon ? 'orange' : 'success'} size="sm" dot>
+              {row.purpose?.replace('_', ' ') || 'custom'}
+            </Badge>
+          </div>
+        )
+      }
     },
     {
       key: 'purpose',
       header: 'Purpose',
+      priority: 2,
+      hideOnMobile: true,
       render: (val) => {
         const variants = {
           root_ca: 'amber',
@@ -210,6 +230,7 @@ export default function TrustStorePage() {
     {
       key: 'not_after',
       header: 'Expires',
+      priority: 2,
       render: (val) => {
         if (!val) return <span className="text-text-tertiary">—</span>
         const date = new Date(val)
@@ -221,9 +242,18 @@ export default function TrustStorePage() {
             {formatDate(val)}
           </Badge>
         )
+      },
+      mobileRender: (val) => {
+        if (!val) return null
+        return (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-text-tertiary">Expires:</span>
+            <span className="text-text-secondary">{formatDate(val)}</span>
+          </div>
+        )
       }
     }
-  ]
+  ], [])
 
   // Row actions
   const rowActions = (row) => [

@@ -29,6 +29,7 @@ import {
 import { 
   ResponsiveLayout,
   ResponsiveDataTable,
+  MobileCard,
   Card, 
   Button, 
   Badge, 
@@ -247,60 +248,55 @@ export default function AuditLogsPage() {
     return Array.from(names).sort();
   }, [logs]);
 
-  // Table columns
+  // Table columns - standardized with header, priority, mobileRender
   const columns = useMemo(() => [
     {
-      key: 'timestamp',
-      label: 'Time',
-      sortable: true,
-      width: '100px',
-      render: (value) => (
-        <span className="text-xs text-text-secondary whitespace-nowrap">
-          {formatTime(value)}
-        </span>
-      )
-    },
-    {
-      key: 'username',
-      label: 'User',
-      width: '120px',
-      render: (value) => (
-        <div className="flex items-center gap-1">
-          <User size={12} className="text-text-secondary" />
-          <span className="text-sm font-medium">{value || 'system'}</span>
-        </div>
-      )
-    },
-    {
       key: 'action',
-      label: 'Action',
-      render: (value) => {
+      header: 'Action',
+      priority: 1,
+      render: (value, row) => {
         const category = getActionCategory(value);
         const color = categoryColors[category] || 'gray';
         const Icon = actionIcons[value] || actionIcons.default;
         return (
-          <div className="flex items-center gap-1.5">
-            <Icon size={14} className="text-text-secondary" />
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg icon-bg-violet flex items-center justify-center shrink-0">
+              <Icon size={14} weight="duotone" />
+            </div>
             <Badge variant={color} size="sm">
               {value.replace(/_/g, ' ')}
             </Badge>
           </div>
         );
+      },
+      // Mobile: Action + status badge
+      mobileRender: (value, row) => {
+        const Icon = actionIcons[value] || actionIcons.default;
+        return (
+          <div className="flex items-center justify-between gap-2 w-full">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="w-7 h-7 rounded-lg icon-bg-violet flex items-center justify-center shrink-0">
+                <Icon size={14} weight="duotone" />
+              </div>
+              <span className="font-medium truncate">{value?.replace(/_/g, ' ')}</span>
+            </div>
+            <div className="shrink-0">
+              {row.success ? (
+                <Badge variant="emerald" size="sm"><CheckCircle size={12} weight="fill" /> OK</Badge>
+              ) : (
+                <Badge variant="red" size="sm"><XCircle size={12} weight="fill" /> Fail</Badge>
+              )}
+            </div>
+          </div>
+        );
       }
     },
     {
-      key: 'resource_type',
-      label: 'Resource',
-      render: (value, row) => (
-        <span className="text-sm text-text-secondary truncate">
-          {value}{row.resource_name ? `: ${row.resource_name}` : (row.resource_id ? ` #${row.resource_id}` : '')}
-        </span>
-      )
-    },
-    {
       key: 'success',
-      label: 'Status',
+      header: 'Status',
+      priority: 2,
       width: '80px',
+      hideOnMobile: true, // Status shown in action mobileRender
       render: (value) => (
         value ? (
           <Badge variant="emerald" size="sm">
@@ -316,53 +312,62 @@ export default function AuditLogsPage() {
       )
     },
     {
-      key: 'ip_address',
-      label: 'IP',
+      key: 'username',
+      header: 'User',
+      priority: 3,
       width: '120px',
+      hideOnMobile: true,
+      render: (value) => (
+        <div className="flex items-center gap-1">
+          <User size={12} className="text-text-secondary" />
+          <span className="text-sm font-medium">{value || 'system'}</span>
+        </div>
+      )
+    },
+    {
+      key: 'resource_type',
+      header: 'Resource',
+      priority: 4,
+      hideOnMobile: true,
+      render: (value, row) => (
+        <span className="text-sm text-text-secondary truncate">
+          {value}{row.resource_name ? `: ${row.resource_name}` : (row.resource_id ? ` #${row.resource_id}` : '')}
+        </span>
+      )
+    },
+    {
+      key: 'timestamp',
+      header: 'Time',
+      priority: 5,
+      sortable: true,
+      width: '100px',
+      render: (value) => (
+        <span className="text-xs text-text-secondary whitespace-nowrap">
+          {formatTime(value)}
+        </span>
+      ),
+      // Mobile: User + resource + time
+      mobileRender: (value, row) => (
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span><span className="text-text-tertiary">User:</span> <span className="text-text-secondary">{row.username || 'system'}</span></span>
+          {row.resource_type && (
+            <span><span className="text-text-tertiary">Resource:</span> <span className="text-text-secondary">{row.resource_type}</span></span>
+          )}
+          <span><span className="text-text-tertiary">Time:</span> <span className="text-text-secondary">{formatTime(value)}</span></span>
+        </div>
+      )
+    },
+    {
+      key: 'ip_address',
+      header: 'IP',
+      priority: 6,
+      width: '120px',
+      hideOnMobile: true,
       render: (value) => (
         <span className="text-xs text-text-secondary font-mono">{value || '-'}</span>
       )
     }
   ], []);
-
-  // Mobile card render
-  const renderMobileCard = useCallback((log, isSelected) => {
-    const Icon = actionIcons[log.action] || actionIcons.default;
-    const category = getActionCategory(log.action);
-    const color = categoryColors[category] || 'gray';
-    
-    return (
-      <div className={`p-4 ${isSelected ? 'mobile-row-selected' : ''}`}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className={`w-10 h-10 rounded-lg bg-bg-tertiary flex items-center justify-center`}>
-              <Icon size={20} className="text-text-secondary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-text-primary truncate">
-                  {log.action?.replace(/_/g, ' ')}
-                </span>
-                <Badge variant={log.success ? 'emerald' : 'red'} size="sm">
-                  {log.success ? 'OK' : 'Fail'}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-text-secondary mt-0.5">
-                <span>{log.username || 'system'}</span>
-                <span>•</span>
-                <span>{formatTime(log.timestamp)}</span>
-              </div>
-              {(log.resource_type || log.resource_name) && (
-                <div className="text-xs text-text-secondary mt-1 truncate">
-                  {log.resource_type}{log.resource_name ? `: ${log.resource_name}` : ''}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }, []);
 
   // Stats for header
   const headerStats = useMemo(() => {
@@ -750,7 +755,6 @@ export default function AuditLogsPage() {
           toolbarActions={headerActions}
           selectedId={selectedLog?.id}
           onRowClick={setSelectedLog}
-          renderMobileCard={renderMobileCard}
           pagination={{
             page,
             perPage,

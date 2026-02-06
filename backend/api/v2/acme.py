@@ -6,7 +6,7 @@ ACME Configuration Routes v2.0
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from models import db, AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, SystemConfig, CA
+from models import db, AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, SystemConfig, CA, Certificate
 
 bp = Blueprint('acme_v2', __name__)
 
@@ -285,4 +285,66 @@ def unregister_proxy_account():
     return success_response(
         data={'registered': False},
         message='Proxy account unregistered'
+    )
+
+
+@bp.route('/api/v2/acme/history', methods=['GET'])
+@require_auth(['read:acme'])
+def get_acme_history():
+    """Get history of certificates issued via ACME
+    
+    Query params:
+        page: Page number (default: 1)
+        per_page: Items per page (default: 50, max: 100)
+    """
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 50, type=int), 100)
+    
+    # Get certificates with source='acme'
+    query = Certificate.query.filter_by(source='acme').order_by(
+        Certificate.created_at.desc()
+    )
+    total = query.count()
+    certs = query.offset((page - 1) * per_page).limit(per_page).all()
+    
+    # Batch fetch CAs and orders to avoid N+1
+    cert_ids = [c.id for c in certs]
+    ca_refs = [c.caref for c in certs if c.caref]
+    
+    # Fetch all CAs at once
+    cas_map = {}
+    if ca_refs:
+        cas = CA.query.filter(CA.refid.in_(ca_refs)).all()
+        cas_map = {ca.refid: ca.common_name for ca in cas}
+    
+    # Fetch all orders at once
+    orders_map = {}
+    if cert_ids:
+        orders = AcmeOrder.query.filter(AcmeOrder.certificate_id.in_(cert_ids)).all()
+        for order in orders:
+            account = order.account
+            orders_map[order.certificate_id] = {
+                'order_id': order.order_id,
+                'account': account.account_id if account else 'Unknown',
+                'status': order.status
+            }
+    
+    data = []
+    for cert in certs:
+        data.append({
+            'id': cert.id,
+            'refid': cert.refid,
+            'common_name': cert.subject_cn or cert.descr,
+            'serial': cert.serial_number,
+            'issuer': cas_map.get(cert.caref) if cert.caref else None,
+            'valid_from': cert.valid_from.isoformat() if cert.valid_from else None,
+            'valid_to': cert.valid_to.isoformat() if cert.valid_to else None,
+            'revoked': cert.revoked,
+            'created_at': cert.created_at.isoformat() if cert.created_at else None,
+            'order': orders_map.get(cert.id)
+        })
+    
+    return success_response(
+        data=data,
+        meta={'total': total, 'page': page, 'per_page': per_page}
     )
