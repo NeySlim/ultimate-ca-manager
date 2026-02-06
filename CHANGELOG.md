@@ -21,41 +21,40 @@ Major release with a completely new React 18 frontend replacing the legacy HTMX 
 
 #### New Features
 - **12 Theme Variants** - 6 color themes (Gray, Ocean, Purple, Forest, Sunset, Cyber) × Light/Dark modes
-- **Certificate Groups** - Organize certificates into custom groups
+- **User Groups** - Organize users with permission-based groups
+- **Certificate Templates** - Predefined certificate configurations
 - **Smart Import** - Intelligent parser for certs, keys, CSRs (like SSLShopper)
-- **Certificate Tools** - Format conversion, validation, chain building
-- **Global Search** - Ctrl+K command palette with database search
-- **ACME History** - Complete order and certificate history tracking
-- **Audit Trail** - Full action logging with hash chain verification
-- **Security Dashboard** (Pro) - Secrets status, anomaly detection
-- **Filter Presets** - Save and reuse table filters
-- **Customizable Columns** - Show/hide table columns per preference
-- **Server-side Sorting** - Efficient sorting for large datasets
-- **Orphan Certificate Badge** - Visual indicator for certs without CA
-- **Recent History & Favorites** - Quick access to frequently used items
+- **Certificate Tools** - SSL checker, CSR decoder, certificate decoder, key matcher, format converter
+- **Command Palette** - Ctrl+K global search with quick actions
+- **Trust Store** - Manage trusted CA certificates
+- **ACME Management** - Account tracking, order history, challenge status
+- **Audit Logs** - Full action logging with filtering, export, and integrity verification
+- **Dashboard Charts** - Certificate trend (7 days), status distribution pie chart
+- **Activity Feed** - Real-time recent actions display
 
 #### UI Improvements
 - **Responsive Design** - Mobile-first with adaptive layouts
-- **Mobile Navigation** - Grid menu, swipe gestures
-- **Keyboard Navigation** - Full keyboard support
-- **Real-time Updates** - Live data refresh
-- **Geist + JetBrains Mono** fonts
-- **Unified Icon System** - Custom UCM SVG icons with gradient colors
-- **Premium Help Modals** - Contextual help for every page
+- **Mobile Navigation** - Grid menu with swipe support
+- **Keyboard Navigation** - Full keyboard accessibility
+- **Real-time Updates** - WebSocket-based live refresh
+- **Inter + JetBrains Mono** fonts
+- **Custom Icon System** - UCM SVG icons with theme-aware colors
+- **Contextual Help** - Help modals on every page
 
 #### Backend Improvements
 - **API v2** - RESTful JSON API under `/api/v2/`
 - **Unified Paths** - Same structure for DEB/RPM/Docker (`/opt/ucm/`)
-- **Auto-migration** - Seamless v1.8.x → v2.0.0 upgrade
-- **CRL Auto-regeneration** - Background scheduler
+- **Auto-migration** - Seamless v1.8.x → v2.0.0 upgrade with backup
+- **CRL Auto-regeneration** - Background scheduler for CRL refresh
 - **Health Check API** - System monitoring endpoints
 - **Database Optimization** - Automated VACUUM
-- **Log Rotation** - Automatic log management
+- **Log Rotation** - Automatic log management via logrotate
+- **WebSocket Support** - Real-time event notifications
 
 #### Deployment
-- **Dynamic Pro Loader** - No stubs needed for Community builds
 - **Unified CI/CD** - Single workflow for DEB/RPM/Docker
-- **Tested Packages** - Both DEB and RPM verified
+- **Tested Packages** - Both DEB and RPM verified on Debian 12 and Fedora 43
+- **Python venv** - Isolated dependencies, no system package conflicts
 
 ---
 

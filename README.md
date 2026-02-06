@@ -405,18 +405,22 @@ Comprehensive technical documentation is available in the [`/docs`](/docs) direc
 - **Modern React 18 UI** - Responsive, accessible, mobile-friendly
 - **12 Theme Variants** - 6 color themes × Light/Dark modes
 - **Split-View Layout** - Master-detail navigation
-- **Keyboard Navigation** - Cmd+K command palette
+- **Command Palette** - Ctrl+K for quick navigation and search
 
 ### New Features
-- **Groups** - Organize certificates into custom groups
-- **ACME Management** - Full ACME account and order tracking
-- **Enhanced Dashboard** - Real-time statistics and charts
-- **Audit Trail** - Complete action logging
-- **API v2** - RESTful JSON API with OpenAPI docs
+- **User Groups** - Organize users with permission-based groups
+- **Certificate Templates** - Predefined certificate configurations
+- **Certificate Tools** - SSL checker, CSR/cert decoder, format converter
+- **Smart Import** - Intelligent parser for certs, keys, CSRs
+- **Trust Store** - Manage trusted CA certificates
+- **ACME Management** - Account tracking, order history
+- **Audit Logs** - Full action logging with export and verification
+- **Dashboard Charts** - Certificate trends, status distribution
 
 ### Improvements
-- **Unified Installation** - Same paths for DEB/RPM/Docker
-- **Auto-migration** - Seamless v1.8.x → v2.0 upgrade
-- **Better Security** - JWT tokens, key encryption support
+- **Unified Installation** - Same paths for DEB/RPM/Docker (`/opt/ucm/`)
+- **Auto-migration** - Seamless v1.8.x → v2.0 upgrade with backup
+- **WebSocket Support** - Real-time updates
+- **API v2** - RESTful JSON API
 - **Performance** - Faster loading, optimized queries
 
