@@ -26,7 +26,8 @@ override_dh_auto_install:
 	
 	# Copy application files
 	cp -r backend/* debian/ucm/opt/ucm/backend/
-	cp -r frontend/* debian/ucm/opt/ucm/frontend/
+	# Only copy built frontend (dist/), not node_modules or source
+	cp -r frontend/dist debian/ucm/opt/ucm/frontend/
 	
 	# Remove .env files (configuration is created by postinst)
 	rm -f debian/ucm/opt/ucm/.env* debian/ucm/opt/ucm/backend/.env* 2>/dev/null || true
