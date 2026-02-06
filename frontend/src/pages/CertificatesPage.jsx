@@ -843,6 +843,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
             onChange={(e) => setP12Password(e.target.value)}
             placeholder="Minimum 4 characters"
             autoFocus
+            showStrength
           />
           <Input
             label="Confirm Password"

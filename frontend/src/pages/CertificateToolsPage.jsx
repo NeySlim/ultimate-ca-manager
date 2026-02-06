@@ -651,6 +651,7 @@ export default function CertificateToolsPage() {
             value={pkcs12Password}
             onChange={(e) => setPkcs12Password(e.target.value)}
             className="w-48"
+            showStrength
           />
         )}
       </div>

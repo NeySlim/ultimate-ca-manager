@@ -657,11 +657,13 @@ export default function CAsPage() {
             Enter a password to protect the PKCS#12 file. This password will be required to import the certificate elsewhere.
           </p>
           <Input
+            label="Export Password"
             type="password"
             placeholder="Enter password (min 4 characters)"
             value={p12Password}
             onChange={(e) => setP12Password(e.target.value)}
             autoFocus
+            showStrength
           />
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button variant="secondary" onClick={() => { setShowP12Modal(false); setP12Password(''); setP12CA(null) }}>
