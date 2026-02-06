@@ -15,6 +15,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [permissions, setPermissions] = useState([])
   const [role, setRole] = useState(null)
+  const [forcePasswordChange, setForcePasswordChange] = useState(false)
 
   // Check session on mount
   useEffect(() => {
@@ -75,6 +76,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true)
       setPermissions(response.data?.permissions || response.permissions || [])
       setRole(response.data?.role || response.role || null)
+      setForcePasswordChange(response.data?.force_password_change || false)
       debug('✅ User authenticated:', userData)
       return response
     } catch (error) {
@@ -103,10 +105,13 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(false)
       setPermissions([])
       setRole(null)
+      setForcePasswordChange(false)
       setLoading(false)
       debug('🔓 Local session cleared')
     }
   }
+
+  const clearForcePasswordChange = () => setForcePasswordChange(false)
 
   const value = {
     user,
@@ -114,9 +119,11 @@ export function AuthProvider({ children }) {
     loading,
     permissions,
     role,
+    forcePasswordChange,
     login,
     logout,
     checkSession,
+    clearForcePasswordChange,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

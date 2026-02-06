@@ -654,3 +654,74 @@ class NotificationService:
         """Send a test email to verify SMTP configuration"""
         success, _ = EmailService.send_test_email(recipient)
         return success
+
+    @staticmethod
+    def send_email(to: str, subject: str, template: str, context: dict) -> bool:
+        """
+        Send templated email
+        
+        Args:
+            to: Recipient email
+            subject: Email subject
+            template: Template name (password_reset, etc.)
+            context: Variables for template
+        """
+        # Generate HTML based on template
+        if template == 'password_reset':
+            html_body = NotificationService._render_password_reset_template(context)
+        else:
+            # Generic template
+            html_body = NotificationService._base_template(
+                subject,
+                '#2563eb',
+                f"<p>{context.get('message', '')}</p>"
+            )
+        
+        success, _ = EmailService.send_email(
+            recipients=[to],
+            subject=subject,
+            body_html=html_body
+        )
+        return success
+
+    @staticmethod
+    def _render_password_reset_template(context: dict) -> str:
+        """Render password reset email template"""
+        username = context.get('username', 'User')
+        reset_url = context.get('reset_url', '#')
+        expires_in = context.get('expires_in', '1 hour')
+        ip_address = context.get('ip_address', 'Unknown')
+        
+        content = f"""
+        <p>Hello <strong>{username}</strong>,</p>
+        
+        <p>We received a request to reset your password. Click the button below to create a new password:</p>
+        
+        <p style="text-align: center; margin: 30px 0;">
+            <a href="{reset_url}" 
+               style="background: #2563eb; color: white; padding: 12px 32px; 
+                      text-decoration: none; border-radius: 6px; font-weight: 500;">
+                Reset Password
+            </a>
+        </p>
+        
+        <p style="color: #666; font-size: 13px;">
+            Or copy and paste this link into your browser:<br>
+            <a href="{reset_url}" style="color: #2563eb; word-break: break-all;">{reset_url}</a>
+        </p>
+        
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+        
+        <p style="color: #666; font-size: 13px;">
+            <strong>Security Details:</strong><br>
+            • This link expires in <strong>{expires_in}</strong><br>
+            • Request originated from IP: {ip_address}<br>
+            • If you didn't request this, you can safely ignore this email
+        </p>
+        """
+        
+        return NotificationService._base_template(
+            'Password Reset Request',
+            '#f59e0b',  # Warning/amber color
+            content
+        )

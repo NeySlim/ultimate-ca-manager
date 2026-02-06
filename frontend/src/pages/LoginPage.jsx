@@ -4,7 +4,7 @@
  * Remembers last username in localStorage
  */
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft } from '@phosphor-icons/react'
 import { Card, Button, Input, Logo, LoadingSpinner } from '../components'
 import { useAuth, useNotification } from '../contexts'
@@ -27,14 +27,21 @@ export default function LoginPage() {
   const [userMethods, setUserMethods] = useState(null) // Methods available for this user
   const [statusMessage, setStatusMessage] = useState('')
   const [hasSavedUsername, setHasSavedUsername] = useState(false) // Track if we loaded from storage
+  const [emailConfigured, setEmailConfigured] = useState(false)
 
-  // Load last username on mount
+  // Load last username on mount + check email config
   useEffect(() => {
     const lastUsername = localStorage.getItem(STORAGE_KEY)
     if (lastUsername) {
       setUsername(lastUsername)
       setHasSavedUsername(true)
     }
+    
+    // Check if email is configured for "Forgot Password" link
+    fetch('/api/v2/auth/email-configured')
+      .then(res => res.json())
+      .then(data => setEmailConfigured(data.configured || false))
+      .catch(() => setEmailConfigured(false))
   }, [])
 
   // Focus password field when switching to password auth
@@ -409,6 +416,18 @@ export default function LoginPage() {
                     </>
                   )}
                 </Button>
+
+                {/* Forgot Password Link - only if email configured */}
+                {emailConfigured && (
+                  <div className="text-center">
+                    <Link
+                      to="/forgot-password"
+                      className="text-sm text-accent hover:text-accent/80 hover:underline transition-colors"
+                    >
+                      Forgot your password?
+                    </Link>
+                  </div>
+                )}
 
                 {/* Show WebAuthn option if available */}
                 {userMethods?.webauthn && userMethods.webauthn_credentials > 0 && authMethodsService.isWebAuthnSupported() && (

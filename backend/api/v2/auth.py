@@ -181,6 +181,7 @@ def login():
                     'username': user.username
                 },
                 'csrf_token': csrf_token,
+                'force_password_change': user.force_password_change or False,
                 'security_alerts': [a['message'] for a in anomalies if a.get('severity') in ('medium', 'high')]
             },
             message='Login successful'
@@ -222,7 +223,8 @@ def login():
                     'id': user.id,
                     'username': user.username
                 },
-                'csrf_token': csrf_token
+                'csrf_token': csrf_token,
+                'force_password_change': user.force_password_change or False
             },
             message='Login successful'
         )
@@ -326,3 +328,140 @@ def refresh_token():
         },
         message='Token refreshed'
     )
+
+
+# ============================================================================
+# Password Reset (Forgot Password)
+# ============================================================================
+
+def _is_email_configured():
+    """Check if email/SMTP is configured"""
+    from models import SystemConfig
+    try:
+        smtp_host = SystemConfig.get('smtp_host')
+        return bool(smtp_host and smtp_host.strip())
+    except:
+        return False
+
+
+@bp.route('/api/v2/auth/forgot-password', methods=['POST'])
+def forgot_password():
+    """
+    Request password reset - sends email with reset link
+    Only works if email is configured
+    """
+    import secrets
+    from datetime import timedelta
+    
+    # Check if email is configured
+    if not _is_email_configured():
+        return error_response('Password reset unavailable - email not configured', 503)
+    
+    data = request.get_json() or {}
+    email = data.get('email', '').strip().lower()
+    
+    if not email:
+        return error_response('Email is required', 400)
+    
+    # Always return success to prevent email enumeration
+    user = User.query.filter(db.func.lower(User.email) == email).first()
+    
+    if user and user.active:
+        # Generate secure token
+        token = secrets.token_urlsafe(48)
+        user.password_reset_token = hashlib.sha256(token.encode()).hexdigest()
+        user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
+        db.session.commit()
+        
+        # Send email
+        try:
+            from services.notification_service import NotificationService
+            reset_url = f"{current_app.config.get('BASE_URL', 'https://localhost:8443')}/reset-password?token={token}"
+            
+            NotificationService.send_email(
+                to=user.email,
+                subject='UCM - Password Reset Request',
+                template='password_reset',
+                context={
+                    'username': user.username,
+                    'reset_url': reset_url,
+                    'expires_in': '1 hour',
+                    'ip_address': request.remote_addr
+                }
+            )
+        except Exception as e:
+            current_app.logger.error(f"Failed to send password reset email: {e}")
+    
+    # Always return success to prevent enumeration
+    return success_response(
+        message='If an account with that email exists, a password reset link has been sent.'
+    )
+
+
+@bp.route('/api/v2/auth/reset-password', methods=['POST'])
+def reset_password():
+    """
+    Reset password using token from email
+    """
+    data = request.get_json() or {}
+    token = data.get('token', '').strip()
+    new_password = data.get('password', '')
+    
+    if not token:
+        return error_response('Reset token is required', 400)
+    
+    if not new_password or len(new_password) < 8:
+        return error_response('Password must be at least 8 characters', 400)
+    
+    # Validate password strength
+    try:
+        from security.password_policy import validate_password
+        is_valid, message = validate_password(new_password)
+        if not is_valid:
+            return error_response(message, 400)
+    except ImportError:
+        pass  # Password policy not available
+    
+    # Find user by token hash
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    user = User.query.filter_by(password_reset_token=token_hash).first()
+    
+    if not user:
+        return error_response('Invalid or expired reset token', 400)
+    
+    if user.password_reset_expires < datetime.utcnow():
+        # Clear expired token
+        user.password_reset_token = None
+        user.password_reset_expires = None
+        db.session.commit()
+        return error_response('Reset token has expired', 400)
+    
+    # Reset password
+    user.set_password(new_password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    user.force_password_change = False
+    user.failed_logins = 0
+    user.locked_until = None
+    db.session.commit()
+    
+    # Audit log
+    try:
+        from services.audit_service import AuditService
+        AuditService.log(
+            action='password_reset',
+            entity_type='user',
+            entity_id=user.id,
+            details={'method': 'email_reset'},
+            user_id=user.id
+        )
+    except:
+        pass
+    
+    return success_response(message='Password has been reset successfully')
+
+
+@bp.route('/api/v2/auth/email-configured', methods=['GET'])
+def check_email_configured():
+    """Check if email is configured (for showing forgot password link)"""
+    return success_response(data={'configured': _is_email_configured()})
