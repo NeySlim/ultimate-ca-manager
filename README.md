@@ -65,21 +65,21 @@ See all features in action: **[View Full Gallery](docs/SCREENSHOTS.md)**
 <table>
 <tr>
 <td width="50%">
-<img src="docs/screenshots/dash.png" alt="Dashboard">
+<img src="docs/screenshots/dashboard.png" alt="Dashboard">
 <b>Dashboard</b> - Overview and statistics
 </td>
 <td width="50%">
-<img src="docs/screenshots/CAs.png" alt="Certificate Authorities">
+<img src="docs/screenshots/cas.png" alt="Certificate Authorities">
 <b>CA Management</b> - Manage authorities
 </td>
 </tr>
 <tr>
 <td width="50%">
-<img src="docs/screenshots/ACME.png" alt="ACME Server">
-<b>ACME Server</b> - Let's Encrypt compatible
+<img src="docs/screenshots/certificates.png" alt="Certificates">
+<b>Certificates</b> - Full lifecycle management
 </td>
 <td width="50%">
-<img src="docs/screenshots/blossom-dark.png" alt="Themes">
+<img src="docs/screenshots/theme-panel.png" alt="Themes">
 <b>12 Theme Variants</b> - 6 colors × Light/Dark
 </td>
 </tr>
@@ -164,80 +164,46 @@ services:
 
 ## 📚 Documentation
 
-### Installation & Setup
-- [Installation Guide](docs/installation/README.md) - Complete installation instructions
-- [Docker Guide](docs/installation/docker.md) - Docker deployment details
-- [First Steps](docs/user-guide/first-steps.md) - Getting started guide
+Full documentation is available on the **[Wiki](https://github.com/NeySlim/ultimate-ca-manager/wiki)**.
 
-### User Guides
-- [CA Management](docs/user-guide/ca-management.md) - Managing Certificate Authorities
-- [Certificates](docs/user-guide/certificates.md) - Certificate operations
-- [SCEP Server](docs/user-guide/protocols/scep.md) - SCEP configuration
-- [ACME Support](docs/user-guide/protocols/acme.md) - ACME/Let's Encrypt
-- [OCSP Responder](docs/user-guide/protocols/ocsp.md) - OCSP setup
-- [CRL/CDP](docs/user-guide/protocols/crl.md) - Certificate revocation
-
-### Administration
-- [Configuration](docs/administration/configuration.md) - System configuration
-- [User Management](docs/administration/user-management.md) - User accounts & roles
-- [Backup & Restore](docs/administration/backup-restore.md) - Backup procedures
-- [Monitoring](docs/administration/monitoring.md) - Health & monitoring
-
-### Development
-- [Architecture](docs/development/architecture.md) - System architecture
-- [Building](docs/development/building.md) - Build from source
-- [Contributing](docs/development/contributing.md) - Contribution guidelines
-- [API Documentation](docs/development/api.md) - REST API reference
+### Quick Links
+- [Installation Guide](https://github.com/NeySlim/ultimate-ca-manager/wiki/Installation-Guide)
+- [Quick Start](https://github.com/NeySlim/ultimate-ca-manager/wiki/Quick-Start)
+- [CA Management](https://github.com/NeySlim/ultimate-ca-manager/wiki/CA-Management)
+- [Certificate Operations](https://github.com/NeySlim/ultimate-ca-manager/wiki/Certificate-Operations)
+- [SCEP Server](https://github.com/NeySlim/ultimate-ca-manager/wiki/SCEP-Server)
+- [ACME Support](https://github.com/NeySlim/ultimate-ca-manager/wiki/ACME-Support)
+- [API Documentation](https://github.com/NeySlim/ultimate-ca-manager/wiki/API-Documentation)
+- [Troubleshooting](https://github.com/NeySlim/ultimate-ca-manager/wiki/Troubleshooting)
 
 ---
 
-## 📡 API Endpoints
+## 📡 API v2
 
-### Authentication
-- `POST /api/auth/login` - User login
-- `POST /api/auth/logout` - User logout
-- `POST /api/auth/webauthn/*` - WebAuthn operations
+UCM provides a RESTful JSON API under `/api/v2/`. Full documentation in [OpenAPI spec](docs/openapi.yaml).
 
-### Certificate Authorities
-- `GET /api/ca/list` - List all CAs
-- `POST /api/ca/create` - Create new CA
-- `DELETE /api/ca/{id}` - Delete CA
-- `GET /api/ca/{id}/export` - Export CA
-
-### Certificates
-- `GET /api/certificates/list` - List certificates
-- `POST /api/certificates/create` - Create certificate
-- `POST /api/certificates/sign` - Sign CSR
-- `POST /api/certificates/revoke` - Revoke certificate
-- `GET /api/certificates/{id}/export` - Export certificate
-
-### SCEP
-- `GET /scep/pkiclient.exe` - SCEP enrollment endpoint
-- `POST /scep/pkiclient.exe` - SCEP operations
-
-### ACME
-- `POST /acme/new-account` - Create ACME account
-- `POST /acme/new-order` - Create certificate order
-- `POST /acme/authz/{id}` - Authorization challenge
-- `POST /acme/challenge/{id}` - Challenge validation
-- `POST /acme/finalize/{id}` - Finalize order
-
-### OCSP
-- `POST /ocsp` - OCSP status request
-
-### CRL
-- `GET /crl/{ca_id}` - Download CRL for CA
+### Key Endpoints
+| Resource | Endpoints |
+|----------|-----------|
+| **Auth** | `POST /api/v2/auth/login`, `/logout`, `/verify` |
+| **CAs** | `GET/POST /api/v2/cas`, `GET/PUT/DELETE /api/v2/cas/{id}` |
+| **Certificates** | `GET/POST /api/v2/certificates`, `POST .../revoke`, `POST .../renew` |
+| **CSRs** | `GET/POST /api/v2/csrs`, `POST /api/v2/csrs/{id}/sign` |
+| **ACME** | `GET /api/v2/acme/accounts`, `/orders`, `/challenges` |
+| **SCEP** | `GET /scep/pkiclient.exe` (RFC 8894) |
+| **OCSP** | `POST /ocsp` (RFC 6960) |
+| **CRL** | `GET /crl/{ca_id}` |
 
 ---
 
 ## 🛠️ Technology Stack
 
-- **Frontend:** React 18, Vite, Radix UI, Tailwind CSS
-- **Backend:** Python 3.11, Flask, SQLAlchemy
-- **Database:** SQLite
-- **Server:** Gunicorn (production), Werkzeug (dev)
+- **Frontend:** React 18, Vite, Radix UI
+- **Backend:** Python 3.11+, Flask, SQLAlchemy
+- **Database:** SQLite (PostgreSQL supported)
+- **Server:** Gunicorn with gevent WebSocket
 - **Cryptography:** pyOpenSSL, cryptography
-- **Authentication:** Flask-Login, PyJWT, WebAuthn
+- **Authentication:** JWT, WebAuthn/FIDO2, TOTP
 
 ---
 
