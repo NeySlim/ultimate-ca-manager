@@ -32,7 +32,13 @@ class AuthManager:
     
     def __init__(self):
         """Initialize auth manager"""
-        self.jwt_secret = current_app.config.get('JWT_SECRET_KEY', 'dev-secret-change-me')
+        jwt_secret = current_app.config.get('JWT_SECRET_KEY')
+        if not jwt_secret or jwt_secret == 'dev-secret-change-me':
+            # Generate a secure secret if not configured
+            import secrets
+            jwt_secret = secrets.token_urlsafe(32)
+            current_app.logger.warning("JWT_SECRET_KEY not configured - using auto-generated secret (will change on restart)")
+        self.jwt_secret = jwt_secret
         self.jwt_expiry = current_app.config.get('JWT_ACCESS_TOKEN_EXPIRES', 3600)
     
     def authenticate_request(self, request_obj):

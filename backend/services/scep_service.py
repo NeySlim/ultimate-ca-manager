@@ -293,11 +293,8 @@ class SCEPService:
             db.session.add(scep_req)
             
             # Auto-approve if configured
-            print(f"DEBUG: auto_approve = {self.auto_approve}, challenge_password = {self.challenge_password}", flush=True)
             if self.auto_approve:
-                print(f"DEBUG: Auto-approve enabled, creating certificate...", flush=True)
                 cert_refid = self._auto_approve_request(scep_req, csr)
-                print(f"DEBUG: Certificate created with refid: {cert_refid}", flush=True)
                 scep_req.status = "approved"
                 scep_req.cert_refid = cert_refid
                 scep_req.approved_by = "auto"

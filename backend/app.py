@@ -679,8 +679,11 @@ def init_database(app):
             
             db.session.commit()
             print(f"\n[SETUP] Initial admin user created: {admin.username}")
-            print(f"[SETUP] Default password: {app.config['INITIAL_ADMIN_PASSWORD']}")
-            print(f"[SETUP] CHANGE THIS PASSWORD IMMEDIATELY!\n")
+            if app.config['INITIAL_ADMIN_PASSWORD'] == 'changeme123':
+                print(f"[SETUP] Using default password - CHANGE THIS IMMEDIATELY!")
+            else:
+                print(f"[SETUP] Using custom password from INITIAL_ADMIN_PASSWORD")
+            print(f"[SETUP] Login and change password in Settings > Account\n")
     except IntegrityError:
         # Another worker already created the initial data
         db.session.rollback()
