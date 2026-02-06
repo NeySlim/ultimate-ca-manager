@@ -219,110 +219,62 @@ export default function DashboardPage() {
 
   return (
     <div className="flex-1 h-full overflow-y-auto xl:overflow-hidden bg-bg-primary">
-      <div className="p-3 space-y-3 max-w-[1800px] mx-auto xl:h-full xl:flex xl:flex-col">
+      <div className="p-4 space-y-4 max-w-[1800px] mx-auto xl:h-full xl:flex xl:flex-col">
         
-        {/* Hero Header */}
-        <div className="relative overflow-hidden rounded-xl hero-gradient border border-accent-primary/20 p-3">
-          <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-accent-primary/5 blur-2xl" />
+        {/* Compact Header Row */}
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Left: Logo + Version */}
+          <div className="flex items-center gap-3">
+            <Logo variant="horizontal" size="md" />
+            <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-border/50">
+              <Badge variant="primary" size="sm">{versionInfo.edition === 'pro' ? 'Pro' : 'Community'}</Badge>
+              <span className="text-xs text-text-tertiary">v{versionInfo.version || '2.0.0'}</span>
+            </div>
+          </div>
           
-          <div className="relative flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-3">
-              <Logo variant="horizontal" size="md" />
-              <div className="hidden sm:block w-px h-10 bg-border/50" />
-              <div>
-                <p className="text-sm text-text-secondary">{getGreeting()} 👋</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <Badge variant="primary" size="sm">{versionInfo.edition === 'pro' ? 'Pro' : 'Community'}</Badge>
-                  <span className="text-xs text-text-tertiary">v{versionInfo.version || '2.0.0'}</span>
-                  {/* Live Indicator */}
-                  <div className="flex items-center gap-1 ml-2">
-                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'status-success-bg-solid animate-pulse' : 'bg-text-tertiary'}`} />
-                    <span className={`text-xs ${isConnected ? 'status-success-text' : 'text-text-tertiary'}`}>
-                      {isConnected ? 'Live' : 'Offline'}
-                    </span>
-                  </div>
-                </div>
-              </div>
+          <div className="flex-1" />
+          
+          {/* Right: Status + Actions */}
+          <div className="flex items-center gap-3">
+            {/* Live Status Pill */}
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+              isConnected 
+                ? 'bg-accent-success/10 text-accent-success border border-accent-success/20' 
+                : 'bg-bg-tertiary text-text-tertiary border border-border'
+            }`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-current animate-pulse' : 'bg-current'}`} />
+              {isConnected ? 'Live' : 'Offline'}
             </div>
             
-            <div className="flex-1" />
-            
-            {/* Quick Actions */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Actions */}
+            <div className="flex items-center gap-1.5">
               <Button size="sm" onClick={() => navigate('/certificates?action=create')}>
                 <Plus size={14} weight="bold" />
-                Issue Cert
+                <span className="hidden sm:inline">Issue Cert</span>
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => navigate('/cas?action=create')}>
-                <Plus size={14} weight="bold" />
-                Create CA
+              <Button size="sm" variant="ghost" onClick={loadDashboard} title="Refresh">
+                <ArrowsClockwise size={16} />
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => navigate('/csrs')}>
-                <ListChecks size={14} weight="bold" />
-                Sign CSR
-              </Button>
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                onClick={loadDashboard} 
-                title="Refresh"
-                className="hidden md:flex"
-              >
-                <ArrowsClockwise size={14} />
-              </Button>
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                onClick={() => setShowWidgetSettings(true)} 
-                title="Customize dashboard"
-                className="hidden md:flex"
-              >
-                <SlidersHorizontal size={14} />
+              <Button size="sm" variant="ghost" onClick={() => setShowWidgetSettings(true)} title="Customize" className="hidden md:flex">
+                <SlidersHorizontal size={16} />
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Stats Row - Now with colors and live indicators */}
+        {/* Stats Row - Compact horizontal stats */}
         {widgets.find(w => w.id === 'stats')?.visible && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard 
-            icon={Certificate}
-            label="Certificates"
-            value={totalCerts}
-            color="blue"
-            live={isConnected}
-            onClick={() => navigate('/certificates')}
-          />
-          <StatCard 
-            icon={ShieldCheck}
-            label="Authorities"
-            value={totalCAs}
-            color="purple"
-            live={isConnected}
-            onClick={() => navigate('/cas')}
-          />
-          <StatCard 
-            icon={ListChecks}
-            label="CSR Queue"
-            value={pendingCSRs}
-            color={pendingCSRs > 0 ? 'yellow' : 'slate'}
-            badge={pendingCSRs > 0 ? 'Pending' : null}
-            onClick={() => navigate('/csrs')}
-          />
-          <StatCard 
-            icon={Globe}
-            label="ACME Accounts"
-            value={acmeAccounts}
-            color="emerald"
-            onClick={() => navigate('/acme')}
-          />
+          <StatCard icon={Certificate} label="Certificates" value={totalCerts} color="blue" onClick={() => navigate('/certificates')} />
+          <StatCard icon={ShieldCheck} label="Authorities" value={totalCAs} color="violet" onClick={() => navigate('/cas')} />
+          <StatCard icon={ListChecks} label="CSR Queue" value={pendingCSRs} color={pendingCSRs > 0 ? 'amber' : 'slate'} badge={pendingCSRs > 0 ? 'Pending' : null} onClick={() => navigate('/csrs')} />
+          <StatCard icon={Globe} label="ACME" value={acmeAccounts} color="emerald" onClick={() => navigate('/acme')} />
         </div>
         )}
         
-        {/* Charts Row - hidden on smaller desktops to fit content */}
+        {/* Charts Row - visible on 2xl+ screens only */}
         {widgets.find(w => w.id === 'charts')?.visible && (
-        <div className="hidden 2xl:grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="hidden 2xl:grid grid-cols-2 gap-4">
           {/* Certificate Trend */}
           <Card variant="elevated" className="p-0">
             <Card.Header 
@@ -359,27 +311,27 @@ export default function DashboardPage() {
         </div>
         )}
 
-        {/* Expiring Certs Warning Banner */}
+        {/* Expiring Warning Banner - more elegant */}
         {widgets.find(w => w.id === 'expiring')?.visible && expiringCount > 0 && (
-          <div 
+          <button 
             onClick={() => navigate('/certificates?filter=expiring')}
-            className="flex items-center gap-3 p-3 rounded-lg stat-card-warning cursor-pointer border transition-colors"
+            className="w-full flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 hover:border-amber-500/40 transition-all group"
           >
-            <div className="w-8 h-8 rounded-lg status-warning-bg flex items-center justify-center">
-              <Warning size={18} weight="fill" className="status-warning-text" />
+            <div className="w-9 h-9 rounded-lg bg-amber-500/15 flex items-center justify-center">
+              <Warning size={18} weight="fill" className="text-amber-500" />
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium status-warning-text">
+            <div className="flex-1 text-left">
+              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
                 {expiringCount} certificate{expiringCount > 1 ? 's' : ''} expiring soon
               </p>
               <p className="text-xs text-text-secondary">Click to view and renew</p>
             </div>
-            <CaretRight size={16} className="status-warning-text" />
-          </div>
+            <CaretRight size={16} className="text-amber-500 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+          </button>
         )}
 
-        {/* Main Content - 2x2 Grid + Activity Column */}
-        <div className="xl:flex-1 grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {/* Main Content - 2 columns on lg+ */}
+        <div className="xl:flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4">
           
           {/* Left: 2x2 Grid for Certs, CAs, System, ACME */}
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 sm:grid-rows-2 gap-3 sm:auto-rows-fr">
@@ -708,69 +660,34 @@ function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
   )
 }
 
-// Enhanced Stat Card with live indicator and subtle polish
-function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
-  const accentMap = {
-    blue: '--accent-primary',
-    purple: '--accent-primary',
-    yellow: '--accent-warning',
-    emerald: '--accent-success',
-    slate: '--text-tertiary',
-  }
-  
-  const colorClasses = {
-    blue: 'primary',
-    purple: 'primary',
-    yellow: 'warning',
-    emerald: 'success',
-    slate: '',
-  }
-  
+// Enhanced Stat Card with hover effects
+function StatCard({ icon: Icon, label, value, color, onClick, badge }) {
   const iconStyles = {
     blue: 'icon-bg-blue',
-    purple: 'icon-bg-violet',
-    yellow: 'icon-bg-amber',
+    violet: 'icon-bg-violet',
+    amber: 'icon-bg-amber',
     emerald: 'icon-bg-emerald',
-    slate: 'icon-bg-teal',
+    slate: 'icon-bg-slate',
   }
-  
-  const variant = colorClasses[color] || ''
-  const accentVar = accentMap[color] || accentMap.slate
   
   return (
     <button 
       onClick={onClick}
-      className={`stat-card-enhanced ${variant} relative p-4 text-left group transition-all duration-200`}
-      style={{ '--card-accent': `var(${accentVar})` }}
+      className="relative p-3.5 text-left group rounded-xl bg-bg-secondary border border-border/50 hover:border-border hover:shadow-lg transition-all duration-200"
     >
-      {/* Live indicator */}
-      {live && (
-        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
-          <span className="text-2xs status-success-text font-medium opacity-0 group-hover:opacity-100 transition-opacity">Live</span>
-          <div className="w-2 h-2 rounded-full status-success-bg-solid animate-pulse-soft" />
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${iconStyles[color] || iconStyles.slate}`}>
+          <Icon size={20} weight="duotone" />
         </div>
-      )}
-      
-      <div className="relative flex items-center gap-3">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${iconStyles[color] || iconStyles.slate}`}>
-          <Icon size={22} weight="duotone" />
-        </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
+          <p className="text-2xl font-bold text-text-primary tracking-tight tabular-nums">{value}</p>
           <div className="flex items-center gap-2">
-            <p className="text-2xl font-bold text-text-primary tracking-tight tabular-nums">{value}</p>
-            {badge && (
-              <Badge variant="warning" size="sm" dot pulse>{badge}</Badge>
-            )}
+            <p className="text-xs text-text-secondary">{label}</p>
+            {badge && <Badge variant="warning" size="sm" dot>{badge}</Badge>}
           </div>
-          <p className="text-xs text-text-secondary font-medium">{label}</p>
         </div>
+        <CaretRight size={14} className="text-text-tertiary opacity-0 group-hover:opacity-60 transition-all group-hover:translate-x-0.5" />
       </div>
-      
-      {/* Subtle hover arrow */}
-      <CaretRight 
-        size={14} 
-        className="absolute right-3 bottom-3 text-text-tertiary opacity-0 group-hover:opacity-60 transition-all duration-200 group-hover:translate-x-0.5" 
-      />
     </button>
   )
 }
