@@ -1,0 +1,325 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g., 2.0.0-beta1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ============================================================
+  # Build Debian Package
+  # ============================================================
+  build-deb:
+    name: Build DEB Package
+    runs-on: ubuntu-latest
+    
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      deb_version: ${{ steps.version.outputs.deb_version }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Extract version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          # Convert to DEB version (2.0.0-beta1 -> 2.0.0~beta1)
+          DEB_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "deb_version=$DEB_VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION (DEB: $DEB_VERSION)"
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+      
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential debhelper fakeroot devscripts
+      
+      - name: Update changelog version
+        run: |
+          VERSION="${{ steps.version.outputs.deb_version }}"
+          DATE=$(date -R)
+          cat > packaging/debian/changelog << EOF
+          ucm ($VERSION) stable; urgency=medium
+
+            * Release $VERSION
+
+           -- UCM Team <support@ucm.local>  $DATE
+
+          EOF
+      
+      - name: Build DEB package
+        run: |
+          dpkg-buildpackage -us -uc -b
+          mv ../ucm_*.deb .
+          ls -la ucm_*.deb
+      
+      - name: Generate checksums
+        run: |
+          for f in ucm_*.deb; do
+            sha256sum "$f" > "$f.sha256"
+          done
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package
+          path: |
+            ucm_*.deb
+            ucm_*.deb.sha256
+
+  # ============================================================
+  # Build RPM Package
+  # ============================================================
+  build-rpm:
+    name: Build RPM Package
+    runs-on: ubuntu-latest
+    needs: build-deb
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+      
+      - name: Build RPM in Fedora container
+        run: |
+          VERSION="${{ needs.build-deb.outputs.version }}"
+          # Convert version for RPM (2.0.0-beta1 -> 2.0.0~beta1)
+          RPM_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
+          
+          docker run --rm \
+            -v $(pwd):/workspace \
+            -v /tmp/rpm-output:/output \
+            fedora:43 bash -c "
+              dnf install -y rpm-build python3 python3-pip python3-devel systemd-rpm-macros gcc openssl-devel make tar gzip
+              
+              mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+              
+              cd /workspace
+              
+              # Create source tarball
+              tar czf ~/rpmbuild/SOURCES/ucm-${RPM_VERSION}.tar.gz \
+                --transform 's,^,ucm-${RPM_VERSION}/,' \
+                --exclude='.git' --exclude='*.pyc' --exclude='__pycache__' \
+                --exclude='node_modules' --exclude='.pytest_cache' .
+              
+              # Update version in spec
+              sed -i \"s/^Version:.*/Version:        ${RPM_VERSION}/\" packaging/rpm/ucm.spec
+              
+              # Build RPM
+              rpmbuild -bb packaging/rpm/ucm.spec \
+                --define \"_sourcedir \$(pwd)/packaging/rpm\" \
+                --define \"_topdir ~/rpmbuild\"
+              
+              # Copy output
+              cp ~/rpmbuild/RPMS/*/*.rpm /output/
+              cd /output && sha256sum *.rpm > checksums.sha256
+            "
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package
+          path: /tmp/rpm-output/*.rpm
+
+  # ============================================================
+  # Build Docker Image
+  # ============================================================
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: build-deb
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+      
+      - name: Set image name
+        id: image
+        run: |
+          echo "name=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') }}
+            type=raw,value=${{ needs.build-deb.outputs.version }}
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.build-deb.outputs.version }}
+
+  # ============================================================
+  # Create GitHub Release
+  # ============================================================
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-deb, build-rpm, build-docker]
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Download DEB artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-package
+          path: ./artifacts
+      
+      - name: Download RPM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm-package
+          path: ./artifacts
+      
+      - name: Generate release notes
+        id: notes
+        run: |
+          VERSION="${{ needs.build-deb.outputs.version }}"
+          IMAGE="ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')"
+          
+          cat > notes.md << 'EOF'
+          ## 🚀 Installation
+          
+          ### Docker (Recommended)
+          ```bash
+          docker pull IMAGE:VERSION
+          docker run -d -p 8443:8443 \
+            -e SECRET_KEY=$(openssl rand -hex 32) \
+            -e JWT_SECRET_KEY=$(openssl rand -hex 32) \
+            --name ucm IMAGE:VERSION
+          ```
+          
+          ### Debian/Ubuntu
+          ```bash
+          wget https://github.com/REPO/releases/download/vVERSION/ucm_DEB_VERSION_all.deb
+          sudo dpkg -i ucm_*_all.deb
+          sudo apt-get install -f
+          ```
+          
+          ### Fedora/RHEL
+          ```bash
+          wget https://github.com/REPO/releases/download/vVERSION/ucm-RPM_VERSION-1.fc43.noarch.rpm
+          sudo dnf install ./ucm-*.rpm
+          ```
+          
+          ## 🔐 Default Credentials
+          - **Username:** `admin`
+          - **Password:** Check `/etc/ucm/ucm.env` after install, or shown during install
+          
+          ⚠️ **Change the password immediately after first login!**
+          
+          ## 📚 Documentation
+          - [Installation Guide](https://github.com/NeySlim/ultimate-ca-manager/wiki)
+          - [API Documentation](https://github.com/NeySlim/ultimate-ca-manager/wiki/API)
+          
+          ## ⬆️ Upgrading from v1.8.x
+          Data is automatically migrated when upgrading. A backup is created in `/opt/ucm/data/backups/`.
+          EOF
+          
+          # Replace placeholders
+          DEB_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
+          RPM_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
+          sed -i "s|IMAGE|$IMAGE|g" notes.md
+          sed -i "s|VERSION|$VERSION|g" notes.md
+          sed -i "s|DEB_VERSION|$DEB_VERSION|g" notes.md
+          sed -i "s|RPM_VERSION|$RPM_VERSION|g" notes.md
+          sed -i "s|REPO|${{ github.repository }}|g" notes.md
+          
+          cat notes.md
+      
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: notes.md
+          draft: false
+          prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+          files: |
+            artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
