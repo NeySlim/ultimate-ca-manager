@@ -35,7 +35,7 @@ override_dh_auto_install:
 	install -m 755 packaging/debian/start-ucm.sh debian/ucm/opt/ucm/start-ucm.sh
 	
 	# Install requirements.txt
-	install -m 644 requirements.txt debian/ucm/opt/ucm/requirements.txt
+	install -m 644 backend/requirements.txt debian/ucm/opt/ucm/requirements.txt
 	
 	# Copy documentation
 	cp README.md debian/ucm/usr/share/doc/ucm/
@@ -49,6 +49,7 @@ override_dh_auto_install:
 	# Set permissions
 	find debian/ucm/opt/ucm -type f -exec chmod 644 {} \;
 	find debian/ucm/opt/ucm -type d -exec chmod 755 {} \;
+	chmod +x debian/ucm/opt/ucm/start-ucm.sh
 	chmod +x debian/ucm/opt/ucm/backend/app.py || true
 
 override_dh_installinit:

@@ -117,9 +117,10 @@ ENVEOF
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         fi
         
-        # Create venv if not exists
-        if [ ! -d "$UCM_HOME/venv" ]; then
+        # Create or update venv
+        if [ ! -f "$UCM_HOME/venv/bin/gunicorn" ]; then
             echo "Creating Python virtual environment..."
+            rm -rf "$UCM_HOME/venv" 2>/dev/null || true
             python3 -m venv "$UCM_HOME/venv"
             "$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
             "$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
@@ -131,6 +132,18 @@ ENVEOF
         chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_CONFIG"
         chown -R "$UCM_USER":"$UCM_GROUP" /var/log/ucm
         chmod 750 "$UCM_DATA"
+        
+        # Generate HTTPS cert if not exists
+        if [ ! -f "$UCM_DATA/https_cert.pem" ]; then
+            echo "Generating HTTPS certificate..."
+            openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+                -keyout "$UCM_DATA/https_key.pem" \
+                -out "$UCM_DATA/https_cert.pem" \
+                -subj "/CN=ucm/O=UCM/OU=PKI" 2>/dev/null
+            chown "$UCM_USER":"$UCM_GROUP" "$UCM_DATA"/https_*.pem
+            chmod 600 "$UCM_DATA/https_key.pem"
+            chmod 644 "$UCM_DATA/https_cert.pem"
+        fi
         
         # Enable and start service
         systemctl daemon-reload
