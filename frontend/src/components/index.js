@@ -85,3 +85,4 @@ export { RichStatsBar } from './ui/RichStatsBar'
 // Dashboard charts
 // Charts are lazy loaded - NOT exported from main bundle
 // Import directly: import { CertificateTrendChart, ... } from './DashboardChart'
+export { UpdateChecker } from './UpdateChecker'

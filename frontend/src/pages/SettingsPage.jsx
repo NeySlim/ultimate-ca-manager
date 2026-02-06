@@ -9,13 +9,14 @@ import { useSearchParams } from 'react-router-dom'
 import { 
   Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
   Envelope, Download, Trash, HardDrives, Lock, Key, Palette, Sun, Moon, Desktop, Info,
-  Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise
+  Timer, Clock, WarningCircle, UploadSimple, Certificate, Eye, ArrowsClockwise, Rocket
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
   Button, Input, Select, Badge,
   LoadingSpinner, FileUpload, Modal, HelpCard,
-  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent
+  DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
+  UpdateChecker
 } from '../components'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
@@ -36,6 +37,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'audit', label: 'Audit', icon: ListBullets, color: 'icon-bg-orange' },
   { id: 'database', label: 'Database', icon: HardDrives, color: 'icon-bg-blue' },
   { id: 'https', label: 'HTTPS', icon: Lock, color: 'icon-bg-emerald' },
+  { id: 'updates', label: 'Updates', icon: Rocket, color: 'icon-bg-violet' },
 ]
 
 // Appearance Settings Component
@@ -1110,6 +1112,18 @@ export default function SettingsPage() {
                 />
               </div>
             </DetailSection>
+          </DetailContent>
+        )
+
+      case 'updates':
+        return (
+          <DetailContent>
+            <DetailHeader compact
+              icon={Rocket}
+              title="Software Updates"
+              subtitle="Check for and install UCM updates"
+            />
+            <UpdateChecker />
           </DetailContent>
         )
 
