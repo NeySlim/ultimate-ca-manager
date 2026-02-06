@@ -223,11 +223,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+          images: |
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+            neyslim/ucm
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -284,11 +292,17 @@ jobs:
           
           ### Docker (Recommended)
           ```bash
+          # From Docker Hub
+          docker pull neyslim/ucm:VERSION
+          
+          # Or from GitHub Container Registry
           docker pull IMAGE:VERSION
+          
+          # Run
           docker run -d -p 8443:8443 \
             -e SECRET_KEY=$(openssl rand -hex 32) \
             -e JWT_SECRET_KEY=$(openssl rand -hex 32) \
-            --name ucm IMAGE:VERSION
+            --name ucm neyslim/ucm:VERSION
           ```
           
           ### Debian/Ubuntu
