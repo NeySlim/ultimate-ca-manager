@@ -83,4 +83,5 @@ export { UnifiedPageHeader } from './ui/UnifiedPageHeader'
 export { RichStatsBar } from './ui/RichStatsBar'
 
 // Dashboard charts
-export { CertificateTrendChart, StatusPieChart, MiniSparkline } from './DashboardChart'
+// Charts are lazy loaded - NOT exported from main bundle
+// Import directly: import { CertificateTrendChart, ... } from './DashboardChart'

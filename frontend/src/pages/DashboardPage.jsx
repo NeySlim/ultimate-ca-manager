@@ -11,7 +11,9 @@ import {
   UploadSimple, Key, Warning, WifiHigh, Heartbeat, Database, Lightning,
   SlidersHorizontal, Eye, EyeSlash, X
 } from '@phosphor-icons/react'
-import { Card, Button, Badge, LoadingSpinner, Logo, Modal, CertificateTrendChart, StatusPieChart } from '../components'
+import { Card, Button, Badge, LoadingSpinner, Logo, Modal } from '../components'
+// Charts loaded directly to allow proper code splitting (recharts is large)
+import { CertificateTrendChart, StatusPieChart } from '../components/DashboardChart'
 import { dashboardService, certificatesService, acmeService } from '../services'
 import { useNotification } from '../contexts'
 import { useWebSocket, EventType } from '../hooks'
