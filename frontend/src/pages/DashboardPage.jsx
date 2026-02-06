@@ -333,7 +333,7 @@ export default function DashboardPage() {
               title="Certificate Activity"
               subtitle="Last 7 days"
             />
-            <Card.Body className="!pt-0 !pb-2">
+            <Card.Body className="!pt-2 !pb-2">
               <CertificateTrendChart data={certificateTrend} height={140} />
             </Card.Body>
           </Card>
@@ -346,7 +346,7 @@ export default function DashboardPage() {
               title="Status Distribution"
               subtitle="Current certificates"
             />
-            <Card.Body className="!pt-0 !pb-2">
+            <Card.Body className="!pt-2 !pb-2">
               <StatusPieChart 
                 data={{
                   valid: Math.max(0, (stats?.total_certificates || 0) - (stats?.expiring_soon || 0) - (stats?.revoked || 0)),
@@ -486,7 +486,7 @@ export default function DashboardPage() {
                   </Button>
                 }
               />
-              <Card.Body className="!pt-0">
+              <Card.Body className="!pt-2">
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <SystemStat 
                     icon={WifiHigh} 
