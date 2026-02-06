@@ -1,87 +1,76 @@
-# UCM Screenshots Gallery
+# UCM v2.0.0 Screenshots Gallery
+
+## 🎨 New React UI
+
+UCM v2.0.0 features a completely redesigned interface built with React 18 and Radix UI components.
 
 ## Dashboard
-![Dashboard](screenshots/dash.png)
-*Main dashboard with certificate statistics and recent activity*
+![Dashboard](screenshots/dashboard.png)
+*Modern dashboard with real-time statistics, activity feed, and system health*
+
+![Dashboard Dark](screenshots/dashboard-dark.png)
+*Dashboard in dark mode*
 
 ## Certificate Management
 
-### Certificate Authorities List
-![CAs List](screenshots/CAs.png)
-*View and manage all Certificate Authorities*
+### Certificate Authorities
+![CAs](screenshots/cas.png)
+*Manage Root and Intermediate Certificate Authorities*
 
-### Certificates List
-![Certificates](screenshots/Certs.png)
-*Browse all issued certificates with filtering and search*
+### Certificates
+![Certificates](screenshots/certificates.png)
+*Browse, filter, and manage all certificates*
 
-### Certificate Revocation Lists (CRL)
-![CRL Management](screenshots/CRL.png)
-*CRL generation and distribution management*
+### Certificate Signing Requests
+![CSRs](screenshots/csrs.png)
+*Review and sign pending certificate requests*
+
+### Groups
+![Groups](screenshots/groups.png)
+*Organize certificates into custom groups*
 
 ## Protocol Support
 
 ### ACME Server
-![ACME](screenshots/ACME.png)
-*ACME protocol configuration (Let's Encrypt compatible)*
+![ACME](screenshots/acme.png)
+*ACME protocol configuration - Let's Encrypt compatible (certbot, acme.sh)*
 
 ### SCEP Service
-![SCEP](screenshots/SCEP.png)
+![SCEP](screenshots/scep.png)
 *SCEP enrollment for mobile devices and network equipment*
 
-### OCSP Responder
-![OCSP](screenshots/OCSP.png)
-*Real-time certificate validation via OCSP*
+### CRL/OCSP
+![CRL OCSP](screenshots/crl-ocsp.png)
+*Certificate Revocation Lists and OCSP Responder configuration*
 
-## User Management
+## Administration
 
-### User Accounts
-![Users](screenshots/USERS.png)
-*User management with role-based access control*
+### Audit Logs
+![Audit Logs](screenshots/audit-logs.png)
+*Complete action logging with filtering and export*
 
-### User Profile Settings
-![User Settings](screenshots/User_settings.png)
-*Personal account settings and preferences*
+### Settings
+![Settings](screenshots/settings.png)
+*System configuration with multiple tabs*
 
-### My Certificates (mTLS)
-![My Certificates](screenshots/my-certificates.png)
-*User's personal client certificates for mTLS authentication*
-
-### WebAuthn/FIDO2
-![Hardware Keys](screenshots/hw_keys.png)
-*Passwordless authentication with hardware security keys*
-
-## Security Features
-
-### mTLS Configuration
-![mTLS Settings](screenshots/mtls-settings.png)
-*Mutual TLS authentication settings*
-
-### Email Notifications
-![Notifications](screenshots/notifications.png)
-*Certificate expiration alerts and notifications*
-
-## System Configuration
-
-### System Settings
-![System Settings](screenshots/System_settings.png)
-*Global system configuration and HTTPS certificate management*
-
-## Themes
-
-### Amber Light Theme
-![Amber Light](screenshots/amber-light.png)
-*Clean and professional light theme*
-
-### Blossom Dark Theme
-![Blossom Dark](screenshots/blossom-dark.png)
-*Beautiful dark theme with pink accents*
+### Theme Selection
+![Themes](screenshots/theme-panel.png)
+*6 color themes × Light/Dark modes = 12 theme variants*
 
 ---
 
-**Available Themes:**
-- Sentinel (Light/Dark) - Default professional theme
-- Amber (Light/Dark) - Warm golden tones
-- Nebula (Light/Dark) - Blue cosmic theme
-- Blossom (Light/Dark) - Pink floral theme
+## 🎨 Available Themes
 
-All themes support both light and dark modes with smooth transitions.
+| Theme | Light | Dark |
+|-------|-------|------|
+| Gray | ⚪ | ⚫ |
+| Blue Ocean | 🔵 | 🌊 |
+| Purple Night | 💜 | 🌌 |
+| Green Forest | 💚 | 🌲 |
+| Orange Sunset | 🧡 | 🌅 |
+| Cyber Pink | 💗 | 🌸 |
+
+All themes support:
+- **Light/Dark modes** with smooth transitions
+- **Follow System** option for automatic switching
+- Persistent preference per user
