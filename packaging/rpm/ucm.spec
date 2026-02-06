@@ -8,6 +8,8 @@ URL:            https://github.com/NeySlim/ultimate-ca-manager
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch
+# Disable auto-detection of requires (we manage deps via venv)
+AutoReqProv:    no
 Requires:       python3 >= 3.9
 Requires:       systemd
 Requires:       openssl >= 1.1.1
