@@ -7,20 +7,20 @@ After=network.target
 Type=exec
 User=ucm
 Group=ucm
-WorkingDirectory=/usr/share/ucm/backend
+WorkingDirectory=/opt/ucm/backend
 
 # Environment
 EnvironmentFile=-/etc/ucm/ucm.env
 
 # Start script handles cert generation
-ExecStart=/usr/share/ucm/start-ucm.sh
+ExecStart=/opt/ucm/start-ucm.sh
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/ucm /var/log/ucm /etc/ucm
+ReadWritePaths=/opt/ucm/data /var/log/ucm /etc/ucm
 ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictRealtime=true
