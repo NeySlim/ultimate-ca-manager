@@ -82,6 +82,8 @@ jobs:
       
       - name: Build DEB package
         run: |
+          # Create symlink for debian directory (dpkg expects debian/ at root)
+          ln -s packaging/debian debian
           dpkg-buildpackage -us -uc -b
           mv ../ucm_*.deb .
           ls -la ucm_*.deb
