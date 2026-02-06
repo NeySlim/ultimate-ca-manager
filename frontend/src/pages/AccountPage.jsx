@@ -648,6 +648,7 @@ export default function AccountPage() {
           label="New Password"
           type="password"
           name="new_password"
+          showStrength
           required
         />
         <Input

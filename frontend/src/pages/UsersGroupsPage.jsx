@@ -939,6 +939,7 @@ function UserForm({ user, onSubmit, onCancel }) {
         onChange={(e) => setFormData(p => ({ ...p, password: e.target.value }))}
         required={!user}
         placeholder="••••••••"
+        showStrength={!user}
       />
       <Select
         label="Role"
