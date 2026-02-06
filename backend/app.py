@@ -515,12 +515,17 @@ def init_database(app):
                 ('totp_secret', 'VARCHAR(32)', None),
                 ('totp_confirmed', 'BOOLEAN', '0'),
                 ('backup_codes', 'TEXT', None),
+                ('failed_logins', 'INTEGER', '0'),
+                ('locked_until', 'DATETIME', None),
+                ('login_count', 'INTEGER', '0'),
             ],
             'certificates': [
                 ('archived', 'BOOLEAN', '0'),
                 ('source', 'VARCHAR(50)', None),
                 ('template_id', 'INTEGER', None),
                 ('owner_group_id', 'INTEGER', None),
+                ('key_algo', 'VARCHAR(20)', None),
+                ('subject_cn', 'VARCHAR(255)', None),
             ],
             'certificate_authorities': [
                 ('cdp_enabled', 'BOOLEAN', '0'),
@@ -528,12 +533,15 @@ def init_database(app):
                 ('ocsp_enabled', 'BOOLEAN', '0'),
                 ('ocsp_url', 'VARCHAR(512)', None),
                 ('owner_group_id', 'INTEGER', None),
+                ('serial_number', 'VARCHAR(64)', None),
             ],
             'groups': [
                 ('description', 'TEXT', None),
             ],
             'audit_logs': [
                 ('resource_name', 'VARCHAR(255)', None),
+                ('entry_hash', 'VARCHAR(64)', None),
+                ('prev_hash', 'VARCHAR(64)', None),
             ],
         }
         

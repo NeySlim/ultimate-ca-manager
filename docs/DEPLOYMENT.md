@@ -200,3 +200,124 @@ Pro features are only available if the Pro license is installed:
 - Certificate policies & approval workflows
 
 Pro tables are created automatically when Pro modules are detected.
+
+---
+
+## Upgrading from v1.8.x to v2.0.0
+
+### Major Changes in v2.0.0
+
+1. **Data Directory Location**
+   - v1.8.x: `/opt/ucm/backend/data/`
+   - v2.0.0: `/opt/ucm/data/`
+
+2. **Configuration**
+   - v1.8.x: `/opt/ucm/.env`
+   - v2.0.0: `/etc/ucm/ucm.env`
+
+3. **New Features**
+   - User sessions tracking
+   - Groups and group-based permissions
+   - API keys
+   - Certificate templates
+   - Trusted certificates store
+   - Database migrations tracking
+
+### Migration Steps
+
+#### Automatic Migration (Recommended)
+
+```bash
+# 1. Stop UCM
+systemctl stop ucm
+
+# 2. Backup everything
+cp -r /opt/ucm /opt/ucm.backup.v1.8.x
+cp /opt/ucm/backend/data/ucm.db /root/ucm.db.backup
+
+# 3. Install v2.0.0 package
+dpkg -i ucm_2.0.0_amd64.deb
+
+# 4. Run migration script
+cd /opt/ucm/backend
+python3 migrate_v1_to_v2.py /opt/ucm
+
+# 5. Start UCM
+systemctl start ucm
+
+# 6. Verify
+curl -k https://localhost:8443/api/health
+journalctl -u ucm -n 50
+
+# 7. If OK, clean up old data
+rm -rf /opt/ucm/backend/data
+```
+
+#### Manual Migration
+
+```bash
+# 1. Stop UCM
+systemctl stop ucm
+
+# 2. Create new data directory
+mkdir -p /opt/ucm/data/{ca,certs,private,sessions,backups}
+
+# 3. Copy files
+cp -r /opt/ucm/backend/data/ca/* /opt/ucm/data/ca/
+cp -r /opt/ucm/backend/data/certs/* /opt/ucm/data/certs/
+cp -r /opt/ucm/backend/data/private/* /opt/ucm/data/private/
+cp /opt/ucm/backend/data/ucm.db /opt/ucm/data/
+cp /opt/ucm/backend/data/https_*.pem /opt/ucm/data/
+
+# 4. Migrate config
+cp /opt/ucm/.env /etc/ucm/ucm.env
+# Edit /etc/ucm/ucm.env and update DATABASE_PATH=/opt/ucm/data/ucm.db
+
+# 5. Run database migration
+cd /opt/ucm/backend
+python3 migrate_v1_to_v2.py --db-only /opt/ucm/data/ucm.db
+
+# 6. Fix permissions
+chown -R ucm:ucm /opt/ucm/data
+
+# 7. Start UCM
+systemctl start ucm
+```
+
+### Database Schema Changes
+
+| Table | New Columns (v2.0.0) |
+|-------|---------------------|
+| users | totp_secret, totp_confirmed, backup_codes, failed_logins, locked_until, login_count |
+| certificates | archived, source, template_id, owner_group_id, key_algo, subject_cn |
+| certificate_authorities | owner_group_id, serial_number |
+| audit_logs | resource_name, entry_hash, prev_hash |
+
+### New Tables in v2.0.0
+
+- `user_sessions` - Active session tracking
+- `groups` - User groups
+- `group_members` - Group membership
+- `api_keys` - API key authentication
+- `certificate_templates` - Certificate templates
+- `trusted_certificates` - Trusted CA store
+- `_migrations` - Migration tracking
+
+### Rollback
+
+If something goes wrong:
+
+```bash
+# Stop UCM
+systemctl stop ucm
+
+# Restore backup
+rm -rf /opt/ucm
+cp -r /opt/ucm.backup.v1.8.x /opt/ucm
+
+# Reinstall v1.8.3
+dpkg -i ucm_1.8.3_all.deb
+
+# Start
+systemctl start ucm
+```
