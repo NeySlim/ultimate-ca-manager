@@ -82,6 +82,7 @@ export default function DashboardPage() {
   const [certificateTrend, setCertificateTrend] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState(new Date())
+  const [versionInfo, setVersionInfo] = useState({ version: '', edition: 'community' })
   
   // Widget customization
   const [widgets, setWidgets] = useState(loadWidgetPrefs)
@@ -138,6 +139,22 @@ export default function DashboardPage() {
   useEffect(() => {
     loadDashboard()
   }, [loadDashboard])
+
+  // Load version info (public endpoint, only once)
+  useEffect(() => {
+    const loadVersion = async () => {
+      try {
+        const response = await fetch('/api/v2/system/updates/version')
+        if (response.ok) {
+          const data = await response.json()
+          setVersionInfo(data.data || { version: '', edition: 'community' })
+        }
+      } catch {
+        // Ignore errors, version display is not critical
+      }
+    }
+    loadVersion()
+  }, [])
 
   // Subscribe to PKI events for auto-refresh
   useEffect(() => {
@@ -215,8 +232,8 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-text-secondary">{getGreeting()} 👋</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <Badge variant="primary" size="sm">Pro</Badge>
-                  <span className="text-xs text-text-tertiary">v2.0.3</span>
+                  <Badge variant="primary" size="sm">{versionInfo.edition === 'pro' ? 'Pro' : 'Community'}</Badge>
+                  <span className="text-xs text-text-tertiary">v{versionInfo.version || '2.0.0'}</span>
                   {/* Live Indicator */}
                   <div className="flex items-center gap-1 ml-2">
                     <div className={`w-2 h-2 rounded-full ${isConnected ? 'status-success-bg-solid animate-pulse' : 'bg-text-tertiary'}`} />
