@@ -824,6 +824,7 @@ export default function SettingsPage() {
                       onChange={(e) => updateSetting('backup_password', e.target.value)}
                       placeholder="Min 12 characters"
                       helperText="Password used to encrypt automatic backups"
+                      showStrength
                     />
                     <Input
                       label="Retention Period (days)"
@@ -1225,6 +1226,7 @@ export default function SettingsPage() {
             placeholder="Minimum 12 characters"
             helperText="Use a strong password - you'll need it to restore the backup"
             autoFocus
+            showStrength
           />
           <div className="flex gap-3 justify-end pt-4">
             <Button variant="secondary" onClick={() => { setShowBackupModal(false); setBackupPassword('') }}>
