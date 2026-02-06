@@ -35,8 +35,10 @@ install -d %{buildroot}%{_localstatedir}/log/%{name}
 install -d %{buildroot}%{_unitdir}
 
 cp -r backend/* %{buildroot}%{ucm_home}/backend/
-cp -r frontend/* %{buildroot}%{ucm_home}/frontend/
+cp -r frontend/dist %{buildroot}%{ucm_home}/frontend/
 find %{buildroot}%{ucm_home} -name '.env*' -delete
+find %{buildroot}%{ucm_home} -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+find %{buildroot}%{ucm_home} -name '*.pyc' -delete
 
 install -m 644 backend/requirements.txt %{buildroot}%{ucm_home}/requirements.txt
 install -m 755 packaging/debian/start-ucm.sh %{buildroot}%{ucm_home}/start-ucm.sh
