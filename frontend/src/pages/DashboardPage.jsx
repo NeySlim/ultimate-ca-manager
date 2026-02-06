@@ -218,15 +218,15 @@ export default function DashboardPage() {
   const expiringCount = expiringCerts.length
 
   return (
-    <div className="flex-1 h-full overflow-auto bg-bg-primary">
-      <div className="p-4 space-y-4 max-w-[1800px] mx-auto min-h-full flex flex-col">
+    <div className="flex-1 h-full overflow-y-auto xl:overflow-hidden bg-bg-primary">
+      <div className="p-3 space-y-3 max-w-[1800px] mx-auto xl:h-full xl:flex xl:flex-col">
         
         {/* Hero Header */}
-        <div className="relative overflow-hidden rounded-xl hero-gradient border border-accent-primary/20 p-4">
+        <div className="relative overflow-hidden rounded-xl hero-gradient border border-accent-primary/20 p-3">
           <div className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-accent-primary/5 blur-2xl" />
           
-          <div className="relative flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-4">
+          <div className="relative flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3">
               <Logo variant="horizontal" size="md" />
               <div className="hidden sm:block w-px h-10 bg-border/50" />
               <div>
@@ -320,9 +320,9 @@ export default function DashboardPage() {
         </div>
         )}
         
-        {/* Charts Row */}
+        {/* Charts Row - hidden on smaller desktops to fit content */}
         {widgets.find(w => w.id === 'charts')?.visible && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="hidden 2xl:grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* Certificate Trend */}
           <Card variant="elevated" className="p-0">
             <Card.Header 
@@ -332,7 +332,7 @@ export default function DashboardPage() {
               subtitle="Last 7 days"
             />
             <Card.Body className="!pt-0 !pb-2">
-              <CertificateTrendChart data={certificateTrend} height={140} />
+              <CertificateTrendChart data={certificateTrend} height={100} />
             </Card.Body>
           </Card>
           
@@ -352,7 +352,7 @@ export default function DashboardPage() {
                   expired: 0,
                   revoked: stats?.revoked || 0,
                 }}
-                height={140} 
+                height={100} 
               />
             </Card.Body>
           </Card>
@@ -379,14 +379,14 @@ export default function DashboardPage() {
         )}
 
         {/* Main Content - 2x2 Grid + Activity Column */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
+        <div className="xl:flex-1 grid grid-cols-1 lg:grid-cols-3 gap-3">
           
           {/* Left: 2x2 Grid for Certs, CAs, System, ACME */}
-          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 sm:grid-rows-2 gap-3 sm:auto-rows-fr">
             
             {/* Recent Certificates */}
             {widgets.find(w => w.id === 'certs')?.visible && (
-            <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
+            <Card variant="elevated" className="flex flex-col p-0">
               <Card.Header 
                 icon={Certificate}
                 iconColor="blue"
@@ -401,7 +401,7 @@ export default function DashboardPage() {
                 {recentCerts.length === 0 ? (
                   <EmptyWidget icon={Certificate} text="No certificates yet" />
                 ) : (
-                  recentCerts.slice(0, 4).map((cert, i) => (
+                  recentCerts.slice(0, 2).map((cert, i) => (
                     <div 
                       key={cert.id || i}
                       onClick={() => navigate(`/certificates/${cert.id}`)}
@@ -432,7 +432,7 @@ export default function DashboardPage() {
 
             {/* Recent CAs */}
             {widgets.find(w => w.id === 'cas')?.visible && (
-            <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
+            <Card variant="elevated" className="flex flex-col  p-0">
               <Card.Header 
                 icon={ShieldCheck}
                 iconColor="violet"
@@ -447,7 +447,7 @@ export default function DashboardPage() {
                 {recentCAs.length === 0 ? (
                   <EmptyWidget icon={ShieldCheck} text="No CAs yet" />
                 ) : (
-                  recentCAs.slice(0, 4).map((ca, i) => (
+                  recentCAs.slice(0, 2).map((ca, i) => (
                     <div 
                       key={ca.id || i}
                       onClick={() => navigate(`/cas/${ca.id}`)}
@@ -473,7 +473,7 @@ export default function DashboardPage() {
 
             {/* System Health */}
             {widgets.find(w => w.id === 'system')?.visible && (
-            <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
+            <Card variant="elevated" className="flex flex-col  p-0">
               <Card.Header 
                 icon={Heartbeat}
                 iconColor="emerald"
@@ -484,12 +484,12 @@ export default function DashboardPage() {
                   </Button>
                 }
               />
-              <Card.Body className="!pt-0">
-                <div className="grid grid-cols-2 gap-2 mb-3">
+              <Card.Body className="!pt-0 !pb-2">
+                <div className="grid grid-cols-2 gap-1.5 mb-2">
                   <SystemStat 
                     icon={WifiHigh} 
                     label="WebSocket" 
-                    value={isConnected ? 'Connected' : 'Disconnected'} 
+                    value={isConnected ? 'Connected' : 'Offline'} 
                     status={isConnected ? 'online' : 'offline'} 
                   />
                   <SystemStat 
@@ -498,23 +498,11 @@ export default function DashboardPage() {
                     value="Healthy" 
                     status="online" 
                   />
-                  <SystemStat 
-                    icon={Clock} 
-                    label="Last Update" 
-                    value={formatRelativeTime(lastUpdate)} 
-                    status="online" 
-                  />
-                  <SystemStat 
-                    icon={Lightning} 
-                    label="API" 
-                    value="Online" 
-                    status="online" 
-                  />
                 </div>
-                <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
+                <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-1.5">
                   Services
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-4 gap-1.5">
                   <ServiceBadge name="ACME" status={systemStatus?.acme} />
                   <ServiceBadge name="SCEP" status={systemStatus?.scep} />
                   <ServiceBadge name="OCSP" status={systemStatus?.ocsp} />
@@ -526,7 +514,7 @@ export default function DashboardPage() {
 
             {/* ACME Accounts */}
             {widgets.find(w => w.id === 'acme')?.visible && (
-            <Card variant="elevated" className="flex flex-col min-h-[200px] p-0">
+            <Card variant="elevated" className="flex flex-col  p-0">
               <Card.Header 
                 icon={Globe}
                 iconColor="orange"
@@ -542,7 +530,7 @@ export default function DashboardPage() {
                   <EmptyWidget icon={Globe} text="No ACME accounts" />
                 ) : (
                   <div className="space-y-0.5">
-                    {recentAcme.slice(0, 4).map((account, i) => (
+                    {recentAcme.slice(0, 2).map((account, i) => (
                       <div 
                         key={account.id || i} 
                         className="p-2.5 rounded-lg hover:bg-bg-tertiary/50 cursor-pointer transition-colors group flex items-center gap-3"
