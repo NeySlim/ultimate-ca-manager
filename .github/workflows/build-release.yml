@@ -129,44 +129,46 @@ jobs:
       - name: Build RPM in Fedora container
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
-          # Convert version for RPM spec (2.0.0-beta1 -> 2.0.0~beta1)
+          # For RPM Version field (supports ~), and for tarball name (use _)
           RPM_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
-          # For tarball/directory names, use underscore (~ is problematic in paths)
           TAR_VERSION=$(echo "$VERSION" | sed 's/-/_/g')
           
           mkdir -p /tmp/rpm-output
           
+          # Create the tarball on host with correct structure
+          mkdir -p /tmp/rpm-build/ucm-${TAR_VERSION}
+          cp -r backend frontend packaging /tmp/rpm-build/ucm-${TAR_VERSION}/
+          tar -C /tmp/rpm-build -czf /tmp/rpm-build/ucm-${TAR_VERSION}.tar.gz ucm-${TAR_VERSION}
+          
           docker run --rm \
-            -v $(pwd):/workspace \
+            -v $(pwd):/workspace:ro \
+            -v /tmp/rpm-build:/rpm-sources:ro \
             -v /tmp/rpm-output:/output \
             -e RPM_VERSION="$RPM_VERSION" \
             -e TAR_VERSION="$TAR_VERSION" \
             fedora:43 bash -c '
-              dnf install -y rpm-build python3 python3-pip python3-devel systemd-rpm-macros gcc openssl-devel make tar gzip
+              set -e
+              dnf install -y rpm-build rpmdevtools python3 python3-pip systemd-rpm-macros
               
-              mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+              rpmdev-setuptree
               
-              cd /workspace
+              # Copy tarball
+              cp /rpm-sources/ucm-${TAR_VERSION}.tar.gz ~/rpmbuild/SOURCES/
               
-              # Create source tarball with underscore version
-              tar czf ~/rpmbuild/SOURCES/ucm-${TAR_VERSION}.tar.gz \
-                --transform "s,^,ucm-${TAR_VERSION}/," \
-                --exclude=".git" --exclude="*.pyc" --exclude="__pycache__" \
-                --exclude="node_modules" --exclude=".pytest_cache" .
-              
-              # Copy spec and update versions
-              cp packaging/rpm/ucm.spec ~/rpmbuild/SPECS/
+              # Create spec from template with correct versions
+              cp /workspace/packaging/rpm/ucm.spec ~/rpmbuild/SPECS/
               sed -i "s/^Version:.*/Version:        ${RPM_VERSION}/" ~/rpmbuild/SPECS/ucm.spec
               sed -i "s/^Source0:.*/Source0:        ucm-${TAR_VERSION}.tar.gz/" ~/rpmbuild/SPECS/ucm.spec
-              # Fix setup to use TAR_VERSION directory name
               sed -i "s/%setup -q/%setup -q -n ucm-${TAR_VERSION}/" ~/rpmbuild/SPECS/ucm.spec
               
-              # Build RPM
-              rpmbuild -bb ~/rpmbuild/SPECS/ucm.spec \
-                --define "_topdir ~/rpmbuild"
+              # Fix bogus date warning (Feb 03 2026 is wrong day, should be Thu)
+              sed -i "s/Mon Feb 03 2026/Thu Feb 05 2026/" ~/rpmbuild/SPECS/ucm.spec
               
-              # Copy output
-              cp ~/rpmbuild/RPMS/*/*.rpm /output/
+              # Build
+              rpmbuild -bb ~/rpmbuild/SPECS/ucm.spec
+              
+              # Copy outputs
+              cp ~/rpmbuild/RPMS/noarch/*.rpm /output/
               cd /output && sha256sum *.rpm > checksums.sha256
             '
       
