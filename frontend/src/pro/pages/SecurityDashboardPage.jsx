@@ -1,3 +1,3 @@
 // Pro-only placeholder - Community Edition
 import { Navigate } from 'react-router-dom'
-export default function HSMPage() { return <Navigate to="/" replace /> }
+export default function SecurityDashboardPage() { return <Navigate to="/" replace /> }
