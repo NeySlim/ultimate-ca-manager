@@ -91,15 +91,20 @@ def create_backup():
     """Create backup now"""
     from datetime import datetime
     import os
+    import secrets
     
     try:
         from services.backup_service import BackupService
         data = request.json or {}
         password = data.get('password')
+        generated_password = False
         
-        # Security: Require explicit password for encrypted backups
-        if not password or len(password) < 8:
-            return error_response('Backup password required (minimum 8 characters)', 400)
+        # Generate secure random password if not provided
+        if not password:
+            password = secrets.token_urlsafe(16)  # 128-bit entropy
+            generated_password = True
+        elif len(password) < 8:
+            return error_response('Password must be at least 8 characters', 400)
         
         service = BackupService()
         backup_bytes = service.create_backup(password)
@@ -113,13 +118,20 @@ def create_backup():
         with open(filepath, 'wb') as f:
             f.write(backup_bytes)
         
+        response_data = {
+            'filename': filename,
+            'size': len(backup_bytes),
+            'path': filepath
+        }
+        
+        # Include generated password in response so user can save it
+        if generated_password:
+            response_data['password'] = password
+            response_data['password_generated'] = True
+        
         return success_response(
-            data={
-                'filename': filename,
-                'size': len(backup_bytes),
-                'path': filepath
-            },
-            message='Backup created successfully'
+            data=response_data,
+            message='Backup created successfully' + (' - SAVE THE PASSWORD!' if generated_password else '')
         )
     except Exception as e:
         return error_response(f'Backup failed: {str(e)}', 500)
