@@ -52,37 +52,45 @@ def get_github_repo():
 
 
 def get_current_version():
-    """Get currently installed version"""
-    # Try config first
+    """Get currently installed version from single source of truth"""
+    # Priority order:
+    # 1. ENV variable (for Docker/override)
+    # 2. /opt/ucm/VERSION (main deployment)
+    # 3. backend/VERSION (dev/source)
+    # 4. Package manager (dpkg/rpm)
+    # 5. Fallback
+    
+    # 1. Environment variable
     version = os.getenv('APP_VERSION', '')
     if version:
         return version
     
-    # Try reading from version file
-    version_file = '/opt/ucm/VERSION'
-    if os.path.exists(version_file):
-        with open(version_file, 'r') as f:
-            return f.read().strip()
+    # 2. Main VERSION file
+    for version_file in ['/opt/ucm/VERSION', 'VERSION', 'backend/VERSION']:
+        if os.path.exists(version_file):
+            with open(version_file, 'r') as f:
+                v = f.read().strip()
+                if v:
+                    return v
     
-    # Try reading from package info
+    # 3. Package manager
     try:
         result = subprocess.run(
             ['dpkg-query', '-W', '-f=${Version}', 'ucm'],
             capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0 and result.stdout:
-            # DEB version uses ~ instead of -
             return result.stdout.strip().replace('~', '-')
     except (subprocess.SubprocessError, FileNotFoundError):
         pass
     
     try:
         result = subprocess.run(
-            ['rpm', '-q', '--queryformat', '%{VERSION}-%{RELEASE}', 'ucm'],
+            ['rpm', '-q', '--queryformat', '%{VERSION}', 'ucm'],
             capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0 and result.stdout:
-            return result.stdout.strip().split('.')[0]  # Remove .fc43 etc
+            return result.stdout.strip()
     except (subprocess.SubprocessError, FileNotFoundError):
         pass
     
