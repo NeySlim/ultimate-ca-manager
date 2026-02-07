@@ -59,6 +59,20 @@ dist/
 build/
 *.egg-info/
 
+# Debian packaging build
+packaging/debian/ucm/
+packaging/debian/.debhelper/
+packaging/debian/debhelper-build-stamp
+packaging/debian/files
+packaging/debian/*.substvars
+packaging/debian/*.debhelper.log
+
+# RPM packaging build
+packaging/rpm/BUILD/
+packaging/rpm/RPMS/
+packaging/rpm/SRPMS/
+packaging/rpm/BUILDROOT/
+
 # Logs
 *.log
 logs/
