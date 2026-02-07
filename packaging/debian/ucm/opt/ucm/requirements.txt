@@ -23,7 +23,7 @@ cbor2==5.8.0
 
 # SCEP Support
 pycryptodome==3.23.0
-pyasn1==0.6.1
+pyasn1==0.6.2
 pyasn1-modules==0.4.1
 
 # ACME Support
@@ -75,6 +75,6 @@ flake8==7.3.0
 
 # WebSocket Support
 flask-socketio==5.3.7
-python-socketio==5.11.0
+python-socketio==5.16.1
 gevent==24.11.1
 gevent-websocket==0.10.1
