@@ -5,6 +5,7 @@
  * Pro features (SSO) are dynamically added when Pro module is present
  */
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { 
   Gear, EnvelopeSimple, ShieldCheck, Database, ListBullets, FloppyDisk, 
@@ -43,26 +44,27 @@ const BASE_SETTINGS_CATEGORIES = [
 
 // Appearance Settings Component
 function AppearanceSettings() {
+  const { t } = useTranslation()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
   const { forceDesktop, setForceDesktop, screenWidth, breakpoints } = useMobile()
   
   const modeOptions = [
-    { id: 'system', label: 'Follow System', icon: Desktop, description: 'Automatically switch based on your OS settings' },
-    { id: 'light', label: 'Light', icon: Sun, description: 'Always use light theme' },
-    { id: 'dark', label: 'Dark', icon: Moon, description: 'Always use dark theme' },
+    { id: 'system', label: t('settings.followSystem'), icon: Desktop, description: t('settings.followSystemDesc') },
+    { id: 'light', label: t('settings.light'), icon: Sun, description: t('settings.lightDesc') },
+    { id: 'dark', label: t('settings.dark'), icon: Moon, description: t('settings.darkDesc') },
   ]
   
   return (
     <DetailContent>
       <DetailHeader compact
         icon={Palette}
-        title="Appearance"
-        subtitle="Customize the look and feel of UCM"
+        title={t('settings.appearance')}
+        subtitle={t('settings.appearanceSubtitle')}
       />
       
-      <DetailSection title="Color Theme">
+      <DetailSection title={t('settings.colorTheme')}>
         <p className="text-sm text-text-secondary mb-4">
-          Choose a color scheme that suits your preference
+          {t('settings.colorThemeDesc')}
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {themes.map(theme => (
@@ -96,9 +98,9 @@ function AppearanceSettings() {
         </div>
       </DetailSection>
       
-      <DetailSection title="Appearance Mode">
+      <DetailSection title={t('settings.appearanceMode')}>
         <p className="text-sm text-text-secondary mb-4">
-          Control how the interface brightness adapts
+          {t('settings.appearanceModeDesc')}
         </p>
         <div className="space-y-2">
           {modeOptions.map(opt => {
@@ -138,9 +140,9 @@ function AppearanceSettings() {
         </div>
       </DetailSection>
       
-      <DetailSection title="Layout Mode">
+      <DetailSection title={t('settings.layoutMode')}>
         <p className="text-sm text-text-secondary mb-4">
-          Control responsive layout behavior for smaller windows
+          {t('settings.layoutModeDesc')}
         </p>
         <button
           onClick={() => setForceDesktop(!forceDesktop)}
@@ -159,11 +161,11 @@ function AppearanceSettings() {
             <Desktop size={20} weight={forceDesktop ? 'fill' : 'regular'} />
           </div>
           <div className="flex-1">
-            <div className="font-medium text-text-primary">Force Desktop Layout</div>
+            <div className="font-medium text-text-primary">{t('settings.forceDesktopLayout')}</div>
             <div className="text-xs text-text-tertiary">
               {forceDesktop 
-                ? 'Desktop layout always enabled' 
-                : `Mobile layout activates below ${breakpoints.lg}px (current: ${screenWidth}px)`
+                ? t('settings.desktopLayoutEnabled') 
+                : t('settings.mobileLayoutActivates', { breakpoint: breakpoints.lg, current: screenWidth })
               }
             </div>
           </div>
@@ -183,31 +185,31 @@ function AppearanceSettings() {
         {forceDesktop && (
           <p className="text-xs text-text-tertiary mt-2 flex items-center gap-1">
             <Info size={12} />
-            This setting is saved in your browser and persists across sessions.
+            {t('settings.settingSavedInBrowser')}
           </p>
         )}
       </DetailSection>
       
-      <DetailSection title="Language">
+      <DetailSection title={t('settings.language')}>
         <p className="text-sm text-text-secondary mb-4">
-          Choose your preferred language
+          {t('settings.languageDesc')}
         </p>
         <LanguageSelector />
       </DetailSection>
       
-      <DetailSection title="Preview">
+      <DetailSection title={t('settings.preview')}>
         <div className="p-4 rounded-lg bg-bg-tertiary border border-border">
-          <p className="text-sm text-text-secondary mb-2">Current settings:</p>
+          <p className="text-sm text-text-secondary mb-2">{t('settings.currentSettings')}:</p>
           <p className="text-text-primary">
-            <span className="font-medium">{themes.find(t => t.id === themeFamily)?.name}</span>
+            <span className="font-medium">{themes.find(th => th.id === themeFamily)?.name}</span>
             {' · '}
             <span className="text-text-secondary">
-              {mode === 'system' ? 'Following system preference' : mode === 'dark' ? 'Dark mode' : 'Light mode'}
+              {mode === 'system' ? t('settings.followingSystemPreference') : mode === 'dark' ? t('settings.darkMode') : t('settings.lightMode')}
             </span>
             {forceDesktop && (
               <>
                 {' · '}
-                <span className="text-accent-primary">Desktop forced</span>
+                <span className="text-accent-primary">{t('settings.desktopForced')}</span>
               </>
             )}
           </p>
@@ -218,6 +220,7 @@ function AppearanceSettings() {
 }
 
 export default function SettingsPage() {
+  const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
   const { canWrite, hasPermission } = usePermission()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -571,33 +574,33 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader compact
               icon={Gear}
-              title="General Settings"
-              subtitle="System name, URL, timezone configuration"
+              title={t('settings.generalTitle')}
+              subtitle={t('settings.generalSubtitle')}
               actions={canWrite('settings') ? [
-                { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('general'), disabled: saving }
+                { label: t('settings.saveChanges'), icon: FloppyDisk, onClick: () => handleSave('general'), disabled: saving }
               ] : []}
             />
-            <DetailSection title="System Configuration" icon={Gear} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.systemConfiguration')} icon={Gear} iconClass="icon-bg-blue">
               <div className="space-y-4">
                 <Input
-                  label="System Name"
+                  label={t('settings.systemName')}
                   value={settings.system_name || ''}
                   onChange={(e) => updateSetting('system_name', e.target.value)}
-                  helperText="Display name for the UCM system"
+                  helperText={t('settings.systemNameHelper')}
                 />
                 <Input
-                  label="Base URL"
+                  label={t('settings.baseUrl')}
                   value={settings.base_url || ''}
                   onChange={(e) => updateSetting('base_url', e.target.value)}
                   placeholder="https://ucm.example.com"
-                  helperText="Public URL of this UCM instance"
+                  helperText={t('settings.baseUrlHelper')}
                 />
               </div>
             </DetailSection>
-            <DetailSection title="Session & Timezone" icon={Clock} iconClass="icon-bg-teal">
+            <DetailSection title={t('settings.sessionTimezone')} icon={Clock} iconClass="icon-bg-teal">
               <div className="space-y-4">
                 <Input
-                  label="Session Timeout (minutes)"
+                  label={t('settings.sessionTimeout')}
                   type="number"
                   value={settings.session_timeout || 30}
                   onChange={(e) => updateSetting('session_timeout', parseInt(e.target.value))}
@@ -605,7 +608,7 @@ export default function SettingsPage() {
                   max="1440"
                 />
                 <Select
-                  label="Timezone"
+                  label={t('settings.timezone')}
                   options={[
                     { value: 'UTC', label: 'UTC' },
                     { value: 'America/New_York', label: 'America/New York' },
@@ -628,18 +631,18 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader compact
               icon={EnvelopeSimple}
-              title="Email Settings"
-              subtitle="SMTP server configuration for notifications"
+              title={t('settings.emailTitle')}
+              subtitle={t('settings.emailSubtitle')}
               actions={canWrite('settings') ? [
-                { label: 'Test Email', icon: Envelope, onClick: handleTestEmail, variant: 'secondary' },
-                { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('email'), disabled: saving }
+                { label: t('settings.testEmail'), icon: Envelope, onClick: handleTestEmail, variant: 'secondary' },
+                { label: t('settings.saveChanges'), icon: FloppyDisk, onClick: () => handleSave('email'), disabled: saving }
               ] : []}
             />
-            <DetailSection title="SMTP Server" icon={Envelope} iconClass="icon-bg-violet">
+            <DetailSection title={t('settings.smtpServer')} icon={Envelope} iconClass="icon-bg-violet">
               <DetailGrid>
                 <div className="col-span-full md:col-span-1">
                   <Input
-                    label="SMTP Host"
+                    label={t('settings.smtpHost')}
                     value={settings.smtp_host || ''}
                     onChange={(e) => updateSetting('smtp_host', e.target.value)}
                     placeholder="smtp.example.com"
@@ -647,7 +650,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="col-span-full md:col-span-1">
                   <Input
-                    label="SMTP Port"
+                    label={t('settings.smtpPort')}
                     type="number"
                     value={settings.smtp_port || 587}
                     onChange={(e) => updateSetting('smtp_port', parseInt(e.target.value))}
@@ -655,15 +658,15 @@ export default function SettingsPage() {
                 </div>
               </DetailGrid>
             </DetailSection>
-            <DetailSection title="Authentication" icon={Key} iconClass="icon-bg-amber">
+            <DetailSection title={t('settings.authentication')} icon={Key} iconClass="icon-bg-amber">
               <div className="space-y-4">
                 <Input
-                  label="SMTP Username"
+                  label={t('settings.smtpUsername')}
                   value={settings.smtp_username || ''}
                   onChange={(e) => updateSetting('smtp_username', e.target.value)}
                 />
                 <Input
-                  label="SMTP Password"
+                  label={t('settings.smtpPassword')}
                   type="password"
                   value={settings.smtp_password || ''}
                   onChange={(e) => updateSetting('smtp_password', e.target.value)}
@@ -671,10 +674,10 @@ export default function SettingsPage() {
                 />
               </div>
             </DetailSection>
-            <DetailSection title="Email Options" icon={EnvelopeSimple} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.emailOptions')} icon={EnvelopeSimple} iconClass="icon-bg-blue">
               <div className="space-y-4">
                 <Input
-                  label="From Email"
+                  label={t('settings.fromEmail')}
                   type="email"
                   value={settings.smtp_from_email || ''}
                   onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
@@ -687,7 +690,7 @@ export default function SettingsPage() {
                     onChange={(e) => updateSetting('smtp_use_tls', e.target.checked)}
                     className="rounded border-border bg-bg-tertiary"
                   />
-                  <span className="text-sm text-text-primary">Use TLS/STARTTLS</span>
+                  <span className="text-sm text-text-primary">{t('settings.useTls')}</span>
                 </label>
               </div>
             </DetailSection>
@@ -699,13 +702,13 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader compact
               icon={ShieldCheck}
-              title="Security Settings"
-              subtitle="Password, 2FA, sessions configuration"
+              title={t('settings.securityTitle')}
+              subtitle={t('settings.securitySubtitle')}
               actions={hasPermission('admin:system') ? [
-                { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('security'), disabled: saving }
+                { label: t('settings.saveChanges'), icon: FloppyDisk, onClick: () => handleSave('security'), disabled: saving }
               ] : []}
             />
-            <DetailSection title="Two-Factor Authentication" icon={ShieldCheck} iconClass="icon-bg-emerald">
+            <DetailSection title={t('settings.twoFactorAuth')} icon={ShieldCheck} iconClass="icon-bg-emerald">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -714,15 +717,15 @@ export default function SettingsPage() {
                   className="rounded border-border bg-bg-tertiary"
                 />
                 <div>
-                  <p className="text-sm text-text-primary font-medium">Enforce Two-Factor Authentication</p>
-                  <p className="text-xs text-text-secondary">Require all users to enable 2FA</p>
+                  <p className="text-sm text-text-primary font-medium">{t('settings.enforce2fa')}</p>
+                  <p className="text-xs text-text-secondary">{t('settings.enforce2faDesc')}</p>
                 </div>
               </label>
             </DetailSection>
-            <DetailSection title="Password Policy" icon={Lock} iconClass="icon-bg-violet">
+            <DetailSection title={t('settings.passwordPolicy')} icon={Lock} iconClass="icon-bg-violet">
               <div className="space-y-4">
                 <Input
-                  label="Minimum Password Length"
+                  label={t('settings.minPasswordLength')}
                   type="number"
                   value={settings.min_password_length || 8}
                   onChange={(e) => updateSetting('min_password_length', parseInt(e.target.value))}
@@ -737,7 +740,7 @@ export default function SettingsPage() {
                       onChange={(e) => updateSetting('password_require_uppercase', e.target.checked)}
                       className="rounded border-border bg-bg-tertiary"
                     />
-                    <span className="text-sm text-text-primary">Require uppercase letters</span>
+                    <span className="text-sm text-text-primary">{t('settings.requireUppercase')}</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -746,7 +749,7 @@ export default function SettingsPage() {
                       onChange={(e) => updateSetting('password_require_numbers', e.target.checked)}
                       className="rounded border-border bg-bg-tertiary"
                     />
-                    <span className="text-sm text-text-primary">Require numbers</span>
+                    <span className="text-sm text-text-primary">{t('settings.requireNumbers')}</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -755,16 +758,16 @@ export default function SettingsPage() {
                       onChange={(e) => updateSetting('password_require_special', e.target.checked)}
                       className="rounded border-border bg-bg-tertiary"
                     />
-                    <span className="text-sm text-text-primary">Require special characters</span>
+                    <span className="text-sm text-text-primary">{t('settings.requireSpecial')}</span>
                   </label>
                 </div>
               </div>
             </DetailSection>
-            <DetailSection title="Session & Rate Limits" icon={Timer} iconClass="icon-bg-teal">
+            <DetailSection title={t('settings.sessionRateLimits')} icon={Timer} iconClass="icon-bg-teal">
               <DetailGrid>
                 <div className="col-span-full md:col-span-1">
                   <Input
-                    label="Session Duration (hours)"
+                    label={t('settings.sessionDuration')}
                     type="number"
                     value={settings.session_duration || 24}
                     onChange={(e) => updateSetting('session_duration', parseInt(e.target.value))}
@@ -774,7 +777,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="col-span-full md:col-span-1">
                   <Input
-                    label="API Rate Limit (requests/minute)"
+                    label={t('settings.apiRateLimit')}
                     type="number"
                     value={settings.api_rate_limit || 60}
                     onChange={(e) => updateSetting('api_rate_limit', parseInt(e.target.value))}
@@ -792,13 +795,13 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader compact
               icon={Database}
-              title="Backup & Restore"
-              subtitle="Data backup and recovery options"
+              title={t('settings.backupTitle')}
+              subtitle={t('settings.backupSubtitle')}
               actions={hasPermission('admin:system') ? [
-                { label: 'Create Backup', icon: Database, onClick: () => setShowBackupModal(true) }
+                { label: t('settings.createBackup'), icon: Database, onClick: () => setShowBackupModal(true) }
               ] : []}
             />
-            <DetailSection title="Automatic Backups" icon={Database} iconClass="icon-bg-emerald">
+            <DetailSection title={t('settings.automaticBackups')} icon={Database} iconClass="icon-bg-emerald">
               <div className="space-y-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -808,34 +811,34 @@ export default function SettingsPage() {
                     className="rounded border-border bg-bg-tertiary"
                   />
                   <div>
-                    <p className="text-sm text-text-primary font-medium">Enable Automatic Backups</p>
-                    <p className="text-xs text-text-secondary">Daily encrypted backups saved to /opt/ucm/data/backups</p>
+                    <p className="text-sm text-text-primary font-medium">{t('settings.enableAutoBackups')}</p>
+                    <p className="text-xs text-text-secondary">{t('settings.autoBackupsDesc')}</p>
                   </div>
                 </label>
 
                 {settings.auto_backup_enabled && (
                   <>
                     <Select
-                      label="Backup Frequency"
+                      label={t('settings.backupFrequency')}
                       options={[
-                        { value: 'daily', label: 'Daily' },
-                        { value: 'weekly', label: 'Weekly' },
-                        { value: 'monthly', label: 'Monthly' },
+                        { value: 'daily', label: t('settings.daily') },
+                        { value: 'weekly', label: t('settings.weekly') },
+                        { value: 'monthly', label: t('settings.monthly') },
                       ]}
                       value={settings.backup_frequency || 'daily'}
                       onChange={(val) => updateSetting('backup_frequency', val)}
                     />
                     <Input
-                      label="Auto-Backup Password"
+                      label={t('settings.autoBackupPassword')}
                       type="password"
                       value={settings.backup_password || ''}
                       onChange={(e) => updateSetting('backup_password', e.target.value)}
-                      placeholder="Min 12 characters"
-                      helperText="Password used to encrypt automatic backups"
+                      placeholder={t('settings.min12Characters')}
+                      helperText={t('settings.autoBackupPasswordHelper')}
                       showStrength
                     />
                     <Input
-                      label="Retention Period (days)"
+                      label={t('settings.retentionPeriod')}
                       type="number"
                       value={settings.backup_retention_days || 30}
                       onChange={(e) => updateSetting('backup_retention_days', parseInt(e.target.value))}
@@ -848,17 +851,17 @@ export default function SettingsPage() {
                 {hasPermission('admin:system') && (
                   <Button size="sm" onClick={() => handleSave('backup')} disabled={saving}>
                     <FloppyDisk size={16} />
-                    Save Settings
+                    {t('settings.saveSettings')}
                   </Button>
                 )}
               </div>
             </DetailSection>
 
-            <DetailSection title="Available Backups" icon={Download} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.availableBackups')} icon={Download} iconClass="icon-bg-blue">
               {backups.length === 0 ? (
                 <div className="p-6 text-center">
-                  <p className="text-sm text-text-secondary">No backups found</p>
-                  <p className="text-xs text-text-tertiary mt-1">Create a backup to protect your data</p>
+                  <p className="text-sm text-text-secondary">{t('settings.noBackups')}</p>
+                  <p className="text-xs text-text-tertiary mt-1">{t('settings.noBackupsHint')}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -885,13 +888,13 @@ export default function SettingsPage() {
               )}
             </DetailSection>
 
-            <DetailSection title="Restore from Backup" icon={UploadSimple} iconClass="icon-bg-orange">
+            <DetailSection title={t('settings.restoreFromBackup')} icon={UploadSimple} iconClass="icon-bg-orange">
               <div>
-                <p className="text-xs text-text-secondary mb-4">Upload a .ucmbkp file to restore all data</p>
+                <p className="text-xs text-text-secondary mb-4">{t('settings.restoreFromBackupDesc')}</p>
                 <FileUpload
                   accept=".ucmbkp,.tar.gz"
                   onFileSelect={(file) => { setRestoreFile(file); setShowRestoreModal(true) }}
-                  helperText="Select backup file (encrypted .ucmbkp)"
+                  helperText={t('settings.selectBackupFile')}
                 />
               </div>
             </DetailSection>
@@ -903,13 +906,13 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader compact
               icon={ListBullets}
-              title="Audit Log Settings"
-              subtitle="Logging configuration and retention"
+              title={t('settings.auditTitle')}
+              subtitle={t('settings.auditSubtitle')}
               actions={hasPermission('admin:system') ? [
-                { label: 'Save Changes', icon: FloppyDisk, onClick: () => handleSave('audit'), disabled: saving }
+                { label: t('settings.saveChanges'), icon: FloppyDisk, onClick: () => handleSave('audit'), disabled: saving }
               ] : []}
             />
-            <DetailSection title="Audit Logging" icon={ListBullets} iconClass="icon-bg-orange">
+            <DetailSection title={t('settings.auditLogging')} icon={ListBullets} iconClass="icon-bg-orange">
               <div className="space-y-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -919,13 +922,13 @@ export default function SettingsPage() {
                     className="rounded border-border bg-bg-tertiary"
                   />
                   <div>
-                    <p className="text-sm text-text-primary font-medium">Enable Audit Logging</p>
-                    <p className="text-xs text-text-secondary">Log all system activities</p>
+                    <p className="text-sm text-text-primary font-medium">{t('settings.enableAuditLogging')}</p>
+                    <p className="text-xs text-text-secondary">{t('settings.enableAuditLoggingDesc')}</p>
                   </div>
                 </label>
 
                 <Input
-                  label="Log Retention (days)"
+                  label={t('settings.logRetention')}
                   type="number"
                   value={settings.audit_retention_days || 90}
                   onChange={(e) => updateSetting('audit_retention_days', parseInt(e.target.value))}
@@ -935,23 +938,23 @@ export default function SettingsPage() {
                 />
               </div>
             </DetailSection>
-            <DetailSection title="Events to Log" icon={Eye} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.eventsToLog')} icon={Eye} iconClass="icon-bg-blue">
               <div className="space-y-2">
                 {[
-                  'User Login/Logout',
-                  'Certificate Issue/Revoke',
-                  'CA Create/Delete',
-                  'Settings Changes',
-                  'User Management',
+                  { key: 'userLoginLogout', label: t('settings.eventUserLoginLogout') },
+                  { key: 'certIssueRevoke', label: t('settings.eventCertIssueRevoke') },
+                  { key: 'caCreateDelete', label: t('settings.eventCaCreateDelete') },
+                  { key: 'settingsChanges', label: t('settings.eventSettingsChanges') },
+                  { key: 'userManagement', label: t('settings.eventUserManagement') },
                 ].map(event => (
-                  <label key={event} className="flex items-center gap-2 cursor-pointer">
+                  <label key={event.key} className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={true}
                       disabled={!settings.audit_enabled}
                       className="rounded border-border bg-bg-tertiary"
                     />
-                    <span className="text-sm text-text-primary">{event}</span>
+                    <span className="text-sm text-text-primary">{event.label}</span>
                   </label>
                 ))}
               </div>
@@ -964,58 +967,58 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader compact
               icon={HardDrives}
-              title="Database Management"
-              subtitle="Database statistics and maintenance"
+              title={t('settings.databaseTitle')}
+              subtitle={t('settings.databaseSubtitle')}
             />
-            <DetailSection title="Database Statistics" icon={HardDrives} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.databaseStatistics')} icon={HardDrives} iconClass="icon-bg-blue">
               <DetailGrid>
                 <DetailField
-                  label="Total Certificates"
+                  label={t('settings.totalCertificates')}
                   value={dbStats?.certificates || '-'}
                 />
                 <DetailField
-                  label="Certificate Authorities"
+                  label={t('settings.certificateAuthorities')}
                   value={dbStats?.cas || '-'}
                 />
                 <DetailField
-                  label="Database Size"
+                  label={t('settings.databaseSize')}
                   value={dbStats?.size || '-'}
                 />
                 <DetailField
-                  label="Last Optimized"
+                  label={t('settings.lastOptimized')}
                   value={dbStats?.last_optimized || '-'}
                 />
               </DetailGrid>
             </DetailSection>
 
-            <DetailSection title="Maintenance" icon={Gear} iconClass="icon-bg-teal">
+            <DetailSection title={t('settings.maintenance')} icon={Gear} iconClass="icon-bg-teal">
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-3">
                   <Button size="sm" variant="secondary" onClick={handleOptimizeDb}>
                     <Database size={16} />
-                    Optimize Database
+                    {t('settings.optimizeDatabase')}
                   </Button>
                   <Button size="sm" variant="secondary" onClick={handleIntegrityCheck}>
                     <ShieldCheck size={16} />
-                    Integrity Check
+                    {t('settings.integrityCheck')}
                   </Button>
                   <Button size="sm" variant="secondary" onClick={handleExportDb}>
                     <Download size={16} />
-                    Export Database
+                    {t('settings.exportDatabase')}
                   </Button>
                 </div>
               </div>
             </DetailSection>
 
-            <DetailSection title="Danger Zone" icon={WarningCircle} iconClass="icon-bg-orange" className="mt-4">
+            <DetailSection title={t('settings.dangerZone')} icon={WarningCircle} iconClass="icon-bg-orange" className="mt-4">
               <div className="p-4 status-danger-bg status-danger-border border rounded-lg">
-                <h4 className="text-sm font-semibold text-status-danger mb-2">⚠️ Database Reset</h4>
+                <h4 className="text-sm font-semibold text-status-danger mb-2">⚠️ {t('settings.databaseReset')}</h4>
                 <p className="text-xs text-text-secondary mb-3">
-                  Reset database to initial state. This will DELETE ALL certificates, CAs, users, and settings.
+                  {t('settings.databaseResetDesc')}
                 </p>
                 <Button variant="danger" size="sm" onClick={handleResetDb}>
                   <Trash size={16} />
-                  Reset Database
+                  {t('settings.resetDatabase')}
                 </Button>
               </div>
             </DetailSection>
@@ -1027,34 +1030,34 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader compact
               icon={Lock}
-              title="HTTPS Certificate Management"
-              subtitle="SSL/TLS certificate for secure connections"
+              title={t('settings.httpsTitle')}
+              subtitle={t('settings.httpsSubtitle')}
               badge={httpsInfo?.type && (
                 <Badge variant={httpsInfo?.type === 'CA-Signed' ? 'success' : httpsInfo?.type === 'Self-Signed' ? 'warning' : 'secondary'}>
                   {httpsInfo?.type}
                 </Badge>
               )}
             />
-            <DetailSection title="Current Certificate" icon={Certificate} iconClass="icon-bg-blue">
+            <DetailSection title={t('settings.currentCertificate')} icon={Certificate} iconClass="icon-bg-blue">
               <DetailGrid>
                 <DetailField
-                  label="Common Name"
+                  label={t('settings.commonName')}
                   value={httpsInfo?.common_name || window.location.hostname}
                 />
                 <DetailField
-                  label="Issuer"
+                  label={t('settings.issuer')}
                   value={httpsInfo?.issuer || '-'}
                 />
                 <DetailField
-                  label="Valid From"
+                  label={t('settings.validFrom')}
                   value={formatDate(httpsInfo?.valid_from)}
                 />
                 <DetailField
-                  label="Valid Until"
+                  label={t('settings.validUntil')}
                   value={formatDate(httpsInfo?.valid_to)}
                 />
                 <DetailField
-                  label="Fingerprint (SHA256)"
+                  label={t('settings.fingerprintSha256')}
                   value={httpsInfo?.fingerprint || '-'}
                   mono
                   copyable
@@ -1063,24 +1066,24 @@ export default function SettingsPage() {
               </DetailGrid>
             </DetailSection>
 
-            <DetailSection title="Use UCM Certificate" icon={Certificate} iconClass="icon-bg-violet">
+            <DetailSection title={t('settings.useUcmCertificate')} icon={Certificate} iconClass="icon-bg-violet">
               <div className="space-y-4">
                 <p className="text-xs text-text-secondary">
-                  Apply an existing certificate from UCM as the HTTPS certificate. Only valid certificates with private keys are shown.
+                  {t('settings.useUcmCertificateDesc')}
                 </p>
                 <Select
-                  label="Select Certificate"
+                  label={t('settings.selectCertificate')}
                   value={selectedHttpsCert}
                   onChange={setSelectedHttpsCert}
-                  placeholder="Choose a certificate..."
+                  placeholder={t('settings.chooseCertificate')}
                   options={certificates.map(cert => ({
                     value: cert.id,
-                    label: `${cert.common_name || 'Certificate'} (expires ${formatDate(cert.valid_to)})`
+                    label: `${cert.common_name || t('certificates.certificate')} (${t('settings.expires')} ${formatDate(cert.valid_to)})`
                   }))}
                 />
                 {certificates.length === 0 && (
                   <p className="text-xs text-text-secondary">
-                    No valid certificates with private keys found. Issue a certificate first.
+                    {t('settings.noValidCertificates')}
                   </p>
                 )}
                 <Button 
@@ -1090,34 +1093,34 @@ export default function SettingsPage() {
                   disabled={!selectedHttpsCert}
                 >
                   <ShieldCheck size={16} />
-                  Apply Selected Certificate
+                  {t('settings.applySelectedCertificate')}
                 </Button>
               </div>
             </DetailSection>
 
-            <DetailSection title="Regenerate Certificate" icon={ArrowsClockwise} iconClass="icon-bg-emerald">
+            <DetailSection title={t('settings.regenerateCertificate')} icon={ArrowsClockwise} iconClass="icon-bg-emerald">
               <div className="space-y-3">
                 <p className="text-xs text-text-secondary">
-                  Generate a new self-signed HTTPS certificate. The server will restart automatically.
+                  {t('settings.regenerateCertificateDesc')}
                 </p>
                 <Button variant="secondary" size="sm" onClick={handleRegenerateHttpsCert}>
                   <Key size={16} />
-                  Regenerate Self-Signed Certificate
+                  {t('settings.regenerateSelfSigned')}
                 </Button>
               </div>
             </DetailSection>
 
-            <DetailSection title="Apply Custom Certificate" icon={Lock} iconClass="icon-bg-amber">
+            <DetailSection title={t('settings.applyCustomCertificate')} icon={Lock} iconClass="icon-bg-amber">
               <div className="space-y-3">
                 <p className="text-xs text-text-secondary">
-                  Upload your own certificate and private key (PEM format).
+                  {t('settings.applyCustomCertificateDesc')}
                 </p>
                 <FileUpload
                   accept=".pem,.crt,.key"
                   onFileSelect={(file) => {
-                    showError('Feature coming soon: Upload custom HTTPS certificate')
+                    showError(t('settings.featureComingSoon'))
                   }}
-                  helperText="Select certificate or key file (PEM format)"
+                  helperText={t('settings.selectCertOrKeyFile')}
                 />
               </div>
             </DetailSection>
@@ -1129,8 +1132,8 @@ export default function SettingsPage() {
           <DetailContent>
             <DetailHeader compact
               icon={Rocket}
-              title="Software Updates"
-              subtitle="Check for and install UCM updates"
+              title={t('settings.updatesTitle')}
+              subtitle={t('settings.updatesSubtitle')}
             />
             <UpdateChecker />
           </DetailContent>
@@ -1185,25 +1188,25 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <LoadingSpinner message="Loading settings..." />
+        <LoadingSpinner message={t('settings.loadingSettings')} />
       </div>
     )
   }
 
-  // Transform categories to tabs format
+  // Transform categories to tabs format with translations
   const tabs = SETTINGS_CATEGORIES.map(cat => ({
     id: cat.id,
-    label: cat.label,
+    label: t(`settings.tabs.${cat.id}`, { defaultValue: cat.label }),
     icon: cat.icon,
     color: cat.color,
-    badge: cat.pro ? { label: 'Pro', variant: 'info' } : undefined
+    badge: cat.pro ? { label: t('common.pro'), variant: 'info' } : undefined
   }))
 
   return (
     <>
       <ResponsiveLayout
-        title="Settings"
-        subtitle="System configuration"
+        title={t('settings.title')}
+        subtitle={t('settings.subtitle')}
         icon={Gear}
         tabs={tabs}
         activeTab={selectedCategory}
@@ -1219,32 +1222,31 @@ export default function SettingsPage() {
       <Modal
         open={showBackupModal}
         onClose={() => { setShowBackupModal(false); setBackupPassword('') }}
-        title="Create Encrypted Backup"
+        title={t('settings.createEncryptedBackup')}
       >
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
-            Create a backup containing all data (database, certificates, CAs, users, configuration).
-            The backup will be encrypted with your password.
+            {t('settings.createBackupDesc')}
           </p>
           <Input
-            label="Encryption Password"
+            label={t('settings.encryptionPassword')}
             type="password"
             value={backupPassword}
             onChange={(e) => setBackupPassword(e.target.value)}
-            placeholder="Minimum 12 characters"
-            helperText="Use a strong password - you'll need it to restore the backup"
+            placeholder={t('settings.min12Characters')}
+            helperText={t('settings.encryptionPasswordHelper')}
             autoFocus
             showStrength
           />
           <div className="flex gap-3 justify-end pt-4">
             <Button variant="secondary" onClick={() => { setShowBackupModal(false); setBackupPassword('') }}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button 
               onClick={handleBackup} 
               disabled={backupLoading || !backupPassword || backupPassword.length < 12}
             >
-              {backupLoading ? 'Creating...' : 'Create & Download'}
+              {backupLoading ? t('settings.creating') : t('settings.createAndDownload')}
             </Button>
           </div>
         </div>
@@ -1254,39 +1256,38 @@ export default function SettingsPage() {
       <Modal
         open={showRestoreModal}
         onClose={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}
-        title="Restore from Backup"
+        title={t('settings.restoreFromBackup')}
       >
         <div className="space-y-4">
           <div className="p-3 status-warning-bg status-warning-border border rounded-lg">
-            <p className="text-sm status-warning-text font-medium">⚠️ Warning</p>
+            <p className="text-sm status-warning-text font-medium">⚠️ {t('common.warning')}</p>
             <p className="text-xs status-warning-text opacity-80">
-              This will REPLACE ALL current data with the backup contents.
-              This action cannot be undone.
+              {t('settings.restoreWarning')}
             </p>
           </div>
           {restoreFile && (
             <p className="text-sm text-text-primary">
-              File: <strong>{restoreFile.name}</strong>
+              {t('settings.file')}: <strong>{restoreFile.name}</strong>
             </p>
           )}
           <Input
-            label="Backup Password"
+            label={t('settings.backupPassword')}
             type="password"
             value={restorePassword}
             onChange={(e) => setRestorePassword(e.target.value)}
-            placeholder="Enter the password used to create the backup"
+            placeholder={t('settings.enterBackupPassword')}
             autoFocus
           />
           <div className="flex gap-3 justify-end pt-4">
             <Button variant="secondary" onClick={() => { setShowRestoreModal(false); setRestorePassword(''); setRestoreFile(null) }}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button 
               variant="danger"
               onClick={handleRestoreBackup} 
               disabled={backupLoading || !restorePassword || restorePassword.length < 12}
             >
-              {backupLoading ? 'Restoring...' : 'Restore Backup'}
+              {backupLoading ? t('settings.restoring') : t('settings.restoreBackup')}
             </Button>
           </div>
         </div>

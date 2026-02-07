@@ -3,6 +3,7 @@
  * View and filter audit logs with real-time updates
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   ClockCounterClockwise, 
   User, 
@@ -45,7 +46,7 @@ import {
 } from '../components';
 import { useNotification } from '../contexts';
 import auditService from '../services/audit.service';
-import { ERRORS, LABELS } from '../lib/messages';
+import { ERRORS } from '../lib/messages';
 
 // Action icons mapping
 const actionIcons = {
@@ -91,6 +92,7 @@ const getActionCategory = (action) => {
 };
 
 export default function AuditLogsPage() {
+  const { t } = useTranslation();
   const { showError, showSuccess } = useNotification();
   
   // State
@@ -194,9 +196,9 @@ export default function AuditLogsPage() {
       a.click();
       URL.revokeObjectURL(url);
       
-      showSuccess(`Exported audit logs as ${format.toUpperCase()}`);
+      showSuccess(t('common.exportedFormat', { format: format.toUpperCase() }));
     } catch (err) {
-      showError('Failed to export logs');
+      showError(t('audit.exportLogs') + ' ' + t('common.failed').toLowerCase());
     }
   };
 
@@ -208,7 +210,7 @@ export default function AuditLogsPage() {
       setShowCleanupModal(false);
       loadData();
     } catch (err) {
-      showError('Failed to cleanup logs');
+      showError(t('audit.cleanupLogs') + ' ' + t('common.failed').toLowerCase());
     } finally {
       setCleanupLoading(false);
     }
@@ -230,9 +232,9 @@ export default function AuditLogsPage() {
     const now = new Date();
     const diff = (now - date) / 1000;
     
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 60) return t('common.justNow');
+    if (diff < 3600) return t('common.minutesAgo', { count: Math.floor(diff / 60) });
+    if (diff < 86400) return t('common.hoursAgo', { count: Math.floor(diff / 3600) });
     
     return date.toLocaleDateString(undefined, { 
       month: 'short', 
@@ -252,7 +254,7 @@ export default function AuditLogsPage() {
   const columns = useMemo(() => [
     {
       key: 'action',
-      header: 'Action',
+      header: t('audit.action'),
       priority: 1,
       render: (value, row) => {
         const category = getActionCategory(value);
@@ -293,7 +295,7 @@ export default function AuditLogsPage() {
     },
     {
       key: 'success',
-      header: 'Status',
+      header: t('common.status'),
       priority: 2,
       width: '80px',
       hideOnMobile: true, // Status shown in action mobileRender
@@ -313,7 +315,7 @@ export default function AuditLogsPage() {
     },
     {
       key: 'username',
-      header: 'User',
+      header: t('audit.user'),
       priority: 3,
       width: '120px',
       hideOnMobile: true,
@@ -326,7 +328,7 @@ export default function AuditLogsPage() {
     },
     {
       key: 'resource_type',
-      header: 'Resource',
+      header: t('audit.target'),
       priority: 4,
       hideOnMobile: true,
       render: (value, row) => (
@@ -337,7 +339,7 @@ export default function AuditLogsPage() {
     },
     {
       key: 'timestamp',
-      header: 'Time',
+      header: t('audit.timestamp'),
       priority: 5,
       sortable: true,
       width: '100px',
@@ -359,7 +361,7 @@ export default function AuditLogsPage() {
     },
     {
       key: 'ip_address',
-      header: 'IP',
+      header: t('audit.ipAddress'),
       priority: 6,
       width: '120px',
       hideOnMobile: true,
@@ -367,16 +369,16 @@ export default function AuditLogsPage() {
         <span className="text-xs text-text-secondary font-mono">{value || '-'}</span>
       )
     }
-  ], []);
+  ], [t]);
 
   // Stats for header
   const headerStats = useMemo(() => {
     if (!stats) return [];
     return [
-      { icon: Database, label: 'Total', value: stats.total_logs || 0, variant: 'default' },
-      { icon: CheckCircle, label: 'Success', value: stats.success_count || 0, variant: 'success' },
-      { icon: XCircle, label: 'Failed', value: stats.failure_count || 0, variant: 'danger' },
-      { icon: Users, label: 'Users', value: stats.unique_users || 0, variant: 'info' }
+      { icon: Database, label: t('common.total'), value: stats.total_logs || 0, variant: 'default' },
+      { icon: CheckCircle, label: t('common.success'), value: stats.success_count || 0, variant: 'success' },
+      { icon: XCircle, label: t('common.failed'), value: stats.failure_count || 0, variant: 'danger' },
+      { icon: Users, label: t('common.users'), value: stats.unique_users || 0, variant: 'info' }
     ];
   }, [stats]);
 
@@ -399,8 +401,8 @@ export default function AuditLogsPage() {
       onChange: (v) => { setFilterSuccess(v); setPage(1); },
       placeholder: LABELS.FILTERS.ALL_STATUS,
       options: [
-        { value: 'true', label: 'Success' },
-        { value: 'false', label: 'Failed' }
+        { value: 'true', label: t('common.success') },
+        { value: 'false', label: t('common.failed') }
       ]
     },
     {
@@ -433,24 +435,24 @@ export default function AuditLogsPage() {
         <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
           <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
             <Database size={16} className="text-accent-primary" />
-            Last 30 Days Statistics
+            {t('common.last30DaysStats')}
           </h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center p-3 bg-bg-tertiary rounded-lg">
               <p className="text-2xl font-bold text-text-primary">{stats.total_logs || 0}</p>
-              <p className="text-xs text-text-secondary">Total Events</p>
+              <p className="text-xs text-text-secondary">{t('common.totalEvents')}</p>
             </div>
             <div className="text-center p-3 bg-bg-tertiary rounded-lg">
               <p className="text-2xl font-bold status-success-text">{stats.success_count || 0}</p>
-              <p className="text-xs text-text-secondary">Successful</p>
+              <p className="text-xs text-text-secondary">{t('common.successful')}</p>
             </div>
             <div className="text-center p-3 bg-bg-tertiary rounded-lg">
               <p className="text-2xl font-bold status-danger-text">{stats.failure_count || 0}</p>
-              <p className="text-xs text-text-secondary">Failed</p>
+              <p className="text-xs text-text-secondary">{t('common.failed')}</p>
             </div>
             <div className="text-center p-3 bg-bg-tertiary rounded-lg">
               <p className="text-2xl font-bold text-text-primary">{stats.unique_users || 0}</p>
-              <p className="text-xs text-text-secondary">Active Users</p>
+              <p className="text-xs text-text-secondary">{t('common.activeUsers')}</p>
             </div>
           </div>
         </Card>
@@ -486,12 +488,12 @@ export default function AuditLogsPage() {
     <div className="p-4 space-y-4">
       <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
         <Calendar size={16} />
-        Date Range Filter
+        {t('audit.dateRange')}
       </h3>
       
       <div className="space-y-3">
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">From Date</label>
+          <label className="block text-xs font-medium text-text-secondary mb-1">{t('common.fromDate')}</label>
           <Input
             type="date"
             value={filterDateFrom}
@@ -500,7 +502,7 @@ export default function AuditLogsPage() {
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">To Date</label>
+          <label className="block text-xs font-medium text-text-secondary mb-1">{t('common.toDate')}</label>
           <Input
             type="date"
             value={filterDateTo}
@@ -513,7 +515,7 @@ export default function AuditLogsPage() {
       {/* Quick Filters */}
       <div className="space-y-2 pt-4 border-t border-border">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          Quick Filters
+          {t('common.quickFilters')}
         </h4>
         <div className="space-y-2">
           <Button 
@@ -523,7 +525,7 @@ export default function AuditLogsPage() {
             onClick={() => { setFilterAction('login_failure'); setShowDateFilters(false); setPage(1); }}
           >
             <XCircle size={14} />
-            Failed Logins
+            {t('common.failedLogins')}
           </Button>
           <Button 
             variant={filterSuccess === 'false' && !filterAction ? 'primary' : 'ghost'} 
@@ -532,7 +534,7 @@ export default function AuditLogsPage() {
             onClick={() => { setFilterSuccess('false'); setFilterAction(''); setShowDateFilters(false); setPage(1); }}
           >
             <Warning size={14} />
-            All Failures
+            {t('common.allFailures')}
           </Button>
         </div>
       </div>
@@ -546,14 +548,14 @@ export default function AuditLogsPage() {
           onClick={() => { clearFilters(); setShowDateFilters(false); }}
         >
           <ArrowsClockwise size={14} />
-          Clear All Filters
+          {t('common.clearAllFilters')}
         </Button>
       )}
 
       {/* Export Section */}
       <div className="space-y-2 pt-4 border-t border-border">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          Export Logs
+          {t('audit.exportLogs')}
         </h4>
         <div className="flex gap-2">
           <Button 
@@ -585,57 +587,57 @@ export default function AuditLogsPage() {
       <CompactHeader
         icon={actionIcons[selectedLog.action] || actionIcons.default}
         iconClass={selectedLog.success ? "bg-status-success/20" : "bg-status-danger/20"}
-        title={selectedLog.action?.replace(/_/g, ' ') || 'Event'}
-        subtitle={`${selectedLog.resource_type || 'System'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`}
+        title={selectedLog.action?.replace(/_/g, ' ') || t('audit.event')}
+        subtitle={`${selectedLog.resource_type || t('common.system')}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`}
         badge={
           <Badge variant={selectedLog.success ? 'emerald' : 'red'} size="sm">
             {selectedLog.success ? (
-              <><CheckCircle size={12} weight="fill" /> Success</>
+              <><CheckCircle size={12} weight="fill" /> {t('common.success')}</>
             ) : (
-              <><XCircle size={12} weight="fill" /> Failed</>
+              <><XCircle size={12} weight="fill" /> {t('common.failed')}</>
             )}
           </Badge>
         }
       />
 
       <CompactStats stats={[
-        { icon: User, value: selectedLog.username || 'system' },
+        { icon: User, value: selectedLog.username || t('common.system') },
         { icon: ClockCounterClockwise, value: formatTime(selectedLog.timestamp) }
       ]} />
 
-      <CompactSection title="Event Details">
+      <CompactSection title={t('audit.details')}>
         <CompactGrid>
           <CompactField 
-            label="Timestamp" 
+            label={t('audit.timestamp')} 
             value={new Date(selectedLog.timestamp).toLocaleString()} 
           />
           <CompactField 
-            label="User" 
-            value={selectedLog.username || 'system'} 
+            label={t('audit.user')} 
+            value={selectedLog.username || t('common.system')} 
           />
           <CompactField 
-            label="Action" 
+            label={t('audit.action')} 
             value={selectedLog.action?.replace(/_/g, ' ')} 
           />
           <CompactField 
-            label="Resource" 
+            label={t('audit.target')} 
             value={`${selectedLog.resource_type || '-'}${selectedLog.resource_name ? `: ${selectedLog.resource_name}` : (selectedLog.resource_id ? ` #${selectedLog.resource_id}` : '')}`} 
           />
           <CompactField 
-            label="IP Address" 
+            label={t('audit.ipAddress')} 
             value={selectedLog.ip_address} 
             mono 
             copyable 
           />
           <CompactField 
-            label="Status" 
-            value={selectedLog.success ? 'Success' : 'Failed'} 
+            label={t('common.status')} 
+            value={selectedLog.success ? t('common.success') : t('common.failed')} 
           />
         </CompactGrid>
       </CompactSection>
 
       {selectedLog.details && (
-        <CompactSection title="Details" collapsible>
+        <CompactSection title={t('audit.details')} collapsible>
           <pre className="text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
             {selectedLog.details}
           </pre>
@@ -643,7 +645,7 @@ export default function AuditLogsPage() {
       )}
 
       {selectedLog.user_agent && (
-        <CompactSection title="Client Information" collapsible defaultOpen={false}>
+        <CompactSection title={t('common.clientInfo')} collapsible defaultOpen={false}>
           <pre className="text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto whitespace-pre-wrap">
             {selectedLog.user_agent}
           </pre>
@@ -663,7 +665,7 @@ export default function AuditLogsPage() {
         className="hidden md:inline-flex"
       >
         <Calendar size={14} />
-        Date
+        {t('common.date')}
         {(filterDateFrom || filterDateTo) && (
           <Badge variant="primary" size="sm" className="ml-1">1</Badge>
         )}
@@ -673,7 +675,7 @@ export default function AuditLogsPage() {
       </Button>
       <Button variant="secondary" size="sm" onClick={() => setShowCleanupModal(true)}>
         <Trash size={14} className="text-status-danger" />
-        <span className="hidden md:inline">Cleanup</span>
+        <span className="hidden md:inline">{t('audit.cleanupLogs')}</span>
       </Button>
       {/* Mobile: More filters */}
       <Button 
@@ -698,9 +700,9 @@ export default function AuditLogsPage() {
   return (
     <>
       <ResponsiveLayout
-        title="Audit Logs"
+        title={t('audit.title')}
         icon={ClockCounterClockwise}
-        subtitle={`${total} log entries`}
+        subtitle={t('common.countEntries', { count: total })}
         stats={headerStats}
         helpPageKey="auditLogs"
         splitView={true}
@@ -709,12 +711,12 @@ export default function AuditLogsPage() {
             <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
               <ClockCounterClockwise size={24} className="text-text-tertiary" />
             </div>
-            <p className="text-sm text-text-secondary">Select a log entry to view details</p>
+            <p className="text-sm text-text-secondary">{t('common.selectToView')}</p>
           </div>
         }
         slideOverOpen={!!selectedLog || showDateFilters}
         onSlideOverClose={() => { setSelectedLog(null); setShowDateFilters(false); }}
-        slideOverTitle={selectedLog ? 'Log Details' : 'Filters & Export'}
+        slideOverTitle={selectedLog ? t('common.details') : t('common.filtersExport')}
         slideOverContent={selectedLog ? logDetailContent : dateFilterContent}
         slideOverWidth={selectedLog ? 'md' : 'sm'}
       >
@@ -725,30 +727,30 @@ export default function AuditLogsPage() {
           searchable
           externalSearch={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Search logs..."
+          searchPlaceholder={t('common.searchLogs')}
           toolbarFilters={[
             {
               key: 'action',
               value: filterAction,
               onChange: (v) => { setFilterAction(v); setPage(1); },
-              placeholder: LABELS.FILTERS.ALL_ACTIONS,
+              placeholder: t('common.allActions'),
               options: (actions.actions || []).map(a => ({ value: a, label: a.replace(/_/g, ' ') }))
             },
             {
               key: 'status',
               value: filterSuccess,
               onChange: (v) => { setFilterSuccess(v); setPage(1); },
-              placeholder: LABELS.FILTERS.ALL_STATUS,
+              placeholder: t('common.allStatus'),
               options: [
-                { value: 'true', label: 'Success' },
-                { value: 'false', label: 'Failed' }
+                { value: 'true', label: t('common.success') },
+                { value: 'false', label: t('common.failed') }
               ]
             },
             {
               key: 'username',
               value: filterUsername,
               onChange: (v) => { setFilterUsername(v); setPage(1); },
-              placeholder: LABELS.FILTERS.ALL_USERS,
+              placeholder: t('common.allUsers'),
               options: uniqueUsernames.map(u => ({ value: u, label: u }))
             }
           ]}
@@ -764,8 +766,8 @@ export default function AuditLogsPage() {
           }}
           emptyState={{
             icon: ClockCounterClockwise,
-            title: 'No audit logs found',
-            description: search || activeFilters > 0 ? 'Try adjusting your filters' : 'Activity will appear here'
+            title: t('audit.noLogs'),
+            description: search || activeFilters > 0 ? t('common.tryAdjustFilters') : t('common.activityWillAppear')
           }}
         />
       </ResponsiveLayout>
@@ -774,17 +776,16 @@ export default function AuditLogsPage() {
       <Modal
         open={showCleanupModal}
         onOpenChange={setShowCleanupModal}
-        title="Cleanup Old Logs"
+        title={t('audit.cleanupLogs')}
         size="sm"
       >
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
-            Delete audit logs older than the specified number of days.
-            This action cannot be undone.
+            {t('common.deleteOlderThanDays')}
           </p>
           
           <div>
-            <label className="block text-xs font-medium mb-1">Retention Days</label>
+            <label className="block text-xs font-medium mb-1">{t('common.retentionDays')}</label>
             <Input
               type="number"
               min={30}
@@ -793,13 +794,13 @@ export default function AuditLogsPage() {
               onChange={(e) => setCleanupDays(Math.max(30, parseInt(e.target.value) || 90))}
             />
             <p className="text-xs text-text-secondary mt-1">
-              Minimum: 30 days
+              {t('common.minimum')}: 30 {t('common.days')}
             </p>
           </div>
           
           <div className="flex justify-end gap-2">
             <Button size="sm" variant="secondary" onClick={() => setShowCleanupModal(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button 
               variant="danger" 
@@ -807,7 +808,7 @@ export default function AuditLogsPage() {
               loading={cleanupLoading}
             >
               <Trash size={14} />
-              Delete Old Logs
+              {t('common.deleteOldLogs')}
             </Button>
           </div>
         </div>

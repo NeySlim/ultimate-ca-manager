@@ -3,6 +3,7 @@
  * SSL checker, decoders, converters - like SSLShopper tools
  */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Wrench, Globe, FileMagnifyingGlass, Key, ArrowsLeftRight,
   CheckCircle, XCircle, Warning, Certificate,
@@ -17,40 +18,40 @@ import { apiClient } from '../services'
 import { useNotification } from '../contexts'
 import { cn } from '../lib/utils'
 
-// Tool definitions
+// Tool definitions - only static data, names/descriptions are translated in component
 const TOOLS = [
   {
     id: 'ssl-checker',
-    name: 'SSL Checker',
-    description: 'Check SSL certificate of a remote server',
+    nameKey: 'tools.sslChecker',
+    descKey: 'tools.sslCheckerDesc',
     icon: Globe,
     color: 'green'
   },
   {
     id: 'csr-decoder',
-    name: 'CSR Decoder',
-    description: 'Decode a Certificate Signing Request',
+    nameKey: 'tools.csrDecoder',
+    descKey: 'tools.csrDecoderDesc',
     icon: FileMagnifyingGlass,
     color: 'blue'
   },
   {
     id: 'cert-decoder',
-    name: 'Certificate Decoder',
-    description: 'Decode and analyze a certificate',
+    nameKey: 'tools.certDecoder',
+    descKey: 'tools.certDecoderDesc',
     icon: Certificate,
     color: 'purple'
   },
   {
     id: 'key-matcher',
-    name: 'Key Matcher',
-    description: 'Verify if key, certificate and CSR match',
+    nameKey: 'tools.keyMatcher',
+    descKey: 'tools.keyMatcherDesc',
     icon: Key,
     color: 'orange'
   },
   {
     id: 'converter',
-    name: 'SSL Converter',
-    description: 'Convert between PEM, DER, PKCS12, PKCS7',
+    nameKey: 'tools.converter',
+    descKey: 'tools.converterDesc',
     icon: ArrowsLeftRight,
     color: 'teal'
   }
@@ -64,39 +65,40 @@ const iconColors = {
   teal: 'icon-bg-teal'
 }
 
-// Help content
-const helpContent = {
-  title: 'Certificate Tools',
-  description: 'A collection of SSL/TLS tools to help you troubleshoot, verify, decode and convert certificates.',
-  sections: [
-    {
-      title: 'SSL Checker',
-      content: 'Enter a hostname to check its SSL certificate. Shows validity, expiry, cipher suite, TLS version, and any issues like mismatched hostnames or expired certificates.'
-    },
-    {
-      title: 'CSR Decoder',
-      content: 'Paste a CSR (Certificate Signing Request) in PEM format to see its contents including subject, public key type/size, and any requested extensions like SANs.'
-    },
-    {
-      title: 'Certificate Decoder',
-      content: 'Paste a certificate in PEM format to see all details: subject, issuer, validity dates, extensions, key usage, fingerprints, and more.'
-    },
-    {
-      title: 'Key Matcher',
-      content: 'Verify that a private key, certificate, and/or CSR belong together by comparing their public keys. Useful before installing certificates.'
-    },
-    {
-      title: 'SSL Converter',
-      content: 'Convert certificates and keys between formats: PEM ↔ DER, PEM → PKCS12 (requires key), PEM → PKCS7. Download the converted file directly.'
-    }
-  ]
-}
-
 export default function CertificateToolsPage() {
+  const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const [activeTool, setActiveTool] = useState('ssl-checker')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
+
+  // Help content with translations
+  const helpContent = {
+    title: t('tools.helpTitle'),
+    description: t('tools.helpDescription'),
+    sections: [
+      {
+        title: t('tools.sslChecker'),
+        content: t('tools.helpSslChecker')
+      },
+      {
+        title: t('tools.csrDecoder'),
+        content: t('tools.helpCsrDecoder')
+      },
+      {
+        title: t('tools.certDecoder'),
+        content: t('tools.helpCertDecoder')
+      },
+      {
+        title: t('tools.keyMatcher'),
+        content: t('tools.helpKeyMatcher')
+      },
+      {
+        title: t('tools.converter'),
+        content: t('tools.helpConverter')
+      }
+    ]
+  }
 
   // SSL Checker state
   const [sslHostname, setSslHostname] = useState('')
@@ -162,7 +164,7 @@ export default function CertificateToolsPage() {
 
   const handleCheckSSL = async () => {
     if (!sslHostname.trim()) {
-      showError('Please enter a hostname')
+      showError(t('tools.pleaseEnterHostname'))
       return
     }
     setLoading(true)
@@ -174,7 +176,7 @@ export default function CertificateToolsPage() {
       })
       setResult({ type: 'ssl', data: response.data })
     } catch (error) {
-      showError(error.message || 'Failed to check SSL')
+      showError(error.message || t('tools.failedToCheckSsl'))
       setResult({ type: 'error', message: error.message })
     } finally {
       setLoading(false)
@@ -183,7 +185,7 @@ export default function CertificateToolsPage() {
 
   const handleDecodeCSR = async () => {
     if (!csrPem.trim()) {
-      showError('Please paste a CSR')
+      showError(t('tools.pleasePasteCsr'))
       return
     }
     setLoading(true)
@@ -194,7 +196,7 @@ export default function CertificateToolsPage() {
       })
       setResult({ type: 'csr', data: response.data })
     } catch (error) {
-      showError(error.message || 'Failed to decode CSR')
+      showError(error.message || t('tools.failedToDecodeCsr'))
       setResult({ type: 'error', message: error.message })
     } finally {
       setLoading(false)
@@ -203,7 +205,7 @@ export default function CertificateToolsPage() {
 
   const handleDecodeCert = async () => {
     if (!certPem.trim()) {
-      showError('Please paste a certificate')
+      showError(t('tools.pleasePasteCert'))
       return
     }
     setLoading(true)
@@ -214,7 +216,7 @@ export default function CertificateToolsPage() {
       })
       setResult({ type: 'cert', data: response.data })
     } catch (error) {
-      showError(error.message || 'Failed to decode certificate')
+      showError(error.message || t('tools.failedToDecodeCert'))
       setResult({ type: 'error', message: error.message })
     } finally {
       setLoading(false)
@@ -223,7 +225,7 @@ export default function CertificateToolsPage() {
 
   const handleMatchKeys = async () => {
     if (!matchCert.trim() && !matchKey.trim() && !matchCsr.trim()) {
-      showError('Please provide at least one item to match')
+      showError(t('tools.pleaseProvideItem'))
       return
     }
     setLoading(true)
@@ -237,7 +239,7 @@ export default function CertificateToolsPage() {
       })
       setResult({ type: 'match', data: response.data })
     } catch (error) {
-      showError(error.message || 'Failed to match keys')
+      showError(error.message || t('tools.failedToMatchKeys'))
       setResult({ type: 'error', message: error.message })
     } finally {
       setLoading(false)
@@ -250,11 +252,11 @@ export default function CertificateToolsPage() {
     const keyContent = convertKeyFile ? await readFileAsText(convertKeyFile) : convertKey.trim()
     
     if (!content) {
-      showError('Please upload a file or paste content to convert')
+      showError(t('tools.pleaseUploadOrPaste'))
       return
     }
     if (convertFormat === 'pkcs12' && !keyContent) {
-      showError('Private key is required for PKCS12 conversion')
+      showError(t('tools.privateKeyRequired'))
       return
     }
     setLoading(true)
@@ -271,7 +273,7 @@ export default function CertificateToolsPage() {
       })
       setResult({ type: 'convert', data: response.data })
     } catch (error) {
-      showError(error.message || 'Conversion failed')
+      showError(error.message || t('tools.conversionFailed'))
       setResult({ type: 'error', message: error.message })
     } finally {
       setLoading(false)
@@ -311,12 +313,12 @@ export default function CertificateToolsPage() {
     a.download = filename
     a.click()
     URL.revokeObjectURL(url)
-    showSuccess(`Downloaded ${filename}`)
+    showSuccess(t('tools.downloaded', { filename }))
   }
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
-    showSuccess('Copied to clipboard')
+    showSuccess(t('tools.copiedToClipboard'))
   }
 
   // Reusable Textarea with file upload
@@ -357,7 +359,7 @@ export default function CertificateToolsPage() {
           <label className="text-sm font-medium text-text-primary">{label}</label>
           <label htmlFor={fileInputId} className="flex items-center gap-1 text-xs text-accent-primary hover:underline cursor-pointer">
             <UploadSimple size={12} />
-            Upload file
+            {t('tools.uploadFile')}
           </label>
           <input
             id={fileInputId}
@@ -399,8 +401,8 @@ export default function CertificateToolsPage() {
             <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-2', iconColors[tool.color])}>
               <Icon size={18} weight="duotone" className="text-text-primary" />
             </div>
-            <div className="text-sm font-medium text-text-primary">{tool.name}</div>
-            <div className="text-xs text-text-secondary mt-0.5 line-clamp-2">{tool.description}</div>
+            <div className="text-sm font-medium text-text-primary">{t(tool.nameKey)}</div>
+            <div className="text-xs text-text-secondary mt-0.5 line-clamp-2">{t(tool.descKey)}</div>
           </button>
         )
       })}
@@ -413,7 +415,7 @@ export default function CertificateToolsPage() {
       <div className="flex gap-3">
         <div className="flex-1">
           <Input
-            label="Hostname"
+            label={t('tools.hostname')}
             placeholder="example.com"
             value={sslHostname}
             onChange={(e) => setSslHostname(e.target.value)}
@@ -421,7 +423,7 @@ export default function CertificateToolsPage() {
         </div>
         <div className="w-24">
           <Input
-            label="Port"
+            label={t('tools.port')}
             placeholder="443"
             value={sslPort}
             onChange={(e) => setSslPort(e.target.value)}
@@ -430,7 +432,7 @@ export default function CertificateToolsPage() {
       </div>
       <Button onClick={handleCheckSSL} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Globe size={16} />}
-        Check SSL
+        {t('tools.checkSSL')}
       </Button>
     </div>
   )
@@ -439,7 +441,7 @@ export default function CertificateToolsPage() {
   const renderCSRDecoder = () => (
     <div className="space-y-4">
       <TextareaWithUpload
-        label="CSR (PEM or DER)"
+        label={t('tools.csrPemLabel')}
         placeholder="-----BEGIN CERTIFICATE REQUEST-----&#10;...&#10;-----END CERTIFICATE REQUEST-----"
         value={csrPem}
         onChange={(e) => setCsrPem(e.target.value)}
@@ -448,7 +450,7 @@ export default function CertificateToolsPage() {
       />
       <Button onClick={handleDecodeCSR} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <FileMagnifyingGlass size={16} />}
-        Decode CSR
+        {t('tools.decodeCsr')}
       </Button>
     </div>
   )
@@ -457,7 +459,7 @@ export default function CertificateToolsPage() {
   const renderCertDecoder = () => (
     <div className="space-y-4">
       <TextareaWithUpload
-        label="Certificate (PEM or DER)"
+        label={t('tools.certPemLabel')}
         placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
         value={certPem}
         onChange={(e) => setCertPem(e.target.value)}
@@ -466,7 +468,7 @@ export default function CertificateToolsPage() {
       />
       <Button onClick={handleDecodeCert} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Certificate size={16} />}
-        Decode Certificate
+        {t('tools.decodeCert')}
       </Button>
     </div>
   )
@@ -476,7 +478,7 @@ export default function CertificateToolsPage() {
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <TextareaWithUpload
-          label="Certificate (optional)"
+          label={t('tools.certificateOptional')}
           placeholder="-----BEGIN CERTIFICATE-----"
           value={matchCert}
           onChange={(e) => setMatchCert(e.target.value)}
@@ -484,7 +486,7 @@ export default function CertificateToolsPage() {
           accept=".pem,.crt,.cer,.der"
         />
         <TextareaWithUpload
-          label="Private Key (optional)"
+          label={t('tools.privateKeyOptional')}
           placeholder="-----BEGIN PRIVATE KEY-----"
           value={matchKey}
           onChange={(e) => setMatchKey(e.target.value)}
@@ -492,7 +494,7 @@ export default function CertificateToolsPage() {
           accept=".pem,.key,.der"
         />
         <TextareaWithUpload
-          label="CSR (optional)"
+          label={t('tools.csrOptional')}
           placeholder="-----BEGIN CERTIFICATE REQUEST-----"
           value={matchCsr}
           onChange={(e) => setMatchCsr(e.target.value)}
@@ -501,16 +503,16 @@ export default function CertificateToolsPage() {
         />
       </div>
       <Input
-        label="Key Password (if encrypted)"
+        label={t('tools.keyPassword')}
         type="password"
-        placeholder="Optional password for encrypted key"
+        placeholder={t('tools.keyPasswordPlaceholder')}
         value={matchPassword}
         onChange={(e) => setMatchPassword(e.target.value)}
         className="max-w-xs"
       />
       <Button onClick={handleMatchKeys} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <Key size={16} />}
-        Match Keys
+        {t('tools.matchKeys')}
       </Button>
     </div>
   )
@@ -520,11 +522,11 @@ export default function CertificateToolsPage() {
     <div className="space-y-4">
       {/* Input section */}
       <div className="p-4 border border-border rounded-lg bg-bg-secondary/50 space-y-4">
-        <div className="text-sm font-medium text-text-primary">Input (any format)</div>
+        <div className="text-sm font-medium text-text-primary">{t('tools.inputAnyFormat')}</div>
         
         {/* File upload */}
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">Upload File</label>
+          <label className="block text-xs font-medium text-text-secondary mb-1">{t('tools.uploadFileLabel')}</label>
           <input
             type="file"
             accept=".pem,.crt,.cer,.der,.p12,.pfx,.p7b,.p7c,.key,.csr"
@@ -532,7 +534,7 @@ export default function CertificateToolsPage() {
             className="w-full text-sm text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:border-0 file:rounded file:bg-accent-primary file:text-white file:cursor-pointer hover:file:bg-accent-primary/90"
           />
           <p className="text-xs text-text-secondary mt-1">
-            Supports: PEM, DER, CRT, CER, P12/PFX, P7B, KEY, CSR
+            {t('tools.supportsFormats')}
           </p>
         </div>
         
@@ -552,7 +554,7 @@ export default function CertificateToolsPage() {
         {/* Or paste */}
         <div className="flex items-center gap-2">
           <div className="flex-1 h-px bg-border" />
-          <span className="text-xs text-text-secondary">or paste PEM content</span>
+          <span className="text-xs text-text-secondary">{t('tools.orPastePem')}</span>
           <div className="flex-1 h-px bg-border" />
         </div>
         
@@ -572,16 +574,16 @@ export default function CertificateToolsPage() {
           <ArrowRight size={20} className="text-text-secondary" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">Output Format</label>
+          <label className="block text-xs font-medium text-text-secondary mb-1">{t('tools.outputFormat')}</label>
           <select
             value={convertFormat}
             onChange={(e) => setConvertFormat(e.target.value)}
             className="px-3 py-2 text-sm bg-bg-secondary border border-border rounded-md text-text-primary"
           >
-            <option value="pem">PEM (Text)</option>
-            <option value="der">DER (Binary)</option>
-            <option value="pkcs12">PKCS12 (.p12/.pfx)</option>
-            <option value="pkcs7">PKCS7 (.p7b)</option>
+            <option value="pem">{t('tools.pemText')}</option>
+            <option value="der">{t('tools.derBinary')}</option>
+            <option value="pkcs12">{t('tools.pkcs12')}</option>
+            <option value="pkcs7">{t('tools.pkcs7')}</option>
           </select>
         </div>
       </div>
@@ -589,10 +591,10 @@ export default function CertificateToolsPage() {
       {/* Additional inputs for PKCS12 output */}
       {convertFormat === 'pkcs12' && (
         <div className="p-4 border border-border rounded-lg bg-bg-secondary/50 space-y-4">
-          <div className="text-sm font-medium text-text-primary">PKCS12 requires private key</div>
+          <div className="text-sm font-medium text-text-primary">{t('tools.pkcs12RequiresKey')}</div>
           
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">Private Key File (optional if included in input)</label>
+            <label className="block text-xs font-medium text-text-secondary mb-1">{t('tools.privateKeyFile')}</label>
             <input
               type="file"
               accept=".pem,.key,.der"
@@ -603,7 +605,7 @@ export default function CertificateToolsPage() {
           
           {!convertKeyFile && (
             <Textarea
-              label="Or paste private key"
+              label={t('tools.orPasteKey')}
               placeholder="-----BEGIN PRIVATE KEY-----"
               value={convertKey}
               onChange={(e) => setConvertKey(e.target.value)}
@@ -613,8 +615,8 @@ export default function CertificateToolsPage() {
           )}
           
           <Textarea
-            label="CA Chain (optional)"
-            placeholder="Intermediate and root certificates..."
+            label={t('tools.caChainOptional')}
+            placeholder={t('tools.caChainPlaceholder')}
             value={convertChain}
             onChange={(e) => setConvertChain(e.target.value)}
             rows={3}
@@ -625,8 +627,8 @@ export default function CertificateToolsPage() {
 
       {convertFormat === 'pkcs7' && (
         <Textarea
-          label="CA Chain (optional)"
-          placeholder="Additional certificates to include..."
+          label={t('tools.caChainOptional')}
+          placeholder={t('tools.additionalCerts')}
           value={convertChain}
           onChange={(e) => setConvertChain(e.target.value)}
           rows={4}
@@ -636,18 +638,18 @@ export default function CertificateToolsPage() {
 
       <div className="flex gap-3 flex-wrap items-end">
         <Input
-          label="Input Password"
+          label={t('tools.inputPassword')}
           type="password"
-          placeholder="For encrypted files"
+          placeholder={t('tools.forEncryptedFiles')}
           value={convertPassword}
           onChange={(e) => setConvertPassword(e.target.value)}
           className="w-48"
         />
         {convertFormat === 'pkcs12' && (
           <Input
-            label="Output PKCS12 Password"
+            label={t('tools.outputPkcs12Password')}
             type="password"
-            placeholder="Password for .p12"
+            placeholder={t('tools.passwordForP12')}
             value={pkcs12Password}
             onChange={(e) => setPkcs12Password(e.target.value)}
             className="w-48"
@@ -658,7 +660,7 @@ export default function CertificateToolsPage() {
 
       <Button onClick={handleConvert} disabled={loading}>
         {loading ? <Spinner size={16} className="animate-spin" /> : <ArrowsLeftRight size={16} />}
-        Convert
+        {t('tools.convert')}
       </Button>
     </div>
   )
@@ -667,7 +669,7 @@ export default function CertificateToolsPage() {
   const renderSSLResult = (data) => {
     if (!data) return null
     return (
-    <CompactSection title="SSL Check Result" defaultOpen>
+    <CompactSection title={t('tools.sslCheckResult')} defaultOpen>
       <div className="space-y-4">
         {/* Status banner */}
         <div className={cn(
@@ -681,7 +683,7 @@ export default function CertificateToolsPage() {
           )}
           <div>
             <div className="font-medium text-text-primary">
-              {data.has_issues ? 'Issues Found' : 'Certificate OK'}
+              {data.has_issues ? t('tools.issuesFound') : t('tools.certificateOk')}
             </div>
             <div className="text-sm text-text-secondary">
               {data.hostname}:{data.port}
@@ -703,12 +705,12 @@ export default function CertificateToolsPage() {
 
         {/* Certificate info */}
         <CompactGrid cols={2}>
-          <CompactField label="Common Name" value={data.subject?.commonName} copyable />
-          <CompactField label="Issuer" value={data.issuer?.commonName || data.issuer?.organizationName} />
-          <CompactField label="Valid From" value={new Date(data.not_valid_before).toLocaleDateString()} />
-          <CompactField label="Valid Until" value={new Date(data.not_valid_after).toLocaleDateString()} />
-          <CompactField label="Days Left" value={data.days_until_expiry} />
-          <CompactField label="Status" value={
+          <CompactField label={t('tools.commonName')} value={data.subject?.commonName} copyable />
+          <CompactField label={t('tools.issuer')} value={data.issuer?.commonName || data.issuer?.organizationName} />
+          <CompactField label={t('tools.validFrom')} value={new Date(data.not_valid_before).toLocaleDateString()} />
+          <CompactField label={t('tools.validUntil')} value={new Date(data.not_valid_after).toLocaleDateString()} />
+          <CompactField label={t('tools.daysLeft')} value={data.days_until_expiry} />
+          <CompactField label={t('tools.status')} value={
             <Badge variant={data.status === 'valid' ? 'success' : 'danger'}>
               {data.status}
             </Badge>
@@ -717,16 +719,16 @@ export default function CertificateToolsPage() {
 
         {/* Connection info */}
         <CompactGrid cols={2}>
-          <CompactField label="TLS Version" value={data.tls_version} />
-          <CompactField label="Cipher" value={data.cipher?.name} />
-          <CompactField label="Key Type" value={`${data.public_key?.type} ${data.public_key?.size}-bit`} />
-          <CompactField label="Signature" value={data.signature_algorithm} />
+          <CompactField label={t('tools.tlsVersion')} value={data.tls_version} />
+          <CompactField label={t('tools.cipher')} value={data.cipher?.name} />
+          <CompactField label={t('tools.keyType')} value={`${data.public_key?.type} ${data.public_key?.size}-bit`} />
+          <CompactField label={t('tools.signature')} value={data.signature_algorithm} />
         </CompactGrid>
 
         {/* SANs */}
         {data.extensions?.subject_alt_names?.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-text-secondary mb-1">Subject Alternative Names</div>
+            <div className="text-xs font-medium text-text-secondary mb-1">{t('tools.subjectAltNames')}</div>
             <div className="flex flex-wrap gap-1">
               {data.extensions.subject_alt_names.map((san, i) => (
                 <Badge key={i} variant="secondary">{san.replace('DNS:', '')}</Badge>
@@ -737,7 +739,7 @@ export default function CertificateToolsPage() {
 
         {/* Fingerprints */}
         <CompactGrid cols={1}>
-          <CompactField label="SHA-256 Fingerprint" value={data.fingerprints?.sha256} copyable mono className="text-xs" />
+          <CompactField label={t('tools.sha256Fingerprint')} value={data.fingerprints?.sha256} copyable mono className="text-xs" />
         </CompactGrid>
       </div>
     </CompactSection>
@@ -747,24 +749,24 @@ export default function CertificateToolsPage() {
   const renderCSRResult = (data) => {
     if (!data) return null
     return (
-    <CompactSection title="CSR Details" defaultOpen>
+    <CompactSection title={t('tools.csrDetails')} defaultOpen>
       <div className="space-y-4">
         <CompactGrid cols={2}>
-          <CompactField label="Common Name" value={data.subject?.commonName} copyable />
-          <CompactField label="Organization" value={data.subject?.organizationName} />
-          <CompactField label="Country" value={data.subject?.countryName} />
-          <CompactField label="State" value={data.subject?.stateOrProvinceName} />
-          <CompactField label="Key Type" value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
-          <CompactField label="Signature Valid" value={
+          <CompactField label={t('tools.commonName')} value={data.subject?.commonName} copyable />
+          <CompactField label={t('tools.organization')} value={data.subject?.organizationName} />
+          <CompactField label={t('tools.country')} value={data.subject?.countryName} />
+          <CompactField label={t('tools.state')} value={data.subject?.stateOrProvinceName} />
+          <CompactField label={t('tools.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
+          <CompactField label={t('tools.signatureValid')} value={
             <Badge variant={data.is_signature_valid ? 'success' : 'danger'}>
-              {data.is_signature_valid ? 'Yes' : 'No'}
+              {data.is_signature_valid ? t('common.yes') : t('common.no')}
             </Badge>
           } />
         </CompactGrid>
 
         {data.extensions?.subject_alt_names?.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-text-secondary mb-1">Requested SANs</div>
+            <div className="text-xs font-medium text-text-secondary mb-1">{t('tools.requestedSans')}</div>
             <div className="flex flex-wrap gap-1">
               {data.extensions.subject_alt_names.map((san, i) => (
                 <Badge key={i} variant="secondary">{san.replace('DNS:', '')}</Badge>
@@ -780,7 +782,7 @@ export default function CertificateToolsPage() {
   const renderCertResult = (data) => {
     if (!data) return null
     return (
-    <CompactSection title="Certificate Details" defaultOpen>
+    <CompactSection title={t('tools.certDetails')} defaultOpen>
       <div className="space-y-4">
         {/* Status */}
         <div className={cn(
@@ -794,41 +796,41 @@ export default function CertificateToolsPage() {
           )}
           <div>
             <div className="font-medium text-text-primary">
-              {data.status === 'valid' ? 'Valid Certificate' : data.status === 'expired' ? 'Expired' : 'Not Yet Valid'}
+              {data.status === 'valid' ? t('tools.validCertificate') : data.status === 'expired' ? t('tools.expired') : t('tools.notYetValid')}
             </div>
             <div className="text-sm text-text-secondary">
-              {data.is_ca ? 'Certificate Authority' : 'End Entity Certificate'}
+              {data.is_ca ? t('tools.certificateAuthority') : t('tools.endEntityCertificate')}
             </div>
           </div>
         </div>
 
         {/* Subject & Issuer */}
         <CompactGrid cols={2}>
-          <CompactField label="Subject CN" value={data.subject?.commonName} copyable />
-          <CompactField label="Issuer CN" value={data.issuer?.commonName} />
-          <CompactField label="Organization" value={data.subject?.organizationName} />
-          <CompactField label="Issuer Org" value={data.issuer?.organizationName} />
+          <CompactField label={t('tools.subjectCn')} value={data.subject?.commonName} copyable />
+          <CompactField label={t('tools.issuerCn')} value={data.issuer?.commonName} />
+          <CompactField label={t('tools.organization')} value={data.subject?.organizationName} />
+          <CompactField label={t('tools.issuerOrg')} value={data.issuer?.organizationName} />
         </CompactGrid>
 
         {/* Validity */}
         <CompactGrid cols={3}>
-          <CompactField label="Valid From" value={new Date(data.not_valid_before).toLocaleDateString()} />
-          <CompactField label="Valid Until" value={new Date(data.not_valid_after).toLocaleDateString()} />
-          <CompactField label="Days Left" value={data.days_until_expiry} />
+          <CompactField label={t('tools.validFrom')} value={new Date(data.not_valid_before).toLocaleDateString()} />
+          <CompactField label={t('tools.validUntil')} value={new Date(data.not_valid_after).toLocaleDateString()} />
+          <CompactField label={t('tools.daysLeft')} value={data.days_until_expiry} />
         </CompactGrid>
 
         {/* Technical */}
         <CompactGrid cols={2}>
-          <CompactField label="Serial Number" value={data.serial_number} copyable mono />
-          <CompactField label="Version" value={data.version} />
-          <CompactField label="Key Type" value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
-          <CompactField label="Signature Algorithm" value={data.signature_algorithm} />
+          <CompactField label={t('tools.serialNumber')} value={data.serial_number} copyable mono />
+          <CompactField label={t('tools.version')} value={data.version} />
+          <CompactField label={t('tools.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
+          <CompactField label={t('tools.signatureAlgorithm')} value={data.signature_algorithm} />
         </CompactGrid>
 
         {/* Extensions */}
         {data.extensions?.key_usage?.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-text-secondary mb-1">Key Usage</div>
+            <div className="text-xs font-medium text-text-secondary mb-1">{t('tools.keyUsage')}</div>
             <div className="flex flex-wrap gap-1">
               {data.extensions.key_usage.map((ku, i) => (
                 <Badge key={i} variant="secondary">{ku}</Badge>
@@ -839,7 +841,7 @@ export default function CertificateToolsPage() {
 
         {data.extensions?.extended_key_usage?.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-text-secondary mb-1">Extended Key Usage</div>
+            <div className="text-xs font-medium text-text-secondary mb-1">{t('tools.extendedKeyUsage')}</div>
             <div className="flex flex-wrap gap-1">
               {data.extensions.extended_key_usage.map((eku, i) => (
                 <Badge key={i} variant="secondary">{eku}</Badge>
@@ -850,7 +852,7 @@ export default function CertificateToolsPage() {
 
         {data.extensions?.subject_alt_names?.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-text-secondary mb-1">Subject Alternative Names</div>
+            <div className="text-xs font-medium text-text-secondary mb-1">{t('tools.subjectAltNames')}</div>
             <div className="flex flex-wrap gap-1">
               {data.extensions.subject_alt_names.map((san, i) => (
                 <Badge key={i} variant="secondary">{san.replace('DNS:', '')}</Badge>
@@ -861,8 +863,8 @@ export default function CertificateToolsPage() {
 
         {/* Fingerprints */}
         <CompactGrid cols={1}>
-          <CompactField label="SHA-1" value={data.fingerprints?.sha1} copyable mono className="text-xs" />
-          <CompactField label="SHA-256" value={data.fingerprints?.sha256} copyable mono className="text-xs" />
+          <CompactField label={t('tools.sha1')} value={data.fingerprints?.sha1} copyable mono className="text-xs" />
+          <CompactField label={t('tools.sha256')} value={data.fingerprints?.sha256} copyable mono className="text-xs" />
         </CompactGrid>
       </div>
     </CompactSection>
@@ -872,7 +874,7 @@ export default function CertificateToolsPage() {
   const renderMatchResult = (data) => {
     if (!data) return null
     return (
-    <CompactSection title="Key Match Results" defaultOpen>
+    <CompactSection title={t('tools.keyMatchResults')} defaultOpen>
       <div className="space-y-4">
         {/* Overall status */}
         <div className={cn(
@@ -886,17 +888,17 @@ export default function CertificateToolsPage() {
           )}
           <div>
             <div className="text-lg font-medium text-text-primary">
-              {data.all_match ? 'All Items Match!' : 'Mismatch Detected'}
+              {data.all_match ? t('tools.allItemsMatch') : t('tools.mismatchDetected')}
             </div>
             <div className="text-sm text-text-secondary">
-              {data.matches?.length || 0} matches, {data.mismatches?.length || 0} mismatches
+              {t('tools.matchCount', { matches: data.matches?.length || 0, mismatches: data.mismatches?.length || 0 })}
             </div>
           </div>
         </div>
 
         {/* Items parsed */}
         <div>
-          <div className="text-xs font-medium text-text-secondary mb-2">Parsed Items</div>
+          <div className="text-xs font-medium text-text-secondary mb-2">{t('tools.parsedItems')}</div>
           <div className="space-y-2">
             {data.items?.map((item, i) => (
               <div key={i} className="flex items-center gap-2 p-2 rounded bg-bg-secondary">
@@ -919,7 +921,7 @@ export default function CertificateToolsPage() {
         {/* Match details */}
         {data.matches?.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-text-secondary mb-2">Matches</div>
+            <div className="text-xs font-medium text-text-secondary mb-2">{t('tools.matches')}</div>
             <div className="space-y-1">
               {data.matches.map((m, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm text-status-success">
@@ -933,7 +935,7 @@ export default function CertificateToolsPage() {
 
         {data.mismatches?.length > 0 && (
           <div>
-            <div className="text-xs font-medium text-text-secondary mb-2">Mismatches</div>
+            <div className="text-xs font-medium text-text-secondary mb-2">{t('tools.mismatches')}</div>
             <div className="space-y-1">
               {data.mismatches.map((m, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm text-status-danger">
@@ -952,14 +954,14 @@ export default function CertificateToolsPage() {
   const renderConvertResult = (data) => {
     if (!data) return null
     return (
-    <CompactSection title="Conversion Result" defaultOpen>
+    <CompactSection title={t('tools.conversionResult')} defaultOpen>
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <CheckCircle size={24} weight="fill" className="text-status-success" />
           <div>
-            <div className="font-medium text-text-primary">Conversion Successful</div>
+            <div className="font-medium text-text-primary">{t('tools.conversionSuccessful')}</div>
             <div className="text-sm text-text-secondary">
-              Output: {data.filename} ({data.format?.toUpperCase()})
+              {t('tools.outputFile', { filename: data.filename, format: data.format?.toUpperCase() })}
             </div>
           </div>
         </div>
@@ -981,7 +983,7 @@ export default function CertificateToolsPage() {
 
         <Button onClick={downloadConverted}>
           <Download size={16} />
-          Download {data.filename}
+          {t('tools.download', { filename: data.filename })}
         </Button>
       </div>
     </CompactSection>
@@ -1024,8 +1026,8 @@ export default function CertificateToolsPage() {
 
   return (
     <ResponsiveLayout
-      title="Certificate Tools"
-      subtitle="SSL checker, decoders, converters and key matcher"
+      title={t('tools.title')}
+      subtitle={t('tools.subtitle')}
       icon={Wrench}
       helpContent={helpContent}
     >

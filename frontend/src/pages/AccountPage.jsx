@@ -3,6 +3,7 @@
  * Uses DetailCard design system like SettingsPage
  */
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   User, Key, FloppyDisk, Fingerprint, Certificate, 
   PencilSimple, Trash, Plus, Warning, ShieldCheck
@@ -18,17 +19,18 @@ import { useAuth, useNotification, useMobile } from '../contexts'
 import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 import { formatDate } from '../lib/utils'
 
-// Tab configuration
-const TABS = [
-  { id: 'profile', label: 'Profile', icon: User },
-  { id: 'security', label: 'Security', icon: ShieldCheck },
-  { id: 'api-keys', label: 'API Keys', icon: Key },
-]
-
 export default function AccountPage() {
+  const { t } = useTranslation()
   const { user } = useAuth()
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
+
+  // Tab configuration - inside component to use translations
+  const TABS = [
+    { id: 'profile', label: t('account.profile'), icon: User },
+    { id: 'security', label: t('account.security'), icon: ShieldCheck },
+    { id: 'api-keys', label: t('account.apiKeys'), icon: Key },
+  ]
   
   // State
   const [loading, setLoading] = useState(true)
@@ -145,10 +147,10 @@ export default function AccountPage() {
   const handleToggle2FA = async () => {
     try {
       if (accountData.two_factor_enabled) {
-        const code = await showPrompt('Enter your 2FA code to disable:', {
-          title: 'Disable Two-Factor Authentication',
+        const code = await showPrompt(t('account.enterCodeToDisable'), {
+          title: t('account.disableTwoFactor'),
           placeholder: '123456',
-          confirmText: 'Disable 2FA'
+          confirmText: t('account.disable2FA')
         })
         if (!code) return
         await accountService.disable2FA(code)
@@ -241,13 +243,13 @@ export default function AccountPage() {
         name: webauthnName
       })
       
-      showSuccess('Security key registered successfully')
+      showSuccess(t('account.keyRegistered'))
       setShowWebAuthnModal(false)
       setWebauthnName('')
       await loadWebAuthnCredentials()
     } catch (error) {
       if (error.name === 'NotAllowedError') {
-        showError('Registration cancelled or timed out')
+        showError(t('account.registrationCancelled'))
       } else {
         showError(error.message || 'Failed to register security key')
       }
@@ -257,16 +259,16 @@ export default function AccountPage() {
   }
 
   const handleDeleteWebAuthn = async (credentialId) => {
-    const confirmed = await showConfirm('Delete this security key?', {
-      title: 'Delete Security Key',
-      confirmText: 'Delete',
+    const confirmed = await showConfirm(t('account.deleteKeyConfirm'), {
+      title: t('account.deleteSecurityKey'),
+      confirmText: t('common.delete'),
       variant: 'danger'
     })
     if (!confirmed) return
     
     try {
       await accountService.deleteWebAuthnCredential(credentialId)
-      showSuccess('Security key deleted')
+      showSuccess(t('account.keyDeleted'))
       await loadWebAuthnCredentials()
     } catch (error) {
       showError(error.message || 'Failed to delete security key')
@@ -277,7 +279,7 @@ export default function AccountPage() {
   const handleCreateApiKey = async (keyData) => {
     try {
       const created = await accountService.createApiKey(keyData)
-      showSuccess(`API key created. Key: ${created.key || created.data?.key}`)
+      showSuccess(t('account.apiKeyCreated', { key: created.key || created.data?.key }))
       setShowApiKeyModal(false)
       await loadApiKeys()
     } catch (error) {
@@ -286,9 +288,9 @@ export default function AccountPage() {
   }
 
   const handleDeleteApiKey = async (keyId) => {
-    const confirmed = await showConfirm(CONFIRM.DELETE.GENERIC, {
-      title: 'Delete API Key',
-      confirmText: 'Delete',
+    const confirmed = await showConfirm(t('account.deleteAPIKeyConfirm'), {
+      title: t('account.deleteAPIKey'),
+      confirmText: t('common.delete'),
       variant: 'danger'
     })
     if (!confirmed) return
@@ -304,16 +306,16 @@ export default function AccountPage() {
 
   // mTLS handlers
   const handleDeleteMTLS = async (certId) => {
-    const confirmed = await showConfirm('Delete this client certificate?', {
-      title: 'Delete Certificate',
-      confirmText: 'Delete',
+    const confirmed = await showConfirm(t('account.deleteCertConfirm'), {
+      title: t('account.deleteCertificate'),
+      confirmText: t('common.delete'),
       variant: 'danger'
     })
     if (!confirmed) return
     
     try {
       await accountService.deleteMTLSCertificate(certId)
-      showSuccess('Certificate deleted')
+      showSuccess(t('account.certificateDeleted'))
       await loadMTLSCertificates()
     } catch (error) {
       showError(error.message || 'Failed to delete certificate')
@@ -326,27 +328,27 @@ export default function AccountPage() {
     <DetailContent>
       <DetailHeader
         icon={User}
-        title="Profile Information"
-        subtitle="Your personal account details"
+        title={t('account.profileInfo')}
+        subtitle={t('account.personalDetails')}
         actions={editMode ? [
-          { label: 'Cancel', variant: 'secondary', onClick: () => setEditMode(false) },
-          { label: saving ? 'Saving...' : 'Save', icon: FloppyDisk, onClick: handleSaveProfile, disabled: saving }
+          { label: t('account.cancel'), variant: 'secondary', onClick: () => setEditMode(false) },
+          { label: saving ? t('account.saving') : t('account.save'), icon: FloppyDisk, onClick: handleSaveProfile, disabled: saving }
         ] : [
-          { label: 'Edit', icon: PencilSimple, variant: 'secondary', onClick: () => setEditMode(true) }
+          { label: t('account.edit'), icon: PencilSimple, variant: 'secondary', onClick: () => setEditMode(true) }
         ]}
       />
       
-      <DetailSection title="Account Information">
+      <DetailSection title={t('account.accountInfo')}>
         {editMode ? (
           <div className="space-y-4">
             <Input
-              label="Full Name"
+              label={t('account.fullName')}
               value={formData.full_name}
               onChange={(e) => setFormData(p => ({ ...p, full_name: e.target.value }))}
-              placeholder="Enter your name"
+              placeholder={t('account.enterYourName')}
             />
             <Input
-              label="Email"
+              label={t('account.email')}
               type="email"
               value={formData.email}
               onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
@@ -354,14 +356,14 @@ export default function AccountPage() {
           </div>
         ) : (
           <DetailGrid>
-            <DetailField label="Username" value={accountData.username || '—'} />
-            <DetailField label="Full Name" value={accountData.full_name || accountData.username || '—'} />
-            <DetailField label="Email" value={accountData.email || '—'} />
+            <DetailField label={t('account.username')} value={accountData.username || '—'} />
+            <DetailField label={t('account.fullName')} value={accountData.full_name || accountData.username || '—'} />
+            <DetailField label={t('account.email')} value={accountData.email || '—'} />
             <DetailField 
-              label="Role" 
+              label={t('account.role')} 
               value={
                 <Badge variant={accountData.role === 'admin' ? 'primary' : 'secondary'}>
-                  {accountData.role || 'User'}
+                  {accountData.role || t('account.user')}
                 </Badge>
               } 
             />
@@ -369,25 +371,25 @@ export default function AccountPage() {
         )}
       </DetailSection>
       
-      <DetailSection title="Account Activity">
+      <DetailSection title={t('account.accountActivity')}>
         <DetailGrid>
           <DetailField 
-            label="Account Created" 
+            label={t('account.accountCreated')} 
             value={accountData.created_at ? formatDate(accountData.created_at) : '—'} 
           />
           <DetailField 
-            label="Last Login" 
+            label={t('account.lastLogin')} 
             value={accountData.last_login ? formatDate(accountData.last_login, true) : '—'} 
           />
           <DetailField 
-            label="Total Logins" 
+            label={t('account.totalLogins')} 
             value={accountData.login_count || 0} 
           />
           <DetailField 
-            label="Status" 
+            label={t('account.status')} 
             value={
               <Badge variant={accountData.active ? 'success' : 'danger'}>
-                {accountData.active ? 'Active' : 'Inactive'}
+                {accountData.active ? t('account.active') : t('account.inactive')}
               </Badge>
             } 
           />
@@ -400,35 +402,35 @@ export default function AccountPage() {
     <DetailContent>
       <DetailHeader
         icon={ShieldCheck}
-        title="Security Settings"
-        subtitle="Manage your account security"
+        title={t('account.securitySettings')}
+        subtitle={t('account.manageAccountSecurity')}
       />
       
       {/* Password */}
-      <DetailSection title="Password">
+      <DetailSection title={t('account.password')}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-text-primary">Change your password</p>
+            <p className="text-sm text-text-primary">{t('account.changeYourPassword')}</p>
             <p className="text-xs text-text-tertiary mt-0.5">
-              Last changed: {accountData.password_changed_at 
+              {t('account.lastChanged')}: {accountData.password_changed_at 
                 ? formatDate(accountData.password_changed_at)
-                : 'Never'}
+                : t('account.never')}
             </p>
           </div>
           <Button size="sm" onClick={() => setShowPasswordModal(true)}>
-            Change Password
+            {t('account.changePassword')}
           </Button>
         </div>
       </DetailSection>
 
       {/* 2FA */}
-      <DetailSection title="Two-Factor Authentication">
+      <DetailSection title={t('account.twoFactorAuth')}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-text-primary">Authenticator App (TOTP)</p>
+            <p className="text-sm text-text-primary">{t('account.authenticatorApp')}</p>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant={accountData.two_factor_enabled ? 'success' : 'secondary'}>
-                {accountData.two_factor_enabled ? 'Enabled' : 'Disabled'}
+                {accountData.two_factor_enabled ? t('common.enabled') : t('common.disabled')}
               </Badge>
             </div>
           </div>
@@ -437,26 +439,26 @@ export default function AccountPage() {
             variant={accountData.two_factor_enabled ? 'danger' : 'primary'} 
             onClick={handleToggle2FA}
           >
-            {accountData.two_factor_enabled ? 'Disable 2FA' : 'Enable 2FA'}
+            {accountData.two_factor_enabled ? t('account.disable2FA') : t('account.enable2FA')}
           </Button>
         </div>
       </DetailSection>
 
       {/* WebAuthn */}
       <DetailSection 
-        title="Security Keys (WebAuthn/FIDO2)"
-        subtitle="Use YubiKey, TouchID, or Windows Hello for passwordless login"
+        title={t('account.securityKeys')}
+        subtitle={t('account.webauthnDescription')}
         actions={
           <Button size="sm" onClick={() => setShowWebAuthnModal(true)}>
             <Plus size={14} className="mr-1" />
-            Add Key
+            {t('account.addKey')}
           </Button>
         }
       >
         {webauthnCredentials.length === 0 ? (
           <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
             <Fingerprint size={28} className="mx-auto mb-2 text-text-tertiary" />
-            <p className="text-sm text-text-secondary">No security keys registered</p>
+            <p className="text-sm text-text-secondary">{t('account.noSecurityKeys')}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -470,8 +472,8 @@ export default function AccountPage() {
                   <div>
                     <p className="text-sm font-medium text-text-primary">{cred.name || 'Security Key'}</p>
                     <p className="text-xs text-text-tertiary">
-                      Added {formatDate(cred.created_at)}
-                      {cred.last_used_at && ` • Used ${formatDate(cred.last_used_at)}`}
+                      {t('account.added')} {formatDate(cred.created_at)}
+                      {cred.last_used_at && ` • ${t('account.used')} ${formatDate(cred.last_used_at)}`}
                     </p>
                   </div>
                 </div>
@@ -486,22 +488,22 @@ export default function AccountPage() {
 
       {/* mTLS Certificates */}
       <DetailSection 
-        title="Client Certificates (mTLS)"
+        title={t('account.clientCertificates')}
         actions={
           <Button size="sm" onClick={() => setShowMTLSModal(true)}>
             <Plus size={14} className="mr-1" />
-            Add Certificate
+            {t('account.addCertificate')}
           </Button>
         }
       >
         <p className="text-sm text-text-secondary mb-3">
-          Use X.509 client certificates for mutual TLS authentication
+          {t('account.useMTLSCerts')}
         </p>
         
         {mtlsCertificates.length === 0 ? (
           <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
             <Certificate size={28} className="mx-auto mb-2 text-text-tertiary" />
-            <p className="text-sm text-text-secondary">No client certificates enrolled</p>
+            <p className="text-sm text-text-secondary">{t('account.noCertificatesEnrolled')}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -515,7 +517,7 @@ export default function AccountPage() {
                   <div>
                     <p className="text-sm font-medium text-text-primary">{cert.cn || cert.subject}</p>
                     <p className="text-xs text-text-tertiary">
-                      Expires {formatDate(cert.not_after)}
+                      {t('account.expiresOn')} {formatDate(cert.not_after)}
                     </p>
                   </div>
                 </div>
@@ -534,29 +536,25 @@ export default function AccountPage() {
     <DetailContent>
       <DetailHeader
         icon={Key}
-        title="API Keys"
-        subtitle="Manage your programmatic access keys"
+        title={t('account.apiKeys')}
+        subtitle={t('account.aboutAPIKeys')}
         actions={[
-          { label: 'Create Key', icon: Plus, onClick: () => setShowApiKeyModal(true) }
+          { label: t('account.createKey'), icon: Plus, onClick: () => setShowApiKeyModal(true) }
         ]}
       />
       
       <HelpCard 
         variant="tip" 
-        title="About API Keys" 
-        items={[
-          'API keys allow programmatic access to UCM',
-          'Keep your keys secret and rotate them regularly',
-          'Each key can have a custom expiration date'
-        ]} 
+        title={t('account.aboutAPIKeys')} 
+        items={t('account.apiKeyTips', { returnObjects: true })} 
       />
 
-      <DetailSection title="Your API Keys">
+      <DetailSection title={t('account.yourAPIKeys')}>
         {apiKeys.length === 0 ? (
           <div className="p-4 bg-bg-tertiary/50 border border-border rounded-lg text-center">
             <Key size={28} className="mx-auto mb-2 text-text-tertiary" />
-            <p className="text-sm text-text-secondary">No API keys created</p>
-            <p className="text-xs text-text-tertiary mt-1">Create a key to access UCM API</p>
+            <p className="text-sm text-text-secondary">{t('account.noAPIKeys')}</p>
+            <p className="text-xs text-text-tertiary mt-1">{t('account.createKeyToAccess')}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -570,12 +568,12 @@ export default function AccountPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-text-primary">{key.name}</p>
-                      {!key.is_active && <Badge variant="secondary" size="xs">Inactive</Badge>}
+                      {!key.is_active && <Badge variant="secondary" size="xs">{t('common.inactive')}</Badge>}
                     </div>
                     <p className="text-xs text-text-tertiary font-mono">{key.key_prefix}...</p>
                     <p className="text-xs text-text-tertiary">
-                      Created {formatDate(key.created_at)}
-                      {key.expires_at && ` • Expires ${formatDate(key.expires_at)}`}
+                      {t('account.created')} {formatDate(key.created_at)}
+                      {key.expires_at && ` • ${t('account.expires')} ${formatDate(key.expires_at)}`}
                     </p>
                   </div>
                 </div>
@@ -607,7 +605,7 @@ export default function AccountPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <LoadingSpinner message="Loading account..." />
+        <LoadingSpinner message={t('account.loadingAccount')} />
       </div>
     )
   }
@@ -615,7 +613,7 @@ export default function AccountPage() {
   return (
     <>
       <ResponsiveLayout
-        title="My Account"
+        title={t('account.title')}
         subtitle={accountData.email || user?.username}
         icon={User}
         tabs={TABS}
@@ -634,25 +632,25 @@ export default function AccountPage() {
       <FormModal
         open={showPasswordModal}
         onOpenChange={setShowPasswordModal}
-        title="Change Password"
+        title={t('account.changePassword')}
         onSubmit={handleChangePassword}
-        submitLabel="Change Password"
+        submitLabel={t('account.changePassword')}
       >
         <Input
-          label="Current Password"
+          label={t('account.currentPassword')}
           type="password"
           name="current_password"
           required
         />
         <Input
-          label="New Password"
+          label={t('account.newPassword')}
           type="password"
           name="new_password"
           showStrength
           required
         />
         <Input
-          label="Confirm New Password"
+          label={t('account.confirmNewPassword')}
           type="password"
           name="confirm_password"
           required
@@ -663,22 +661,22 @@ export default function AccountPage() {
       <FormModal
         open={showApiKeyModal}
         onOpenChange={setShowApiKeyModal}
-        title="Create API Key"
+        title={t('account.createAPIKey')}
         onSubmit={handleCreateApiKey}
-        submitLabel="Create Key"
+        submitLabel={t('account.createKey')}
       >
         <Input
-          label="Key Name"
+          label={t('account.apiKeyName')}
           name="name"
-          placeholder="e.g., CI/CD Pipeline"
+          placeholder={t('account.keyNameExample')}
           required
         />
         <Input
-          label="Expires In (days)"
+          label={t('account.expiresInDays')}
           type="number"
           name="expires_in_days"
           placeholder="365"
-          helperText="Leave empty for no expiration"
+          helperText={t('account.noExpiration')}
         />
       </FormModal>
 
@@ -692,13 +690,13 @@ export default function AccountPage() {
             setConfirmCode('')
           }
         }}
-        title="Enable Two-Factor Authentication"
+        title={t('account.enableTwoFactor')}
       >
         {qrData && (
           <div className="p-4 space-y-4">
             <div>
               <p className="text-sm text-text-secondary mb-3">
-                1. Scan this QR code with your authenticator app:
+                {t('account.scanQRCode')}
               </p>
               <div className="flex justify-center p-4 bg-white rounded-lg">
                 <img src={qrData.qr_code} alt="2FA QR Code" className="w-48 h-48" />
@@ -707,7 +705,7 @@ export default function AccountPage() {
             
             <div>
               <p className="text-sm text-text-secondary mb-2">
-                2. Enter the 6-digit code:
+                {t('account.enterDigitCode')}
               </p>
               <Input
                 type="text"
@@ -723,7 +721,7 @@ export default function AccountPage() {
               <div className="p-3 bg-status-warning/10 border border-status-warning/30 rounded-lg">
                 <p className="text-sm font-medium text-status-warning flex items-center gap-2">
                   <Warning size={16} />
-                  Backup Codes - Save These!
+                  {t('account.backupCodes')}
                 </p>
                 <div className="mt-2 grid grid-cols-2 gap-1 font-mono text-xs">
                   {qrData.backup_codes.map((code, i) => (
@@ -735,10 +733,10 @@ export default function AccountPage() {
             
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
               <Button variant="secondary" onClick={() => setShow2FAModal(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
               <Button onClick={handleConfirm2FA} disabled={confirmCode.length !== 6}>
-                Verify & Enable
+                {t('account.verifyAndEnable')}
               </Button>
             </div>
           </div>
@@ -754,29 +752,29 @@ export default function AccountPage() {
             setWebauthnName('')
           }
         }}
-        title="Register Security Key"
+        title={t('account.registerSecurityKey')}
       >
         <div className="p-4 space-y-4">
           <p className="text-sm text-text-secondary">
-            Add a hardware security key (YubiKey, TouchID, Windows Hello) for passwordless login.
+            {t('account.addHardwareKey')}
           </p>
           
           <Input
-            label="Key Name"
+            label={t('account.keyName')}
             value={webauthnName}
             onChange={(e) => setWebauthnName(e.target.value)}
-            placeholder="e.g., YubiKey 5, MacBook TouchID"
+            placeholder={t('account.keyNamePlaceholder')}
           />
           
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button variant="secondary" onClick={() => setShowWebAuthnModal(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button 
               onClick={handleRegisterWebAuthn} 
               disabled={webauthnRegistering || !webauthnName.trim()}
             >
-              {webauthnRegistering ? 'Waiting for key...' : 'Register Key'}
+              {webauthnRegistering ? t('account.waitingForKey') : t('account.registerKey')}
             </Button>
           </div>
         </div>
@@ -786,15 +784,15 @@ export default function AccountPage() {
       <Modal
         open={showMTLSModal}
         onOpenChange={setShowMTLSModal}
-        title="Add Client Certificate"
+        title={t('account.addCertificate')}
       >
         <div className="p-4">
           <p className="text-sm text-text-secondary">
-            mTLS certificate enrollment coming soon.
+            {t('account.mtlsComingSoon')}
           </p>
           <div className="flex justify-end pt-4 border-t border-border mt-4">
             <Button variant="secondary" onClick={() => setShowMTLSModal(false)}>
-              Close
+              {t('common.close')}
             </Button>
           </div>
         </div>

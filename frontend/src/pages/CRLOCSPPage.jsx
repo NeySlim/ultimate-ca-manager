@@ -3,6 +3,7 @@
  * Certificate Revocation Lists and OCSP responder management
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   FileX, ShieldCheck, ArrowsClockwise, Download, Copy,
   Database, Pulse, Calendar, Hash, XCircle,
@@ -32,6 +33,7 @@ const crlApi = {
 }
 
 export default function CRLOCSPPage() {
+  const { t } = useTranslation()
   const { showSuccess, showError, showInfo } = useNotification()
   const { canWrite } = usePermission()
   
@@ -107,7 +109,7 @@ export default function CRLOCSPPage() {
   const handleToggleAutoRegen = async (ca) => {
     try {
       const result = await crlApi.toggleAutoRegen(ca.id, !ca.cdp_enabled)
-      showSuccess(`Auto-regeneration ${result.data.cdp_enabled ? 'enabled' : 'disabled'} for ${ca.descr}`)
+      showSuccess(t(result.data.cdp_enabled ? 'crlOcsp.autoRegenEnabled' : 'crlOcsp.autoRegenDisabled', { name: ca.descr }))
       // Update local state
       setCas(prev => prev.map(c => c.id === ca.id ? { ...c, cdp_enabled: result.data.cdp_enabled } : c))
       if (selectedCA?.id === ca.id) {
@@ -167,17 +169,17 @@ export default function CRLOCSPPage() {
 
   // Header stats
   const headerStats = useMemo(() => [
-    { icon: ShieldCheck, label: 'CAs', value: cas.length },
-    { icon: FileX, label: 'CRLs', value: crls.length, variant: 'info' },
-    { icon: XCircle, label: 'Revoked', value: totalRevoked, variant: 'danger' },
-    { icon: Pulse, label: 'OCSP', value: ocspStatus.running ? 'Online' : 'Offline', variant: ocspStatus.running ? 'success' : 'warning' }
-  ], [cas.length, crls.length, totalRevoked, ocspStatus.running])
+    { icon: ShieldCheck, label: t('cas.title'), value: cas.length },
+    { icon: FileX, label: t('crlOcsp.crl'), value: crls.length, variant: 'info' },
+    { icon: XCircle, label: t('crlOcsp.revoked'), value: totalRevoked, variant: 'danger' },
+    { icon: Pulse, label: t('crlOcsp.ocsp'), value: ocspStatus.running ? t('common.online') : t('common.offline'), variant: ocspStatus.running ? 'success' : 'warning' }
+  ], [cas.length, crls.length, totalRevoked, ocspStatus.running, t])
 
   // Table columns
   const columns = useMemo(() => [
     {
       key: 'descr',
-      header: 'CA Name',
+      header: t('crlOcsp.caName'),
       priority: 1,
       sortable: true,
       render: (v, row) => (
@@ -203,25 +205,25 @@ export default function CRLOCSPPage() {
             <span className="font-medium truncate">{v || row.name}</span>
           </div>
           <Badge variant={row.has_crl ? 'success' : 'orange'} size="sm" dot pulse={!row.has_crl}>
-            {row.has_crl ? 'Active' : 'No CRL'}
+            {row.has_crl ? t('crlOcsp.active') : t('crlOcsp.noCRL')}
           </Badge>
         </div>
       )
     },
     {
       key: 'has_crl',
-      header: 'Status',
+      header: t('crlOcsp.status'),
       priority: 2,
       hideOnMobile: true,
       render: (v) => (
         <Badge variant={v ? 'success' : 'orange'} size="sm" dot pulse={!v}>
-          {v ? 'Active' : 'No CRL'}
+          {v ? t('crlOcsp.active') : t('crlOcsp.noCRL')}
         </Badge>
       )
     },
     {
       key: 'cdp_enabled',
-      header: 'Auto',
+      header: t('crlOcsp.auto'),
       priority: 3,
       hideOnMobile: true,
       render: (v, row) => (
@@ -238,7 +240,7 @@ export default function CRLOCSPPage() {
     },
     {
       key: 'revoked_count',
-      header: 'Revoked',
+      header: t('crlOcsp.revoked'),
       priority: 2,
       render: (v) => (
         <Badge variant={v > 0 ? 'danger' : 'secondary'} size="sm" dot={v > 0}>
@@ -247,7 +249,7 @@ export default function CRLOCSPPage() {
       ),
       mobileRender: (v) => (
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-text-tertiary">Revoked:</span>
+          <span className="text-text-tertiary">{t('crlOcsp.revoked')}:</span>
           <Badge variant={v > 0 ? 'danger' : 'secondary'} size="sm" dot={v > 0}>
             {v || 0}
           </Badge>
@@ -256,7 +258,7 @@ export default function CRLOCSPPage() {
     },
     {
       key: 'crl_updated',
-      header: 'Updated',
+      header: t('crlOcsp.updated'),
       priority: 3,
       hideOnMobile: true,
       render: (v) => (
@@ -265,7 +267,7 @@ export default function CRLOCSPPage() {
         </span>
       )
     }
-  ], [canWrite, handleToggleAutoRegen])
+  ], [canWrite, handleToggleAutoRegen, t])
 
   // Help content
   const helpContent = (
@@ -274,16 +276,16 @@ export default function CRLOCSPPage() {
       <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Database size={16} className="text-accent-primary" />
-          CRL Statistics
+          {t('crlOcsp.crlStatistics')}
         </h3>
         <div className="grid grid-cols-2 gap-3">
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
             <p className="text-2xl font-bold text-text-primary">{crls.length}</p>
-            <p className="text-xs text-text-secondary">Active CRLs</p>
+            <p className="text-xs text-text-secondary">{t('crlOcsp.activeCRLs')}</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
             <p className="text-2xl font-bold text-status-danger">{totalRevoked}</p>
-            <p className="text-xs text-text-secondary">Revoked Certs</p>
+            <p className="text-xs text-text-secondary">{t('crlOcsp.revokedCerts')}</p>
           </div>
         </div>
       </Card>
@@ -292,21 +294,21 @@ export default function CRLOCSPPage() {
       <Card className={`p-4 space-y-3 ${ocspStatus.enabled ? 'stat-card-success' : 'stat-card-warning'}`}>
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Pulse size={16} className="text-accent-primary" />
-          OCSP Responder
+          {t('crlOcsp.ocspResponder')}
         </h3>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-text-secondary">Status</span>
+            <span className="text-sm text-text-secondary">{t('crlOcsp.status')}</span>
             <StatusIndicator status={ocspStatus.enabled && ocspStatus.running ? 'success' : 'warning'}>
-              {ocspStatus.enabled ? (ocspStatus.running ? 'Running' : 'Stopped') : 'Disabled'}
+              {ocspStatus.enabled ? (ocspStatus.running ? t('crlOcsp.running') : t('crlOcsp.stopped')) : t('common.disabled')}
             </StatusIndicator>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-text-secondary">Total Requests</span>
+            <span className="text-sm text-text-secondary">{t('crlOcsp.totalRequests')}</span>
             <span className="text-sm font-medium text-text-primary">{ocspStats.total_requests}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-text-secondary">Cache Hit Rate</span>
+            <span className="text-sm text-text-secondary">{t('crlOcsp.cacheHitRate')}</span>
             <span className="text-sm font-medium text-text-primary">{cacheHitRate}%</span>
           </div>
         </div>
@@ -314,19 +316,16 @@ export default function CRLOCSPPage() {
 
       {/* Help Cards */}
       <div className="space-y-3">
-        <HelpCard variant="info" title="About CRLs">
-          Certificate Revocation Lists (CRLs) contain serial numbers of revoked certificates. 
-          They are periodically published and cached by clients for offline verification.
+        <HelpCard variant="info" title={t('crlOcsp.aboutCRLs')}>
+          {t('crlOcsp.crlDescription')}
         </HelpCard>
         
-        <HelpCard variant="tip" title="OCSP vs CRL">
-          OCSP provides real-time revocation status checks. CRL is a periodic snapshot. 
-          Enable both for maximum compatibility with all clients and applications.
+        <HelpCard variant="tip" title={t('crlOcsp.ocspVsCRL')}>
+          {t('crlOcsp.ocspVsCRLDescription')}
         </HelpCard>
 
-        <HelpCard variant="warning" title="Distribution Points">
-          Include CDP (CRL Distribution Point) and AIA (Authority Information Access) URLs 
-          in your CA settings to enable automatic revocation checking.
+        <HelpCard variant="warning" title={t('crlOcsp.cdpNote')}>
+          {t('crlOcsp.cdpNoteDescription')}
         </HelpCard>
       </div>
     </div>
@@ -343,11 +342,11 @@ export default function CRLOCSPPage() {
           </div>
           <div>
             <h3 className="text-sm font-semibold text-text-primary">{selectedCA.descr || selectedCA.name}</h3>
-            <p className="text-xs text-text-secondary">CRL & OCSP Configuration</p>
+            <p className="text-xs text-text-secondary">{t('crlOcsp.crlDetails')}</p>
           </div>
         </div>
         <Badge variant={selectedCRL ? 'success' : 'warning'} size="sm" dot>
-          {selectedCRL ? 'Active' : 'No CRL'}
+          {selectedCRL ? t('crlOcsp.active') : t('crlOcsp.noCRL')}
         </Badge>
       </div>
 
@@ -356,17 +355,17 @@ export default function CRLOCSPPage() {
         <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
           <Hash size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.crl_number || '-'}</div>
-          <div className="text-2xs text-text-tertiary">CRL #</div>
+          <div className="text-2xs text-text-tertiary">{t('crlOcsp.crlNumber')}</div>
         </div>
         <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
           <XCircle size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.revoked_count || 0}</div>
-          <div className="text-2xs text-text-tertiary">Revoked</div>
+          <div className="text-2xs text-text-tertiary">{t('crlOcsp.revoked')}</div>
         </div>
         <div className="bg-bg-tertiary/40 rounded-lg p-2 text-center">
           <Calendar size={14} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-sm font-semibold text-text-primary">{selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at, 'short') : '-'}</div>
-          <div className="text-2xs text-text-tertiary">Updated</div>
+          <div className="text-2xs text-text-tertiary">{t('crlOcsp.updated')}</div>
         </div>
       </div>
 
@@ -381,47 +380,47 @@ export default function CRLOCSPPage() {
             className="flex-1"
           >
             <ArrowsClockwise size={14} className={regenerating ? 'animate-spin' : ''} />
-            {regenerating ? 'Regenerating...' : 'Regenerate CRL'}
+            {regenerating ? t('crlOcsp.regenerating') : t('crlOcsp.regenerateCRL')}
           </Button>
         )}
         {selectedCRL?.crl_pem && (
           <Button size="sm" variant="secondary" onClick={handleDownloadCRL}>
             <Download size={14} />
-            Download
+            {t('common.download')}
           </Button>
         )}
       </div>
 
       {/* CRL Configuration */}
-      <CompactSection title="CRL Configuration" icon={LinkIcon}>
+      <CompactSection title={t('crlOcsp.crlConfig')} icon={LinkIcon}>
         <CompactGrid cols={2}>
-          <CompactField label="CA Name" value={selectedCA.descr || selectedCA.name} />
-          <CompactField label="Status" value={selectedCRL ? 'Active' : 'Not Generated'} />
-          <CompactField label="CRL Number" value={selectedCRL?.crl_number || '-'} />
-          <CompactField label="Revoked Count" value={selectedCRL?.revoked_count || 0} />
-          <CompactField label="Last Updated" value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} />
-          <CompactField label="Next Update" value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'} />
+          <CompactField label={t('crlOcsp.caName')} value={selectedCA.descr || selectedCA.name} />
+          <CompactField label={t('crlOcsp.status')} value={selectedCRL ? t('crlOcsp.active') : t('crlOcsp.noCRL')} />
+          <CompactField label={t('crlOcsp.crlNumber')} value={selectedCRL?.crl_number || '-'} />
+          <CompactField label={t('crlOcsp.revokedCount')} value={selectedCRL?.revoked_count || 0} />
+          <CompactField label={t('crlOcsp.lastUpdate')} value={selectedCRL?.updated_at ? formatDate(selectedCRL.updated_at) : '-'} />
+          <CompactField label={t('crlOcsp.nextUpdate')} value={selectedCRL?.next_update ? formatDate(selectedCRL.next_update) : '-'} />
         </CompactGrid>
       </CompactSection>
 
       {/* OCSP Configuration */}
-      <CompactSection title="OCSP Configuration" icon={Pulse}>
+      <CompactSection title={t('crlOcsp.ocspConfig')} icon={Pulse}>
         <CompactGrid cols={2}>
           <CompactField 
-            label="Status" 
-            value={ocspStatus.enabled ? (ocspStatus.running ? 'Running' : 'Stopped') : 'Disabled'} 
+            label={t('crlOcsp.status')} 
+            value={ocspStatus.enabled ? (ocspStatus.running ? t('crlOcsp.running') : t('crlOcsp.stopped')) : t('common.disabled')} 
           />
-          <CompactField label="Total Requests" value={ocspStats.total_requests} />
-          <CompactField label="Cache Hits" value={ocspStats.cache_hits} />
-          <CompactField label="Hit Rate" value={`${cacheHitRate}%`} />
+          <CompactField label={t('crlOcsp.totalRequests')} value={ocspStats.total_requests} />
+          <CompactField label={t('crlOcsp.cacheHits')} value={ocspStats.cache_hits} />
+          <CompactField label={t('crlOcsp.hitRate')} value={`${cacheHitRate}%`} />
         </CompactGrid>
       </CompactSection>
 
       {/* Distribution Points */}
-      <CompactSection title="Distribution Points" icon={LinkIcon}>
+      <CompactSection title={t('crlOcsp.distributionPoints')} icon={LinkIcon}>
         <div className="space-y-3">
           <div>
-            <p className="text-xs text-text-secondary mb-1">CDP (CRL Distribution Point)</p>
+            <p className="text-xs text-text-secondary mb-1">{t('crlOcsp.cdp')}</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
                 {`${window.location.origin}/crl/${selectedCA.refid}.crl`}
@@ -432,7 +431,7 @@ export default function CRLOCSPPage() {
             </div>
           </div>
           <div>
-            <p className="text-xs text-text-secondary mb-1">AIA (OCSP Responder)</p>
+            <p className="text-xs text-text-secondary mb-1">{t('crlOcsp.aia')}</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-xs font-mono text-text-primary bg-bg-tertiary p-2 rounded break-all">
                 {`${window.location.origin}/ocsp/${selectedCA.refid}`}
@@ -443,7 +442,7 @@ export default function CRLOCSPPage() {
             </div>
           </div>
           <p className="text-xs text-text-tertiary">
-            Include these URLs in CA settings for automatic revocation checking.
+            {t('crlOcsp.includeURLsNote')}
           </p>
         </div>
       </CompactSection>
@@ -472,9 +471,9 @@ export default function CRLOCSPPage() {
 
   return (
     <ResponsiveLayout
-      title="CRL & OCSP"
+      title={t('crlOcsp.title')}
       icon={FileX}
-      subtitle={`${crls.length} active CRLs`}
+      subtitle={t('crlOcsp.subtitle', { count: crls.length })}
       stats={headerStats}
       helpPageKey="crlocsp"
       splitView={true}
@@ -483,12 +482,12 @@ export default function CRLOCSPPage() {
           <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
             <FileX size={24} className="text-text-tertiary" />
           </div>
-          <p className="text-sm text-text-secondary">Select a CA to manage CRLs</p>
+          <p className="text-sm text-text-secondary">{t('crlOcsp.selectCA')}</p>
         </div>
       }
       slideOverOpen={!!selectedCA}
       onSlideOverClose={() => { setSelectedCA(null); setSelectedCRL(null); }}
-      slideOverTitle="CRL Details"
+      slideOverTitle={t('crlOcsp.crlDetails')}
       slideOverContent={detailContent}
       slideOverWidth="md"
     >
@@ -497,7 +496,7 @@ export default function CRLOCSPPage() {
         columns={columns}
         keyField="id"
         searchable
-        searchPlaceholder="Search CAs..."
+        searchPlaceholder={t('crlOcsp.searchCAs')}
         searchKeys={['name', 'common_name', 'cn']}
         toolbarActions={
           <>
@@ -521,8 +520,8 @@ export default function CRLOCSPPage() {
         }}
         emptyState={{
           icon: FileX,
-          title: 'No Certificate Authorities',
-          description: 'Create a CA first to manage CRLs'
+          title: t('crlOcsp.noCAs'),
+          description: t('crlOcsp.createCAFirst')
         }}
       />
     </ResponsiveLayout>

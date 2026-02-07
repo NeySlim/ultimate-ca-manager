@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { 
   User, Users, UsersThree, Plus, Trash, PencilSimple, Key, 
   CheckCircle, XCircle, Crown, Clock, ShieldCheck, UserCircle
@@ -23,6 +24,7 @@ import { formatDate, cn } from '../lib/utils'
 import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 
 export default function UsersGroupsPage() {
+  const { t } = useTranslation()
   const { isMobile } = useMobile()
   const [searchParams, setSearchParams] = useSearchParams()
   const { showSuccess, showError, showConfirm } = useNotification()
@@ -259,25 +261,25 @@ export default function UsersGroupsPage() {
       const disabled = users.filter(u => !u.active).length
       const admins = users.filter(u => u.role === 'admin').length
       return [
-        { icon: CheckCircle, label: 'Active', value: active, variant: 'success' },
-        { icon: XCircle, label: 'Disabled', value: disabled, variant: 'secondary' },
-        { icon: Crown, label: 'Admins', value: admins, variant: 'primary' },
-        { icon: User, label: 'Total', value: users.length, variant: 'default' }
+        { icon: CheckCircle, label: t('common.active'), value: active, variant: 'success' },
+        { icon: XCircle, label: t('common.disabled'), value: disabled, variant: 'secondary' },
+        { icon: Crown, label: t('users.admin'), value: admins, variant: 'primary' },
+        { icon: User, label: t('common.total'), value: users.length, variant: 'default' }
       ]
     } else {
       return [
-        { icon: Users, label: 'Groups', value: groups.length, variant: 'primary' },
-        { icon: User, label: 'Users', value: users.length, variant: 'secondary' }
+        { icon: Users, label: t('groups.title'), value: groups.length, variant: 'primary' },
+        { icon: User, label: t('users.title'), value: users.length, variant: 'secondary' }
       ]
     }
-  }, [activeTab, users, groups])
+  }, [activeTab, users, groups, t])
 
   // ============= COLUMNS =============
   
   const userColumns = useMemo(() => [
     {
       key: 'username',
-      header: 'User',
+      header: t('users.user'),
       priority: 1,
       sortable: true,
       render: (val, row) => {
@@ -328,7 +330,7 @@ export default function UsersGroupsPage() {
               <span className="font-medium truncate">{val || '—'}</span>
             </div>
             <Badge variant={row.active ? 'success' : 'orange'} size="sm" dot>
-              {row.active ? 'Active' : 'Disabled'}
+              {row.active ? t('common.active') : t('common.disabled')}
             </Badge>
           </div>
         )
@@ -336,7 +338,7 @@ export default function UsersGroupsPage() {
     },
     {
       key: 'role',
-      header: 'Role',
+      header: t('users.role'),
       priority: 2,
       sortable: true,
       render: (val, row) => {
@@ -347,10 +349,15 @@ export default function UsersGroupsPage() {
           viewer: { variant: 'teal', dot: false }
         }
         const config = roleConfig[val] || roleConfig.viewer
+        const roleLabels = {
+          admin: t('users.admin'),
+          operator: t('users.operator'),
+          viewer: t('users.viewer')
+        }
         return (
           <Badge variant={config.variant} size="sm" dot={config.dot}>
             {val === 'admin' && <Crown weight="fill" className="h-3 w-3 mr-1" />}
-            {val || 'viewer'}
+            {roleLabels[val] || t('users.viewer')}
           </Badge>
         )
       },
@@ -362,12 +369,17 @@ export default function UsersGroupsPage() {
           viewer: { variant: 'teal', dot: false }
         }
         const config = roleConfig[val] || roleConfig.viewer
+        const roleLabels = {
+          admin: t('users.admin'),
+          operator: t('users.operator'),
+          viewer: t('users.viewer')
+        }
         return (
           <div className="flex items-center gap-2 text-xs">
             <span className="text-text-secondary truncate">{row.email || '—'}</span>
             <Badge variant={config.variant} size="xs" dot={config.dot}>
               {val === 'admin' && <Crown weight="fill" className="h-2.5 w-2.5 mr-0.5" />}
-              {val || 'viewer'}
+              {roleLabels[val] || t('users.viewer')}
             </Badge>
           </div>
         )
@@ -375,7 +387,7 @@ export default function UsersGroupsPage() {
     },
     {
       key: 'active',
-      header: 'Status',
+      header: t('common.status'),
       priority: 3,
       hideOnMobile: true,
       sortable: true,
@@ -387,13 +399,13 @@ export default function UsersGroupsPage() {
           dot 
           pulse={val}
         >
-          {val ? 'Active' : 'Disabled'}
+          {val ? t('common.active') : t('common.disabled')}
         </Badge>
       )
     },
     {
       key: 'last_login',
-      header: 'Last Login',
+      header: t('users.lastLogin'),
       hideOnMobile: true,
       sortable: true,
       render: (val) => (
@@ -402,12 +414,12 @@ export default function UsersGroupsPage() {
         </span>
       )
     }
-  ], [])
+  ], [t])
 
   const groupColumns = useMemo(() => [
     {
       key: 'name',
-      header: 'Group',
+      header: t('groups.group'),
       priority: 1,
       sortable: true,
       render: (val, row) => {
@@ -427,7 +439,7 @@ export default function UsersGroupsPage() {
     },
     {
       key: 'description',
-      header: 'Description',
+      header: t('common.description'),
       priority: 2,
       hideOnMobile: true,
       render: (val) => (
@@ -436,37 +448,37 @@ export default function UsersGroupsPage() {
     },
     {
       key: 'member_count',
-      header: 'Members',
+      header: t('groups.members'),
       priority: 3,
       sortable: true,
       render: (val, row) => {
         const count = row.members?.length || val || 0
         return (
           <Badge variant={count > 0 ? 'primary' : 'secondary'} size="sm" dot>
-            {count} {count === 1 ? 'member' : 'members'}
+            {count} {count === 1 ? t('groups.members').replace('Members', 'member').toLowerCase() : t('groups.members').toLowerCase()}
           </Badge>
         )
       }
     }
-  ], [])
+  ], [t])
 
   // ============= ROW ACTIONS =============
   
   const userRowActions = useCallback((row) => [
-    { label: 'Edit', icon: PencilSimple, onClick: () => { setEditingUser(row); setShowUserModal(true) } },
-    { label: row.active ? 'Disable' : 'Enable', icon: row.active ? XCircle : CheckCircle, onClick: () => handleToggleUser(row) },
-    { label: 'Reset Password', icon: Key, onClick: () => handleResetPassword(row) },
+    { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingUser(row); setShowUserModal(true) } },
+    { label: row.active ? t('users.deactivate') : t('users.activate'), icon: row.active ? XCircle : CheckCircle, onClick: () => handleToggleUser(row) },
+    { label: t('users.resetPassword'), icon: Key, onClick: () => handleResetPassword(row) },
     ...(canDelete('users') ? [
-      { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDeleteUser(row) }
+      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDeleteUser(row) }
     ] : [])
-  ], [canDelete])
+  ], [canDelete, t])
 
   const groupRowActions = useCallback((row) => [
-    { label: 'Edit', icon: PencilSimple, onClick: () => { setEditingGroup(row); setShowGroupModal(true) } },
+    { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingGroup(row); setShowGroupModal(true) } },
     ...(canDelete('users') ? [
-      { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDeleteGroup(row) }
+      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDeleteGroup(row) }
     ] : [])
-  ], [canDelete])
+  ], [canDelete, t])
 
   // ============= HELP CONTENT =============
   
@@ -476,59 +488,59 @@ export default function UsersGroupsPage() {
       <div className="visual-section">
         <div className="visual-section-header">
           <Users size={16} className="status-primary-text" />
-          {activeTab === 'users' ? 'User Statistics' : 'Group Statistics'}
+          {activeTab === 'users' ? t('users.title') + ' ' + t('common.details') : t('groups.title') + ' ' + t('common.details')}
         </div>
         <div className="visual-section-body">
           {activeTab === 'users' ? (
             <div className="grid grid-cols-2 gap-3">
               <div className="help-stat-card">
                 <div className="help-stat-value help-stat-value-success">{users.filter(u => u.active).length}</div>
-                <div className="help-stat-label">Active</div>
+                <div className="help-stat-label">{t('common.active')}</div>
               </div>
               <div className="help-stat-card">
                 <div className="help-stat-value">{users.filter(u => !u.active).length}</div>
-                <div className="help-stat-label">Disabled</div>
+                <div className="help-stat-label">{t('common.disabled')}</div>
               </div>
               <div className="help-stat-card">
                 <div className="help-stat-value help-stat-value-primary">{users.filter(u => u.role === 'admin').length}</div>
-                <div className="help-stat-label">Admins</div>
+                <div className="help-stat-label">{t('users.admin')}</div>
               </div>
               <div className="help-stat-card">
                 <div className="help-stat-value">{users.length}</div>
-                <div className="help-stat-label">Total</div>
+                <div className="help-stat-label">{t('common.total')}</div>
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <div className="help-stat-card">
                 <div className="help-stat-value help-stat-value-primary">{groups.length}</div>
-                <div className="help-stat-label">Groups</div>
+                <div className="help-stat-label">{t('groups.title')}</div>
               </div>
               <div className="help-stat-card">
                 <div className="help-stat-value">{users.length}</div>
-                <div className="help-stat-label">Users</div>
+                <div className="help-stat-label">{t('users.title')}</div>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      <HelpCard title="User Management" variant="info">
-        Create and manage user accounts. Assign roles to control access levels.
+      <HelpCard title={t('users.title')} variant="info">
+        {t('users.title')}
       </HelpCard>
-      <HelpCard title="Roles" variant="tip">
+      <HelpCard title={t('users.role')} variant="tip">
         <div className="space-y-1.5 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="primary" size="sm" dot>{LABELS.ROLES.ADMIN}</Badge>
-            <span className="text-xs">Full access</span>
+            <Badge variant="primary" size="sm" dot>{t('users.admin')}</Badge>
+            <span className="text-xs">{t('common.all')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm" dot>{LABELS.ROLES.OPERATOR}</Badge>
-            <span className="text-xs">Manage certificates</span>
+            <Badge variant="warning" size="sm" dot>{t('users.operator')}</Badge>
+            <span className="text-xs">{t('certificates.title')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" size="sm" dot>{LABELS.ROLES.VIEWER}</Badge>
-            <span className="text-xs">Read-only access</span>
+            <Badge variant="secondary" size="sm" dot>{t('users.viewer')}</Badge>
+            <span className="text-xs">{t('common.details')}</span>
           </div>
         </div>
       </HelpCard>
@@ -546,7 +558,7 @@ export default function UsersGroupsPage() {
         subtitle={selectedUser.email}
         badge={
           <Badge variant={selectedUser.active ? 'success' : 'secondary'} size="sm" icon={selectedUser.active ? CheckCircle : XCircle}>
-            {selectedUser.active ? 'Active' : 'Disabled'}
+            {selectedUser.active ? t('common.active') : t('common.disabled')}
           </Badge>
         }
       />
@@ -556,44 +568,43 @@ export default function UsersGroupsPage() {
         {canWrite('users') && (
           <>
             <Button size="sm" variant="secondary" onClick={() => { setEditingUser(selectedUser); setShowUserModal(true) }}>
-              <PencilSimple size={14} /> Edit
+              <PencilSimple size={14} /> {t('common.edit')}
             </Button>
             <Button size="sm" variant="secondary" onClick={() => handleToggleUser(selectedUser)}>
               {selectedUser.active ? <XCircle size={14} /> : <CheckCircle size={14} />}
-              {selectedUser.active ? 'Disable' : 'Enable'}
+              {selectedUser.active ? t('users.deactivate') : t('users.activate')}
             </Button>
             <Button size="sm" variant="secondary" onClick={() => handleResetPassword(selectedUser)}>
-              <Key size={14} /> Reset Password
+              <Key size={14} /> {t('users.resetPassword')}
             </Button>
           </>
         )}
         {canDelete('users') && (
           <Button size="sm" variant="danger-soft" onClick={() => handleDeleteUser(selectedUser)}>
-            <Trash size={14} /> Delete
+            <Trash size={14} /> {t('common.delete')}
           </Button>
         )}
       </div>
 
-      <CompactSection title="User Information" icon={UserCircle} iconClass="icon-bg-blue">
+      <CompactSection title={t('users.user') + ' ' + t('common.info')} icon={UserCircle} iconClass="icon-bg-blue">
         <CompactGrid columns={1}>
-          <CompactField label="Full Name" value={selectedUser.full_name || '—'} />
-          <CompactField label="Email" value={selectedUser.email} />
-          <CompactField label="Role" value={selectedUser.role} />
+          <CompactField label={t('common.name')} value={selectedUser.full_name || '—'} />
+          <CompactField label={t('users.email')} value={selectedUser.email} />
+          <CompactField label={t('users.role')} value={selectedUser.role} />
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title="Activity" icon={Clock} iconClass="icon-bg-green">
+      <CompactSection title={t('users.lastLogin')} icon={Clock} iconClass="icon-bg-green">
         <CompactGrid columns={1}>
-          <CompactField label="Created" value={formatDate(selectedUser.created_at)} />
-          <CompactField label="Last Login" value={selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never'} />
-          <CompactField label="Login Count" value={selectedUser.login_count || 0} />
+          <CompactField label={t('common.created')} value={formatDate(selectedUser.created_at)} />
+          <CompactField label={t('users.lastLogin')} value={selectedUser.last_login ? formatDate(selectedUser.last_login) : 'Never'} />
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title="Security" icon={ShieldCheck} iconClass="icon-bg-purple">
+      <CompactSection title={t('nav.security')} icon={ShieldCheck} iconClass="icon-bg-purple">
         <CompactGrid columns={1}>
-          <CompactField label="MFA Enabled" value={selectedUser.mfa_enabled ? 'Yes' : 'No'} />
-          <CompactField label="TOTP Configured" value={selectedUser.totp_confirmed ? 'Yes' : 'No'} />
+          <CompactField label={t('users.enable2FA')} value={selectedUser.mfa_enabled ? t('common.yes') : t('common.no')} />
+          <CompactField label="TOTP" value={selectedUser.totp_confirmed ? t('common.yes') : t('common.no')} />
         </CompactGrid>
       </CompactSection>
     </div>
@@ -605,38 +616,38 @@ export default function UsersGroupsPage() {
         icon={Users}
         iconClass="bg-accent-primary/20"
         title={selectedGroup.name}
-        subtitle={`${selectedGroup.members?.length || 0} ${(selectedGroup.members?.length || 0) === 1 ? 'member' : 'members'}`}
+        subtitle={`${selectedGroup.members?.length || 0} ${(selectedGroup.members?.length || 0) === 1 ? t('groups.members').toLowerCase().replace('members', 'member') : t('groups.members').toLowerCase()}`}
       />
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
         {canWrite('users') && (
           <Button size="sm" variant="secondary" onClick={() => { setEditingGroup(selectedGroup); setShowGroupModal(true) }}>
-            <PencilSimple size={14} /> Edit
+            <PencilSimple size={14} /> {t('common.edit')}
           </Button>
         )}
         {canDelete('users') && (
           <Button size="sm" variant="danger-soft" onClick={() => handleDeleteGroup(selectedGroup)}>
-            <Trash size={14} /> Delete
+            <Trash size={14} /> {t('common.delete')}
           </Button>
         )}
       </div>
 
-      <CompactSection title="Group Information" icon={Users} iconClass="icon-bg-orange">
+      <CompactSection title={t('groups.group') + ' ' + t('common.info')} icon={Users} iconClass="icon-bg-orange">
         <CompactGrid columns={1}>
-          <CompactField label="Name" value={selectedGroup.name} />
-          <CompactField label="Description" value={selectedGroup.description || '—'} />
-          <CompactField label="Created" value={formatDate(selectedGroup.created_at)} />
+          <CompactField label={t('common.name')} value={selectedGroup.name} />
+          <CompactField label={t('common.description')} value={selectedGroup.description || '—'} />
+          <CompactField label={t('common.created')} value={formatDate(selectedGroup.created_at)} />
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title="Members">
+      <CompactSection title={t('groups.members')}>
         <div className="space-y-3">
           {/* Manage Members Button */}
           {canWrite('users') && (
             <div className="flex justify-end">
               <Button size="sm" onClick={() => setShowMemberModal(true)}>
-                <Users size={14} /> Manage Members
+                <Users size={14} /> {t('groups.members')}
               </Button>
             </div>
           )}
@@ -644,7 +655,7 @@ export default function UsersGroupsPage() {
           {/* Members Preview */}
           {(selectedGroup.members?.length || 0) === 0 ? (
             <p className="text-sm text-text-tertiary text-center py-4">
-              No members in this group
+              {t('groups.noGroups').replace('groups', 'members')}
             </p>
           ) : (
             <div className="space-y-2">
@@ -673,7 +684,7 @@ export default function UsersGroupsPage() {
                   onClick={() => setShowMemberModal(true)}
                   className="w-full text-sm text-accent-primary hover:text-accent-primary/80 py-2"
                 >
-                  + {selectedGroup.members.length - 5} more members
+                  + {selectedGroup.members.length - 5} {t('groups.members').toLowerCase()}
                 </button>
               )}
             </div>
@@ -720,14 +731,14 @@ export default function UsersGroupsPage() {
 
   // Tabs
   const tabs = [
-    { id: 'users', label: 'Users', icon: User, count: users.length },
-    { id: 'groups', label: 'Groups', icon: Users, count: groups.length }
+    { id: 'users', label: t('users.title'), icon: User, count: users.length },
+    { id: 'groups', label: t('groups.title'), icon: Users, count: groups.length }
   ]
 
   return (
     <>
       <ResponsiveLayout
-        title={activeTab === 'users' ? 'Users' : 'Groups'}
+        title={activeTab === 'users' ? t('users.title') : t('groups.title')}
         subtitle={`${currentData.length} ${activeTab}`}
         icon={activeTab === 'users' ? User : Users}
         stats={stats}
@@ -735,7 +746,7 @@ export default function UsersGroupsPage() {
         activeTab={activeTab}
         onTabChange={handleTabChange}
         helpContent={helpContent}
-        helpTitle="User Management"
+        helpTitle={t('users.title')}
         splitView={true}
         splitEmptyContent={
           <div className="h-full flex flex-col items-center justify-center p-6 text-center">
@@ -743,7 +754,7 @@ export default function UsersGroupsPage() {
               {activeTab === 'users' ? <User size={24} className="text-text-tertiary" /> : <Users size={24} className="text-text-tertiary" />}
             </div>
             <p className="text-sm text-text-secondary">
-              Select {activeTab === 'users' ? 'a user' : 'a group'} to view details
+              {activeTab === 'users' ? t('users.noUsers') : t('groups.noGroups')}
             </p>
           </div>
         }
@@ -762,7 +773,7 @@ export default function UsersGroupsPage() {
           selectedId={currentSelected?.id}
           rowActions={currentRowActions}
           searchable
-          searchPlaceholder={`Search ${activeTab}...`}
+          searchPlaceholder={`${t('common.search')} ${activeTab}...`}
           searchKeys={activeTab === 'users' ? ['username', 'email', 'full_name', 'role'] : ['name', 'description']}
           toolbarFilters={activeTab === 'users' ? [
             {
@@ -771,9 +782,9 @@ export default function UsersGroupsPage() {
               onChange: setFilterRole,
               placeholder: LABELS.FILTERS.ALL_ROLES,
               options: [
-                { value: 'admin', label: LABELS.ROLES.ADMIN },
-                { value: 'operator', label: LABELS.ROLES.OPERATOR },
-                { value: 'viewer', label: LABELS.ROLES.VIEWER }
+                { value: 'admin', label: t('users.admin') },
+                { value: 'operator', label: t('users.operator') },
+                { value: 'viewer', label: t('users.viewer') }
               ]
             },
             {
@@ -782,8 +793,8 @@ export default function UsersGroupsPage() {
               onChange: setFilterStatus,
               placeholder: LABELS.FILTERS.ALL_STATUS,
               options: [
-                { value: 'active', label: LABELS.STATUS.ACTIVE },
-                { value: 'disabled', label: 'Disabled' }
+                { value: 'active', label: t('common.active') },
+                { value: 'disabled', label: t('common.disabled') }
               ]
             }
           ] : []}
@@ -795,7 +806,7 @@ export default function UsersGroupsPage() {
             ) : (
               <Button size="sm" onClick={handleOpenCreateModal}>
                 <Plus size={14} weight="bold" />
-                New {activeTab === 'users' ? 'User' : 'Group'}
+                {activeTab === 'users' ? t('users.createUser') : t('groups.createGroup')}
               </Button>
             )
           )}
@@ -809,11 +820,11 @@ export default function UsersGroupsPage() {
             onPerPageChange: (v) => { setPerPage(v); setPage(1) }
           }}
           emptyIcon={activeTab === 'users' ? User : Users}
-          emptyTitle={`No ${activeTab}`}
-          emptyDescription={`Create your first ${activeTab === 'users' ? 'user' : 'group'} to get started`}
+          emptyTitle={activeTab === 'users' ? t('users.noUsers') : t('groups.noGroups')}
+          emptyDescription={activeTab === 'users' ? t('users.createUser') : t('groups.createGroup')}
           emptyAction={canWrite('users') && (
             <Button onClick={handleOpenCreateModal}>
-              <Plus size={16} /> New {activeTab === 'users' ? 'User' : 'Group'}
+              <Plus size={16} /> {activeTab === 'users' ? t('users.createUser') : t('groups.createGroup')}
             </Button>
           )}
         />
@@ -824,7 +835,7 @@ export default function UsersGroupsPage() {
       <Modal
         open={showUserModal}
         onOpenChange={(open) => { setShowUserModal(open); if (!open) setEditingUser(null) }}
-        title={editingUser ? 'Edit User' : 'Create User'}
+        title={editingUser ? t('users.editUser') : t('users.createUser')}
         size="md"
       >
         <UserForm
@@ -838,7 +849,7 @@ export default function UsersGroupsPage() {
       <Modal
         open={showGroupModal}
         onOpenChange={(open) => { setShowGroupModal(open); if (!open) setEditingGroup(null) }}
-        title={editingGroup ? 'Edit Group' : 'Create Group'}
+        title={editingGroup ? t('groups.editGroup') : t('groups.createGroup')}
         size="md"
       >
         <GroupForm
@@ -853,7 +864,7 @@ export default function UsersGroupsPage() {
         <MemberTransferModal
           open={showMemberModal}
           onClose={() => setShowMemberModal(false)}
-          title={`Manage Members - ${selectedGroup.name}`}
+          title={`${t('groups.members')} - ${selectedGroup.name}`}
           allUsers={users}
           currentMembers={selectedGroup.members || []}
           onSave={handleSaveMembers}
@@ -867,6 +878,7 @@ export default function UsersGroupsPage() {
 // ============= USER FORM =============
 
 function UserForm({ user, onSubmit, onCancel }) {
+  const { t } = useTranslation()
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -911,7 +923,7 @@ function UserForm({ user, onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
-        label="Username"
+        label={t('users.username')}
         value={formData.username}
         onChange={(e) => setFormData(p => ({ ...p, username: e.target.value }))}
         required
@@ -919,7 +931,7 @@ function UserForm({ user, onSubmit, onCancel }) {
         placeholder="johndoe"
       />
       <Input
-        label="Email"
+        label={t('users.email')}
         type="email"
         value={formData.email}
         onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
@@ -927,13 +939,13 @@ function UserForm({ user, onSubmit, onCancel }) {
         placeholder="john@example.com"
       />
       <Input
-        label="Full Name"
+        label={t('common.name')}
         value={formData.full_name}
         onChange={(e) => setFormData(p => ({ ...p, full_name: e.target.value }))}
         placeholder="John Doe"
       />
       <Input
-        label={user ? 'New Password (leave blank to keep)' : 'Password'}
+        label={user ? t('account.newPassword') : t('auth.password')}
         type="password"
         value={formData.password}
         onChange={(e) => setFormData(p => ({ ...p, password: e.target.value }))}
@@ -942,21 +954,21 @@ function UserForm({ user, onSubmit, onCancel }) {
         showStrength={!user}
       />
       <Select
-        label="Role"
+        label={t('users.role')}
         value={formData.role}
         onChange={(val) => setFormData(p => ({ ...p, role: val }))}
         options={[
-          { value: 'admin', label: LABELS.ROLES.ADMIN },
-          { value: 'operator', label: LABELS.ROLES.OPERATOR },
-          { value: 'viewer', label: LABELS.ROLES.VIEWER }
+          { value: 'admin', label: t('users.admin') },
+          { value: 'operator', label: t('users.operator') },
+          { value: 'viewer', label: t('users.viewer') }
         ]}
       />
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" disabled={loading}>
-          {loading ? <LoadingSpinner size="sm" /> : (user ? 'Update' : 'Create')}
+          {loading ? <LoadingSpinner size="sm" /> : (user ? t('common.save') : t('common.create'))}
         </Button>
       </div>
     </form>
@@ -966,6 +978,7 @@ function UserForm({ user, onSubmit, onCancel }) {
 // ============= GROUP FORM =============
 
 function GroupForm({ group, onSubmit, onCancel }) {
+  const { t } = useTranslation()
   const [formData, setFormData] = useState({
     name: '',
     description: ''
@@ -999,24 +1012,24 @@ function GroupForm({ group, onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
-        label="Group Name"
+        label={t('groups.groupName')}
         value={formData.name}
         onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
         required
         placeholder="developers"
       />
       <Input
-        label="Description"
+        label={t('common.description')}
         value={formData.description}
         onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
         placeholder="Development team"
       />
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" disabled={loading}>
-          {loading ? <LoadingSpinner size="sm" /> : (group ? 'Update' : 'Create')}
+          {loading ? <LoadingSpinner size="sm" /> : (group ? t('common.save') : t('common.create'))}
         </Button>
       </div>
     </form>

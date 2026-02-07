@@ -2,6 +2,7 @@
  * CAs (Certificate Authorities) Page - Using ResponsiveLayout
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { 
   Key, Download, Trash,
@@ -23,6 +24,7 @@ import { useMobile } from '../contexts/MobileContext'
 import { extractData, formatDate, cn } from '../lib/utils'
 
 export default function CAsPage() {
+  const { t } = useTranslation()
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
@@ -289,28 +291,28 @@ export default function CAsPage() {
     const expiredCount = cas.filter(c => c.status === 'Expired').length
     
     return [
-      { icon: Crown, label: 'Root', value: rootCount, variant: 'warning' },
-      { icon: ShieldCheck, label: 'Intermediate', value: intermediateCount, variant: 'primary' },
-      { icon: Certificate, label: 'Active', value: activeCount, variant: 'success' },
-      { icon: Clock, label: 'Expired', value: expiredCount, variant: 'danger' }
+      { icon: Crown, label: t('cas.rootCA'), value: rootCount, variant: 'warning' },
+      { icon: ShieldCheck, label: t('cas.intermediateCA'), value: intermediateCount, variant: 'primary' },
+      { icon: Certificate, label: t('common.active'), value: activeCount, variant: 'success' },
+      { icon: Clock, label: t('common.expired'), value: expiredCount, variant: 'danger' }
     ]
-  }, [cas])
+  }, [cas, t])
 
   // Filters config
   const filters = useMemo(() => [
     {
       key: 'type',
-      label: 'Type',
+      label: t('common.type'),
       type: 'select',
       value: filterType,
       onChange: setFilterType,
       placeholder: LABELS.FILTERS.ALL_TYPES,
       options: [
-        { value: 'root', label: 'Root CA' },
-        { value: 'intermediate', label: 'Intermediate' }
+        { value: 'root', label: t('cas.rootCA') },
+        { value: 'intermediate', label: t('cas.intermediateCA') }
       ]
     }
-  ], [filterType])
+  ], [filterType, t])
 
   const activeFiltersCount = (filterType ? 1 : 0)
 
@@ -330,7 +332,7 @@ export default function CAsPage() {
   return (
     <>
       <ResponsiveLayout
-        title="Certificate Authorities"
+        title={t('cas.title')}
         subtitle={`${cas.length} CA${cas.length !== 1 ? 's' : ''}`}
         icon={ShieldCheck}
         stats={stats}
@@ -342,12 +344,12 @@ export default function CAsPage() {
             <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
               <ShieldCheck size={24} className="text-text-tertiary" />
             </div>
-            <p className="text-sm text-text-secondary">Select a CA to view details</p>
+            <p className="text-sm text-text-secondary">{t('cas.selectToView')}</p>
           </div>
         }
         slideOverOpen={!!selectedCA}
         onSlideOverClose={() => setSelectedCA(null)}
-        slideOverTitle="CA Details"
+        slideOverTitle={t('cas.caDetails')}
         slideOverWidth="wide"
         slideOverContent={selectedCA && (
           <CADetailsPanel 
@@ -356,6 +358,7 @@ export default function CAsPage() {
             canDelete={canDelete}
             onExport={(format) => handleExport(selectedCA, format)}
             onDelete={() => handleDelete(selectedCA.id)}
+            t={t}
           />
         )}
       >
@@ -369,7 +372,7 @@ export default function CAsPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search CAs..."
+                  placeholder={t('cas.searchPlaceholder')}
                   className={cn(
                     'w-full rounded-lg border border-border bg-bg-primary',
                     'text-text-primary placeholder:text-text-tertiary',
@@ -415,8 +418,8 @@ export default function CAsPage() {
                     onChange={setFilterType}
                     placeholder={LABELS.FILTERS.ALL_TYPES}
                     options={[
-                      { value: 'root', label: 'Root' },
-                      { value: 'intermediate', label: 'Intermediate' },
+                      { value: 'root', label: t('cas.rootCA') },
+                      { value: 'intermediate', label: t('cas.intermediateCA') },
                     ]}
                     size="sm"
                   />
@@ -425,9 +428,9 @@ export default function CAsPage() {
                     onChange={setFilterStatus}
                     placeholder={LABELS.FILTERS.ALL_STATUS}
                     options={[
-                      { value: 'valid', label: 'Valid' },
-                      { value: 'expiring', label: 'Expiring' },
-                      { value: 'expired', label: 'Expired' },
+                      { value: 'valid', label: t('common.valid') },
+                      { value: 'expiring', label: t('common.expiring') },
+                      { value: 'expired', label: t('common.expired') },
                     ]}
                     size="sm"
                   />
@@ -442,11 +445,11 @@ export default function CAsPage() {
                   <>
                     <Button size="sm" onClick={() => openModal('create')} className="shrink-0">
                       <Plus size={14} weight="bold" />
-                      Create
+                      {t('common.create')}
                     </Button>
                     <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)} className="shrink-0">
                       <UploadSimple size={14} />
-                      Import
+                      {t('common.import')}
                     </Button>
                   </>
                 )
@@ -465,11 +468,11 @@ export default function CAsPage() {
                 <div className="w-16 h-16 rounded-2xl bg-bg-tertiary flex items-center justify-center mb-4">
                   <ShieldCheck size={32} className="text-text-secondary" />
                 </div>
-                <h3 className="text-lg font-medium text-text-primary mb-1">No Certificate Authorities</h3>
-                <p className="text-sm text-text-secondary text-center mb-4">Create your first CA to get started</p>
+                <h3 className="text-lg font-medium text-text-primary mb-1">{t('cas.noCA')}</h3>
+                <p className="text-sm text-text-secondary text-center mb-4">{t('cas.createFirst')}</p>
                 {canWrite('cas') && (
                   <Button onClick={() => openModal('create')}>
-                    <Plus size={16} /> Create CA
+                    <Plus size={16} /> {t('cas.createCA')}
                   </Button>
                 )}
               </div>
@@ -478,12 +481,12 @@ export default function CAsPage() {
                 {/* Table Header - Desktop */}
                 {!isMobile && (
                   <div className="flex items-center gap-3 px-3 py-2 mb-2 text-2xs font-semibold text-text-tertiary uppercase tracking-wider border-b border-border/50">
-                    <div className="flex-1 min-w-0">Certificate Authority</div>
-                    {viewMode === 'list' && <div className="w-24 text-center">Parent</div>}
-                    <div className="w-20 text-center">Type</div>
-                    <div className="w-16 text-center">Certs</div>
-                    <div className="w-20 text-center">Expires</div>
-                    <div className="w-16 text-center">Status</div>
+                    <div className="flex-1 min-w-0">{t('cas.ca')}</div>
+                    {viewMode === 'list' && <div className="w-24 text-center">{t('cas.parentCA')}</div>}
+                    <div className="w-20 text-center">{t('common.type')}</div>
+                    <div className="w-16 text-center">{t('cas.issuedCertificates')}</div>
+                    <div className="w-20 text-center">{t('common.expires')}</div>
+                    <div className="w-16 text-center">{t('common.status')}</div>
                   </div>
                 )}
                 
@@ -504,6 +507,7 @@ export default function CAsPage() {
                         isMobile={isMobile}
                         isLast={idx === filteredTree.length - 1}
                         isFirst={idx === 0}
+                        t={t}
                       />
                     ))
                   ) : (
@@ -531,6 +535,7 @@ export default function CAsPage() {
                           selectedId={selectedCA?.id}
                           onSelect={loadCADetails}
                           isMobile={isMobile}
+                          t={t}
                         />
                       ))
                   )}
@@ -545,29 +550,29 @@ export default function CAsPage() {
       <Modal
         open={modals.create}
         onOpenChange={() => closeModal('create')}
-        title="Create Certificate Authority"
+        title={t('cas.createCA')}
         size="lg"
       >
         <form onSubmit={handleCreateCA} className="space-y-6 p-4">
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary">Subject Information</h3>
-            <Input name="commonName" label="Common Name (CN)" placeholder="My Certificate Authority" required />
+            <h3 className="text-sm font-semibold text-text-primary">{t('cas.subjectInfo')}</h3>
+            <Input name="commonName" label={t('certificates.commonName') + ' (CN)'} placeholder="My Certificate Authority" required />
             <div className="grid grid-cols-2 gap-4">
-              <Input name="organization" label="Organization (O)" placeholder="My Company" />
-              <Input name="country" label="Country (C)" placeholder="US" maxLength={2} />
+              <Input name="organization" label={t('cas.organization') + ' (O)'} placeholder="My Company" />
+              <Input name="country" label={t('cas.country') + ' (C)'} placeholder="US" maxLength={2} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input name="state" label="State/Province (ST)" placeholder="California" />
-              <Input name="locality" label="City/Locality (L)" placeholder="San Francisco" />
+              <Input name="state" label={t('cas.stateProvince') + ' (ST)'} placeholder="California" />
+              <Input name="locality" label={t('cas.locality') + ' (L)'} placeholder="San Francisco" />
             </div>
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary">Key Configuration</h3>
+            <h3 className="text-sm font-semibold text-text-primary">{t('cas.keyConfiguration')}</h3>
             <div className="grid grid-cols-2 gap-4">
               <Select
                 name="keyAlgo"
-                label="Key Algorithm"
+                label={t('certificates.keyAlgorithm')}
                 options={[
                   { value: 'RSA', label: 'RSA' },
                   { value: 'ECDSA', label: 'ECDSA' }
@@ -576,7 +581,7 @@ export default function CAsPage() {
               />
               <Select
                 name="keySize"
-                label="Key Size"
+                label={t('certificates.keySize')}
                 options={[
                   { value: '2048', label: '2048 bits' },
                   { value: '3072', label: '3072 bits' },
@@ -588,28 +593,28 @@ export default function CAsPage() {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary">Validity</h3>
+            <h3 className="text-sm font-semibold text-text-primary">{t('certificates.validityPeriod')}</h3>
             <Select
               name="validityYears"
-              label="Validity Period"
+              label={t('certificates.validityPeriod')}
               options={[
-                { value: '5', label: '5 years' },
-                { value: '10', label: '10 years' },
-                { value: '15', label: '15 years' },
-                { value: '20', label: '20 years' }
+                { value: '5', label: t('cas.yearsValidity', { count: 5 }) },
+                { value: '10', label: t('cas.yearsValidity', { count: 10 }) },
+                { value: '15', label: t('cas.yearsValidity', { count: 15 }) },
+                { value: '20', label: t('cas.yearsValidity', { count: 20 }) }
               ]}
               defaultValue="10"
             />
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-text-primary">CA Type</h3>
+            <h3 className="text-sm font-semibold text-text-primary">{t('cas.caType')}</h3>
             <Select
               name="type"
-              label="Type"
+              label={t('common.type')}
               options={[
-                { value: 'root', label: 'Root CA (Self-signed)' },
-                { value: 'intermediate', label: 'Intermediate CA (Signed by parent)' }
+                { value: 'root', label: t('cas.rootCASelfSigned') },
+                { value: 'intermediate', label: t('cas.intermediateCASigned') }
               ]}
               value={createFormType}
               onChange={(value) => setCreateFormType(value)}
@@ -617,7 +622,7 @@ export default function CAsPage() {
             {createFormType === 'intermediate' && (
               <Select
                 name="parentCAId"
-                label="Parent CA"
+                label={t('cas.parentCA')}
                 options={cas.map(ca => ({
                   value: ca.id.toString(),
                   label: ca.name || ca.descr || ca.common_name
@@ -629,9 +634,9 @@ export default function CAsPage() {
 
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button type="button" variant="secondary" onClick={() => closeModal('create')}>
-              Cancel
+              {t('common.cancel')}
             </Button>
-            <Button type="submit">Create CA</Button>
+            <Button type="submit">{t('cas.createCA')}</Button>
           </div>
         </form>
       </Modal>
@@ -650,16 +655,16 @@ export default function CAsPage() {
       <Modal
         open={showP12Modal}
         onOpenChange={() => { setShowP12Modal(false); setP12Password(''); setP12CA(null) }}
-        title={`Export as ${p12Format.toUpperCase()}`}
+        title={t('cas.exportAs', { format: p12Format.toUpperCase() })}
       >
         <div className="p-4 space-y-4">
           <p className="text-sm text-text-secondary">
-            Enter a password to protect the PKCS#12 file. This password will be required to import the certificate elsewhere.
+            {t('cas.p12PasswordDescription')}
           </p>
           <Input
-            label="Export Password"
+            label={t('cas.exportPassword')}
             type="password"
-            placeholder="Enter password (min 4 characters)"
+            placeholder={t('cas.enterPasswordPlaceholder')}
             value={p12Password}
             onChange={(e) => setP12Password(e.target.value)}
             autoFocus
@@ -667,10 +672,10 @@ export default function CAsPage() {
           />
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button variant="secondary" onClick={() => { setShowP12Modal(false); setP12Password(''); setP12CA(null) }}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleExportP12} disabled={!p12Password || p12Password.length < 4}>
-              <Download size={14} /> Export
+              <Download size={14} /> {t('common.export')}
             </Button>
           </div>
         </div>
@@ -683,7 +688,7 @@ export default function CAsPage() {
 // TREE NODE COMPONENT - Styled with visual hierarchy
 // =============================================================================
 
-function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, isOrphan, isMobile, isLast = false, isFirst = false }) {
+function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, isOrphan, isMobile, isLast = false, isFirst = false, t }) {
   const hasChildren = ca.children && ca.children.length > 0
   const isExpanded = expandedNodes.has(ca.id)
   const isSelected = selectedId === ca.id
@@ -696,8 +701,8 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
     const d = new Date(date)
     const now = new Date()
     const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24))
-    if (diffDays < 0) return { text: 'Expired', variant: 'danger', urgent: true }
-    if (diffDays < 30) return { text: `${diffDays}d left`, variant: 'warning', urgent: true }
+    if (diffDays < 0) return { text: t('common.expired'), variant: 'danger', urgent: true }
+    if (diffDays < 30) return { text: t('cas.daysLeft', { count: diffDays }), variant: 'warning', urgent: true }
     if (diffDays < 365) return { text: `${Math.floor(diffDays / 30)}mo`, variant: 'default', urgent: false }
     const formatted = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
     return { text: formatted, variant: 'default', urgent: false }
@@ -796,7 +801,7 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
                 'px-2 py-0.5 rounded-md text-2xs font-semibold',
                 ca.type === 'root' ? 'badge-bg-amber' : 'badge-bg-blue'
               )}>
-                {ca.type === 'root' ? 'Root' : 'Intermediate'}
+                {ca.type === 'root' ? t('cas.rootCA') : t('cas.intermediateCA')}
               </span>
             </div>
             
@@ -876,6 +881,7 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
               isOrphan={false}
               isMobile={isMobile}
               isLast={idx === ca.children.length - 1}
+              t={t}
             />
           ))}
         </div>
@@ -888,7 +894,7 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
 // LIST ROW COMPONENT - Flat list view
 // =============================================================================
 
-function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
+function ListRow({ ca, allCAs, selectedId, onSelect, isMobile, t }) {
   const isSelected = selectedId === ca.id
   
   // Find parent CA name
@@ -900,8 +906,8 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
     const d = new Date(date)
     const now = new Date()
     const diffDays = Math.ceil((d - now) / (1000 * 60 * 60 * 24))
-    if (diffDays < 0) return { text: 'Expired', variant: 'danger' }
-    if (diffDays < 30) return { text: `${diffDays}d left`, variant: 'warning' }
+    if (diffDays < 0) return { text: t('common.expired'), variant: 'danger' }
+    if (diffDays < 30) return { text: t('cas.daysLeft', { count: diffDays }), variant: 'warning' }
     if (diffDays < 365) return { text: `${Math.floor(diffDays / 30)}mo`, variant: 'default' }
     const formatted = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
     return { text: formatted, variant: 'default' }
@@ -963,7 +969,7 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
               'px-2 py-0.5 rounded-md text-2xs font-semibold',
               ca.type === 'root' ? 'badge-bg-amber' : 'badge-bg-blue'
             )}>
-              {ca.type === 'root' ? 'Root' : 'Intermediate'}
+              {ca.type === 'root' ? t('cas.rootCA') : t('cas.intermediateCA')}
             </span>
           </div>
           
@@ -1034,7 +1040,7 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile }) {
 // CA DETAILS PANEL
 // =============================================================================
 
-function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete }) {
+function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, t }) {
   return (
     <div className="p-3 space-y-3">
       {/* Header */}
@@ -1043,10 +1049,10 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-text-primary truncate">
-              {ca.name || ca.common_name || 'CA'}
+              {ca.name || ca.common_name || t('cas.ca')}
             </h3>
             <Badge variant={ca.type === 'root' || ca.is_root ? 'warning' : 'primary'} size="sm">
-              {ca.type === 'root' || ca.is_root ? 'root' : 'intermediate'}
+              {ca.type === 'root' || ca.is_root ? t('cas.rootCA') : t('cas.intermediateCA')}
             </Badge>
           </div>
           {ca.subject && (
@@ -1057,7 +1063,7 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete }) {
 
       {/* Stats */}
       <CompactStats stats={[
-        { icon: Certificate, value: `${ca.certs || 0} certificates` },
+        { icon: Certificate, value: t('cas.certificateCount', { count: ca.certs || 0 }) },
         { icon: Clock, value: ca.valid_to ? formatDate(ca.valid_to, 'short') : '—' },
         { badge: ca.status, badgeVariant: ca.status === 'Active' ? 'success' : 'danger' }
       ]} />
@@ -1087,37 +1093,37 @@ function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete }) {
       </div>
 
       {/* Subject Info */}
-      <CompactSection title="Subject">
+      <CompactSection title={t('cas.subject')}>
         <CompactGrid>
-          <CompactField label="Common Name" value={ca.common_name} copyable className="col-span-2" />
-          <CompactField label="Organization" value={ca.organization} />
-          <CompactField label="Country" value={ca.country} />
-          <CompactField label="State" value={ca.state} />
-          <CompactField label="Locality" value={ca.locality} />
+          <CompactField label={t('certificates.commonName')} value={ca.common_name} copyable className="col-span-2" />
+          <CompactField label={t('cas.organization')} value={ca.organization} />
+          <CompactField label={t('cas.country')} value={ca.country} />
+          <CompactField label={t('cas.stateProvince')} value={ca.state} />
+          <CompactField label={t('cas.locality')} value={ca.locality} />
         </CompactGrid>
       </CompactSection>
 
       {/* Key Info */}
-      <CompactSection title="Key Information">
+      <CompactSection title={t('cas.keyInformation')}>
         <CompactGrid>
-          <CompactField label="Algorithm" value={ca.key_algorithm || 'RSA'} />
-          <CompactField label="Key Size" value={ca.key_size} />
-          <CompactField label="Signature" value={ca.signature_algorithm} />
+          <CompactField label={t('cas.algorithm')} value={ca.key_algorithm || 'RSA'} />
+          <CompactField label={t('certificates.keySize')} value={ca.key_size} />
+          <CompactField label={t('cas.signature')} value={ca.signature_algorithm} />
         </CompactGrid>
       </CompactSection>
 
       {/* Validity */}
-      <CompactSection title="Validity">
+      <CompactSection title={t('cas.validity')}>
         <CompactGrid>
-          <CompactField label="Not Before" value={ca.valid_from ? formatDate(ca.valid_from) : '—'} />
-          <CompactField label="Not After" value={ca.valid_to ? formatDate(ca.valid_to) : '—'} />
-          <CompactField label="Serial" value={ca.serial_number} copyable mono className="col-span-2" />
+          <CompactField label={t('certificates.validFrom')} value={ca.valid_from ? formatDate(ca.valid_from) : '—'} />
+          <CompactField label={t('certificates.validTo')} value={ca.valid_to ? formatDate(ca.valid_to) : '—'} />
+          <CompactField label={t('certificates.serialNumber')} value={ca.serial_number} copyable mono className="col-span-2" />
         </CompactGrid>
       </CompactSection>
 
       {/* Fingerprints */}
       {(ca.thumbprint_sha1 || ca.thumbprint_sha256) && (
-        <CompactSection title="Fingerprints">
+        <CompactSection title={t('certificates.fingerprints')}>
           <CompactGrid>
             {ca.thumbprint_sha1 && (
               <CompactField label="SHA-1" value={ca.thumbprint_sha1} copyable mono className="col-span-2" />

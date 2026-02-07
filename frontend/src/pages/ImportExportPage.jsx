@@ -3,6 +3,7 @@
  */
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { 
   UploadSimple, DownloadSimple, CloudArrowUp, ArrowsLeftRight, 
   CheckCircle, Certificate, ShieldCheck, Key
@@ -17,17 +18,18 @@ import { SUCCESS } from '../lib/messages'
 
 const STORAGE_KEY = 'opnsense_config'
 
-// Simplified tabs - Smart Import replaces old import tabs
-const TABS = [
-  { id: 'import', label: 'Import', icon: UploadSimple },
-  { id: 'opnsense', label: 'OpnSense', icon: CloudArrowUp },
-  { id: 'export-certs', label: 'Export Certs', icon: DownloadSimple },
-  { id: 'export-cas', label: 'Export CAs', icon: DownloadSimple },
-]
-
 export default function ImportExportPage() {
+  const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const navigate = useNavigate()
+  
+  // Tabs with translations
+  const TABS = [
+    { id: 'import', label: t('importExport.tabs.import'), icon: UploadSimple },
+    { id: 'opnsense', label: t('importExport.tabs.opnsense'), icon: CloudArrowUp },
+    { id: 'export-certs', label: t('importExport.tabs.exportCerts'), icon: DownloadSimple },
+    { id: 'export-cas', label: t('importExport.tabs.exportCAs'), icon: DownloadSimple },
+  ]
   const [activeTab, setActiveTab] = useState('import')
   const [processing, setProcessing] = useState(false)
   const [cas, setCas] = useState([])
@@ -75,7 +77,7 @@ export default function ImportExportPage() {
         api_key: opnsenseApiKey,
         api_secret: opnsenseApiSecret
       }))
-      showSuccess('Configuration saved')
+      showSuccess(t('importExport.opnsense.configSaved'))
     } catch (e) {}
   }
 
@@ -94,7 +96,7 @@ export default function ImportExportPage() {
       saveOpnsenseConfig()
     } catch (error) {
       setTestResult('error')
-      showError(error.message || 'Connection failed')
+      showError(error.message || t('importExport.opnsense.connectionFailed'))
     } finally {
       setProcessing(false)
     }
@@ -112,7 +114,7 @@ export default function ImportExportPage() {
       showSuccess(result.message || SUCCESS.IMPORT.OPNSENSE)
       loadCAs()
     } catch (error) {
-      showError(error.message || 'Import failed')
+      showError(error.message || t('importExport.importFailed'))
     } finally {
       setProcessing(false)
     }
@@ -130,9 +132,9 @@ export default function ImportExportPage() {
       a.download = `certificates.${ext}`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess('Certificates exported')
+      showSuccess(t('importExport.export.certificatesExported'))
     } catch (error) {
-      showError(error.message || 'Export failed')
+      showError(error.message || t('importExport.export.exportFailed'))
     }
   }
 
@@ -146,9 +148,9 @@ export default function ImportExportPage() {
       a.download = `ca-certificates.${ext}`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess('CA certificates exported')
+      showSuccess(t('importExport.export.caExported'))
     } catch (error) {
-      showError(error.message || 'Export failed')
+      showError(error.message || t('importExport.export.exportFailed'))
     }
   }
 
@@ -171,10 +173,10 @@ export default function ImportExportPage() {
       case 'import':
         return (
           <DetailSection 
-            title="Smart Import" 
+            title={t('importExport.smartImport.title')}
             icon={UploadSimple} 
             iconClass="icon-bg-violet" 
-            description="Import certificates, keys, CSRs, and chains from any format"
+            description={t('importExport.smartImport.description')}
           >
             <SmartImportWidget onImportComplete={handleImportComplete} />
           </DetailSection>
@@ -183,28 +185,28 @@ export default function ImportExportPage() {
       case 'opnsense':
         return (
           <div className="space-y-4">
-            <DetailSection title="OpnSense Connection" icon={CloudArrowUp} iconClass="icon-bg-orange" description="Import certificates from OpnSense firewall">
+            <DetailSection title={t('importExport.opnsense.title')} icon={CloudArrowUp} iconClass="icon-bg-orange" description={t('importExport.opnsense.description')}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input 
-                  label="Host / IP" 
+                  label={t('importExport.opnsense.hostLabel')}
                   value={opnsenseHost}
                   onChange={(e) => setOpnsenseHost(e.target.value)}
                   placeholder="192.168.1.1"
                 />
                 <Input 
-                  label="Port" 
+                  label={t('importExport.opnsense.portLabel')}
                   value={opnsensePort}
                   onChange={(e) => setOpnsensePort(e.target.value)}
                   placeholder="443"
                 />
                 <Input 
-                  label="API Key" 
+                  label={t('importExport.opnsense.apiKeyLabel')}
                   value={opnsenseApiKey}
                   onChange={(e) => setOpnsenseApiKey(e.target.value)}
                   placeholder="API Key"
                 />
                 <Input 
-                  label="API Secret" 
+                  label={t('importExport.opnsense.apiSecretLabel')}
                   type="password"
                   value={opnsenseApiSecret}
                   onChange={(e) => setOpnsenseApiSecret(e.target.value)}
@@ -214,21 +216,21 @@ export default function ImportExportPage() {
             </DetailSection>
             
             {testResult && (
-              <DetailSection title="Connection Result" icon={testResult === 'success' ? CheckCircle : Key} iconClass={testResult === 'success' ? 'icon-bg-emerald' : 'icon-bg-orange'}>
+              <DetailSection title={t('importExport.opnsense.connectionResult')} icon={testResult === 'success' ? CheckCircle : Key} iconClass={testResult === 'success' ? 'icon-bg-emerald' : 'icon-bg-orange'}>
                 {testResult === 'success' ? (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-status-success">
                       <CheckCircle size={18} weight="fill" />
-                      <span className="text-sm font-medium">Connected successfully</span>
+                      <span className="text-sm font-medium">{t('importExport.opnsense.connectedSuccessfully')}</span>
                     </div>
                     {testItems.length > 0 && (
                       <div className="text-sm text-text-secondary">
-                        Found {testItems.length} certificates available for import
+                        {t('importExport.opnsense.foundCertificates', { count: testItems.length })}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-status-danger">Connection failed. Check your credentials.</div>
+                  <div className="text-sm text-status-danger">{t('importExport.opnsense.connectionFailed')}</div>
                 )}
               </DetailSection>
             )}
@@ -240,12 +242,12 @@ export default function ImportExportPage() {
                 disabled={processing || !opnsenseHost || !opnsenseApiKey || !opnsenseApiSecret}
                 size="lg"
               >
-                {processing ? 'Testing...' : 'Test Connection'}
+                {processing ? t('importExport.opnsense.testing') : t('importExport.opnsense.testConnection')}
               </Button>
               {testResult === 'success' && testItems.length > 0 && (
                 <Button onClick={handleImportFromOpnsense} disabled={processing} size="lg">
                   <UploadSimple size={18} />
-                  Import {testItems.length} Certificates
+                  {t('importExport.opnsense.importCertificates', { count: testItems.length })}
                 </Button>
               )}
             </div>
@@ -254,31 +256,31 @@ export default function ImportExportPage() {
       
       case 'export-certs':
         return (
-          <DetailSection title="Export All Certificates" icon={Certificate} iconClass="icon-bg-blue" description="Download all certificates in a single file">
+          <DetailSection title={t('importExport.export.allCertsTitle')} icon={Certificate} iconClass="icon-bg-blue" description={t('importExport.export.allCertsDesc')}>
             <div className="grid grid-cols-2 gap-3">
               <Button variant="secondary" onClick={() => handleExportAllCerts('pem')} className="justify-center">
-                <DownloadSimple size={16} /> PEM Bundle
+                <DownloadSimple size={16} /> {t('importExport.export.pemBundle')}
               </Button>
               <Button onClick={() => handleExportAllCerts('pkcs7')} className="justify-center">
-                <DownloadSimple size={16} /> P7B Bundle
+                <DownloadSimple size={16} /> {t('importExport.export.p7bBundle')}
               </Button>
             </div>
-            <p className="text-xs text-text-tertiary mt-2">Use individual certificate export for DER, PKCS#12, or PFX formats</p>
+            <p className="text-xs text-text-tertiary mt-2">{t('importExport.export.individualExportHint')}</p>
           </DetailSection>
         )
       
       case 'export-cas':
         return (
-          <DetailSection title="Export All CAs" icon={ShieldCheck} iconClass="icon-bg-green" description={`Download all CA certificates (${cas.length} total)`}>
+          <DetailSection title={t('importExport.export.allCAsTitle')} icon={ShieldCheck} iconClass="icon-bg-green" description={t('importExport.export.allCAsDesc', { count: cas.length })}>
             <div className="grid grid-cols-2 gap-3">
               <Button variant="secondary" onClick={() => handleExportAllCAs('pem')} className="justify-center">
-                <DownloadSimple size={16} /> PEM Bundle
+                <DownloadSimple size={16} /> {t('importExport.export.pemBundle')}
               </Button>
               <Button onClick={() => handleExportAllCAs('pkcs7')} className="justify-center">
-                <DownloadSimple size={16} /> P7B Bundle
+                <DownloadSimple size={16} /> {t('importExport.export.p7bBundle')}
               </Button>
             </div>
-            <p className="text-xs text-text-tertiary mt-2">Use individual CA export for DER, PKCS#12, or PFX formats</p>
+            <p className="text-xs text-text-tertiary mt-2">{t('importExport.export.individualCAExportHint')}</p>
           </DetailSection>
         )
       
@@ -289,8 +291,8 @@ export default function ImportExportPage() {
 
   return (
     <ResponsiveLayout
-      title="Import / Export"
-      subtitle="Transfer certificates and CAs"
+      title={t('importExport.title')}
+      subtitle={t('importExport.subtitle')}
       icon={ArrowsLeftRight}
       tabs={TABS}
       activeTab={activeTab}

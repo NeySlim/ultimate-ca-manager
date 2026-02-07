@@ -8,6 +8,7 @@
  * - Mobile: Full-screen navigation
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
   Globe, Lightning, Database, Gear, ClockCounterClockwise, Certificate, Clock,
@@ -26,6 +27,7 @@ import { formatDate, cn } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
 
 export default function ACMEPage() {
+  const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
   
   // Data states
@@ -209,7 +211,7 @@ export default function ACMEPage() {
   const accountColumns = useMemo(() => [
     {
       key: 'email',
-      header: 'Email',
+      header: t('acme.email'),
       priority: 1,
       render: (_, row) => (
         <div className="flex items-center gap-2">
@@ -239,7 +241,7 @@ export default function ACMEPage() {
     },
     {
       key: 'status',
-      header: 'Status',
+      header: t('acme.status'),
       priority: 2,
       hideOnMobile: true,
       render: (val) => (
@@ -251,30 +253,30 @@ export default function ACMEPage() {
     },
     {
       key: 'created_at',
-      header: 'Created',
+      header: t('acme.created'),
       priority: 3,
       hideOnMobile: true,
       render: (val) => formatDate(val),
       mobileRender: (val) => (
         <div className="text-xs text-text-tertiary">
-          Created: <span className="text-text-secondary">{formatDate(val)}</span>
+          {t('acme.created')}: <span className="text-text-secondary">{formatDate(val)}</span>
         </div>
       )
     }
-  ], [])
+  ], [t])
 
   // Main tabs
   const tabs = [
-    { id: 'config', label: 'Configuration', icon: Gear },
-    { id: 'accounts', label: 'Accounts', icon: Key, count: accounts.length },
-    { id: 'history', label: 'History', icon: ClockCounterClockwise, count: history.length }
+    { id: 'config', label: t('acme.config'), icon: Gear },
+    { id: 'accounts', label: t('acme.accounts'), icon: Key, count: accounts.length },
+    { id: 'history', label: t('acme.history'), icon: ClockCounterClockwise, count: history.length }
   ]
 
   // Detail tabs (when account selected)
   const detailTabs = [
-    { id: 'account', label: 'Details', icon: Key },
-    { id: 'orders', label: 'Orders', icon: Globe, count: orders.length },
-    { id: 'challenges', label: 'Challenges', icon: ShieldCheck, count: challenges.length }
+    { id: 'account', label: t('acme.details'), icon: Key },
+    { id: 'orders', label: t('acme.orders'), icon: Globe, count: orders.length },
+    { id: 'challenges', label: t('acme.challenges'), icon: ShieldCheck, count: challenges.length }
   ]
 
   // Header actions
@@ -282,12 +284,12 @@ export default function ACMEPage() {
     <>
       <Button variant="secondary" size="sm" onClick={loadData} className="hidden md:inline-flex">
         <ArrowsClockwise size={14} />
-        Refresh
+        {t('acme.refresh')}
       </Button>
       {activeTab === 'accounts' && (
         <Button size="sm" onClick={() => setShowCreateModal(true)}>
           <Plus size={14} />
-          <span className="hidden sm:inline">New Account</span>
+          <span className="hidden sm:inline">{t('acme.newAccount')}</span>
         </Button>
       )}
     </>
@@ -299,24 +301,24 @@ export default function ACMEPage() {
       <Card className="p-4 space-y-3 bg-gradient-to-br from-accent-primary/5 to-transparent">
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Database size={16} className="text-accent-primary" />
-          ACME Statistics
+          {t('acme.statistics')}
         </h3>
         <div className="grid grid-cols-2 gap-3">
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
             <p className="text-2xl font-bold text-text-primary">{stats.total}</p>
-            <p className="text-xs text-text-secondary">Accounts</p>
+            <p className="text-xs text-text-secondary">{t('acme.accounts')}</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
             <p className="text-2xl font-bold status-success-text">{stats.active}</p>
-            <p className="text-xs text-text-secondary">Active</p>
+            <p className="text-xs text-text-secondary">{t('acme.active')}</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
             <p className="text-2xl font-bold text-accent-primary">{stats.orders}</p>
-            <p className="text-xs text-text-secondary">Orders</p>
+            <p className="text-xs text-text-secondary">{t('acme.orders')}</p>
           </div>
           <div className="text-center p-3 bg-bg-tertiary rounded-lg">
             <p className="text-2xl font-bold status-warning-text">{stats.pending}</p>
-            <p className="text-xs text-text-secondary">Pending</p>
+            <p className="text-xs text-text-secondary">{t('acme.pending')}</p>
           </div>
         </div>
       </Card>
@@ -324,38 +326,35 @@ export default function ACMEPage() {
       <Card className={`p-4 space-y-3 ${acmeSettings.enabled ? 'stat-card-success' : 'stat-card-warning'}`}>
         <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
           <Lightning size={16} className="text-accent-primary" />
-          Server Status
+          {t('acme.serverStatus')}
         </h3>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-text-secondary">ACME Server</span>
+            <span className="text-sm text-text-secondary">{t('acme.acmeServer')}</span>
             <StatusIndicator status={acmeSettings.enabled ? 'success' : 'warning'}>
-              {acmeSettings.enabled ? 'Enabled' : 'Disabled'}
+              {acmeSettings.enabled ? t('acme.enabled') : t('acme.disabled')}
             </StatusIndicator>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-text-secondary">LE Proxy</span>
+            <span className="text-sm text-text-secondary">{t('acme.leProxy')}</span>
             <StatusIndicator status={acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'success' : 'warning') : 'inactive'}>
-              {acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? 'Active' : 'Setup Required') : 'Disabled'}
+              {acmeSettings.proxy_enabled ? (acmeSettings.proxy_registered ? t('acme.active') : t('acme.setupRequired')) : t('acme.disabled')}
             </StatusIndicator>
           </div>
         </div>
       </Card>
 
       <div className="space-y-3">
-        <HelpCard variant="info" title="About ACME">
-          ACME (Automatic Certificate Management Environment) enables automated certificate 
-          issuance. Compatible with certbot, acme.sh, and other ACME clients.
+        <HelpCard variant="info" title={t('acme.aboutAcme')}>
+          {t('acme.aboutAcmeInfo')}
         </HelpCard>
         
-        <HelpCard variant="tip" title="Let's Encrypt Proxy">
-          Enable the LE Proxy to forward requests to Let's Encrypt while maintaining 
-          centralized audit logging and control.
+        <HelpCard variant="tip" title={t('acme.letsEncryptProxy')}>
+          {t('acme.letsEncryptProxyTip')}
         </HelpCard>
 
-        <HelpCard variant="warning" title="Account Security">
-          ACME accounts contain private keys. Deactivate or delete unused accounts 
-          to minimize security exposure.
+        <HelpCard variant="warning" title={t('common.warning')}>
+          {t('acme.accountSecurityWarning')}
         </HelpCard>
       </div>
     </div>
@@ -367,7 +366,7 @@ export default function ACMEPage() {
       <CompactHeader
         icon={Key}
         iconClass={selectedAccount.status === 'valid' ? "bg-status-success/20" : "bg-bg-tertiary"}
-        title={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email || 'Account'}
+        title={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email || t('acme.account')}
         subtitle={`ID: ${selectedAccount.account_id?.substring(0, 24)}...`}
         badge={
           <Badge variant={selectedAccount.status === 'valid' ? 'success' : 'secondary'} size="sm">
@@ -379,8 +378,8 @@ export default function ACMEPage() {
 
       <CompactStats stats={[
         { icon: Key, value: selectedAccount.key_type || 'RSA-2048' },
-        { icon: Globe, value: `${orders.length} orders` },
-        { icon: ShieldCheck, value: `${challenges.length} challenges` },
+        { icon: Globe, value: `${orders.length} ${t('acme.orders').toLowerCase()}` },
+        { icon: ShieldCheck, value: `${challenges.length} ${t('acme.challenges').toLowerCase()}` },
       ]} />
 
       {/* Actions */}
@@ -393,7 +392,7 @@ export default function ACMEPage() {
           disabled={selectedAccount.status !== 'valid'}
         >
           <XCircle size={14} />
-          Deactivate
+          {t('acme.deactivate')}
         </Button>
         <Button 
           size="sm" 
@@ -430,36 +429,36 @@ export default function ACMEPage() {
       {/* Tab Content */}
       {activeDetailTab === 'account' && (
         <div className="space-y-3">
-          <CompactSection title="Account Information">
+          <CompactSection title={t('acme.accountInformation')}>
             <CompactGrid>
-              <CompactField label="Email" value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} />
-              <CompactField label="Status">
+              <CompactField label={t('acme.email')} value={selectedAccount.contact?.[0]?.replace('mailto:', '') || selectedAccount.email} />
+              <CompactField label={t('acme.status')}>
                 <StatusIndicator status={selectedAccount.status === 'valid' ? 'active' : 'inactive'}>
                   {selectedAccount.status}
                 </StatusIndicator>
               </CompactField>
-              <CompactField label="Key Type" value={selectedAccount.key_type || 'RSA-2048'} />
-              <CompactField label="Created" value={formatDate(selectedAccount.created_at)} />
+              <CompactField label={t('acme.keyType')} value={selectedAccount.key_type || 'RSA-2048'} />
+              <CompactField label={t('acme.created')} value={formatDate(selectedAccount.created_at)} />
             </CompactGrid>
           </CompactSection>
 
-          <CompactSection title="Account ID" collapsible defaultOpen={false}>
+          <CompactSection title={t('acme.accountId')} collapsible defaultOpen={false}>
             <p className="font-mono text-2xs text-text-secondary break-all bg-bg-tertiary/50 p-2 rounded">
               {selectedAccount.account_id}
             </p>
           </CompactSection>
 
-          <CompactSection title="Terms of Service">
+          <CompactSection title={t('acme.termsOfService')}>
             <div className="flex items-center gap-2 text-xs">
               {selectedAccount.terms_of_service_agreed || selectedAccount.tos_agreed ? (
                 <>
                   <CheckCircle size={14} className="status-success-text" weight="fill" />
-                  <span className="status-success-text">Accepted</span>
+                  <span className="status-success-text">{t('acme.accepted')}</span>
                 </>
               ) : (
                 <>
                   <XCircle size={14} className="status-danger-text" weight="fill" />
-                  <span className="status-danger-text">Not Accepted</span>
+                  <span className="status-danger-text">{t('acme.notAccepted')}</span>
                 </>
               )}
             </div>
@@ -468,9 +467,9 @@ export default function ACMEPage() {
       )}
 
       {activeDetailTab === 'orders' && (
-        <CompactSection title={`${orders.length} Orders`}>
+        <CompactSection title={`${orders.length} ${t('acme.orders')}`}>
           {orders.length === 0 ? (
-            <p className="text-xs text-text-tertiary py-4 text-center">No certificate orders</p>
+            <p className="text-xs text-text-tertiary py-4 text-center">{t('acme.noCertificateOrders')}</p>
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
               {orders.map((order, i) => (
@@ -496,20 +495,20 @@ export default function ACMEPage() {
                   {/* Details Grid */}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-text-tertiary">Method</span>
+                      <span className="text-text-tertiary">{t('acme.method')}</span>
                       <span className="text-text-secondary font-medium">{order.method || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-text-tertiary">Expires</span>
+                      <span className="text-text-tertiary">{t('acme.expires')}</span>
                       <span className="text-text-secondary">{order.expires || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between col-span-2">
-                      <span className="text-text-tertiary">Created</span>
+                      <span className="text-text-tertiary">{t('acme.created')}</span>
                       <span className="text-text-secondary">{order.created_at ? formatDate(order.created_at) : 'N/A'}</span>
                     </div>
                     {order.order_id && (
                       <div className="flex justify-between col-span-2 mt-1 pt-1 border-t border-border/30">
-                        <span className="text-text-tertiary">Order ID</span>
+                        <span className="text-text-tertiary">{t('acme.orderId')}</span>
                         <span className="text-text-tertiary font-mono text-[10px] truncate max-w-[180px]" title={order.order_id}>
                           {order.order_id}
                         </span>
@@ -524,9 +523,9 @@ export default function ACMEPage() {
       )}
 
       {activeDetailTab === 'challenges' && (
-        <CompactSection title={`${challenges.length} Challenges`}>
+        <CompactSection title={`${challenges.length} ${t('acme.challenges')}`}>
           {challenges.length === 0 ? (
-            <p className="text-xs text-text-tertiary py-4 text-center">No active challenges</p>
+            <p className="text-xs text-text-tertiary py-4 text-center">{t('acme.noActiveChallenges')}</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {challenges.map((ch, i) => (
@@ -553,13 +552,12 @@ export default function ACMEPage() {
   // Configuration content
   const configContent = (
     <div className="p-4 space-y-4">
-      <HelpCard variant="info" title="About ACME Protocol" compact>
-        ACME enables automated certificate issuance. Configure the server below, then use 
-        the directory URL with any ACME client (certbot, acme.sh, etc.).
+      <HelpCard variant="info" title={t('acme.aboutAcme')} compact>
+        {t('acme.aboutAcmeDesc')}
       </HelpCard>
 
       {/* ACME Server */}
-      <CompactSection title="ACME Server" icon={Globe}>
+      <CompactSection title={t('acme.acmeServer')} icon={Globe}>
         <div className="space-y-3">
           <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
             <input
@@ -569,17 +567,17 @@ export default function ACMEPage() {
               className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
             />
             <div>
-              <p className="text-sm text-text-primary font-medium">Enable ACME Server</p>
-              <p className="text-xs text-text-secondary">Allow automated certificate issuance via ACME</p>
+              <p className="text-sm text-text-primary font-medium">{t('acme.enableAcmeServer')}</p>
+              <p className="text-xs text-text-secondary">{t('acme.enableAcmeServerDesc')}</p>
             </div>
           </label>
 
           <Select
-            label="Default Issuing CA"
+            label={t('acme.defaultIssuingCA')}
             value={acmeSettings.issuing_ca_id?.toString() || ''}
             onChange={(val) => updateSetting('issuing_ca_id', val ? parseInt(val) : null)}
             disabled={!acmeSettings.enabled}
-            placeholder="Select a CA..."
+            placeholder={t('acme.selectCA')}
             options={cas.map(ca => ({ 
               value: ca.id.toString(), 
               label: ca.name || ca.common_name 
@@ -589,22 +587,22 @@ export default function ACMEPage() {
       </CompactSection>
 
       {/* ACME Endpoints */}
-      <CompactSection title="ACME Endpoints" icon={Lightning}>
+      <CompactSection title={t('acme.endpoints')} icon={Lightning}>
         <CompactGrid columns={1}>
           <CompactField 
-            label="Directory URL" 
+            label={t('acme.directoryUrl')} 
             value={`${window.location.origin}/acme/directory`}
             mono
             copyable
           />
         </CompactGrid>
         <p className="text-xs text-text-tertiary mt-2">
-          Use this URL with certbot: <code className="bg-bg-tertiary px-1 rounded">--server {window.location.origin}/acme/directory</code>
+          {t('acme.certbotUsage')} <code className="bg-bg-tertiary px-1 rounded">--server {window.location.origin}/acme/directory</code>
         </p>
       </CompactSection>
 
       {/* Let's Encrypt Proxy */}
-      <CompactSection title="Let's Encrypt Proxy" icon={ShieldCheck}>
+      <CompactSection title={t('acme.letsEncryptProxy')} icon={ShieldCheck}>
         <div className="space-y-3">
           <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
             <input
@@ -614,8 +612,8 @@ export default function ACMEPage() {
               className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
             />
             <div>
-              <p className="text-sm text-text-primary font-medium">Enable Let's Encrypt Proxy</p>
-              <p className="text-xs text-text-secondary">Forward requests to Let's Encrypt with audit logging</p>
+              <p className="text-sm text-text-primary font-medium">{t('acme.enableLetsEncryptProxy')}</p>
+              <p className="text-xs text-text-secondary">{t('acme.enableLetsEncryptProxyDesc')}</p>
             </div>
           </label>
 
@@ -623,7 +621,7 @@ export default function ACMEPage() {
             <>
               <CompactGrid columns={1}>
                 <CompactField 
-                  label="Proxy Endpoint" 
+                  label={t('acme.proxyEndpoint')} 
                   value={`${window.location.origin}/api/v2/acme/proxy`}
                   mono
                   copyable
@@ -636,7 +634,7 @@ export default function ACMEPage() {
                     <div className="flex items-center gap-2">
                       <CheckCircle size={18} className="status-success-text" weight="fill" />
                       <div>
-                        <p className="text-sm font-medium text-text-primary">Proxy Registered</p>
+                        <p className="text-sm font-medium text-text-primary">{t('acme.proxyRegistered')}</p>
                         <p className="text-xs text-text-secondary">{acmeSettings.proxy_email}</p>
                       </div>
                     </div>
@@ -653,12 +651,12 @@ export default function ACMEPage() {
               ) : (
                 <div className="space-y-3 p-3 bg-bg-tertiary/30 rounded-lg">
                   <Input
-                    label="Email Address"
+                    label={t('acme.emailAddress')}
                     type="email"
                     value={proxyEmail}
                     onChange={(e) => setProxyEmail(e.target.value)}
                     placeholder="admin@example.com"
-                    helperText="Required for Let's Encrypt account registration"
+                    helperText={t('acme.emailRequired')}
                   />
                   <Button 
                     variant="secondary" 
@@ -667,7 +665,7 @@ export default function ACMEPage() {
                     disabled={!proxyEmail}
                   >
                     <Key size={14} />
-                    Register Account
+                    {t('acme.registerAccount')}
                   </Button>
                 </div>
               )}
@@ -680,7 +678,7 @@ export default function ACMEPage() {
       <div className="flex gap-2 pt-3 border-t border-border">
         <Button onClick={handleSaveConfig} disabled={saving}>
           <FloppyDisk size={14} />
-          {saving ? 'Saving...' : 'Save Configuration'}
+          {saving ? t('acme.saving') : t('acme.saveConfiguration')}
         </Button>
       </div>
     </div>
@@ -692,7 +690,7 @@ export default function ACMEPage() {
       data={filteredAccounts}
       columns={accountColumns}
       searchable
-      searchPlaceholder="Search accounts..."
+      searchPlaceholder={t('acme.searchAccounts')}
       onSearch={setSearchQuery}
       onRowClick={selectAccount}
       selectedRow={selectedAccount}
@@ -706,12 +704,12 @@ export default function ACMEPage() {
       }}
       emptyState={{
         icon: Key,
-        title: 'No ACME Accounts',
-        description: searchQuery ? 'No accounts match your search' : 'Create your first ACME account to get started',
+        title: t('acme.noAccounts'),
+        description: searchQuery ? t('acme.noMatchingAccounts') : t('acme.noAccountsDesc'),
         action: !searchQuery && (
           <Button onClick={() => setShowCreateModal(true)}>
             <Plus size={14} />
-            Create Account
+            {t('acme.createAccount')}
           </Button>
         )
       }}
@@ -722,7 +720,7 @@ export default function ACMEPage() {
   const historyColumns = useMemo(() => [
     {
       key: 'common_name',
-      header: 'Common Name',
+      header: t('acme.commonName'),
       priority: 1,
       sortable: true,
       render: (value, row) => (
@@ -757,14 +755,14 @@ export default function ACMEPage() {
             size="sm"
             icon={row?.revoked ? XCircle : CheckCircle}
           >
-            {row?.revoked ? 'Revoked' : 'Valid'}
+            {row?.revoked ? t('acme.revoked') : t('acme.valid')}
           </Badge>
         </div>
       )
     },
     {
       key: 'revoked',
-      header: 'Status',
+      header: t('acme.status'),
       priority: 2,
       hideOnMobile: true,
       render: (value) => (
@@ -775,13 +773,13 @@ export default function ACMEPage() {
           dot
           pulse={!value}
         >
-          {value ? 'Revoked' : 'Valid'}
+          {value ? t('acme.revoked') : t('acme.valid')}
         </Badge>
       )
     },
     {
       key: 'issuer',
-      header: 'Issuer',
+      header: t('acme.issuer'),
       priority: 3,
       sortable: true,
       hideOnMobile: true,
@@ -797,7 +795,7 @@ export default function ACMEPage() {
     },
     {
       key: 'valid_to',
-      header: 'Expires',
+      header: t('acme.expires'),
       priority: 4,
       sortable: true,
       render: (value) => {
@@ -822,7 +820,7 @@ export default function ACMEPage() {
                 isExpiring ? "text-status-warning" : 
                 "text-text-tertiary"
               )}>
-                {isExpired ? 'Expired' : `${daysLeft} days`}
+                {isExpired ? t('acme.expired') : t('acme.daysLeft', { count: daysLeft })}
               </span>
             </div>
           </div>
@@ -838,7 +836,7 @@ export default function ACMEPage() {
           <div className="flex items-center gap-2 text-xs">
             <Clock size={12} className="text-text-tertiary" />
             <span className={isExpired ? "text-status-error" : "text-text-secondary"}>
-              {isExpired ? 'Expired' : `${daysLeft}d`}
+              {isExpired ? t('acme.expired') : `${daysLeft}d`}
             </span>
           </div>
         )
@@ -846,7 +844,7 @@ export default function ACMEPage() {
     },
     {
       key: 'created_at',
-      header: 'Issued',
+      header: t('acme.issued'),
       priority: 5,
       sortable: true,
       hideOnMobile: true,
@@ -856,7 +854,7 @@ export default function ACMEPage() {
         </span>
       )
     }
-  ], [])
+  ], [t])
 
   // Certificate detail content for history tab
   const certDetailContent = selectedCert && (
@@ -865,11 +863,11 @@ export default function ACMEPage() {
         icon={ClockCounterClockwise}
         iconClass={selectedCert.revoked ? "bg-status-error/20" : "bg-status-success/20"}
         title={selectedCert.common_name}
-        subtitle={`Issued by ${selectedCert.issuer || 'Unknown CA'}`}
+        subtitle={`${t('acme.issuer')}: ${selectedCert.issuer || 'Unknown CA'}`}
         badge={
           <Badge variant={selectedCert.revoked ? 'danger' : 'success'} size="sm">
             {!selectedCert.revoked && <CheckCircle size={10} weight="fill" />}
-            {selectedCert.revoked ? 'Revoked' : 'Valid'}
+            {selectedCert.revoked ? t('acme.revoked') : t('acme.valid')}
           </Badge>
         }
       />
@@ -879,28 +877,28 @@ export default function ACMEPage() {
         { icon: Globe, value: selectedCert.order?.status || 'N/A' },
       ]} />
       
-      <CompactSection title="Certificate Details">
+      <CompactSection title={t('acme.certificateDetails')}>
         <CompactGrid>
-          <CompactField label="Common Name" value={selectedCert.common_name} copyable />
-          <CompactField label="Serial Number" value={selectedCert.serial} mono copyable />
-          <CompactField label="Issuer" value={selectedCert.issuer || 'Unknown'} />
+          <CompactField label={t('acme.commonName')} value={selectedCert.common_name} copyable />
+          <CompactField label={t('acme.serialNumber')} value={selectedCert.serial} mono copyable />
+          <CompactField label={t('acme.issuer')} value={selectedCert.issuer || 'Unknown'} />
         </CompactGrid>
       </CompactSection>
       
-      <CompactSection title="Validity">
+      <CompactSection title={t('acme.validity')}>
         <CompactGrid>
-          <CompactField label="Valid From" value={selectedCert.valid_from ? formatDate(selectedCert.valid_from) : 'N/A'} />
-          <CompactField label="Valid To" value={selectedCert.valid_to ? formatDate(selectedCert.valid_to) : 'N/A'} />
-          <CompactField label="Issued" value={selectedCert.created_at ? formatDate(selectedCert.created_at) : 'N/A'} />
+          <CompactField label={t('acme.validFrom')} value={selectedCert.valid_from ? formatDate(selectedCert.valid_from) : 'N/A'} />
+          <CompactField label={t('acme.validTo')} value={selectedCert.valid_to ? formatDate(selectedCert.valid_to) : 'N/A'} />
+          <CompactField label={t('acme.issued')} value={selectedCert.created_at ? formatDate(selectedCert.created_at) : 'N/A'} />
         </CompactGrid>
       </CompactSection>
       
       {selectedCert.order && (
-        <CompactSection title="ACME Order">
+        <CompactSection title={t('acme.acmeOrder')}>
           <CompactGrid>
-            <CompactField label="Account" value={selectedCert.order.account} />
-            <CompactField label="Order Status" value={selectedCert.order.status} />
-            <CompactField label="Order ID" value={selectedCert.order.order_id} mono copyable />
+            <CompactField label={t('acme.account')} value={selectedCert.order.account} />
+            <CompactField label={t('acme.orderStatus')} value={selectedCert.order.status} />
+            <CompactField label={t('acme.orderId')} value={selectedCert.order.order_id} mono copyable />
           </CompactGrid>
         </CompactSection>
       )}
@@ -932,7 +930,7 @@ export default function ACMEPage() {
       data={filteredHistory}
       columns={historyColumns}
       searchable
-      searchPlaceholder="Search certificates..."
+      searchPlaceholder={t('acme.searchCertificates')}
       searchKeys={['common_name', 'serial', 'issuer']}
       getRowId={(row) => row.id}
       onRowClick={setSelectedCert}
@@ -946,24 +944,24 @@ export default function ACMEPage() {
           key: 'status',
           value: historyFilterStatus,
           onChange: setHistoryFilterStatus,
-          placeholder: 'All Status',
+          placeholder: t('acme.allStatus'),
           options: [
-            { value: 'valid', label: 'Valid' },
-            { value: 'revoked', label: 'Revoked' }
+            { value: 'valid', label: t('acme.valid') },
+            { value: 'revoked', label: t('acme.revoked') }
           ]
         },
         {
           key: 'ca',
           value: historyFilterCA,
           onChange: setHistoryFilterCA,
-          placeholder: 'All CAs',
+          placeholder: t('acme.allCAs'),
           options: historyCAs
         }
       ]}
       emptyState={{
         icon: ClockCounterClockwise,
-        title: 'No ACME Certificates',
-        description: 'Certificates issued via ACME will appear here'
+        title: t('acme.noCertificates'),
+        description: t('acme.noCertificatesDesc')
       }}
     />
   )
@@ -979,13 +977,13 @@ export default function ACMEPage() {
   return (
     <>
       <ResponsiveLayout
-        title="ACME Protocol"
-        subtitle={`${accounts.length} account${accounts.length !== 1 ? 's' : ''}`}
+        title={t('acme.title')}
+        subtitle={`${accounts.length} ${t('acme.account')}${accounts.length !== 1 ? 's' : ''}`}
         icon={Lightning}
         stats={[
-          { icon: Key, label: 'Accounts', value: accounts.length },
-          { icon: CheckCircle, label: 'Active', value: stats.active, variant: 'success' },
-          { icon: ClockCounterClockwise, label: 'Certificates', value: history.length, variant: 'primary' },
+          { icon: Key, label: t('acme.accounts'), value: accounts.length },
+          { icon: CheckCircle, label: t('acme.active'), value: stats.active, variant: 'success' },
+          { icon: ClockCounterClockwise, label: t('acme.certificates'), value: history.length, variant: 'primary' },
         ]}
         tabs={tabs}
         activeTab={activeTab}
@@ -1008,8 +1006,8 @@ export default function ACMEPage() {
         slideOverOpen={activeTab === 'accounts' ? !!selectedAccount : !!selectedCert}
         slideOverTitle={
           activeTab === 'accounts' 
-            ? (selectedAccount?.email || 'Account Details')
-            : (selectedCert?.common_name || 'Certificate Details')
+            ? (selectedAccount?.email || t('acme.details'))
+            : (selectedCert?.common_name || t('acme.certificateDetails'))
         }
         slideOverContent={activeTab === 'accounts' ? accountDetailContent : certDetailContent}
         onSlideOverClose={() => {
@@ -1029,7 +1027,7 @@ export default function ACMEPage() {
       <Modal
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        title="Create ACME Account"
+        title={t('acme.createAccountTitle')}
       >
         <CreateAccountForm
           onSubmit={handleCreate}
@@ -1042,6 +1040,7 @@ export default function ACMEPage() {
 
 // Create Account Form Component
 function CreateAccountForm({ onSubmit, onCancel }) {
+  const { t } = useTranslation()
   const { showWarning } = useNotification()
   const [formData, setFormData] = useState({
     email: '',
@@ -1052,7 +1051,7 @@ function CreateAccountForm({ onSubmit, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!formData.agree_tos) {
-      showWarning('You must agree to the Terms of Service')
+      showWarning(t('acme.agreeToTermsRequired'))
       return
     }
     onSubmit(formData)
@@ -1061,16 +1060,16 @@ function CreateAccountForm({ onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Input
-        label="Email Address"
+        label={t('acme.emailAddress')}
         type="email"
         value={formData.email}
         onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
         required
-        helperText="Contact email for certificate expiry notifications"
+        helperText={t('acme.contactEmailHelper')}
       />
       
       <Select
-        label="Key Type"
+        label={t('acme.keyType')}
         value={formData.key_type}
         onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
         options={[
@@ -1089,17 +1088,17 @@ function CreateAccountForm({ onSubmit, onCancel }) {
           className="rounded border-border bg-bg-tertiary mt-1"
         />
         <span className="text-sm text-text-primary">
-          I agree to the ACME Terms of Service
+          {t('acme.agreeToTerms')}
         </span>
       </label>
       
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
+          {t('acme.cancel')}
         </Button>
         <Button type="submit">
           <Plus size={14} />
-          Create Account
+          {t('acme.createAccount')}
         </Button>
       </div>
     </form>

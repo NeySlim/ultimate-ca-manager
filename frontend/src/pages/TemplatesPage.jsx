@@ -6,6 +6,7 @@
  * MOBILE: Card-style list with full-screen details
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   FileText, Plus, Copy, Trash, Download, FileArrowUp, PencilSimple,
   Certificate, ShieldCheck, Clock, Eye
@@ -22,6 +23,7 @@ import { formatDate } from '../lib/utils'
 import { ERRORS, SUCCESS, LABELS, CONFIRM } from '../lib/messages'
 
 export default function TemplatesPage() {
+  const { t } = useTranslation()
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
@@ -196,18 +198,18 @@ export default function TemplatesPage() {
     const certTemplates = templates.filter(t => getTemplateType(t) === 'certificate').length
     const caTemplates = templates.filter(t => getTemplateType(t) === 'ca').length
     return [
-      { icon: Certificate, label: 'Certificate', value: certTemplates, variant: 'primary' },
-      { icon: ShieldCheck, label: 'CA', value: caTemplates, variant: 'violet' },
-      { icon: FileText, label: 'Total', value: templates.length, variant: 'default' }
+      { icon: Certificate, label: t('templates.certificate'), value: certTemplates, variant: 'primary' },
+      { icon: ShieldCheck, label: t('templates.ca'), value: caTemplates, variant: 'violet' },
+      { icon: FileText, label: t('common.total'), value: templates.length, variant: 'default' }
     ]
-  }, [templates, getTemplateType])
+  }, [templates, getTemplateType, t])
 
   // ============= COLUMNS =============
   
   const columns = useMemo(() => [
     {
       key: 'name',
-      header: 'Template',
+      header: t('templates.template'),
       priority: 1,
       sortable: true,
       render: (val, row) => {
@@ -236,7 +238,7 @@ export default function TemplatesPage() {
               <span className="font-medium truncate">{val || 'Unnamed'}</span>
             </div>
             <Badge variant={type === 'ca' ? 'amber' : 'primary'} size="sm" dot>
-              {type === 'ca' ? 'CA' : 'Cert'}
+              {type === 'ca' ? t('templates.ca') : t('templates.cert')}
             </Badge>
           </div>
         )
@@ -244,48 +246,48 @@ export default function TemplatesPage() {
     },
     {
       key: 'type',
-      header: 'Type',
+      header: t('common.type'),
       priority: 2,
       sortable: true,
       hideOnMobile: true,
       render: (val) => (
         <Badge variant={val === 'ca' ? 'amber' : 'primary'} size="sm" dot>
-          {val === 'ca' ? 'CA' : 'Certificate'}
+          {val === 'ca' ? t('templates.ca') : t('templates.certificate')}
         </Badge>
       )
     },
     {
       key: 'validity_days',
-      header: 'Validity',
+      header: t('templates.validity'),
       priority: 3,
       hideOnMobile: true,
       sortable: true,
       render: (val) => (
         <span className="text-sm text-text-secondary">
-          {val || 365} days
+          {t('templates.validityDays', { count: val || 365 })}
         </span>
       ),
       mobileRender: (val) => (
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-text-tertiary">Validity:</span>
+          <span className="text-text-tertiary">{t('templates.validity')}:</span>
           <span className="text-text-secondary">{val || 365}d</span>
         </div>
       )
     },
     {
       key: 'usage_count',
-      header: 'Used',
+      header: t('templates.used'),
       hideOnMobile: true,
       sortable: true,
       render: (val) => (
         <Badge variant="outline" size="sm">
-          {val || 0} certs
+          {t('templates.certsIssued', { count: val || 0 })}
         </Badge>
       )
     },
     {
       key: 'description',
-      header: 'Description',
+      header: t('common.description'),
       hideOnMobile: true,
       render: (val) => (
         <span className="text-xs text-text-secondary truncate max-w-[200px]">
@@ -293,41 +295,40 @@ export default function TemplatesPage() {
         </span>
       )
     }
-  ], [])
+  ], [t])
 
   // ============= ROW ACTIONS =============
   
   const rowActions = useCallback((row) => [
-    { label: 'Edit', icon: PencilSimple, onClick: () => { setEditingTemplate(row); setShowTemplateModal(true) } },
-    { label: 'Duplicate', icon: Copy, onClick: () => handleDuplicateTemplate(row) },
-    { label: 'Export', icon: Download, onClick: () => handleExportTemplate(row) },
+    { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingTemplate(row); setShowTemplateModal(true) } },
+    { label: t('templates.duplicateTemplate'), icon: Copy, onClick: () => handleDuplicateTemplate(row) },
+    { label: t('common.export'), icon: Download, onClick: () => handleExportTemplate(row) },
     ...(canDelete('templates') ? [
-      { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDeleteTemplate(row) }
+      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDeleteTemplate(row) }
     ] : [])
-  ], [canDelete])
+  ], [canDelete, t])
 
   // ============= HELP CONTENT =============
   
   const helpContent = (
     <div className="space-y-3">
-      <HelpCard title="About Templates" variant="info">
-        Certificate templates define default values for certificate issuance.
-        Use them to standardize certificate properties across your organization.
+      <HelpCard title={t('templates.aboutTemplates')} variant="info">
+        {t('templates.aboutTemplatesDescription')}
       </HelpCard>
-      <HelpCard title="Template Types" variant="tip">
+      <HelpCard title={t('templates.templateTypes')} variant="tip">
         <div className="space-y-1 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="primary" size="sm">Certificate</Badge>
-            <span className="text-xs">End-entity certs (servers, users)</span>
+            <Badge variant="primary" size="sm">{t('templates.certificate')}</Badge>
+            <span className="text-xs">{t('templates.endEntityCerts')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm">CA</Badge>
-            <span className="text-xs">Intermediate CAs</span>
+            <Badge variant="warning" size="sm">{t('templates.ca')}</Badge>
+            <span className="text-xs">{t('templates.intermediateCAs')}</span>
           </div>
         </div>
       </HelpCard>
-      <HelpCard title="Key Usage" variant="warning">
-        Ensure Key Usage and Extended Key Usage match your certificate's intended purpose.
+      <HelpCard title={t('templates.keyUsage')} variant="warning">
+        {t('templates.keyUsageWarning')}
       </HelpCard>
     </div>
   )
@@ -340,10 +341,10 @@ export default function TemplatesPage() {
         icon={FileText}
         iconClass={selectedTemplate.type === 'ca' ? "bg-accent-warning/20" : "bg-accent-primary/20"}
         title={selectedTemplate.name}
-        subtitle={`${selectedTemplate.usage_count || 0} certificates issued`}
+        subtitle={t('templates.certificatesIssued', { count: selectedTemplate.usage_count || 0 })}
         badge={
           <Badge variant={selectedTemplate.type === 'ca' ? 'warning' : 'primary'} size="sm">
-            {selectedTemplate.type === 'ca' ? 'CA' : 'Certificate'}
+            {selectedTemplate.type === 'ca' ? t('templates.ca') : t('templates.certificate')}
           </Badge>
         }
       />
@@ -351,60 +352,60 @@ export default function TemplatesPage() {
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="secondary" onClick={() => setShowPreviewModal(true)}>
-          <Eye size={14} /> Preview
+          <Eye size={14} /> {t('common.details')}
         </Button>
         {canWrite('templates') && (
           <>
             <Button size="sm" variant="secondary" onClick={() => { setEditingTemplate(selectedTemplate); setShowTemplateModal(true) }}>
-              <PencilSimple size={14} /> Edit
+              <PencilSimple size={14} /> {t('common.edit')}
             </Button>
             <Button size="sm" variant="secondary" onClick={() => handleDuplicateTemplate(selectedTemplate)}>
-              <Copy size={14} /> Duplicate
+              <Copy size={14} /> {t('common.copy')}
             </Button>
           </>
         )}
         <Button size="sm" variant="secondary" onClick={() => handleExportTemplate(selectedTemplate)}>
-          <Download size={14} /> Export
+          <Download size={14} /> {t('common.export')}
         </Button>
         {canDelete('templates') && (
           <Button size="sm" variant="danger" onClick={() => handleDeleteTemplate(selectedTemplate)}>
-            <Trash size={14} /> Delete
+            <Trash size={14} /> {t('common.delete')}
           </Button>
         )}
       </div>
 
-      <CompactSection title="Basic Information">
+      <CompactSection title={t('templates.basicInfo')}>
         <CompactGrid columns={1}>
-          <CompactField label="Name" value={selectedTemplate.name} />
-          <CompactField label="Type" value={selectedTemplate.type === 'ca' ? 'Certificate Authority' : 'Certificate'} />
-          <CompactField label="Description" value={selectedTemplate.description || '—'} />
+          <CompactField label={t('common.name')} value={selectedTemplate.name} />
+          <CompactField label={t('common.type')} value={selectedTemplate.type === 'ca' ? t('templates.certificateAuthority') : t('templates.certificate')} />
+          <CompactField label={t('common.description')} value={selectedTemplate.description || '—'} />
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title="Validity Period" icon={Clock}>
+      <CompactSection title={t('templates.validityPeriod')} icon={Clock}>
         <CompactGrid columns={2}>
-          <CompactField label="Default" value={`${selectedTemplate.validity_days || 365} days`} />
-          <CompactField label="Maximum" value={`${selectedTemplate.max_validity_days || 3650} days`} />
+          <CompactField label={t('templates.default')} value={t('templates.validityDays', { count: selectedTemplate.validity_days || 365 })} />
+          <CompactField label={t('templates.maximum')} value={t('templates.validityDays', { count: selectedTemplate.max_validity_days || 3650 })} />
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title="Subject Template" collapsible>
+      <CompactSection title={t('templates.subjectTemplate')} collapsible>
         <CompactGrid columns={2}>
-          <CompactField label="Country (C)" value={selectedTemplate.subject?.C || '—'} />
-          <CompactField label="State (ST)" value={selectedTemplate.subject?.ST || '—'} />
-          <CompactField label="Organization (O)" value={selectedTemplate.subject?.O || '—'} />
-          <CompactField label="Common Name (CN)" value={selectedTemplate.subject?.CN || '—'} />
+          <CompactField label={t('templates.country')} value={selectedTemplate.subject?.C || '—'} />
+          <CompactField label={t('templates.state')} value={selectedTemplate.subject?.ST || '—'} />
+          <CompactField label={t('templates.organization')} value={selectedTemplate.subject?.O || '—'} />
+          <CompactField label={t('templates.commonName')} value={selectedTemplate.subject?.CN || '—'} />
         </CompactGrid>
       </CompactSection>
 
       {(selectedTemplate.key_usage?.length > 0 || selectedTemplate.extended_key_usage?.length > 0) && (
-        <CompactSection title="Key Usage" collapsible defaultOpen={false}>
+        <CompactSection title={t('templates.keyUsage')} collapsible defaultOpen={false}>
           <CompactGrid columns={1}>
             {selectedTemplate.key_usage?.length > 0 && (
-              <CompactField label="Key Usage" value={selectedTemplate.key_usage.join(', ')} />
+              <CompactField label={t('templates.keyUsage')} value={selectedTemplate.key_usage.join(', ')} />
             )}
             {selectedTemplate.extended_key_usage?.length > 0 && (
-              <CompactField label="Extended Key Usage" value={selectedTemplate.extended_key_usage.join(', ')} />
+              <CompactField label={t('templates.extKeyUsage')} value={selectedTemplate.extended_key_usage.join(', ')} />
             )}
           </CompactGrid>
         </CompactSection>
@@ -417,8 +418,8 @@ export default function TemplatesPage() {
   return (
     <>
       <ResponsiveLayout
-        title="Templates"
-        subtitle={`${templates.length} template${templates.length !== 1 ? 's' : ''}`}
+        title={t('templates.title')}
+        subtitle={`${templates.length} ${t('templates.template').toLowerCase()}${templates.length !== 1 ? 's' : ''}`}
         icon={FileText}
         stats={stats}
         helpPageKey="templates"
@@ -428,11 +429,11 @@ export default function TemplatesPage() {
             <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
               <FileText size={24} className="text-text-tertiary" />
             </div>
-            <p className="text-sm text-text-secondary">Select a template to view details</p>
+            <p className="text-sm text-text-secondary">{t('templates.selectTemplate')}</p>
           </div>
         }
         slideOverOpen={!!selectedTemplate}
-        slideOverTitle={selectedTemplate?.name || 'Template Details'}
+        slideOverTitle={selectedTemplate?.name || t('common.details')}
         slideOverContent={detailContent}
         slideOverWidth="lg"
         onSlideOverClose={() => setSelectedTemplate(null)}
@@ -445,17 +446,17 @@ export default function TemplatesPage() {
           selectedId={selectedTemplate?.id}
           rowActions={rowActions}
           searchable
-          searchPlaceholder="Search templates..."
+          searchPlaceholder={t('templates.searchPlaceholder')}
           searchKeys={['name', 'description', 'type']}
           toolbarFilters={[
             {
               key: 'type',
               value: filterType,
               onChange: setFilterType,
-              placeholder: LABELS.FILTERS.ALL_TYPES,
+              placeholder: t('templates.allTypes'),
               options: [
-                { value: 'certificate', label: 'Certificate' },
-                { value: 'ca', label: 'CA' }
+                { value: 'certificate', label: t('templates.certificate') },
+                { value: 'ca', label: t('templates.ca') }
               ]
             }
           ]}
@@ -468,11 +469,11 @@ export default function TemplatesPage() {
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }}>
                   <Plus size={14} weight="bold" />
-                  New
+                  {t('templates.new')}
                 </Button>
                 <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
                   <FileArrowUp size={14} />
-                  Import
+                  {t('common.import')}
                 </Button>
               </div>
             )
@@ -487,11 +488,11 @@ export default function TemplatesPage() {
             onPerPageChange: (v) => { setPerPage(v); setPage(1) }
           }}
           emptyIcon={FileText}
-          emptyTitle="No templates"
-          emptyDescription="Create your first template to get started"
+          emptyTitle={t('templates.noTemplates')}
+          emptyDescription={t('templates.noTemplatesDescription')}
           emptyAction={canWrite('templates') && (
             <Button onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }}>
-              <Plus size={16} /> New Template
+              <Plus size={16} /> {t('templates.createTemplate')}
             </Button>
           )}
         />
@@ -501,7 +502,7 @@ export default function TemplatesPage() {
       <Modal
         open={showTemplateModal}
         onOpenChange={(open) => { setShowTemplateModal(open); if (!open) setEditingTemplate(null) }}
-        title={editingTemplate ? 'Edit Template' : 'Create Template'}
+        title={editingTemplate ? t('templates.editTemplate') : t('templates.createTemplate')}
         size="lg"
       >
         <TemplateForm
@@ -515,16 +516,16 @@ export default function TemplatesPage() {
       <Modal
         open={showImportModal}
         onOpenChange={setShowImportModal}
-        title="Import Template"
+        title={t('templates.importTemplate')}
         size="md"
       >
         <div className="p-4 space-y-4">
           <p className="text-sm text-text-secondary">
-            Import a certificate template from a JSON file or paste JSON content
+            {t('templates.importDescription')}
           </p>
           
           <div>
-            <label className="block text-xs font-medium text-text-primary mb-1">Template File (JSON)</label>
+            <label className="block text-xs font-medium text-text-primary mb-1">{t('templates.templateFile')}</label>
             <input
               ref={fileRef}
               type="file"
@@ -536,12 +537,12 @@ export default function TemplatesPage() {
           
           <div className="flex items-center gap-3">
             <div className="flex-1 border-t border-border"></div>
-            <span className="text-xs text-text-secondary">OR paste JSON content</span>
+            <span className="text-xs text-text-secondary">{t('templates.orPasteJson')}</span>
             <div className="flex-1 border-t border-border"></div>
           </div>
           
           <div>
-            <label className="block text-xs font-medium text-text-primary mb-1">Paste JSON Content</label>
+            <label className="block text-xs font-medium text-text-primary mb-1">{t('templates.pasteJsonContent')}</label>
             <textarea
               value={importJson}
               onChange={(e) => { setImportJson(e.target.value); setImportFile(null); if (fileRef.current) fileRef.current.value = '' }}
@@ -552,10 +553,10 @@ export default function TemplatesPage() {
           </div>
           
           <div className="flex justify-end gap-2 pt-4 border-t border-border">
-            <Button variant="secondary" onClick={() => setShowImportModal(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => setShowImportModal(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleImportTemplate} disabled={importing || (!importFile && !importJson.trim())}>
               {importing ? <LoadingSpinner size="sm" /> : <FileArrowUp size={16} />}
-              Import Template
+              {t('templates.importTemplate')}
             </Button>
           </div>
         </div>
@@ -574,6 +575,7 @@ export default function TemplatesPage() {
 // ============= TEMPLATE FORM =============
 
 function TemplateForm({ template, onSubmit, onCancel }) {
+  const { t } = useTranslation()
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -635,25 +637,25 @@ function TemplateForm({ template, onSubmit, onCancel }) {
       {/* Basic Info */}
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label="Template Name"
+          label={t('templates.templateName')}
           value={formData.name}
           onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
           placeholder="e.g., Web Server Certificate"
           required
         />
         <Select
-          label="Type"
+          label={t('common.type')}
           value={formData.type}
           onChange={(val) => setFormData(p => ({ ...p, type: val }))}
           options={[
-            { value: 'certificate', label: 'Certificate' },
-            { value: 'ca', label: 'Certificate Authority' }
+            { value: 'certificate', label: t('templates.certificate') },
+            { value: 'ca', label: t('templates.certificateAuthority') }
           ]}
         />
       </div>
 
       <Textarea
-        label="Description"
+        label={t('common.description')}
         value={formData.description}
         onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
         placeholder="Brief description of this template"
@@ -663,13 +665,13 @@ function TemplateForm({ template, onSubmit, onCancel }) {
       {/* Validity */}
       <div className="grid grid-cols-2 gap-4">
         <Input
-          label="Default Validity (days)"
+          label={t('templates.defaultValidity')}
           type="number"
           value={formData.validity_days}
           onChange={(e) => setFormData(p => ({ ...p, validity_days: parseInt(e.target.value) || 365 }))}
         />
         <Input
-          label="Maximum Validity (days)"
+          label={t('templates.maxValidity')}
           type="number"
           value={formData.max_validity_days}
           onChange={(e) => setFormData(p => ({ ...p, max_validity_days: parseInt(e.target.value) || 3650 }))}
@@ -678,28 +680,28 @@ function TemplateForm({ template, onSubmit, onCancel }) {
 
       {/* Subject Template */}
       <div className="border-t border-border pt-4">
-        <h4 className="text-sm font-medium text-text-primary mb-3">Subject Template</h4>
+        <h4 className="text-sm font-medium text-text-primary mb-3">{t('templates.subjectTemplate')}</h4>
         <div className="grid grid-cols-2 gap-4">
           <Input
-            label="Country (C)"
+            label={t('templates.country')}
             value={formData.subject.C}
             onChange={(e) => updateSubject('C', e.target.value)}
             placeholder="US"
           />
           <Input
-            label="State (ST)"
+            label={t('templates.state')}
             value={formData.subject.ST}
             onChange={(e) => updateSubject('ST', e.target.value)}
             placeholder="California"
           />
           <Input
-            label="Organization (O)"
+            label={t('templates.organization')}
             value={formData.subject.O}
             onChange={(e) => updateSubject('O', e.target.value)}
             placeholder="Example Corp"
           />
           <Input
-            label="Common Name (CN)"
+            label={t('templates.commonName')}
             value={formData.subject.CN}
             onChange={(e) => updateSubject('CN', e.target.value)}
             placeholder="*.example.com"
@@ -709,10 +711,10 @@ function TemplateForm({ template, onSubmit, onCancel }) {
 
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit" disabled={loading || !formData.name.trim()}>
-          {loading ? <LoadingSpinner size="sm" /> : (template ? 'Update' : 'Create')}
+          {loading ? <LoadingSpinner size="sm" /> : (template ? t('templates.update') : t('common.create'))}
         </Button>
       </div>
     </form>

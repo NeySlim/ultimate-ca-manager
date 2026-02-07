@@ -5,6 +5,7 @@
  * MOBILE: Card-style list with full-screen details, swipe gestures
  */
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   Certificate, Download, Trash, X, Plus, Info,
   CheckCircle, Warning, UploadSimple, Clock, XCircle, ArrowClockwise, LinkBreak, Star, ArrowsLeftRight
@@ -21,6 +22,7 @@ import { usePermission, useRecentHistory, useFavorites } from '../hooks'
 import { formatDate, extractCN, cn } from '../lib/utils'
 
 export default function CertificatesPage() {
+  const { t } = useTranslation()
   const { isMobile } = useMobile()
   const { addToHistory } = useRecentHistory('certificates')
   const { isFavorite, toggleFavorite } = useFavorites('certificates')
@@ -163,8 +165,8 @@ export default function CertificatesPage() {
   // Revoke certificate
   const handleRevoke = async (id) => {
     const confirmed = await showConfirm(CONFIRM.REVOKE.MESSAGE, {
-      title: 'Revoke Certificate',
-      confirmText: 'Revoke',
+      title: t('certificates.revokeCertificate'),
+      confirmText: t('certificates.revokeCertificate').split(' ')[0],
       variant: 'danger'
     })
     if (!confirmed) return
@@ -181,29 +183,29 @@ export default function CertificatesPage() {
   // Renew certificate
   const handleRenew = async (id) => {
     const confirmed = await showConfirm(
-      'This will create a new certificate with the same subject and extended validity. The current certificate will remain valid until revoked.',
+      t('certificates.confirmRenew'),
       {
-        title: 'Renew Certificate',
-        confirmText: 'Renew',
+        title: t('certificates.renewCertificate'),
+        confirmText: t('common.refresh'),
         variant: 'primary'
       }
     )
     if (!confirmed) return
     try {
       await certificatesService.renew(id)
-      showSuccess('Certificate renewed successfully')
+      showSuccess(t('notifications.certificateIssued', { name: '' }).replace(': ', ''))
       loadData()
       setSelectedCert(null)
     } catch (error) {
-      showError(error.message || 'Failed to renew certificate')
+      showError(error.message || t('common.operationFailed'))
     }
   }
 
   // Delete certificate
   const handleDelete = async (id) => {
     const confirmed = await showConfirm(CONFIRM.DELETE.CERTIFICATE, {
-      title: 'Delete Certificate',
-      confirmText: 'Delete',
+      title: t('certificates.deleteCertificate'),
+      confirmText: t('common.delete'),
       variant: 'danger'
     })
     if (!confirmed) return
@@ -219,11 +221,11 @@ export default function CertificatesPage() {
 
   const handleUploadKey = async () => {
     if (!keyPem.trim()) {
-      showError('Please provide a private key')
+      showError(t('validation.required'))
       return
     }
     if (!keyPem.includes('PRIVATE KEY')) {
-      showError('Invalid private key format - must be PEM format')
+      showError(t('validation.invalidFormat'))
       return
     }
     try {
@@ -237,7 +239,7 @@ export default function CertificatesPage() {
       const updated = await certificatesService.getById(selectedCert.id)
       setSelectedCert(updated.data || updated)
     } catch (error) {
-      showError(error.message || 'Failed to upload private key')
+      showError(error.message || t('common.operationFailed'))
     }
   }
 
@@ -273,18 +275,18 @@ export default function CertificatesPage() {
   // Each stat is clickable to filter the table
   const stats = useMemo(() => {
     const baseStats = [
-      { icon: CheckCircle, label: 'Valid', value: certStats.valid, variant: 'success', filterValue: 'valid' },
-      { icon: Warning, label: 'Expiring', shortLabel: 'Exp.', value: certStats.expiring, variant: 'warning', filterValue: 'expiring' },
-      { icon: Clock, label: 'Expired', value: certStats.expired, variant: 'neutral', filterValue: 'expired' },
-      { icon: X, label: 'Revoked', shortLabel: 'Rev.', value: certStats.revoked, variant: 'danger', filterValue: 'revoked' }
+      { icon: CheckCircle, label: t('common.valid'), value: certStats.valid, variant: 'success', filterValue: 'valid' },
+      { icon: Warning, label: t('common.expiring'), shortLabel: t('common.expiring').substring(0, 3) + '.', value: certStats.expiring, variant: 'warning', filterValue: 'expiring' },
+      { icon: Clock, label: t('common.expired'), value: certStats.expired, variant: 'neutral', filterValue: 'expired' },
+      { icon: X, label: t('common.revoked'), shortLabel: t('common.revoked').substring(0, 3) + '.', value: certStats.revoked, variant: 'danger', filterValue: 'revoked' }
     ]
     // Add orphan stat if there are any
     if (orphanCount > 0) {
-      baseStats.push({ icon: LinkBreak, label: 'Orphan', value: orphanCount, variant: 'warning', filterValue: 'orphan' })
+      baseStats.push({ icon: LinkBreak, label: t('certificates.orphan'), value: orphanCount, variant: 'warning', filterValue: 'orphan' })
     }
-    baseStats.push({ icon: Certificate, label: 'Total', value: certStats.total, variant: 'primary', filterValue: '' })
+    baseStats.push({ icon: Certificate, label: t('common.total'), value: certStats.total, variant: 'primary', filterValue: '' })
     return baseStats
-  }, [certStats, orphanCount])
+  }, [certStats, orphanCount, t])
   
   // Handle stat click to filter
   const handleStatClick = useCallback((filterValue) => {
@@ -328,11 +330,11 @@ export default function CertificatesPage() {
     const isRevoked = row.revoked
     const status = isRevoked ? 'revoked' : row.status || 'unknown'
     const config = {
-      valid: { variant: 'success', icon: CheckCircle, label: 'Valid', pulse: true },
-      expiring: { variant: 'warning', icon: Clock, label: 'Expiring', pulse: true },
-      expired: { variant: 'danger', icon: XCircle, label: 'Expired', pulse: false },
-      revoked: { variant: 'danger', icon: X, label: 'Revoked', pulse: false },
-      unknown: { variant: 'secondary', icon: Info, label: 'Unknown', pulse: false }
+      valid: { variant: 'success', icon: CheckCircle, label: t('common.valid'), pulse: true },
+      expiring: { variant: 'warning', icon: Clock, label: t('common.expiring'), pulse: true },
+      expired: { variant: 'danger', icon: XCircle, label: t('common.expired'), pulse: false },
+      revoked: { variant: 'danger', icon: X, label: t('common.revoked'), pulse: false },
+      unknown: { variant: 'secondary', icon: Info, label: t('common.status'), pulse: false }
     }
     const { variant, icon, label, pulse } = config[status] || config.unknown
     return <Badge variant={variant} size="sm" icon={icon} dot pulse={pulse}>{label}</Badge>
@@ -341,7 +343,7 @@ export default function CertificatesPage() {
   const columns = useMemo(() => [
     {
       key: 'cn',
-      header: 'Common Name',
+      header: t('certificates.commonName'),
       priority: 1,
       sortable: true,
       render: (val, row) => (
@@ -354,7 +356,7 @@ export default function CertificatesPage() {
           </div>
           <span className="font-medium truncate">{val}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
-          {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak} title="CA not found">Orphan</Badge>}
+          {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak} title={t('certificates.orphanDescription')}>{t('certificates.orphan')}</Badge>}
           {row.source === 'acme' && <Badge variant="cyan" size="sm" dot>ACME</Badge>}
           {row.source === 'scep' && <Badge variant="orange" size="sm" dot>SCEP</Badge>}
         </div>
@@ -369,7 +371,7 @@ export default function CertificatesPage() {
             )}>
               <Certificate size={14} weight="duotone" />
             </div>
-            <span className="font-medium truncate">{val || row.cn || row.common_name || 'Certificate'}</span>
+            <span className="font-medium truncate">{val || row.cn || row.common_name || t('certificates.certificate')}</span>
             <KeyIndicator hasKey={row.has_private_key} size={12} />
           </div>
           <div className="shrink-0">
@@ -380,7 +382,7 @@ export default function CertificatesPage() {
     },
     {
       key: 'status',
-      header: 'Status',
+      header: t('common.status'),
       priority: 2,
       sortable: true, // Groups by status type, then alphabetically
       hideOnMobile: true, // Status shown in CN mobileRender
@@ -388,11 +390,11 @@ export default function CertificatesPage() {
         const isRevoked = row.revoked
         const status = isRevoked ? 'revoked' : val || 'unknown'
         const config = {
-          valid: { variant: 'success', icon: CheckCircle, label: 'Valid', pulse: true },
-          expiring: { variant: 'warning', icon: Clock, label: 'Expiring', pulse: true },
-          expired: { variant: 'danger', icon: XCircle, label: 'Expired', pulse: false },
-          revoked: { variant: 'danger', icon: X, label: 'Revoked', pulse: false },
-          unknown: { variant: 'secondary', icon: Info, label: 'Unknown', pulse: false }
+          valid: { variant: 'success', icon: CheckCircle, label: t('common.valid'), pulse: true },
+          expiring: { variant: 'warning', icon: Clock, label: t('common.expiring'), pulse: true },
+          expired: { variant: 'danger', icon: XCircle, label: t('common.expired'), pulse: false },
+          revoked: { variant: 'danger', icon: X, label: t('common.revoked'), pulse: false },
+          unknown: { variant: 'secondary', icon: Info, label: t('common.status'), pulse: false }
         }
         const { variant, icon, label, pulse } = config[status] || config.unknown
         return (
@@ -404,7 +406,7 @@ export default function CertificatesPage() {
     },
     {
       key: 'issuer',
-      header: 'Issuer',
+      header: t('certificates.issuer'),
       priority: 3,
       sortable: true,
       render: (val, row) => (
@@ -422,7 +424,7 @@ export default function CertificatesPage() {
     },
     {
       key: 'valid_to',
-      header: 'Expires',
+      header: t('common.expires'),
       priority: 4, // Show on mobile as tertiary
       sortable: true,
       render: (val) => (
@@ -434,10 +436,10 @@ export default function CertificatesPage() {
       mobileRender: (val, row) => (
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-text-tertiary">Exp:</span>
+            <span className="text-text-tertiary">{t('common.expires').substring(0, 3)}:</span>
             <span className="text-text-secondary">{formatDate(val)}</span>
           </div>
-          {row.isOrphan && <Badge variant="warning" size="xs" icon={LinkBreak}>Orphan</Badge>}
+          {row.isOrphan && <Badge variant="warning" size="xs" icon={LinkBreak}>{t('certificates.orphan')}</Badge>}
           {row.source === 'acme' && <Badge variant="cyan" size="xs" dot>ACME</Badge>}
           {row.source === 'scep' && <Badge variant="orange" size="xs" dot>SCEP</Badge>}
         </div>
@@ -445,7 +447,7 @@ export default function CertificatesPage() {
     },
     {
       key: 'key_type',
-      header: 'Key',
+      header: t('certificates.keyType'),
       hideOnMobile: true,
       sortable: true,
       render: (val, row) => (
@@ -454,23 +456,23 @@ export default function CertificatesPage() {
         </span>
       )
     }
-  ], [])
+  ], [t])
 
   // Row actions
   const rowActions = useCallback((row) => [
-    { label: 'View Details', icon: Info, onClick: () => handleSelectCert(row) },
-    { label: 'Export PEM', icon: Download, onClick: () => handleExportRow(row, 'pem') },
-    { label: 'Export PKCS#12', icon: Download, onClick: () => handleExportRow(row, 'p12') },
+    { label: t('common.details'), icon: Info, onClick: () => handleSelectCert(row) },
+    { label: t('certificates.exportPEM'), icon: Download, onClick: () => handleExportRow(row, 'pem') },
+    { label: t('certificates.exportPKCS12'), icon: Download, onClick: () => handleExportRow(row, 'p12') },
     ...(canWrite('certificates') && !row.revoked && row.has_private_key ? [
-      { label: 'Renew', icon: ArrowClockwise, onClick: () => handleRenew(row.id) }
+      { label: t('certificates.renewCertificate').split(' ')[0], icon: ArrowClockwise, onClick: () => handleRenew(row.id) }
     ] : []),
     ...(canWrite('certificates') && !row.revoked ? [
-      { label: 'Revoke', icon: X, variant: 'danger', onClick: () => handleRevoke(row.id) }
+      { label: t('certificates.revokeCertificate').split(' ')[0], icon: X, variant: 'danger', onClick: () => handleRevoke(row.id) }
     ] : []),
     ...(canDelete('certificates') ? [
-      { label: 'Delete', icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
+      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
     ] : [])
-  ], [canWrite, canDelete])
+  ], [canWrite, canDelete, t])
 
   // State for P12 password modal
   const [showP12Modal, setShowP12Modal] = useState(false)
@@ -483,7 +485,7 @@ export default function CertificatesPage() {
     // For P12, we need a password - show modal
     if (format === 'p12' || format === 'pkcs12') {
       if (!cert.has_private_key) {
-        showError('Certificate has no private key for PKCS#12 export')
+        showError(t('common.operationFailed'))
         return
       }
       setP12Cert(cert)
@@ -509,7 +511,7 @@ export default function CertificatesPage() {
   // Export P12/PFX with password
   const handleExportP12 = async () => {
     if (!p12Password || p12Password.length < 4) {
-      showError('Password must be at least 4 characters')
+      showError(t('validation.minLength', { count: 4 }))
       return
     }
     try {
@@ -521,13 +523,13 @@ export default function CertificatesPage() {
       a.download = `${p12Cert.common_name || p12Cert.cn || 'certificate'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess(`Certificate exported as ${p12Format.toUpperCase()}`)
+      showSuccess(t('common.operationSuccess'))
       setShowP12Modal(false)
       setP12Password('')
       setP12Cert(null)
       setP12Format('pkcs12')
     } catch (error) {
-      showError(error.message || 'Failed to export certificate')
+      showError(error.message || t('common.operationFailed'))
     }
   }
 
@@ -535,21 +537,21 @@ export default function CertificatesPage() {
   const filters = useMemo(() => [
     {
       key: 'status',
-      label: 'Status',
+      label: t('common.status'),
       type: 'select',
       value: filterStatus,
       onChange: setFilterStatus,
       placeholder: LABELS.FILTERS.ALL_STATUS,
       options: [
-        { value: 'valid', label: 'Valid' },
-        { value: 'expiring', label: 'Expiring Soon' },
-        { value: 'expired', label: 'Expired' },
-        { value: 'revoked', label: 'Revoked' }
+        { value: 'valid', label: t('common.valid') },
+        { value: 'expiring', label: t('common.expiring') },
+        { value: 'expired', label: t('common.expired') },
+        { value: 'revoked', label: t('common.revoked') }
       ]
     },
     {
       key: 'ca',
-      label: 'Issuing CA',
+      label: t('certificates.issuer'),
       type: 'select',
       value: filterCA,
       onChange: setFilterCA,
@@ -559,7 +561,7 @@ export default function CertificatesPage() {
         label: ca.descr || ca.common_name 
       }))
     }
-  ], [filterStatus, filterCA, cas])
+  ], [filterStatus, filterCA, cas, t])
 
   const activeFilters = (filterStatus ? 1 : 0) + (filterCA ? 1 : 0)
 
@@ -570,47 +572,47 @@ export default function CertificatesPage() {
       <div className="visual-section">
         <div className="visual-section-header">
           <Certificate size={16} className="status-primary-text" />
-          Certificate Statistics
+          {t('certificates.title')}
         </div>
         <div className="visual-section-body">
           <div className="quick-info-grid">
             <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-success">{stats.find(s => s.label === 'Valid')?.value || 0}</div>
-              <div className="help-stat-label">Valid</div>
+              <div className="help-stat-value help-stat-value-success">{stats.find(s => s.filterValue === 'valid')?.value || 0}</div>
+              <div className="help-stat-label">{t('common.valid')}</div>
             </div>
             <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-warning">{stats.find(s => s.label === 'Expiring')?.value || 0}</div>
-              <div className="help-stat-label">Expiring</div>
+              <div className="help-stat-value help-stat-value-warning">{stats.find(s => s.filterValue === 'expiring')?.value || 0}</div>
+              <div className="help-stat-label">{t('common.expiring')}</div>
             </div>
             <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-danger">{stats.find(s => s.label === 'Expired')?.value || 0}</div>
-              <div className="help-stat-label">Expired</div>
+              <div className="help-stat-value help-stat-value-danger">{stats.find(s => s.filterValue === 'expired')?.value || 0}</div>
+              <div className="help-stat-label">{t('common.expired')}</div>
             </div>
           </div>
         </div>
       </div>
 
-      <HelpCard title="About Certificates" variant="info">
-        Digital certificates authenticate identities and enable encrypted communications using PKI.
+      <HelpCard title={t('help.aboutCertificates')} variant="info">
+        {t('certificates.title')}
       </HelpCard>
-      <HelpCard title="Status Legend" variant="info">
+      <HelpCard title={t('help.statusLegend')} variant="info">
         <div className="space-y-1.5 mt-2">
           <div className="flex items-center gap-2">
-            <Badge variant="success" size="sm" dot>Valid</Badge>
-            <span className="text-xs">Active and trusted</span>
+            <Badge variant="success" size="sm" dot>{t('common.valid')}</Badge>
+            <span className="text-xs">{t('common.active')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm" dot>Expiring</Badge>
-            <span className="text-xs">Expires within 30 days</span>
+            <Badge variant="warning" size="sm" dot>{t('common.expiring')}</Badge>
+            <span className="text-xs">{t('common.expiring')}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="danger" size="sm" dot>Revoked</Badge>
-            <span className="text-xs">No longer valid</span>
+            <Badge variant="danger" size="sm" dot>{t('common.revoked')}</Badge>
+            <span className="text-xs">{t('common.invalid')}</span>
           </div>
         </div>
       </HelpCard>
-      <HelpCard title="Export Formats" variant="tip">
-        PEM format is most common. Use DER for Java apps, PKCS#12 for Windows.
+      <HelpCard title={t('help.exportFormats')} variant="tip">
+        {t('certificates.exportPEM')}, {t('certificates.exportDER')}, {t('certificates.exportPKCS12')}
       </HelpCard>
     </div>
   )
@@ -632,8 +634,8 @@ export default function CertificatesPage() {
   return (
     <>
       <ResponsiveLayout
-        title="Certificates"
-        subtitle={`${total} certificate${total !== 1 ? 's' : ''}`}
+        title={t('certificates.title')}
+        subtitle={`${total} ${t('certificates.certificate')}${total !== 1 ? 's' : ''}`}
         icon={Certificate}
         stats={stats}
         onStatClick={handleStatClick}
@@ -645,11 +647,11 @@ export default function CertificatesPage() {
             <div className="w-14 h-14 rounded-xl bg-bg-tertiary flex items-center justify-center mb-3">
               <Certificate size={24} className="text-text-tertiary" />
             </div>
-            <p className="text-sm text-text-secondary">Select a certificate to view details</p>
+            <p className="text-sm text-text-secondary">{t('certificates.noCertificates')}</p>
           </div>
         }
         slideOverOpen={!!selectedCert}
-        slideOverTitle={selectedCert?.cn || selectedCert?.common_name || 'Certificate Details'}
+        slideOverTitle={selectedCert?.cn || selectedCert?.common_name || t('certificates.certificate')}
         slideOverContent={slideOverContent}
         slideOverWidth="wide"
         slideOverActions={selectedCert && (
@@ -665,7 +667,6 @@ export default function CertificatesPage() {
                 ? 'text-status-warning hover:text-status-warning bg-status-warning/10'
                 : 'text-text-tertiary hover:text-status-warning hover:bg-status-warning/10'
             )}
-            title={isFavorite(selectedCert.id) ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Star size={16} weight={isFavorite(selectedCert.id) ? 'fill' : 'regular'} />
           </button>
@@ -680,7 +681,7 @@ export default function CertificatesPage() {
           selectedId={selectedCert?.id}
           rowActions={rowActions}
           searchable
-          searchPlaceholder="Search certificates..."
+          searchPlaceholder={t('common.search') + ' ' + t('certificates.title').toLowerCase() + '...'}
           searchKeys={['cn', 'common_name', 'subject', 'issuer', 'serial']}
           columnStorageKey="ucm-certs-columns"
           filterPresetsKey="ucm-certs-presets"
@@ -694,10 +695,10 @@ export default function CertificatesPage() {
               onChange: setFilterStatus,
               placeholder: LABELS.FILTERS.ALL_STATUS,
               options: [
-                { value: 'valid', label: 'Valid' },
-                { value: 'expiring', label: 'Expiring' },
-                { value: 'expired', label: 'Expired' },
-                { value: 'revoked', label: 'Revoked' }
+                { value: 'valid', label: t('common.valid') },
+                { value: 'expiring', label: t('common.expiring') },
+                { value: 'expired', label: t('common.expired') },
+                { value: 'revoked', label: t('common.revoked') }
               ]
             },
             {
@@ -716,7 +717,7 @@ export default function CertificatesPage() {
               {!isMobile && (
                 <Button size="sm" variant="secondary" onClick={() => setShowCompareModal(true)}>
                   <ArrowsLeftRight size={14} />
-                  Compare
+                  {t('common.compare') || 'Compare'}
                 </Button>
               )}
               {canWrite('certificates') && (
@@ -733,11 +734,11 @@ export default function CertificatesPage() {
                   <>
                     <Button size="sm" variant="secondary" onClick={() => setShowImportModal(true)}>
                       <UploadSimple size={14} />
-                      Import
+                      {t('common.import')}
                     </Button>
                     <Button size="sm" onClick={() => setShowIssueModal(true)}>
                       <Plus size={14} weight="bold" />
-                      Issue
+                      {t('certificates.issueCertificate').split(' ')[0]}
                     </Button>
                   </>
                 )
@@ -755,11 +756,11 @@ export default function CertificatesPage() {
             onPerPageChange: (v) => { setPerPage(v); setPage(1) }
           }}
           emptyIcon={Certificate}
-          emptyTitle="No certificates"
-          emptyDescription="Issue your first certificate to get started"
+          emptyTitle={t('certificates.noCertificates')}
+          emptyDescription={t('certificates.issueCertificate')}
           emptyAction={canWrite('certificates') && (
             <Button onClick={() => setShowIssueModal(true)}>
-              <Plus size={16} /> Issue Certificate
+              <Plus size={16} /> {t('certificates.issueCertificate')}
             </Button>
           )}
         />
@@ -769,7 +770,7 @@ export default function CertificatesPage() {
       <Modal
         open={showIssueModal}
         onOpenChange={setShowIssueModal}
-        title="Issue Certificate"
+        title={t('certificates.issueCertificate')}
         size="lg"
       >
         <IssueCertificateForm
@@ -781,10 +782,11 @@ export default function CertificatesPage() {
               setShowIssueModal(false)
               loadData()
             } catch (error) {
-              showError(error.message || 'Failed to issue certificate')
+              showError(error.message || t('common.operationFailed'))
             }
           }}
           onCancel={() => setShowIssueModal(false)}
+          t={t}
         />
       </Modal>
 
@@ -792,11 +794,11 @@ export default function CertificatesPage() {
       <Modal
         open={showKeyModal}
         onOpenChange={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}
-        title="Upload Private Key"
+        title={t('common.upload')}
       >
         <div className="p-4 space-y-4">
           <p className="text-sm text-text-secondary">
-            Upload a private key for <strong>{selectedCert?.cn || selectedCert?.common_name}</strong>
+            {t('common.upload')} <strong>{selectedCert?.cn || selectedCert?.common_name}</strong>
           </p>
           <Textarea
             label="Private Key (PEM)"
@@ -809,18 +811,18 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
             className="font-mono text-xs"
           />
           <Input
-            label="Passphrase (if encrypted)"
+            label={t('auth.password')}
             type="password"
             value={keyPassphrase}
             onChange={(e) => setKeyPassphrase(e.target.value)}
-            placeholder="Leave empty if key is not encrypted"
+            placeholder={t('common.optional')}
           />
           <div className="flex justify-end gap-2 pt-2 border-t border-border">
             <Button variant="secondary" onClick={() => { setShowKeyModal(false); setKeyPem(''); setKeyPassphrase('') }}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleUploadKey} disabled={!keyPem.trim()}>
-              <UploadSimple size={16} /> Upload Key
+              <UploadSimple size={16} /> {t('common.upload')}
             </Button>
           </div>
         </div>
@@ -830,37 +832,37 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
       <Modal
         open={showP12Modal}
         onClose={() => { setShowP12Modal(false); setP12Password(''); setP12Cert(null) }}
-        title="Export PKCS#12"
+        title={t('certificates.exportPKCS12')}
       >
         <div className="p-4 space-y-4">
           <p className="text-sm text-text-secondary">
-            Enter a password to protect the PKCS#12 file. This password will be required when importing the certificate.
+            {t('certificates.pkcs12Password')}
           </p>
           <Input
-            label="Password"
+            label={t('auth.password')}
             type="password"
             value={p12Password}
             onChange={(e) => setP12Password(e.target.value)}
-            placeholder="Minimum 4 characters"
+            placeholder={t('validation.minLength', { count: 4 })}
             autoFocus
             showStrength
           />
           <Input
-            label="Confirm Password"
+            label={t('account.confirmPassword')}
             type="password"
-            placeholder="Re-enter password"
+            placeholder={t('account.confirmPassword')}
             onBlur={(e) => {
               if (e.target.value && e.target.value !== p12Password) {
-                showError('Passwords do not match')
+                showError(t('validation.passwordMismatch'))
               }
             }}
           />
           <div className="flex justify-end gap-2 pt-2 border-t border-border">
             <Button variant="secondary" onClick={() => { setShowP12Modal(false); setP12Password(''); setP12Cert(null) }}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleExportP12} disabled={!p12Password || p12Password.length < 4}>
-              <Download size={16} /> Export PKCS#12
+              <Download size={16} /> {t('certificates.exportPKCS12')}
             </Button>
           </div>
         </div>
@@ -888,7 +890,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
 }
 
 // Issue Certificate Form
-function IssueCertificateForm({ cas, onSubmit, onCancel }) {
+function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
   const [formData, setFormData] = useState({
     ca_id: '',
     common_name: '',
@@ -906,19 +908,19 @@ function IssueCertificateForm({ cas, onSubmit, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
       <Select
-        label="Certificate Authority"
+        label={t('cas.ca')}
         value={formData.ca_id}
         onChange={(e) => setFormData(prev => ({ ...prev, ca_id: e.target.value }))}
         required
       >
-        <option value="">Select a CA...</option>
+        <option value="">{t('certificates.selectCA')}</option>
         {cas.map(ca => (
           <option key={ca.id} value={ca.id}>{ca.descr || ca.common_name}</option>
         ))}
       </Select>
       
       <Input 
-        label="Common Name" 
+        label={t('certificates.commonName')} 
         placeholder="example.com"
         value={formData.common_name}
         onChange={(e) => setFormData(prev => ({ ...prev, common_name: e.target.value }))}
@@ -926,7 +928,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel }) {
       />
       
       <Textarea 
-        label="Subject Alternative Names" 
+        label={t('certificates.san')} 
         placeholder="DNS:example.com&#10;DNS:www.example.com&#10;IP:192.168.1.1" 
         rows={3}
         value={formData.san}
@@ -935,7 +937,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel }) {
       
       <div className="grid grid-cols-2 gap-4">
         <Select
-          label="Key Type"
+          label={t('certificates.keyType')}
           value={formData.key_type}
           onChange={(e) => setFormData(prev => ({ ...prev, key_type: e.target.value }))}
         >
@@ -944,7 +946,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel }) {
         </Select>
         
         <Select
-          label="Key Size"
+          label={t('certificates.keySize')}
           value={formData.key_size}
           onChange={(e) => setFormData(prev => ({ ...prev, key_size: e.target.value }))}
         >
@@ -963,7 +965,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel }) {
       </div>
       
       <Input 
-        label="Validity (days)" 
+        label={t('certificates.validityPeriod') + ' (' + t('certificates.days') + ')'} 
         type="number"
         placeholder="365"
         value={formData.validity_days}
@@ -972,11 +974,11 @@ function IssueCertificateForm({ cas, onSubmit, onCancel }) {
       
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="submit">
           <Certificate size={16} />
-          Issue Certificate
+          {t('certificates.issueCertificate')}
         </Button>
       </div>
     </form>
