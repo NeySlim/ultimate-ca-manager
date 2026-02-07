@@ -18,6 +18,7 @@ import {
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   UpdateChecker
 } from '../components'
+import LanguageSelector from '../components/ui/LanguageSelector'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
@@ -185,6 +186,13 @@ function AppearanceSettings() {
             This setting is saved in your browser and persists across sessions.
           </p>
         )}
+      </DetailSection>
+      
+      <DetailSection title="Language">
+        <p className="text-sm text-text-secondary mb-4">
+          Choose your preferred language
+        </p>
+        <LanguageSelector />
       </DetailSection>
       
       <DetailSection title="Preview">

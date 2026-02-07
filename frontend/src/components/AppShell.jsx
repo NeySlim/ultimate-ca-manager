@@ -2,6 +2,7 @@
  * AppShell Component - Main application layout with mobile support
  */
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom'
 import { 
   List, X, MagnifyingGlass,
@@ -20,31 +21,32 @@ import { useNotification } from '../contexts/NotificationContext'
 import { certificatesService } from '../services'
 import { loadProModule } from '../proLoader.jsx'
 
-// Mobile navigation items (grid menu)
+// Mobile navigation items (grid menu) - labels are i18n keys
 const mobileNavItems = [
-  { id: '', icon: House, label: 'Dashboard', path: '/' },
-  { id: 'certificates', icon: Certificate, label: 'Certificates', path: '/certificates' },
-  { id: 'cas', icon: ShieldCheck, label: 'CAs', path: '/cas' },
-  { id: 'csrs', icon: FileText, label: 'CSRs', path: '/csrs' },
-  { id: 'templates', icon: ListIcon, label: 'Templates', path: '/templates' },
-  { id: 'users', icon: User, label: 'Users', path: '/users' },
-  { id: 'acme', icon: Key, label: 'ACME', path: '/acme' },
-  { id: 'scep', icon: Robot, label: 'SCEP', path: '/scep-config' },
-  { id: 'crl-ocsp', icon: FileX, label: 'CRL/OCSP', path: '/crl-ocsp' },
-  { id: 'truststore', icon: Vault, label: 'Trust Store', path: '/truststore' },
-  { id: 'import', icon: UploadSimple, label: 'Import', path: '/import' },
-  { id: 'audit', icon: ClockCounterClockwise, label: 'Audit', path: '/audit' },
-  { id: 'settings', icon: Gear, label: 'Settings', path: '/settings' },
+  { id: '', icon: House, labelKey: 'nav.dashboard', path: '/' },
+  { id: 'certificates', icon: Certificate, labelKey: 'nav.certificates', path: '/certificates' },
+  { id: 'cas', icon: ShieldCheck, labelKey: 'nav.cas', path: '/cas' },
+  { id: 'csrs', icon: FileText, labelKey: 'nav.csrs', path: '/csrs' },
+  { id: 'templates', icon: ListIcon, labelKey: 'nav.templates', path: '/templates' },
+  { id: 'users', icon: User, labelKey: 'nav.users', path: '/users' },
+  { id: 'acme', icon: Key, labelKey: 'nav.acme', path: '/acme' },
+  { id: 'scep', icon: Robot, labelKey: 'nav.scep', path: '/scep-config' },
+  { id: 'crl-ocsp', icon: FileX, labelKey: 'nav.crlOcsp', path: '/crl-ocsp' },
+  { id: 'truststore', icon: Vault, labelKey: 'nav.trustStore', path: '/truststore' },
+  { id: 'import', icon: UploadSimple, labelKey: 'nav.importExport', path: '/import' },
+  { id: 'audit', icon: ClockCounterClockwise, labelKey: 'nav.audit', path: '/audit' },
+  { id: 'settings', icon: Gear, labelKey: 'nav.settings', path: '/settings' },
 ]
 
-// Pro items (added dynamically)
+// Pro items (added dynamically) - labels are i18n keys
 const proNavItems = [
-  { id: 'security', icon: Detective, label: 'Security', path: '/security', pro: true },
-  { id: 'rbac', icon: Shield, label: 'RBAC', path: '/rbac', pro: true },
-  { id: 'hsm', icon: Lock, label: 'HSM', path: '/hsm', pro: true },
+  { id: 'security', icon: Detective, labelKey: 'nav.security', path: '/security', pro: true },
+  { id: 'rbac', icon: Shield, labelKey: 'nav.rbac', path: '/rbac', pro: true },
+  { id: 'hsm', icon: Lock, labelKey: 'nav.hsm', path: '/hsm', pro: true },
 ]
 
 export function AppShell() {
+  const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
@@ -163,10 +165,10 @@ export function AppShell() {
           
           {/* Page title - custom labels for some pages */}
           <span className="text-xs font-medium text-text-primary truncate max-w-[140px]">
-            {activePage === '' ? 'Dashboard' : 
-             activePage === 'import' ? 'Import / Export' :
-             activePage === 'scep-config' ? 'SCEP Protocol' :
-             activePage === 'crl-ocsp' ? 'CRL & OCSP' :
+            {activePage === '' ? t('nav.dashboard') : 
+             activePage === 'import' ? t('nav.importExport') :
+             activePage === 'scep-config' ? t('nav.scep') :
+             activePage === 'crl-ocsp' ? t('nav.crlOcsp') :
              activePage.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
           </span>
           
@@ -303,7 +305,7 @@ export function AppShell() {
                     >
                       <Icon size={20} weight={isActive ? "fill" : "regular"} />
                       <span className="text-3xs font-medium text-center leading-tight">
-                        {item.label}
+                        {t(item.labelKey)}
                       </span>
                       {item.pro && (
                         <span className="text-3xs px-0.5 py-0.5 status-warning-bg status-warning-text rounded">

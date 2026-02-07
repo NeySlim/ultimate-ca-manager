@@ -3,6 +3,7 @@
  * Real-time updates via WebSocket events
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { 
   ShieldCheck, Certificate, ClockCounterClockwise, Clock,
@@ -68,6 +69,7 @@ const actionIcons = {
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation()
   const { showError } = useNotification()
   const navigate = useNavigate()
   
@@ -203,9 +205,9 @@ export default function DashboardPage() {
 
   const getGreeting = () => {
     const hour = new Date().getHours()
-    if (hour < 12) return 'Good morning'
-    if (hour < 18) return 'Good afternoon'
-    return 'Good evening'
+    if (hour < 12) return t('dashboard.goodMorning')
+    if (hour < 18) return t('dashboard.goodAfternoon')
+    return t('dashboard.goodEvening')
   }
 
   const totalCerts = stats?.total_certificates || 0
@@ -240,7 +242,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-1 ml-2">
                     <div className={`w-2 h-2 rounded-full ${isConnected ? 'status-success-bg-solid animate-pulse' : 'bg-text-tertiary'}`} />
                     <span className={`text-xs ${isConnected ? 'status-success-text' : 'text-text-tertiary'}`}>
-                      {isConnected ? 'Live' : 'Offline'}
+                      {isConnected ? t('dashboard.liveUpdates') : t('common.offline')}
                     </span>
                   </div>
                 </div>
@@ -290,7 +292,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard 
             icon={Certificate}
-            label="Certificates"
+            label={t('nav.certificates')}
             value={totalCerts}
             color="blue"
             live={isConnected}
@@ -298,7 +300,7 @@ export default function DashboardPage() {
           />
           <StatCard 
             icon={ShieldCheck}
-            label="Authorities"
+            label={t('nav.cas')}
             value={totalCAs}
             color="purple"
             live={isConnected}
@@ -306,15 +308,15 @@ export default function DashboardPage() {
           />
           <StatCard 
             icon={ListChecks}
-            label="CSR Queue"
+            label={t('nav.csrs')}
             value={pendingCSRs}
             color={pendingCSRs > 0 ? 'yellow' : 'slate'}
-            badge={pendingCSRs > 0 ? 'Pending' : null}
+            badge={pendingCSRs > 0 ? t('common.pending') : null}
             onClick={() => navigate('/csrs')}
           />
           <StatCard 
             icon={Globe}
-            label="ACME Accounts"
+            label={t('nav.acme')}
             value={acmeAccounts}
             color="emerald"
             onClick={() => navigate('/acme')}
@@ -330,7 +332,7 @@ export default function DashboardPage() {
             <Card.Header 
               icon={Lightning}
               iconColor="blue"
-              title="Certificate Activity"
+              title={t('dashboard.certificateActivity')}
               subtitle="Last 7 days"
             />
             <Card.Body className="!pt-2 !pb-2">
@@ -343,7 +345,7 @@ export default function DashboardPage() {
             <Card.Header 
               icon={Certificate}
               iconColor="violet"
-              title="Status Distribution"
+              title={t('dashboard.statusDistribution')}
               subtitle="Current certificates"
             />
             <Card.Body className="!pt-2 !pb-2">
@@ -372,9 +374,9 @@ export default function DashboardPage() {
             </div>
             <div className="flex-1">
               <p className="text-sm font-medium status-warning-text">
-                {expiringCount} certificate{expiringCount > 1 ? 's' : ''} expiring soon
+                {t('dashboard.expiringCertificates', { count: expiringCount })}
               </p>
-              <p className="text-xs text-text-secondary">Click to view and renew</p>
+              <p className="text-xs text-text-secondary">{t('dashboard.clickToRenew')}</p>
             </div>
             <CaretRight size={16} className="status-warning-text" />
           </div>
@@ -392,7 +394,7 @@ export default function DashboardPage() {
               <Card.Header 
                 icon={Certificate}
                 iconColor="blue"
-                title="Recent Certificates"
+                title={t('dashboard.recentCertificates')}
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate('/certificates')}>
                     View all <CaretRight size={12} />
@@ -438,7 +440,7 @@ export default function DashboardPage() {
               <Card.Header 
                 icon={ShieldCheck}
                 iconColor="violet"
-                title="Recent CAs"
+                title={t('dashboard.recentCAs')}
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate('/cas')}>
                     View all <CaretRight size={12} />

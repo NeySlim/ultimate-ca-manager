@@ -4,6 +4,7 @@
  * Remembers last username in localStorage
  */
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, Link } from 'react-router-dom'
 import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft } from '@phosphor-icons/react'
 import { Card, Button, Input, Logo, LoadingSpinner } from '../components'
@@ -13,6 +14,7 @@ import { authMethodsService } from '../services/authMethods.service'
 const STORAGE_KEY = 'ucm_last_username'
 
 export default function LoginPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { login } = useAuth()
   const { showError, showSuccess, showInfo } = useNotification()
@@ -218,13 +220,13 @@ export default function LoginPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-text-primary mb-2">
             {step === 'username' 
-              ? (username ? 'Welcome Back' : 'Sign In')
-              : 'Welcome Back'
+              ? (username ? t('auth.welcomeBack') : t('auth.login'))
+              : t('auth.welcomeBack')
             }
           </h1>
           <p className="text-sm text-text-secondary">
             {step === 'username' 
-              ? (username ? 'Click to continue to your account' : 'Enter your username to continue')
+              ? (username ? 'Click to continue to your account' : t('auth.signInToContinue'))
               : statusMessage || (authMethod === 'password' ? 'Enter your password to continue' : 'Choose how to authenticate')
             }
           </p>
@@ -279,7 +281,7 @@ export default function LoginPage() {
               /* No saved username: show input field */
               <form onSubmit={handleContinue} className="space-y-4">
                 <Input
-                  label="Username"
+                  label={t('auth.username')}
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -388,7 +390,7 @@ export default function LoginPage() {
                 
                 <Input
                   ref={passwordRef}
-                  label="Password"
+                  label={t('auth.password')}
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -412,7 +414,7 @@ export default function LoginPage() {
                   ) : (
                     <>
                       <Key size={18} weight="fill" />
-                      <span>Sign In</span>
+                      <span>{t('auth.login')}</span>
                     </>
                   )}
                 </Button>
@@ -424,7 +426,7 @@ export default function LoginPage() {
                       to="/forgot-password"
                       className="text-sm text-accent hover:text-accent/80 hover:underline transition-colors"
                     >
-                      Forgot your password?
+                      {t('auth.forgotPassword')}
                     </Link>
                   </div>
                 )}

@@ -1,5 +1,0 @@
-#!/bin/bash
-set -e
-systemctl stop ucm.service || true
-systemctl disable ucm.service || true
-exit 0
