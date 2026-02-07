@@ -1017,7 +1017,11 @@
     "dataRetention": "Data Retention",
     "exportOptions": "Export Options",
     "cleanedUpLogs": "Cleaned up {{count}} old logs",
-    "cleanupFailed": "Cleanup failed"
+    "cleanupFailed": "Cleanup failed",
+    "status": "Status",
+    "allActions": "All Actions",
+    "allStatus": "All Status",
+    "allUsers": "All Users"
   },
   "settings": {
     "appearance": {

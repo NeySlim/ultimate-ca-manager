@@ -386,20 +386,20 @@ export default function AuditLogsPage() {
   const filters = useMemo(() => [
     {
       key: 'action',
-      label: 'Action',
+      label: t('audit.action'),
       type: 'select',
       value: filterAction,
       onChange: (v) => { setFilterAction(v); setPage(1); },
-      placeholder: LABELS.FILTERS.ALL_ACTIONS,
+      placeholder: t('audit.allActions'),
       options: (actions.actions || []).map(a => ({ value: a, label: a.replace(/_/g, ' ') }))
     },
     {
       key: 'status',
-      label: 'Status',
+      label: t('audit.status'),
       type: 'select',
       value: filterSuccess,
       onChange: (v) => { setFilterSuccess(v); setPage(1); },
-      placeholder: LABELS.FILTERS.ALL_STATUS,
+      placeholder: t('audit.allStatus'),
       options: [
         { value: 'true', label: t('common.success') },
         { value: 'false', label: t('common.failed') }
@@ -407,14 +407,14 @@ export default function AuditLogsPage() {
     },
     {
       key: 'username',
-      label: 'User',
+      label: t('audit.user'),
       type: 'select',
       value: filterUsername,
       onChange: (v) => { setFilterUsername(v); setPage(1); },
-      placeholder: LABELS.FILTERS.ALL_USERS,
+      placeholder: t('audit.allUsers'),
       options: uniqueUsernames.map(u => ({ value: u, label: u }))
     }
-  ], [filterAction, filterSuccess, filterUsername, actions.actions, uniqueUsernames]);
+  ], [filterAction, filterSuccess, filterUsername, actions.actions, uniqueUsernames, t]);
 
   // Count active filters
   const activeFilters = useMemo(() => {
