@@ -1,11 +1,11 @@
 # 🗺️ UCM Roadmap
 
-**Current Version:** v2.0.0-beta1  
+**Current Version:** v2.0.0  
 **Status:** Beta Testing
 
 ---
 
-## ✅ v2.0.0-beta1 - Complete UI Rewrite (CURRENT)
+## ✅ v2.0.0 - Complete UI Rewrite (RELEASED)
 
 ### Frontend Rewrite ✅
 - ✅ **React 18 + Vite** - Modern SPA replacing HTMX
@@ -56,22 +56,22 @@
 
 ---
 
-## 🔮 v2.1.0 - Pro Features (FUTURE)
+## ✅ Pro Features (v2.0.0)
 
-### Pro Feature UIs
+### Enterprise Security ✅
+- ✅ **HSM** - PKCS#11, AWS CloudHSM, Azure Key Vault
+- ✅ **RBAC** - Custom roles and permissions
+- ✅ **SSO** - SAML, OAuth2, LDAP integration
+- ✅ **Security Dashboard** - Secrets management, anomaly detection
+
+### Coming in Pro v2.1.0
 - [ ] **Policies Page** - Certificate policy management
 - [ ] **Approval Workflows** - Multi-approver requests
-- [ ] **Webhooks Page** - Event notifications
 - [ ] **Reports Page** - Scheduled reports
 
-### Enterprise Integration (Pro)
-- [ ] **SSO** - SAML, OAuth2, LDAP (backend ready)
-- [ ] **HSM** - PKCS#11, Cloud HSM (backend ready)
-- [ ] **RBAC** - Custom roles (backend ready)
-
-### High Availability (Pro)
-- [ ] **PostgreSQL** - External database (code ready)
-- [ ] **Redis Sessions** - Distributed sessions (code ready)
+### High Availability (Planned)
+- [ ] **PostgreSQL** - External database
+- [ ] **Redis Sessions** - Distributed sessions
 
 ---
 
@@ -89,7 +89,7 @@
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| v2.0.0-beta1 | 2026-02-06 | React 18 UI, 12 themes, templates, groups |
+| v2.0.0 | 2026-02-06 | React 18 UI, 12 themes, templates, groups |
 | v1.8.3 | 2026-01-10 | Standalone mode, packaging fixes |
 | v1.7.0 | 2026-01-08 | ACME, WebAuthn |
 | v1.0.0 | 2025-12-15 | Initial release |

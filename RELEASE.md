@@ -27,10 +27,10 @@ After installation:
 
 ```bash
 # Download
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_2.0.0.beta1_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm_2.0.0_all.deb
 
 # Install
-sudo dpkg -i ucm_2.0.0.beta1_all.deb
+sudo dpkg -i ucm_2.0.0_all.deb
 
 # If dependency issues (shouldn't happen with venv approach):
 sudo apt-get install -f
@@ -40,12 +40,12 @@ sudo apt-get install -f
 
 ```bash
 # Download
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-2.0.0.beta1-1.fc43.noarch.rpm
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-2.0.0-1.fc43.noarch.rpm
 
 # Install
-sudo dnf install ./ucm-2.0.0.beta1-1.fc43.noarch.rpm
+sudo dnf install ./ucm-2.0.0-1.fc43.noarch.rpm
 # or
-sudo rpm -ivh ucm-2.0.0.beta1-1.fc43.noarch.rpm
+sudo rpm -ivh ucm-2.0.0-1.fc43.noarch.rpm
 ```
 
 ### Docker
@@ -57,7 +57,7 @@ docker run -d \
   -v ucm-data:/opt/ucm/data \
   -e SECRET_KEY=$(openssl rand -hex 32) \
   -e JWT_SECRET_KEY=$(openssl rand -hex 32) \
-  ghcr.io/neyslim/ucm:2.0.0-beta1
+  ghcr.io/neyslim/ucm:2.0.0
 ```
 
 ---
@@ -88,7 +88,7 @@ sudo cp /var/lib/ucm/ucm.db /var/lib/ucm/ucm.db.backup
 sudo cp /etc/ucm/ucm.env /etc/ucm/ucm.env.backup
 
 # Install new version
-sudo dpkg -i ucm_2.0.0.beta1_all.deb
+sudo dpkg -i ucm_2.0.0_all.deb
 
 # Check migration log
 sudo cat /var/log/ucm/migration.log
@@ -205,10 +205,10 @@ sudo -u ucm /opt/ucm/venv/bin/python -c "from migration_runner import run_all_mi
 
 ```bash
 # Frontend
-cd frontend && npm version 2.0.0-beta1
+cd frontend && npm version 2.0.0
 
 # DEB changelog
-dch -v 2.0.0~beta1 "Release notes..."
+dch -v 2.0.0 "Release notes..."
 
 # RPM spec (auto-updated by CI)
 ```
@@ -216,8 +216,8 @@ dch -v 2.0.0~beta1 "Release notes..."
 ### 2. Create Tag
 
 ```bash
-git tag v2.0.0-beta1
-git push origin v2.0.0-beta1
+git tag v2.0.0
+git push origin v2.0.0
 ```
 
 ### 3. CI/CD Pipeline
@@ -241,7 +241,7 @@ The `build-release.yml` workflow automatically:
 
 ## Changelog
 
-### v2.0.0-beta1 (2026-02-06)
+### v2.0.0 (2026-02-06)
 
 **New Features:**
 - Complete UI redesign with Radix UI components
