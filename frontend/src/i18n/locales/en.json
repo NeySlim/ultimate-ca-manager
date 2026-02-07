@@ -150,6 +150,7 @@
   "auth": {
     "login": "Sign In",
     "logout": "Sign Out",
+    "continue": "Continue",
     "username": "Username",
     "password": "Password",
     "rememberMe": "Remember me",
@@ -180,7 +181,12 @@
     "signingIn": "Signing in...",
     "signingInAs": "Signing in as",
     "trySecurityKeyAgain": "Try Security Key Again",
-    "key": "Key"
+    "key": "Key",
+    "waitingForSecurityKey": "Waiting for security key...",
+    "touchSecurityKey": "Touch your security key...",
+    "securityKeyCancelled": "Security key cancelled. Use password instead.",
+    "welcomeBackUser": "Welcome back, {{username}}!",
+    "usePasswordInstead": "Use password instead"
   },
   "dashboard": {
     "title": "Dashboard",
