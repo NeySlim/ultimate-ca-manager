@@ -19,16 +19,16 @@ import { useNotification } from '../contexts'
 import { useWebSocket, EventType } from '../hooks'
 import { formatRelativeTime } from '../lib/ui'
 
-// Default widgets configuration
+// Default widgets configuration - names are i18n keys
 const DEFAULT_WIDGETS = [
-  { id: 'stats', name: 'Statistics', visible: true },
-  { id: 'charts', name: 'Charts & Analytics', visible: true },
-  { id: 'system', name: 'System Status', visible: true },
-  { id: 'expiring', name: 'Expiring Certificates', visible: true },
-  { id: 'activity', name: 'Recent Activity', visible: true },
-  { id: 'certs', name: 'Recent Certificates', visible: true },
-  { id: 'cas', name: 'Certificate Authorities', visible: true },
-  { id: 'acme', name: 'ACME Accounts', visible: true },
+  { id: 'stats', nameKey: 'dashboard.widgetStatistics', visible: true },
+  { id: 'charts', nameKey: 'dashboard.widgetChartsAnalytics', visible: true },
+  { id: 'system', nameKey: 'dashboard.widgetSystemStatus', visible: true },
+  { id: 'expiring', nameKey: 'dashboard.widgetExpiringCertificates', visible: true },
+  { id: 'activity', nameKey: 'dashboard.widgetRecentActivity', visible: true },
+  { id: 'certs', nameKey: 'dashboard.widgetRecentCertificates', visible: true },
+  { id: 'cas', nameKey: 'dashboard.widgetCertificateAuthorities', visible: true },
+  { id: 'acme', nameKey: 'dashboard.widgetAcmeAccounts', visible: true },
 ]
 
 // Load widget preferences from localStorage
@@ -259,17 +259,17 @@ export default function DashboardPage() {
               </Button>
               <Button size="sm" variant="secondary" onClick={() => navigate('/cas?action=create')}>
                 <Plus size={14} weight="bold" />
-                Create CA
+                {t('common.createCA')}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => navigate('/csrs')}>
                 <ListChecks size={14} weight="bold" />
-                Sign CSR
+                {t('common.signCSR')}
               </Button>
               <Button 
                 size="sm" 
                 variant="ghost" 
                 onClick={loadDashboard} 
-                title="Refresh"
+                title={t('common.refresh')}
                 className="hidden md:flex"
               >
                 <ArrowsClockwise size={14} />
@@ -278,7 +278,7 @@ export default function DashboardPage() {
                 size="sm" 
                 variant="ghost" 
                 onClick={() => setShowWidgetSettings(true)} 
-                title="Customize dashboard"
+                title={t('dashboard.customizeDashboard')}
                 className="hidden md:flex"
               >
                 <SlidersHorizontal size={14} />
@@ -333,7 +333,7 @@ export default function DashboardPage() {
               icon={Lightning}
               iconColor="blue"
               title={t('dashboard.certificateActivity')}
-              subtitle="Last 7 days"
+              subtitle={t('dashboard.last7Days')}
             />
             <Card.Body className="!pt-2 !pb-2">
               <CertificateTrendChart data={certificateTrend} height={140} />
@@ -346,7 +346,7 @@ export default function DashboardPage() {
               icon={Certificate}
               iconColor="violet"
               title={t('dashboard.statusDistribution')}
-              subtitle="Current certificates"
+              subtitle={t('dashboard.currentCertificates')}
             />
             <Card.Body className="!pt-2 !pb-2">
               <StatusPieChart 
@@ -397,13 +397,13 @@ export default function DashboardPage() {
                 title={t('dashboard.recentCertificates')}
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate('/certificates')}>
-                    View all <CaretRight size={12} />
+                    {t('common.viewAll')} <CaretRight size={12} />
                   </Button>
                 }
               />
               <Card.Body className="flex-1 overflow-y-auto space-y-0.5 !pt-0">
                 {recentCerts.length === 0 ? (
-                  <EmptyWidget icon={Certificate} text="No certificates yet" />
+                  <EmptyWidget icon={Certificate} text={t('dashboard.noCertificatesYet')} />
                 ) : (
                   recentCerts.slice(0, 4).map((cert, i) => (
                     <div 
@@ -443,13 +443,13 @@ export default function DashboardPage() {
                 title={t('dashboard.recentCAs')}
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate('/cas')}>
-                    View all <CaretRight size={12} />
+                    {t('common.viewAll')} <CaretRight size={12} />
                   </Button>
                 }
               />
               <Card.Body className="flex-1 overflow-y-auto space-y-0.5 !pt-0">
                 {recentCAs.length === 0 ? (
-                  <EmptyWidget icon={ShieldCheck} text="No CAs yet" />
+                  <EmptyWidget icon={ShieldCheck} text={t('dashboard.noCAsYet')} />
                 ) : (
                   recentCAs.slice(0, 4).map((ca, i) => (
                     <div 
@@ -465,7 +465,7 @@ export default function DashboardPage() {
                           {ca.dn_commonname || ca.descr || ca.name}
                         </span>
                         <Badge variant={ca.is_root ? 'purple' : 'info'} size="sm">
-                          {ca.is_root ? 'Root' : 'Sub'}
+                          {ca.is_root ? t('dashboard.root') : t('dashboard.sub')}
                         </Badge>
                       </div>
                     </div>
@@ -481,7 +481,7 @@ export default function DashboardPage() {
               <Card.Header 
                 icon={Heartbeat}
                 iconColor="emerald"
-                title="System Health"
+                title={t('dashboard.systemHealth')}
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate('/settings')}>
                     <Gear size={14} />
@@ -492,31 +492,31 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <SystemStat 
                     icon={WifiHigh} 
-                    label="WebSocket" 
-                    value={isConnected ? 'Connected' : 'Disconnected'} 
+                    label={t('dashboard.websocket')} 
+                    value={isConnected ? t('dashboard.connected') : t('dashboard.disconnected')} 
                     status={isConnected ? 'online' : 'offline'} 
                   />
                   <SystemStat 
                     icon={Database} 
-                    label="Database" 
-                    value="Healthy" 
+                    label={t('dashboard.database')} 
+                    value={t('dashboard.healthy')} 
                     status="online" 
                   />
                   <SystemStat 
                     icon={Clock} 
-                    label="Last Update" 
+                    label={t('dashboard.lastUpdate')} 
                     value={formatRelativeTime(lastUpdate)} 
                     status="online" 
                   />
                   <SystemStat 
                     icon={Lightning} 
-                    label="API" 
-                    value="Online" 
+                    label={t('dashboard.api')} 
+                    value={t('common.online')} 
                     status="online" 
                   />
                 </div>
                 <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
-                  Services
+                  {t('dashboard.services')}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <ServiceBadge name="ACME" status={systemStatus?.acme} />
@@ -534,16 +534,16 @@ export default function DashboardPage() {
               <Card.Header 
                 icon={Globe}
                 iconColor="orange"
-                title="ACME Accounts"
+                title={t('dashboard.acmeAccounts')}
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate('/acme')}>
-                    View all <CaretRight size={12} />
+                    {t('common.viewAll')} <CaretRight size={12} />
                   </Button>
                 }
               />
               <Card.Body className="flex-1 overflow-y-auto !pt-0">
                 {recentAcme.length === 0 ? (
-                  <EmptyWidget icon={Globe} text="No ACME accounts" />
+                  <EmptyWidget icon={Globe} text={t('dashboard.noAcmeAccounts')} />
                 ) : (
                   <div className="space-y-0.5">
                     {recentAcme.slice(0, 4).map((account, i) => (
@@ -559,7 +559,7 @@ export default function DashboardPage() {
                           <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
                             {account.email || account.contact}
                           </span>
-                          <Badge variant="secondary" size="sm">{account.orders_count || 0} orders</Badge>
+                          <Badge variant="secondary" size="sm">{account.orders_count || 0} {t('dashboard.orders')}</Badge>
                         </div>
                       </div>
                     ))}
@@ -576,22 +576,22 @@ export default function DashboardPage() {
             <Card.Header 
               icon={ClockCounterClockwise}
               iconColor="teal"
-              title="Recent Activity"
-              subtitle={isConnected ? "Live updates" : undefined}
+              title={t('dashboard.recentActivity')}
+              subtitle={isConnected ? t('dashboard.liveUpdates') : undefined}
               action={
                 <div className="flex items-center gap-2">
                   {isConnected && (
                     <Badge variant="success" size="sm" dot pulse>Live</Badge>
                   )}
                   <Button size="sm" variant="ghost" onClick={() => navigate('/audit')}>
-                    View all <CaretRight size={12} />
+                    {t('common.viewAll')} <CaretRight size={12} />
                   </Button>
                 </div>
               }
             />
             <Card.Body className="flex-1 overflow-y-auto !pt-0">
               {activityLog.length === 0 ? (
-                <EmptyWidget icon={ClockCounterClockwise} text="No recent activity" />
+                <EmptyWidget icon={ClockCounterClockwise} text={t('dashboard.noRecentActivity')} />
               ) : (
                 <div className="space-y-0.5">
                   {activityLog.map((activity, i) => {
@@ -653,6 +653,7 @@ export default function DashboardPage() {
 
 // Widget Settings Modal
 function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
+  const { t } = useTranslation()
   const [localWidgets, setLocalWidgets] = useState(widgets)
   
   useEffect(() => {
@@ -678,8 +679,8 @@ function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
               <SlidersHorizontal size={18} className="text-accent-primary" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-text-primary">Customize Dashboard</h2>
-              <p className="text-xs text-text-secondary">Show or hide widgets</p>
+              <h2 className="text-base font-semibold text-text-primary">{t('dashboard.customizeDashboard')}</h2>
+              <p className="text-xs text-text-secondary">{t('dashboard.showOrHideWidgets')}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary">
@@ -700,7 +701,7 @@ function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
                 {widget.visible ? <Eye size={14} /> : <EyeSlash size={14} />}
               </div>
               <span className={`text-sm ${widget.visible ? 'text-text-primary' : 'text-text-tertiary'}`}>
-                {widget.name}
+                {t(widget.nameKey)}
               </span>
             </button>
           ))}
@@ -708,14 +709,14 @@ function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
         
         <div className="flex items-center justify-between pt-3 border-t border-border">
           <Button size="sm" variant="ghost" onClick={resetToDefaults}>
-            Reset to defaults
+            {t('common.reset')}
           </Button>
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={onClose}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button size="sm" onClick={() => onSave(localWidgets)}>
-              Save
+              {t('common.save')}
             </Button>
           </div>
         </div>

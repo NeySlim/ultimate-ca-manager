@@ -191,26 +191,26 @@ export default function ImportExportPage() {
                   label={t('importExport.opnsense.hostLabel')}
                   value={opnsenseHost}
                   onChange={(e) => setOpnsenseHost(e.target.value)}
-                  placeholder="192.168.1.1"
+                  placeholder={t('importExport.opnsense.hostPlaceholder')}
                 />
                 <Input 
                   label={t('importExport.opnsense.portLabel')}
                   value={opnsensePort}
                   onChange={(e) => setOpnsensePort(e.target.value)}
-                  placeholder="443"
+                  placeholder={t('importExport.opnsense.portPlaceholder')}
                 />
                 <Input 
                   label={t('importExport.opnsense.apiKeyLabel')}
                   value={opnsenseApiKey}
                   onChange={(e) => setOpnsenseApiKey(e.target.value)}
-                  placeholder="API Key"
+                  placeholder={t('importExport.opnsense.apiKeyPlaceholder')}
                 />
                 <Input 
                   label={t('importExport.opnsense.apiSecretLabel')}
                   type="password"
                   value={opnsenseApiSecret}
                   onChange={(e) => setOpnsenseApiSecret(e.target.value)}
-                  placeholder="API Secret"
+                  placeholder={t('importExport.opnsense.apiSecretPlaceholder')}
                 />
               </div>
             </DetailSection>

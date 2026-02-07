@@ -16,6 +16,7 @@
  *   />
  */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   Certificate, 
   Key, 
@@ -43,23 +44,6 @@ import { Button } from './Button'
 import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { cn } from '../lib/utils'
 
-// Status badge config
-const statusConfig = {
-  valid: { variant: 'success', label: 'Valid' },
-  expiring: { variant: 'warning', label: 'Expiring Soon' },
-  expired: { variant: 'danger', label: 'Expired' },
-  revoked: { variant: 'danger', label: 'Revoked' }
-}
-
-// Source badge config
-const sourceConfig = {
-  acme: { variant: 'info', label: 'ACME' },
-  scep: { variant: 'warning', label: 'SCEP' },
-  import: { variant: 'default', label: 'Imported' },
-  csr: { variant: 'default', label: 'From CSR' },
-  manual: { variant: 'default', label: 'Manual' }
-}
-
 // Format date helper
 function formatDate(dateStr, format = 'full') {
   if (!dateStr) return '—'
@@ -80,8 +64,8 @@ function formatDate(dateStr, format = 'full') {
   }
 }
 
-// Expiry indicator
-function ExpiryIndicator({ daysRemaining, validTo }) {
+// Expiry indicator - uses t from parent
+function ExpiryIndicator({ daysRemaining, validTo, t }) {
   let color = 'text-status-success'
   let bgColor = 'bg-status-success/10'
   let label = `${daysRemaining}d`
@@ -89,17 +73,17 @@ function ExpiryIndicator({ daysRemaining, validTo }) {
   if (daysRemaining <= 0) {
     color = 'text-status-danger'
     bgColor = 'bg-status-danger/10'
-    label = 'Expired'
+    label = t('common.expired')
   } else if (daysRemaining <= 7) {
     color = 'text-status-danger'
     bgColor = 'bg-status-danger/10'
-    label = `${daysRemaining}d left`
+    label = t('details.daysLeft', { count: daysRemaining })
   } else if (daysRemaining <= 30) {
     color = 'text-status-warning'
     bgColor = 'bg-status-warning/10'
-    label = `${daysRemaining}d left`
+    label = t('details.daysLeft', { count: daysRemaining })
   } else {
-    label = `${daysRemaining}d left`
+    label = t('details.daysLeft', { count: daysRemaining })
   }
   
   return (
@@ -107,7 +91,7 @@ function ExpiryIndicator({ daysRemaining, validTo }) {
       <Clock size={14} className={cn("sm:w-4 sm:h-4", color)} />
       <div>
         <div className={cn("text-xs sm:text-sm font-medium", color)}>{label}</div>
-        <div className="text-2xs sm:text-xs text-text-tertiary">Exp: {formatDate(validTo, 'short')}</div>
+        <div className="text-2xs sm:text-xs text-text-tertiary">{t('common.expires')}: {formatDate(validTo, 'short')}</div>
       </div>
     </div>
   )
@@ -126,6 +110,7 @@ export function CertificateDetails({
   showActions = true,
   showPem = true
 }) {
+  const { t } = useTranslation()
   const [pemCopied, setPemCopied] = useState(false)
   const [showFullPem, setShowFullPem] = useState(false)
   
@@ -133,6 +118,24 @@ export function CertificateDetails({
   
   const cert = certificate
   const status = cert.revoked ? 'revoked' : (cert.status || 'valid')
+  
+  // Status badge config
+  const statusConfig = {
+    valid: { variant: 'success', label: t('common.valid') },
+    expiring: { variant: 'warning', label: t('details.expiringSoon') },
+    expired: { variant: 'danger', label: t('common.expired') },
+    revoked: { variant: 'danger', label: t('common.revoked') }
+  }
+  
+  // Source badge config
+  const sourceConfig = {
+    acme: { variant: 'info', label: 'ACME' },
+    scep: { variant: 'warning', label: 'SCEP' },
+    import: { variant: 'default', label: t('details.imported') },
+    csr: { variant: 'default', label: t('details.fromCSR') },
+    manual: { variant: 'default', label: t('details.manual') }
+  }
+  
   const statusBadge = statusConfig[status] || statusConfig.valid
   const sourceBadge = sourceConfig[cert.source] || null
   
@@ -160,7 +163,7 @@ export function CertificateDetails({
       
       {/* Expiry indicator */}
       {!cert.revoked && cert.days_remaining !== undefined && (
-        <ExpiryIndicator daysRemaining={cert.days_remaining} validTo={cert.valid_to} />
+        <ExpiryIndicator daysRemaining={cert.days_remaining} validTo={cert.valid_to} t={t} />
       )}
       
       {/* Quick stats */}
@@ -172,7 +175,7 @@ export function CertificateDetails({
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
           <Lock size={14} className={cn("mx-auto mb-0.5 sm:mb-1 sm:w-4 sm:h-4", cert.has_private_key ? "text-status-success" : "text-text-tertiary")} />
-          <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.has_private_key ? 'Key' : 'No Key'}</div>
+          <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.has_private_key ? t('details.hasKey') : t('details.noKey')}</div>
           <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">
             {cert.has_private_key ? (cert.private_key_location || '—') : '—'}
           </div>
@@ -180,7 +183,7 @@ export function CertificateDetails({
         <div className="bg-bg-tertiary/50 rounded-lg p-2 sm:p-2.5 text-center">
           <ShieldCheck size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
           <div className="text-2xs sm:text-xs font-medium text-text-primary truncate">{cert.signature_algorithm?.split('-')[0] || '—'}</div>
-          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">Signature</div>
+          <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">{t('details.signature')}</div>
         </div>
       </div>
       
@@ -213,17 +216,17 @@ export function CertificateDetails({
           )}
           {/* Action buttons */}
           {onRenew && canWrite && !cert.revoked && (
-            <Button size="xs" variant="secondary" onClick={onRenew} title="Renew">
+            <Button size="xs" variant="secondary" onClick={onRenew} title={t('certificates.renewCertificate')}>
               <ArrowsClockwise size={14} />
             </Button>
           )}
           {onRevoke && canWrite && !cert.revoked && (
-            <Button size="xs" variant="warning-soft" onClick={onRevoke} title="Revoke">
+            <Button size="xs" variant="warning-soft" onClick={onRevoke} title={t('certificates.revokeCertificate')}>
               <X size={14} />
             </Button>
           )}
           {onDelete && canDelete && (
-            <Button size="xs" variant="danger-soft" onClick={onDelete} title="Delete">
+            <Button size="xs" variant="danger-soft" onClick={onDelete} title={t('common.delete')}>
               <Trash size={14} />
             </Button>
           )}
@@ -231,39 +234,39 @@ export function CertificateDetails({
       )}
       
       {/* Subject Information */}
-      <CompactSection title="Subject" icon={Globe} iconClass="icon-bg-blue">
+      <CompactSection title={t('details.subject')} icon={Globe} iconClass="icon-bg-blue">
         <CompactGrid>
-          <CompactField icon={Globe} label="Common Name" value={cert.cn || cert.common_name} />
-          <CompactField icon={Buildings} label="Organization" value={cert.organization} />
-          <CompactField autoIcon label="Org Unit" value={cert.organizational_unit} />
-          <CompactField icon={MapPin} label="Locality" value={cert.locality} />
-          <CompactField autoIcon label="State" value={cert.state} />
-          <CompactField autoIcon label="Country" value={cert.country} />
-          <CompactField icon={Envelope} label="Email" value={cert.email} colSpan={2} />
+          <CompactField icon={Globe} label={t('details.commonName')} value={cert.cn || cert.common_name} />
+          <CompactField icon={Buildings} label={t('details.organization')} value={cert.organization} />
+          <CompactField autoIcon label={t('details.orgUnit')} value={cert.organizational_unit} />
+          <CompactField icon={MapPin} label={t('details.locality')} value={cert.locality} />
+          <CompactField autoIcon label={t('details.state')} value={cert.state} />
+          <CompactField autoIcon label={t('details.country')} value={cert.country} />
+          <CompactField icon={Envelope} label={t('details.email')} value={cert.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
       
       {/* Validity Period */}
-      <CompactSection title="Validity" icon={Calendar} iconClass="icon-bg-green">
+      <CompactSection title={t('details.validity')} icon={Calendar} iconClass="icon-bg-green">
         <CompactGrid>
-          <CompactField icon={Calendar} label="Valid From" value={formatDate(cert.valid_from)} />
-          <CompactField icon={Calendar} label="Valid Until" value={formatDate(cert.valid_to)} />
+          <CompactField icon={Calendar} label={t('details.validFrom')} value={formatDate(cert.valid_from)} />
+          <CompactField icon={Calendar} label={t('details.validUntil')} value={formatDate(cert.valid_to)} />
         </CompactGrid>
       </CompactSection>
       
       {/* Technical Details */}
-      <CompactSection title="Technical Details" icon={Key} iconClass="icon-bg-purple">
+      <CompactSection title={t('details.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
-          <CompactField icon={Hash} label="Serial" value={cert.serial_number} mono copyable />
-          <CompactField autoIcon label="Key Type" value={cert.key_type} />
-          <CompactField autoIcon label="Sig Algo" value={cert.signature_algorithm} />
-          <CompactField autoIcon label="Cert Type" value={cert.cert_type} />
+          <CompactField icon={Hash} label={t('details.serial')} value={cert.serial_number} mono copyable />
+          <CompactField autoIcon label={t('details.keyType')} value={cert.key_type} />
+          <CompactField autoIcon label={t('details.sigAlgo')} value={cert.signature_algorithm} />
+          <CompactField autoIcon label={t('details.certType')} value={cert.cert_type} />
         </CompactGrid>
       </CompactSection>
       
       {/* SANs */}
       {cert.san_combined && (
-        <CompactSection title="Subject Alternative Names" icon={Globe} iconClass="icon-bg-cyan">
+        <CompactSection title={t('details.subjectAltNames')} icon={Globe} iconClass="icon-bg-cyan">
           <div className="text-xs font-mono text-text-primary break-all bg-bg-tertiary/30 p-2 rounded border border-border/50">
             {cert.san_combined}
           </div>
@@ -271,16 +274,16 @@ export function CertificateDetails({
       )}
       
       {/* Issuer */}
-      <CompactSection title="Issuer" icon={ShieldCheck} iconClass="icon-bg-orange">
+      <CompactSection title={t('details.issuer')} icon={ShieldCheck} iconClass="icon-bg-orange">
         <CompactGrid cols={1}>
-          <CompactField autoIcon label="Issuer" value={cert.issuer} mono />
-          <CompactField autoIcon label="CA" value={cert.issuer_name} />
-          <CompactField autoIcon label="CA Reference" value={cert.caref} mono copyable />
+          <CompactField autoIcon label={t('details.issuer')} value={cert.issuer} mono />
+          <CompactField autoIcon label={t('details.ca')} value={cert.issuer_name} />
+          <CompactField autoIcon label={t('details.caReference')} value={cert.caref} mono copyable />
         </CompactGrid>
       </CompactSection>
       
       {/* Thumbprints */}
-      <CompactSection title="Fingerprints" icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
+      <CompactSection title={t('details.fingerprints')} icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
         <CompactGrid cols={1}>
           <CompactField autoIcon label="SHA-1" value={cert.thumbprint_sha1} mono copyable />
           <CompactField autoIcon label="SHA-256" value={cert.thumbprint_sha256} mono copyable />
@@ -289,7 +292,7 @@ export function CertificateDetails({
       
       {/* PEM */}
       {showPem && cert.pem && (
-        <CompactSection title="PEM Certificate" icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
+        <CompactSection title={t('details.pemCertificate')} icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
               "text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto border border-border/30",
@@ -311,7 +314,7 @@ export function CertificateDetails({
                 setShowFullPem(!showFullPem)
               }}
             >
-              {showFullPem ? 'Show Less' : 'Show Full'}
+              {showFullPem ? t('details.showLess') : t('details.showFull')}
             </Button>
             <Button 
               type="button"
@@ -325,7 +328,7 @@ export function CertificateDetails({
               }}
             >
               {pemCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
-              {pemCopied ? 'Copied!' : 'Copy PEM'}
+              {pemCopied ? t('common.copied') : t('details.copyPem')}
             </Button>
           </div>
         </CompactSection>
@@ -333,28 +336,28 @@ export function CertificateDetails({
       
       {/* Revocation info */}
       {cert.revoked && (
-        <CompactSection title="Revocation Details">
+        <CompactSection title={t('details.revocationDetails')}>
           <div className="bg-status-danger/10 border border-status-danger/20 rounded-lg p-3">
             <div className="flex items-center gap-2 text-status-danger mb-2">
               <X size={16} />
-              <span className="font-medium">This certificate has been revoked</span>
+              <span className="font-medium">{t('details.certificateRevoked')}</span>
             </div>
             <CompactGrid>
-              <CompactField label="Revoked At" value={formatDate(cert.revoked_at)} />
-              <CompactField label="Reason" value={cert.revoke_reason || 'Unspecified'} />
+              <CompactField label={t('details.revokedAt')} value={formatDate(cert.revoked_at)} />
+              <CompactField label={t('details.reason')} value={cert.revoke_reason || t('details.unspecified')} />
             </CompactGrid>
           </div>
         </CompactSection>
       )}
       
       {/* Metadata */}
-      <CompactSection title="Metadata" collapsible defaultOpen={false}>
+      <CompactSection title={t('details.metadata')} collapsible defaultOpen={false}>
         <CompactGrid>
-          <CompactField label="Created" value={formatDate(cert.created_at)} />
-          <CompactField label="Created By" value={cert.created_by} />
-          <CompactField label="Source" value={cert.source} />
-          <CompactField label="Imported From" value={cert.imported_from} />
-          <CompactField label="Reference ID" value={cert.refid} mono copyable colSpan={2} />
+          <CompactField label={t('details.created')} value={formatDate(cert.created_at)} />
+          <CompactField label={t('details.createdBy')} value={cert.created_by} />
+          <CompactField label={t('details.source')} value={cert.source} />
+          <CompactField label={t('details.importedFrom')} value={cert.imported_from} />
+          <CompactField label={t('details.referenceId')} value={cert.refid} mono copyable colSpan={2} />
         </CompactGrid>
       </CompactSection>
     </div>

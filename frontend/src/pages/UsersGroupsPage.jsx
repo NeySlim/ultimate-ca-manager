@@ -928,7 +928,7 @@ function UserForm({ user, onSubmit, onCancel }) {
         onChange={(e) => setFormData(p => ({ ...p, username: e.target.value }))}
         required
         disabled={!!user}
-        placeholder="johndoe"
+        placeholder={t('users.usernamePlaceholder')}
       />
       <Input
         label={t('users.email')}
@@ -936,13 +936,13 @@ function UserForm({ user, onSubmit, onCancel }) {
         value={formData.email}
         onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
         required
-        placeholder="john@example.com"
+        placeholder={t('users.emailPlaceholder')}
       />
       <Input
         label={t('common.name')}
         value={formData.full_name}
         onChange={(e) => setFormData(p => ({ ...p, full_name: e.target.value }))}
-        placeholder="John Doe"
+        placeholder={t('users.namePlaceholder')}
       />
       <Input
         label={user ? t('account.newPassword') : t('auth.password')}
@@ -950,7 +950,7 @@ function UserForm({ user, onSubmit, onCancel }) {
         value={formData.password}
         onChange={(e) => setFormData(p => ({ ...p, password: e.target.value }))}
         required={!user}
-        placeholder="••••••••"
+        placeholder={t('users.passwordPlaceholder')}
         showStrength={!user}
       />
       <Select
@@ -1016,13 +1016,13 @@ function GroupForm({ group, onSubmit, onCancel }) {
         value={formData.name}
         onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
         required
-        placeholder="developers"
+        placeholder={t('groups.namePlaceholder')}
       />
       <Input
         label={t('common.description')}
         value={formData.description}
         onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
-        placeholder="Development team"
+        placeholder={t('groups.descriptionPlaceholder')}
       />
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>

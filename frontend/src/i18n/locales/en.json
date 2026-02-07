@@ -103,7 +103,10 @@
     "days": "days",
     "deleteOldLogs": "Delete Old Logs",
     "clientInfo": "Client Information",
-    "exportedFormat": "Exported as {{format}}"
+    "exportedFormat": "Exported as {{format}}",
+    "viewAll": "View all",
+    "createCA": "Create CA",
+    "signCSR": "Sign CSR"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -143,7 +146,20 @@
     "enterCode": "Enter verification code",
     "verifyCode": "Verify",
     "useSecurityKey": "Use security key",
-    "useBackupCode": "Use backup code"
+    "useBackupCode": "Use backup code",
+    "enterUsername": "Enter your username",
+    "enterPassword": "Enter your password",
+    "newPassword": "New Password",
+    "minCharacters": "Minimum 8 characters",
+    "confirmPassword": "Confirm Password",
+    "reenterPassword": "Re-enter password",
+    "emailAddress": "Email Address",
+    "emailPlaceholder": "you@example.com",
+    "clickToContinue": "Click to continue to your account",
+    "enterPasswordToContinue": "Enter your password to continue",
+    "chooseAuthMethod": "Choose how to authenticate",
+    "continueAs": "Continue as",
+    "useDifferentAccount": "Use a different account"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -165,7 +181,34 @@
     "issuesDetected": "Issues detected",
     "lastUpdated": "Last updated",
     "liveUpdates": "Live updates",
-    "viewInCertificates": "View in Certificates"
+    "viewInCertificates": "View in Certificates",
+    "last7Days": "Last 7 days",
+    "currentCertificates": "Current certificates",
+    "noCertificatesYet": "No certificates yet",
+    "noCAsYet": "No CAs yet",
+    "noAcmeAccounts": "No ACME accounts",
+    "noRecentActivity": "No recent activity",
+    "services": "Services",
+    "acmeAccounts": "ACME Accounts",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "healthy": "Healthy",
+    "websocket": "WebSocket",
+    "database": "Database",
+    "lastUpdate": "Last Update",
+    "api": "API",
+    "root": "Root",
+    "sub": "Sub",
+    "orders": "orders",
+    "widgetStatistics": "Statistics",
+    "widgetChartsAnalytics": "Charts & Analytics",
+    "widgetSystemStatus": "System Status",
+    "widgetExpiringCertificates": "Expiring Certificates",
+    "widgetRecentActivity": "Recent Activity",
+    "widgetRecentCertificates": "Recent Certificates",
+    "widgetCertificateAuthorities": "Certificate Authorities",
+    "widgetAcmeAccounts": "ACME Accounts",
+    "showOrHideWidgets": "Show or hide widgets"
   },
   "certificates": {
     "title": "Certificates",
@@ -215,7 +258,11 @@
     "timeline": "Timeline",
     "signingDetails": "Signing Details",
     "fingerprints": "Fingerprints",
-    "notes": "Notes"
+    "notes": "Notes",
+    "privateKeyPEM": "Private Key (PEM)",
+    "commonNamePlaceholder": "example.com",
+    "sanPlaceholder": "DNS:example.com\nDNS:www.example.com\nIP:192.168.1.1",
+    "validityPlaceholder": "365"
   },
   "cas": {
     "title": "Certificate Authorities",
@@ -260,7 +307,12 @@
     "algorithm": "Algorithm",
     "signature": "Signature",
     "validity": "Validity",
-    "certificateCount": "{{count}} certificates"
+    "certificateCount": "{{count}} certificates",
+    "cnPlaceholder": "My Certificate Authority",
+    "orgPlaceholder": "My Company",
+    "countryPlaceholder": "US",
+    "statePlaceholder": "California",
+    "localityPlaceholder": "San Francisco"
   },
   "csrs": {
     "title": "Certificate Signing Requests",
@@ -410,7 +462,13 @@
     "commonName": "Common Name (CN)",
     "new": "New",
     "update": "Update",
-    "allTypes": "All Types"
+    "allTypes": "All Types",
+    "namePlaceholder": "e.g., Web Server Certificate",
+    "descriptionPlaceholder": "Brief description of this template",
+    "countryPlaceholder": "US",
+    "statePlaceholder": "California",
+    "orgPlaceholder": "Example Corp",
+    "cnPlaceholder": "*.example.com"
   },
   "users": {
     "title": "Users",
@@ -432,7 +490,11 @@
     "enable2FA": "Enable 2FA",
     "disable2FA": "Disable 2FA",
     "deactivate": "Deactivate",
-    "activate": "Activate"
+    "activate": "Activate",
+    "usernamePlaceholder": "johndoe",
+    "emailPlaceholder": "john@example.com",
+    "namePlaceholder": "John Doe",
+    "passwordPlaceholder": "••••••••"
   },
   "groups": {
     "title": "Groups",
@@ -443,7 +505,9 @@
     "groupName": "Group Name",
     "members": "Members",
     "permissions": "Permissions",
-    "noGroups": "No groups found"
+    "noGroups": "No groups found",
+    "namePlaceholder": "developers",
+    "descriptionPlaceholder": "Development team"
   },
   "acme": {
     "title": "ACME Protocol",
@@ -539,7 +603,8 @@
     "validTo": "Valid To",
     "acmeOrder": "ACME Order",
     "account": "Account",
-    "orderStatus": "Order Status"
+    "orderStatus": "Order Status",
+    "emailPlaceholder": "admin@example.com"
   },
   "scep": {
     "title": "SCEP Protocol",
@@ -719,7 +784,8 @@
     "bestPractices": "Best Practices",
     "bestPracticesDesc": "Only add certificates from trusted sources. Regularly review and remove expired or unnecessary certificates to maintain security.",
     "securityNote": "Security Note",
-    "securityNoteDesc": "Certificates in the Trust Store can validate any certificate chain. Be careful when adding third-party certificates."
+    "securityNoteDesc": "Certificates in the Trust Store can validate any certificate chain. Be careful when adding third-party certificates.",
+    "sha256": "SHA-256"
   },
   "importExport": {
     "title": "Import / Export",
@@ -748,7 +814,11 @@
       "connectedSuccessfully": "Connected successfully",
       "foundCertificates": "Found {{count}} certificates available for import",
       "connectionFailed": "Connection failed. Check your credentials.",
-      "configSaved": "Configuration saved"
+      "configSaved": "Configuration saved",
+      "hostPlaceholder": "192.168.1.1",
+      "portPlaceholder": "443",
+      "apiKeyPlaceholder": "API Key",
+      "apiSecretPlaceholder": "API Secret"
     },
     "export": {
       "allCertsTitle": "Export All Certificates",
@@ -901,7 +971,9 @@
     "helpCsrDecoder": "Paste a CSR (Certificate Signing Request) in PEM format to see its contents including subject, public key type/size, and any requested extensions like SANs.",
     "helpCertDecoder": "Paste a certificate in PEM format to see all details: subject, issuer, validity dates, extensions, key usage, fingerprints, and more.",
     "helpKeyMatcher": "Verify that a private key, certificate, and/or CSR belong together by comparing their public keys. Useful before installing certificates.",
-    "helpConverter": "Convert certificates and keys between formats: PEM ↔ DER, PEM → PKCS12 (requires key), PEM → PKCS7. Download the converted file directly."
+    "helpConverter": "Convert certificates and keys between formats: PEM ↔ DER, PEM → PKCS12 (requires key), PEM → PKCS7. Download the converted file directly.",
+    "hostnamePlaceholder": "example.com",
+    "portPlaceholder": "443"
   },
   "audit": {
     "title": "Audit Logs",
@@ -917,7 +989,11 @@
     "cleanupLogs": "Cleanup Old Logs",
     "filterByAction": "Filter by action",
     "filterByUser": "Filter by user",
-    "dateRange": "Date range"
+    "dateRange": "Date range",
+    "aboutAuditLogs": "About Audit Logs",
+    "filteringSearch": "Filtering & Search",
+    "dataRetention": "Data Retention",
+    "exportOptions": "Export Options"
   },
   "settings": {
     "title": "Settings",
@@ -979,7 +1055,7 @@
     "generalSubtitle": "System name, URL, timezone configuration",
     "systemConfiguration": "System Configuration",
     "sessionTimezone": "Session & Timezone",
-    "sessionTimeout": "Session Timeout (minutes)",
+    "sessionTimeout": "Session Timeout",
     "smtpServer": "SMTP Server",
     "smtpHost": "SMTP Host",
     "smtpPort": "SMTP Port",
@@ -1003,7 +1079,6 @@
     "requireUppercase": "Require uppercase letters",
     "requireNumbers": "Require numbers",
     "requireSpecial": "Require special characters",
-    "sessionTimeout": "Session Timeout",
     "maxLoginAttempts": "Max Login Attempts",
     "lockoutDuration": "Lockout Duration",
     "twoFactorAuth": "Two-Factor Authentication",
@@ -1113,7 +1188,18 @@
     "updateAvailable": "Update available",
     "saveChanges": "Save Changes",
     "changesSaved": "Settings saved successfully",
-    "loadingSettings": "Loading settings..."
+    "loadingSettings": "Loading settings...",
+    "color": "Color",
+    "baseUrlPlaceholder": "https://ucm.example.com",
+    "smtpHostPlaceholder": "smtp.example.com",
+    "passwordPlaceholder": "••••••••",
+    "fromEmailPlaceholder": "noreply@example.com",
+    "helpGeneral": "General Settings",
+    "helpEmail": "Email Configuration",
+    "helpSecurity": "Security Settings",
+    "helpBackup": "Backup & Restore",
+    "helpDatabase": "Database Management",
+    "helpHttps": "HTTPS Certificate"
   },
   "account": {
     "title": "My Account",
@@ -1220,7 +1306,9 @@
     "expires": "Expires",
     "deleteAccount": "Delete Account",
     "deactivateAccount": "Deactivate Account",
-    "loadingAccount": "Loading account..."
+    "loadingAccount": "Loading account...",
+    "daysPlaceholder": "365",
+    "codePlaceholder": "000000"
   },
   "rbac": {
     "title": "Role-Based Access Control",
@@ -1454,7 +1542,10 @@
     "networkError": "Network error. Please check your connection.",
     "unauthorized": "Unauthorized. Please log in.",
     "notFound": "Resource not found",
-    "serverError": "Server error. Please try again."
+    "serverError": "Server error. Please try again.",
+    "certificatesExpiredAndExpiring": "{{expired}} certificate(s) expired and {{expiring}} expiring soon",
+    "certificatesExpired": "{{count}} certificate(s) expired",
+    "certificatesExpiringSoon": "{{count}} certificate(s) expiring soon"
   },
   "help": {
     "aboutCertificates": "About Certificates",
@@ -1498,5 +1589,156 @@
     "maxLength": "Maximum {{count}} characters",
     "passwordMismatch": "Passwords do not match",
     "invalidFormat": "Invalid format"
+  },
+  "details": {
+    "subject": "Subject",
+    "issuer": "Issuer",
+    "validity": "Validity",
+    "technicalDetails": "Technical Details",
+    "fingerprints": "Fingerprints",
+    "pemCertificate": "PEM Certificate",
+    "metadata": "Metadata",
+    "subjectAltNames": "Subject Alternative Names",
+    "revocationDetails": "Revocation Details",
+    "revocationConfig": "Revocation Configuration",
+    "commonName": "Common Name",
+    "organization": "Organization",
+    "orgUnit": "Org Unit",
+    "locality": "Locality",
+    "state": "State",
+    "stateProvince": "State/Province",
+    "country": "Country",
+    "email": "Email",
+    "validFrom": "Valid From",
+    "validUntil": "Valid Until",
+    "keyType": "Key Type",
+    "keySize": "Key Size",
+    "keyAlgorithm": "Key Algorithm",
+    "signature": "Signature",
+    "sigAlgo": "Signature Algorithm",
+    "serial": "Serial",
+    "serialNumber": "Serial Number",
+    "signatureAlgorithm": "Signature Algorithm",
+    "certType": "Certificate Type",
+    "subjectDN": "Subject DN",
+    "issuerDN": "Issuer DN",
+    "created": "Created",
+    "createdAt": "Created At",
+    "createdBy": "Created By",
+    "signedAt": "Signed At",
+    "signedBy": "Signed By",
+    "importedFrom": "Imported From",
+    "source": "Source",
+    "referenceId": "Reference ID",
+    "privateKey": "Private Key",
+    "available": "Available",
+    "hasKey": "Has Key",
+    "noKey": "No Key",
+    "ca": "CA",
+    "caReference": "CA Reference",
+    "endEntity": "End Entity",
+    "intermediate": "Intermediate",
+    "daysRemaining": "{{count}} days remaining until expiry",
+    "daysLeft": "{{count}}d left",
+    "expiredDaysAgo": "Certificate expired {{count}} days ago",
+    "expiringSoon": "Expiring Soon",
+    "showLess": "Show Less",
+    "showFull": "Show Full",
+    "copyPem": "Copy PEM",
+    "csrPem": "CSR PEM",
+    "imported": "Imported",
+    "fromCSR": "From CSR",
+    "manual": "Manual",
+    "certificateRevoked": "This certificate has been revoked",
+    "revokedAt": "Revoked At",
+    "reason": "Reason",
+    "unspecified": "Unspecified",
+    "dnsNames": "DNS Names",
+    "ipAddresses": "IP Addresses",
+    "sans": "SANs",
+    "crlDistPoint": "CRL Distribution Point",
+    "ocspUrl": "OCSP URL",
+    "addedAt": "Added At",
+    "addedBy": "Added By",
+    "notes": "Notes"
+  },
+  "settings": {
+    "appearance": {
+      "theme": "Theme",
+      "colorTheme": "Color Theme",
+      "appearance": "Appearance",
+      "followSystem": "Follow System",
+      "dark": "Dark",
+      "light": "Light"
+    }
+  },
+  "compare": {
+    "title": "Compare Certificates",
+    "subtitle": "Side by side comparison",
+    "selectCertificate": "Select a certificate...",
+    "certificateA": "Certificate A",
+    "certificateB": "Certificate B",
+    "swap": "Swap certificates",
+    "field": "Field",
+    "identical": "Identical",
+    "differences": "{{count}} difference",
+    "differences_plural": "{{count}} differences",
+    "identicalDescription": "These certificates have identical properties",
+    "differencesDescription": "Differences are highlighted in orange",
+    "selectTwoToCompare": "Select two certificates to compare"
+  },
+  "members": {
+    "manageMembers": "Manage Members",
+    "availableUsers": "Available Users",
+    "groupMembers": "Group Members",
+    "addAll": "Add all",
+    "addSelected": "Add selected",
+    "removeSelected": "Remove selected",
+    "removeAll": "Remove all",
+    "noMatchingUsers": "No matching users",
+    "allUsersAreMembers": "All users are members",
+    "noMatchingMembers": "No matching members",
+    "noMembersYet": "No members yet",
+    "dragOrUseButtons": "Drag users between lists or use the buttons"
+  },
+  "session": {
+    "expiring": "Session Expiring",
+    "willExpireIn": "Your session will expire in",
+    "clickToContinue": "Click below to continue working, or you'll be logged out automatically.",
+    "logOutNow": "Log Out Now",
+    "stayLoggedIn": "Stay Logged In"
+  },
+  "password": {
+    "changeRequired": "Password Change Required",
+    "securityReason": "For security reasons, you must change your password before continuing.",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm New Password",
+    "changePassword": "Change Password",
+    "currentRequired": "Current password is required",
+    "newRequired": "New password is required",
+    "minLength": "Password must be at least 8 characters",
+    "mustBeDifferent": "New password must be different from current",
+    "noMatch": "Passwords do not match",
+    "incorrect": "Incorrect password",
+    "changeSuccess": "Password changed successfully",
+    "changeFailed": "Failed to change password"
+  },
+  "import": {
+    "smartImport": "Smart Import",
+    "encrypted": "Encrypted",
+    "hasMatchingKey": "Has matching key"
+  },
+  "trustStore": {
+    "caTrust": "CA Trust",
+    "caTrustDesc": "Trusted for issuing certificates",
+    "tlsTrust": "TLS Trust",
+    "tlsTrustDesc": "Trusted for TLS/SSL connections",
+    "codeSigning": "Code Signing",
+    "codeSigningDesc": "Trusted for code signing",
+    "emailTrust": "Email",
+    "emailTrustDesc": "Trusted for S/MIME",
+    "clientAuth": "Client Auth",
+    "clientAuthDesc": "Trusted for client authentication"
   }
 }

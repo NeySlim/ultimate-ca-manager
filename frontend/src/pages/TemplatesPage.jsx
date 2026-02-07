@@ -640,7 +640,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
           label={t('templates.templateName')}
           value={formData.name}
           onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
-          placeholder="e.g., Web Server Certificate"
+          placeholder={t('templates.namePlaceholder')}
           required
         />
         <Select
@@ -658,7 +658,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
         label={t('common.description')}
         value={formData.description}
         onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))}
-        placeholder="Brief description of this template"
+        placeholder={t('templates.descriptionPlaceholder')}
         rows={2}
       />
 
@@ -686,25 +686,25 @@ function TemplateForm({ template, onSubmit, onCancel }) {
             label={t('templates.country')}
             value={formData.subject.C}
             onChange={(e) => updateSubject('C', e.target.value)}
-            placeholder="US"
+            placeholder={t('templates.countryPlaceholder')}
           />
           <Input
             label={t('templates.state')}
             value={formData.subject.ST}
             onChange={(e) => updateSubject('ST', e.target.value)}
-            placeholder="California"
+            placeholder={t('templates.statePlaceholder')}
           />
           <Input
             label={t('templates.organization')}
             value={formData.subject.O}
             onChange={(e) => updateSubject('O', e.target.value)}
-            placeholder="Example Corp"
+            placeholder={t('templates.orgPlaceholder')}
           />
           <Input
             label={t('templates.commonName')}
             value={formData.subject.CN}
             onChange={(e) => updateSubject('CN', e.target.value)}
-            placeholder="*.example.com"
+            placeholder={t('templates.cnPlaceholder')}
           />
         </div>
       </div>

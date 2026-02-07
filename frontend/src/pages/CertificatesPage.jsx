@@ -801,7 +801,7 @@ export default function CertificatesPage() {
             {t('common.upload')} <strong>{selectedCert?.cn || selectedCert?.common_name}</strong>
           </p>
           <Textarea
-            label="Private Key (PEM)"
+            label={t('certificates.privateKeyPEM')}
             value={keyPem}
             onChange={(e) => setKeyPem(e.target.value)}
             placeholder="-----BEGIN PRIVATE KEY-----
@@ -921,7 +921,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
       
       <Input 
         label={t('certificates.commonName')} 
-        placeholder="example.com"
+        placeholder={t('certificates.commonNamePlaceholder')}
         value={formData.common_name}
         onChange={(e) => setFormData(prev => ({ ...prev, common_name: e.target.value }))}
         required
@@ -929,7 +929,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
       
       <Textarea 
         label={t('certificates.san')} 
-        placeholder="DNS:example.com&#10;DNS:www.example.com&#10;IP:192.168.1.1" 
+        placeholder={t('certificates.sanPlaceholder')} 
         rows={3}
         value={formData.san}
         onChange={(e) => setFormData(prev => ({ ...prev, san: e.target.value }))}
@@ -967,7 +967,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel, t }) {
       <Input 
         label={t('certificates.validityPeriod') + ' (' + t('certificates.days') + ')'} 
         type="number"
-        placeholder="365"
+        placeholder={t('certificates.validityPlaceholder')}
         value={formData.validity_days}
         onChange={(e) => setFormData(prev => ({ ...prev, validity_days: e.target.value }))}
       />

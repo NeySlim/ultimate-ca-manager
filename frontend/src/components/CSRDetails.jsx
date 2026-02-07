@@ -5,6 +5,7 @@
  * Uses global Compact components for consistent styling.
  */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   FileText, 
   Key, 
@@ -48,12 +49,12 @@ function formatDate(dateStr, format = 'full') {
 }
 
 // Status configuration
-const statusConfig = {
-  pending: { variant: 'warning', label: 'Pending' },
-  approved: { variant: 'success', label: 'Approved' },
-  rejected: { variant: 'danger', label: 'Rejected' },
-  signed: { variant: 'success', label: 'Signed' }
-}
+const getStatusConfig = (t) => ({
+  pending: { variant: 'warning', label: t('common.pending') },
+  approved: { variant: 'success', label: t('common.approved') },
+  rejected: { variant: 'danger', label: t('common.rejected') },
+  signed: { variant: 'success', label: t('csrs.signed') }
+})
 
 export function CSRDetails({ 
   csr,
@@ -66,6 +67,7 @@ export function CSRDetails({
   showActions = true,
   showPem = true
 }) {
+  const { t } = useTranslation()
   const [showFullPem, setShowFullPem] = useState(false)
   const [pemCopied, setPemCopied] = useState(false)
   
@@ -73,6 +75,7 @@ export function CSRDetails({
   
   const status = csr.status?.toLowerCase() || 'pending'
   const isPending = status === 'pending'
+  const statusConfig = getStatusConfig(t)
   
   return (
     <div className="space-y-4 p-4">
@@ -97,17 +100,17 @@ export function CSRDetails({
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-2xs text-text-tertiary">Key Type</div>
+          <div className="text-2xs text-text-tertiary">{t('details.keyType')}</div>
           <div className="text-xs font-medium text-text-primary">{csr.key_type || csr.key_algorithm || 'N/A'}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Hash size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-2xs text-text-tertiary">Key Size</div>
+          <div className="text-2xs text-text-tertiary">{t('details.keySize')}</div>
           <div className="text-xs font-medium text-text-primary">{csr.key_size || 'N/A'}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <FileText size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-2xs text-text-tertiary">Signature</div>
+          <div className="text-2xs text-text-tertiary">{t('details.signature')}</div>
           <div className="text-xs font-medium text-text-primary">{csr.signature_algorithm || 'N/A'}</div>
         </div>
       </div>
@@ -117,17 +120,17 @@ export function CSRDetails({
         <div className="flex gap-2 flex-wrap">
           {onSign && canWrite && (
             <Button size="sm" variant="primary" onClick={onSign}>
-              <Check size={14} /> Sign CSR
+              <Check size={14} /> {t('csrs.signCSR')}
             </Button>
           )}
           {onReject && canWrite && (
             <Button size="sm" variant="danger" onClick={onReject}>
-              <Trash size={14} /> Reject
+              <Trash size={14} /> {t('csrs.rejectCSR')}
             </Button>
           )}
           {onDownload && (
             <Button size="sm" variant="secondary" onClick={onDownload}>
-              <Download size={14} /> Download CSR
+              <Download size={14} /> {t('csrs.downloadCSR')}
             </Button>
           )}
           {onDelete && canDelete && (
@@ -139,59 +142,59 @@ export function CSRDetails({
       )}
       
       {/* Subject Information */}
-      <CompactSection title="Subject">
+      <CompactSection title={t('details.subject')}>
         <CompactGrid>
-          <CompactField icon={Globe} label="Common Name" value={csr.common_name || csr.cn} />
-          <CompactField icon={Buildings} label="Organization" value={csr.organization || csr.o} />
-          <CompactField label="Org Unit" value={csr.organizational_unit || csr.ou} />
-          <CompactField icon={MapPin} label="Locality" value={csr.locality || csr.l} />
-          <CompactField label="State" value={csr.state || csr.st} />
-          <CompactField label="Country" value={csr.country || csr.c} />
-          <CompactField icon={Envelope} label="Email" value={csr.email} colSpan={2} />
+          <CompactField icon={Globe} label={t('details.commonName')} value={csr.common_name || csr.cn} />
+          <CompactField icon={Buildings} label={t('details.organization')} value={csr.organization || csr.o} />
+          <CompactField label={t('details.orgUnit')} value={csr.organizational_unit || csr.ou} />
+          <CompactField icon={MapPin} label={t('details.locality')} value={csr.locality || csr.l} />
+          <CompactField label={t('details.state')} value={csr.state || csr.st} />
+          <CompactField label={t('details.country')} value={csr.country || csr.c} />
+          <CompactField icon={Envelope} label={t('details.email')} value={csr.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
       
       {/* Subject Alternative Names */}
       {(csr.san || csr.sans || csr.san_dns || csr.san_ip) && (
-        <CompactSection title="Subject Alternative Names">
+        <CompactSection title={t('details.subjectAltNames')}>
           <CompactGrid cols={1}>
             {csr.san_dns && csr.san_dns.length > 0 && (
               <CompactField 
                 icon={Globe} 
-                label="DNS Names" 
+                label={t('details.dnsNames')} 
                 value={Array.isArray(csr.san_dns) ? csr.san_dns.join(', ') : csr.san_dns} 
               />
             )}
             {csr.san_ip && csr.san_ip.length > 0 && (
               <CompactField 
                 icon={ListBullets} 
-                label="IP Addresses" 
+                label={t('details.ipAddresses')} 
                 value={Array.isArray(csr.san_ip) ? csr.san_ip.join(', ') : csr.san_ip} 
               />
             )}
             {csr.san && !csr.san_dns && !csr.san_ip && (
-              <CompactField icon={ListBullets} label="SANs" value={csr.san} />
+              <CompactField icon={ListBullets} label={t('details.sans')} value={csr.san} />
             )}
             {csr.sans && (
-              <CompactField icon={ListBullets} label="SANs" value={csr.sans} />
+              <CompactField icon={ListBullets} label={t('details.sans')} value={csr.sans} />
             )}
           </CompactGrid>
         </CompactSection>
       )}
       
       {/* Technical Details */}
-      <CompactSection title="Technical Details">
+      <CompactSection title={t('details.technicalDetails')}>
         <CompactGrid>
-          <CompactField icon={Key} label="Key Algorithm" value={csr.key_algorithm || csr.key_type} />
-          <CompactField label="Key Size" value={csr.key_size} />
-          <CompactField label="Sig Algo" value={csr.signature_algorithm} />
-          <CompactField label="Subject DN" value={csr.subject} mono colSpan={2} />
+          <CompactField icon={Key} label={t('details.keyAlgorithm')} value={csr.key_algorithm || csr.key_type} />
+          <CompactField label={t('details.keySize')} value={csr.key_size} />
+          <CompactField label={t('details.sigAlgo')} value={csr.signature_algorithm} />
+          <CompactField label={t('details.subjectDN')} value={csr.subject} mono colSpan={2} />
         </CompactGrid>
       </CompactSection>
       
       {/* PEM */}
       {showPem && csr.pem && (
-        <CompactSection title="CSR PEM" collapsible defaultOpen={false}>
+        <CompactSection title={t('details.csrPem')} collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
               "text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
@@ -213,7 +216,7 @@ export function CSRDetails({
                 setShowFullPem(!showFullPem)
               }}
             >
-              {showFullPem ? 'Show Less' : 'Show Full'}
+              {showFullPem ? t('details.showLess') : t('details.showFull')}
             </Button>
             <Button 
               type="button"
@@ -227,19 +230,19 @@ export function CSRDetails({
               }}
             >
               {pemCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
-              {pemCopied ? 'Copied!' : 'Copy PEM'}
+              {pemCopied ? t('common.copied') : t('details.copyPem')}
             </Button>
           </div>
         </CompactSection>
       )}
       
       {/* Metadata */}
-      <CompactSection title="Metadata" collapsible defaultOpen={false}>
+      <CompactSection title={t('details.metadata')} collapsible defaultOpen={false}>
         <CompactGrid>
-          <CompactField icon={Calendar} label="Created At" value={formatDate(csr.created_at)} />
-          <CompactField label="Created By" value={csr.created_by} />
-          <CompactField label="Signed At" value={csr.signed_at ? formatDate(csr.signed_at) : null} />
-          <CompactField label="Signed By" value={csr.signed_by} />
+          <CompactField icon={Calendar} label={t('details.createdAt')} value={formatDate(csr.created_at)} />
+          <CompactField label={t('details.createdBy')} value={csr.created_by} />
+          <CompactField label={t('details.signedAt')} value={csr.signed_at ? formatDate(csr.signed_at) : null} />
+          <CompactField label={t('details.signedBy')} value={csr.signed_by} />
         </CompactGrid>
       </CompactSection>
     </div>

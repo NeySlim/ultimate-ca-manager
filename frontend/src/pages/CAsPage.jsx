@@ -393,7 +393,7 @@ export default function CAsPage() {
                           ? 'bg-accent-primary text-white' 
                           : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
                       )}
-                      title="Hierarchical view"
+                      title={t('cas.hierarchyView')}
                     >
                       <TreeStructure size={14} weight={viewMode === 'tree' ? 'fill' : 'regular'} />
                     </button>
@@ -405,7 +405,7 @@ export default function CAsPage() {
                           ? 'bg-accent-primary text-white' 
                           : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
                       )}
-                      title="List view"
+                      title={t('cas.listView')}
                     >
                       <List size={14} weight={viewMode === 'list' ? 'fill' : 'regular'} />
                     </button>
@@ -556,14 +556,14 @@ export default function CAsPage() {
         <form onSubmit={handleCreateCA} className="space-y-6 p-4">
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-text-primary">{t('cas.subjectInfo')}</h3>
-            <Input name="commonName" label={t('certificates.commonName') + ' (CN)'} placeholder="My Certificate Authority" required />
+            <Input name="commonName" label={t('certificates.commonName') + ' (CN)'} placeholder={t('cas.cnPlaceholder')} required />
             <div className="grid grid-cols-2 gap-4">
-              <Input name="organization" label={t('cas.organization') + ' (O)'} placeholder="My Company" />
-              <Input name="country" label={t('cas.country') + ' (C)'} placeholder="US" maxLength={2} />
+              <Input name="organization" label={t('cas.organization') + ' (O)'} placeholder={t('cas.orgPlaceholder')} />
+              <Input name="country" label={t('cas.country') + ' (C)'} placeholder={t('cas.countryPlaceholder')} maxLength={2} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Input name="state" label={t('cas.stateProvince') + ' (ST)'} placeholder="California" />
-              <Input name="locality" label={t('cas.locality') + ' (L)'} placeholder="San Francisco" />
+              <Input name="state" label={t('cas.stateProvince') + ' (ST)'} placeholder={t('cas.statePlaceholder')} />
+              <Input name="locality" label={t('cas.locality') + ' (L)'} placeholder={t('cas.localityPlaceholder')} />
             </div>
           </div>
 

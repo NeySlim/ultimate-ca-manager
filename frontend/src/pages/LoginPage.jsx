@@ -6,18 +6,22 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, Link } from 'react-router-dom'
-import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft } from '@phosphor-icons/react'
+import { ShieldCheck, Fingerprint, Key, User, ArrowRight, ArrowLeft, GithubLogo, Palette, Globe } from '@phosphor-icons/react'
 import { Card, Button, Input, Logo, LoadingSpinner } from '../components'
+import { languages } from '../i18n'
 import { useAuth, useNotification } from '../contexts'
+import { useTheme } from '../contexts/ThemeContext'
 import { authMethodsService } from '../services/authMethods.service'
+import { cn } from '../lib/utils'
 
 const STORAGE_KEY = 'ucm_last_username'
 
 export default function LoginPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { login } = useAuth()
   const { showError, showSuccess, showInfo } = useNotification()
+  const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
   const passwordRef = useRef(null)
   
   // Login flow step: 'username' | 'auth'
@@ -30,6 +34,11 @@ export default function LoginPage() {
   const [statusMessage, setStatusMessage] = useState('')
   const [hasSavedUsername, setHasSavedUsername] = useState(false) // Track if we loaded from storage
   const [emailConfigured, setEmailConfigured] = useState(false)
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false)
+  const [langMenuOpen, setLangMenuOpen] = useState(false)
+
+  // Get current language
+  const currentLang = languages.find(l => l.code === (i18n.language?.split('-')[0] || 'en')) || languages[0]
 
   // Load last username on mount + check email config
   useEffect(() => {
@@ -226,8 +235,8 @@ export default function LoginPage() {
           </h1>
           <p className="text-sm text-text-secondary">
             {step === 'username' 
-              ? (username ? 'Click to continue to your account' : t('auth.signInToContinue'))
-              : statusMessage || (authMethod === 'password' ? 'Enter your password to continue' : 'Choose how to authenticate')
+              ? (username ? t('auth.clickToContinue') : t('auth.signInToContinue'))
+              : statusMessage || (authMethod === 'password' ? t('auth.enterPasswordToContinue') : t('auth.chooseAuthMethod'))
             }
           </p>
         </div>
@@ -250,7 +259,7 @@ export default function LoginPage() {
                       <User size={24} className="text-white" weight="bold" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">Continue as</p>
+                      <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.continueAs')}</p>
                       <p className="text-lg font-semibold text-text-primary truncate">{username}</p>
                     </div>
                     <div className="text-accent group-hover:translate-x-1 transition-transform">
@@ -274,7 +283,7 @@ export default function LoginPage() {
                   className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-2"
                   disabled={loading}
                 >
-                  Use a different account
+                  {t('auth.useDifferentAccount')}
                 </button>
               </>
             ) : (
@@ -285,7 +294,7 @@ export default function LoginPage() {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username"
+                  placeholder={t('auth.enterUsername')}
                   disabled={loading}
                   autoComplete="username"
                   autoFocus
@@ -394,7 +403,7 @@ export default function LoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder={t('auth.enterPassword')}
                   disabled={loading}
                   autoComplete="current-password"
                   autoFocus
@@ -483,9 +492,126 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="text-center text-xs text-text-secondary pt-4 border-t border-border">
-          <p>Ultimate Certificate Manager v2</p>
+        {/* Footer with actions */}
+        <div className="pt-4 border-t border-border space-y-3">
+          {/* Action buttons row */}
+          <div className="flex items-center justify-center gap-2 relative">
+            {/* Language Selector - Flag only */}
+            <div className="relative">
+              <button
+                onClick={() => { setLangMenuOpen(!langMenuOpen); setThemeMenuOpen(false) }}
+                className="flex items-center justify-center w-9 h-9 rounded-md bg-bg-tertiary hover:bg-bg-secondary border border-border text-text-secondary hover:text-text-primary transition-colors"
+                title={t('settings.language')}
+              >
+                <span className="text-lg">{currentLang.flag}</span>
+              </button>
+              
+              {/* Language dropdown */}
+              {langMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setLangMenuOpen(false)} />
+                  <div className="absolute bottom-full mb-2 left-0 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl p-1.5 min-w-[140px]">
+                    {languages.map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => { 
+                          i18n.changeLanguage(lang.code)
+                          try { localStorage.setItem('i18nextLng', lang.code) } catch {}
+                          setLangMenuOpen(false)
+                        }}
+                        className={cn(
+                          "w-full px-2 py-1.5 text-left text-sm rounded flex items-center gap-2",
+                          "hover:bg-bg-tertiary transition-colors",
+                          currentLang.code === lang.code && "text-accent-primary bg-accent-primary/10"
+                        )}
+                      >
+                        <span>{lang.flag}</span>
+                        {lang.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            
+            {/* Theme Selector */}
+            <div className="relative">
+              <button
+                onClick={() => { setThemeMenuOpen(!themeMenuOpen); setLangMenuOpen(false) }}
+                className="flex items-center justify-center w-9 h-9 rounded-md bg-bg-tertiary hover:bg-bg-secondary border border-border text-text-secondary hover:text-text-primary transition-colors"
+                title={t('settings.appearance')}
+              >
+                <Palette size={18} />
+              </button>
+              
+              {/* Theme dropdown */}
+              {themeMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setThemeMenuOpen(false)} />
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl p-1.5 min-w-[160px]">
+                    {/* Color Themes */}
+                    <div className="px-2 py-0.5 text-xs text-text-tertiary uppercase tracking-wider">{t('settings.color')}</div>
+                    {themes.map((theme) => (
+                      <button
+                        key={theme.id}
+                        onClick={() => { setThemeFamily(theme.id); setThemeMenuOpen(false) }}
+                        className={cn(
+                          "w-full px-2 py-1.5 text-left text-sm rounded flex items-center gap-2",
+                          "hover:bg-bg-tertiary transition-colors",
+                          themeFamily === theme.id && "text-accent-primary bg-accent-primary/10"
+                        )}
+                      >
+                        <div 
+                          className="w-3 h-3 rounded-full border border-border"
+                          style={{ background: theme.accent }}
+                        />
+                        {theme.name}
+                      </button>
+                    ))}
+                    
+                    {/* Separator */}
+                    <div className="h-px bg-border my-1.5" />
+                    
+                    {/* Mode */}
+                    <div className="px-2 py-0.5 text-xs text-text-tertiary uppercase tracking-wider">{t('settings.appearance')}</div>
+                    {[
+                      { id: 'system', labelKey: 'settings.followSystem' },
+                      { id: 'dark', labelKey: 'settings.dark' },
+                      { id: 'light', labelKey: 'settings.light' }
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        onClick={() => { setMode(opt.id); setThemeMenuOpen(false) }}
+                        className={cn(
+                          "w-full px-2 py-1.5 text-left text-sm rounded",
+                          "hover:bg-bg-tertiary transition-colors",
+                          mode === opt.id && "text-accent-primary bg-accent-primary/10"
+                        )}
+                      >
+                        {t(opt.labelKey)}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            
+            {/* GitHub Link */}
+            <a
+              href="https://github.com/NeySlim/ultimate-ca-manager"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center w-9 h-9 rounded-md bg-bg-tertiary hover:bg-bg-secondary border border-border text-text-secondary hover:text-text-primary transition-colors"
+              title="GitHub"
+            >
+              <GithubLogo size={18} />
+            </a>
+          </div>
+          
+          {/* Version */}
+          <p className="text-center text-xs text-text-tertiary">
+            Ultimate Certificate Manager v2
+          </p>
         </div>
       </Card>
     </div>

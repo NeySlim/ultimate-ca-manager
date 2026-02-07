@@ -3,11 +3,13 @@
  */
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Lock, CheckCircle, Warning, ArrowLeft } from '@phosphor-icons/react'
 import { Card, Button, Input, Logo } from '../components'
 import { apiClient } from '../services'
 
 export default function ResetPasswordPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
@@ -114,24 +116,24 @@ export default function ResetPasswordPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <Input
-                  label="New Password"
+                  label={t('auth.newPassword')}
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   icon={<Lock size={18} />}
-                  placeholder="Minimum 8 characters"
+                  placeholder={t('auth.minCharacters')}
                   showStrength
                   autoFocus
                   required
                 />
 
                 <Input
-                  label="Confirm Password"
+                  label={t('auth.confirmPassword')}
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   icon={<Lock size={18} />}
-                  placeholder="Re-enter password"
+                  placeholder={t('auth.reenterPassword')}
                   required
                 />
 

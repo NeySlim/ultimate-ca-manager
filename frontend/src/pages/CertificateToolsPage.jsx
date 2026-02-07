@@ -416,7 +416,7 @@ export default function CertificateToolsPage() {
         <div className="flex-1">
           <Input
             label={t('tools.hostname')}
-            placeholder="example.com"
+            placeholder={t('tools.hostnamePlaceholder')}
             value={sslHostname}
             onChange={(e) => setSslHostname(e.target.value)}
           />
@@ -424,7 +424,7 @@ export default function CertificateToolsPage() {
         <div className="w-24">
           <Input
             label={t('tools.port')}
-            placeholder="443"
+            placeholder={t('tools.portPlaceholder')}
             value={sslPort}
             onChange={(e) => setSslPort(e.target.value)}
           />

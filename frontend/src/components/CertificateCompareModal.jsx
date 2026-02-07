@@ -2,6 +2,7 @@
  * CertificateCompareModal - Compare two certificates side by side
  */
 import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X, Certificate, ArrowsLeftRight } from '@phosphor-icons/react'
 import { Modal } from './Modal'
 import { Badge } from './Badge'
@@ -33,6 +34,7 @@ function CompareField({ label, value1, value2, mono = false }) {
 }
 
 export function CertificateCompareModal({ open, onClose, certificates = [], initialCert = null }) {
+  const { t } = useTranslation()
   const [cert1Id, setCert1Id] = useState(initialCert?.id || '')
   const [cert2Id, setCert2Id] = useState('')
   
@@ -46,12 +48,12 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
   const cert2 = useMemo(() => certificates.find(c => String(c.id) === String(cert2Id)), [certificates, cert2Id])
   
   const options = useMemo(() => [
-    { value: '', label: 'Select a certificate...' },
+    { value: '', label: t('compare.selectCertificate') },
     ...certificates.map(c => ({
       value: String(c.id),
-      label: c.common_name || c.subject || `Certificate #${c.id}`
+      label: c.common_name || c.subject || `${t('certificates.certificate')} #${c.id}`
     }))
-  ], [certificates])
+  ], [certificates, t])
   
   // Swap certificates
   const handleSwap = () => {
@@ -84,8 +86,8 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
               <ArrowsLeftRight size={18} className="text-accent-primary" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-text-primary">Compare Certificates</h2>
-              <p className="text-xs text-text-secondary">Side by side comparison</p>
+              <h2 className="text-base font-semibold text-text-primary">{t('compare.title')}</h2>
+              <p className="text-xs text-text-secondary">{t('compare.subtitle')}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary">
@@ -96,7 +98,7 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
         {/* Certificate selectors */}
         <div className="grid grid-cols-[1fr,auto,1fr] gap-2 items-end mb-4">
           <div>
-            <label className="text-xs text-text-secondary mb-1 block">Certificate A</label>
+            <label className="text-xs text-text-secondary mb-1 block">{t('compare.certificateA')}</label>
             <Select
               value={cert1Id}
               onChange={e => setCert1Id(e.target.value)}
@@ -108,12 +110,12 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
             onClick={handleSwap}
             disabled={!cert1Id || !cert2Id}
             className="p-2 rounded hover:bg-bg-tertiary text-text-secondary disabled:opacity-50"
-            title="Swap certificates"
+            title={t('compare.swap')}
           >
             <ArrowsLeftRight size={18} />
           </button>
           <div>
-            <label className="text-xs text-text-secondary mb-1 block">Certificate B</label>
+            <label className="text-xs text-text-secondary mb-1 block">{t('compare.certificateB')}</label>
             <Select
               value={cert2Id}
               onChange={e => setCert2Id(e.target.value)}
@@ -127,12 +129,12 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
         {cert1 && cert2 && (
           <div className="flex items-center gap-4 mb-4 p-2 rounded-lg bg-bg-tertiary">
             <Badge variant={differences === 0 ? 'success' : 'warning'}>
-              {differences === 0 ? 'Identical' : `${differences} difference${differences > 1 ? 's' : ''}`}
+              {differences === 0 ? t('compare.identical') : t('compare.differences', { count: differences })}
             </Badge>
             <span className="text-xs text-text-secondary">
               {differences === 0 
-                ? 'These certificates have identical properties'
-                : 'Differences are highlighted in orange'
+                ? t('compare.identicalDescription')
+                : t('compare.differencesDescription')
               }
             </span>
           </div>
@@ -143,34 +145,34 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
           <div className="border border-border rounded-lg overflow-hidden">
             {/* Header row */}
             <div className="grid grid-cols-[140px,1fr,1fr] gap-2 py-2 px-3 bg-bg-tertiary border-b border-border">
-              <span className="text-xs font-semibold text-text-secondary">Field</span>
+              <span className="text-xs font-semibold text-text-secondary">{t('compare.field')}</span>
               <div className="flex items-center gap-2">
                 <Certificate size={14} className="text-accent-primary" />
                 <span className="text-xs font-semibold text-text-primary truncate">
-                  {cert1.common_name || 'Certificate A'}
+                  {cert1.common_name || t('compare.certificateA')}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Certificate size={14} className="text-accent-secondary" />
                 <span className="text-xs font-semibold text-text-primary truncate">
-                  {cert2.common_name || 'Certificate B'}
+                  {cert2.common_name || t('compare.certificateB')}
                 </span>
               </div>
             </div>
             
             {/* Comparison fields */}
             <div className="px-3 py-1 max-h-[400px] overflow-y-auto">
-              <CompareField label="Common Name" value1={cert1.common_name} value2={cert2.common_name} />
-              <CompareField label="Status" value1={cert1.status} value2={cert2.status} />
-              <CompareField label="Issuer" value1={cert1.issuer} value2={cert2.issuer} />
-              <CompareField label="Key Type" value1={cert1.key_type} value2={cert2.key_type} />
-              <CompareField label="Key Size" value1={cert1.key_size} value2={cert2.key_size} />
-              <CompareField label="Valid From" value1={formatDate(cert1.valid_from)} value2={formatDate(cert2.valid_from)} />
-              <CompareField label="Valid To" value1={formatDate(cert1.valid_to)} value2={formatDate(cert2.valid_to)} />
-              <CompareField label="Serial Number" value1={cert1.serial_number} value2={cert2.serial_number} mono />
-              <CompareField label="Signature Algo" value1={cert1.signature_algorithm} value2={cert2.signature_algorithm} />
+              <CompareField label={t('details.commonName')} value1={cert1.common_name} value2={cert2.common_name} />
+              <CompareField label={t('common.status')} value1={cert1.status} value2={cert2.status} />
+              <CompareField label={t('details.issuer')} value1={cert1.issuer} value2={cert2.issuer} />
+              <CompareField label={t('details.keyType')} value1={cert1.key_type} value2={cert2.key_type} />
+              <CompareField label={t('details.keySize')} value1={cert1.key_size} value2={cert2.key_size} />
+              <CompareField label={t('details.validFrom')} value1={formatDate(cert1.valid_from)} value2={formatDate(cert2.valid_from)} />
+              <CompareField label={t('details.validUntil')} value1={formatDate(cert1.valid_to)} value2={formatDate(cert2.valid_to)} />
+              <CompareField label={t('details.serialNumber')} value1={cert1.serial_number} value2={cert2.serial_number} mono />
+              <CompareField label={t('details.sigAlgo')} value1={cert1.signature_algorithm} value2={cert2.signature_algorithm} />
               {(cert1.san || cert2.san) && (
-                <CompareField label="SANs" value1={cert1.san} value2={cert2.san} />
+                <CompareField label={t('details.sans')} value1={cert1.san} value2={cert2.san} />
               )}
               {(cert1.thumbprint_sha256 || cert2.thumbprint_sha256) && (
                 <CompareField label="SHA-256" value1={cert1.thumbprint_sha256?.substring(0, 32) + '...'} value2={cert2.thumbprint_sha256?.substring(0, 32) + '...'} mono />
@@ -180,7 +182,7 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
         ) : (
           <div className="text-center py-8 text-text-secondary">
             <ArrowsLeftRight size={32} className="mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Select two certificates to compare</p>
+            <p className="text-sm">{t('compare.selectTwoToCompare')}</p>
           </div>
         )}
       </div>

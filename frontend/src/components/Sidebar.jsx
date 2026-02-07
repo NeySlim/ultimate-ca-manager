@@ -3,6 +3,7 @@
  * Supports Pro features when license is active (dynamic import)
  */
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
   SignOut, Palette, Check, UserCircle, UploadSimple, ClockCounterClockwise, Robot,
@@ -21,6 +22,7 @@ import { loadProModule } from '../proLoader.jsx'
 
 export function Sidebar({ activePage }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { themeFamily, setThemeFamily, mode, setMode, themes, isLight } = useTheme()
   const { user, logout } = useAuth()
   const { isLargeScreen } = useMobile()
@@ -72,28 +74,28 @@ export function Sidebar({ activePage }) {
   // (keeping this effect empty for backwards compatibility)
 
   const pages = [
-    { id: '', icon: House, label: 'Dashboard', path: '/' },
-    { id: 'certificates', icon: Certificate, label: 'Certificates', path: '/certificates' },
-    { id: 'cas', icon: ShieldCheck, label: 'CAs', path: '/cas' },
-    { id: 'csrs', icon: FileText, label: 'CSRs', path: '/csrs' },
-    { id: 'templates', icon: List, label: 'Templates', path: '/templates' },
-    { id: 'users', icon: User, label: 'Users', path: '/users' },
-    { id: 'acme', icon: Key, label: 'ACME', path: '/acme' },
-    { id: 'scep', icon: Robot, label: 'SCEP', path: '/scep-config' },
-    { id: 'crl-ocsp', icon: FileX, label: 'CRL/OCSP', path: '/crl-ocsp' },
-    { id: 'truststore', icon: Vault, label: 'Trust Store', path: '/truststore' },
-    { id: 'import', icon: UploadSimple, label: 'Import', path: '/import' },
-    { id: 'tools', icon: Wrench, label: 'Tools', path: '/tools' },
-    { id: 'audit', icon: ClockCounterClockwise, label: 'Audit', path: '/audit' },
-    { id: 'settings', icon: Gear, label: 'Settings', path: '/settings' },
+    { id: '', icon: House, labelKey: 'nav.dashboard', path: '/' },
+    { id: 'certificates', icon: Certificate, labelKey: 'nav.certificates', path: '/certificates' },
+    { id: 'cas', icon: ShieldCheck, labelKey: 'nav.cas', path: '/cas' },
+    { id: 'csrs', icon: FileText, labelKey: 'nav.csrs', path: '/csrs' },
+    { id: 'templates', icon: List, labelKey: 'nav.templates', path: '/templates' },
+    { id: 'users', icon: User, labelKey: 'nav.users', path: '/users' },
+    { id: 'acme', icon: Key, labelKey: 'nav.acme', path: '/acme' },
+    { id: 'scep', icon: Robot, labelKey: 'nav.scep', path: '/scep-config' },
+    { id: 'crl-ocsp', icon: FileX, labelKey: 'nav.crlOcsp', path: '/crl-ocsp' },
+    { id: 'truststore', icon: Vault, labelKey: 'nav.trustStore', path: '/truststore' },
+    { id: 'import', icon: UploadSimple, labelKey: 'nav.importExport', path: '/import' },
+    { id: 'tools', icon: Wrench, labelKey: 'nav.tools', path: '/tools' },
+    { id: 'audit', icon: ClockCounterClockwise, labelKey: 'nav.audit', path: '/audit' },
+    { id: 'settings', icon: Gear, labelKey: 'nav.settings', path: '/settings' },
   ]
 
   // Pro-only pages (only shown when license is active)
   // SSO is now in Settings, Groups is now in Users
   const proPages = [
-    { id: 'rbac', icon: Shield, label: 'RBAC', path: '/rbac' },
-    { id: 'hsm', icon: Lock, label: 'HSM', path: '/hsm' },
-    { id: 'security', icon: Detective, label: 'Security', path: '/security' },
+    { id: 'rbac', icon: Shield, labelKey: 'nav.rbac', path: '/rbac' },
+    { id: 'hsm', icon: Lock, labelKey: 'nav.hsm', path: '/hsm' },
+    { id: 'security', icon: Detective, labelKey: 'nav.security', path: '/security' },
   ]
 
   const handleLogout = async () => {
@@ -104,7 +106,7 @@ export function Sidebar({ activePage }) {
   return (
     <div className="w-14 h-full border-r border-border/60 bg-gradient-to-b from-bg-secondary to-bg-tertiary flex flex-col items-center py-2 gap-px">
       {/* Logo */}
-      <Link to="/" className={cn(buttonSize, "flex items-center justify-center mb-2")} title="UCM Dashboard">
+      <Link to="/" className={cn(buttonSize, "flex items-center justify-center mb-2")} title={t('dashboard.title')}>
         <Logo variant="compact" size="sm" withText={false} />
       </Link>
 
@@ -113,6 +115,7 @@ export function Sidebar({ activePage }) {
         const Icon = page.icon
         const isActive = activePage === page.id
         const showBadge = page.id === 'certificates' && expiringCount > 0
+        const label = t(page.labelKey)
         return (
           <Link
             key={page.id}
@@ -124,7 +127,7 @@ export function Sidebar({ activePage }) {
                 ? "bg-accent-primary/10 text-accent-primary border border-accent-primary/20" 
                 : "text-text-secondary hover:bg-bg-tertiary/70 hover:text-text-primary"
             )}
-            title={showBadge ? `${page.label} (${expiringCount} expiring)` : page.label}
+            title={showBadge ? `${label} (${expiringCount} ${t('common.expiring').toLowerCase()})` : label}
           >
             <Icon size={iconSize} weight={isActive ? 'fill' : 'regular'} />
             {isActive && (
@@ -140,9 +143,9 @@ export function Sidebar({ activePage }) {
             )}
             {/* Tooltip */}
             <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-md text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
-              {page.label}
+              {label}
               {showBadge && (
-                <span className="ml-1 text-status-warning">({expiringCount} expiring)</span>
+                <span className="ml-1 text-status-warning">({expiringCount} {t('common.expiring').toLowerCase()})</span>
               )}
             </div>
           </Link>
@@ -156,6 +159,7 @@ export function Sidebar({ activePage }) {
           {proPages.map(page => {
             const Icon = page.icon
             const isActive = activePage === page.id
+            const label = t(page.labelKey)
             return (
               <Link
                 key={page.id}
@@ -167,7 +171,7 @@ export function Sidebar({ activePage }) {
                     ? "bg-accent-pro/20 text-accent-pro border border-accent-pro/30" 
                     : "text-accent-pro/60 hover:bg-accent-pro/10 hover:text-accent-pro"
                 )}
-                title={`${page.label} (Pro)`}
+                title={`${label} (${t('common.pro')})`}
               >
                 <Icon size={iconSize} weight={isActive ? 'fill' : 'regular'} />
                 {isActive && (
@@ -176,7 +180,7 @@ export function Sidebar({ activePage }) {
                 {/* Tooltip */}
                 <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-accent-pro/30 rounded-md text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50 flex items-center gap-1.5">
                   <Crown size={12} className="text-accent-pro" />
-                  {page.label}
+                  {label}
                 </div>
               </Link>
             )
@@ -192,7 +196,7 @@ export function Sidebar({ activePage }) {
           <button className={cn(buttonSize, "rounded-sm flex items-center justify-center text-text-secondary hover:bg-bg-tertiary hover:text-text-primary transition-all group")}>
             <Palette size={iconSize} />
             <div className="absolute left-full ml-2 px-2 py-1 bg-bg-tertiary border border-border rounded-sm text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-              Theme
+              {t('settings.appearance.theme')}
             </div>
           </button>
         </DropdownMenu.Trigger>
@@ -204,7 +208,7 @@ export function Sidebar({ activePage }) {
             side="right"
           >
             <DropdownMenu.Label className="px-3 py-1.5 text-xs text-text-tertiary uppercase tracking-wider">
-              Color Theme
+              {t('settings.appearance.colorTheme')}
             </DropdownMenu.Label>
             {themes.map(theme => (
               <DropdownMenu.Item
@@ -226,19 +230,19 @@ export function Sidebar({ activePage }) {
             <DropdownMenu.Separator className="h-px bg-border my-1" />
             
             <DropdownMenu.Label className="px-3 py-1.5 text-xs text-text-tertiary uppercase tracking-wider">
-              Appearance
+              {t('settings.appearance.appearance')}
             </DropdownMenu.Label>
             {[
-              { id: 'system', label: 'Follow System' },
-              { id: 'dark', label: 'Dark' },
-              { id: 'light', label: 'Light' }
+              { id: 'system', labelKey: 'settings.appearance.followSystem' },
+              { id: 'dark', labelKey: 'settings.appearance.dark' },
+              { id: 'light', labelKey: 'settings.appearance.light' }
             ].map(opt => (
               <DropdownMenu.Item
                 key={opt.id}
                 onClick={() => setMode(opt.id)}
                 className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
               >
-                <span className="flex-1">{opt.label}</span>
+                <span className="flex-1">{t(opt.labelKey)}</span>
                 {mode === opt.id && (
                   <Check size={16} weight="bold" className="text-accent-primary" />
                 )}
@@ -273,7 +277,7 @@ export function Sidebar({ activePage }) {
               className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
             >
               <UserCircle size={16} />
-              <span>Account</span>
+              <span>{t('nav.account')}</span>
             </DropdownMenu.Item>
 
             <DropdownMenu.Item
@@ -281,7 +285,7 @@ export function Sidebar({ activePage }) {
               className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:bg-bg-tertiary text-text-primary transition-colors"
             >
               <Gear size={16} />
-              <span>Settings</span>
+              <span>{t('nav.settings')}</span>
             </DropdownMenu.Item>
 
             <DropdownMenu.Separator className="h-px bg-border my-1" />
@@ -291,7 +295,7 @@ export function Sidebar({ activePage }) {
               className="flex items-center gap-3 px-3 py-2 text-sm rounded-sm cursor-pointer outline-none hover:status-danger-bg status-danger-text transition-colors"
             >
               <SignOut size={16} />
-              <span>Sign Out</span>
+              <span>{t('auth.logout')}</span>
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>

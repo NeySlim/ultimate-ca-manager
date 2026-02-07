@@ -3,11 +3,13 @@
  */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Envelope, ArrowLeft, CheckCircle } from '@phosphor-icons/react'
 import { Card, Button, Input, Logo } from '../components'
 import { apiClient } from '../services'
 
 export default function ForgotPasswordPage() {
+  const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -85,12 +87,12 @@ export default function ForgotPasswordPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <Input
-                  label="Email Address"
+                  label={t('auth.emailAddress')}
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   icon={<Envelope size={18} />}
-                  placeholder="you@example.com"
+                  placeholder={t('auth.emailPlaceholder')}
                   error={error}
                   autoFocus
                   required

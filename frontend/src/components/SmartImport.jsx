@@ -5,6 +5,7 @@
  * Can be used standalone or wrapped in a modal
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   UploadSimple, FileText, Key, ShieldCheck, Certificate,
   WarningCircle, CheckCircle, XCircle, LockSimple, Link,
@@ -636,6 +637,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
  * SmartImport Modal - wraps widget in a modal
  */
 export function SmartImportModal({ isOpen, onClose, onImportComplete }) {
+  const { t } = useTranslation()
   const handleComplete = (result) => {
     onImportComplete?.(result)
     onClose()
@@ -645,7 +647,7 @@ export function SmartImportModal({ isOpen, onClose, onImportComplete }) {
     <Modal
       open={isOpen}
       onClose={onClose}
-      title="Smart Import"
+      title={t('import.smartImport')}
       size="lg"
     >
       <div className="p-4">

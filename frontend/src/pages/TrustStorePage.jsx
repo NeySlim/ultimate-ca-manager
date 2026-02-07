@@ -396,7 +396,7 @@ export default function TrustStorePage() {
         {/* Fingerprints */}
         {selectedCert.fingerprint_sha256 && (
           <CompactSection title={t('trustStore.fingerprints')} icon={Fingerprint} collapsible defaultOpen={false}>
-            <CompactField icon={Fingerprint} label="SHA-256" value={selectedCert.fingerprint_sha256} mono copyable />
+            <CompactField icon={Fingerprint} label={t('trustStore.sha256')} value={selectedCert.fingerprint_sha256} mono copyable />
           </CompactSection>
         )}
 

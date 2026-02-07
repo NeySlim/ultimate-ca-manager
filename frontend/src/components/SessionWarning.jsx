@@ -3,6 +3,7 @@
  * Shows countdown popup when session is about to expire
  */
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Timer, ArrowsClockwise } from '@phosphor-icons/react'
 import { Modal, Button } from '../components'
 import { useAuth } from '../contexts'
@@ -12,6 +13,7 @@ const DEFAULT_SESSION_TIMEOUT = 30 * 60 * 1000 // 30 minutes in ms
 const WARNING_BEFORE = 5 * 60 * 1000 // Show warning 5 minutes before expiry
 
 export function SessionWarning() {
+  const { t } = useTranslation()
   const { user, logout } = useAuth()
   const [showWarning, setShowWarning] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(0)
@@ -82,7 +84,7 @@ export function SessionWarning() {
     <Modal
       open={showWarning}
       onClose={() => {}} // Don't allow closing by clicking outside
-      title="Session Expiring"
+      title={t('session.expiring')}
     >
       <div className="p-4 text-center space-y-4">
         <div className="flex justify-center">
@@ -93,7 +95,7 @@ export function SessionWarning() {
         
         <div>
           <p className="text-text-primary font-medium">
-            Your session will expire in
+            {t('session.willExpireIn')}
           </p>
           <p className="text-3xl font-bold text-accent-warning mt-2">
             {formatTime(secondsLeft)}
@@ -101,16 +103,16 @@ export function SessionWarning() {
         </div>
         
         <p className="text-sm text-text-secondary">
-          Click below to continue working, or you'll be logged out automatically.
+          {t('session.clickToContinue')}
         </p>
         
         <div className="flex gap-3 justify-center pt-2">
           <Button variant="secondary" onClick={logout}>
-            Log Out Now
+            {t('session.logOutNow')}
           </Button>
           <Button onClick={extendSession}>
             <ArrowsClockwise size={16} />
-            Stay Logged In
+            {t('session.stayLoggedIn')}
           </Button>
         </div>
       </div>

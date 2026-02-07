@@ -655,7 +655,7 @@ export default function ACMEPage() {
                     type="email"
                     value={proxyEmail}
                     onChange={(e) => setProxyEmail(e.target.value)}
-                    placeholder="admin@example.com"
+                    placeholder={t('acme.emailPlaceholder')}
                     helperText={t('acme.emailRequired')}
                   />
                   <Button 

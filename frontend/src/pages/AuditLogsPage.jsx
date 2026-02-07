@@ -460,22 +460,22 @@ export default function AuditLogsPage() {
 
       {/* Help Cards */}
       <div className="space-y-3">
-        <HelpCard variant="info" title="About Audit Logs">
+        <HelpCard variant="info" title={t('audit.aboutAuditLogs')}>
           All user actions are logged for security and compliance purposes.
           Logs include timestamps, users, actions, resources, and IP addresses.
         </HelpCard>
         
-        <HelpCard variant="tip" title="Filtering & Search">
+        <HelpCard variant="tip" title={t('audit.filteringSearch')}>
           Use filters to narrow down logs by date range, user, action type, or status.
           The search box supports full-text search across all log fields.
         </HelpCard>
 
-        <HelpCard variant="warning" title="Data Retention">
+        <HelpCard variant="warning" title={t('audit.dataRetention')}>
           Old logs can be cleaned up to save storage space.
           The minimum retention period is 30 days for compliance requirements.
         </HelpCard>
 
-        <HelpCard variant="info" title="Export Options">
+        <HelpCard variant="info" title={t('audit.exportOptions')}>
           Export logs in JSON or CSV format for external analysis,
           compliance reporting, or integration with SIEM systems.
         </HelpCard>

@@ -8,16 +8,18 @@ import {
   List, X, MagnifyingGlass,
   House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
   UploadSimple, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock,
-  UserCircle, Palette, Question, Detective
+  UserCircle, Palette, Question, Detective, SignOut, Globe
 } from '@phosphor-icons/react'
 import { Sidebar } from './Sidebar'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { WebSocketIndicator } from './WebSocketIndicator'
 import { HelpModal } from './ui/HelpModal'
+import LanguageSelector from './ui/LanguageSelector'
 import { cn } from '../lib/utils'
 import { Logo } from './Logo'
 import { useTheme } from '../contexts/ThemeContext'
 import { useNotification } from '../contexts/NotificationContext'
+import { useAuth } from '../contexts/AuthContext'
 import { certificatesService } from '../services'
 import { loadProModule } from '../proLoader.jsx'
 
@@ -50,6 +52,7 @@ export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
+  const { logout } = useAuth()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
@@ -113,11 +116,11 @@ export function AppShell() {
           sessionStorage.setItem('ucm-expiring-alert-shown', 'true')
           
           if (expired > 0 && expiring > 0) {
-            showWarning(`${expired} certificate${expired > 1 ? 's have' : ' has'} expired and ${expiring} ${expiring > 1 ? 'are' : 'is'} expiring soon`)
+            showWarning(t('notifications.certificatesExpiredAndExpiring', { expired, expiring }))
           } else if (expired > 0) {
-            showWarning(`${expired} certificate${expired > 1 ? 's have' : ' has'} expired`)
+            showWarning(t('notifications.certificatesExpired', { count: expired }))
           } else {
-            showWarning(`${expiring} certificate${expiring > 1 ? 's are' : ' is'} expiring soon`)
+            showWarning(t('notifications.certificatesExpiringSoon', { count: expiring }))
           }
         }
       } catch {
@@ -128,7 +131,7 @@ export function AppShell() {
     // Delay check to let the app settle
     const timer = setTimeout(checkExpiringCerts, 2000)
     return () => clearTimeout(timer)
-  }, [showWarning])
+  }, [showWarning, t])
 
   // Close mobile menu on navigation
   useEffect(() => {
@@ -228,7 +231,7 @@ export function AppShell() {
           />
           <div className="fixed top-10 right-2 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl p-1.5 min-w-[160px] max-h-[60vh] overflow-auto">
             {/* Color Themes */}
-            <div className="px-2 py-0.5 text-3xs text-text-tertiary uppercase tracking-wider">Color</div>
+            <div className="px-2 py-0.5 text-3xs text-text-tertiary uppercase tracking-wider">{t('settings.color')}</div>
             {themes.map((theme) => (
               <button
                 key={theme.id}
@@ -251,11 +254,11 @@ export function AppShell() {
             <div className="h-px bg-border my-1.5" />
             
             {/* Mode */}
-            <div className="px-2 py-0.5 text-3xs text-text-tertiary uppercase tracking-wider">Appearance</div>
+            <div className="px-2 py-0.5 text-3xs text-text-tertiary uppercase tracking-wider">{t('settings.appearance')}</div>
             {[
-              { id: 'system', label: 'System' },
-              { id: 'dark', label: 'Dark' },
-              { id: 'light', label: 'Light' }
+              { id: 'system', labelKey: 'settings.followSystem' },
+              { id: 'dark', labelKey: 'settings.dark' },
+              { id: 'light', labelKey: 'settings.light' }
             ].map(opt => (
               <button
                 key={opt.id}
@@ -266,7 +269,7 @@ export function AppShell() {
                   mode === opt.id && "text-accent-primary bg-accent-primary/10"
                 )}
               >
-                {opt.label}
+                {t(opt.labelKey)}
               </button>
             ))}
           </div>
@@ -315,6 +318,18 @@ export function AppShell() {
                     </Link>
                   )
                 })}
+              </div>
+              
+              {/* Footer: Language selector + Logout */}
+              <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
+                <LanguageSelector className="flex-1" />
+                <button
+                  onClick={() => { setMobileMenuOpen(false); logout(); }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-status-danger hover:bg-status-danger/10 transition-colors"
+                >
+                  <SignOut size={18} />
+                  <span className="text-sm font-medium">{t('auth.logout')}</span>
+                </button>
               </div>
             </div>
           </div>

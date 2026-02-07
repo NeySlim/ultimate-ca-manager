@@ -5,6 +5,7 @@
  * Uses global Compact components for consistent styling.
  */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   Certificate, 
   Key, 
@@ -28,6 +29,7 @@ import {
 import { Badge, CATypeIcon } from './Badge'
 import { Button } from './Button'
 import { CompactSection, CompactGrid, CompactField } from './DetailCard'
+import { cn } from '../lib/utils'
 
 // Format date helper
 function formatDate(dateStr, format = 'full') {
@@ -58,6 +60,7 @@ export function CADetails({
   showActions = true,
   showPem = true
 }) {
+  const { t } = useTranslation()
   const [showFullPem, setShowFullPem] = useState(false)
   const [pemCopied, setPemCopied] = useState(false)
   
@@ -72,9 +75,9 @@ export function CADetails({
   
   const status = getStatus()
   const statusConfig = {
-    valid: { variant: 'success', label: 'Active' },
-    expiring: { variant: 'warning', label: 'Expiring Soon' },
-    expired: { variant: 'danger', label: 'Expired' }
+    valid: { variant: 'success', label: t('common.active') },
+    expiring: { variant: 'warning', label: t('details.expiringSoon') },
+    expired: { variant: 'danger', label: t('common.expired') }
   }
   
   return (
@@ -88,7 +91,7 @@ export function CADetails({
               {ca.common_name || ca.descr}
             </h3>
             <Badge variant={ca.is_root ? 'warning' : 'info'}>
-              {ca.is_root ? 'Root CA' : 'Intermediate'}
+              {ca.is_root ? t('cas.rootCA') : t('details.intermediate')}
             </Badge>
             <Badge variant={statusConfig[status].variant}>
               {statusConfig[status].label}
@@ -104,24 +107,24 @@ export function CADetails({
       <div className="grid grid-cols-4 gap-2">
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-2xs text-text-tertiary">Key Type</div>
+          <div className="text-2xs text-text-tertiary">{t('details.keyType')}</div>
           <div className="text-xs font-medium text-text-primary">{ca.key_type || 'N/A'}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Lock size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-2xs text-text-tertiary">Private Key</div>
+          <div className="text-2xs text-text-tertiary">{t('details.privateKey')}</div>
           <div className="text-xs font-medium text-text-primary">
-            {ca.has_private_key ? 'Available' : 'None'}
+            {ca.has_private_key ? t('details.available') : t('common.none')}
           </div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-2xs text-text-tertiary">Signature</div>
+          <div className="text-2xs text-text-tertiary">{t('details.signature')}</div>
           <div className="text-xs font-medium text-text-primary">{ca.signature_algorithm || ca.hash_algorithm || 'N/A'}</div>
         </div>
         <div className="bg-bg-tertiary/50 rounded-lg p-2 text-center">
           <Certificate size={16} className="mx-auto text-text-tertiary mb-1" />
-          <div className="text-2xs text-text-tertiary">Certificates</div>
+          <div className="text-2xs text-text-tertiary">{t('nav.certificates')}</div>
           <div className="text-xs font-medium text-text-primary">{ca.certs || 0}</div>
         </div>
       </div>
@@ -137,9 +140,9 @@ export function CADetails({
         )}>
           <Clock size={14} />
           {ca.days_remaining <= 0 ? (
-            <span>Certificate expired {Math.abs(ca.days_remaining)} days ago</span>
+            <span>{t('details.expiredDaysAgo', { count: Math.abs(ca.days_remaining) })}</span>
           ) : (
-            <span>{ca.days_remaining} days remaining until expiry</span>
+            <span>{t('details.daysRemaining', { count: ca.days_remaining })}</span>
           )}
         </div>
       )}
@@ -149,73 +152,73 @@ export function CADetails({
         <div className="flex gap-2 flex-wrap">
           {onExport && (
             <Button size="sm" variant="secondary" onClick={onExport}>
-              <Download size={14} /> Export
+              <Download size={14} /> {t('common.export')}
             </Button>
           )}
           {onDelete && canDelete && (
             <Button size="sm" variant="danger-soft" onClick={onDelete}>
-              <Trash size={14} /> Delete
+              <Trash size={14} /> {t('common.delete')}
             </Button>
           )}
         </div>
       )}
       
       {/* Subject Information */}
-      <CompactSection title="Subject" icon={Globe} iconClass="icon-bg-blue">
+      <CompactSection title={t('details.subject')} icon={Globe} iconClass="icon-bg-blue">
         <CompactGrid>
-          <CompactField icon={Globe} label="Common Name" value={ca.common_name} />
-          <CompactField icon={Buildings} label="Organization" value={ca.organization} />
-          <CompactField autoIcon label="Org Unit" value={ca.organizational_unit} />
-          <CompactField icon={MapPin} label="Locality" value={ca.locality} />
-          <CompactField autoIcon label="State" value={ca.state} />
-          <CompactField autoIcon label="Country" value={ca.country} />
-          <CompactField icon={Envelope} label="Email" value={ca.email} colSpan={2} />
+          <CompactField icon={Globe} label={t('details.commonName')} value={ca.common_name} />
+          <CompactField icon={Buildings} label={t('details.organization')} value={ca.organization} />
+          <CompactField autoIcon label={t('details.orgUnit')} value={ca.organizational_unit} />
+          <CompactField icon={MapPin} label={t('details.locality')} value={ca.locality} />
+          <CompactField autoIcon label={t('details.state')} value={ca.state} />
+          <CompactField autoIcon label={t('details.country')} value={ca.country} />
+          <CompactField icon={Envelope} label={t('details.email')} value={ca.email} colSpan={2} />
         </CompactGrid>
       </CompactSection>
       
       {/* Issuer (if intermediate) */}
       {!ca.is_root && ca.issuer && (
-        <CompactSection title="Issuer" icon={TreeStructure} iconClass="icon-bg-orange">
+        <CompactSection title={t('details.issuer')} icon={TreeStructure} iconClass="icon-bg-orange">
           <CompactGrid cols={1}>
-            <CompactField icon={TreeStructure} label="Issuer DN" value={ca.issuer} />
+            <CompactField icon={TreeStructure} label={t('details.issuerDN')} value={ca.issuer} />
           </CompactGrid>
         </CompactSection>
       )}
       
       {/* Validity Period */}
-      <CompactSection title="Validity" icon={Calendar} iconClass="icon-bg-green">
+      <CompactSection title={t('details.validity')} icon={Calendar} iconClass="icon-bg-green">
         <CompactGrid>
-          <CompactField icon={Calendar} label="Valid From" value={formatDate(ca.valid_from)} />
-          <CompactField icon={Calendar} label="Valid Until" value={formatDate(ca.valid_to)} />
+          <CompactField icon={Calendar} label={t('details.validFrom')} value={formatDate(ca.valid_from)} />
+          <CompactField icon={Calendar} label={t('details.validUntil')} value={formatDate(ca.valid_to)} />
         </CompactGrid>
       </CompactSection>
       
       {/* Technical Details */}
-      <CompactSection title="Technical Details" icon={Key} iconClass="icon-bg-purple">
+      <CompactSection title={t('details.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
-          <CompactField icon={Hash} label="Serial" value={ca.serial} mono copyable />
-          <CompactField autoIcon label="Key Type" value={ca.key_type} />
-          <CompactField autoIcon label="Sig Algo" value={ca.signature_algorithm || ca.hash_algorithm} />
-          <CompactField label="Subject DN" value={ca.subject} mono colSpan={2} />
+          <CompactField icon={Hash} label={t('details.serial')} value={ca.serial} mono copyable />
+          <CompactField autoIcon label={t('details.keyType')} value={ca.key_type} />
+          <CompactField autoIcon label={t('details.sigAlgo')} value={ca.signature_algorithm || ca.hash_algorithm} />
+          <CompactField label={t('details.subjectDN')} value={ca.subject} mono colSpan={2} />
         </CompactGrid>
       </CompactSection>
       
       {/* CRL/OCSP Configuration */}
       {(ca.cdp_enabled || ca.ocsp_enabled) && (
-        <CompactSection title="Revocation Configuration" icon={Link} iconClass="icon-bg-cyan">
+        <CompactSection title={t('details.revocationConfig')} icon={Link} iconClass="icon-bg-cyan">
           <CompactGrid cols={1}>
             {ca.cdp_enabled && (
-              <CompactField icon={Link} label="CRL Distribution Point" value={ca.cdp_url} mono />
+              <CompactField icon={Link} label={t('details.crlDistPoint')} value={ca.cdp_url} mono />
             )}
             {ca.ocsp_enabled && (
-              <CompactField icon={Link} label="OCSP URL" value={ca.ocsp_url} mono />
+              <CompactField icon={Link} label={t('details.ocspUrl')} value={ca.ocsp_url} mono />
             )}
           </CompactGrid>
         </CompactSection>
       )}
       
       {/* Fingerprints */}
-      <CompactSection title="Fingerprints" icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
+      <CompactSection title={t('details.fingerprints')} icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
         <CompactGrid cols={1}>
           <CompactField icon={Fingerprint} label="SHA-256" value={ca.thumbprint_sha256} mono copyable />
           <CompactField icon={Fingerprint} label="SHA-1" value={ca.thumbprint_sha1} mono copyable />
@@ -224,7 +227,7 @@ export function CADetails({
       
       {/* PEM */}
       {showPem && ca.pem && (
-        <CompactSection title="PEM Certificate" icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
+        <CompactSection title={t('details.pemCertificate')} icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
               "text-2xs font-mono text-text-secondary bg-bg-tertiary/50 p-2 rounded overflow-x-auto",
@@ -246,7 +249,7 @@ export function CADetails({
                 setShowFullPem(!showFullPem)
               }}
             >
-              {showFullPem ? 'Show Less' : 'Show Full'}
+              {showFullPem ? t('details.showLess') : t('details.showFull')}
             </Button>
             <Button 
               type="button"
@@ -260,18 +263,18 @@ export function CADetails({
               }}
             >
               {pemCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
-              {pemCopied ? 'Copied!' : 'Copy PEM'}
+              {pemCopied ? t('common.copied') : t('details.copyPem')}
             </Button>
           </div>
         </CompactSection>
       )}
       
       {/* Metadata */}
-      <CompactSection title="Metadata" collapsible defaultOpen={false}>
+      <CompactSection title={t('details.metadata')} collapsible defaultOpen={false}>
         <CompactGrid>
-          <CompactField autoIcon label="Created" value={formatDate(ca.created_at)} />
-          <CompactField autoIcon label="Created By" value={ca.created_by} />
-          <CompactField label="Imported From" value={ca.imported_from} colSpan={2} />
+          <CompactField autoIcon label={t('details.created')} value={formatDate(ca.created_at)} />
+          <CompactField autoIcon label={t('details.createdBy')} value={ca.created_by} />
+          <CompactField label={t('details.importedFrom')} value={ca.imported_from} colSpan={2} />
         </CompactGrid>
       </CompactSection>
     </div>

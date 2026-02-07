@@ -675,7 +675,7 @@ export default function AccountPage() {
           label={t('account.expiresInDays')}
           type="number"
           name="expires_in_days"
-          placeholder="365"
+          placeholder={t('account.daysPlaceholder')}
           helperText={t('account.noExpiration')}
         />
       </FormModal>
@@ -709,7 +709,7 @@ export default function AccountPage() {
               </p>
               <Input
                 type="text"
-                placeholder="000000"
+                placeholder={t('account.codePlaceholder')}
                 value={confirmCode}
                 onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 maxLength={6}

@@ -12,6 +12,7 @@
  * - Bulk add/remove with arrow buttons
  */
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   User, MagnifyingGlass, Plus, Minus, CaretRight, CaretLeft,
   CaretDoubleRight, CaretDoubleLeft, CheckSquare, Square
@@ -23,12 +24,14 @@ import { cn } from '../lib/utils'
 export function MemberTransferModal({
   open,
   onClose,
-  title = 'Manage Members',
+  title,
   allUsers = [],
   currentMembers = [],
   onSave,
   loading = false,
 }) {
+  const { t } = useTranslation()
+  const modalTitle = title || t('members.manageMembers')
   // Local state for pending changes - store user IDs
   const [members, setMembers] = useState(() => 
     currentMembers.map(m => m.user_id)
@@ -257,7 +260,7 @@ export function MemberTransferModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={title}
+      title={modalTitle}
       size="xl"
     >
       <div className="p-4">
@@ -276,7 +279,7 @@ export function MemberTransferModal({
             <div className="px-3 py-2 bg-bg-secondary border-b border-border">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-text-primary">
-                  Available Users
+                  {t('members.availableUsers')}
                 </span>
                 <span className="text-xs text-text-tertiary">
                   {availableUsers.length}
@@ -287,7 +290,7 @@ export function MemberTransferModal({
                 <MagnifyingGlass size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder={t('common.search') + '...'}
                   value={searchAvailable}
                   onChange={(e) => setSearchAvailable(e.target.value)}
                   className="w-full pl-7 pr-2 py-1.5 text-xs bg-bg-tertiary border border-border rounded text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary"
@@ -299,7 +302,7 @@ export function MemberTransferModal({
             <div className="flex-1 overflow-auto p-2 space-y-1">
               {availableUsers.length === 0 ? (
                 <p className="text-xs text-text-tertiary text-center py-4">
-                  {searchAvailable ? 'No matching users' : 'All users are members'}
+                  {searchAvailable ? t('members.noMatchingUsers') : t('members.allUsersAreMembers')}
                 </p>
               ) : (
                 availableUsers.map(user => (
@@ -326,7 +329,7 @@ export function MemberTransferModal({
               variant="secondary"
               onClick={addAll}
               disabled={availableUsers.length === 0}
-              title="Add all"
+              title={t('members.addAll')}
               className="w-9 h-9 p-0"
             >
               <CaretDoubleRight size={16} />
@@ -336,7 +339,7 @@ export function MemberTransferModal({
               variant="primary"
               onClick={addSelected}
               disabled={selectedAvailable.size === 0}
-              title="Add selected"
+              title={t('members.addSelected')}
               className="w-9 h-9 p-0"
             >
               <CaretRight size={18} weight="bold" />
@@ -346,7 +349,7 @@ export function MemberTransferModal({
               variant="danger"
               onClick={removeSelected}
               disabled={selectedMembers.size === 0}
-              title="Remove selected"
+              title={t('members.removeSelected')}
               className="w-9 h-9 p-0"
             >
               <CaretLeft size={18} weight="bold" />
@@ -356,7 +359,7 @@ export function MemberTransferModal({
               variant="secondary"
               onClick={removeAll}
               disabled={memberUsers.length === 0}
-              title="Remove all"
+              title={t('members.removeAll')}
               className="w-9 h-9 p-0"
             >
               <CaretDoubleLeft size={16} />
@@ -377,7 +380,7 @@ export function MemberTransferModal({
             <div className="px-3 py-2 bg-bg-secondary border-b border-border">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-text-primary">
-                  Group Members
+                  {t('members.groupMembers')}
                 </span>
                 <span className="text-xs text-text-tertiary">
                   {memberUsers.length}
@@ -388,7 +391,7 @@ export function MemberTransferModal({
                 <MagnifyingGlass size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-tertiary" />
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder={t('common.search') + '...'}
                   value={searchMembers}
                   onChange={(e) => setSearchMembers(e.target.value)}
                   className="w-full pl-7 pr-2 py-1.5 text-xs bg-bg-tertiary border border-border rounded text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent-primary"
@@ -400,7 +403,7 @@ export function MemberTransferModal({
             <div className="flex-1 overflow-auto p-2 space-y-1">
               {memberUsers.length === 0 ? (
                 <p className="text-xs text-text-tertiary text-center py-4">
-                  {searchMembers ? 'No matching members' : 'No members yet'}
+                  {searchMembers ? t('members.noMatchingMembers') : t('members.noMembersYet')}
                 </p>
               ) : (
                 memberUsers.map(user => (
@@ -425,17 +428,17 @@ export function MemberTransferModal({
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
           <p className="text-xs text-text-tertiary">
             {hasChanges ? (
-              <span className="text-status-warning">You have unsaved changes</span>
+              <span className="text-status-warning">{t('common.unsavedChanges')}</span>
             ) : (
-              'Drag users between lists or use the buttons'
+              t('members.dragOrUseButtons')
             )}
           </p>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={onClose}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSave} disabled={!hasChanges || loading}>
-              {loading ? 'Saving...' : 'Save Changes'}
+              {loading ? t('common.loading') : t('common.save')}
             </Button>
           </div>
         </div>

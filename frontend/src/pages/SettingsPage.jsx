@@ -31,15 +31,15 @@ import { loadProSettings } from '../proLoader.jsx'
 // Base settings categories (Community)
 // Settings categories with colors for visual distinction
 const BASE_SETTINGS_CATEGORIES = [
-  { id: 'general', label: 'General', icon: Gear, color: 'icon-bg-blue' },
-  { id: 'appearance', label: 'Appearance', icon: Palette, color: 'icon-bg-violet' },
-  { id: 'email', label: 'Email', icon: EnvelopeSimple, color: 'icon-bg-teal' },
-  { id: 'security', label: 'Security', icon: ShieldCheck, color: 'icon-bg-amber' },
-  { id: 'backup', label: 'Backup', icon: Database, color: 'icon-bg-emerald' },
-  { id: 'audit', label: 'Audit', icon: ListBullets, color: 'icon-bg-orange' },
-  { id: 'database', label: 'Database', icon: HardDrives, color: 'icon-bg-blue' },
-  { id: 'https', label: 'HTTPS', icon: Lock, color: 'icon-bg-emerald' },
-  { id: 'updates', label: 'Updates', icon: Rocket, color: 'icon-bg-violet' },
+  { id: 'general', labelKey: 'settings.tabs.general', icon: Gear, color: 'icon-bg-blue' },
+  { id: 'appearance', labelKey: 'settings.tabs.appearance', icon: Palette, color: 'icon-bg-violet' },
+  { id: 'email', labelKey: 'settings.tabs.email', icon: EnvelopeSimple, color: 'icon-bg-teal' },
+  { id: 'security', labelKey: 'settings.tabs.security', icon: ShieldCheck, color: 'icon-bg-amber' },
+  { id: 'backup', labelKey: 'settings.tabs.backup', icon: Database, color: 'icon-bg-emerald' },
+  { id: 'audit', labelKey: 'settings.tabs.audit', icon: ListBullets, color: 'icon-bg-orange' },
+  { id: 'database', labelKey: 'settings.tabs.database', icon: HardDrives, color: 'icon-bg-blue' },
+  { id: 'https', labelKey: 'settings.tabs.https', icon: Lock, color: 'icon-bg-emerald' },
+  { id: 'updates', labelKey: 'settings.tabs.updates', icon: Rocket, color: 'icon-bg-violet' },
 ]
 
 // Appearance Settings Component
@@ -592,7 +592,7 @@ export default function SettingsPage() {
                   label={t('settings.baseUrl')}
                   value={settings.base_url || ''}
                   onChange={(e) => updateSetting('base_url', e.target.value)}
-                  placeholder="https://ucm.example.com"
+                  placeholder={t('settings.baseUrlPlaceholder')}
                   helperText={t('settings.baseUrlHelper')}
                 />
               </div>
@@ -645,7 +645,7 @@ export default function SettingsPage() {
                     label={t('settings.smtpHost')}
                     value={settings.smtp_host || ''}
                     onChange={(e) => updateSetting('smtp_host', e.target.value)}
-                    placeholder="smtp.example.com"
+                    placeholder={t('settings.smtpHostPlaceholder')}
                   />
                 </div>
                 <div className="col-span-full md:col-span-1">
@@ -670,7 +670,7 @@ export default function SettingsPage() {
                   type="password"
                   value={settings.smtp_password || ''}
                   onChange={(e) => updateSetting('smtp_password', e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={t('settings.passwordPlaceholder')}
                 />
               </div>
             </DetailSection>
@@ -681,7 +681,7 @@ export default function SettingsPage() {
                   type="email"
                   value={settings.smtp_from_email || ''}
                   onChange={(e) => updateSetting('smtp_from_email', e.target.value)}
-                  placeholder="noreply@example.com"
+                  placeholder={t('settings.fromEmailPlaceholder')}
                 />
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -1153,32 +1153,32 @@ export default function SettingsPage() {
   // Help content for modal
   const helpContent = (
     <div className="space-y-4">
-      <HelpCard variant="info" title="General Settings">
+      <HelpCard variant="info" title={t('settings.helpGeneral')}>
         Configure your UCM instance name, base URL, session timeout, and timezone.
         These settings affect all users and system behavior.
       </HelpCard>
       
-      <HelpCard variant="tip" title="Email Configuration">
+      <HelpCard variant="tip" title={t('settings.helpEmail')}>
         Configure SMTP settings to enable email notifications for certificate
         expiration alerts and system events. Test your configuration before saving.
       </HelpCard>
 
-      <HelpCard variant="warning" title="Security Settings">
+      <HelpCard variant="warning" title={t('settings.helpSecurity')}>
         Security settings like 2FA enforcement and password policies affect all users.
         Changes take effect immediately - users may need to update their credentials.
       </HelpCard>
 
-      <HelpCard variant="info" title="Backup & Restore">
+      <HelpCard variant="info" title={t('settings.helpBackup')}>
         Create encrypted backups of all data including certificates, CAs, users, 
         and settings. Store backup passwords securely - they cannot be recovered.
       </HelpCard>
 
-      <HelpCard variant="tip" title="Database Management">
+      <HelpCard variant="tip" title={t('settings.helpDatabase')}>
         Optimize database performance, check integrity, or export data.
         The danger zone allows complete database reset - use with extreme caution.
       </HelpCard>
 
-      <HelpCard variant="info" title="HTTPS Certificate">
+      <HelpCard variant="info" title={t('settings.helpHttps')}>
         Manage the SSL/TLS certificate used by UCM. You can use a certificate
         from your PKI or generate a self-signed certificate for testing.
       </HelpCard>
@@ -1196,7 +1196,7 @@ export default function SettingsPage() {
   // Transform categories to tabs format with translations
   const tabs = SETTINGS_CATEGORIES.map(cat => ({
     id: cat.id,
-    label: t(`settings.tabs.${cat.id}`, { defaultValue: cat.label }),
+    label: t(cat.labelKey),
     icon: cat.icon,
     color: cat.color,
     badge: cat.pro ? { label: t('common.pro'), variant: 'info' } : undefined
