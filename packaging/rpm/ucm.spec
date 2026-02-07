@@ -1,5 +1,5 @@
 Name:           ucm
-Version:        2.0.0~beta1
+Version:        2.0.0
 Release:        1%{?dist}
 Summary:        Ultimate CA Manager - Complete PKI Management Platform
 
@@ -11,8 +11,11 @@ BuildArch:      noarch
 # Disable auto-detection of requires (we manage deps via venv)
 AutoReqProv:    no
 Requires:       python3 >= 3.9
+Requires:       python3-devel
 Requires:       systemd
 Requires:       openssl >= 1.1.1
+Requires:       gcc-c++
+Requires:       swig
 
 # Use /opt/ucm like DEB package for consistency
 %define ucm_home /opt/ucm
