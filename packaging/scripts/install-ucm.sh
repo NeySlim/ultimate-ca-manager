@@ -279,7 +279,7 @@ main() {
         esac
         
         echo ""
-        read -p "Select option [1]: " choice
+        read -p "Select option [1]: " choice < /dev/tty
         choice=${choice:-1}
         
         if [ "$choice" = "1" ]; then

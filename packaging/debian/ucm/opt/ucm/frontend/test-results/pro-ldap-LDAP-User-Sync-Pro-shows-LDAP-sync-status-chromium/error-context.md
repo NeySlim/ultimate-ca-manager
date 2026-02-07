@@ -1,0 +1,266 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e5]:
+    - generic [ref=e7]:
+      - link "UCM Dashboard" [ref=e8] [cursor=pointer]:
+        - /url: /
+      - link "Dashboard" [ref=e14] [cursor=pointer]:
+        - /url: /
+        - img [ref=e15]
+        - generic: Dashboard
+      - link "Certificates" [ref=e17] [cursor=pointer]:
+        - /url: /certificates
+        - img [ref=e18]
+        - generic: Certificates
+      - link "CAs" [ref=e20] [cursor=pointer]:
+        - /url: /cas
+        - img [ref=e21]
+        - generic: CAs
+      - link "CSRs" [ref=e23] [cursor=pointer]:
+        - /url: /csrs
+        - img [ref=e24]
+        - generic: CSRs
+      - link "Templates" [ref=e26] [cursor=pointer]:
+        - /url: /templates
+        - img [ref=e27]
+        - generic: Templates
+      - link "Users" [ref=e29] [cursor=pointer]:
+        - /url: /users
+        - img [ref=e30]
+        - generic: Users
+      - link "ACME" [ref=e33] [cursor=pointer]:
+        - /url: /acme
+        - img [ref=e34]
+        - generic: ACME
+      - link "SCEP" [ref=e36] [cursor=pointer]:
+        - /url: /scep-config
+        - img [ref=e37]
+        - generic: SCEP
+      - link "CRL/OCSP" [ref=e39] [cursor=pointer]:
+        - /url: /crl-ocsp
+        - img [ref=e40]
+        - generic: CRL/OCSP
+      - link "Trust Store" [ref=e42] [cursor=pointer]:
+        - /url: /truststore
+        - img [ref=e43]
+        - generic: Trust Store
+      - link "Import" [ref=e45] [cursor=pointer]:
+        - /url: /import
+        - img [ref=e46]
+        - generic: Import
+      - link "Tools" [ref=e48] [cursor=pointer]:
+        - /url: /tools
+        - img [ref=e49]
+        - generic: Tools
+      - link "Audit" [ref=e51] [cursor=pointer]:
+        - /url: /audit
+        - img [ref=e52]
+        - generic: Audit
+      - link "Settings" [ref=e54] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e55]
+        - generic: Settings
+      - link "RBAC" [ref=e58] [cursor=pointer]:
+        - /url: /rbac
+        - img [ref=e59]
+        - generic:
+          - img
+          - text: RBAC
+      - link "HSM" [ref=e61] [cursor=pointer]:
+        - /url: /hsm
+        - img [ref=e62]
+        - generic:
+          - img
+          - text: HSM
+      - link "Security" [ref=e64] [cursor=pointer]:
+        - /url: /security
+        - img [ref=e65]
+        - generic:
+          - img
+          - text: Security
+      - button "Theme" [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
+        - generic: Theme
+      - button "Real-time updates active" [ref=e70] [cursor=pointer]:
+        - img [ref=e71]
+      - button "admin" [ref=e73] [cursor=pointer]:
+        - img [ref=e74]
+        - generic: admin
+    - generic [ref=e77]:
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - img [ref=e82]
+            - generic [ref=e84]:
+              - heading "Users" [level=1] [ref=e85]
+              - paragraph [ref=e86]: 4 users
+          - button "Help" [ref=e88] [cursor=pointer]:
+            - img [ref=e89]
+            - generic [ref=e91]: Help
+        - generic [ref=e93]:
+          - button "Users 4" [ref=e94] [cursor=pointer]:
+            - img [ref=e95]
+            - generic [ref=e97]: Users
+            - generic [ref=e98]: "4"
+          - button "Groups 1" [ref=e99] [cursor=pointer]:
+            - img [ref=e100]
+            - generic [ref=e102]: Groups
+            - generic [ref=e103]: "1"
+      - generic [ref=e104]:
+        - generic [ref=e105]:
+          - img [ref=e107]
+          - generic [ref=e110]:
+            - generic [ref=e111]: "2"
+            - generic [ref=e112]: Active
+        - generic [ref=e113]:
+          - img [ref=e115]
+          - generic [ref=e118]:
+            - generic [ref=e119]: "2"
+            - generic [ref=e120]: Disabled
+        - generic [ref=e121]:
+          - img [ref=e123]
+          - generic [ref=e126]:
+            - generic [ref=e127]: "1"
+            - generic [ref=e128]: Admins
+        - generic [ref=e129]:
+          - img [ref=e131]
+          - generic [ref=e134]:
+            - generic [ref=e135]: "4"
+            - generic [ref=e136]: Total
+      - generic [ref=e137]:
+        - main [ref=e138]:
+          - generic [ref=e140]:
+            - generic [ref=e142]:
+              - generic [ref=e143]:
+                - img [ref=e144]
+                - textbox "Search users..." [ref=e146]
+              - generic [ref=e147]:
+                - combobox [ref=e149] [cursor=pointer]:
+                  - generic: All Roles
+                  - img [ref=e151]
+                - combobox [ref=e154] [cursor=pointer]:
+                  - generic: All Status
+                  - img [ref=e156]
+              - button "New User" [ref=e159] [cursor=pointer]:
+                - img [ref=e160]
+                - text: New User
+            - table [ref=e163]:
+              - rowgroup [ref=e164]:
+                - row "User Role Status Last Login" [ref=e165]:
+                  - columnheader "User" [ref=e166] [cursor=pointer]:
+                    - generic [ref=e167]:
+                      - text: User
+                      - img [ref=e168]
+                  - columnheader "Role" [ref=e170] [cursor=pointer]:
+                    - generic [ref=e171]: Role
+                  - columnheader "Status" [ref=e172] [cursor=pointer]:
+                    - generic [ref=e173]: Status
+                  - columnheader "Last Login" [ref=e174] [cursor=pointer]:
+                    - generic [ref=e175]: Last Login
+                  - columnheader [ref=e176]
+              - rowgroup [ref=e177]:
+                - row "A admin admin@localhost admin Active Feb 6, 2026" [ref=e178] [cursor=pointer]:
+                  - cell "A admin admin@localhost" [ref=e179]:
+                    - generic "admin" [ref=e180]:
+                      - generic [ref=e181]:
+                        - generic [ref=e182]: A
+                        - generic [ref=e183]:
+                          - generic [ref=e184]: admin
+                          - generic [ref=e185]: admin@localhost
+                  - cell "admin" [ref=e186]:
+                    - generic "admin" [ref=e187]:
+                      - generic [ref=e188]:
+                        - img [ref=e190]
+                        - text: admin
+                  - cell "Active" [ref=e192]:
+                    - generic [ref=e194]:
+                      - img [ref=e196]
+                      - text: Active
+                  - cell "Feb 6, 2026" [ref=e198]:
+                    - generic "2026-02-06T07:01:28.137006" [ref=e199]: Feb 6, 2026
+                  - cell [ref=e200]:
+                    - button [ref=e202]:
+                      - img [ref=e203]
+                - row "Q qa_test_user qa@test.local viewer Disabled Never" [ref=e205] [cursor=pointer]:
+                  - cell "Q qa_test_user qa@test.local" [ref=e206]:
+                    - generic "qa_test_user" [ref=e207]:
+                      - generic [ref=e208]:
+                        - generic [ref=e209]: Q
+                        - generic [ref=e210]:
+                          - generic [ref=e211]: qa_test_user
+                          - generic [ref=e212]: qa@test.local
+                  - cell "viewer" [ref=e213]:
+                    - generic "viewer" [ref=e214]:
+                      - generic [ref=e215]: viewer
+                  - cell "Disabled" [ref=e216]:
+                    - generic [ref=e218]:
+                      - img [ref=e220]
+                      - text: Disabled
+                  - cell "Never" [ref=e222]:
+                    - generic [ref=e223]: Never
+                  - cell [ref=e224]:
+                    - button [ref=e226]:
+                      - img [ref=e227]
+                - row "Q qa-test-user qa@test.com viewer Disabled Never" [ref=e229] [cursor=pointer]:
+                  - cell "Q qa-test-user qa@test.com" [ref=e230]:
+                    - generic "qa-test-user" [ref=e231]:
+                      - generic [ref=e232]:
+                        - generic [ref=e233]: Q
+                        - generic [ref=e234]:
+                          - generic [ref=e235]: qa-test-user
+                          - generic [ref=e236]: qa@test.com
+                  - cell "viewer" [ref=e237]:
+                    - generic "viewer" [ref=e238]:
+                      - generic [ref=e239]: viewer
+                  - cell "Disabled" [ref=e240]:
+                    - generic [ref=e242]:
+                      - img [ref=e244]
+                      - text: Disabled
+                  - cell "Never" [ref=e246]:
+                    - generic [ref=e247]: Never
+                  - cell [ref=e248]:
+                    - button [ref=e250]:
+                      - img [ref=e251]
+                - row "Z zeezr ezrezr@efdsf.com operator Active Never" [ref=e253] [cursor=pointer]:
+                  - cell "Z zeezr ezrezr@efdsf.com" [ref=e254]:
+                    - generic "zeezr" [ref=e255]:
+                      - generic [ref=e256]:
+                        - generic [ref=e257]: Z
+                        - generic [ref=e258]:
+                          - generic [ref=e259]: zeezr
+                          - generic [ref=e260]: ezrezr@efdsf.com
+                  - cell "operator" [ref=e261]:
+                    - generic "operator" [ref=e262]:
+                      - generic [ref=e263]: operator
+                  - cell "Active" [ref=e264]:
+                    - generic [ref=e266]:
+                      - img [ref=e268]
+                      - text: Active
+                  - cell "Never" [ref=e270]:
+                    - generic [ref=e271]: Never
+                  - cell [ref=e272]:
+                    - button [ref=e274]:
+                      - img [ref=e275]
+            - generic [ref=e277]:
+              - paragraph [ref=e278]:
+                - generic [ref=e279]: 1-4
+                - text: of 4
+              - generic [ref=e280]:
+                - combobox [ref=e282] [cursor=pointer]:
+                  - generic: 25/page
+                  - img [ref=e284]
+                - button [disabled] [ref=e286]:
+                  - img [ref=e287]
+                - generic [ref=e289]: 1/1
+                - button [disabled] [ref=e290]:
+                  - img [ref=e291]
+        - complementary [ref=e293]:
+          - generic "Drag to resize panel" [ref=e294]
+          - generic [ref=e296]:
+            - img [ref=e298]
+            - paragraph [ref=e300]: Select a user to view details
+  - region "Notifications (F8)":
+    - list
+```

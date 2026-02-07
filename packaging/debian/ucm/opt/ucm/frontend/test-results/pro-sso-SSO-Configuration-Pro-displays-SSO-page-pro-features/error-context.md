@@ -1,0 +1,156 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e5]:
+    - generic [ref=e7]:
+      - link "UCM Dashboard" [ref=e8] [cursor=pointer]:
+        - /url: /
+      - link "Dashboard" [ref=e14] [cursor=pointer]:
+        - /url: /
+        - img [ref=e15]
+        - generic: Dashboard
+      - link "Certificates" [ref=e17] [cursor=pointer]:
+        - /url: /certificates
+        - img [ref=e18]
+        - generic: Certificates
+      - link "CAs" [ref=e20] [cursor=pointer]:
+        - /url: /cas
+        - img [ref=e21]
+        - generic: CAs
+      - link "CSRs" [ref=e23] [cursor=pointer]:
+        - /url: /csrs
+        - img [ref=e24]
+        - generic: CSRs
+      - link "Templates" [ref=e26] [cursor=pointer]:
+        - /url: /templates
+        - img [ref=e27]
+        - generic: Templates
+      - link "Users" [ref=e29] [cursor=pointer]:
+        - /url: /users
+        - img [ref=e30]
+        - generic: Users
+      - link "ACME" [ref=e32] [cursor=pointer]:
+        - /url: /acme
+        - img [ref=e33]
+        - generic: ACME
+      - link "SCEP" [ref=e35] [cursor=pointer]:
+        - /url: /scep-config
+        - img [ref=e36]
+        - generic: SCEP
+      - link "CRL/OCSP" [ref=e38] [cursor=pointer]:
+        - /url: /crl-ocsp
+        - img [ref=e39]
+        - generic: CRL/OCSP
+      - link "Trust Store" [ref=e41] [cursor=pointer]:
+        - /url: /truststore
+        - img [ref=e42]
+        - generic: Trust Store
+      - link "Import" [ref=e44] [cursor=pointer]:
+        - /url: /import
+        - img [ref=e45]
+        - generic: Import
+      - link "Tools" [ref=e47] [cursor=pointer]:
+        - /url: /tools
+        - img [ref=e48]
+        - generic: Tools
+      - link "Audit" [ref=e50] [cursor=pointer]:
+        - /url: /audit
+        - img [ref=e51]
+        - generic: Audit
+      - link "Settings" [ref=e53] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e54]
+        - generic: Settings
+      - link "RBAC" [ref=e58] [cursor=pointer]:
+        - /url: /rbac
+        - img [ref=e59]
+        - generic:
+          - img
+          - text: RBAC
+      - link "HSM" [ref=e61] [cursor=pointer]:
+        - /url: /hsm
+        - img [ref=e62]
+        - generic:
+          - img
+          - text: HSM
+      - link "Security" [ref=e64] [cursor=pointer]:
+        - /url: /security
+        - img [ref=e65]
+        - generic:
+          - img
+          - text: Security
+      - button "Theme" [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
+        - generic: Theme
+      - button "Real-time updates active" [ref=e70] [cursor=pointer]:
+        - img [ref=e71]
+      - button "admin" [ref=e73] [cursor=pointer]:
+        - img [ref=e74]
+        - generic: admin
+    - generic [ref=e77]:
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - img [ref=e82]
+            - generic [ref=e84]:
+              - heading "Settings" [level=1] [ref=e85]
+              - paragraph [ref=e86]: System configuration
+          - button "Help" [ref=e88] [cursor=pointer]:
+            - img [ref=e89]
+            - generic [ref=e91]: Help
+        - generic [ref=e93]:
+          - button "General" [ref=e94] [cursor=pointer]:
+            - img [ref=e95]
+            - generic [ref=e97]: General
+          - button "Appearance" [ref=e98] [cursor=pointer]:
+            - img [ref=e99]
+            - generic [ref=e101]: Appearance
+          - button "Email" [ref=e102] [cursor=pointer]:
+            - img [ref=e103]
+            - generic [ref=e105]: Email
+          - button "Security" [ref=e106] [cursor=pointer]:
+            - img [ref=e107]
+            - generic [ref=e109]: Security
+          - button "SSO Pro" [ref=e110] [cursor=pointer]:
+            - img [ref=e111]
+            - generic [ref=e113]: SSO
+            - generic [ref=e114]: Pro
+          - button "Backup" [ref=e115] [cursor=pointer]:
+            - img [ref=e116]
+            - generic [ref=e118]: Backup
+          - button "Audit" [ref=e119] [cursor=pointer]:
+            - img [ref=e120]
+            - generic [ref=e122]: Audit
+          - button "Database" [ref=e123] [cursor=pointer]:
+            - img [ref=e124]
+            - generic [ref=e126]: Database
+          - button "HTTPS" [ref=e127] [cursor=pointer]:
+            - img [ref=e128]
+            - generic [ref=e130]: HTTPS
+      - main [ref=e132]:
+        - generic [ref=e135]:
+          - generic [ref=e137]:
+            - generic [ref=e138]:
+              - img [ref=e140]
+              - generic [ref=e143]:
+                - heading "Single Sign-On" [level=2] [ref=e144]
+                - paragraph [ref=e145]: Configure LDAP, OAuth2, or SAML providers for centralized authentication
+            - generic [ref=e146]:
+              - generic [ref=e147]: Pro
+              - button "Add Provider" [ref=e149] [cursor=pointer]:
+                - img [ref=e150]
+                - text: Add Provider
+          - generic [ref=e153]:
+            - img [ref=e155]
+            - generic [ref=e157]:
+              - paragraph [ref=e158]: SSO Providers
+              - generic [ref=e159]: Connect UCM to your identity provider for seamless authentication. Users can login with their corporate credentials.
+          - generic [ref=e160]:
+            - img [ref=e164]
+            - heading "No SSO providers" [level=3] [ref=e167]
+            - paragraph [ref=e168]: Add LDAP, OAuth2, or SAML providers
+            - button "Add Provider" [ref=e169] [cursor=pointer]
+  - region "Notifications (F8)":
+    - list
+```

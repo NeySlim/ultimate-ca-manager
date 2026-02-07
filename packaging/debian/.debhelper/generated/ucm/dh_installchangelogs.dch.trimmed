@@ -1,0 +1,41 @@
+ucm (2.0.0~beta1) stable; urgency=medium
+
+  * First beta release of UCM 2.0
+  * Complete UI redesign with responsive layout
+  * New security features: TOTP MFA, WebAuthn, password policies
+  * Database migration system for v1.8.x upgrades
+  * Groups and user management
+  * ACME, SCEP, OCSP support
+  * Certificate templates
+  * Improved audit logging with hash chain
+
+ -- UCM Team <support@ucm.local>  Thu, 06 Feb 2026 09:00:00 +0100
+
+ucm (2.0.0) stable; urgency=medium
+
+  * Version 2.0.0 - Major Release
+  
+  * Features:
+    - Complete UI redesign with 8 themes
+    - Pro: HSM integration page
+    - Pro: SSO/SAML/OIDC integration
+    - Pro: RBAC with role inheritance
+    - Pro: Group management with hierarchies
+    - ACME protocol support (Let's Encrypt compatible)
+    - WebAuthn/FIDO2 passwordless authentication
+    - mTLS client certificate authentication
+    - EST protocol support (RFC 7030)
+    - Auto-renewal service
+    - Webhook notifications
+    - Certificate templates
+    - WebAuthn multi-key registration (platform + cross-platform)
+    - HTTPS certificate selection from managed certs
+
+  * Bug fixes:
+    - Fixed WebAuthn registration for multiple authenticators
+    - Fixed Radix Select empty value handling
+    - Fixed database auto-migration
+    - Fixed HTTPS certificate apply and service restart
+    - Fixed cross-platform DATA_DIR paths
+
+ -- UCM Development Team <dev@ucm-project.org>  Mon, 03 Feb 2026 14:00:00 +0100

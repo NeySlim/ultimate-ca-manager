@@ -1,0 +1,176 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - link:
+            - /url: /
+          - link:
+            - /url: /
+            - img
+            - generic: Dashboard
+          - link:
+            - /url: /certificates
+            - img
+            - generic: Certificates
+          - link:
+            - /url: /cas
+            - img
+            - generic: CAs
+          - link:
+            - /url: /csrs
+            - img
+            - generic: CSRs
+          - link:
+            - /url: /templates
+            - img
+            - generic: Templates
+          - link:
+            - /url: /users
+            - img
+            - generic: Users
+          - link:
+            - /url: /acme
+            - img
+            - generic: ACME
+          - link:
+            - /url: /scep
+            - img
+            - generic: SCEP
+          - link:
+            - /url: /import
+            - img
+            - generic: Import
+          - link:
+            - /url: /audit
+            - img
+            - generic: Audit
+          - link:
+            - /url: /settings
+            - img
+            - generic: Settings
+          - link:
+            - /url: /groups
+            - img
+            - generic:
+              - img
+              - text: Groups
+          - link:
+            - /url: /rbac
+            - img
+            - generic:
+              - img
+              - text: RBAC
+          - link:
+            - /url: /sso
+            - img
+            - generic:
+              - img
+              - text: SSO
+          - link:
+            - /url: /hsm
+            - img
+            - generic:
+              - img
+              - text: HSM
+          - button:
+            - img
+            - generic: Theme
+          - button:
+            - img
+            - generic: admin
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - heading [level=1]: HSM Providers
+          - generic:
+            - generic:
+              - button:
+                - img
+                - text: New
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - img
+                - textbox:
+                  - /placeholder: Search providers...
+            - generic:
+              - button:
+                - img
+                - generic:
+                  - paragraph: PKCS#11
+                - generic:
+                  - generic: 0 keys
+                  - img
+              - button:
+                - img
+                - generic:
+                  - paragraph: AWS CloudHSM
+                - generic:
+                  - generic: 0 keys
+                  - img
+              - button:
+                - img
+                - generic:
+                  - paragraph: Azure Key Vault
+                - generic:
+                  - generic: 0 keys
+                  - img
+              - button:
+                - img
+                - generic:
+                  - paragraph: Google Cloud KMS
+                - generic:
+                  - generic: 0 keys
+                  - img
+          - generic:
+            - generic: 4 providers
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - img
+                - paragraph: Select a provider or create a new one
+    - list
+  - dialog "New HSM Provider" [ref=e2]:
+    - generic [ref=e3]:
+      - heading "New HSM Provider" [level=2] [ref=e4]
+      - button [active] [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: Provider Name*
+          - textbox [ref=e14]
+        - generic [ref=e15]:
+          - generic [ref=e16]: Provider Type
+          - combobox [ref=e17] [cursor=pointer]:
+            - generic: PKCS#11 (Local HSM)
+            - img [ref=e19]
+          - combobox [ref=e21]
+      - generic [ref=e22]:
+        - generic [ref=e23]:
+          - generic [ref=e24]: PKCS#11 Library Path
+          - textbox "/usr/lib/softhsm/libsofthsm2.so" [ref=e26]
+        - generic [ref=e27]:
+          - generic [ref=e28]:
+            - generic [ref=e29]: Slot ID (optional)
+            - spinbutton [ref=e31]
+          - generic [ref=e32]:
+            - generic [ref=e33]: Token Label
+            - textbox [ref=e35]
+        - generic [ref=e36]:
+          - generic [ref=e37]: PIN
+          - textbox [ref=e39]
+      - generic [ref=e40]:
+        - checkbox "Enable provider" [ref=e41]
+        - text: Enable provider
+      - generic [ref=e42]:
+        - button "Cancel" [ref=e43] [cursor=pointer]
+        - button "Create" [ref=e44] [cursor=pointer]
+```

@@ -1,0 +1,967 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e5]:
+    - generic [ref=e7]:
+      - link "UCM Dashboard" [ref=e8] [cursor=pointer]:
+        - /url: /
+      - link "Dashboard" [ref=e14] [cursor=pointer]:
+        - /url: /
+        - img [ref=e15]
+        - generic: Dashboard
+      - link "Certificates" [ref=e17] [cursor=pointer]:
+        - /url: /certificates
+        - img [ref=e18]
+        - generic: Certificates
+      - link "CAs" [ref=e21] [cursor=pointer]:
+        - /url: /cas
+        - img [ref=e22]
+        - generic: CAs
+      - link "CSRs" [ref=e24] [cursor=pointer]:
+        - /url: /csrs
+        - img [ref=e25]
+        - generic: CSRs
+      - link "Templates" [ref=e27] [cursor=pointer]:
+        - /url: /templates
+        - img [ref=e28]
+        - generic: Templates
+      - link "Users" [ref=e30] [cursor=pointer]:
+        - /url: /users
+        - img [ref=e31]
+        - generic: Users
+      - link "ACME" [ref=e33] [cursor=pointer]:
+        - /url: /acme
+        - img [ref=e34]
+        - generic: ACME
+      - link "SCEP" [ref=e36] [cursor=pointer]:
+        - /url: /scep-config
+        - img [ref=e37]
+        - generic: SCEP
+      - link "CRL/OCSP" [ref=e39] [cursor=pointer]:
+        - /url: /crl-ocsp
+        - img [ref=e40]
+        - generic: CRL/OCSP
+      - link "Trust Store" [ref=e42] [cursor=pointer]:
+        - /url: /truststore
+        - img [ref=e43]
+        - generic: Trust Store
+      - link "Import" [ref=e45] [cursor=pointer]:
+        - /url: /import
+        - img [ref=e46]
+        - generic: Import
+      - link "Tools" [ref=e48] [cursor=pointer]:
+        - /url: /tools
+        - img [ref=e49]
+        - generic: Tools
+      - link "Audit" [ref=e51] [cursor=pointer]:
+        - /url: /audit
+        - img [ref=e52]
+        - generic: Audit
+      - link "Settings" [ref=e54] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e55]
+        - generic: Settings
+      - link "RBAC" [ref=e58] [cursor=pointer]:
+        - /url: /rbac
+        - img [ref=e59]
+        - generic:
+          - img
+          - text: RBAC
+      - link "HSM" [ref=e61] [cursor=pointer]:
+        - /url: /hsm
+        - img [ref=e62]
+        - generic:
+          - img
+          - text: HSM
+      - link "Security" [ref=e64] [cursor=pointer]:
+        - /url: /security
+        - img [ref=e65]
+        - generic:
+          - img
+          - text: Security
+      - button "Theme" [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
+        - generic: Theme
+      - button "Real-time updates active" [ref=e70] [cursor=pointer]:
+        - img [ref=e71]
+      - button "admin" [ref=e73] [cursor=pointer]:
+        - img [ref=e74]
+        - generic: admin
+    - generic [ref=e77]:
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - img [ref=e82]
+          - generic [ref=e84]:
+            - heading "Certificates" [level=1] [ref=e85]
+            - paragraph [ref=e86]: 31 certificates
+        - button "Help" [ref=e88] [cursor=pointer]:
+          - img [ref=e89]
+          - generic [ref=e91]: Help
+      - generic [ref=e92]:
+        - generic "Click to filter by Valid" [ref=e93] [cursor=pointer]:
+          - img [ref=e95]
+          - generic [ref=e98]:
+            - generic [ref=e99]: "25"
+            - generic [ref=e100]: Valid
+        - generic "Click to filter by Expiring" [ref=e101] [cursor=pointer]:
+          - img [ref=e103]
+          - generic [ref=e106]:
+            - generic [ref=e107]: "0"
+            - generic [ref=e108]: Expiring
+        - generic "Click to filter by Expired" [ref=e109] [cursor=pointer]:
+          - img [ref=e111]
+          - generic [ref=e114]:
+            - generic [ref=e115]: "0"
+            - generic [ref=e116]: Expired
+        - generic "Click to filter by Revoked" [ref=e117] [cursor=pointer]:
+          - img [ref=e119]
+          - generic [ref=e122]:
+            - generic [ref=e123]: "0"
+            - generic [ref=e124]: Revoked
+        - generic "Click to filter by Total" [ref=e125] [cursor=pointer]:
+          - img [ref=e127]
+          - generic [ref=e130]:
+            - generic [ref=e131]: "31"
+            - generic [ref=e132]: Total
+      - generic [ref=e133]:
+        - main [ref=e134]:
+          - generic [ref=e135]:
+            - generic [ref=e137]:
+              - generic [ref=e138]:
+                - img [ref=e139]
+                - textbox "Search certificates..." [ref=e141]
+              - generic [ref=e142]:
+                - combobox [ref=e144] [cursor=pointer]:
+                  - generic: All Status
+                  - img [ref=e146]
+                - combobox [ref=e149] [cursor=pointer]:
+                  - generic: All CAs
+                  - img [ref=e151]
+              - button "Customize columns" [ref=e154] [cursor=pointer]:
+                - img [ref=e155]
+              - button "Filter presets" [ref=e158] [cursor=pointer]:
+                - img [ref=e159]
+              - button "Export data" [ref=e162] [cursor=pointer]:
+                - img [ref=e163]
+              - generic [ref=e166]:
+                - button "Compare" [ref=e167] [cursor=pointer]:
+                  - img [ref=e168]
+                  - text: Compare
+                - button "Import" [ref=e170] [cursor=pointer]:
+                  - img [ref=e171]
+                  - text: Import
+                - button "Issue" [ref=e173] [cursor=pointer]:
+                  - img [ref=e174]
+                  - text: Issue
+            - table [ref=e177]:
+              - rowgroup [ref=e178]:
+                - row "Common Name Status Issuer Expires Key" [ref=e179]:
+                  - columnheader "Common Name" [ref=e180] [cursor=pointer]:
+                    - generic [ref=e181]:
+                      - text: Common Name
+                      - img [ref=e182]
+                  - columnheader "Status" [ref=e184] [cursor=pointer]:
+                    - generic [ref=e185]: Status
+                  - columnheader "Issuer" [ref=e186] [cursor=pointer]:
+                    - generic [ref=e187]: Issuer
+                  - columnheader "Expires" [ref=e188] [cursor=pointer]:
+                    - generic [ref=e189]: Expires
+                  - columnheader "Key" [ref=e190] [cursor=pointer]:
+                    - generic [ref=e191]: Key
+                  - columnheader [ref=e192]
+              - rowgroup [ref=e193]:
+                - row "*.lan.pew.pet Valid lan.pew.pet Oct 7, 2036 RSA" [ref=e194] [cursor=pointer]:
+                  - cell "*.lan.pew.pet" [ref=e195]:
+                    - generic "*.lan.pew.pet" [ref=e196]:
+                      - generic [ref=e197]:
+                        - img [ref=e199]
+                        - generic [ref=e202]: "*.lan.pew.pet"
+                        - generic "Private key available" [ref=e203]:
+                          - img [ref=e204]
+                  - cell "Valid" [ref=e206]:
+                    - generic "valid" [ref=e207]:
+                      - generic [ref=e208]:
+                        - img [ref=e210]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e212]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e213]: lan.pew.pet
+                  - cell "Oct 7, 2036" [ref=e214]:
+                    - generic "2036-10-07T23:18:55" [ref=e215]: Oct 7, 2036
+                  - cell "RSA" [ref=e216]:
+                    - generic "RSA 4096" [ref=e217]: RSA
+                  - cell [ref=e218]:
+                    - button [ref=e220]:
+                      - img [ref=e221]
+                - row "ad.lan.pew.pet Valid lan.pew.pet Jan 24, 2036 RSA" [ref=e223] [cursor=pointer]:
+                  - cell "ad.lan.pew.pet" [ref=e224]:
+                    - generic "ad.lan.pew.pet" [ref=e225]:
+                      - generic [ref=e226]:
+                        - img [ref=e228]
+                        - generic [ref=e231]: ad.lan.pew.pet
+                        - generic "Private key available" [ref=e232]:
+                          - img [ref=e233]
+                  - cell "Valid" [ref=e235]:
+                    - generic "valid" [ref=e236]:
+                      - generic [ref=e237]:
+                        - img [ref=e239]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e241]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e242]: lan.pew.pet
+                  - cell "Jan 24, 2036" [ref=e243]:
+                    - generic "2036-01-24T23:18:19" [ref=e244]: Jan 24, 2036
+                  - cell "RSA" [ref=e245]:
+                    - generic "RSA 4096" [ref=e246]: RSA
+                  - cell [ref=e247]:
+                    - button [ref=e249]:
+                      - img [ref=e250]
+                - row "brother.lan.pew.pet Valid lan.pew.pet Apr 13, 2050 RSA" [ref=e252] [cursor=pointer]:
+                  - cell "brother.lan.pew.pet" [ref=e253]:
+                    - generic "brother.lan.pew.pet" [ref=e254]:
+                      - generic [ref=e255]:
+                        - img [ref=e257]
+                        - generic [ref=e260]: brother.lan.pew.pet
+                        - generic "Private key available" [ref=e261]:
+                          - img [ref=e262]
+                  - cell "Valid" [ref=e264]:
+                    - generic "valid" [ref=e265]:
+                      - generic [ref=e266]:
+                        - img [ref=e268]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e270]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e271]: lan.pew.pet
+                  - cell "Apr 13, 2050" [ref=e272]:
+                    - generic "2050-04-13T22:32:40" [ref=e273]: Apr 13, 2050
+                  - cell "RSA" [ref=e274]:
+                    - generic "RSA 4096" [ref=e275]: RSA
+                  - cell [ref=e276]:
+                    - button [ref=e278]:
+                      - img [ref=e279]
+                - row "forti.lan.pew.pet Valid lan.pew.pet Jan 20, 2035 RSA" [ref=e281] [cursor=pointer]:
+                  - cell "forti.lan.pew.pet" [ref=e282]:
+                    - generic "forti.lan.pew.pet" [ref=e283]:
+                      - generic [ref=e284]:
+                        - img [ref=e286]
+                        - generic [ref=e289]: forti.lan.pew.pet
+                        - generic "No private key" [ref=e290]:
+                          - img [ref=e291]
+                          - img [ref=e293]
+                  - cell "Valid" [ref=e295]:
+                    - generic "valid" [ref=e296]:
+                      - generic [ref=e297]:
+                        - img [ref=e299]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e301]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e302]: lan.pew.pet
+                  - cell "Jan 20, 2035" [ref=e303]:
+                    - generic "2035-01-20T09:07:53" [ref=e304]: Jan 20, 2035
+                  - cell "RSA" [ref=e305]:
+                    - generic "RSA 512" [ref=e306]: RSA
+                  - cell [ref=e307]:
+                    - button [ref=e309]:
+                      - img [ref=e310]
+                - row "fw.lan.pew.pet Valid lan.pew.pet Mar 8, 2027 RSA" [ref=e312] [cursor=pointer]:
+                  - cell "fw.lan.pew.pet" [ref=e313]:
+                    - generic "fw.lan.pew.pet" [ref=e314]:
+                      - generic [ref=e315]:
+                        - img [ref=e317]
+                        - generic [ref=e320]: fw.lan.pew.pet
+                        - generic "Private key available" [ref=e321]:
+                          - img [ref=e322]
+                  - cell "Valid" [ref=e324]:
+                    - generic "valid" [ref=e325]:
+                      - generic [ref=e326]:
+                        - img [ref=e328]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e330]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e331]: lan.pew.pet
+                  - cell "Mar 8, 2027" [ref=e332]:
+                    - generic "2027-03-08T16:56:18.139602" [ref=e333]: Mar 8, 2027
+                  - cell "RSA" [ref=e334]:
+                    - generic "RSA 2048" [ref=e335]: RSA
+                  - cell [ref=e336]:
+                    - button [ref=e338]:
+                      - img [ref=e339]
+                - row "geralt.lan.pew.pet Valid lan.pew.pet Apr 13, 2050 RSA" [ref=e341] [cursor=pointer]:
+                  - cell "geralt.lan.pew.pet" [ref=e342]:
+                    - generic "geralt.lan.pew.pet" [ref=e343]:
+                      - generic [ref=e344]:
+                        - img [ref=e346]
+                        - generic [ref=e349]: geralt.lan.pew.pet
+                        - generic "Private key available" [ref=e350]:
+                          - img [ref=e351]
+                  - cell "Valid" [ref=e353]:
+                    - generic "valid" [ref=e354]:
+                      - generic [ref=e355]:
+                        - img [ref=e357]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e359]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e360]: lan.pew.pet
+                  - cell "Apr 13, 2050" [ref=e361]:
+                    - generic "2050-04-13T22:37:34" [ref=e362]: Apr 13, 2050
+                  - cell "RSA" [ref=e363]:
+                    - generic "RSA 4096" [ref=e364]: RSA
+                  - cell [ref=e365]:
+                    - button [ref=e367]:
+                      - img [ref=e368]
+                - row "GERALT.lan.pew.pet Valid lan-AD-CA Oct 22, 2044 RSA" [ref=e370] [cursor=pointer]:
+                  - cell "GERALT.lan.pew.pet" [ref=e371]:
+                    - generic "GERALT.lan.pew.pet" [ref=e372]:
+                      - generic [ref=e373]:
+                        - img [ref=e375]
+                        - generic [ref=e378]: GERALT.lan.pew.pet
+                        - generic "Private key available" [ref=e379]:
+                          - img [ref=e380]
+                  - cell "Valid" [ref=e382]:
+                    - generic "valid" [ref=e383]:
+                      - generic [ref=e384]:
+                        - img [ref=e386]
+                        - text: Valid
+                  - cell "lan-AD-CA" [ref=e388]:
+                    - generic "CN=lan-AD-CA,DC=lan,DC=pew,DC=pet" [ref=e389]: lan-AD-CA
+                  - cell "Oct 22, 2044" [ref=e390]:
+                    - generic "2044-10-22T17:27:33" [ref=e391]: Oct 22, 2044
+                  - cell "RSA" [ref=e392]:
+                    - generic "RSA 4096" [ref=e393]: RSA
+                  - cell [ref=e394]:
+                    - button [ref=e396]:
+                      - img [ref=e397]
+                - row "hass.lan.pew.pet Valid lan.pew.pet Mar 8, 2027 RSA" [ref=e399] [cursor=pointer]:
+                  - cell "hass.lan.pew.pet" [ref=e400]:
+                    - generic "hass.lan.pew.pet" [ref=e401]:
+                      - generic [ref=e402]:
+                        - img [ref=e404]
+                        - generic [ref=e407]: hass.lan.pew.pet
+                        - generic "Private key available" [ref=e408]:
+                          - img [ref=e409]
+                  - cell "Valid" [ref=e411]:
+                    - generic "valid" [ref=e412]:
+                      - generic [ref=e413]:
+                        - img [ref=e415]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e417]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e418]: lan.pew.pet
+                  - cell "Mar 8, 2027" [ref=e419]:
+                    - generic "2027-03-08T16:56:23.058545" [ref=e420]: Mar 8, 2027
+                  - cell "RSA" [ref=e421]:
+                    - generic "RSA 2048" [ref=e422]: RSA
+                  - cell [ref=e423]:
+                    - button [ref=e425]:
+                      - img [ref=e426]
+                - row "hypernet.lan.pew.pet Valid lan.pew.pet Mar 8, 2027 RSA" [ref=e428] [cursor=pointer]:
+                  - cell "hypernet.lan.pew.pet" [ref=e429]:
+                    - generic "hypernet.lan.pew.pet" [ref=e430]:
+                      - generic [ref=e431]:
+                        - img [ref=e433]
+                        - generic [ref=e436]: hypernet.lan.pew.pet
+                        - generic "Private key available" [ref=e437]:
+                          - img [ref=e438]
+                  - cell "Valid" [ref=e440]:
+                    - generic "valid" [ref=e441]:
+                      - generic [ref=e442]:
+                        - img [ref=e444]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e446]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e447]: lan.pew.pet
+                  - cell "Mar 8, 2027" [ref=e448]:
+                    - generic "2027-03-08T08:00:10.876495" [ref=e449]: Mar 8, 2027
+                  - cell "RSA" [ref=e450]:
+                    - generic "RSA 2048" [ref=e451]: RSA
+                  - cell [ref=e452]:
+                    - button [ref=e454]:
+                      - img [ref=e455]
+                - row "Lan Pew Pet ACME Valid lan.pew.pet Oct 30, 2036 EC" [ref=e457] [cursor=pointer]:
+                  - cell "Lan Pew Pet ACME" [ref=e458]:
+                    - generic "Lan Pew Pet ACME" [ref=e459]:
+                      - generic [ref=e460]:
+                        - img [ref=e462]
+                        - generic [ref=e465]: Lan Pew Pet ACME
+                        - generic "No private key" [ref=e466]:
+                          - img [ref=e467]
+                          - img [ref=e469]
+                  - cell "Valid" [ref=e471]:
+                    - generic "valid" [ref=e472]:
+                      - generic [ref=e473]:
+                        - img [ref=e475]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e477]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e478]: lan.pew.pet
+                  - cell "Oct 30, 2036" [ref=e479]:
+                    - generic "2036-10-30T12:36:18" [ref=e480]: Oct 30, 2036
+                  - cell "EC" [ref=e481]:
+                    - generic "EC secp256r1" [ref=e482]: EC
+                  - cell [ref=e483]:
+                    - button [ref=e485]:
+                      - img [ref=e486]
+                - row "lan-AD-CA Valid lan.pew.pet Jan 22, 2036 RSA" [ref=e488] [cursor=pointer]:
+                  - cell "lan-AD-CA" [ref=e489]:
+                    - generic "lan-AD-CA" [ref=e490]:
+                      - generic [ref=e491]:
+                        - img [ref=e493]
+                        - generic [ref=e496]: lan-AD-CA
+                        - generic "No private key" [ref=e497]:
+                          - img [ref=e498]
+                          - img [ref=e500]
+                  - cell "Valid" [ref=e502]:
+                    - generic "valid" [ref=e503]:
+                      - generic [ref=e504]:
+                        - img [ref=e506]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e508]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e509]: lan.pew.pet
+                  - cell "Jan 22, 2036" [ref=e510]:
+                    - generic "2036-01-22T00:11:43" [ref=e511]: Jan 22, 2036
+                  - cell "RSA" [ref=e512]:
+                    - generic "RSA 2048" [ref=e513]: RSA
+                  - cell [ref=e514]:
+                    - button [ref=e516]:
+                      - img [ref=e517]
+                - row "liezporiezrpoi Valid lan.pew.pet Jan 9, 2027 RSA" [ref=e519] [cursor=pointer]:
+                  - cell "liezporiezrpoi" [ref=e520]:
+                    - generic "liezporiezrpoi" [ref=e521]:
+                      - generic [ref=e522]:
+                        - img [ref=e524]
+                        - generic [ref=e527]: liezporiezrpoi
+                        - generic "No private key" [ref=e528]:
+                          - img [ref=e529]
+                          - img [ref=e531]
+                  - cell "Valid" [ref=e533]:
+                    - generic "valid" [ref=e534]:
+                      - generic [ref=e535]:
+                        - img [ref=e537]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e539]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e540]: lan.pew.pet
+                  - cell "Jan 9, 2027" [ref=e541]:
+                    - generic "2027-01-09T15:17:08" [ref=e542]: Jan 9, 2027
+                  - cell "RSA" [ref=e543]:
+                    - generic "RSA 4096" [ref=e544]: RSA
+                  - cell [ref=e545]:
+                    - button [ref=e547]:
+                      - img [ref=e548]
+                - row "lio Valid lan-AD-CA Feb 4, 2027 RSA" [ref=e550] [cursor=pointer]:
+                  - cell "lio" [ref=e551]:
+                    - generic "lio" [ref=e552]:
+                      - generic [ref=e553]:
+                        - img [ref=e555]
+                        - generic [ref=e558]: lio
+                        - generic "Private key available" [ref=e559]:
+                          - img [ref=e560]
+                  - cell "Valid" [ref=e562]:
+                    - generic "valid" [ref=e563]:
+                      - generic [ref=e564]:
+                        - img [ref=e566]
+                        - text: Valid
+                  - cell "lan-AD-CA" [ref=e568]:
+                    - generic "CN=lan-AD-CA,DC=lan,DC=pew,DC=pet" [ref=e569]: lan-AD-CA
+                  - cell "Feb 4, 2027" [ref=e570]:
+                    - generic "2027-02-04T16:57:05.448906" [ref=e571]: Feb 4, 2027
+                  - cell "RSA" [ref=e572]:
+                    - generic "RSA 2048" [ref=e573]: RSA
+                  - cell [ref=e574]:
+                    - button [ref=e576]:
+                      - img [ref=e577]
+                - row "Lionel Alarcon Valid lan.pew.pet Oct 1, 2036 RSA" [ref=e579] [cursor=pointer]:
+                  - cell "Lionel Alarcon" [ref=e580]:
+                    - generic "Lionel Alarcon" [ref=e581]:
+                      - generic [ref=e582]:
+                        - img [ref=e584]
+                        - generic [ref=e587]: Lionel Alarcon
+                        - generic "Private key available" [ref=e588]:
+                          - img [ref=e589]
+                  - cell "Valid" [ref=e591]:
+                    - generic "valid" [ref=e592]:
+                      - generic [ref=e593]:
+                        - img [ref=e595]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e597]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e598]: lan.pew.pet
+                  - cell "Oct 1, 2036" [ref=e599]:
+                    - generic "2036-10-01T21:54:43" [ref=e600]: Oct 1, 2036
+                  - cell "RSA" [ref=e601]:
+                    - generic "RSA 2048" [ref=e602]: RSA
+                  - cell [ref=e603]:
+                    - button [ref=e605]:
+                      - img [ref=e606]
+                - row "machintruc.lan.pew.pet Valid — - RSA" [ref=e608] [cursor=pointer]:
+                  - cell "machintruc.lan.pew.pet" [ref=e609]:
+                    - generic "machintruc.lan.pew.pet" [ref=e610]:
+                      - generic [ref=e611]:
+                        - img [ref=e613]
+                        - generic [ref=e616]: machintruc.lan.pew.pet
+                        - generic "No private key" [ref=e617]:
+                          - img [ref=e618]
+                          - img [ref=e620]
+                  - cell "Valid" [ref=e622]:
+                    - generic "valid" [ref=e623]:
+                      - generic [ref=e624]:
+                        - img [ref=e626]
+                        - text: Valid
+                  - cell "—" [ref=e628]:
+                    - generic [ref=e629]: —
+                  - cell "-" [ref=e630]:
+                    - generic [ref=e631]: "-"
+                  - cell "RSA" [ref=e632]:
+                    - generic "RSA 4096" [ref=e633]: RSA
+                  - cell [ref=e634]:
+                    - button [ref=e636]:
+                      - img [ref=e637]
+                - row "machintruc.lan.pew.pet Valid — - RSA" [ref=e639] [cursor=pointer]:
+                  - cell "machintruc.lan.pew.pet" [ref=e640]:
+                    - generic "machintruc.lan.pew.pet" [ref=e641]:
+                      - generic [ref=e642]:
+                        - img [ref=e644]
+                        - generic [ref=e647]: machintruc.lan.pew.pet
+                        - generic "Private key available" [ref=e648]:
+                          - img [ref=e649]
+                  - cell "Valid" [ref=e651]:
+                    - generic "valid" [ref=e652]:
+                      - generic [ref=e653]:
+                        - img [ref=e655]
+                        - text: Valid
+                  - cell "—" [ref=e657]:
+                    - generic [ref=e658]: —
+                  - cell "-" [ref=e659]:
+                    - generic [ref=e660]: "-"
+                  - cell "RSA" [ref=e661]:
+                    - generic "RSA 4096" [ref=e662]: RSA
+                  - cell [ref=e663]:
+                    - button [ref=e665]:
+                      - img [ref=e666]
+                - row "machintruc.lan.pew.pet Valid — - RSA" [ref=e668] [cursor=pointer]:
+                  - cell "machintruc.lan.pew.pet" [ref=e669]:
+                    - generic "machintruc.lan.pew.pet" [ref=e670]:
+                      - generic [ref=e671]:
+                        - img [ref=e673]
+                        - generic [ref=e676]: machintruc.lan.pew.pet
+                        - generic "Private key available" [ref=e677]:
+                          - img [ref=e678]
+                  - cell "Valid" [ref=e680]:
+                    - generic "valid" [ref=e681]:
+                      - generic [ref=e682]:
+                        - img [ref=e684]
+                        - text: Valid
+                  - cell "—" [ref=e686]:
+                    - generic [ref=e687]: —
+                  - cell "-" [ref=e688]:
+                    - generic [ref=e689]: "-"
+                  - cell "RSA" [ref=e690]:
+                    - generic "RSA 4096" [ref=e691]: RSA
+                  - cell [ref=e692]:
+                    - button [ref=e694]:
+                      - img [ref=e695]
+                - row "machintruc.lan.pew.pet Valid — - RSA" [ref=e697] [cursor=pointer]:
+                  - cell "machintruc.lan.pew.pet" [ref=e698]:
+                    - generic "machintruc.lan.pew.pet" [ref=e699]:
+                      - generic [ref=e700]:
+                        - img [ref=e702]
+                        - generic [ref=e705]: machintruc.lan.pew.pet
+                        - generic "Private key available" [ref=e706]:
+                          - img [ref=e707]
+                  - cell "Valid" [ref=e709]:
+                    - generic "valid" [ref=e710]:
+                      - generic [ref=e711]:
+                        - img [ref=e713]
+                        - text: Valid
+                  - cell "—" [ref=e715]:
+                    - generic [ref=e716]: —
+                  - cell "-" [ref=e717]:
+                    - generic [ref=e718]: "-"
+                  - cell "RSA" [ref=e719]:
+                    - generic "RSA 4096" [ref=e720]: RSA
+                  - cell [ref=e721]:
+                    - button [ref=e723]:
+                      - img [ref=e724]
+                - row "machintruc.lan.pew.pet Valid — - RSA" [ref=e726] [cursor=pointer]:
+                  - cell "machintruc.lan.pew.pet" [ref=e727]:
+                    - generic "machintruc.lan.pew.pet" [ref=e728]:
+                      - generic [ref=e729]:
+                        - img [ref=e731]
+                        - generic [ref=e734]: machintruc.lan.pew.pet
+                        - generic "Private key available" [ref=e735]:
+                          - img [ref=e736]
+                  - cell "Valid" [ref=e738]:
+                    - generic "valid" [ref=e739]:
+                      - generic [ref=e740]:
+                        - img [ref=e742]
+                        - text: Valid
+                  - cell "—" [ref=e744]:
+                    - generic [ref=e745]: —
+                  - cell "-" [ref=e746]:
+                    - generic [ref=e747]: "-"
+                  - cell "RSA" [ref=e748]:
+                    - generic "RSA 4096" [ref=e749]: RSA
+                  - cell [ref=e750]:
+                    - button [ref=e752]:
+                      - img [ref=e753]
+                - row "machintruc.lan.pew.pet Valid — - RSA" [ref=e755] [cursor=pointer]:
+                  - cell "machintruc.lan.pew.pet" [ref=e756]:
+                    - generic "machintruc.lan.pew.pet" [ref=e757]:
+                      - generic [ref=e758]:
+                        - img [ref=e760]
+                        - generic [ref=e763]: machintruc.lan.pew.pet
+                        - generic "Private key available" [ref=e764]:
+                          - img [ref=e765]
+                  - cell "Valid" [ref=e767]:
+                    - generic "valid" [ref=e768]:
+                      - generic [ref=e769]:
+                        - img [ref=e771]
+                        - text: Valid
+                  - cell "—" [ref=e773]:
+                    - generic [ref=e774]: —
+                  - cell "-" [ref=e775]:
+                    - generic [ref=e776]: "-"
+                  - cell "RSA" [ref=e777]:
+                    - generic "RSA 4096" [ref=e778]: RSA
+                  - cell [ref=e779]:
+                    - button [ref=e781]:
+                      - img [ref=e782]
+                - row "netsuit Valid lan.pew.pet Dec 29, 2026 RSA" [ref=e784] [cursor=pointer]:
+                  - cell "netsuit" [ref=e785]:
+                    - generic "netsuit" [ref=e786]:
+                      - generic [ref=e787]:
+                        - img [ref=e789]
+                        - generic [ref=e792]: netsuit
+                        - generic "Private key available" [ref=e793]:
+                          - img [ref=e794]
+                  - cell "Valid" [ref=e796]:
+                    - generic "valid" [ref=e797]:
+                      - generic [ref=e798]:
+                        - img [ref=e800]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e802]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e803]: lan.pew.pet
+                  - cell "Dec 29, 2026" [ref=e804]:
+                    - generic "2026-12-29T21:49:15" [ref=e805]: Dec 29, 2026
+                  - cell "RSA" [ref=e806]:
+                    - generic "RSA 2048" [ref=e807]: RSA
+                  - cell [ref=e808]:
+                    - button [ref=e810]:
+                      - img [ref=e811]
+                - row "network.lan.pew.pet Valid lan.pew.pet Jun 24, 2026 RSA" [ref=e813] [cursor=pointer]:
+                  - cell "network.lan.pew.pet" [ref=e814]:
+                    - generic "network.lan.pew.pet" [ref=e815]:
+                      - generic [ref=e816]:
+                        - img [ref=e818]
+                        - generic [ref=e821]: network.lan.pew.pet
+                        - generic "Private key available" [ref=e822]:
+                          - img [ref=e823]
+                  - cell "Valid" [ref=e825]:
+                    - generic "valid" [ref=e826]:
+                      - generic [ref=e827]:
+                        - img [ref=e829]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e831]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e832]: lan.pew.pet
+                  - cell "Jun 24, 2026" [ref=e833]:
+                    - generic "2026-06-24T17:29:22" [ref=e834]: Jun 24, 2026
+                  - cell "RSA" [ref=e835]:
+                    - generic "RSA 2048" [ref=e836]: RSA
+                  - cell [ref=e837]:
+                    - button [ref=e839]:
+                      - img [ref=e840]
+                - row "pinet.lan.pew.pet Valid lan.pew.pet Oct 12, 2036 RSA" [ref=e842] [cursor=pointer]:
+                  - cell "pinet.lan.pew.pet" [ref=e843]:
+                    - generic "pinet.lan.pew.pet" [ref=e844]:
+                      - generic [ref=e845]:
+                        - img [ref=e847]
+                        - generic [ref=e850]: pinet.lan.pew.pet
+                        - generic "Private key available" [ref=e851]:
+                          - img [ref=e852]
+                  - cell "Valid" [ref=e854]:
+                    - generic "valid" [ref=e855]:
+                      - generic [ref=e856]:
+                        - img [ref=e858]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e860]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e861]: lan.pew.pet
+                  - cell "Oct 12, 2036" [ref=e862]:
+                    - generic "2036-10-12T20:52:11" [ref=e863]: Oct 12, 2036
+                  - cell "RSA" [ref=e864]:
+                    - generic "RSA 2048" [ref=e865]: RSA
+                  - cell [ref=e866]:
+                    - button [ref=e868]:
+                      - img [ref=e869]
+                - row "pve.lan.pew.pet Valid lan.pew.pet Apr 13, 2050 RSA" [ref=e871] [cursor=pointer]:
+                  - cell "pve.lan.pew.pet" [ref=e872]:
+                    - generic "pve.lan.pew.pet" [ref=e873]:
+                      - generic [ref=e874]:
+                        - img [ref=e876]
+                        - generic [ref=e879]: pve.lan.pew.pet
+                        - generic "Private key available" [ref=e880]:
+                          - img [ref=e881]
+                  - cell "Valid" [ref=e883]:
+                    - generic "valid" [ref=e884]:
+                      - generic [ref=e885]:
+                        - img [ref=e887]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e889]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e890]: lan.pew.pet
+                  - cell "Apr 13, 2050" [ref=e891]:
+                    - generic "2050-04-13T16:02:11" [ref=e892]: Apr 13, 2050
+                  - cell "RSA" [ref=e893]:
+                    - generic "RSA 4096" [ref=e894]: RSA
+                  - cell [ref=e895]:
+                    - button [ref=e897]:
+                      - img [ref=e898]
+                - row "pve2.lan.pew.pet Valid lan.pew.pet Oct 18, 2036 RSA" [ref=e900] [cursor=pointer]:
+                  - cell "pve2.lan.pew.pet" [ref=e901]:
+                    - generic "pve2.lan.pew.pet" [ref=e902]:
+                      - generic [ref=e903]:
+                        - img [ref=e905]
+                        - generic [ref=e908]: pve2.lan.pew.pet
+                        - generic "Private key available" [ref=e909]:
+                          - img [ref=e910]
+                  - cell "Valid" [ref=e912]:
+                    - generic "valid" [ref=e913]:
+                      - generic [ref=e914]:
+                        - img [ref=e916]
+                        - text: Valid
+                  - cell "lan.pew.pet" [ref=e918]:
+                    - generic "CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR" [ref=e919]: lan.pew.pet
+                  - cell "Oct 18, 2036" [ref=e920]:
+                    - generic "2036-10-18T08:38:05" [ref=e921]: Oct 18, 2036
+                  - cell "RSA" [ref=e922]:
+                    - generic "RSA 2048" [ref=e923]: RSA
+                  - cell [ref=e924]:
+                    - button [ref=e926]:
+                      - img [ref=e927]
+            - generic [ref=e929]:
+              - paragraph [ref=e930]:
+                - generic [ref=e931]: 1-25
+                - text: of 31
+              - generic [ref=e932]:
+                - combobox [ref=e934] [cursor=pointer]:
+                  - generic: 25/page
+                  - img [ref=e936]
+                - button [disabled] [ref=e938]:
+                  - img [ref=e939]
+                - generic [ref=e941]: 1/2
+                - button [ref=e942] [cursor=pointer]:
+                  - img [ref=e943]
+        - complementary [ref=e945]:
+          - generic "Drag to resize panel" [ref=e946]
+          - generic [ref=e948]:
+            - generic [ref=e949]:
+              - heading "*.lan.pew.pet" [level=3] [ref=e950]
+              - button "Add to favorites" [ref=e952] [cursor=pointer]:
+                - img [ref=e953]
+              - button [ref=e955] [cursor=pointer]:
+                - img [ref=e956]
+            - generic [ref=e959]:
+              - generic [ref=e960]:
+                - img [ref=e962]
+                - generic [ref=e964]:
+                  - generic [ref=e965]:
+                    - heading "*.lan.pew.pet" [level=3] [ref=e966]
+                    - generic [ref=e967]: Valid
+                    - generic [ref=e968]: Manual
+                  - paragraph [ref=e969]: CN=*.lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR
+              - generic [ref=e970]:
+                - img [ref=e971]
+                - generic [ref=e973]:
+                  - generic [ref=e974]: 3896d left
+                  - generic [ref=e975]: "Exp: Oct 7, 2036"
+              - generic [ref=e976]:
+                - generic [ref=e977]:
+                  - img [ref=e978]
+                  - generic [ref=e980]: RSA
+                  - generic [ref=e981]: 4096 bits
+                - generic [ref=e982]:
+                  - img [ref=e983]
+                  - generic [ref=e985]: Key
+                  - generic [ref=e986]: stored
+                - generic [ref=e987]:
+                  - img [ref=e988]
+                  - generic [ref=e990]: SHA256
+                  - generic [ref=e991]: Signature
+              - generic [ref=e992]:
+                - generic [ref=e993]:
+                  - button "PEM" [ref=e994] [cursor=pointer]:
+                    - img [ref=e995]
+                    - text: PEM
+                  - button "DER" [ref=e997] [cursor=pointer]:
+                    - img [ref=e998]
+                    - text: DER
+                  - button "P7B" [ref=e1000] [cursor=pointer]:
+                    - img [ref=e1001]
+                    - text: P7B
+                  - button "P12" [ref=e1003] [cursor=pointer]:
+                    - img [ref=e1004]
+                    - text: P12
+                  - button "PFX" [ref=e1006] [cursor=pointer]:
+                    - img [ref=e1007]
+                    - text: PFX
+                - button "Renew" [ref=e1009] [cursor=pointer]:
+                  - img [ref=e1010]
+                - button "Revoke" [ref=e1012] [cursor=pointer]:
+                  - img [ref=e1013]
+                - button "Delete" [ref=e1015] [cursor=pointer]:
+                  - img [ref=e1016]
+              - generic [ref=e1018]:
+                - button "Subject" [disabled] [ref=e1019]:
+                  - generic [ref=e1021]:
+                    - img [ref=e1023]
+                    - heading "Subject" [level=4] [ref=e1025]
+                - generic [ref=e1029]:
+                  - generic [ref=e1030]:
+                    - img [ref=e1032]
+                    - generic [ref=e1034]:
+                      - generic [ref=e1035]: Common Name
+                      - generic [ref=e1036]: "*.lan.pew.pet"
+                  - generic [ref=e1037]:
+                    - img [ref=e1039]
+                    - generic [ref=e1041]:
+                      - generic [ref=e1042]: Organization
+                      - generic [ref=e1043]: Pew Pet
+                  - generic [ref=e1044]:
+                    - img [ref=e1046]
+                    - generic [ref=e1048]:
+                      - generic [ref=e1049]: Locality
+                      - generic [ref=e1050]: Montpellier
+                  - generic [ref=e1051]:
+                    - img [ref=e1053]
+                    - generic [ref=e1055]:
+                      - generic [ref=e1056]: State
+                      - generic [ref=e1057]: Occitanie
+                  - generic [ref=e1058]:
+                    - img [ref=e1060]
+                    - generic [ref=e1062]:
+                      - generic [ref=e1063]: Country
+                      - generic [ref=e1064]: FR
+                  - generic [ref=e1065]:
+                    - img [ref=e1067]
+                    - generic [ref=e1069]:
+                      - generic [ref=e1070]: Email
+                      - generic [ref=e1071]: lio@pew.pet
+              - generic [ref=e1072]:
+                - button "Validity" [disabled] [ref=e1073]:
+                  - generic [ref=e1075]:
+                    - img [ref=e1077]
+                    - heading "Validity" [level=4] [ref=e1079]
+                - generic [ref=e1083]:
+                  - generic [ref=e1084]:
+                    - img [ref=e1086]
+                    - generic [ref=e1088]:
+                      - generic [ref=e1089]: Valid From
+                      - generic [ref=e1090]: November 24, 2025 at 11:18 PM
+                  - generic [ref=e1091]:
+                    - img [ref=e1093]
+                    - generic [ref=e1095]:
+                      - generic [ref=e1096]: Valid Until
+                      - generic [ref=e1097]: October 7, 2036 at 11:18 PM
+              - generic [ref=e1098]:
+                - button "Technical Details" [disabled] [ref=e1099]:
+                  - generic [ref=e1101]:
+                    - img [ref=e1103]
+                    - heading "Technical Details" [level=4] [ref=e1105]
+                - generic [ref=e1109]:
+                  - generic [ref=e1110]:
+                    - img [ref=e1112]
+                    - generic [ref=e1114]:
+                      - generic [ref=e1115]: Serial
+                      - generic [ref=e1116]: "31"
+                    - button "Copy" [ref=e1117] [cursor=pointer]:
+                      - img [ref=e1118]
+                  - generic [ref=e1120]:
+                    - img [ref=e1122]
+                    - generic [ref=e1124]:
+                      - generic [ref=e1125]: Key Type
+                      - generic [ref=e1126]: RSA 4096
+                  - generic [ref=e1127]:
+                    - img [ref=e1129]
+                    - generic [ref=e1131]:
+                      - generic [ref=e1132]: Sig Algo
+                      - generic [ref=e1133]: SHA256-RSA
+                  - generic [ref=e1134]:
+                    - img [ref=e1136]
+                    - generic [ref=e1138]:
+                      - generic [ref=e1139]: Cert Type
+                      - generic [ref=e1140]: server_cert
+              - generic [ref=e1141]:
+                - button "Subject Alternative Names" [disabled] [ref=e1142]:
+                  - generic [ref=e1144]:
+                    - img [ref=e1146]
+                    - heading "Subject Alternative Names" [level=4] [ref=e1148]
+                - generic [ref=e1152]: DNS:*.lan.pew.pet
+              - generic [ref=e1153]:
+                - button "Issuer" [disabled] [ref=e1154]:
+                  - generic [ref=e1156]:
+                    - img [ref=e1158]
+                    - heading "Issuer" [level=4] [ref=e1160]
+                - generic [ref=e1164]:
+                  - generic [ref=e1165]:
+                    - img [ref=e1167]
+                    - generic [ref=e1169]:
+                      - generic [ref=e1170]: Issuer
+                      - generic [ref=e1171]: CN=lan.pew.pet,1.2.840.113549.1.9.1=lio@pew.pet,O=Pew Pet,L=Montpellier,ST=Occitanie,C=FR
+                  - generic [ref=e1172]:
+                    - img [ref=e1174]
+                    - generic [ref=e1176]:
+                      - generic [ref=e1177]: CA
+                      - generic [ref=e1178]: lan.pew.pet
+                  - generic [ref=e1179]:
+                    - img [ref=e1181]
+                    - generic [ref=e1183]:
+                      - generic [ref=e1184]: CA Reference
+                      - generic [ref=e1185]: 6382320a5ea11
+                    - button "Copy" [ref=e1186] [cursor=pointer]:
+                      - img [ref=e1187]
+              - generic [ref=e1189]:
+                - button "Fingerprints" [ref=e1190] [cursor=pointer]:
+                  - generic [ref=e1192]:
+                    - img [ref=e1194]
+                    - heading "Fingerprints" [level=4] [ref=e1196]
+                  - img [ref=e1197]
+                - generic [ref=e1200]:
+                  - generic [ref=e1201]:
+                    - img [ref=e1203]
+                    - generic [ref=e1205]:
+                      - generic [ref=e1206]: SHA-1
+                      - generic [ref=e1207]: DA:98:EE:68:9E:EA:E2:B3:3D:04:F9:9A:05:23:28:DD:78:48:DE:87
+                    - button "Copy" [ref=e1208] [cursor=pointer]:
+                      - img [ref=e1209]
+                  - generic [ref=e1211]:
+                    - img [ref=e1213]
+                    - generic [ref=e1215]:
+                      - generic [ref=e1216]: SHA-256
+                      - generic [ref=e1217]: 89:94:04:7D:BF:E8:E0:3D:C1:AE:73:24:1D:2B:04:47:4E:3B:2B:68:31:4F:38:88:AC:BF:F5:11:B5:53:11:49
+                    - button "Copy" [ref=e1218] [cursor=pointer]:
+                      - img [ref=e1219]
+              - generic [ref=e1221]:
+                - button "PEM Certificate" [ref=e1222] [cursor=pointer]:
+                  - generic [ref=e1224]:
+                    - img [ref=e1226]
+                    - heading "PEM Certificate" [level=4] [ref=e1228]
+                  - img [ref=e1229]
+                - generic [ref=e1231]:
+                  - generic [ref=e1233]: "-----BEGIN CERTIFICATE----- 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 -----END CERTIFICATE-----"
+                  - generic [ref=e1234]:
+                    - button "Show Full" [ref=e1235] [cursor=pointer]
+                    - button "Copy PEM" [ref=e1236] [cursor=pointer]:
+                      - img [ref=e1237]
+                      - text: Copy PEM
+              - generic [ref=e1239]:
+                - button "Metadata" [ref=e1240] [cursor=pointer]:
+                  - heading "Metadata" [level=4] [ref=e1243]
+                  - img [ref=e1244]
+                - generic [ref=e1247]:
+                  - generic [ref=e1248]:
+                    - generic [ref=e1249]: "Created:"
+                    - text: January 10, 2026 at 11:41 PM
+                  - generic [ref=e1250]:
+                    - generic [ref=e1251]: "Created By:"
+                    - text: import
+                  - generic [ref=e1252]:
+                    - generic [ref=e1253]: "Source:"
+                    - text: manual
+                  - generic [ref=e1254]:
+                    - generic [ref=e1255]: "Imported From:"
+                    - text: opnsense
+                  - generic [ref=e1256] [cursor=pointer]:
+                    - generic [ref=e1257]: "Reference ID:"
+                    - text: 6924e7dea3718
+                    - img [ref=e1259]
+  - region "Notifications (F8)":
+    - list
+```

@@ -1,0 +1,190 @@
+#!/bin/bash
+# UCM Post-Installation Script (non-interactive)
+
+set -e
+
+PACKAGE="ucm"
+UCM_USER="ucm"
+UCM_GROUP="ucm"
+UCM_HOME="/opt/ucm"
+UCM_DATA="/opt/ucm/data"
+UCM_CONFIG="/etc/ucm"
+V1_DATA="/opt/ucm/backend/data"
+
+case "$1" in
+    configure)
+        # Create user and group
+        if ! getent group "$UCM_GROUP" >/dev/null 2>&1; then
+            addgroup --system "$UCM_GROUP" >/dev/null
+        fi
+        
+        if ! getent passwd "$UCM_USER" >/dev/null 2>&1; then
+            adduser --system --home "$UCM_HOME" --no-create-home \
+                    --ingroup "$UCM_GROUP" --disabled-password \
+                    --shell /bin/false "$UCM_USER" >/dev/null
+        fi
+        
+        # Create directories
+        mkdir -p "$UCM_DATA"/{ca,certs,backups,sessions,private}
+        mkdir -p "$UCM_CONFIG"
+        mkdir -p /var/log/ucm
+        
+        # ============================================================
+        # AUTOMATIC MIGRATION FROM v1.8.x
+        # ============================================================
+        # Check multiple possible v1.8.x data locations
+        V1_DB=""
+        if [ -f "$V1_DATA/ucm.db" ]; then
+            V1_DB="$V1_DATA/ucm.db"
+        elif [ -f "/var/lib/ucm/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
+            # v1.8.3 DEB package used /var/lib/ucm
+            V1_DB="/var/lib/ucm/ucm.db"
+        fi
+        
+        if [ -n "$V1_DB" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo " Detected UCM v1.8.x data"
+            echo " Migrating to v2.0.0..."
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            # Copy DB first
+            cp "$V1_DB" "$UCM_DATA/ucm.db"
+            chown "$UCM_USER":"$UCM_GROUP" "$UCM_DATA/ucm.db"
+            
+            # Copy files from v1.8.x data dir if exists
+            V1_DIR=$(dirname "$V1_DB")
+            for dir in ca certs private crl; do
+                if [ -d "$V1_DIR/$dir" ] && [ "$(ls -A $V1_DIR/$dir 2>/dev/null)" ]; then
+                    cp -r "$V1_DIR/$dir"/* "$UCM_DATA/$dir/" 2>/dev/null || true
+                fi
+            done
+            
+            # Update DATABASE_PATH in existing config if needed
+            if [ -f "$UCM_CONFIG/ucm.env" ]; then
+                sed -i "s|DATABASE_PATH=.*|DATABASE_PATH=$UCM_DATA/ucm.db|" "$UCM_CONFIG/ucm.env"
+            fi
+            
+            # Schema migrations are run automatically at app startup
+            echo "✓ Migration complete (schema migrations will run at first startup)"
+        fi
+        # ============================================================
+        
+        # Sudoers for service restart
+        echo "ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm" > /etc/sudoers.d/ucm-service
+        chmod 440 /etc/sudoers.d/ucm-service
+        
+        # Create config if not exists (fresh install)
+        if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
+            SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+            JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+            ADMIN_PASS=$(python3 -c 'import secrets; print(secrets.token_hex(8))')
+            
+            cat > "$UCM_CONFIG/ucm.env" << ENVEOF
+# ============================================================
+# UCM Configuration File
+# ============================================================
+# This file is sourced by the UCM service at startup.
+# Edit values below and restart UCM: systemctl restart ucm
+
+# ============ REQUIRED (auto-generated) ============
+SECRET_KEY=$SECRET_KEY
+JWT_SECRET_KEY=$JWT_SECRET
+DATABASE_PATH=$UCM_DATA/ucm.db
+
+# ============ NETWORK ============
+HTTPS_PORT=8443
+# HTTP_PORT=8080
+# HTTP_REDIRECT=true
+# FQDN=ucm.example.com
+
+# ============ LOGGING ============
+LOG_LEVEL=INFO
+
+# ============ SECURITY ============
+# SESSION_TIMEOUT=3600
+# JWT_ACCESS_TOKEN_EXPIRES=900
+# JWT_REFRESH_TOKEN_EXPIRES=604800
+# RATE_LIMIT_ENABLED=true
+# RATE_LIMIT_PER_MINUTE=60
+# RATE_LIMIT_PER_HOUR=1000
+
+# ============ HTTPS CERTIFICATES ============
+# HTTPS_CERT_PATH=/opt/ucm/data/https_cert.pem
+# HTTPS_KEY_PATH=/opt/ucm/data/https_key.pem
+# HTTPS_AUTO_GENERATE=true
+
+# ============ INITIAL ADMIN (first start only) ============
+INITIAL_ADMIN_PASSWORD=$ADMIN_PASS
+# INITIAL_ADMIN_USERNAME=admin
+# INITIAL_ADMIN_EMAIL=admin@ucm.local
+
+# ============ SCEP (optional) ============
+# SCEP_ENABLED=false
+# SCEP_CHALLENGE_PASSWORD=
+# SCEP_CA_ID=
+# SCEP_AUTO_APPROVE=false
+
+# ============ DATABASE POOL (advanced) ============
+# DB_POOL_SIZE=10
+# DB_POOL_TIMEOUT=30
+# DB_POOL_RECYCLE=3600
+# DB_MAX_OVERFLOW=20
+
+# ============ REDIS (optional, for HA) ============
+# REDIS_URL=redis://localhost:6379/0
+ENVEOF
+            chmod 600 "$UCM_CONFIG/ucm.env"
+            
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo " UCM INSTALLED"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo " Admin password: $ADMIN_PASS"
+            echo " Config: $UCM_CONFIG/ucm.env"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        fi
+        
+        # Always ensure config has correct paths (for upgrades from older versions)
+        if [ -f "$UCM_CONFIG/ucm.env" ]; then
+            # Update DATABASE_PATH if pointing to old location
+            sed -i "s|DATABASE_PATH=/var/lib/ucm/ucm.db|DATABASE_PATH=$UCM_DATA/ucm.db|" "$UCM_CONFIG/ucm.env"
+            # Ensure DATA_DIR is set
+            grep -q "^DATA_DIR=" "$UCM_CONFIG/ucm.env" || echo "DATA_DIR=$UCM_DATA" >> "$UCM_CONFIG/ucm.env"
+        fi
+        
+        # Always recreate venv to ensure correct dependencies
+        # This handles both fresh install and upgrades
+        echo "Creating/updating Python virtual environment..."
+        rm -rf "$UCM_HOME/venv" 2>/dev/null || true
+        python3 -m venv "$UCM_HOME/venv"
+        "$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
+        "$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
+        
+        # Set permissions
+        chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_HOME"
+        chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_DATA"
+        chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_CONFIG"
+        chown -R "$UCM_USER":"$UCM_GROUP" /var/log/ucm
+        chmod 750 "$UCM_DATA"
+        
+        # Generate HTTPS cert if not exists
+        if [ ! -f "$UCM_DATA/https_cert.pem" ]; then
+            echo "Generating HTTPS certificate..."
+            openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+                -keyout "$UCM_DATA/https_key.pem" \
+                -out "$UCM_DATA/https_cert.pem" \
+                -subj "/CN=ucm/O=UCM/OU=PKI" 2>/dev/null
+            chown "$UCM_USER":"$UCM_GROUP" "$UCM_DATA"/https_*.pem
+            chmod 600 "$UCM_DATA/https_key.pem"
+            chmod 644 "$UCM_DATA/https_cert.pem"
+        fi
+        
+        # Enable and start service
+        systemctl daemon-reload
+        systemctl enable ucm
+        systemctl start ucm || true
+        ;;
+esac
+
+exit 0

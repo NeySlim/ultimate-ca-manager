@@ -1,0 +1,158 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e5]:
+    - generic [ref=e7]:
+      - link "UCM Dashboard" [ref=e8] [cursor=pointer]:
+        - /url: /
+      - link "Dashboard" [ref=e14] [cursor=pointer]:
+        - /url: /
+        - img [ref=e15]
+        - generic: Dashboard
+      - link "Certificates" [ref=e17] [cursor=pointer]:
+        - /url: /certificates
+        - img [ref=e18]
+        - generic: Certificates
+      - link "CAs" [ref=e20] [cursor=pointer]:
+        - /url: /cas
+        - img [ref=e21]
+        - generic: CAs
+      - link "CSRs" [ref=e23] [cursor=pointer]:
+        - /url: /csrs
+        - img [ref=e24]
+        - generic: CSRs
+      - link "Templates" [ref=e26] [cursor=pointer]:
+        - /url: /templates
+        - img [ref=e27]
+        - generic: Templates
+      - link "Users" [ref=e29] [cursor=pointer]:
+        - /url: /users
+        - img [ref=e30]
+        - generic: Users
+      - link "ACME" [ref=e32] [cursor=pointer]:
+        - /url: /acme
+        - img [ref=e33]
+        - generic: ACME
+      - link "SCEP" [ref=e35] [cursor=pointer]:
+        - /url: /scep-config
+        - img [ref=e36]
+        - generic: SCEP
+      - link "CRL/OCSP" [ref=e38] [cursor=pointer]:
+        - /url: /crl-ocsp
+        - img [ref=e39]
+        - generic: CRL/OCSP
+      - link "Trust Store" [ref=e41] [cursor=pointer]:
+        - /url: /truststore
+        - img [ref=e42]
+        - generic: Trust Store
+      - link "Import" [ref=e44] [cursor=pointer]:
+        - /url: /import
+        - img [ref=e45]
+        - generic: Import
+      - link "Tools" [ref=e47] [cursor=pointer]:
+        - /url: /tools
+        - img [ref=e48]
+        - generic: Tools
+      - link "Audit" [ref=e50] [cursor=pointer]:
+        - /url: /audit
+        - img [ref=e51]
+        - generic: Audit
+      - link "Settings" [ref=e53] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e54]
+        - generic: Settings
+      - link "RBAC" [ref=e57] [cursor=pointer]:
+        - /url: /rbac
+        - img [ref=e58]
+        - generic:
+          - img
+          - text: RBAC
+      - link "HSM" [ref=e60] [cursor=pointer]:
+        - /url: /hsm
+        - img [ref=e61]
+        - generic:
+          - img
+          - text: HSM
+      - link "Security" [ref=e64] [cursor=pointer]:
+        - /url: /security
+        - img [ref=e65]
+        - generic:
+          - img
+          - text: Security
+      - button "Theme" [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
+        - generic: Theme
+      - button "Real-time updates active" [ref=e70] [cursor=pointer]:
+        - img [ref=e71]
+      - button "admin" [ref=e73] [cursor=pointer]:
+        - img [ref=e74]
+        - generic: admin
+    - generic [ref=e77]:
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - img [ref=e82]
+          - generic [ref=e84]:
+            - heading "HSM Management" [level=1] [ref=e85]
+            - paragraph [ref=e86]: 0 providers
+        - button "Help" [ref=e88] [cursor=pointer]:
+          - img [ref=e89]
+          - generic [ref=e91]: Help
+      - generic [ref=e92]:
+        - generic [ref=e93]:
+          - img [ref=e95]
+          - generic [ref=e98]:
+            - generic [ref=e99]: "0"
+            - generic [ref=e100]: Providers
+        - generic [ref=e101]:
+          - img [ref=e103]
+          - generic [ref=e106]:
+            - generic [ref=e107]: "0"
+            - generic [ref=e108]: Enabled
+        - generic [ref=e109]:
+          - img [ref=e111]
+          - generic [ref=e114]:
+            - generic [ref=e115]: "0"
+            - generic [ref=e116]: Disabled
+        - generic [ref=e117]:
+          - img [ref=e119]
+          - generic [ref=e122]:
+            - generic [ref=e123]: "0"
+            - generic [ref=e124]: Keys
+        - generic [ref=e125]:
+          - img [ref=e127]
+          - generic [ref=e130]:
+            - generic [ref=e131]: "0"
+            - generic [ref=e132]: Cloud
+      - generic [ref=e133]:
+        - main [ref=e134]:
+          - generic [ref=e136]:
+            - generic [ref=e138]:
+              - generic [ref=e139]:
+                - img [ref=e140]
+                - textbox "Search providers..." [ref=e142]
+              - generic [ref=e143]:
+                - combobox [ref=e145] [cursor=pointer]:
+                  - generic: All Status
+                  - img [ref=e147]
+                - combobox [ref=e150] [cursor=pointer]:
+                  - generic: All Types
+                  - img [ref=e152]
+              - button "New Provider" [ref=e155] [cursor=pointer]:
+                - img [ref=e156]
+                - text: New Provider
+            - generic [ref=e158]:
+              - img [ref=e160]
+              - heading "No HSM providers" [level=3] [ref=e162]
+              - paragraph [ref=e163]: Configure hardware security modules for key storage
+              - button "New Provider" [ref=e164] [cursor=pointer]:
+                - img [ref=e165]
+                - text: New Provider
+        - complementary [ref=e167]:
+          - generic "Drag to resize panel" [ref=e168]
+          - generic [ref=e170]:
+            - img [ref=e172]
+            - paragraph [ref=e175]: Select a provider to view details
+  - region "Notifications (F8)":
+    - list
+```

@@ -1,0 +1,146 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - link "UCM Dashboard" [ref=e6] [cursor=pointer]:
+        - /url: /
+      - link "Dashboard" [ref=e12] [cursor=pointer]:
+        - /url: /
+        - img [ref=e13]
+        - generic: Dashboard
+      - link "Certificates" [ref=e15] [cursor=pointer]:
+        - /url: /certificates
+        - img [ref=e16]
+        - generic: Certificates
+      - link "CAs" [ref=e18] [cursor=pointer]:
+        - /url: /cas
+        - img [ref=e19]
+        - generic: CAs
+      - link "CSRs" [ref=e21] [cursor=pointer]:
+        - /url: /csrs
+        - img [ref=e22]
+        - generic: CSRs
+      - link "Templates" [ref=e24] [cursor=pointer]:
+        - /url: /templates
+        - img [ref=e25]
+        - generic: Templates
+      - link "Users" [ref=e27] [cursor=pointer]:
+        - /url: /users
+        - img [ref=e28]
+        - generic: Users
+      - link "ACME" [ref=e30] [cursor=pointer]:
+        - /url: /acme
+        - img [ref=e31]
+        - generic: ACME
+      - link "SCEP" [ref=e33] [cursor=pointer]:
+        - /url: /scep
+        - img [ref=e34]
+        - generic: SCEP
+      - link "Import" [ref=e36] [cursor=pointer]:
+        - /url: /import
+        - img [ref=e37]
+        - generic: Import
+      - link "Audit" [ref=e39] [cursor=pointer]:
+        - /url: /audit
+        - img [ref=e40]
+        - generic: Audit
+      - link "Settings" [ref=e42] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e43]
+        - generic: Settings
+      - link "Groups" [ref=e46] [cursor=pointer]:
+        - /url: /groups
+        - img [ref=e47]
+        - generic:
+          - img
+          - text: Groups
+      - link "RBAC" [ref=e49] [cursor=pointer]:
+        - /url: /rbac
+        - img [ref=e50]
+        - generic:
+          - img
+          - text: RBAC
+      - link "SSO" [ref=e52] [cursor=pointer]:
+        - /url: /sso
+        - img [ref=e53]
+        - generic:
+          - img
+          - text: SSO
+      - link "HSM" [ref=e55] [cursor=pointer]:
+        - /url: /hsm
+        - img [ref=e56]
+        - generic:
+          - img
+          - text: HSM
+      - button "Theme" [ref=e59] [cursor=pointer]:
+        - img [ref=e60]
+        - generic: Theme
+      - button "admin" [ref=e62] [cursor=pointer]:
+        - img [ref=e63]
+        - generic: admin
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - heading "HSM Providers" [level=1] [ref=e69]
+        - button "New" [ref=e72] [cursor=pointer]:
+          - img [ref=e73]
+          - text: New
+        - generic [ref=e75]:
+          - generic [ref=e77]:
+            - img [ref=e79]
+            - textbox "Search providers..." [ref=e81]
+          - generic [ref=e82]:
+            - button "PKCS#11 0 keys" [ref=e83] [cursor=pointer]:
+              - img [ref=e84]
+              - paragraph [ref=e88]: PKCS#11
+              - generic [ref=e89]:
+                - generic [ref=e90]: 0 keys
+                - img [ref=e91]
+            - button "AWS CloudHSM 0 keys" [ref=e93] [cursor=pointer]:
+              - img [ref=e94]
+              - paragraph [ref=e97]: AWS CloudHSM
+              - generic [ref=e98]:
+                - generic [ref=e99]: 0 keys
+                - img [ref=e100]
+            - button "Azure Key Vault 0 keys" [ref=e102] [cursor=pointer]:
+              - img [ref=e103]
+              - paragraph [ref=e106]: Azure Key Vault
+              - generic [ref=e107]:
+                - generic [ref=e108]: 0 keys
+                - img [ref=e109]
+            - button "Google Cloud KMS 0 keys" [ref=e111] [cursor=pointer]:
+              - img [ref=e112]
+              - paragraph [ref=e115]: Google Cloud KMS
+              - generic [ref=e116]:
+                - generic [ref=e117]: 0 keys
+                - img [ref=e118]
+        - generic [ref=e121]: 4 providers
+      - generic [ref=e124]:
+        - generic [ref=e125]:
+          - generic [ref=e126]:
+            - img [ref=e128]
+            - generic [ref=e130]:
+              - heading "PKCS#11" [level=2] [ref=e131]
+              - generic [ref=e132]:
+                - generic [ref=e133]: Disabled
+                - generic [ref=e135]: keys
+          - generic [ref=e136]:
+            - button "Test" [ref=e137] [cursor=pointer]:
+              - img [ref=e138]
+              - text: Test
+            - button [ref=e140] [cursor=pointer]:
+              - img [ref=e141]
+            - button [ref=e143] [cursor=pointer]:
+              - img [ref=e144]
+        - heading "Configuration" [level=3] [ref=e148]
+        - generic [ref=e150]:
+          - generic [ref=e151]:
+            - heading "Keys" [level=3] [ref=e152]
+            - button "Generate Key" [ref=e153] [cursor=pointer]:
+              - img [ref=e154]
+              - text: Generate Key
+          - paragraph [ref=e156]: No keys in this HSM
+  - region "Notifications (F8)":
+    - list
+```

@@ -1,0 +1,212 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - link:
+                - /url: /
+              - link:
+                - /url: /
+                - img
+                - generic: Dashboard
+              - link:
+                - /url: /certificates
+                - img
+                - generic: Certificates
+              - link:
+                - /url: /cas
+                - img
+                - generic: CAs
+              - link:
+                - /url: /csrs
+                - img
+                - generic: CSRs
+              - link:
+                - /url: /templates
+                - img
+                - generic: Templates
+              - link:
+                - /url: /users
+                - img
+                - generic: Users
+              - link:
+                - /url: /acme
+                - img
+                - generic: ACME
+              - link:
+                - /url: /scep-config
+                - img
+                - generic: SCEP
+              - link:
+                - /url: /crl-ocsp
+                - img
+                - generic: CRL/OCSP
+              - link:
+                - /url: /truststore
+                - img
+                - generic: Trust Store
+              - link:
+                - /url: /import
+                - img
+                - generic: Import
+              - link:
+                - /url: /tools
+                - img
+                - generic: Tools
+              - link:
+                - /url: /audit
+                - img
+                - generic: Audit
+              - link:
+                - /url: /settings
+                - img
+                - generic: Settings
+              - link:
+                - /url: /rbac
+                - img
+                - generic:
+                  - img
+                  - text: RBAC
+              - link:
+                - /url: /hsm
+                - img
+                - generic:
+                  - img
+                  - text: HSM
+              - link:
+                - /url: /security
+                - img
+                - generic:
+                  - img
+                  - text: Security
+              - button:
+                - img
+                - generic: Theme
+              - button:
+                - img
+              - button:
+                - img
+                - generic: admin
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                    - generic:
+                      - heading [level=1]: Groups
+                      - paragraph: 1 groups
+                  - generic:
+                    - button:
+                      - img
+                      - generic: Help
+                - generic:
+                  - generic:
+                    - button:
+                      - img
+                      - generic: Users
+                      - generic: "4"
+                    - button:
+                      - img
+                      - generic: Groups
+                      - generic: "1"
+              - generic:
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "1"
+                    - generic: Groups
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "4"
+                    - generic: Users
+              - generic:
+                - main:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                            - textbox:
+                              - /placeholder: Search groups...
+                          - generic:
+                            - button:
+                              - img
+                              - text: New Group
+                      - generic:
+                        - table:
+                          - rowgroup:
+                            - row:
+                              - columnheader:
+                                - generic:
+                                  - text: Group
+                                  - img
+                              - columnheader:
+                                - generic: Description
+                              - columnheader:
+                                - generic: Members
+                              - columnheader
+                          - rowgroup:
+                            - row:
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - img
+                                    - generic: operators
+                              - cell:
+                                - generic: operators
+                              - cell:
+                                - generic:
+                                  - generic: 1 member
+                              - cell:
+                                - generic:
+                                  - button:
+                                    - img
+                      - generic:
+                        - paragraph:
+                          - generic: 1-1
+                          - text: of 1
+                        - generic:
+                          - generic:
+                            - combobox:
+                              - generic: 25/page
+                              - generic:
+                                - img
+                          - button [disabled]:
+                            - img
+                          - generic: 1/1
+                          - button [disabled]:
+                            - img
+                - complementary:
+                  - generic:
+                    - generic:
+                      - img
+                    - paragraph: Select a group to view details
+    - list
+  - dialog "Create Group" [ref=e2]:
+    - generic [ref=e3]:
+      - heading "Create Group" [level=2] [ref=e4]
+      - button [active] [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: Group Name*
+        - textbox "developers" [ref=e13]
+      - generic [ref=e14]:
+        - generic [ref=e15]: Description
+        - textbox "Development team" [ref=e17]
+      - generic [ref=e18]:
+        - button "Cancel" [ref=e19] [cursor=pointer]
+        - button "Create" [ref=e20] [cursor=pointer]
+```

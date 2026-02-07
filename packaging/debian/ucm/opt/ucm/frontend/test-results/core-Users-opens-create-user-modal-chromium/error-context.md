@@ -1,0 +1,323 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - link:
+                - /url: /
+              - link:
+                - /url: /
+                - img
+                - generic: Dashboard
+              - link:
+                - /url: /certificates
+                - img
+                - generic: Certificates
+              - link:
+                - /url: /cas
+                - img
+                - generic: CAs
+              - link:
+                - /url: /csrs
+                - img
+                - generic: CSRs
+              - link:
+                - /url: /templates
+                - img
+                - generic: Templates
+              - link:
+                - /url: /users
+                - img
+                - generic: Users
+              - link:
+                - /url: /acme
+                - img
+                - generic: ACME
+              - link:
+                - /url: /scep-config
+                - img
+                - generic: SCEP
+              - link:
+                - /url: /crl-ocsp
+                - img
+                - generic: CRL/OCSP
+              - link:
+                - /url: /truststore
+                - img
+                - generic: Trust Store
+              - link:
+                - /url: /import
+                - img
+                - generic: Import
+              - link:
+                - /url: /tools
+                - img
+                - generic: Tools
+              - link:
+                - /url: /audit
+                - img
+                - generic: Audit
+              - link:
+                - /url: /settings
+                - img
+                - generic: Settings
+              - link:
+                - /url: /rbac
+                - img
+                - generic:
+                  - img
+                  - text: RBAC
+              - link:
+                - /url: /hsm
+                - img
+                - generic:
+                  - img
+                  - text: HSM
+              - link:
+                - /url: /security
+                - img
+                - generic:
+                  - img
+                  - text: Security
+              - button:
+                - img
+                - generic: Theme
+              - button:
+                - img
+              - button:
+                - img
+                - generic: admin
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                    - generic:
+                      - heading [level=1]: Users
+                      - paragraph: 4 users
+                  - generic:
+                    - button:
+                      - img
+                      - generic: Help
+                - generic:
+                  - generic:
+                    - button:
+                      - img
+                      - generic: Users
+                      - generic: "4"
+                    - button:
+                      - img
+                      - generic: Groups
+                      - generic: "1"
+              - generic:
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "2"
+                    - generic: Active
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "2"
+                    - generic: Disabled
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "1"
+                    - generic: Admins
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "4"
+                    - generic: Total
+              - generic:
+                - main:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                            - textbox:
+                              - /placeholder: Search users...
+                          - generic:
+                            - generic:
+                              - combobox:
+                                - generic: All Roles
+                                - generic:
+                                  - img
+                            - generic:
+                              - combobox:
+                                - generic: All Status
+                                - generic:
+                                  - img
+                          - generic:
+                            - button:
+                              - img
+                              - text: New User
+                      - generic:
+                        - table:
+                          - rowgroup:
+                            - row:
+                              - columnheader:
+                                - generic:
+                                  - text: User
+                                  - img
+                              - columnheader:
+                                - generic: Role
+                              - columnheader:
+                                - generic: Status
+                              - columnheader:
+                                - generic: Last Login
+                              - columnheader
+                          - rowgroup:
+                            - row:
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic: A
+                                    - generic:
+                                      - generic: admin
+                                      - generic: admin@localhost
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - img
+                                    - text: admin
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - img
+                                    - text: Active
+                              - cell:
+                                - generic: Feb 6, 2026
+                              - cell:
+                                - generic:
+                                  - button:
+                                    - img
+                            - row:
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic: Q
+                                    - generic:
+                                      - generic: qa_test_user
+                                      - generic: qa@test.local
+                              - cell:
+                                - generic:
+                                  - generic: viewer
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - img
+                                    - text: Disabled
+                              - cell:
+                                - generic: Never
+                              - cell:
+                                - generic:
+                                  - button:
+                                    - img
+                            - row:
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic: Q
+                                    - generic:
+                                      - generic: qa-test-user
+                                      - generic: qa@test.com
+                              - cell:
+                                - generic:
+                                  - generic: viewer
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - img
+                                    - text: Disabled
+                              - cell:
+                                - generic: Never
+                              - cell:
+                                - generic:
+                                  - button:
+                                    - img
+                            - row:
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic: Z
+                                    - generic:
+                                      - generic: zeezr
+                                      - generic: ezrezr@efdsf.com
+                              - cell:
+                                - generic:
+                                  - generic: operator
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - img
+                                    - text: Active
+                              - cell:
+                                - generic: Never
+                              - cell:
+                                - generic:
+                                  - button:
+                                    - img
+                      - generic:
+                        - paragraph:
+                          - generic: 1-4
+                          - text: of 4
+                        - generic:
+                          - generic:
+                            - combobox:
+                              - generic: 25/page
+                              - generic:
+                                - img
+                          - button [disabled]:
+                            - img
+                          - generic: 1/1
+                          - button [disabled]:
+                            - img
+                - complementary:
+                  - generic:
+                    - generic:
+                      - img
+                    - paragraph: Select a user to view details
+    - list
+  - dialog "Create User" [ref=e2]:
+    - generic [ref=e3]:
+      - heading "Create User" [level=2] [ref=e4]
+      - button [active] [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: Username*
+        - textbox "johndoe" [ref=e13]
+      - generic [ref=e14]:
+        - generic [ref=e15]: Email*
+        - textbox "john@example.com" [ref=e17]
+      - generic [ref=e18]:
+        - generic [ref=e19]: Full Name
+        - textbox "John Doe" [ref=e21]
+      - generic [ref=e22]:
+        - generic [ref=e23]: Password*
+        - textbox "••••••••" [ref=e25]
+      - generic [ref=e26]:
+        - generic [ref=e27]: Role
+        - combobox [ref=e28] [cursor=pointer]:
+          - generic: Viewer
+          - img [ref=e30]
+        - combobox [ref=e32]
+      - generic [ref=e33]:
+        - button "Cancel" [ref=e34] [cursor=pointer]
+        - button "Create" [ref=e35] [cursor=pointer]
+```

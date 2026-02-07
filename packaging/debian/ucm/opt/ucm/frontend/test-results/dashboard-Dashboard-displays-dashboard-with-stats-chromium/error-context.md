@@ -1,0 +1,396 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]:
+      - generic [ref=e7]:
+        - link "UCM Dashboard" [ref=e8] [cursor=pointer]:
+          - /url: /
+        - link "Dashboard" [ref=e14] [cursor=pointer]:
+          - /url: /
+          - img [ref=e15]
+          - generic: Dashboard
+        - link "Certificates" [ref=e17] [cursor=pointer]:
+          - /url: /certificates
+          - img [ref=e18]
+          - generic: Certificates
+        - link "CAs" [ref=e20] [cursor=pointer]:
+          - /url: /cas
+          - img [ref=e21]
+          - generic: CAs
+        - link "CSRs" [ref=e23] [cursor=pointer]:
+          - /url: /csrs
+          - img [ref=e24]
+          - generic: CSRs
+        - link "Templates" [ref=e26] [cursor=pointer]:
+          - /url: /templates
+          - img [ref=e27]
+          - generic: Templates
+        - link "Users" [ref=e29] [cursor=pointer]:
+          - /url: /users
+          - img [ref=e30]
+          - generic: Users
+        - link "ACME" [ref=e32] [cursor=pointer]:
+          - /url: /acme
+          - img [ref=e33]
+          - generic: ACME
+        - link "SCEP" [ref=e35] [cursor=pointer]:
+          - /url: /scep-config
+          - img [ref=e36]
+          - generic: SCEP
+        - link "CRL/OCSP" [ref=e38] [cursor=pointer]:
+          - /url: /crl-ocsp
+          - img [ref=e39]
+          - generic: CRL/OCSP
+        - link "Trust Store" [ref=e41] [cursor=pointer]:
+          - /url: /truststore
+          - img [ref=e42]
+          - generic: Trust Store
+        - link "Import" [ref=e44] [cursor=pointer]:
+          - /url: /import
+          - img [ref=e45]
+          - generic: Import
+        - link "Tools" [ref=e47] [cursor=pointer]:
+          - /url: /tools
+          - img [ref=e48]
+          - generic: Tools
+        - link "Audit" [ref=e50] [cursor=pointer]:
+          - /url: /audit
+          - img [ref=e51]
+          - generic: Audit
+        - link "Settings" [ref=e53] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e54]
+          - generic: Settings
+        - link "RBAC" [ref=e57] [cursor=pointer]:
+          - /url: /rbac
+          - img [ref=e58]
+          - generic:
+            - img
+            - text: RBAC
+        - link "HSM" [ref=e60] [cursor=pointer]:
+          - /url: /hsm
+          - img [ref=e61]
+          - generic:
+            - img
+            - text: HSM
+        - link "Security" [ref=e63] [cursor=pointer]:
+          - /url: /security
+          - img [ref=e64]
+          - generic:
+            - img
+            - text: Security
+        - button "Theme" [ref=e66] [cursor=pointer]:
+          - img [ref=e67]
+          - generic: Theme
+        - button "Real-time updates active" [ref=e69] [cursor=pointer]:
+          - img [ref=e70]
+        - button "admin" [ref=e72] [cursor=pointer]:
+          - img [ref=e73]
+          - generic: admin
+      - generic [ref=e77]:
+        - generic [ref=e80]:
+          - generic [ref=e81]:
+            - generic [ref=e87]:
+              - generic [ref=e88]: UCM
+              - generic [ref=e89]: Certificate Manager
+            - generic [ref=e91]:
+              - paragraph [ref=e92]: Good morning 👋
+              - generic [ref=e93]:
+                - generic [ref=e94]: Pro
+                - generic [ref=e95]: v2.0.3
+                - generic [ref=e98]: Live
+          - generic [ref=e99]:
+            - button "Issue Cert" [ref=e100] [cursor=pointer]:
+              - img [ref=e101]
+              - text: Issue Cert
+            - button "Create CA" [ref=e103] [cursor=pointer]:
+              - img [ref=e104]
+              - text: Create CA
+            - button "Sign CSR" [ref=e106] [cursor=pointer]:
+              - img [ref=e107]
+              - text: Sign CSR
+            - button "Refresh" [ref=e109] [cursor=pointer]:
+              - img [ref=e110]
+            - button "Customize dashboard" [ref=e112] [cursor=pointer]:
+              - img [ref=e113]
+        - generic [ref=e115]:
+          - button "Live 31 Certificates" [ref=e116] [cursor=pointer]:
+            - generic [ref=e118]: Live
+            - generic [ref=e120]:
+              - img [ref=e122]
+              - generic [ref=e125]:
+                - paragraph [ref=e127]: "31"
+                - paragraph [ref=e128]: Certificates
+            - img [ref=e129]
+          - button "Live 6 Authorities" [ref=e131] [cursor=pointer]:
+            - generic [ref=e133]: Live
+            - generic [ref=e135]:
+              - img [ref=e137]
+              - generic [ref=e140]:
+                - paragraph [ref=e142]: "6"
+                - paragraph [ref=e143]: Authorities
+            - img [ref=e144]
+          - button "0 CSR Queue" [ref=e146] [cursor=pointer]:
+            - generic [ref=e147]:
+              - img [ref=e149]
+              - generic [ref=e152]:
+                - paragraph [ref=e154]: "0"
+                - paragraph [ref=e155]: CSR Queue
+            - img [ref=e156]
+          - button "1 ACME Accounts" [ref=e158] [cursor=pointer]:
+            - generic [ref=e159]:
+              - img [ref=e161]
+              - generic [ref=e164]:
+                - paragraph [ref=e166]: "1"
+                - paragraph [ref=e167]: ACME Accounts
+            - img [ref=e168]
+        - generic [ref=e170]:
+          - generic [ref=e171]:
+            - generic [ref=e173]:
+              - img [ref=e175]
+              - generic [ref=e178]:
+                - heading "Certificate Activity" [level=3] [ref=e179]
+                - paragraph [ref=e180]: Last 7 days
+            - application [ref=e184]:
+              - generic [ref=e190]:
+                - generic [ref=e191]:
+                  - generic [ref=e193]: Sat
+                  - generic [ref=e195]: Sun
+                  - generic [ref=e197]: Mon
+                  - generic [ref=e199]: Tue
+                  - generic [ref=e201]: Wed
+                  - generic [ref=e203]: Thu
+                  - generic [ref=e205]: Fri
+                - generic [ref=e206]:
+                  - generic [ref=e208]: "0"
+                  - generic [ref=e210]: "2"
+                  - generic [ref=e212]: "4"
+                  - generic [ref=e214]: "6"
+                  - generic [ref=e216]: "8"
+          - generic [ref=e217]:
+            - generic [ref=e219]:
+              - img [ref=e221]
+              - generic [ref=e224]:
+                - heading "Status Distribution" [level=3] [ref=e225]
+                - paragraph [ref=e226]: Current certificates
+            - generic [ref=e229]:
+              - list [ref=e231]:
+                - listitem [ref=e232]:
+                  - img "[object Object] legend icon" [ref=e233]
+                  - generic [ref=e235]: Valid
+              - application [ref=e236]
+        - generic [ref=e242]:
+          - generic [ref=e243]:
+            - generic [ref=e244]:
+              - generic [ref=e245]:
+                - generic [ref=e246]:
+                  - img [ref=e248]
+                  - heading "Recent Certificates" [level=3] [ref=e252]
+                - button "View all" [ref=e253] [cursor=pointer]:
+                  - text: View all
+                  - img [ref=e254]
+              - generic [ref=e256]:
+                - generic [ref=e257] [cursor=pointer]:
+                  - img [ref=e259]
+                  - generic [ref=e262]:
+                    - generic [ref=e263]:
+                      - generic [ref=e264]: "*.lan.pew.pet"
+                      - generic [ref=e265]: Valid
+                    - generic [ref=e267]: Jan 10, 2026
+                - generic [ref=e268] [cursor=pointer]:
+                  - img [ref=e270]
+                  - generic [ref=e273]:
+                    - generic [ref=e274]:
+                      - generic [ref=e275]: ad.lan.pew.pet
+                      - generic [ref=e276]: Valid
+                    - generic [ref=e278]: Jan 10, 2026
+                - generic [ref=e279] [cursor=pointer]:
+                  - img [ref=e281]
+                  - generic [ref=e284]:
+                    - generic [ref=e285]:
+                      - generic [ref=e286]: brother.lan.pew.pet
+                      - generic [ref=e287]: Valid
+                    - generic [ref=e289]: Jan 10, 2026
+                - generic [ref=e290] [cursor=pointer]:
+                  - img [ref=e292]
+                  - generic [ref=e295]:
+                    - generic [ref=e296]:
+                      - generic [ref=e297]: forti.lan.pew.pet
+                      - generic [ref=e298]: Valid
+                    - generic [ref=e300]: Jan 10, 2026
+            - generic [ref=e301]:
+              - generic [ref=e302]:
+                - generic [ref=e303]:
+                  - img [ref=e305]
+                  - heading "Recent CAs" [level=3] [ref=e309]
+                - button "View all" [ref=e310] [cursor=pointer]:
+                  - text: View all
+                  - img [ref=e311]
+              - generic [ref=e313]:
+                - generic [ref=e314] [cursor=pointer]:
+                  - img [ref=e316]
+                  - generic [ref=e319]:
+                    - generic [ref=e320]: "Imported: QA Test Root CA"
+                    - generic [ref=e321]: Root
+                - generic [ref=e322] [cursor=pointer]:
+                  - img [ref=e324]
+                  - generic [ref=e327]:
+                    - generic [ref=e328]: QA Test Root CA
+                    - generic [ref=e329]: Root
+                - generic [ref=e330] [cursor=pointer]:
+                  - img [ref=e332]
+                  - generic [ref=e335]:
+                    - generic [ref=e336]: inter-ca
+                    - generic [ref=e337]: Sub
+                - generic [ref=e338] [cursor=pointer]:
+                  - img [ref=e340]
+                  - generic [ref=e343]:
+                    - generic [ref=e344]: R3 (ACME Client)
+                    - generic [ref=e345]: Sub
+            - generic [ref=e346]:
+              - generic [ref=e347]:
+                - generic [ref=e348]:
+                  - img [ref=e350]
+                  - heading "System Health" [level=3] [ref=e354]
+                - button [ref=e355] [cursor=pointer]:
+                  - img [ref=e356]
+              - generic [ref=e358]:
+                - generic [ref=e359]:
+                  - generic [ref=e360]:
+                    - generic [ref=e361]:
+                      - img [ref=e363]
+                      - generic [ref=e365]: WebSocket
+                    - paragraph [ref=e366]: Connected
+                  - generic [ref=e367]:
+                    - generic [ref=e368]:
+                      - img [ref=e370]
+                      - generic [ref=e372]: Database
+                    - paragraph [ref=e373]: Healthy
+                  - generic [ref=e374]:
+                    - generic [ref=e375]:
+                      - img [ref=e377]
+                      - generic [ref=e379]: Last Update
+                    - paragraph [ref=e380]: just now
+                  - generic [ref=e381]:
+                    - generic [ref=e382]:
+                      - img [ref=e384]
+                      - generic [ref=e386]: API
+                    - paragraph [ref=e387]: Online
+                - generic [ref=e388]: Services
+                - generic [ref=e389]:
+                  - generic [ref=e393]: ACME
+                  - generic [ref=e397]: SCEP
+                  - generic [ref=e401]: OCSP
+                  - generic [ref=e405]: CRL
+            - generic [ref=e406]:
+              - generic [ref=e407]:
+                - generic [ref=e408]:
+                  - img [ref=e410]
+                  - heading "ACME Accounts" [level=3] [ref=e414]
+                - button "View all" [ref=e415] [cursor=pointer]:
+                  - text: View all
+                  - img [ref=e416]
+              - generic [ref=e420] [cursor=pointer]:
+                - img [ref=e422]
+                - generic [ref=e425]:
+                  - generic [ref=e426]: mailto:admin@lan.pew.pet
+                  - generic [ref=e427]: 0 orders
+          - generic [ref=e428]:
+            - generic [ref=e429]:
+              - generic [ref=e430]:
+                - img [ref=e432]
+                - generic [ref=e435]:
+                  - heading "Recent Activity" [level=3] [ref=e436]
+                  - paragraph [ref=e437]: Live updates
+              - generic [ref=e438]:
+                - generic [ref=e439]: Live
+                - button "View all" [ref=e441] [cursor=pointer]:
+                  - text: View all
+                  - img [ref=e442]
+            - generic [ref=e445]:
+              - generic [ref=e446]:
+                - img [ref=e448]
+                - generic [ref=e450]:
+                  - paragraph [ref=e451]: Password login successful for admin
+                  - generic [ref=e452]:
+                    - generic [ref=e453]: admin
+                    - generic [ref=e454]: •
+                    - generic [ref=e455]: 1 hour ago
+              - generic [ref=e456]:
+                - img [ref=e458]
+                - generic [ref=e460]:
+                  - paragraph [ref=e461]: Password login successful for admin
+                  - generic [ref=e462]:
+                    - generic [ref=e463]: admin
+                    - generic [ref=e464]: •
+                    - generic [ref=e465]: 7 hours ago
+              - generic [ref=e466]:
+                - img [ref=e468]
+                - generic [ref=e470]:
+                  - paragraph [ref=e471]: Password login successful for admin
+                  - generic [ref=e472]:
+                    - generic [ref=e473]: admin
+                    - generic [ref=e474]: •
+                    - generic [ref=e475]: 7 hours ago
+              - generic [ref=e476]:
+                - img [ref=e478]
+                - generic [ref=e480]:
+                  - paragraph [ref=e481]: Password login successful for admin
+                  - generic [ref=e482]:
+                    - generic [ref=e483]: admin
+                    - generic [ref=e484]: •
+                    - generic [ref=e485]: 7 hours ago
+              - generic [ref=e486]:
+                - img [ref=e488]
+                - generic [ref=e490]:
+                  - paragraph [ref=e491]: Password login successful for admin
+                  - generic [ref=e492]:
+                    - generic [ref=e493]: admin
+                    - generic [ref=e494]: •
+                    - generic [ref=e495]: 8 hours ago
+              - generic [ref=e496]:
+                - img [ref=e498]
+                - generic [ref=e500]:
+                  - paragraph [ref=e501]: Password login successful for admin
+                  - generic [ref=e502]:
+                    - generic [ref=e503]: admin
+                    - generic [ref=e504]: •
+                    - generic [ref=e505]: 8 hours ago
+              - generic [ref=e506]:
+                - img [ref=e508]
+                - generic [ref=e510]:
+                  - paragraph [ref=e511]: Password login successful for admin
+                  - generic [ref=e512]:
+                    - generic [ref=e513]: admin
+                    - generic [ref=e514]: •
+                    - generic [ref=e515]: 8 hours ago
+              - generic [ref=e516]:
+                - img [ref=e518]
+                - generic [ref=e520]:
+                  - paragraph [ref=e521]: Password login successful for admin
+                  - generic [ref=e522]:
+                    - generic [ref=e523]: admin
+                    - generic [ref=e524]: •
+                    - generic [ref=e525]: 8 hours ago
+              - generic [ref=e526]:
+                - img [ref=e528]
+                - generic [ref=e530]:
+                  - paragraph [ref=e531]: Password login successful for admin
+                  - generic [ref=e532]:
+                    - generic [ref=e533]: admin
+                    - generic [ref=e534]: •
+                    - generic [ref=e535]: 8 hours ago
+              - generic [ref=e536]:
+                - img [ref=e538]
+                - generic [ref=e540]:
+                  - paragraph [ref=e541]: Password login successful for admin
+                  - generic [ref=e542]:
+                    - generic [ref=e543]: admin
+                    - generic [ref=e544]: •
+                    - generic [ref=e545]: 8 hours ago
+    - region "Notifications (F8)":
+      - list
+  - generic [ref=e546]: "0"
+```

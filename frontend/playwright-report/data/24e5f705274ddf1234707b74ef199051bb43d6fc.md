@@ -1,0 +1,144 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - link:
+            - /url: /
+          - link:
+            - /url: /
+            - img
+            - generic: Dashboard
+          - link:
+            - /url: /certificates
+            - img
+            - generic: Certificates
+          - link:
+            - /url: /cas
+            - img
+            - generic: CAs
+          - link:
+            - /url: /csrs
+            - img
+            - generic: CSRs
+          - link:
+            - /url: /templates
+            - img
+            - generic: Templates
+          - link:
+            - /url: /users
+            - img
+            - generic: Users
+          - link:
+            - /url: /acme
+            - img
+            - generic: ACME
+          - link:
+            - /url: /scep
+            - img
+            - generic: SCEP
+          - link:
+            - /url: /import
+            - img
+            - generic: Import
+          - link:
+            - /url: /audit
+            - img
+            - generic: Audit
+          - link:
+            - /url: /settings
+            - img
+            - generic: Settings
+          - link:
+            - /url: /groups
+            - img
+            - generic:
+              - img
+              - text: Groups
+          - link:
+            - /url: /rbac
+            - img
+            - generic:
+              - img
+              - text: RBAC
+          - link:
+            - /url: /sso
+            - img
+            - generic:
+              - img
+              - text: SSO
+          - link:
+            - /url: /hsm
+            - img
+            - generic:
+              - img
+              - text: HSM
+          - button:
+            - img
+            - generic: Theme
+          - button:
+            - img
+            - generic: admin
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - heading [level=1]: Roles
+          - generic:
+            - generic:
+              - button:
+                - img
+                - text: New
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - img
+                - textbox:
+                  - /placeholder: Search roles...
+            - generic:
+              - button:
+                - img
+                - generic:
+                  - paragraph: Administrator
+                  - paragraph: 1 permissions
+              - button:
+                - img
+                - generic:
+                  - paragraph: Operator
+                  - paragraph: 4 permissions
+              - button:
+                - img
+                - generic:
+                  - paragraph: Viewer
+                  - paragraph: 1 permissions
+          - generic:
+            - generic: 3 roles
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - img
+                - heading [level=3]: Select a role
+                - paragraph: Choose a role from the list to manage permissions
+    - list
+  - dialog "Create Custom Role" [ref=e2]:
+    - generic [ref=e3]:
+      - heading "Create Custom Role" [level=2] [ref=e4]
+      - button [active] [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: Role Name
+        - textbox "e.g., Certificate Manager" [ref=e13]
+      - generic [ref=e14]:
+        - generic [ref=e15]: Description
+        - textbox "Brief description of this role" [ref=e17]
+      - generic [ref=e18]:
+        - button "Cancel" [ref=e19] [cursor=pointer]
+        - button "Create" [disabled] [ref=e20]
+```

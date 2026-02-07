@@ -1,0 +1,327 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - link:
+                - /url: /
+              - link:
+                - /url: /
+                - img
+                - generic: Dashboard
+              - link:
+                - /url: /certificates
+                - img
+                - generic: Certificates
+              - link:
+                - /url: /cas
+                - img
+                - generic: CAs
+              - link:
+                - /url: /csrs
+                - img
+                - generic: CSRs
+              - link:
+                - /url: /templates
+                - img
+                - generic: Templates
+              - link:
+                - /url: /users
+                - img
+                - generic: Users
+              - link:
+                - /url: /acme
+                - img
+                - generic: ACME
+              - link:
+                - /url: /scep-config
+                - img
+                - generic: SCEP
+              - link:
+                - /url: /crl-ocsp
+                - img
+                - generic: CRL/OCSP
+              - link:
+                - /url: /truststore
+                - img
+                - generic: Trust Store
+              - link:
+                - /url: /import
+                - img
+                - generic: Import
+              - link:
+                - /url: /tools
+                - img
+                - generic: Tools
+              - link:
+                - /url: /audit
+                - img
+                - generic: Audit
+              - link:
+                - /url: /settings
+                - img
+                - generic: Settings
+              - link:
+                - /url: /rbac
+                - img
+                - generic:
+                  - img
+                  - text: RBAC
+              - link:
+                - /url: /hsm
+                - img
+                - generic:
+                  - img
+                  - text: HSM
+              - link:
+                - /url: /security
+                - img
+                - generic:
+                  - img
+                  - text: Security
+              - button:
+                - img
+                - generic: Theme
+              - button:
+                - img
+              - button:
+                - img
+                - generic: admin
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+                    - generic:
+                      - heading [level=1]: Role-Based Access Control
+                      - paragraph: 6 roles
+                  - generic:
+                    - button:
+                      - img
+                      - generic: Help
+              - generic:
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "6"
+                    - generic: Total
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "3"
+                    - generic: System
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "3"
+                    - generic: Custom
+                - generic:
+                  - generic:
+                    - img
+                  - generic:
+                    - generic: "0"
+                    - generic: Users
+              - generic:
+                - main:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - img
+                            - textbox:
+                              - /placeholder: Search roles...
+                          - generic:
+                            - generic:
+                              - combobox:
+                                - generic: All Types
+                                - generic:
+                                  - img
+                          - generic:
+                            - button:
+                              - img
+                              - text: Create Role
+                      - generic:
+                        - table:
+                          - rowgroup:
+                            - row:
+                              - columnheader:
+                                - generic: Role Name
+                              - columnheader:
+                                - generic: Type
+                              - columnheader:
+                                - generic: Inherits
+                              - columnheader:
+                                - generic: Permissions
+                              - columnheader:
+                                - generic: Users
+                              - columnheader
+                          - rowgroup:
+                            - row:
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - img
+                                    - generic: Administrator
+                              - cell:
+                                - generic:
+                                  - generic: System
+                              - cell:
+                                - generic: —
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic: "1"
+                              - cell:
+                                - generic:
+                                  - generic: "0"
+                              - cell
+                            - row:
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - img
+                                    - generic: Operator
+                              - cell:
+                                - generic:
+                                  - generic: System
+                              - cell:
+                                - generic: —
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic: "13"
+                              - cell:
+                                - generic:
+                                  - generic: "0"
+                              - cell
+                            - row:
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - img
+                                    - generic: User
+                              - cell:
+                                - generic:
+                                  - generic: System
+                              - cell:
+                                - generic: —
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic: "4"
+                              - cell:
+                                - generic:
+                                  - generic: "0"
+                              - cell
+                            - row:
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - img
+                                    - generic: Certificate Manager
+                              - cell:
+                                - generic:
+                                  - generic: Custom
+                              - cell:
+                                - generic: —
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic: "8"
+                              - cell:
+                                - generic:
+                                  - generic: "0"
+                              - cell:
+                                - generic:
+                                  - button:
+                                    - img
+                            - row:
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - img
+                                    - generic: CA Administrator
+                              - cell:
+                                - generic:
+                                  - generic: Custom
+                              - cell:
+                                - generic: —
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic: "7"
+                              - cell:
+                                - generic:
+                                  - generic: "0"
+                              - cell:
+                                - generic:
+                                  - button:
+                                    - img
+                            - row:
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic:
+                                      - img
+                                    - generic: Security Auditor
+                              - cell:
+                                - generic:
+                                  - generic: Custom
+                              - cell:
+                                - generic: —
+                              - cell:
+                                - generic:
+                                  - generic:
+                                    - generic: "6"
+                              - cell:
+                                - generic:
+                                  - generic: "0"
+                              - cell:
+                                - generic:
+                                  - button:
+                                    - img
+                - complementary:
+                  - generic:
+                    - generic:
+                      - img
+                    - paragraph: Select a role to view permissions
+    - list
+  - dialog "Create Custom Role" [ref=e2]:
+    - generic [ref=e3]:
+      - heading "Create Custom Role" [level=2] [ref=e4]
+      - button [active] [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - generic [ref=e12]: Role Name
+          - textbox "e.g., Certificate Manager" [ref=e14]
+        - generic [ref=e15]:
+          - generic [ref=e16]: Description
+          - textbox "Brief description of this role" [ref=e18]
+        - generic [ref=e19]:
+          - generic [ref=e20]: Inherits From
+          - combobox [ref=e21] [cursor=pointer]:
+            - generic: None (standalone role)
+            - img [ref=e23]
+          - combobox [ref=e25]
+      - generic [ref=e26]:
+        - button "Cancel" [ref=e27] [cursor=pointer]
+        - button "Create" [disabled] [ref=e28]
+```
