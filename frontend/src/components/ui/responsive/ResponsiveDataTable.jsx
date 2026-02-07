@@ -1026,20 +1026,20 @@ function DesktopTable({
   const dStyle = densityStyles[density] || densityStyles.compact
   
   // Calculate column styles, preferring stored width over column definition
+  // With tableLayout: fixed, we need explicit widths
   const getColStyle = (col) => {
-    // If we have a stored width for this column, use it
+    // If we have a stored width for this column, use it (in px)
     if (columnWidths[col.key]) {
-      return { width: columnWidths[col.key], minWidth: 50 }
+      return { width: `${columnWidths[col.key]}px`, minWidth: 50, maxWidth: columnWidths[col.key] }
     }
     // If column has fixed width defined
-    if (col.width) return { width: col.width, minWidth: col.width, maxWidth: col.width }
-    // Dynamic sizing with constraints
-    const defaults = {
-      minWidth: col.minWidth || '80px',
-      maxWidth: col.maxWidth || '300px',
-      flex: col.flex || '1 1 auto'
+    if (col.width) return { width: col.width, minWidth: col.minWidth || 50 }
+    // Default: use minWidth as the base width for tableLayout fixed
+    // This ensures columns don't shift when other columns are resized
+    return { 
+      width: col.minWidth || 120,
+      minWidth: col.minWidth || 80
     }
-    return defaults
   }
   
   // Handle resize start
@@ -1083,18 +1083,23 @@ function DesktopTable({
     <div className="flex-1 overflow-auto" ref={tableRef}>
       <table 
         className={cn("w-full text-sm", resizingColumn && "select-none")} 
-        style={{ tableLayout: hasCustomWidths || resizingColumn ? 'fixed' : 'auto' }}
+        style={{ tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: 0 }}
       >
         {/* Header */}
         <thead className="sticky top-0 z-10 bg-bg-secondary/95 backdrop-blur-sm border-b border-border shadow-sm">
           <tr>
-            {columns.map((col) => {
+            {columns.map((col, colIdx) => {
               const style = getColStyle(col)
+              const isLast = colIdx === columns.length - 1 && !rowActions
               return (
                 <th
                   key={col.key}
                   onClick={() => sortable && col.sortable !== false && onSort(col.key)}
-                  style={style}
+                  style={{
+                    ...style,
+                    // Column separator in header - visible
+                    ...(!isLast && { borderRight: '1px solid rgba(128, 128, 128, 0.4)' })
+                  }}
                   className={cn(
                     'text-left text-2xs font-medium text-text-tertiary tracking-wide',
                     'relative group',
@@ -1104,7 +1109,7 @@ function DesktopTable({
                     sort?.key === col.key && 'text-accent-primary'
                   )}
                 >
-                  <div className="flex items-center gap-1.5 truncate pr-2">
+                  <div className="flex items-center gap-1.5 truncate pr-3">
                     {col.header || col.label}
                     {sort?.key === col.key && (
                       sort.direction === 'asc' 
@@ -1113,14 +1118,13 @@ function DesktopTable({
                     )}
                   </div>
                   {/* Resize handle */}
-                  {setColumnWidth && (
+                  {setColumnWidth && !isLast && (
                     <div 
                       className={cn(
-                        "absolute right-0 top-0 h-full w-1 cursor-col-resize",
-                        "opacity-0 group-hover:opacity-100 hover:!opacity-100",
-                        "bg-transparent hover:bg-accent-primary/50",
+                        "absolute right-0 top-0 h-full w-2 cursor-col-resize -mr-1 z-10",
+                        "bg-transparent hover:bg-accent-primary/60",
                         "transition-all duration-150",
-                        resizingColumn === col.key && "opacity-100 bg-accent-primary/70"
+                        resizingColumn === col.key && "bg-accent-primary"
                       )}
                       onMouseDown={(e) => handleResizeStart(e, col.key)}
                       onDoubleClick={(e) => {
@@ -1152,14 +1156,16 @@ function DesktopTable({
               <tr
                 key={row.id || idx}
                 onClick={() => onRowClick?.(row)}
+                style={{ borderBottom: '1px solid rgba(128, 128, 128, 0.25)' }}
                 className={cn(
                   'group transition-all duration-200 table-row-hover',
                   onRowClick && 'cursor-pointer',
                   // Selected state - uses theme-aware CSS class
                   selectedId === row.id && 'row-selected'
                 )}>
-                {columns.map((col) => {
+                {columns.map((col, colIdx) => {
                   const style = getColStyle(col)
+                  const isLast = colIdx === columns.length - 1 && !rowActions
                   return (
                     <td 
                       key={col.key}
@@ -1167,7 +1173,9 @@ function DesktopTable({
                       className={cn(
                         dStyle.cell,
                         "transition-colors duration-200",
-                        col.className
+                        col.className,
+                        // Subtle column separator - very discrete
+                        !isLast && 'border-r border-border/10'
                       )}
                     >
                       <div 

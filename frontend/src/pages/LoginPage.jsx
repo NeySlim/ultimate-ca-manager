@@ -105,7 +105,7 @@ export default function LoginPage() {
       // 2. Try WebAuthn if user has registered keys
       if (methods.webauthn && methods.webauthn_credentials > 0 && authMethodsService.isWebAuthnSupported()) {
         setAuthMethod('webauthn')
-        setStatusMessage('Waiting for security key...')
+        setStatusMessage(t('auth.waitingForSecurityKey'))
         await tryWebAuthnLogin()
         return
       }
@@ -138,7 +138,7 @@ export default function LoginPage() {
       // Try WebAuthn next
       if (userMethods?.webauthn && userMethods.webauthn_credentials > 0 && authMethodsService.isWebAuthnSupported()) {
         setAuthMethod('webauthn')
-        setStatusMessage('Waiting for security key...')
+        setStatusMessage(t('auth.waitingForSecurityKey'))
         await tryWebAuthnLogin()
       } else {
         // Fallback to password
@@ -152,11 +152,11 @@ export default function LoginPage() {
   // Try WebAuthn login
   const tryWebAuthnLogin = async () => {
     try {
-      setStatusMessage('Touch your security key...')
+      setStatusMessage(t('auth.touchSecurityKey'))
       const userData = await authMethodsService.authenticateWebAuthn(username)
       saveUsername(username)
       await login(username, null, userData)
-      showSuccess(`Welcome back, ${username}!`)
+      showSuccess(t('auth.welcomeBackUser', { username }))
       navigate('/dashboard')
     } catch (error) {
       // User cancelled or error → show password form
@@ -164,7 +164,7 @@ export default function LoginPage() {
       setStatusMessage('')
       setLoading(false)
       if (error.message?.includes('cancelled') || error.message?.includes('abort')) {
-        showInfo('Security key cancelled. Use password instead.')
+        showInfo(t('auth.securityKeyCancelled'))
       }
     }
   }
@@ -218,16 +218,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary p-4">
-      <Card className="w-full max-w-md p-8 space-y-6">
+    <div className="min-h-dvh flex items-start sm:items-center justify-center bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-tertiary p-2 sm:p-4 pt-2 sm:pt-4 overflow-hidden">
+      <Card className="w-full max-w-md p-4 sm:p-8 space-y-3 sm:space-y-5">
         {/* Logo */}
-        <div className="flex justify-center mb-2">
-          <Logo variant="horizontal" size="lg" />
+        <div className="flex justify-center mb-1 sm:mb-2">
+          <Logo variant="horizontal" size="lg" className="scale-90 sm:scale-100" />
         </div>
 
         {/* Title */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-text-primary mb-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary mb-1 sm:mb-2">
             {step === 'username' 
               ? (username ? t('auth.welcomeBack') : t('auth.login'))
               : t('auth.welcomeBack')
@@ -243,7 +243,7 @@ export default function LoginPage() {
 
         {/* Step 1: Username */}
         {step === 'username' && (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {/* If username saved from localStorage: show identity card */}
             {hasSavedUsername && username ? (
               <>
@@ -251,16 +251,17 @@ export default function LoginPage() {
                 <button
                   onClick={handleContinue}
                   disabled={loading}
-                  className="w-full text-left relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-4 hover:border-accent/50 hover:shadow-lg transition-all group"
+                  className="w-full text-left relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4 hover:border-accent/50 hover:shadow-lg transition-all group"
                 >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-accent/10 transition-colors" />
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                      <User size={24} className="text-white" weight="bold" />
+                  <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-accent/10 transition-colors" />
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                      <User size={20} className="text-white sm:hidden" weight="bold" />
+                      <User size={24} className="text-white hidden sm:block" weight="bold" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.continueAs')}</p>
-                      <p className="text-lg font-semibold text-text-primary truncate">{username}</p>
+                      <p className="text-base sm:text-lg font-semibold text-text-primary truncate">{username}</p>
                     </div>
                     <div className="text-accent group-hover:translate-x-1 transition-transform">
                       <ArrowRight size={24} weight="bold" />
@@ -325,17 +326,18 @@ export default function LoginPage() {
 
         {/* Step 2: Authentication */}
         {step === 'auth' && (
-          <div className="space-y-5">
+          <div className="space-y-3 sm:space-y-5">
             {/* User identity card - modern design */}
-            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-4">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg">
-                  <User size={24} className="text-white" weight="bold" />
+            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
+              <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent/70 flex items-center justify-center shadow-lg">
+                  <User size={20} className="text-white sm:hidden" weight="bold" />
+                  <User size={24} className="text-white hidden sm:block" weight="bold" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.signingInAs')}</p>
-                  <p className="text-lg font-semibold text-text-primary truncate">{username}</p>
+                  <p className="text-base sm:text-lg font-semibold text-text-primary truncate">{username}</p>
                 </div>
                 <button
                   onClick={handleChangeUser}
@@ -349,7 +351,7 @@ export default function LoginPage() {
 
             {/* Loading state for auto-auth */}
             {loading && (authMethod === 'mtls' || authMethod === 'webauthn') && (
-              <div className="flex flex-col items-center gap-4 py-6">
+              <div className="flex flex-col items-center gap-2 py-2 sm:gap-4 sm:py-6">
                 <div className="relative">
                   <LoadingSpinner size="lg" />
                   {authMethod === 'mtls' && <ShieldCheck size={24} className="absolute inset-0 m-auto text-accent" />}
@@ -363,7 +365,7 @@ export default function LoginPage() {
 
             {/* WebAuthn option (when not loading) */}
             {authMethod === 'webauthn' && !loading && (
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 <Button
                   onClick={handleWebAuthnRetry}
                   className="w-full"
@@ -376,16 +378,16 @@ export default function LoginPage() {
                 
                 <button
                   onClick={() => setAuthMethod('password')}
-                  className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-2"
+                  className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-1.5 sm:py-2"
                 >
-                  Use password instead
+                  {t('auth.usePasswordInstead')}
                 </button>
               </div>
             )}
 
             {/* Password form */}
             {authMethod === 'password' && (
-              <form onSubmit={handlePasswordLogin} className="space-y-4">
+              <form onSubmit={handlePasswordLogin} className="space-y-3 sm:space-y-4">
                 {/* Hidden username field for accessibility */}
                 <input
                   type="text"
@@ -461,7 +463,7 @@ export default function LoginPage() {
             {/* Back button */}
             <button
               onClick={handleBack}
-              className="w-full text-sm text-text-secondary hover:text-text-primary transition-colors py-2 flex items-center justify-center gap-1"
+              className="w-full text-sm text-text-secondary hover:text-text-primary transition-colors py-1.5 sm:py-2 flex items-center justify-center gap-1"
               disabled={loading}
             >
               <ArrowLeft size={14} />
@@ -472,7 +474,7 @@ export default function LoginPage() {
 
         {/* Auth methods available indicator */}
         {step === 'auth' && userMethods && (
-          <div className="flex justify-center gap-2 pt-2">
+          <div className="flex justify-center gap-1.5 sm:gap-2 pt-1 sm:pt-2">
             {userMethods.mtls && (
               <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'mtls' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
                 <ShieldCheck size={12} weight="fill" />
@@ -493,7 +495,7 @@ export default function LoginPage() {
         )}
 
         {/* Footer with actions */}
-        <div className="pt-4 border-t border-border space-y-3">
+        <div className="pt-3 sm:pt-4 border-t border-border space-y-2 sm:space-y-3">
           {/* Action buttons row */}
           <div className="flex items-center justify-center gap-2 relative">
             {/* Language Selector - Flag only */}

@@ -232,6 +232,7 @@
     "exportOptions": "Opciones de exportación"
   },
   "auth": {
+    "continue": "Continuar",
     "login": "Iniciar sesión",
     "logout": "Cerrar sesión",
     "username": "Usuario",

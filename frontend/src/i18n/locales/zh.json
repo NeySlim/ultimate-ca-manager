@@ -232,6 +232,7 @@
     "exportOptions": "导出选项"
   },
   "auth": {
+    "continue": "继续",
     "login": "登录",
     "logout": "退出",
     "username": "用户名",

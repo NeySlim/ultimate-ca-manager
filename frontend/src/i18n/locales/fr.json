@@ -252,6 +252,7 @@
     "allUsers": "Tous les utilisateurs"
   },
   "auth": {
+    "continue": "Continuer",
     "login": "Connexion",
     "logout": "Déconnexion",
     "username": "Nom d'utilisateur",
@@ -284,7 +285,12 @@
     "signingIn": "Connexion...",
     "signingInAs": "Connexion en tant que",
     "trySecurityKeyAgain": "Réessayer la clé de sécurité",
-    "key": "Clé"
+    "key": "Clé",
+    "waitingForSecurityKey": "En attente de la clé de sécurité...",
+    "touchSecurityKey": "Touchez votre clé de sécurité...",
+    "securityKeyCancelled": "Clé de sécurité annulée. Utilisez le mot de passe.",
+    "welcomeBackUser": "Bon retour, {{username}} !",
+    "usePasswordInstead": "Utiliser le mot de passe"
   },
   "cas": {
     "title": "Autorités de certification",
