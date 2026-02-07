@@ -12,23 +12,41 @@
 ## ✨ Key Features
 
 ### 🔐 Complete PKI Infrastructure
-- **Full CA Management** - Create, import, manage Certificate Authorities with complete control
+- **Full CA Management** - Create, import, manage Certificate Authorities with hierarchy support
 - **Certificate Lifecycle** - Generate, sign, revoke, renew, export certificates
+- **CSR Management** - Create, import, sign Certificate Signing Requests
+- **Certificate Templates** - Predefined configurations for server, client, code signing certificates
 - **CRL & CDP** - Certificate Revocation Lists with HTTP/HTTPS distribution points
 - **OCSP Responder** - Real-time certificate status validation (RFC 6960)
+- **Trust Store** - Manage trusted root CA certificates
+
+### 🧰 Certificate Toolbox
+- **SSL Checker** - Verify SSL certificates on any hostname (TLS version, cipher suite, expiry)
+- **CSR Decoder** - Parse and display CSR contents
+- **Certificate Decoder** - Analyze certificate details (extensions, SANs, key usage)
+- **Key Matcher** - Verify certificate and private key match
+- **SSL Converter** - Convert between PEM, DER, PKCS#12, PKCS#7 formats
 
 ### 📡 Industry Standard Protocols
 - **SCEP Server** - RFC 8894 compliant auto-enrollment for network devices
-- **ACME Support** - Let's Encrypt compatible (certbot, acme.sh)
-- **OCSP** - Online Certificate Status Protocol
-- **CRL/CDP** - Certificate Revocation List distribution
+- **ACME Support** - Let's Encrypt compatible (certbot, acme.sh) with account management
+- **OCSP** - Online Certificate Status Protocol responder
+- **CRL/CDP** - Certificate Revocation List distribution points
 
 ### 🔒 Advanced Security
+- **WebAuthn/FIDO2** - Hardware security key support (YubiKey, Passkeys)
 - **mTLS Authentication** - Mutual TLS certificate-based authentication
-- **WebAuthn/FIDO2** - Hardware security key support (YubiKey, etc.)
-- **Multi-Factor Auth** - Multiple authentication methods
-- **JWT Sessions** - Secure token-based authentication
-- **HTTPS Only** - All traffic encrypted by default
+- **TOTP Two-Factor** - Time-based one-time passwords
+- **Password Strength** - Visual strength indicator with policy enforcement
+- **Session Management** - Timeout warning, force password change
+- **Audit Logs** - Full action logging with hash chain integrity verification
+- **Rate Limiting** - Brute force protection on login
+- **JWT Sessions** - Secure httpOnly cookie authentication
+
+### 👥 User & Group Management
+- **User Groups** - Organize users with role-based access
+- **API Keys** - Generate keys for automation and integrations
+- **Session History** - Track all login sessions
 
 ### 🎨 Modern Interface
 - **12 Theme Variants** - 6 color themes (Gray, Ocean, Purple, Forest, Sunset, Cyber) × Light/Dark modes
@@ -36,23 +54,25 @@
 - **React 18 + Radix UI** - Modern, accessible component library
 - **Split-View Layout** - Sidebar, explorer panel, details panel
 - **Responsive Design** - Mobile-first with adaptive layouts
-- **Mobile Navigation** - Grid menu, theme/account quick access
-- **Keyboard Shortcuts** - Cmd+K command palette for power users
-- **Real-time Updates** - Instant feedback on all operations
+- **Command Palette** - Ctrl+K global search with quick actions
+- **Real-time Updates** - WebSocket-based live refresh
+- **Contextual Help** - Help modals on every page
 - **[View Screenshots](docs/SCREENSHOTS.md)** - See all features in action
 
 ### 🚀 Deployment Options
-- **Docker** - Multi-arch images (amd64, arm64) via GHCR
+- **Docker** - Multi-arch images (amd64, arm64) via Docker Hub & GHCR
 - **Debian/Ubuntu** - Native .deb packages
-- **RHEL/Rocky/Alma** - Native .rpm packages
+- **RHEL/Rocky/Fedora** - Native .rpm packages
 - **From Source** - Python 3.11+ with virtual environment
 
 ### ⚙️ Integration & Management
+- **Smart Import** - Intelligent parser for certificates, keys, CSRs (drag & drop)
 - **OPNsense Import** - Direct import from OPNsense firewalls
+- **Bulk Export** - Export all certificates/CAs in one click
 - **Email Notifications** - Certificate expiration alerts
-- **Database Backup** - Manual backup creation via UI
-- **REST API** - Full API for automation
-- **Web Configuration** - All settings via web UI
+- **Backup & Restore** - Full database backup with encryption
+- **REST API v2** - Complete API for automation
+- **Auto-Updates** - Check and install updates from UI
 
 ---
 
