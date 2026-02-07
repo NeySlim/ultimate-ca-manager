@@ -93,6 +93,40 @@ export function ResponsiveDataTable({
   // Sort state
   const [sort, setSort] = useState(defaultSort || null)
   
+  // Column widths state for resizing
+  const [columnWidths, setColumnWidths] = useState(() => {
+    if (columnStorageKey) {
+      try {
+        const saved = localStorage.getItem(`${columnStorageKey}-widths`)
+        return saved ? JSON.parse(saved) : {}
+      } catch {
+        return {}
+      }
+    }
+    return {}
+  })
+  
+  // Save column widths to localStorage
+  useEffect(() => {
+    if (columnStorageKey && Object.keys(columnWidths).length > 0) {
+      localStorage.setItem(`${columnStorageKey}-widths`, JSON.stringify(columnWidths))
+    }
+  }, [columnWidths, columnStorageKey])
+  
+  // Update column width
+  const setColumnWidth = useCallback((key, width) => {
+    setColumnWidths(prev => ({ ...prev, [key]: width }))
+  }, [])
+  
+  // Reset column width to default
+  const resetColumnWidth = useCallback((key) => {
+    setColumnWidths(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }, [])
+  
   // Row actions dropdown
   const [openActionMenu, setOpenActionMenu] = useState(null)
   const actionMenuRef = useRef(null)
@@ -559,6 +593,9 @@ export function ResponsiveDataTable({
           actionMenuRef={actionMenuRef}
           loading={loading}
           density={density}
+          columnWidths={columnWidths}
+          setColumnWidth={setColumnWidth}
+          resetColumnWidth={resetColumnWidth}
         />
       )}
       
@@ -966,8 +1003,20 @@ function DesktopTable({
   setOpenActionMenu,
   actionMenuRef,
   loading,
-  density = 'compact'
+  density = 'compact',
+  columnWidths = {},
+  setColumnWidth,
+  resetColumnWidth
 }) {
+  // Resizing state
+  const [resizingColumn, setResizingColumn] = useState(null)
+  const resizeStartX = useRef(0)
+  const resizeStartWidth = useRef(0)
+  const tableRef = useRef(null)
+  
+  // Check if any column has a custom width
+  const hasCustomWidths = Object.keys(columnWidths).length > 0
+  
   // Density-based padding for rows
   const densityStyles = {
     compact: { cell: 'px-4 py-1', header: 'px-4 py-1.5' },
@@ -976,8 +1025,13 @@ function DesktopTable({
   }
   const dStyle = densityStyles[density] || densityStyles.compact
   
-  // Calculate column flex styles based on content type
+  // Calculate column styles, preferring stored width over column definition
   const getColStyle = (col) => {
+    // If we have a stored width for this column, use it
+    if (columnWidths[col.key]) {
+      return { width: columnWidths[col.key], minWidth: 50 }
+    }
+    // If column has fixed width defined
     if (col.width) return { width: col.width, minWidth: col.width, maxWidth: col.width }
     // Dynamic sizing with constraints
     const defaults = {
@@ -987,10 +1041,50 @@ function DesktopTable({
     }
     return defaults
   }
+  
+  // Handle resize start
+  const handleResizeStart = useCallback((e, colKey) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Get the th element to measure its current width
+    const th = e.target.closest('th')
+    if (!th) return
+    
+    resizeStartX.current = e.clientX
+    resizeStartWidth.current = th.offsetWidth
+    setResizingColumn(colKey)
+  }, [])
+  
+  // Handle resize move
+  useEffect(() => {
+    if (!resizingColumn) return
+    
+    const handleMouseMove = (e) => {
+      const diff = e.clientX - resizeStartX.current
+      const newWidth = Math.max(50, resizeStartWidth.current + diff) // Minimum 50px
+      setColumnWidth(resizingColumn, newWidth)
+    }
+    
+    const handleMouseUp = () => {
+      setResizingColumn(null)
+    }
+    
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [resizingColumn, setColumnWidth])
 
   return (
-    <div className="flex-1 overflow-auto">
-      <table className="w-full text-sm" style={{ tableLayout: 'auto' }}>
+    <div className="flex-1 overflow-auto" ref={tableRef}>
+      <table 
+        className={cn("w-full text-sm", resizingColumn && "select-none")} 
+        style={{ tableLayout: hasCustomWidths || resizingColumn ? 'fixed' : 'auto' }}
+      >
         {/* Header */}
         <thead className="sticky top-0 z-10 bg-bg-secondary/95 backdrop-blur-sm border-b border-border shadow-sm">
           <tr>
@@ -1003,13 +1097,14 @@ function DesktopTable({
                   style={style}
                   className={cn(
                     'text-left text-2xs font-medium text-text-tertiary tracking-wide',
+                    'relative group',
                     dStyle.header,
                     'transition-colors duration-200',
                     sortable && col.sortable !== false && 'cursor-pointer hover:text-text-secondary',
                     sort?.key === col.key && 'text-accent-primary'
                   )}
                 >
-                  <div className="flex items-center gap-1.5 truncate">
+                  <div className="flex items-center gap-1.5 truncate pr-2">
                     {col.header || col.label}
                     {sort?.key === col.key && (
                       sort.direction === 'asc' 
@@ -1017,6 +1112,23 @@ function DesktopTable({
                         : <CaretDown size={10} weight="bold" className="text-accent-primary" />
                     )}
                   </div>
+                  {/* Resize handle */}
+                  {setColumnWidth && (
+                    <div 
+                      className={cn(
+                        "absolute right-0 top-0 h-full w-1 cursor-col-resize",
+                        "opacity-0 group-hover:opacity-100 hover:!opacity-100",
+                        "bg-transparent hover:bg-accent-primary/50",
+                        "transition-all duration-150",
+                        resizingColumn === col.key && "opacity-100 bg-accent-primary/70"
+                      )}
+                      onMouseDown={(e) => handleResizeStart(e, col.key)}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation()
+                        resetColumnWidth(col.key)
+                      }}
+                    />
+                  )}
                 </th>
               )
             })}
