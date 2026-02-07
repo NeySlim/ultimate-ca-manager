@@ -1,6 +1,6 @@
 # Ultimate CA Manager
 
-![Version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-2.1.0-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-success.svg)

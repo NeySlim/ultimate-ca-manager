@@ -1,22 +1,20 @@
-# UCM Pro Features
+# UCM Advanced Features
 
-UCM Pro extends the Community Edition with enterprise-grade features for large deployments.
+All features are included in UCM v2.1+. No separate editions.
 
 ## Features Overview
 
-| Feature | Community | Pro | Enterprise |
-|---------|-----------|-----|------------|
-| Certificate Management | ✅ | ✅ | ✅ |
-| Multiple CAs | ✅ | ✅ | ✅ |
-| ACME Protocol | ✅ | ✅ | ✅ |
-| SCEP Protocol | ✅ | ✅ | ✅ |
-| User Groups | ❌ | ✅ | ✅ |
-| Custom RBAC Roles | ❌ | ✅ | ✅ |
-| SSO (LDAP/OAuth2/SAML) | ❌ | ✅ | ✅ |
-| HSM Integration | ❌ | ✅ | ✅ |
-| Advanced Audit Logs | ❌ | ✅ | ✅ |
-| Priority Support | ❌ | ✅ | ✅ |
-| SLA Guarantee | ❌ | ❌ | ✅ |
+| Feature | Status |
+|---------|--------|
+| Certificate Management | ✅ |
+| Multiple CAs | ✅ |
+| ACME Protocol | ✅ |
+| SCEP Protocol | ✅ |
+| User Groups | ✅ |
+| Custom RBAC Roles | ✅ |
+| SSO (LDAP/OAuth2/SAML) | ✅ |
+| HSM Integration | ✅ |
+| Advanced Audit Logs | ✅ |
 
 ---
 
@@ -57,11 +55,6 @@ Define granular permissions beyond the built-in roles.
 - Inherit from base roles (admin, operator, viewer)
 - Granular permission control per resource type
 - Role hierarchy with permission inheritance
-
-### Default Custom Roles
-- **Certificate Manager** - Full certificate lifecycle
-- **CA Administrator** - CA and CRL management
-- **Security Auditor** - Read-only compliance access
 
 ### Permission Categories
 - Certificates: read, write, delete, revoke, renew
@@ -166,16 +159,6 @@ Hardware Security Module support for secure key storage.
 }
 ```
 
-### AWS CloudHSM Configuration
-```json
-{
-  "provider_type": "aws-cloudhsm",
-  "aws_cluster_id": "cluster-xxxxx",
-  "aws_region": "us-east-1",
-  "aws_crypto_user": "cu_user"
-}
-```
-
 ### Key Types
 - RSA (2048, 3072, 4096 bit)
 - ECDSA (P-256, P-384, P-521)
@@ -196,66 +179,8 @@ GET    /api/v2/hsm/stats        - HSM statistics
 
 ---
 
-## License Activation
-
-### License Types
-- **Community** - Free, open source features only
-- **Pro** - All Pro features, single organization
-- **Enterprise** - Pro + SLA, multi-tenant, priority support
-
-### Activation
-1. Purchase license at https://ucm.example.com/pricing
-2. Receive license key via email
-3. Place key in `/opt/ucm/data/license.key`
-4. Restart UCM service
-5. Pro features automatically unlock
-
-### License API
-```
-GET /api/v2/license - Get current license info
-```
-
-### Response
-```json
-{
-  "type": "pro",
-  "features": ["groups", "rbac", "sso", "hsm"],
-  "expires_at": "2027-01-01T00:00:00Z",
-  "licensed_to": "Example Corp"
-}
-```
-
----
-
-## Database Tables
-
-Pro features use isolated tables prefixed with `pro_`:
-
-```sql
--- Groups
-pro_groups
-pro_group_members
-
--- RBAC
-pro_custom_roles
-pro_role_permissions
-
--- SSO
-pro_sso_providers
-pro_sso_sessions
-
--- HSM
-pro_hsm_providers
-pro_hsm_keys
-```
-
-Tables are automatically created on first startup when Pro modules are available.
-
----
-
 ## Support
 
-- Documentation: https://docs.ucm.example.com
+- Documentation: https://github.com/NeySlim/ultimate-ca-manager/wiki
 - Community: https://github.com/NeySlim/ultimate-ca-manager/discussions
-- Pro Support: support@ucm.example.com
-- Enterprise SLA: enterprise@ucm.example.com
+- Issues: https://github.com/NeySlim/ultimate-ca-manager/issues
