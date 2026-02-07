@@ -374,7 +374,7 @@ export default function SettingsPage() {
 
   const handleBackup = async () => {
     if (!backupPassword || backupPassword.length < 12) {
-      showError('Password must be at least 12 characters')
+      showError(t('settings.passwordMinLength'))
       return
     }
     
@@ -417,9 +417,9 @@ export default function SettingsPage() {
   }
 
   const handleDeleteBackup = async (filename) => {
-    const confirmed = await showConfirm(`Delete backup "${filename}"?`, {
-      title: 'Delete Backup',
-      confirmText: 'Delete',
+    const confirmed = await showConfirm(t('settings.confirmDeleteBackup', { filename }), {
+      title: t('settings.deleteBackup'),
+      confirmText: t('common.delete'),
       variant: 'danger'
     })
     if (!confirmed) return
@@ -435,18 +435,18 @@ export default function SettingsPage() {
 
   const handleRestoreBackup = async () => {
     if (!restoreFile) {
-      showError('Please select a backup file')
+      showError(t('settings.selectBackupFile'))
       return
     }
     if (!restorePassword || restorePassword.length < 12) {
-      showError('Password must be at least 12 characters')
+      showError(t('settings.passwordMinLength'))
       return
     }
     
     setBackupLoading(true)
     try {
       const result = await systemService.restore(restoreFile, restorePassword)
-      showSuccess(`Backup restored successfully: ${result.data?.users || 0} users, ${result.data?.cas || 0} CAs, ${result.data?.certificates || 0} certificates`)
+      showSuccess(t('settings.backupRestored', { users: result.data?.users || 0, cas: result.data?.cas || 0, certs: result.data?.certificates || 0 }))
       setShowRestoreModal(false)
       setRestorePassword('')
       setRestoreFile(null)
@@ -473,7 +473,7 @@ export default function SettingsPage() {
       if (result.passed) {
         showSuccess(SUCCESS.DATABASE.INTEGRITY_PASSED)
       } else {
-        showError(`Integrity check found ${result.errors} errors`)
+        showError(t('settings.integrityErrors', { count: result.errors }))
       }
     } catch (error) {
       showError(error.message || ERRORS.DATABASE.INTEGRITY_FAILED)
@@ -495,19 +495,19 @@ export default function SettingsPage() {
   }
 
   const handleResetDb = async () => {
-    const confirmed1 = await showConfirm('⚠️ WARNING: This will DELETE ALL DATA and reset the database to initial state. Are you absolutely sure?', {
-      title: 'Reset Database',
-      confirmText: 'Continue',
+    const confirmed1 = await showConfirm(t('settings.resetDbWarning'), {
+      title: t('settings.resetDatabase'),
+      confirmText: t('common.next'),
       variant: 'danger'
     })
     if (!confirmed1) return
 
-    const confirmation = await showPrompt('Type YES to confirm database reset:', {
-      title: 'Final Confirmation',
+    const confirmation = await showPrompt(t('settings.typeYesToConfirm'), {
+      title: t('settings.finalConfirmation'),
       placeholder: 'YES'
     })
     if (confirmation !== 'YES') {
-      showError('Database reset cancelled')
+      showError(t('settings.resetDbCancelled'))
       return
     }
 
@@ -522,13 +522,13 @@ export default function SettingsPage() {
 
   const handleApplyUcmCert = async () => {
     if (!selectedHttpsCert) {
-      showError('Please select a certificate')
+      showError(t('settings.selectCertificate'))
       return
     }
 
-    const confirmed = await showConfirm('Apply selected certificate as HTTPS certificate? This will restart the server.', {
-      title: 'Apply Certificate',
-      confirmText: 'Apply & Restart'
+    const confirmed = await showConfirm(t('settings.applyHttpsCertConfirm'), {
+      title: t('settings.applyCertificate'),
+      confirmText: t('settings.applyAndRestart')
     })
     if (!confirmed) return
     
@@ -544,9 +544,9 @@ export default function SettingsPage() {
   }
 
   const handleRegenerateHttpsCert = async () => {
-    const confirmed = await showConfirm('Regenerate HTTPS certificate? This will restart the server.', {
-      title: 'Regenerate Certificate',
-      confirmText: 'Regenerate & Restart'
+    const confirmed = await showConfirm(t('settings.regenerateCertConfirm'), {
+      title: t('settings.regenerateCertificate'),
+      confirmText: t('settings.regenerateAndRestart')
     })
     if (!confirmed) return
     

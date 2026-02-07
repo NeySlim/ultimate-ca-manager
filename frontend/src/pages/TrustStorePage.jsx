@@ -107,10 +107,10 @@ export default function TrustStorePage() {
     setSyncing(true)
     try {
       const response = await truststoreService.syncFromSystem(50)
-      showSuccess(response.message || `Synced ${response.data?.new_count || 0} certificates`)
+      showSuccess(response.message || t('trustStore.syncedCerts', { count: response.data?.new_count || 0 }))
       loadCertificates()
     } catch (error) {
-      showError(error.message || 'Failed to sync from system')
+      showError(error.message || t('trustStore.syncFailed'))
     } finally {
       setSyncing(false)
     }

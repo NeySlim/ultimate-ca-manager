@@ -1,6 +1,7 @@
 /**
  * TemplatePreviewModal - Preview what a certificate would look like with this template
  */
+import { useTranslation } from 'react-i18next'
 import { X, Certificate, Eye, ShieldCheck, Key, Clock, Globe, ListBullets } from '@phosphor-icons/react'
 import { Modal } from './Modal'
 import { Badge } from './Badge'
@@ -51,6 +52,7 @@ function SANPreview({ template }) {
 }
 
 export function TemplatePreviewModal({ open, onClose, template }) {
+  const { t } = useTranslation()
   if (!template) return null
 
   // Calculate sample validity dates
@@ -73,8 +75,8 @@ export function TemplatePreviewModal({ open, onClose, template }) {
               <Eye size={18} className="text-accent-secondary" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-text-primary">Template Preview</h2>
-              <p className="text-xs text-text-secondary">Preview certificate settings for: <strong>{template.name}</strong></p>
+              <h2 className="text-base font-semibold text-text-primary">{t('templates.preview')}</h2>
+              <p className="text-xs text-text-secondary">{t('templates.previewFor')}: <strong>{template.name}</strong></p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary">
@@ -86,7 +88,7 @@ export function TemplatePreviewModal({ open, onClose, template }) {
         <div className="flex items-center gap-2 p-2 mb-4 rounded-lg bg-accent-primary/10 border border-accent-primary/20">
           <Eye size={16} className="text-accent-primary" />
           <span className="text-xs text-text-secondary">
-            This is a preview of what a certificate issued with this template would look like
+            {t('templates.previewDescription')}
           </span>
         </div>
         
@@ -96,8 +98,8 @@ export function TemplatePreviewModal({ open, onClose, template }) {
           <div className="bg-bg-tertiary px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <Certificate size={20} className="text-accent-primary" />
-              <span className="font-medium text-text-primary">Sample Certificate</span>
-              <Badge variant="success" size="sm">Valid</Badge>
+              <span className="font-medium text-text-primary">{t('templates.sampleCertificate')}</span>
+              <Badge variant="success" size="sm">{t('common.valid')}</Badge>
             </div>
           </div>
           
@@ -154,19 +156,19 @@ export function TemplatePreviewModal({ open, onClose, template }) {
           {/* Template restrictions */}
           {(template.max_path_length !== undefined || template.require_cn || !template.allow_any_cn) && (
             <div className="px-4 py-3 bg-bg-tertiary border-t border-border">
-              <div className="text-xs font-medium text-text-secondary mb-2">Template Restrictions</div>
+              <div className="text-xs font-medium text-text-secondary mb-2">{t('templates.restrictions')}</div>
               <div className="flex flex-wrap gap-2">
                 {!template.allow_any_cn && (
-                  <Badge variant="warning" size="sm">Fixed CN</Badge>
+                  <Badge variant="warning" size="sm">{t('templates.fixedCN')}</Badge>
                 )}
                 {template.require_cn && (
-                  <Badge variant="info" size="sm">CN Required</Badge>
+                  <Badge variant="info" size="sm">{t('templates.cnRequired')}</Badge>
                 )}
                 {template.max_path_length !== undefined && template.max_path_length >= 0 && (
-                  <Badge variant="default" size="sm">Path Length: {template.max_path_length}</Badge>
+                  <Badge variant="default" size="sm">{t('templates.pathLength')}: {template.max_path_length}</Badge>
                 )}
                 {template.basic_constraints === 'ca' && (
-                  <Badge variant="purple" size="sm">CA Certificate</Badge>
+                  <Badge variant="purple" size="sm">{t('templates.caCertificate')}</Badge>
                 )}
               </div>
             </div>

@@ -116,7 +116,7 @@ export default function CRLOCSPPage() {
         setSelectedCA(prev => ({ ...prev, cdp_enabled: result.data.cdp_enabled }))
       }
     } catch (error) {
-      showError(error.message || 'Failed to toggle auto-regeneration')
+      showError(error.message || t('crlOcsp.toggleAutoRegenFailed'))
     }
   }
 
@@ -134,7 +134,7 @@ export default function CRLOCSPPage() {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
-    showInfo('Copied to clipboard')
+    showInfo(t('common.copied'))
   }
 
   // Calculate stats

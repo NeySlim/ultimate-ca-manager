@@ -206,11 +206,11 @@ export default function AuditLogsPage() {
     try {
       setCleanupLoading(true);
       const res = await auditService.cleanupLogs(cleanupDays);
-      showSuccess(res.message || `Cleaned up ${res.data?.deleted || 0} old logs`);
+      showSuccess(res.message || t('audit.cleanedUpLogs', { count: res.data?.deleted || 0 }));
       setShowCleanupModal(false);
       loadData();
     } catch (err) {
-      showError(t('audit.cleanupLogs') + ' ' + t('common.failed').toLowerCase());
+      showError(t('audit.cleanupFailed'));
     } finally {
       setCleanupLoading(false);
     }

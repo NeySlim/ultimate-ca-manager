@@ -45,6 +45,9 @@
     "save": "Enregistrer",
     "saving": "Enregistrement...",
     "cancel": "Annuler",
+    "noDataAvailable": "Aucune donnée disponible",
+    "dropFilesOrBrowse": "Déposez des fichiers ici ou cliquez pour parcourir",
+    "anyFile": "Tout fichier",
     "enterYourName": "Entrez votre nom",
     "securitySettings": "Paramètres de sécurité",
     "manageAccountSecurity": "Gérer la sécurité de votre compte",
@@ -106,7 +109,11 @@
     "expires": "Expire",
     "loadingAccount": "Chargement du compte...",
     "daysPlaceholder": "365",
-    "codePlaceholder": "000000"
+    "codePlaceholder": "000000",
+    "registrationFailed": "Échec de l'enregistrement de la clé de sécurité",
+    "deleteKeyFailed": "Échec de la suppression de la clé de sécurité",
+    "deleteCertFailed": "Échec de la suppression du certificat",
+    "securityKey": "Clé de sécurité"
   },
   "acme": {
     "title": "Protocole ACME",
@@ -182,6 +189,9 @@
     "agreeToTermsRequired": "Vous devez accepter les conditions d'utilisation",
     "contactEmailHelper": "Email de contact pour les notifications d'expiration",
     "cancel": "Annuler",
+    "noDataAvailable": "Aucune donnée disponible",
+    "dropFilesOrBrowse": "Déposez des fichiers ici ou cliquez pour parcourir",
+    "anyFile": "Tout fichier",
     "commonName": "Nom commun",
     "issuer": "Émetteur",
     "expires": "Expire",
@@ -203,7 +213,17 @@
     "acmeOrder": "Commande ACME",
     "account": "Compte",
     "orderStatus": "État de la commande",
-    "emailPlaceholder": "admin@exemple.com"
+    "emailPlaceholder": "admin@exemple.com",
+    "proxyRegisteredSuccess": "Compte proxy enregistré avec succès",
+    "proxyRegistrationFailed": "Échec de l'enregistrement du compte proxy",
+    "proxyUnregisteredSuccess": "Compte proxy désinscrit avec succès",
+    "proxyUnregistrationFailed": "Échec de la désinscription du compte proxy",
+    "accountCreatedSuccess": "Compte ACME créé avec succès",
+    "accountCreationFailed": "Échec de la création du compte ACME",
+    "accountDeactivatedSuccess": "Compte désactivé avec succès",
+    "accountDeactivationFailed": "Échec de la désactivation du compte",
+    "accountDeletedSuccess": "Compte supprimé avec succès",
+    "unknownCA": "AC inconnue"
   },
   "audit": {
     "title": "Journaux d'audit",
@@ -223,7 +243,9 @@
     "aboutAuditLogs": "À propos des journaux d'audit",
     "filteringSearch": "Filtrage et recherche",
     "dataRetention": "Conservation des données",
-    "exportOptions": "Options d'exportation"
+    "exportOptions": "Options d'exportation",
+    "cleanedUpLogs": "{{count}} anciens journaux nettoyés",
+    "cleanupFailed": "Échec du nettoyage"
   },
   "auth": {
     "login": "Connexion",
@@ -239,7 +261,7 @@
     "twoFactorRequired": "Authentification à deux facteurs requise",
     "enterCode": "Entrez le code de vérification",
     "verifyCode": "Vérifier",
-    "useSecurityKey": "Utiliser une clé de sécurité",
+    "useSecurityKey": "Utiliser la clé de sécurité",
     "useBackupCode": "Utiliser un code de secours",
     "enterUsername": "Entrez votre nom d'utilisateur",
     "enterPassword": "Entrez votre mot de passe",
@@ -253,12 +275,18 @@
     "enterPasswordToContinue": "Entrez votre mot de passe pour continuer",
     "chooseAuthMethod": "Choisissez comment vous authentifier",
     "continueAs": "Continuer en tant que",
-    "useDifferentAccount": "Utiliser un autre compte"
+    "useDifferentAccount": "Utiliser un autre compte",
+    "checking": "Vérification...",
+    "signingIn": "Connexion...",
+    "signingInAs": "Connexion en tant que",
+    "trySecurityKeyAgain": "Réessayer la clé de sécurité",
+    "key": "Clé"
   },
   "cas": {
     "title": "Autorités de certification",
     "ca": "Autorité de certification",
-    "createCA": "Créer une AC",
+    "createCA": "Créer CA",
+    "issueCert": "Nouv. cert",
     "rootCA": "AC racine",
     "intermediateCA": "AC intermédiaire",
     "issuingCA": "AC émettrice",
@@ -303,7 +331,16 @@
     "orgPlaceholder": "Mon entreprise",
     "countryPlaceholder": "FR",
     "statePlaceholder": "Île-de-France",
-    "localityPlaceholder": "Paris"
+    "localityPlaceholder": "Paris",
+    "intermediate": "Intermédiaire",
+    "deleteCA": "Supprimer l'autorité de certification",
+    "deleteCAButton": "Supprimer l'AC",
+    "deleteFailed": "Échec de la suppression de l'AC",
+    "exportFailed": "Échec de l'exportation de l'AC",
+    "passwordTooShort": "Le mot de passe doit contenir au moins 4 caractères",
+    "exportedAs": "AC exportée en {{format}}",
+    "createFailed": "Échec de la création de l'AC",
+    "unnamedCA": "AC sans nom"
   },
   "certificates": {
     "title": "Certificats",
@@ -361,6 +398,9 @@
   "common": {
     "save": "Enregistrer",
     "cancel": "Annuler",
+    "noDataAvailable": "Aucune donnée disponible",
+    "dropFilesOrBrowse": "Déposez des fichiers ici ou cliquez pour parcourir",
+    "anyFile": "Tout fichier",
     "close": "Fermer",
     "delete": "Supprimer",
     "edit": "Modifier",
@@ -464,8 +504,21 @@
     "clientInfo": "Informations client",
     "exportedFormat": "Exporté en {{format}}",
     "viewAll": "Voir tout",
-    "createCA": "Créer une AC",
-    "signCSR": "Signer une CSR"
+    "createCA": "Créer CA",
+    "issueCert": "Nouv. cert",
+    "signCSR": "Signer une CSR",
+    "change": "Changer",
+    "done": "Terminé",
+    "selectAll": "Tout sélectionner",
+    "deselectAll": "Tout désélectionner",
+    "warnings": "Avertissements",
+    "errors": "Erreurs",
+    "live": "En direct",
+    "updateAvailable": "Mise à jour disponible",
+    "enterPassword": "Entrer le mot de passe",
+    "unknown": "Inconnu",
+    "unnamed": "Sans nom",
+    "na": "N/A"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -529,7 +582,8 @@
     "aia": "AIA (Répondeur OCSP)",
     "includeURLsNote": "Incluez ces URL dans les paramètres de l'AC.",
     "autoRegenEnabled": "Régénération automatique activée pour {{name}}",
-    "autoRegenDisabled": "Régénération automatique désactivée pour {{name}}"
+    "autoRegenDisabled": "Régénération automatique désactivée pour {{name}}",
+    "toggleAutoRegenFailed": "Échec du basculement de la régénération automatique"
   },
   "csrs": {
     "title": "Demandes de signature de certificat",
@@ -568,6 +622,9 @@
     "passphraseHint": "Laisser vide si la clé n'est pas chiffrée",
     "uploadKey": "Téléverser la clé",
     "cancel": "Annuler",
+    "noDataAvailable": "Aucune donnée disponible",
+    "dropFilesOrBrowse": "Déposez des fichiers ici ou cliquez pour parcourir",
+    "anyFile": "Tout fichier",
     "selectCA": "Sélectionner l'AC...",
     "certificateAuthority": "Autorité de certification",
     "validityPeriod": "Période de validité (jours)",
@@ -621,7 +678,15 @@
     "csrPEMError": "Veuillez coller une CSR au format PEM",
     "invalidCSRFormat": "Format CSR invalide. Doit être au format PEM",
     "invalidKeyFormat": "Format de clé privée invalide",
-    "provideKey": "Veuillez fournir une clé privée"
+    "provideKey": "Veuillez fournir une clé privée",
+    "uploadFailed": "Échec du téléversement de la CSR",
+    "signFailed": "Échec de la signature de la CSR",
+    "deleteCSR": "Supprimer la CSR",
+    "deleteFailed": "Échec de la suppression de la CSR",
+    "keyUploadFailed": "Échec du téléversement de la clé privée",
+    "downloadFailed": "Échec du téléchargement",
+    "unnamedCSR": "CSR sans nom",
+    "unnamedCertificate": "Certificat sans nom"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -670,11 +735,12 @@
     "widgetRecentCertificates": "Certificats récents",
     "widgetCertificateAuthorities": "Autorités de certification",
     "widgetAcmeAccounts": "Comptes ACME",
-    "showOrHideWidgets": "Afficher ou masquer les widgets"
+    "showOrHideWidgets": "Afficher ou masquer les widgets",
+    "loadFailed": "Échec du chargement du tableau de bord"
   },
   "details": {
-    "subject": "Subject",
-    "issuer": "Issuer",
+    "subject": "Sujet",
+    "issuer": "Émetteur",
     "validity": "Validity",
     "technicalDetails": "Technical Details",
     "fingerprints": "Fingerprints",
@@ -742,7 +808,10 @@
     "ocspUrl": "OCSP URL",
     "addedAt": "Added At",
     "addedBy": "Added By",
-    "notes": "Notes"
+    "notes": "Notes",
+    "sanDns": "SAN DNS",
+    "valid": "Valide",
+    "algorithm": "Algorithme"
   },
   "groups": {
     "title": "Groupes",
@@ -755,7 +824,8 @@
     "permissions": "Permissions",
     "noGroups": "Aucun groupe trouvé",
     "namePlaceholder": "développeurs",
-    "descriptionPlaceholder": "Équipe de développement"
+    "descriptionPlaceholder": "Équipe de développement",
+    "confirmDelete": "Supprimer le groupe \"{{name}}\" ?"
   },
   "help": {
     "aboutCertificates": "À propos des certificats",
@@ -872,8 +942,45 @@
   },
   "import": {
     "smartImport": "Smart Import",
-    "encrypted": "Encrypted",
-    "hasMatchingKey": "Has matching key"
+    "encrypted": "Chiffré",
+    "hasMatchingKey": "Clé correspondante",
+    "typeCertificate": "Certificat",
+    "typePrivateKey": "Clé privée",
+    "typeCsr": "CSR",
+    "typeCaCertificate": "Certificat CA",
+    "selfSigned": "Auto-signé",
+    "root": "Racine",
+    "intermediate": "Intermédiaire",
+    "leaf": "Feuille",
+    "chain": "Chaîne",
+    "complete": "Complète",
+    "incomplete": "Incomplète",
+    "pleaseAddFiles": "Veuillez ajouter des fichiers ou coller du contenu PEM",
+    "analyzeFailed": "Échec de l'analyse du contenu",
+    "importFailed": "Échec de l'importation",
+    "successImported": "{{count}} objet(s) importé(s) avec succès",
+    "files": "Fichiers",
+    "orPastePem": "ou coller du contenu PEM",
+    "pastePemPlaceholder": "Collez des certificats, clés, CSRs ou chaînes encodés en PEM ici...",
+    "encryptedDetected": "Contenu chiffré détecté",
+    "analyzing": "Analyse...",
+    "analyze": "Analyser",
+    "certificateChains": "Chaînes de certificats",
+    "keyPairsDetected": "{{count}} paire(s) clé-certificat détectée(s)",
+    "detectedObjects": "Objets détectés",
+    "importOptions": "Options d'importation",
+    "skipDuplicates": "Ignorer les doublons",
+    "importCAs": "Importer les CAs",
+    "importCertificates": "Importer les certificats",
+    "importKeys": "Importer les clés",
+    "importObjects": "Importer {{count}} objet(s)",
+    "importingObjects": "Importation en cours...",
+    "importComplete": "Importation terminée",
+    "noObjectsImported": "Aucun objet importé",
+    "allSkipped": "Tous les objets ont été ignorés ou existent déjà",
+    "imported": "Importé",
+    "privateKeysMatched": "clé(s) privée(s) associée(s)",
+    "importMore": "Importer d'autres"
   },
   "importExport": {
     "title": "Import / Export",
@@ -1261,8 +1368,8 @@
     "checkUpdates": "Vérifier les mises à jour",
     "currentVersion": "Version actuelle",
     "latestVersion": "Dernière version",
-    "upToDate": "À jour",
-    "updateAvailable": "Mise à jour disponible",
+    "upToDate": "Vous utilisez la dernière version",
+    "updateAvailable": "Mise à jour disponible : v{{version}}",
     "saveChanges": "Enregistrer les modifications",
     "changesSaved": "Paramètres enregistrés avec succès",
     "subtitle": "Configuration du système",
@@ -1331,7 +1438,7 @@
     "noBackupsHint": "Créez une sauvegarde pour protéger vos données",
     "restoreFromBackup": "Restaurer depuis une sauvegarde",
     "restoreFromBackupDesc": "Téléchargez un fichier .ucmbkp pour restaurer toutes les données",
-    "selectBackupFile": "Sélectionnez le fichier de sauvegarde (fichier .ucmbkp chiffré)",
+    "selectBackupFile": "Veuillez sélectionner un fichier de sauvegarde",
     "createEncryptedBackup": "Créer une sauvegarde chiffrée",
     "createBackupDesc": "Créez une sauvegarde contenant toutes les données (base de données, certificats, AC, utilisateurs, configuration). La sauvegarde sera chiffrée avec votre mot de passe.",
     "encryptionPassword": "Mot de passe de chiffrement",
@@ -1375,7 +1482,7 @@
     "fingerprintSha256": "Empreinte (SHA256)",
     "useUcmCertificate": "Utiliser un certificat UCM",
     "useUcmCertificateDesc": "Appliquez un certificat existant de UCM comme certificat HTTPS. Seuls les certificats valides avec clés privées sont affichés.",
-    "selectCertificate": "Sélectionner un certificat",
+    "selectCertificate": "Veuillez sélectionner un certificat",
     "chooseCertificate": "Choisissez un certificat...",
     "expires": "expire",
     "noValidCertificates": "Aucun certificat valide avec clé privée trouvé. Émettez d'abord un certificat.",
@@ -1400,7 +1507,27 @@
     "helpSecurity": "Paramètres de sécurité",
     "helpBackup": "Sauvegarde et restauration",
     "helpDatabase": "Gestion de base de données",
-    "helpHttps": "Certificat HTTPS"
+    "helpHttps": "Certificat HTTPS",
+    "updateAvailableTitle": "Mise à jour disponible",
+    "upToDateTitle": "À jour",
+    "prerelease": "Pré-version",
+    "current": "Actuelle",
+    "running": "Version",
+    "edition": "Édition",
+    "passwordMinLength": "Le mot de passe doit contenir au moins 12 caractères",
+    "confirmDeleteBackup": "Supprimer la sauvegarde \"{{filename}}\" ?",
+    "deleteBackup": "Supprimer la sauvegarde",
+    "backupRestored": "Sauvegarde restaurée avec succès : {{users}} utilisateurs, {{cas}} AC, {{certs}} certificats",
+    "integrityErrors": "La vérification d'intégrité a trouvé {{count}} erreurs",
+    "resetDbWarning": "⚠️ ATTENTION : Cette action SUPPRIMERA TOUTES LES DONNÉES et réinitialisera la base de données à son état initial. Êtes-vous absolument sûr ?",
+    "typeYesToConfirm": "Tapez OUI pour confirmer la réinitialisation de la base de données :",
+    "finalConfirmation": "Confirmation finale",
+    "resetDbCancelled": "Réinitialisation de la base de données annulée",
+    "applyHttpsCertConfirm": "Appliquer le certificat sélectionné comme certificat HTTPS ? Cela redémarrera le serveur.",
+    "applyCertificate": "Appliquer le certificat",
+    "applyAndRestart": "Appliquer et redémarrer",
+    "regenerateCertConfirm": "Régénérer le certificat HTTPS ? Cela redémarrera le serveur.",
+    "regenerateAndRestart": "Régénérer et redémarrer"
   },
   "sso": {
     "title": "Authentification unique",
@@ -1476,7 +1603,16 @@
     "countryPlaceholder": "FR",
     "statePlaceholder": "Île-de-France",
     "orgPlaceholder": "Exemple SA",
-    "cnPlaceholder": "*.exemple.com"
+    "cnPlaceholder": "*.exemple.com",
+    "preview": "Aperçu du modèle",
+    "previewFor": "Aperçu des paramètres du certificat pour",
+    "previewDescription": "Aperçu de ce à quoi ressemblerait un certificat émis avec ce modèle",
+    "sampleCertificate": "Certificat exemple",
+    "restrictions": "Restrictions du modèle",
+    "fixedCN": "CN fixe",
+    "cnRequired": "CN requis",
+    "pathLength": "Longueur du chemin",
+    "caCertificate": "Certificat CA"
   },
   "time": {
     "justNow": "À l'instant",
@@ -1682,7 +1818,9 @@
     "bestPractices": "Bonnes pratiques",
     "bestPracticesDesc": "N'ajoutez que des certificats provenant de sources fiables.",
     "securityNote": "Note de sécurité",
-    "securityNoteDesc": "Soyez prudent lors de l'ajout de certificats tiers."
+    "securityNoteDesc": "Soyez prudent lors de l'ajout de certificats tiers.",
+    "syncedCerts": "{{count}} certificats synchronisés",
+    "syncFailed": "Échec de la synchronisation depuis le système"
   },
   "users": {
     "title": "Utilisateurs",
@@ -1708,7 +1846,13 @@
     "usernamePlaceholder": "jeandupont",
     "emailPlaceholder": "jean@exemple.com",
     "namePlaceholder": "Jean Dupont",
-    "passwordPlaceholder": "••••••••"
+    "passwordPlaceholder": "••••••••",
+    "confirmDelete": "Supprimer l'utilisateur \"{{name}}\" ?",
+    "userToggled": "Utilisateur {{action}}",
+    "confirmResetPassword": "Réinitialiser le mot de passe pour \"{{name}}\" ?",
+    "newPassword": "Nouveau mot de passe : {{password}}",
+    "checkEmail": "Vérifiez votre email",
+    "resetPasswordFailed": "Échec de la réinitialisation du mot de passe"
   },
   "validation": {
     "required": "Ce champ est requis",

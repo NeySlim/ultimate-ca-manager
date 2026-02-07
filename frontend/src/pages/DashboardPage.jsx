@@ -131,7 +131,7 @@ export default function DashboardPage() {
         setRecentAcme([])
       }
     } catch (error) {
-      showError(error.message || 'Failed to load dashboard')
+      showError(error.message || t('dashboard.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -232,11 +232,11 @@ export default function DashboardPage() {
                 <p className="text-sm text-text-secondary">{getGreeting()} 👋</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   <Badge variant={versionInfo.edition === 'pro' ? 'purple' : 'primary'} size="sm">
-                    {versionInfo.edition === 'pro' ? 'Pro' : 'Community'}
+                    {versionInfo.edition === 'pro' ? t('common.pro') : t('common.community')}
                   </Badge>
                   <span className="text-xs text-text-tertiary">v{versionInfo.version}</span>
                   {versionInfo.update_available && (
-                    <Badge variant="warning" size="sm" dot>Update available</Badge>
+                    <Badge variant="warning" size="sm" dot>{t('common.updateAvailable')}</Badge>
                   )}
                   {/* Live Indicator */}
                   <div className="flex items-center gap-1 ml-2">
@@ -255,7 +255,7 @@ export default function DashboardPage() {
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" onClick={() => navigate('/certificates?action=create')}>
                 <Plus size={14} weight="bold" />
-                Issue Cert
+                {t('common.issueCert')}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => navigate('/cas?action=create')}>
                 <Plus size={14} weight="bold" />
@@ -417,10 +417,10 @@ export default function DashboardPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
-                            {cert.common_name || cert.descr || cert.subject || 'Certificate'}
+                            {cert.common_name || cert.descr || cert.subject || t('common.certificate')}
                           </span>
                           <Badge variant={cert.revoked ? 'danger' : 'success'} size="sm" dot>
-                            {cert.revoked ? 'Revoked' : 'Valid'}
+                            {cert.revoked ? t('common.revoked') : t('common.valid')}
                           </Badge>
                         </div>
                         <div className="text-xs text-text-tertiary mt-0.5">
@@ -581,7 +581,7 @@ export default function DashboardPage() {
               action={
                 <div className="flex items-center gap-2">
                   {isConnected && (
-                    <Badge variant="success" size="sm" dot pulse>Live</Badge>
+                    <Badge variant="success" size="sm" dot pulse>{t('common.live')}</Badge>
                   )}
                   <Button size="sm" variant="ghost" onClick={() => navigate('/audit')}>
                     {t('common.viewAll')} <CaretRight size={12} />

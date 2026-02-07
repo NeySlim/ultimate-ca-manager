@@ -309,11 +309,11 @@ export default function LoginPage() {
                   {loading ? (
                     <>
                       <LoadingSpinner size="sm" />
-                      <span>Checking...</span>
+                      <span>{t('auth.checking')}</span>
                     </>
                   ) : (
                     <>
-                      <span>Continue</span>
+                      <span>{t('auth.continue')}</span>
                       <ArrowRight size={18} weight="bold" />
                     </>
                   )}
@@ -334,7 +334,7 @@ export default function LoginPage() {
                   <User size={24} className="text-white" weight="bold" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">Signing in as</p>
+                  <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.signingInAs')}</p>
                   <p className="text-lg font-semibold text-text-primary truncate">{username}</p>
                 </div>
                 <button
@@ -342,7 +342,7 @@ export default function LoginPage() {
                   className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-accent hover:bg-accent/10 rounded-lg transition-all"
                   disabled={loading}
                 >
-                  Change
+                  {t('common.change')}
                 </button>
               </div>
             </div>
@@ -371,7 +371,7 @@ export default function LoginPage() {
                   disabled={loading}
                 >
                   <Fingerprint size={20} weight="fill" />
-                  <span>Try Security Key Again</span>
+                  <span>{t('auth.trySecurityKeyAgain')}</span>
                 </Button>
                 
                 <button
@@ -418,7 +418,7 @@ export default function LoginPage() {
                   {loading ? (
                     <>
                       <LoadingSpinner size="sm" />
-                      <span>Signing in...</span>
+                      <span>{t('auth.signingIn')}</span>
                     </>
                   ) : (
                     <>
@@ -452,7 +452,7 @@ export default function LoginPage() {
                     disabled={loading}
                   >
                     <Fingerprint size={16} />
-                    <span>Use security key instead</span>
+                    <span>{t('auth.useSecurityKey')}</span>
                   </button>
                 )}
               </form>
@@ -465,7 +465,7 @@ export default function LoginPage() {
               disabled={loading}
             >
               <ArrowLeft size={14} />
-              <span>Back</span>
+              <span>{t('common.back')}</span>
             </button>
           </div>
         )}
@@ -482,12 +482,12 @@ export default function LoginPage() {
             {userMethods.webauthn && userMethods.webauthn_credentials > 0 && (
               <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'webauthn' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
                 <Fingerprint size={12} weight="fill" />
-                <span>Key</span>
+                <span>{t('auth.key')}</span>
               </div>
             )}
             <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'password' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
               <Key size={12} weight="fill" />
-              <span>Password</span>
+              <span>{t('auth.password')}</span>
             </div>
           </div>
         )}

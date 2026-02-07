@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 
 /**
@@ -13,7 +14,8 @@ import { cn } from '../lib/utils'
  * - Gradient shine on hover
  * - Smooth micro-interactions
  */
-export function Button({ children, variant = 'primary', size = 'default', loading = false, className, ...props }) {
+export function Button({ children, variant = 'primary', size = 'default', loading = false, loadingText, className, ...props }) {
+  const { t } = useTranslation()
   const variants = {
     primary: 'btn-gradient text-white',
     secondary: 'btn-soft text-text-primary',
@@ -56,7 +58,7 @@ export function Button({ children, variant = 'primary', size = 'default', loadin
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <span>Loading...</span>
+          <span>{loadingText || t('common.loading')}</span>
         </>
       ) : children}
     </button>

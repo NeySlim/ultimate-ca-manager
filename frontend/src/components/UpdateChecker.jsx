@@ -2,6 +2,7 @@
  * UpdateChecker Component - Check and install updates
  */
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowsClockwise, Download, CheckCircle, Warning, Info, Rocket } from '@phosphor-icons/react'
 import { Card, Button, Badge, LoadingSpinner } from '../components'
 import { apiClient } from '../services'
@@ -9,6 +10,7 @@ import { useNotification } from '../contexts'
 import { formatRelativeTime } from '../lib/ui'
 
 export function UpdateChecker() {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
   const [installing, setInstalling] = useState(false)
@@ -25,9 +27,9 @@ export function UpdateChecker() {
       setUpdateInfo(response.data)
       if (showNotification) {
         if (response.data.update_available) {
-          showSuccess(`Update available: v${response.data.latest_version}`)
+          showSuccess(t('settings.updateAvailable', { version: response.data.latest_version }))
         } else {
-          showSuccess('You are running the latest version')
+          showSuccess(t('settings.upToDate'))
         }
       }
     } catch (err) {
@@ -95,25 +97,25 @@ export function UpdateChecker() {
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-medium text-text-primary">
-                {updateInfo?.update_available ? 'Update Available' : 'Up to Date'}
+                {updateInfo?.update_available ? t('settings.updateAvailableTitle') : t('settings.upToDateTitle')}
               </h3>
               {updateInfo?.prerelease && (
-                <Badge variant="warning" size="sm">Pre-release</Badge>
+                <Badge variant="warning" size="sm">{t('settings.prerelease')}</Badge>
               )}
             </div>
             
             <div className="text-sm text-text-secondary mt-1">
               {updateInfo?.update_available ? (
                 <>
-                  <span className="text-text-tertiary">Current:</span> v{updateInfo.current_version}
+                  <span className="text-text-tertiary">{t('settings.current')}:</span> v{updateInfo.current_version}
                   <span className="mx-2">→</span>
                   <span className="text-accent-success font-medium">v{updateInfo.latest_version}</span>
                 </>
               ) : (
-                <>Running v{updateInfo?.current_version}</>
+                <>{t('settings.running')} v{updateInfo?.current_version}</>
               )}
               <span className="mx-2">•</span>
-              <span className="capitalize">{updateInfo?.edition}</span> Edition
+              <span className="capitalize">{updateInfo?.edition}</span> {t('settings.edition')}
             </div>
             
             {updateInfo?.published_at && updateInfo?.update_available && (

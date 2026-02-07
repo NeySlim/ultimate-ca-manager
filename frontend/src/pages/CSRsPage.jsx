@@ -120,7 +120,7 @@ export default function CSRsPage() {
       closeModal('upload')
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to upload CSR')
+      showError(error.message || t('csrs.uploadFailed'))
     }
   }
 
@@ -141,7 +141,7 @@ export default function CSRsPage() {
       setUploadMode('file')
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to upload CSR')
+      showError(error.message || t('csrs.uploadFailed'))
     }
   }
 
@@ -157,14 +157,14 @@ export default function CSRsPage() {
       loadData()
       setSelectedCSR(null)
     } catch (error) {
-      showError(error.message || 'Failed to sign CSR')
+      showError(error.message || t('csrs.signFailed'))
     }
   }
 
   const handleDelete = async (id) => {
     const confirmed = await showConfirm(CONFIRM.DELETE.CSR, {
-      title: CONFIRM.DELETE.TITLE,
-      confirmText: t('csrs.delete'),
+      title: t('csrs.deleteCSR'),
+      confirmText: t('common.delete'),
       variant: 'danger'
     })
     if (!confirmed) return
@@ -174,7 +174,7 @@ export default function CSRsPage() {
       loadData()
       setSelectedCSR(null)
     } catch (error) {
-      showError(error.message || 'Failed to delete CSR')
+      showError(error.message || t('csrs.deleteFailed'))
     }
   }
 
@@ -198,7 +198,7 @@ export default function CSRsPage() {
       const updated = await csrsService.getById(selectedCSR.id)
       setSelectedCSR(updated.data || updated)
     } catch (error) {
-      showError(error.message || 'Failed to upload private key')
+      showError(error.message || t('csrs.keyUploadFailed'))
     }
   }
 
@@ -212,7 +212,7 @@ export default function CSRsPage() {
       a.click()
       showSuccess(t('common.downloadSuccess'))
     } catch (error) {
-      showError(error.message || 'Failed to download')
+      showError(error.message || t('csrs.downloadFailed'))
     }
   }
 
@@ -237,7 +237,7 @@ export default function CSRsPage() {
           <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-orange">
             <FileText size={14} weight="duotone" />
           </div>
-          <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
+          <span className="font-medium truncate">{row.common_name || row.cn || val || t('common.unnamed')}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
         </div>
       ),
@@ -247,7 +247,7 @@ export default function CSRsPage() {
             <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-orange">
               <FileText size={14} weight="duotone" />
             </div>
-            <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
+            <span className="font-medium truncate">{row.common_name || row.cn || val || t('common.unnamed')}</span>
             <KeyIndicator hasKey={row.has_private_key} size={12} />
           </div>
           <Badge variant="warning" size="sm" dot>{t('csrs.pending')}</Badge>
@@ -295,7 +295,7 @@ export default function CSRsPage() {
           <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
             <Certificate size={14} weight="duotone" />
           </div>
-          <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
+          <span className="font-medium truncate">{row.common_name || row.cn || val || t('common.unnamed')}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
           {row.source === 'acme' && (
             <Badge variant="info" size="sm">ACME</Badge>
@@ -311,7 +311,7 @@ export default function CSRsPage() {
             <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 icon-bg-emerald">
               <Certificate size={14} weight="duotone" />
             </div>
-            <span className="font-medium truncate">{row.common_name || row.cn || val || 'Unnamed'}</span>
+            <span className="font-medium truncate">{row.common_name || row.cn || val || t('common.unnamed')}</span>
             <KeyIndicator hasKey={row.has_private_key} size={12} />
           </div>
           <Badge variant="success" size="sm" dot>{t('csrs.signed')}</Badge>
@@ -481,7 +481,7 @@ export default function CSRsPage() {
         <ResponsiveDataTable
           data={currentData.map(item => ({
             ...item,
-            cn: item.common_name || item.cn || item.subject || 'Unnamed'
+            cn: item.common_name || item.cn || item.subject || t('common.unnamed')
           }))}
           columns={activeTab === 'pending' ? pendingColumns : historyColumns}
           loading={loading}
@@ -695,7 +695,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDelet
       <CompactHeader
         icon={FileText}
         iconClass="bg-accent-warning/20"
-        title={csr.common_name || csr.cn || 'Unnamed CSR'}
+        title={csr.common_name || csr.cn || t('csrs.unnamedCSR')}
         subtitle={csr.organization}
         badge={
           <div className="flex gap-1">
@@ -795,7 +795,7 @@ function SignedCSRDetailsPanel({ cert, onDownload, t }) {
       <CompactHeader
         icon={Certificate}
         iconClass="bg-accent-success/20"
-        title={cert.common_name || cert.cn || 'Unnamed Certificate'}
+        title={cert.common_name || cert.cn || t('csrs.unnamedCertificate')}
         subtitle={cert.organization}
         badge={
           <div className="flex gap-1">

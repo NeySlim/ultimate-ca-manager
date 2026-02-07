@@ -3,6 +3,7 @@
  * Uses Recharts for beautiful responsive charts
  */
 import { useMemo, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { 
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -60,6 +61,7 @@ function CustomTooltip({ active, payload, label }) {
 
 // Certificate trend chart (area chart)
 export function CertificateTrendChart({ data = [], height = 150 }) {
+  const { t } = useTranslation()
   const { mode } = useTheme()
   const colors = useChartColors()
   
@@ -106,7 +108,7 @@ export function CertificateTrendChart({ data = [], height = 150 }) {
         <Area 
           type="monotone" 
           dataKey="issued" 
-          name="Issued"
+          name={t('common.issued')}
           stroke={strokeColor} 
           fill="url(#issuedGradient)"
           strokeWidth={2}
@@ -114,7 +116,7 @@ export function CertificateTrendChart({ data = [], height = 150 }) {
         <Area 
           type="monotone" 
           dataKey="revoked" 
-          name="Revoked"
+          name={t('common.revoked')}
           stroke={revokedColor} 
           fill="transparent"
           strokeWidth={2}
@@ -127,22 +129,23 @@ export function CertificateTrendChart({ data = [], height = 150 }) {
 
 // Status distribution pie chart
 export function StatusPieChart({ data = {}, height = 150 }) {
+  const { t } = useTranslation()
   const colors = useChartColors()
   
   const chartData = useMemo(() => {
     const { valid = 0, expiring = 0, expired = 0, revoked = 0 } = data
     return [
-      { name: 'Valid', value: valid, color: colors.success },
-      { name: 'Expiring', value: expiring, color: colors.warning },
-      { name: 'Expired', value: expired, color: colors.danger },
-      { name: 'Revoked', value: revoked, color: colors.pro },
+      { name: t('common.valid'), value: valid, color: colors.success },
+      { name: t('common.expiring'), value: expiring, color: colors.warning },
+      { name: t('common.expired'), value: expired, color: colors.danger },
+      { name: t('common.revoked'), value: revoked, color: colors.pro },
     ].filter(d => d.value > 0)
-  }, [data, colors])
+  }, [data, colors, t])
   
   if (chartData.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-text-tertiary text-sm">
-        No data available
+        {t('common.noDataAvailable')}
       </div>
     )
   }

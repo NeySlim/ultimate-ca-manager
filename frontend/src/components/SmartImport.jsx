@@ -25,16 +25,17 @@ const SUPPORTED_FORMATS = {
 
 const ALL_FORMATS = [...SUPPORTED_FORMATS.text, ...SUPPORTED_FORMATS.binary].join(',')
 
-// Type icons and colors
+// Type icons and colors - keys for translations
 const TYPE_CONFIG = {
-  certificate: { icon: Certificate, color: 'blue', label: 'Certificate' },
-  private_key: { icon: Key, color: 'orange', label: 'Private Key' },
-  csr: { icon: FileText, color: 'purple', label: 'CSR' },
-  ca_certificate: { icon: ShieldCheck, color: 'green', label: 'CA Certificate' }
+  certificate: { icon: Certificate, color: 'blue', labelKey: 'import.typeCertificate' },
+  private_key: { icon: Key, color: 'orange', labelKey: 'import.typePrivateKey' },
+  csr: { icon: FileText, color: 'purple', labelKey: 'import.typeCsr' },
+  ca_certificate: { icon: ShieldCheck, color: 'green', labelKey: 'import.typeCaCertificate' }
 }
 
 // Object card component
 function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
+  const { t } = useTranslation()
   const config = obj.is_ca ? TYPE_CONFIG.ca_certificate : TYPE_CONFIG[obj.type] || TYPE_CONFIG.certificate
   const Icon = config.icon
   const displayName = obj.subject || obj.san_dns?.[0] || `${obj.type} #${obj.index + 1}`
@@ -56,14 +57,14 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm truncate">{displayName}</span>
-            {obj.is_encrypted && <LockSimple size={16} className="text-status-warning" title="Encrypted" />}
-            {obj.matched_key_index !== null && <Link size={16} className="text-status-success" title="Has matching key" />}
+            {obj.is_encrypted && <LockSimple size={16} className="text-status-warning" title={t('import.encrypted')} />}
+            {obj.matched_key_index !== null && <Link size={16} className="text-status-success" title={t('import.hasMatchingKey')} />}
           </div>
           <div className="flex items-center gap-2 text-xs text-text-secondary">
-            <Badge variant={config.color} size="xs">{config.label}</Badge>
-            {obj.is_self_signed && <Badge variant="gray" size="xs">Self-Signed</Badge>}
-            {obj.chain_position === 'root' && <Badge variant="amber" size="xs">Root</Badge>}
-            {obj.chain_position === 'intermediate' && <Badge variant="blue" size="xs">Intermediate</Badge>}
+            <Badge variant={config.color} size="xs">{t(config.labelKey)}</Badge>
+            {obj.is_self_signed && <Badge variant="gray" size="xs">{t('import.selfSigned')}</Badge>}
+            {obj.chain_position === 'root' && <Badge variant="amber" size="xs">{t('import.root')}</Badge>}
+            {obj.chain_position === 'intermediate' && <Badge variant="blue" size="xs">{t('import.intermediate')}</Badge>}
           </div>
         </div>
         
@@ -74,31 +75,31 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
         <div className="px-3 pb-3 border-t border-border pt-3 space-y-2 text-sm">
           {obj.subject && (
             <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">Subject:</span>
+              <span className="text-text-secondary w-20 shrink-0">{t('details.subject')}:</span>
               <span className="font-mono text-xs break-all">{obj.subject}</span>
             </div>
           )}
           {obj.issuer && obj.issuer !== obj.subject && (
             <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">Issuer:</span>
+              <span className="text-text-secondary w-20 shrink-0">{t('details.issuer')}:</span>
               <span className="font-mono text-xs break-all">{obj.issuer}</span>
             </div>
           )}
           {obj.san_dns?.length > 0 && (
             <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">SAN DNS:</span>
+              <span className="text-text-secondary w-20 shrink-0">{t('details.sanDns')}:</span>
               <span className="font-mono text-xs">{obj.san_dns.join(', ')}</span>
             </div>
           )}
           {obj.not_before && (
             <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">Valid:</span>
+              <span className="text-text-secondary w-20 shrink-0">{t('details.valid')}:</span>
               <span className="text-xs">{new Date(obj.not_before).toLocaleDateString()} → {new Date(obj.not_after).toLocaleDateString()}</span>
             </div>
           )}
           {obj.key_algorithm && (
             <div className="flex gap-2">
-              <span className="text-text-secondary w-20 shrink-0">Algorithm:</span>
+              <span className="text-text-secondary w-20 shrink-0">{t('details.algorithm')}:</span>
               <span className="text-xs">{obj.key_algorithm} ({obj.key_size} bits)</span>
             </div>
           )}
@@ -110,31 +111,32 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
 
 // Chain visualization
 function ChainCard({ chain, index }) {
+  const { t } = useTranslation()
   const hasIssues = chain.errors?.length > 0
   
   return (
     <div className={`border rounded-lg p-3 ${hasIssues ? 'alert-bg-amber' : 'border-border'}`}>
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-sm font-medium">Chain {index + 1}</span>
-        {chain.is_complete ? <Badge variant="green" size="xs">Complete</Badge> : <Badge variant="amber" size="xs">Incomplete</Badge>}
-        <span className="text-xs text-text-secondary ml-auto">{chain.chain_length} certificate(s)</span>
+        <span className="text-sm font-medium">{t('import.chain')} {index + 1}</span>
+        {chain.is_complete ? <Badge variant="green" size="xs">{t('import.complete')}</Badge> : <Badge variant="amber" size="xs">{t('import.incomplete')}</Badge>}
+        <span className="text-xs text-text-secondary ml-auto">{chain.chain_length} {t('common.certificates').toLowerCase()}</span>
       </div>
       
       <div className="flex items-center gap-1 text-xs flex-wrap">
         {chain.root && (
           <>
-            <span className="px-2 py-1 rounded badge-bg-amber">{chain.root.subject?.split(',')[0] || 'Root'}</span>
+            <span className="px-2 py-1 rounded badge-bg-amber">{chain.root.subject?.split(',')[0] || t('import.root')}</span>
             <span className="text-text-secondary">→</span>
           </>
         )}
         {chain.intermediates?.map((int, i) => (
           <span key={i}>
-            <span className="px-2 py-1 rounded badge-bg-blue">{int.subject?.split(',')[0] || `Intermediate ${i + 1}`}</span>
+            <span className="px-2 py-1 rounded badge-bg-blue">{int.subject?.split(',')[0] || `${t('import.intermediate')} ${i + 1}`}</span>
             <span className="text-text-secondary mx-1">→</span>
           </span>
         ))}
         {chain.leaf && (
-          <span className="px-2 py-1 rounded icon-bg-teal">{chain.leaf.subject?.split(',')[0] || chain.leaf.san_dns?.[0] || 'Leaf'}</span>
+          <span className="px-2 py-1 rounded icon-bg-teal">{chain.leaf.subject?.split(',')[0] || chain.leaf.san_dns?.[0] || t('import.leaf')}</span>
         )}
       </div>
       
@@ -287,7 +289,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
   const handleAnalyze = async () => {
     const content = buildContent()
     if (!content) {
-      showError('Please add files or paste PEM content')
+      showError(t('import.pleaseAddFiles'))
       return
     }
     
@@ -304,7 +306,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       setStep('preview')
     } catch (err) {
       console.error('[SmartImport] Analysis error:', err)
-      showError(err.response?.data?.error || err.message || 'Failed to analyze content')
+      showError(err.response?.data?.error || err.message || t('import.analyzeFailed'))
     } finally {
       setIsAnalyzing(false)
     }
@@ -330,10 +332,10 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
                            (result.certificates_imported || 0) + 
                            (result.cas_imported || 0)
       if (totalImported > 0) {
-        showSuccess(`Successfully imported ${totalImported} object(s)`)
+        showSuccess(t('import.successImported', { count: totalImported }))
       }
     } catch (err) {
-      showError(err.response?.data?.error || 'Import failed')
+      showError(err.response?.data?.error || t('import.importFailed'))
       setStep('preview')
     } finally {
       setIsImporting(false)
@@ -396,7 +398,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       {/* File list */}
       {files.length > 0 && (
         <div className="space-y-2">
-          <div className="text-sm font-medium">Files ({files.length})</div>
+          <div className="text-sm font-medium">{t('import.files')} ({files.length})</div>
           {files.map((file, i) => (
             <div key={i} className="flex items-center gap-2 p-2 bg-bg-secondary rounded-lg">
               <File size={16} className="text-text-secondary" />
@@ -416,13 +418,13 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       {/* Or paste PEM */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border"></div></div>
-        <div className="relative flex justify-center text-xs uppercase"><span className="bg-bg-primary px-2 text-text-secondary">or paste PEM content</span></div>
+        <div className="relative flex justify-center text-xs uppercase"><span className="bg-bg-primary px-2 text-text-secondary">{t('import.orPastePem')}</span></div>
       </div>
       
       <textarea
         value={pemContent}
         onChange={(e) => setPemContent(e.target.value)}
-        placeholder="Paste PEM-encoded certificates, keys, CSRs, or chains here..."
+        placeholder={t('import.pastePemPlaceholder')}
         className="w-full h-32 p-3 font-mono text-xs border border-border rounded-lg bg-bg-secondary resize-none focus:outline-none focus:ring-2 focus:ring-accent-primary"
       />
       
@@ -431,12 +433,12 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         <div className="flex items-center gap-2 p-3 rounded-lg alert-bg-amber">
           <LockSimple size={18} />
           <div className="flex-1">
-            <p className="text-sm font-medium">Encrypted content detected</p>
+            <p className="text-sm font-medium">{t('import.encryptedDetected')}</p>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
+              placeholder={t('common.enterPassword')}
               className="mt-2 w-full px-3 py-2 text-sm border border-border rounded-lg bg-bg-primary focus:outline-none focus:ring-2 focus:ring-accent-primary"
             />
           </div>
@@ -445,9 +447,9 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
       
       {/* Actions */}
       <div className="flex justify-end gap-2 pt-2">
-        {onCancel && <Button variant="secondary" onClick={onCancel}>Cancel</Button>}
+        {onCancel && <Button variant="secondary" onClick={onCancel}>{t('common.cancel')}</Button>}
         <Button onClick={handleAnalyze} disabled={(!pemContent.trim() && files.length === 0) || isAnalyzing}>
-          {isAnalyzing ? <><ArrowsClockwise size={16} className="animate-spin" /> Analyzing...</> : 'Analyze'}
+          {isAnalyzing ? <><ArrowsClockwise size={16} className="animate-spin" /> {t('import.analyzing')}</> : t('import.analyze')}
         </Button>
       </div>
     </div>
@@ -476,7 +478,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         {/* Chains */}
         {chains?.length > 0 && (
           <div className="space-y-2">
-            <h3 className="text-sm font-medium">Certificate Chains</h3>
+            <h3 className="text-sm font-medium">{t('import.certificateChains')}</h3>
             {chains.map((chain, i) => <ChainCard key={i} chain={chain} index={i} />)}
           </div>
         )}
@@ -485,7 +487,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         {matching?.matched_pairs?.length > 0 && (
           <div className="text-sm p-2 rounded flex items-center gap-2 alert-bg-green">
             <Link size={16} />
-            {matching.matched_pairs.length} key-certificate pair{matching.matched_pairs.length > 1 ? 's' : ''} detected
+            {t('import.keyPairsDetected', { count: matching.matched_pairs.length })}
           </div>
         )}
         
@@ -494,9 +496,9 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         {/* Objects list */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium">Detected Objects ({objects?.length || 0})</h3>
+            <h3 className="text-sm font-medium">{t('import.detectedObjects')} ({objects?.length || 0})</h3>
             <button type="button" onClick={selectAll} className="text-xs text-accent-primary hover:underline">
-              {selectedObjects.size === objects?.length ? 'Deselect All' : 'Select All'}
+              {selectedObjects.size === objects?.length ? t('common.deselectAll') : t('common.selectAll')}
             </button>
           </div>
           
@@ -509,23 +511,23 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         
         {/* Import options */}
         <div className="border-t border-border pt-4">
-          <h3 className="text-sm font-medium mb-2">Import Options</h3>
+          <h3 className="text-sm font-medium mb-2">{t('import.importOptions')}</h3>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={importOptions.skip_duplicates} onChange={(e) => setImportOptions(prev => ({ ...prev, skip_duplicates: e.target.checked }))} className="w-4 h-4 rounded" />
-              Skip duplicates
+              {t('import.skipDuplicates')}
             </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={importOptions.import_cas} onChange={(e) => setImportOptions(prev => ({ ...prev, import_cas: e.target.checked }))} className="w-4 h-4 rounded" />
-              Import CAs
+              {t('import.importCAs')}
             </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={importOptions.import_certs} onChange={(e) => setImportOptions(prev => ({ ...prev, import_certs: e.target.checked }))} className="w-4 h-4 rounded" />
-              Import certificates
+              {t('import.importCertificates')}
             </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={importOptions.import_keys} onChange={(e) => setImportOptions(prev => ({ ...prev, import_keys: e.target.checked }))} className="w-4 h-4 rounded" />
-              Import keys
+              {t('import.importKeys')}
             </label>
           </div>
         </div>
@@ -536,9 +538,9 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
             setStep('input')
             setAnalysisResult(null)
             setSelectedObjects(new Set())
-          }}>Back</Button>
+          }}>{t('common.back')}</Button>
           <Button onClick={handleImport} disabled={selectedObjects.size === 0 || isImporting}>
-            Import {selectedObjects.size} Object{selectedObjects.size > 1 ? 's' : ''}
+            {t('import.importObjects', { count: selectedObjects.size })}
           </Button>
         </div>
       </div>
@@ -549,7 +551,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
   const renderImportingStep = () => (
     <div className="flex flex-col items-center justify-center py-12">
       <ArrowsClockwise size={48} className="text-accent-primary animate-spin mb-4" />
-      <p className="text-sm">Importing objects...</p>
+      <p className="text-sm">{t('import.importingObjects')}</p>
     </div>
   )
   
@@ -569,14 +571,14 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
           {totalImported > 0 ? (
             <>
               <CheckCircle size={48} className="text-status-success mx-auto mb-3" weight="fill" />
-              <h3 className="text-lg font-medium">Import Complete</h3>
-              <p className="text-sm text-text-secondary">Successfully imported {totalImported} object{totalImported > 1 ? 's' : ''}</p>
+              <h3 className="text-lg font-medium">{t('import.importComplete')}</h3>
+              <p className="text-sm text-text-secondary">{t('import.successImported', { count: totalImported })}</p>
             </>
           ) : (
             <>
               <WarningCircle size={48} className="text-status-warning mx-auto mb-3" />
-              <h3 className="text-lg font-medium">No Objects Imported</h3>
-              <p className="text-sm text-text-secondary">{errors.length > 0 ? errors[0] : 'All objects were skipped or already exist'}</p>
+              <h3 className="text-lg font-medium">{t('import.noObjectsImported')}</h3>
+              <p className="text-sm text-text-secondary">{errors.length > 0 ? errors[0] : t('import.allSkipped')}</p>
             </>
           )}
         </div>
@@ -584,40 +586,40 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
         {/* Show what was imported */}
         {totalImported > 0 && (
           <div className="space-y-1">
-            <h4 className="text-sm font-medium text-status-success">Imported:</h4>
+            <h4 className="text-sm font-medium text-status-success">{t('import.imported')}:</h4>
             {importResult?.csrs_imported > 0 && (
               <div className="text-sm pl-4">✓ {importResult.csrs_imported} CSR{importResult.csrs_imported > 1 ? 's' : ''}</div>
             )}
             {importResult?.certificates_imported > 0 && (
-              <div className="text-sm pl-4">✓ {importResult.certificates_imported} Certificate{importResult.certificates_imported > 1 ? 's' : ''}</div>
+              <div className="text-sm pl-4">✓ {importResult.certificates_imported} {t('common.certificate')}{importResult.certificates_imported > 1 ? 's' : ''}</div>
             )}
             {importResult?.cas_imported > 0 && (
               <div className="text-sm pl-4">✓ {importResult.cas_imported} CA{importResult.cas_imported > 1 ? 's' : ''}</div>
             )}
             {importResult?.keys_matched > 0 && (
-              <div className="text-sm pl-4 text-text-secondary">🔑 {importResult.keys_matched} private key{importResult.keys_matched > 1 ? 's' : ''} matched</div>
+              <div className="text-sm pl-4 text-text-secondary">🔑 {importResult.keys_matched} {t('import.privateKeysMatched')}</div>
             )}
           </div>
         )}
         
         {warnings.length > 0 && (
           <div className="space-y-1">
-            <h4 className="text-sm font-medium text-status-warning">Warnings:</h4>
+            <h4 className="text-sm font-medium text-status-warning">{t('common.warnings')}:</h4>
             {warnings.map((w, i) => <div key={i} className="text-sm pl-4">⚠ {w}</div>)}
           </div>
         )}
         
         {errors.length > 0 && (
           <div className="space-y-1">
-            <h4 className="text-sm font-medium text-status-danger">Errors:</h4>
+            <h4 className="text-sm font-medium text-status-danger">{t('common.errors')}:</h4>
             {errors.map((e, i) => <div key={i} className="text-sm pl-4">✗ {e}</div>)}
           </div>
         )}
         
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-4">
-          <Button variant="secondary" onClick={reset}>Import More</Button>
-          <Button onClick={() => { onImportComplete?.(importResult); }}>Done</Button>
+          <Button variant="secondary" onClick={reset}>{t('import.importMore')}</Button>
+          <Button onClick={() => { onImportComplete?.(importResult); }}>{t('common.done')}</Button>
         </div>
       </div>
     )

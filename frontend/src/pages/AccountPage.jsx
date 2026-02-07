@@ -251,7 +251,7 @@ export default function AccountPage() {
       if (error.name === 'NotAllowedError') {
         showError(t('account.registrationCancelled'))
       } else {
-        showError(error.message || 'Failed to register security key')
+        showError(error.message || t('account.registrationFailed'))
       }
     } finally {
       setWebauthnRegistering(false)
@@ -271,7 +271,7 @@ export default function AccountPage() {
       showSuccess(t('account.keyDeleted'))
       await loadWebAuthnCredentials()
     } catch (error) {
-      showError(error.message || 'Failed to delete security key')
+      showError(error.message || t('account.deleteKeyFailed'))
     }
   }
 
@@ -318,7 +318,7 @@ export default function AccountPage() {
       showSuccess(t('account.certificateDeleted'))
       await loadMTLSCertificates()
     } catch (error) {
-      showError(error.message || 'Failed to delete certificate')
+      showError(error.message || t('account.deleteCertFailed'))
     }
   }
 
@@ -470,7 +470,7 @@ export default function AccountPage() {
                 <div className="flex items-center gap-3">
                   <Fingerprint size={20} className="text-accent-primary" />
                   <div>
-                    <p className="text-sm font-medium text-text-primary">{cred.name || 'Security Key'}</p>
+                    <p className="text-sm font-medium text-text-primary">{cred.name || t('account.securityKey')}</p>
                     <p className="text-xs text-text-tertiary">
                       {t('account.added')} {formatDate(cred.created_at)}
                       {cred.last_used_at && ` • ${t('account.used')} ${formatDate(cred.last_used_at)}`}

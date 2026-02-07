@@ -121,9 +121,9 @@ export default function UsersGroupsPage() {
   }
 
   const handleDeleteUser = async (user) => {
-    const confirmed = await showConfirm(`Delete user "${user.username}"?`, {
-      title: CONFIRM.DELETE.TITLE,
-      confirmText: 'Delete',
+    const confirmed = await showConfirm(t('users.confirmDelete', { name: user.username }), {
+      title: t('users.deleteUser'),
+      confirmText: t('common.delete'),
       variant: 'danger'
     })
     if (!confirmed) return
@@ -140,7 +140,7 @@ export default function UsersGroupsPage() {
   const handleToggleUser = async (user) => {
     try {
       await usersService.update(user.id, { active: !user.active })
-      showSuccess(`User ${user.active ? 'disabled' : 'enabled'}`)
+      showSuccess(t('users.userToggled', { action: user.active ? t('common.disabled') : t('common.enabled') }))
       loadData()
       if (selectedUser?.id === user.id) {
         setSelectedUser({ ...selectedUser, active: !user.active })
@@ -151,16 +151,16 @@ export default function UsersGroupsPage() {
   }
 
   const handleResetPassword = async (user) => {
-    const confirmed = await showConfirm(`Reset password for "${user.username}"?`, {
-      title: CONFIRM.RESET_PASSWORD.TITLE,
-      confirmText: 'Reset'
+    const confirmed = await showConfirm(t('users.confirmResetPassword', { name: user.username }), {
+      title: t('users.resetPassword'),
+      confirmText: t('common.reset')
     })
     if (!confirmed) return
     try {
       const res = await usersService.resetPassword(user.id)
-      showSuccess(`New password: ${res.password || 'Check email'}`)
+      showSuccess(t('users.newPassword', { password: res.password || t('users.checkEmail') }))
     } catch (error) {
-      showError(error.message || 'Failed to reset password')
+      showError(error.message || t('users.resetPasswordFailed'))
     }
   }
 
@@ -191,9 +191,9 @@ export default function UsersGroupsPage() {
   }
 
   const handleDeleteGroup = async (group) => {
-    const confirmed = await showConfirm(`Delete group "${group.name}"?`, {
-      title: CONFIRM.DELETE.TITLE,
-      confirmText: 'Delete',
+    const confirmed = await showConfirm(t('groups.confirmDelete', { name: group.name }), {
+      title: t('groups.deleteGroup'),
+      confirmText: t('common.delete'),
       variant: 'danger'
     })
     if (!confirmed) return

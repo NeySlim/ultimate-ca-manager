@@ -113,8 +113,8 @@ export default function TemplatesPage() {
 
   const handleDeleteTemplate = async (template) => {
     const confirmed = await showConfirm(CONFIRM.DELETE.TEMPLATE, {
-      title: CONFIRM.DELETE.TITLE,
-      confirmText: 'Delete',
+      title: t('templates.deleteTemplate'),
+      confirmText: t('common.delete'),
       variant: 'danger'
     })
     if (!confirmed) return
@@ -222,7 +222,7 @@ export default function TemplatesPage() {
             <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
               {type === 'ca' ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
             </div>
-            <span className="font-medium truncate">{val || 'Unnamed'}</span>
+            <span className="font-medium truncate">{val || t('common.unnamed')}</span>
           </div>
         )
       },
@@ -235,7 +235,7 @@ export default function TemplatesPage() {
               <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
                 {type === 'ca' ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
               </div>
-              <span className="font-medium truncate">{val || 'Unnamed'}</span>
+              <span className="font-medium truncate">{val || t('common.unnamed')}</span>
             </div>
             <Badge variant={type === 'ca' ? 'amber' : 'primary'} size="sm" dot>
               {type === 'ca' ? t('templates.ca') : t('templates.cert')}

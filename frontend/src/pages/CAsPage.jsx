@@ -118,7 +118,7 @@ export default function CAsPage() {
       addToHistory({
         id: fullCA.id,
         name: fullCA.common_name || fullCA.descr || `CA ${fullCA.id}`,
-        subtitle: fullCA.is_root ? 'Root CA' : (fullCA.parent_name || 'Intermediate')
+        subtitle: fullCA.is_root ? t('cas.rootCA') : (fullCA.parent_name || t('cas.intermediate'))
       })
     } catch {
       setSelectedCA(ca)
@@ -127,8 +127,8 @@ export default function CAsPage() {
 
   const handleDelete = async (id) => {
     const confirmed = await showConfirm(CONFIRM.DELETE.CA, {
-      title: 'Delete Certificate Authority',
-      confirmText: 'Delete CA',
+      title: t('cas.deleteCA'),
+      confirmText: t('cas.deleteCAButton'),
       variant: 'danger'
     })
     if (!confirmed) return
@@ -139,7 +139,7 @@ export default function CAsPage() {
       loadCAs()
       setSelectedCA(null)
     } catch (error) {
-      showError(error.message || 'Failed to delete CA')
+      showError(error.message || t('cas.deleteFailed'))
     }
   }
 
@@ -163,14 +163,14 @@ export default function CAsPage() {
       URL.revokeObjectURL(url)
       showSuccess(SUCCESS.EXPORT.CA)
     } catch (error) {
-      showError(error.message || 'Failed to export CA')
+      showError(error.message || t('cas.exportFailed'))
     }
   }
   
   // Export P12/PFX with password
   const handleExportP12 = async () => {
     if (!p12Password || p12Password.length < 4) {
-      showError('Password must be at least 4 characters')
+      showError(t('cas.passwordTooShort'))
       return
     }
     try {
@@ -182,13 +182,13 @@ export default function CAsPage() {
       a.download = `${p12CA.name || p12CA.common_name || 'ca'}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
-      showSuccess(`CA exported as ${p12Format.toUpperCase()}`)
+      showSuccess(t('cas.exportedAs', { format: p12Format.toUpperCase() }))
       setShowP12Modal(false)
       setP12Password('')
       setP12CA(null)
       setP12Format('pkcs12')
     } catch (error) {
-      showError(error.message || 'Failed to export CA')
+      showError(error.message || t('cas.exportFailed'))
     }
   }
 
@@ -214,7 +214,7 @@ export default function CAsPage() {
       closeModal('create')
       loadCAs()
     } catch (error) {
-      showError(error.message || 'Failed to create CA')
+      showError(error.message || t('cas.createFailed'))
     }
   }
 
@@ -783,7 +783,7 @@ function TreeNode({ ca, level, selectedId, expandedNodes, onToggle, onSelect, is
             isMobile ? 'text-sm' : 'text-xs',
             isSelected ? 'text-accent-primary' : 'text-text-primary'
           )}>
-            {ca.name || ca.common_name || 'Unnamed CA'}
+            {ca.name || ca.common_name || t('cas.unnamedCA')}
           </div>
           {!isMobile && ca.subject && (
             <div className="text-2xs text-text-tertiary truncate mt-0.5">
@@ -940,7 +940,7 @@ function ListRow({ ca, allCAs, selectedId, onSelect, isMobile, t }) {
           isMobile ? 'text-sm' : 'text-xs',
           isSelected ? 'text-accent-primary' : 'text-text-primary'
         )}>
-          {ca.name || ca.common_name || 'Unnamed CA'}
+          {ca.name || ca.common_name || t('cas.unnamedCA')}
         </div>
         {!isMobile && ca.subject && (
           <div className="text-2xs text-text-tertiary truncate mt-0.5">

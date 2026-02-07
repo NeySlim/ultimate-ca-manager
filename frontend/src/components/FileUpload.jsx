@@ -2,6 +2,7 @@
  * File Upload Component
  */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { UploadSimple, FileText, X } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { Button } from './Button'
@@ -13,6 +14,7 @@ export function FileUpload({
   maxSize = 10 * 1024 * 1024, // 10MB default
   className 
 }) {
+  const { t } = useTranslation()
   const [isDragging, setIsDragging] = useState(false)
   const [files, setFiles] = useState([])
   const [error, setError] = useState(null)
@@ -104,10 +106,10 @@ export function FileUpload({
         <label htmlFor="file-upload" className="cursor-pointer">
           <UploadSimple size={48} className="mx-auto mb-4 text-text-secondary" weight="duotone" />
           <p className="text-sm font-medium text-text-primary mb-1">
-            Drop files here or click to browse
+            {t('common.dropFilesOrBrowse')}
           </p>
           <p className="text-xs text-text-secondary">
-            {accept || 'Any file'} • Max {(maxSize / 1024 / 1024).toFixed(0)}MB
+            {accept || t('common.anyFile')} • Max {(maxSize / 1024 / 1024).toFixed(0)}MB
           </p>
         </label>
       </div>

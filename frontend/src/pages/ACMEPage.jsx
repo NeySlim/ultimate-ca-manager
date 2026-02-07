@@ -122,23 +122,23 @@ export default function ACMEPage() {
     }
     try {
       await acmeService.registerProxy(proxyEmail)
-      showSuccess('Proxy account registered successfully')
+      showSuccess(t('acme.proxyRegisteredSuccess'))
       setProxyEmail('')
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to register proxy account')
+      showError(error.message || t('acme.proxyRegistrationFailed'))
     }
   }
 
   const handleUnregisterProxy = async () => {
-    const confirmed = await showConfirm('Unregister Let\'s Encrypt proxy account?')
+    const confirmed = await showConfirm(t('acme.confirmUnregisterProxy'))
     if (!confirmed) return
     try {
       await acmeService.unregisterProxy()
-      showSuccess('Proxy account unregistered successfully')
+      showSuccess(t('acme.proxyUnregisteredSuccess'))
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to unregister proxy account')
+      showError(error.message || t('acme.proxyUnregistrationFailed'))
     }
   }
 
@@ -146,42 +146,42 @@ export default function ACMEPage() {
   const handleCreate = async (data) => {
     try {
       const created = await acmeService.createAccount(data)
-      showSuccess('ACME account created successfully')
+      showSuccess(t('acme.accountCreatedSuccess'))
       setShowCreateModal(false)
       loadData()
       selectAccount(created)
     } catch (error) {
-      showError(error.message || 'Failed to create ACME account')
+      showError(error.message || t('acme.accountCreationFailed'))
     }
   }
 
   const handleDeactivate = async (id) => {
-    const confirmed = await showConfirm('Deactivate this ACME account?', {
-      title: 'Deactivate Account',
-      confirmText: 'Deactivate',
+    const confirmed = await showConfirm(t('acme.confirmDeactivate'), {
+      title: t('acme.deactivateAccount'),
+      confirmText: t('acme.deactivate'),
       variant: 'danger'
     })
     if (!confirmed) return
     try {
       await acmeService.deactivateAccount(id)
-      showSuccess('Account deactivated successfully')
+      showSuccess(t('acme.accountDeactivatedSuccess'))
       setSelectedAccount(null)
       loadData()
     } catch (error) {
-      showError(error.message || 'Failed to deactivate account')
+      showError(error.message || t('acme.accountDeactivationFailed'))
     }
   }
 
   const handleDelete = async (id) => {
-    const confirmed = await showConfirm('Delete this ACME account?', {
-      title: 'Delete Account',
-      confirmText: 'Delete',
+    const confirmed = await showConfirm(t('acme.confirmDelete'), {
+      title: t('acme.deleteAccount'),
+      confirmText: t('common.delete'),
       variant: 'danger'
     })
     if (!confirmed) return
     try {
       await acmeService.deleteAccount(id)
-      showSuccess(SUCCESS.DELETE.GENERIC || 'Account deleted successfully')
+      showSuccess(t('acme.accountDeletedSuccess'))
       setSelectedAccount(null)
       loadData()
     } catch (error) {
@@ -477,7 +477,7 @@ export default function ACMEPage() {
                   {/* Header: Domain + Status */}
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <span className="text-sm font-medium text-text-primary truncate flex-1">
-                      {order.domain || order.identifier || 'Unknown'}
+                      {order.domain || order.identifier || t('common.unknown')}
                     </span>
                     <Badge 
                       variant={
@@ -488,7 +488,7 @@ export default function ACMEPage() {
                       } 
                       size="sm"
                     >
-                      {order.status || 'Unknown'}
+                      {order.status || t('common.unknown')}
                     </Badge>
                   </div>
                   
@@ -784,12 +784,12 @@ export default function ACMEPage() {
       sortable: true,
       hideOnMobile: true,
       render: (value) => (
-        <span className="text-sm text-text-secondary">{value || 'Unknown'}</span>
+        <span className="text-sm text-text-secondary">{value || t('common.unknown')}</span>
       ),
       mobileRender: (value) => (
         <div className="flex items-center gap-2 text-xs">
           <span className="text-text-tertiary">CA:</span>
-          <span className="text-text-secondary truncate">{value || 'Unknown'}</span>
+          <span className="text-text-secondary truncate">{value || t('common.unknown')}</span>
         </div>
       )
     },
@@ -863,7 +863,7 @@ export default function ACMEPage() {
         icon={ClockCounterClockwise}
         iconClass={selectedCert.revoked ? "bg-status-error/20" : "bg-status-success/20"}
         title={selectedCert.common_name}
-        subtitle={`${t('acme.issuer')}: ${selectedCert.issuer || 'Unknown CA'}`}
+        subtitle={`${t('acme.issuer')}: ${selectedCert.issuer || t('acme.unknownCA')}`}
         badge={
           <Badge variant={selectedCert.revoked ? 'danger' : 'success'} size="sm">
             {!selectedCert.revoked && <CheckCircle size={10} weight="fill" />}
@@ -873,23 +873,23 @@ export default function ACMEPage() {
       />
 
       <CompactStats stats={[
-        { icon: Key, value: selectedCert.order?.account || 'Unknown' },
-        { icon: Globe, value: selectedCert.order?.status || 'N/A' },
+        { icon: Key, value: selectedCert.order?.account || t('common.unknown') },
+        { icon: Globe, value: selectedCert.order?.status || t('common.na') },
       ]} />
       
       <CompactSection title={t('acme.certificateDetails')}>
         <CompactGrid>
           <CompactField label={t('acme.commonName')} value={selectedCert.common_name} copyable />
           <CompactField label={t('acme.serialNumber')} value={selectedCert.serial} mono copyable />
-          <CompactField label={t('acme.issuer')} value={selectedCert.issuer || 'Unknown'} />
+          <CompactField label={t('acme.issuer')} value={selectedCert.issuer || t('common.unknown')} />
         </CompactGrid>
       </CompactSection>
       
       <CompactSection title={t('acme.validity')}>
         <CompactGrid>
-          <CompactField label={t('acme.validFrom')} value={selectedCert.valid_from ? formatDate(selectedCert.valid_from) : 'N/A'} />
-          <CompactField label={t('acme.validTo')} value={selectedCert.valid_to ? formatDate(selectedCert.valid_to) : 'N/A'} />
-          <CompactField label={t('acme.issued')} value={selectedCert.created_at ? formatDate(selectedCert.created_at) : 'N/A'} />
+          <CompactField label={t('acme.validFrom')} value={selectedCert.valid_from ? formatDate(selectedCert.valid_from) : t('common.na')} />
+          <CompactField label={t('acme.validTo')} value={selectedCert.valid_to ? formatDate(selectedCert.valid_to) : t('common.na')} />
+          <CompactField label={t('acme.issued')} value={selectedCert.created_at ? formatDate(selectedCert.created_at) : t('common.na')} />
         </CompactGrid>
       </CompactSection>
       
