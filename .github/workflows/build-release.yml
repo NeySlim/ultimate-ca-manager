@@ -235,7 +235,7 @@ jobs:
         with:
           images: |
             ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
-            neyslim/ucm
+            neyslim/ultimate-ca-manager
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -293,7 +293,7 @@ jobs:
           ### Docker (Recommended)
           ```bash
           # From Docker Hub
-          docker pull neyslim/ucm:VERSION
+          docker pull neyslim/ultimate-ca-manager:VERSION
           
           # Or from GitHub Container Registry
           docker pull IMAGE:VERSION
@@ -302,7 +302,7 @@ jobs:
           docker run -d -p 8443:8443 \
             -e SECRET_KEY=$(openssl rand -hex 32) \
             -e JWT_SECRET_KEY=$(openssl rand -hex 32) \
-            --name ucm neyslim/ucm:VERSION
+            --name ucm neyslim/ultimate-ca-manager:VERSION
           ```
           
           ### Debian/Ubuntu

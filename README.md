@@ -1,11 +1,9 @@
 # Ultimate CA Manager
 
-![Version](https://img.shields.io/badge/version-2.0.0--beta1-orange.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)
 ![Docker](https://img.shields.io/badge/docker-multi--arch-blue.svg)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-success.svg)
-
-> ⚠️ **v2.0.0-beta1** - Major release with new React UI. [Report issues](https://github.com/NeySlim/ultimate-ca-manager/issues)
 
 **Ultimate CA Manager (UCM)** is a comprehensive Certificate Authority management platform with full PKI protocol support (SCEP, OCSP, ACME, CRL/CDP), multi-factor authentication, and complete certificate lifecycle management.
 
@@ -110,11 +108,11 @@ wget -qO- https://raw.githubusercontent.com/NeySlim/ultimate-ca-manager/main/pac
 
 ```bash
 # Download latest release
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta1/ucm_2.0.0.beta1_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0/ucm_2.0.0_all.deb
 
 # Install
 sudo apt install -y python3-venv python3-pip  # Required dependencies
-sudo dpkg -i ucm_2.0.0.beta1_all.deb
+sudo dpkg -i ucm_2.0.0_all.deb
 sudo systemctl enable --now ucm
 ```
 
@@ -122,21 +120,29 @@ sudo systemctl enable --now ucm
 
 ```bash
 # Download latest release
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta1/ucm-2.0.0.beta1-1.fc43.noarch.rpm
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0/ucm-2.0.0-1.fc43.noarch.rpm
 
 # Install
-sudo dnf install ./ucm-2.0.0.beta1-1.fc43.noarch.rpm
+sudo dnf install ./ucm-2.0.0-1.fc43.noarch.rpm
 sudo systemctl enable --now ucm
 ```
 
-### Docker (Coming Soon)
+### Docker
 
 ```bash
+# From Docker Hub
 docker run -d \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
-  ghcr.io/neyslim/ultimate-ca-manager:2.0.0-beta1
+  neyslim/ultimate-ca-manager:2.0.0
+
+# Or from GitHub Container Registry
+docker run -d \
+  --name ucm \
+  -p 8443:8443 \
+  -v ucm-data:/opt/ucm/data \
+  ghcr.io/neyslim/ultimate-ca-manager:2.0.0
 ```
 
 **Access:** https://localhost:8443  
@@ -148,7 +154,7 @@ docker run -d \
 version: '3.8'
 services:
   ucm:
-    image: ghcr.io/neyslim/ultimate-ca-manager:2.0.0-beta1
+    image: neyslim/ultimate-ca-manager:2.0.0  # or ghcr.io/neyslim/ultimate-ca-manager:2.0.0
     container_name: ucm
     ports:
       - "8443:8443"
@@ -261,20 +267,20 @@ Edit `/etc/ucm/config.json` or use the web interface at **Settings → System Co
 
 ## 🔄 Upgrade
 
-### Upgrading from v1.8.x to v2.0.0-beta1
+### Upgrading from v1.8.x to v2.0.0
 
 Data and configuration are **automatically migrated**. A backup is created in `/opt/ucm/data/backups/`.
 
 ```bash
 # Debian/Ubuntu
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta1/ucm_2.0.0.beta1_all.deb
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0/ucm_2.0.0_all.deb
 sudo apt install -y python3-venv python3-pip
-sudo dpkg -i ucm_2.0.0.beta1_all.deb
+sudo dpkg -i ucm_2.0.0_all.deb
 sudo systemctl restart ucm
 
 # RHEL/Rocky/Fedora
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0-beta1/ucm-2.0.0.beta1-1.fc43.noarch.rpm
-sudo dnf install ./ucm-2.0.0.beta1-1.fc43.noarch.rpm
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/download/v2.0.0/ucm-2.0.0-1.fc43.noarch.rpm
+sudo dnf install ./ucm-2.0.0-1.fc43.noarch.rpm
 sudo systemctl restart ucm
 ```
 
@@ -363,7 +369,7 @@ Comprehensive technical documentation is available in the [`/docs`](/docs) direc
 - **[API Wiring Audit](/docs/API-WIRING-AUDIT.md)** - Frontend/backend integration audit and bug reports
 - **[Documentation Overview](/docs/README.md)** - Architecture, conventions, and contribution guidelines
 
-**Current Status:** 🚧 **Beta** - v2.0.0-beta1 with new React frontend
+**Current Status:** 🚧 **Beta** - v2.0.0 with new React frontend
 
 ## ⚡ What's New in v2.0.0
 
