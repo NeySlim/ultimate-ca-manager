@@ -245,7 +245,11 @@
     "dataRetention": "Conservation des données",
     "exportOptions": "Options d'exportation",
     "cleanedUpLogs": "{{count}} anciens journaux nettoyés",
-    "cleanupFailed": "Échec du nettoyage"
+    "cleanupFailed": "Échec du nettoyage",
+    "status": "Statut",
+    "allActions": "Toutes les actions",
+    "allStatus": "Tous les statuts",
+    "allUsers": "Tous les utilisateurs"
   },
   "auth": {
     "login": "Connexion",

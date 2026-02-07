@@ -182,6 +182,7 @@ function ValidationIssues({ validation }) {
  * SmartImport Widget - can be used standalone or in modal
  */
 export function SmartImportWidget({ onImportComplete, onCancel, compact = false }) {
+  const { t } = useTranslation()
   const { showError, showSuccess } = useNotification()
   const fileInputRef = useRef(null)
   
