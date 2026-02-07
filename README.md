@@ -7,6 +7,8 @@
 
 **Ultimate CA Manager (UCM)** is a comprehensive Certificate Authority management platform with full PKI protocol support (SCEP, OCSP, ACME, CRL/CDP), multi-factor authentication, and complete certificate lifecycle management.
 
+![Dashboard](docs/screenshots/dashboard-dark.png)
+
 ---
 
 ## ✨ Key Features
@@ -57,7 +59,16 @@
 - **Command Palette** - Ctrl+K global search with quick actions
 - **Real-time Updates** - WebSocket-based live refresh
 - **Contextual Help** - Help modals on every page
-- **[View Screenshots](docs/SCREENSHOTS.md)** - See all features in action
+
+### 📸 More Screenshots
+
+| Certificates with Detail Panel | Certificate Toolbox |
+|-------------------------------|---------------------|
+| ![Certificates](docs/screenshots/certificates-detail.png) | ![Toolbox](docs/screenshots/toolbox.png) |
+
+| Mobile | Tablet |
+|--------|--------|
+| ![Mobile](docs/screenshots/mobile-dashboard.png) | ![Tablet](docs/screenshots/tablet-certificates.png) |
 
 ### 🚀 Deployment Options
 - **Docker** - Multi-arch images (amd64, arm64) via Docker Hub & GHCR
