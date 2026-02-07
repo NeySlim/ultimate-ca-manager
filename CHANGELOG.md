@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.0.0-beta2] - 2026-02-07
+## [2.0.0] - 2026-02-07
 
-### 🔐 Security Enhancements
+### 🔐 Security Enhancements (from beta2)
 
 - **Password Show/Hide Toggle** - All password fields now have visibility toggle
 - **Password Strength Indicator** - Visual strength meter with 5 levels (Weak → Strong)

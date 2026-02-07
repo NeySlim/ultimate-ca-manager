@@ -41,18 +41,18 @@
 
 ---
 
-## 🚀 v2.0.0 Stable (PLANNED)
+## ✅ v2.0.0 Stable (RELEASED - 2026-02-07)
 
 ### Polish & Stability
-- [ ] Docker image published to GHCR
-- [ ] Extended E2E test coverage
-- [ ] Performance optimization
-- [ ] Documentation updates
+- [x] Docker image published to GHCR and Docker Hub
+- [x] Extended E2E test coverage (132 tests)
+- [x] Performance optimization
+- [x] Documentation updates
 
 ### Bug Fixes
-- [ ] Address beta feedback
-- [ ] Cross-browser testing
-- [ ] Accessibility audit
+- [x] Address beta feedback
+- [x] Cross-browser testing
+- [x] Accessibility audit
 
 ---
 
