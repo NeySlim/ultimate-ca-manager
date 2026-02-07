@@ -1,9 +1,9 @@
 Name:           ucm
-Version:        2.0.0
+Version:        2.1.0
 Release:        1%{?dist}
 Summary:        Ultimate CA Manager - Complete PKI Management Platform
 
-License:        Proprietary
+License:        BSD-3-Clause
 URL:            https://github.com/NeySlim/ultimate-ca-manager
 Source0:        %{name}-%{version}.tar.gz
 
@@ -157,6 +157,11 @@ systemctl daemon-reload
 systemctl enable %{name}
 systemctl start %{name} || true
 
+# Configure firewall if script exists
+if [ -x "$UCM_HOME/scripts/configure-firewall.sh" ]; then
+    "$UCM_HOME/scripts/configure-firewall.sh" || true
+fi
+
 %preun
 %systemd_preun %{name}.service
 
@@ -170,6 +175,12 @@ systemctl start %{name} || true
 %{_unitdir}/%{name}.service
 
 %changelog
+* Fri Feb 07 2026 UCM Team <dev@ucm.local> - 2.1.0-1
+- Unified release: Pro features merged into main
+- Interactive firewall configuration on install
+- i18n support (9 languages)
+- Column resize in tables
+
 * Mon Feb 03 2026 UCM Team <dev@ucm.local> - 2.0.0-1
 - Version 2.0.0 release
 - Pro features: HSM, SSO, RBAC, Groups

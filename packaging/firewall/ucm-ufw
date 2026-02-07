@@ -1,0 +1,4 @@
+[UCM]
+title=Ultimate CA Manager
+description=PKI Certificate Management Platform
+ports=8443/tcp

@@ -184,6 +184,17 @@ ENVEOF
         systemctl daemon-reload
         systemctl enable ucm
         systemctl start ucm || true
+        
+        # ============================================================
+        # FIREWALL CONFIGURATION
+        # ============================================================
+        # Configure firewall if script exists
+        # Can be controlled via environment variables:
+        #   UCM_PORT=8443 UCM_FIREWALL=yes dpkg -i ucm.deb
+        # Or interactively if no env vars set
+        if [ -x "$UCM_HOME/scripts/configure-firewall.sh" ]; then
+            "$UCM_HOME/scripts/configure-firewall.sh" || true
+        fi
         ;;
 esac
 

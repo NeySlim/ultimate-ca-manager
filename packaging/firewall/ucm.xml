@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>UCM</short>
+  <description>Ultimate CA Manager - PKI Certificate Management Platform</description>
+  <port protocol="tcp" port="8443"/>
+</service>
