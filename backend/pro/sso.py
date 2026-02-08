@@ -537,23 +537,34 @@ def sso_callback(provider_id):
             if not user:
                 return redirect('/login?error=user_creation_failed')
             
-            # Create session
-            sso_session = SSOSession(
-                user_id=user.id,
-                provider_id=provider.id,
-                external_id=userinfo.get('sub', username),
-                access_token=access_token,
-                refresh_token=tokens.get('refresh_token'),
-                expires_at=datetime.utcnow() + timedelta(hours=8)
-            )
-            db.session.add(sso_session)
+            # Create or update SSO session for audit
+            session_id = userinfo.get('sub', username)
+            sso_session = SSOSession.query.filter_by(session_id=session_id).first()
+            if sso_session:
+                sso_session.expires_at = datetime.utcnow() + timedelta(hours=8)
+            else:
+                sso_session = SSOSession(
+                    user_id=user.id,
+                    provider_id=provider.id,
+                    session_id=session_id,
+                    sso_name_id=session_id,
+                    expires_at=datetime.utcnow() + timedelta(hours=8)
+                )
+                db.session.add(sso_session)
             db.session.commit()
             
             # Create JWT tokens
-            tokens = create_tokens_for_user(user)
+            jwt_tokens = create_tokens_for_user(user)
+            
+            # Also establish Flask session for cookie-based auth
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['role'] = user.role
+            session['auth_method'] = 'sso'
+            session.permanent = True  # Use permanent session
             
             # Redirect to app with tokens in URL fragment (secure: not sent to server)
-            return redirect(f'/login/sso-complete?token={tokens["access_token"]}')
+            return redirect(f'/login/sso-complete?token={jwt_tokens["access_token"]}')
             
         except Exception as e:
             current_app.logger.error(f"OAuth2 callback error: {e}")
@@ -623,7 +634,8 @@ def ldap_login():
     sso_session = SSOSession(
         user_id=user.id,
         provider_id=provider.id,
-        external_id=user_info['dn'],
+        session_id=user_info['dn'],
+        sso_name_id=user_info.get('uid', user_info['dn']),
         expires_at=datetime.utcnow() + timedelta(hours=8)
     )
     db.session.add(sso_session)
@@ -631,6 +643,13 @@ def ldap_login():
     
     # Create JWT tokens
     tokens = create_tokens_for_user(user)
+    
+    # Also establish Flask session for cookie-based auth
+    session['user_id'] = user.id
+    session['username'] = user.username
+    session['role'] = user.role
+    session['auth_method'] = 'ldap'
+    session.permanent = True
     
     return success_response(
         data={
@@ -683,13 +702,12 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         email=email or f'{username}@sso.local',
         full_name=fullname or username,
         role=role,
-        is_active=True,
-        auth_method='sso',
+        active=True,
         last_login=datetime.utcnow()
     )
     
     # SSO users don't have a password (they auth via SSO)
-    user.password_hash = None
+    user.password_hash = ''
     
     db.session.add(user)
     db.session.commit()
