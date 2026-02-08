@@ -232,9 +232,10 @@ export function formatDateTime(date) {
 /**
  * Format relative time (e.g., "2 hours ago")
  * @param {string|Date} date - Date value
+ * @param {function} t - Optional translation function
  * @returns {string} - Relative time string
  */
-export function formatRelativeTime(date) {
+export function formatRelativeTime(date, t) {
   if (!date) return '-'
   
   const now = new Date()
@@ -245,10 +246,18 @@ export function formatRelativeTime(date) {
   const diffHours = Math.floor(diffMins / 60)
   const diffDays = Math.floor(diffHours / 24)
   
-  if (diffSecs < 60) return 'just now'
-  if (diffMins < 60) return `${diffMins} ${pluralWord(diffMins, 'minute')} ago`
-  if (diffHours < 24) return `${diffHours} ${pluralWord(diffHours, 'hour')} ago`
-  if (diffDays < 7) return `${diffDays} ${pluralWord(diffDays, 'day')} ago`
+  // Use translation function if provided, otherwise fallback to English
+  if (t) {
+    if (diffSecs < 60) return t('common.justNow')
+    if (diffMins < 60) return t('common.minutesAgo', { count: diffMins })
+    if (diffHours < 24) return t('common.hoursAgo', { count: diffHours })
+    if (diffDays < 7) return t('common.daysAgo', { count: diffDays })
+  } else {
+    if (diffSecs < 60) return 'just now'
+    if (diffMins < 60) return `${diffMins} ${pluralWord(diffMins, 'minute')} ago`
+    if (diffHours < 24) return `${diffHours} ${pluralWord(diffHours, 'hour')} ago`
+    if (diffDays < 7) return `${diffDays} ${pluralWord(diffDays, 'day')} ago`
+  }
   
   return formatDate(date)
 }

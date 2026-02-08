@@ -570,6 +570,19 @@ tr.row-selected td:first-child {
     background-color var(--duration-normal) var(--ease-smooth),
     box-shadow var(--duration-normal) var(--ease-smooth);
 }
+
+/* Row separator - applied to all cells */
+.table-row-hover td {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+/* Column separators */
+.table-col-separator {
+  border-right: 1px solid var(--border);
+}
+.table-col-separator-subtle {
+  border-right: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
 .table-row-hover:hover {
   background-color: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
   box-shadow: 

@@ -81,6 +81,7 @@
     "justNow": "Just now",
     "minutesAgo": "{{count}}m ago",
     "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
     "last30DaysStats": "Last 30 Days Statistics",
     "totalEvents": "Total Events",
     "successful": "Successful",
