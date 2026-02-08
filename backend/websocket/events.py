@@ -94,7 +94,7 @@ def authenticate_socket(f):
 
 @socketio.on('connect')
 @authenticate_socket
-def handle_connect():
+def handle_connect(auth=None):
     """Handle new WebSocket connection."""
     user_id = getattr(request, 'user_id', 'anonymous')
     sid = request.sid
