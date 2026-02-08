@@ -1,5 +1,5 @@
 /**
- * RBAC Management Page (Pro Feature)
+ * RBAC Management Page (Advanced Feature)
  * Role-Based Access Control with custom roles and permissions
  * 
  * Migrated to ResponsiveLayout for consistent UX
@@ -13,12 +13,12 @@ import {
   Badge, Button, Input, FormModal, HelpCard,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader,
   FormSelect
-} from '../../components'
-import { ResponsiveLayout, ResponsiveDataTable } from '../../components/ui/responsive'
-import { useNotification, useMobile } from '../../contexts'
-import { useModals } from '../../hooks'
-import { apiClient } from '../../services/apiClient'
-import { ERRORS, SUCCESS, CONFIRM } from '../../lib/messages'
+} from '../components'
+import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
+import { useNotification, useMobile } from '../contexts'
+import { useModals } from '../hooks'
+import { apiClient } from '../services/apiClient'
+import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 
 // Permission categories for RBAC - aligned with backend
 const PERMISSION_CATEGORIES = {

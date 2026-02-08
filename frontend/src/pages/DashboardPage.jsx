@@ -231,8 +231,8 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-text-secondary">{getGreeting()} 👋</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <Badge variant={versionInfo.edition === 'pro' ? 'purple' : 'primary'} size="sm">
-                    {versionInfo.edition === 'pro' ? t('common.pro') : t('common.community')}
+                  <Badge variant="primary" size="sm">
+                    {t('common.community')}
                   </Badge>
                   <span className="text-xs text-text-tertiary">v{versionInfo.version}</span>
                   {versionInfo.update_available && (

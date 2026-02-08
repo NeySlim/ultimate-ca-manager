@@ -1,5 +1,5 @@
 /**
- * HSM Page - UCM Pro
+ * HSM Page - UCM
  * Hardware Security Module management
  * 
  * Migrated to ResponsiveLayout for consistent UX
@@ -13,11 +13,11 @@ import {
 import { 
   Badge, Button, FormModal, Input, Select, HelpCard,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
-} from '../../components'
-import { ResponsiveLayout, ResponsiveDataTable } from '../../components/ui/responsive'
-import { useNotification, useMobile } from '../../contexts'
-import { apiClient } from '../../services/apiClient'
-import { ERRORS, SUCCESS, CONFIRM } from '../../lib/messages'
+} from '../components'
+import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
+import { useNotification, useMobile } from '../contexts'
+import { apiClient } from '../services/apiClient'
+import { ERRORS, SUCCESS, CONFIRM } from '../lib/messages'
 
 const PROVIDER_TYPES = [
   { value: 'pkcs11', label: 'PKCS#11 (Local HSM)', icon: HardDrive },

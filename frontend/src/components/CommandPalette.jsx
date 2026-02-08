@@ -42,7 +42,7 @@ const COMMANDS = [
   { id: 'upload-csr', label: 'Upload CSR', icon: FileText, path: '/csrs', action: 'upload', category: 'Actions' },
 ]
 
-export function CommandPalette({ open, onOpenChange, isPro = false }) {
+export function CommandPalette({ open, onOpenChange }) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -129,17 +129,16 @@ export function CommandPalette({ open, onOpenChange, isPro = false }) {
     }
   }, [open, refreshHistory, refreshFavorites])
 
-  // Filter commands based on search and pro status
+  // Filter commands based on search - all commands now available
   const filteredCommands = useMemo(() => {
-    const available = COMMANDS.filter(cmd => !cmd.pro || isPro)
-    if (!search) return available
+    if (!search) return COMMANDS
     
     const lower = search.toLowerCase()
-    return available.filter(cmd => 
+    return COMMANDS.filter(cmd => 
       cmd.label.toLowerCase().includes(lower) ||
       cmd.category.toLowerCase().includes(lower)
     )
-  }, [search, isPro])
+  }, [search])
   
   // Filter recent items based on search
   const filteredRecent = useMemo(() => {

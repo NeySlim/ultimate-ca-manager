@@ -131,14 +131,7 @@ export function UpdateChecker() {
               </div>
             )}
             
-            {updateInfo?.needs_token && (
-              <div className="flex items-center gap-1 text-accent-warning text-sm mt-2">
-                <Info size={14} />
-                {updateInfo.message || 'Pro updates require GitHub token configuration.'}
-              </div>
-            )}
-            
-            {updateInfo?.message && !updateInfo?.needs_token && !updateInfo?.update_available && (
+            {updateInfo?.message && !updateInfo?.update_available && (
               <div className="flex items-center gap-1 text-text-tertiary text-xs mt-2">
                 <Info size={14} />
                 {updateInfo.message}
