@@ -880,24 +880,29 @@ def reset_rate_limits():
 @require_auth(['admin:system'])
 def rotate_secrets():
     """
-    Rotate JWT secret key.
+    Rotate JWT secret key with automatic .env update.
     
     Process:
-    1. Current JWT_SECRET_KEY becomes JWT_SECRET_KEY_PREVIOUS
-    2. New key is generated and set as JWT_SECRET_KEY
-    3. Tokens signed with old key remain valid during transition period
-    4. After JWT_ACCESS_TOKEN_EXPIRES, remove the PREVIOUS key
+    1. Backup current .env file
+    2. Current JWT_SECRET_KEY becomes JWT_SECRET_KEY_PREVIOUS
+    3. New key is generated and set as JWT_SECRET_KEY
+    4. Service restart (SIGHUP for graceful reload)
+    5. Tokens signed with old key remain valid during transition period
     
     Body:
         new_secret: Optional - provide your own secret (32+ chars)
+        auto_apply: bool - automatically update .env and restart (default: true)
         
     Returns:
-        Instructions for updating environment
+        Success message or manual instructions if auto_apply=false
     """
     import secrets as py_secrets
+    import shutil
+    from datetime import datetime
     
     data = request.get_json() or {}
     new_secret = data.get('new_secret')
+    auto_apply = data.get('auto_apply', True)
     
     # Generate new secret if not provided
     if not new_secret:
@@ -908,30 +913,118 @@ def rotate_secrets():
     # Get current secret
     current_secret = os.getenv('JWT_SECRET_KEY', '')
     
-    # Log the rotation
-    from services.audit_service import AuditService
-    AuditService.log_action(
-        action='secrets_rotated',
-        resource_type='security',
-        details='JWT secret key rotated. Previous key kept for transition.',
-        success=True
-    )
+    if auto_apply:
+        # Determine .env path based on environment
+        is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
+        if is_docker:
+            env_path = Path('/app/backend/.env')
+            if not env_path.exists():
+                env_path = Path('/app/.env')
+        else:
+            env_path = Path('/etc/ucm/ucm.env')
+        
+        if not env_path.exists():
+            return error_response(f"Environment file not found: {env_path}", 500)
+        
+        try:
+            # Backup current .env
+            backup_path = env_path.with_suffix(f'.env.backup-{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+            shutil.copy(env_path, backup_path)
+            
+            # Read current .env
+            env_content = env_path.read_text()
+            lines = env_content.splitlines()
+            new_lines = []
+            jwt_key_found = False
+            jwt_prev_found = False
+            
+            for line in lines:
+                stripped = line.strip()
+                
+                # Update JWT_SECRET_KEY
+                if stripped.startswith('JWT_SECRET_KEY=') and not stripped.startswith('JWT_SECRET_KEY_PREVIOUS'):
+                    new_lines.append(f'JWT_SECRET_KEY={new_secret}')
+                    jwt_key_found = True
+                # Update or skip JWT_SECRET_KEY_PREVIOUS (we'll add it after)
+                elif stripped.startswith('JWT_SECRET_KEY_PREVIOUS='):
+                    jwt_prev_found = True
+                    # Update with current secret
+                    if current_secret:
+                        new_lines.append(f'JWT_SECRET_KEY_PREVIOUS={current_secret}')
+                else:
+                    new_lines.append(line)
+            
+            # Add JWT_SECRET_KEY if not found
+            if not jwt_key_found:
+                new_lines.append(f'JWT_SECRET_KEY={new_secret}')
+            
+            # Add JWT_SECRET_KEY_PREVIOUS if not found and we have a current secret
+            if not jwt_prev_found and current_secret:
+                new_lines.append(f'JWT_SECRET_KEY_PREVIOUS={current_secret}')
+            
+            # Write updated .env
+            env_path.write_text('\n'.join(new_lines) + '\n')
+            
+            # Log the rotation
+            from services.audit_service import AuditService
+            AuditService.log_action(
+                action='secrets_rotated',
+                resource_type='security',
+                details=f'JWT secret key rotated automatically. Backup: {backup_path.name}',
+                success=True
+            )
+            
+            # Signal service to reload (graceful restart)
+            import signal
+            if is_docker:
+                # In Docker, SIGTERM triggers container restart
+                os.kill(os.getppid(), signal.SIGTERM)
+            else:
+                # In systemd, use SIGHUP for graceful reload or restart service
+                try:
+                    import subprocess
+                    subprocess.run(['systemctl', 'restart', 'ucm'], check=True, timeout=30)
+                except Exception:
+                    # Fallback to SIGHUP
+                    os.kill(os.getppid(), signal.SIGHUP)
+            
+            return success_response(
+                data={
+                    'rotated': True,
+                    'backup': str(backup_path),
+                    'note': 'Service is restarting. You will need to log in again.'
+                },
+                message='JWT secret rotated successfully. Service restarting.'
+            )
+            
+        except Exception as e:
+            current_app.logger.error(f"Failed to rotate secrets: {e}")
+            return error_response(f"Failed to rotate secrets: {str(e)}", 500)
     
-    # Return instructions (we can't modify .env directly for security)
-    return success_response(
-        data={
-            'new_secret': new_secret,
-            'previous_secret': current_secret[:8] + '...' if current_secret else None,
-            'instructions': [
-                '1. Edit /etc/ucm/ucm.env',
-                '2. Set JWT_SECRET_KEY_PREVIOUS to your current JWT_SECRET_KEY value',
-                f'3. Set JWT_SECRET_KEY={new_secret}',
-                '4. Restart UCM: systemctl restart ucm',
-                '5. After 1 hour (token expiry), remove JWT_SECRET_KEY_PREVIOUS'
-            ]
-        },
-        message='New secret generated. Follow instructions to complete rotation.'
-    )
+    else:
+        # Manual mode - return instructions
+        from services.audit_service import AuditService
+        AuditService.log_action(
+            action='secrets_rotation_initiated',
+            resource_type='security',
+            details='JWT secret key generated (manual apply required)',
+            success=True
+        )
+        
+        return success_response(
+            data={
+                'new_secret': new_secret,
+                'previous_secret': current_secret[:8] + '...' if current_secret else None,
+                'instructions': [
+                    '1. Edit /etc/ucm/ucm.env',
+                    '2. Set JWT_SECRET_KEY_PREVIOUS to your current JWT_SECRET_KEY value',
+                    f'3. Set JWT_SECRET_KEY={new_secret}',
+                    '4. Restart UCM: systemctl restart ucm',
+                    '5. After 1 hour (token expiry), remove JWT_SECRET_KEY_PREVIOUS'
+                ]
+            },
+            message='New secret generated. Follow instructions to complete rotation.'
+        )
 
 
 @bp.route('/api/v2/system/security/secrets-status', methods=['GET'])
