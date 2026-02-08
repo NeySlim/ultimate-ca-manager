@@ -149,7 +149,8 @@ def get_https_cert_info():
     from cryptography.hazmat.primitives import hashes
     import hashlib
     
-    cert_path = Path(os.environ.get('HTTPS_CERT_PATH', '/opt/ucm/data/https_cert.pem'))
+    data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
+    cert_path = Path(os.environ.get('HTTPS_CERT_PATH', f'{data_dir}/https_cert.pem'))
     
     if not cert_path.exists():
         return success_response(data={
@@ -253,9 +254,10 @@ def regenerate_https_cert():
             .sign(private_key, hashes.SHA256())
         )
         
-        # Get cert paths from env (set in ucm.env) or use defaults
-        cert_path = Path(os.environ.get('HTTPS_CERT_PATH', '/opt/ucm/data/https_cert.pem'))
-        key_path = Path(os.environ.get('HTTPS_KEY_PATH', '/opt/ucm/data/https_key.pem'))
+        # Get cert paths dynamically - same logic as gunicorn.conf.py
+        data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
+        cert_path = Path(os.environ.get('HTTPS_CERT_PATH', f'{data_dir}/https_cert.pem'))
+        key_path = Path(os.environ.get('HTTPS_KEY_PATH', f'{data_dir}/https_key.pem'))
         
         # Backup existing
         if cert_path.exists():
@@ -326,9 +328,10 @@ def apply_https_cert():
         return error_response("Certificate has no private key - cannot use for HTTPS", 400)
     
     try:
-        # Get cert paths from env (set in ucm.env) or use defaults
-        cert_path = Path(os.environ.get('HTTPS_CERT_PATH', '/opt/ucm/data/https_cert.pem'))
-        key_path = Path(os.environ.get('HTTPS_KEY_PATH', '/opt/ucm/data/https_key.pem'))
+        # Get cert paths dynamically - same logic as gunicorn.conf.py
+        data_dir = os.environ.get('DATA_DIR', '/opt/ucm/data')
+        cert_path = Path(os.environ.get('HTTPS_CERT_PATH', f'{data_dir}/https_cert.pem'))
+        key_path = Path(os.environ.get('HTTPS_KEY_PATH', f'{data_dir}/https_key.pem'))
         
         # Backup existing certs
         if cert_path.exists():
