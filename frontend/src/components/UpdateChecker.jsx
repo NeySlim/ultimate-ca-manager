@@ -114,8 +114,6 @@ export function UpdateChecker() {
               ) : (
                 <>{t('settings.running')} v{updateInfo?.current_version}</>
               )}
-              <span className="mx-2">•</span>
-              <span className="capitalize">{updateInfo?.edition}</span> {t('settings.edition')}
             </div>
             
             {updateInfo?.published_at && updateInfo?.update_available && (

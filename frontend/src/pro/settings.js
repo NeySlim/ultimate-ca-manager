@@ -1,17 +1,17 @@
 /**
  * Settings Categories
- * All settings now available in community edition
+ * All settings now available
  */
 import { Key } from '@phosphor-icons/react'
 import SSOSettingsSection from './components/SSOSettingsSection'
 
-// Additional settings categories (formerly Pro)
+// Additional settings categories
 export const advancedSettingsCategories = [
   { 
     id: 'sso', 
-    label: 'SSO', 
+    labelKey: 'settings.tabs.sso', 
     icon: Key, 
-    description: 'Single Sign-On providers',
+    color: 'icon-bg-purple',
     component: SSOSettingsSection
   },
 ]
