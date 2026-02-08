@@ -8,7 +8,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, User
 from models.pro.sso import SSOProvider, SSOSession
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 
 bp = Blueprint('sso_pro', __name__)
@@ -403,3 +403,296 @@ def get_available_providers():
         'icon': p.icon,
         'is_default': p.is_default
     } for p in providers])
+
+
+@bp.route('/api/v2/sso/login/<int:provider_id>', methods=['GET'])
+def initiate_sso_login(provider_id):
+    """
+    Initiate SSO login flow.
+    For OAuth2: redirects to authorization URL
+    For SAML: redirects to IdP SSO URL
+    For LDAP: returns error (LDAP uses direct auth via /api/v2/sso/ldap/login)
+    """
+    import secrets as py_secrets
+    import urllib.parse
+    
+    provider = SSOProvider.query.get_or_404(provider_id)
+    
+    if not provider.enabled:
+        return error_response("SSO provider is disabled", 400)
+    
+    if provider.provider_type == 'ldap':
+        return error_response("LDAP uses direct authentication. Use /api/v2/sso/ldap/login instead.", 400)
+    
+    # Generate state token for CSRF protection
+    state = py_secrets.token_urlsafe(32)
+    session['sso_state'] = state
+    session['sso_provider_id'] = provider_id
+    
+    if provider.provider_type == 'oauth2':
+        # Build OAuth2 authorization URL
+        scopes = json.loads(provider.oauth2_scopes) if provider.oauth2_scopes else ['openid', 'profile', 'email']
+        
+        # Get callback URL from request
+        callback_url = request.url_root.rstrip('/') + f'/api/v2/sso/callback/{provider_id}'
+        
+        params = {
+            'client_id': provider.oauth2_client_id,
+            'redirect_uri': callback_url,
+            'response_type': 'code',
+            'scope': ' '.join(scopes),
+            'state': state
+        }
+        
+        auth_url = provider.oauth2_auth_url + '?' + urllib.parse.urlencode(params)
+        return redirect(auth_url)
+    
+    elif provider.provider_type == 'saml':
+        # For SAML, we'd need to generate a SAML AuthnRequest
+        # This is a simplified redirect - full SAML requires python3-saml library
+        if not provider.saml_sso_url:
+            return error_response("SAML SSO URL not configured", 400)
+        
+        # Simple redirect (real SAML needs signed request)
+        return redirect(provider.saml_sso_url)
+    
+    return error_response("Unknown provider type", 400)
+
+
+@bp.route('/api/v2/sso/callback/<int:provider_id>', methods=['GET', 'POST'])
+def sso_callback(provider_id):
+    """
+    Handle SSO callback from OAuth2/SAML providers.
+    Creates or updates user and establishes session.
+    """
+    import requests
+    from auth.unified import create_tokens_for_user
+    
+    provider = SSOProvider.query.get_or_404(provider_id)
+    
+    if not provider.enabled:
+        return redirect('/login?error=provider_disabled')
+    
+    # Verify state for CSRF protection
+    state = request.args.get('state')
+    if state != session.get('sso_state'):
+        return redirect('/login?error=invalid_state')
+    
+    if provider.provider_type == 'oauth2':
+        code = request.args.get('code')
+        if not code:
+            error = request.args.get('error', 'no_code')
+            return redirect(f'/login?error={error}')
+        
+        try:
+            # Exchange code for token
+            callback_url = request.url_root.rstrip('/') + f'/api/v2/sso/callback/{provider_id}'
+            
+            token_response = requests.post(
+                provider.oauth2_token_url,
+                data={
+                    'grant_type': 'authorization_code',
+                    'code': code,
+                    'redirect_uri': callback_url,
+                    'client_id': provider.oauth2_client_id,
+                    'client_secret': provider.oauth2_client_secret
+                },
+                timeout=10
+            )
+            
+            if not token_response.ok:
+                current_app.logger.error(f"OAuth2 token exchange failed: {token_response.text}")
+                return redirect('/login?error=token_exchange_failed')
+            
+            tokens = token_response.json()
+            access_token = tokens.get('access_token')
+            
+            if not access_token:
+                return redirect('/login?error=no_access_token')
+            
+            # Get user info
+            userinfo_response = requests.get(
+                provider.oauth2_userinfo_url,
+                headers={'Authorization': f'Bearer {access_token}'},
+                timeout=10
+            )
+            
+            if not userinfo_response.ok:
+                return redirect('/login?error=userinfo_failed')
+            
+            userinfo = userinfo_response.json()
+            
+            # Map attributes
+            attr_mapping = json.loads(provider.attribute_mapping) if provider.attribute_mapping else {}
+            username = userinfo.get(attr_mapping.get('username', 'preferred_username')) or userinfo.get('email', '').split('@')[0]
+            email = userinfo.get(attr_mapping.get('email', 'email'), '')
+            fullname = userinfo.get(attr_mapping.get('fullname', 'name'), '')
+            
+            if not username:
+                return redirect('/login?error=no_username')
+            
+            # Create or update user
+            user = _get_or_create_sso_user(provider, username, email, fullname, userinfo)
+            
+            if not user:
+                return redirect('/login?error=user_creation_failed')
+            
+            # Create session
+            sso_session = SSOSession(
+                user_id=user.id,
+                provider_id=provider.id,
+                external_id=userinfo.get('sub', username),
+                access_token=access_token,
+                refresh_token=tokens.get('refresh_token'),
+                expires_at=datetime.utcnow() + timedelta(hours=8)
+            )
+            db.session.add(sso_session)
+            db.session.commit()
+            
+            # Create JWT tokens
+            tokens = create_tokens_for_user(user)
+            
+            # Redirect to app with tokens in URL fragment (secure: not sent to server)
+            return redirect(f'/login/sso-complete?token={tokens["access_token"]}')
+            
+        except Exception as e:
+            current_app.logger.error(f"OAuth2 callback error: {e}")
+            return redirect('/login?error=callback_error')
+    
+    elif provider.provider_type == 'saml':
+        # Handle SAML response
+        # This is simplified - real SAML needs signature verification
+        saml_response = request.form.get('SAMLResponse')
+        if not saml_response:
+            return redirect('/login?error=no_saml_response')
+        
+        # TODO: Parse and verify SAML response
+        return redirect('/login?error=saml_not_implemented')
+    
+    return redirect('/login?error=unknown_provider_type')
+
+
+@bp.route('/api/v2/sso/ldap/login', methods=['POST'])
+def ldap_login():
+    """
+    Direct LDAP authentication.
+    Unlike OAuth2/SAML, LDAP authenticates with username/password directly.
+    """
+    from auth.unified import create_tokens_for_user
+    
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    provider_id = data.get('provider_id')
+    
+    if not username or not password:
+        return error_response("Username and password required", 400)
+    
+    # Find LDAP provider
+    if provider_id:
+        provider = SSOProvider.query.get(provider_id)
+    else:
+        # Use first enabled LDAP provider
+        provider = SSOProvider.query.filter_by(provider_type='ldap', enabled=True).first()
+    
+    if not provider:
+        return error_response("No LDAP provider configured", 400)
+    
+    if not provider.enabled:
+        return error_response("LDAP provider is disabled", 400)
+    
+    # Authenticate via LDAP
+    user_info, error = _ldap_authenticate_user(provider, username, password)
+    
+    if error:
+        return error_response(f"LDAP authentication failed: {error}", 401)
+    
+    # Create or update user
+    user = _get_or_create_sso_user(
+        provider,
+        user_info['username'],
+        user_info.get('email', ''),
+        user_info.get('fullname', ''),
+        user_info
+    )
+    
+    if not user:
+        return error_response("Failed to create user account", 500)
+    
+    # Create session
+    sso_session = SSOSession(
+        user_id=user.id,
+        provider_id=provider.id,
+        external_id=user_info['dn'],
+        expires_at=datetime.utcnow() + timedelta(hours=8)
+    )
+    db.session.add(sso_session)
+    db.session.commit()
+    
+    # Create JWT tokens
+    tokens = create_tokens_for_user(user)
+    
+    return success_response(
+        data={
+            'access_token': tokens['access_token'],
+            'user': user.to_dict()
+        },
+        message='LDAP authentication successful'
+    )
+
+
+def _get_or_create_sso_user(provider, username, email, fullname, external_data):
+    """Create or update a user from SSO authentication"""
+    from datetime import timedelta
+    
+    user = User.query.filter_by(username=username).first()
+    
+    if user:
+        # Update existing user if auto_update is enabled
+        if provider.auto_update_users:
+            if email:
+                user.email = email
+            if fullname:
+                user.full_name = fullname
+            user.last_login = datetime.utcnow()
+            db.session.commit()
+        return user
+    
+    # Create new user if auto_create is enabled
+    if not provider.auto_create_users:
+        current_app.logger.warning(f"SSO user {username} not found and auto_create disabled")
+        return None
+    
+    # Map role from provider config
+    role_mapping = json.loads(provider.role_mapping) if provider.role_mapping else {}
+    role = provider.default_role or 'viewer'
+    
+    # Check if external data contains role info
+    if role_mapping:
+        external_roles = external_data.get('roles', external_data.get('groups', []))
+        if isinstance(external_roles, str):
+            external_roles = [external_roles]
+        
+        for ext_role, ucm_role in role_mapping.items():
+            if ext_role in external_roles:
+                role = ucm_role
+                break
+    
+    user = User(
+        username=username,
+        email=email or f'{username}@sso.local',
+        full_name=fullname or username,
+        role=role,
+        is_active=True,
+        auth_method='sso',
+        last_login=datetime.utcnow()
+    )
+    
+    # SSO users don't have a password (they auth via SSO)
+    user.password_hash = None
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    current_app.logger.info(f"Created SSO user: {username} with role {role}")
+    return user
