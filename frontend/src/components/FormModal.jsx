@@ -44,7 +44,16 @@ export function FormModal({
 }) {
   const handleSubmit = (e) => {
     e?.preventDefault()
-    onSubmit?.()
+    
+    // Collect form data from the form element
+    const form = e?.target
+    if (form && onSubmit) {
+      const formData = new FormData(form)
+      const data = Object.fromEntries(formData.entries())
+      onSubmit(data)
+    } else {
+      onSubmit?.()
+    }
   }
 
   return (
