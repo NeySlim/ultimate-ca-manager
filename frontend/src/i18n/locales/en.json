@@ -200,6 +200,7 @@
     "ssoUserinfoFailed": "Failed to get user information",
     "ssoNoUsername": "SSO: Could not determine username",
     "ssoUserCreationFailed": "Failed to create user account",
+    "ssoAutoCreateDisabled": "User not found. Automatic account creation is disabled. Contact your administrator.",
     "ssoCallbackError": "SSO authentication error",
     "ssoError": "SSO authentication failed"
   },

@@ -532,10 +532,10 @@ def sso_callback(provider_id):
                 return redirect('/login?error=no_username')
             
             # Create or update user
-            user = _get_or_create_sso_user(provider, username, email, fullname, userinfo)
+            user, error_code = _get_or_create_sso_user(provider, username, email, fullname, userinfo)
             
             if not user:
-                return redirect('/login?error=user_creation_failed')
+                return redirect(f'/login?error={error_code or "user_creation_failed"}')
             
             # Create or update SSO session for audit
             session_id = userinfo.get('sub', username)
@@ -619,7 +619,7 @@ def ldap_login():
         return error_response(f"LDAP authentication failed: {error}", 401)
     
     # Create or update user
-    user = _get_or_create_sso_user(
+    user, error_code = _get_or_create_sso_user(
         provider,
         user_info['username'],
         user_info.get('email', ''),
@@ -628,6 +628,8 @@ def ldap_login():
     )
     
     if not user:
+        if error_code == 'auto_create_disabled':
+            return error_response("User not found and automatic account creation is disabled. Contact your administrator.", 403)
         return error_response("Failed to create user account", 500)
     
     # Create session
@@ -661,7 +663,11 @@ def ldap_login():
 
 
 def _get_or_create_sso_user(provider, username, email, fullname, external_data):
-    """Create or update a user from SSO authentication"""
+    """Create or update a user from SSO authentication
+    
+    Returns:
+        tuple: (user, error_code) - user object or None, and error code if failed
+    """
     from datetime import timedelta
     
     user = User.query.filter_by(username=username).first()
@@ -675,12 +681,12 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
                 user.full_name = fullname
             user.last_login = datetime.utcnow()
             db.session.commit()
-        return user
+        return user, None
     
     # Create new user if auto_create is enabled
     if not provider.auto_create_users:
         current_app.logger.warning(f"SSO user {username} not found and auto_create disabled")
-        return None
+        return None, 'auto_create_disabled'
     
     # Map role from provider config
     role_mapping = json.loads(provider.role_mapping) if provider.role_mapping else {}
@@ -713,4 +719,4 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     db.session.commit()
     
     current_app.logger.info(f"Created SSO user: {username} with role {role}")
-    return user
+    return user, None
