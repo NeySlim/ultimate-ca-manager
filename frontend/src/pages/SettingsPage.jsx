@@ -1,10 +1,8 @@
 /**
  * Settings Page - Horizontal tabs for desktop, scrollable for mobile
  * Uses DetailCard design system
- * 
- * Pro features (SSO) are dynamically added when Pro module is present
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { 
@@ -27,15 +25,15 @@ import { usePermission } from '../hooks'
 import { formatDate } from '../lib/utils'
 import { ERRORS, SUCCESS } from '../lib/messages'
 import { useTheme } from '../contexts/ThemeContext'
-import { advancedSettingsCategories } from '../pro/settings.js'
+import SSOSettingsSection from './settings/SSOSettingsSection'
 
-// Base settings categories
 // Settings categories with colors for visual distinction
 const BASE_SETTINGS_CATEGORIES = [
   { id: 'general', labelKey: 'settings.tabs.general', icon: Gear, color: 'icon-bg-blue' },
   { id: 'appearance', labelKey: 'settings.tabs.appearance', icon: Palette, color: 'icon-bg-violet' },
   { id: 'email', labelKey: 'settings.tabs.email', icon: EnvelopeSimple, color: 'icon-bg-teal' },
   { id: 'security', labelKey: 'settings.tabs.security', icon: ShieldCheck, color: 'icon-bg-amber' },
+  { id: 'sso', labelKey: 'settings.tabs.sso', icon: Key, color: 'icon-bg-purple', component: SSOSettingsSection },
   { id: 'backup', labelKey: 'settings.tabs.backup', icon: Database, color: 'icon-bg-emerald' },
   { id: 'audit', labelKey: 'settings.tabs.audit', icon: ListBullets, color: 'icon-bg-orange' },
   { id: 'database', labelKey: 'settings.tabs.database', icon: HardDrives, color: 'icon-bg-blue' },
@@ -263,12 +261,8 @@ export default function SettingsPage() {
   // HTTPS import modal
   const [showHttpsImportModal, setShowHttpsImportModal] = useState(false)
 
-  // Merge base + advanced categories (all now available)
-  const SETTINGS_CATEGORIES = useMemo(() => [
-    ...BASE_SETTINGS_CATEGORIES.slice(0, 4), // general, email, security, backup
-    ...advancedSettingsCategories,           // SSO
-    ...BASE_SETTINGS_CATEGORIES.slice(4),    // audit, database, https
-  ], [])
+  // All settings categories (SSO now integrated directly)
+  const SETTINGS_CATEGORIES = BASE_SETTINGS_CATEGORIES
 
   useEffect(() => {
     loadSettings()
