@@ -35,6 +35,16 @@ override_dh_auto_install:
 	# Install start script
 	install -m 755 packaging/debian/start-ucm.sh debian/ucm/opt/ucm/start-ucm.sh
 	
+	# Install scripts directory
+	install -d debian/ucm/opt/ucm/scripts
+	install -m 755 packaging/scripts/configure-firewall.sh debian/ucm/opt/ucm/scripts/
+	
+	# Install firewall service definitions
+	install -d debian/ucm/usr/lib/firewalld/services
+	install -d debian/ucm/etc/ufw/applications.d
+	install -m 644 packaging/firewall/ucm.xml debian/ucm/usr/lib/firewalld/services/ || true
+	install -m 644 packaging/firewall/ucm-ufw debian/ucm/etc/ufw/applications.d/ucm || true
+	
 	# Install requirements.txt
 	install -m 644 backend/requirements.txt debian/ucm/opt/ucm/requirements.txt
 	

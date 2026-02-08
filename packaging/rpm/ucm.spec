@@ -34,10 +34,12 @@ Ultimate CA Manager (UCM) is a comprehensive PKI management platform.
 install -d %{buildroot}%{ucm_home}
 install -d %{buildroot}%{ucm_home}/backend
 install -d %{buildroot}%{ucm_home}/frontend
+install -d %{buildroot}%{ucm_home}/scripts
 install -d %{buildroot}%{ucm_data}/{ca,certs,private,sessions,backups}
 install -d %{buildroot}%{_sysconfdir}/%{name}
 install -d %{buildroot}%{_localstatedir}/log/%{name}
 install -d %{buildroot}%{_unitdir}
+install -d %{buildroot}/usr/lib/firewalld/services
 
 cp -r backend/* %{buildroot}%{ucm_home}/backend/
 cp -r frontend/dist %{buildroot}%{ucm_home}/frontend/
@@ -47,6 +49,8 @@ find %{buildroot}%{ucm_home} -name '*.pyc' -delete
 
 install -m 644 backend/requirements.txt %{buildroot}%{ucm_home}/requirements.txt
 install -m 755 packaging/debian/start-ucm.sh %{buildroot}%{ucm_home}/start-ucm.sh
+install -m 755 packaging/scripts/configure-firewall.sh %{buildroot}%{ucm_home}/scripts/
+install -m 644 packaging/firewall/ucm.xml %{buildroot}/usr/lib/firewalld/services/
 install -m 644 packaging/rpm/ucm.service %{buildroot}%{_unitdir}/%{name}.service
 
 %pre
@@ -173,6 +177,7 @@ fi
 %dir %{_sysconfdir}/%{name}/
 %dir %{_localstatedir}/log/%{name}/
 %{_unitdir}/%{name}.service
+/usr/lib/firewalld/services/ucm.xml
 
 %changelog
 * Fri Feb 07 2026 UCM Team <dev@ucm.local> - 2.1.0-1

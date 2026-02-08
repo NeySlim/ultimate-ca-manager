@@ -318,6 +318,12 @@ jobs:
           sudo dnf install ./ucm-*.rpm
           ```
           
+          ### Silent/Automated Install
+          ```bash
+          # Skip firewall prompts for CI/automation
+          sudo UCM_PORT=8443 UCM_FIREWALL=no dpkg -i ucm_*.deb
+          ```
+          
           ## 🔐 Default Credentials
           - **Username:** `admin`
           - **Password:** Check `/etc/ucm/ucm.env` after install, or shown during install
@@ -325,7 +331,7 @@ jobs:
           ⚠️ **Change the password immediately after first login!**
           
           ## 📚 Documentation
-          - [Installation Guide](https://github.com/NeySlim/ultimate-ca-manager/wiki)
+          - [Installation Guide](docs/INSTALLATION.md)
           - [API Documentation](https://github.com/NeySlim/ultimate-ca-manager/wiki/API)
           
           ## ⬆️ Upgrading from v1.8.x
