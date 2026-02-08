@@ -68,7 +68,7 @@ export default function LoginPage() {
   // Get current language
   const currentLang = languages.find(l => l.code === (i18n.language?.split('-')[0] || 'en')) || languages[0]
 
-  // Load SSO providers, last username, check email config
+  // Load SSO providers, last username, check email config - ONCE on mount
   useEffect(() => {
     const lastUsername = localStorage.getItem(STORAGE_KEY)
     if (lastUsername) {
@@ -78,21 +78,51 @@ export default function LoginPage() {
     
     // Check if email is configured for "Forgot Password" link
     fetch('/api/v2/auth/email-configured')
-      .then(res => res.json())
-      .then(data => setEmailConfigured(data.configured || false))
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setEmailConfigured(data?.configured || false))
       .catch(() => setEmailConfigured(false))
     
     // Load SSO providers
     fetch('/api/v2/sso/available')
-      .then(res => res.json())
+      .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (data.data && Array.isArray(data.data)) {
+        if (data?.data && Array.isArray(data.data)) {
           setSsoProviders(data.data)
         }
       })
-      .catch(() => setSsoProviders([]))
+      .catch(() => {})  // Don't clear providers on error
+  }, [])  // Empty deps - only run once on mount
+  
+  // Check for SSO token or errors in URL - separate effect
+  useEffect(() => {
+    // Handle SSO callback with token
+    const token = searchParams.get('token')
+    if (token) {
+      // SSO login successful - establish session with token
+      setLoading(true)
+      setStatusMessage(t('auth.signingIn'))
+      
+      // Store token and verify it
+      fetch('/api/v2/auth/verify', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(res => res.ok ? res.json() : Promise.reject('Token verification failed'))
+        .then(async (data) => {
+          // Login with token
+          await login(data.data?.username || 'sso_user', null, { access_token: token, user: data.data })
+          showSuccess(t('auth.welcomeBackUser', { username: data.data?.username || 'User' }))
+          navigate('/dashboard')
+        })
+        .catch((err) => {
+          console.error('SSO token verification failed:', err)
+          showError(t('auth.ssoError'))
+          setLoading(false)
+          setStatusMessage('')
+        })
+      return
+    }
     
-    // Check for SSO errors in URL
+    // Handle SSO errors
     const error = searchParams.get('error')
     if (error) {
       const errorMessages = {
@@ -106,7 +136,8 @@ export default function LoginPage() {
       }
       showError(errorMessages[error] || t('auth.ssoError'))
     }
-  }, [searchParams, showError, t])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])  // Only check on mount
 
   // Focus password field when switching to password auth
   useEffect(() => {
