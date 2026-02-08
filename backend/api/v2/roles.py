@@ -10,7 +10,7 @@ from models import User, db
 bp = Blueprint('roles', __name__, url_prefix='/api/v2/roles')
 
 
-# Default roles (fallback when Pro not available)
+# Default roles (fallback when features module not loaded)
 DEFAULT_ROLES = {
     'admin': {
         'name': 'Administrator',
@@ -31,9 +31,9 @@ DEFAULT_ROLES = {
 
 
 def get_custom_roles():
-    """Get custom roles from database if Pro is available"""
+    """Get custom roles from database if features module is loaded"""
     try:
-        from models.pro.rbac import CustomRole
+        from models.features.rbac import CustomRole
         return CustomRole.query.order_by(CustomRole.is_system.desc(), CustomRole.name).all()
     except ImportError:
         return None
@@ -43,7 +43,7 @@ def get_custom_roles():
 @require_auth()
 def list_roles():
     """List all available roles"""
-    # Try to get custom roles from Pro
+    # Try to get custom roles from features
     custom_roles = get_custom_roles()
     
     if custom_roles is not None:
@@ -69,13 +69,13 @@ def list_roles():
 def get_role(role_id):
     """Get role details by ID"""
     try:
-        from models.pro.rbac import CustomRole
+        from models.features.rbac import CustomRole
         role = CustomRole.query.get(role_id)
         if not role:
             return jsonify({'error': True, 'message': 'Role not found'}), 404
         return jsonify({'data': role.to_dict()})
     except ImportError:
-        return jsonify({'error': True, 'message': 'Pro required'}), 404
+        return jsonify({'error': True, 'message': 'Feature not available'}), 404
 
 
 @bp.route('', methods=['POST'])
@@ -83,9 +83,9 @@ def get_role(role_id):
 def create_role():
     """Create a new custom role"""
     try:
-        from models.pro.rbac import CustomRole
+        from models.features.rbac import CustomRole
     except ImportError:
-        return jsonify({'error': True, 'message': 'Pro required'}), 403
+        return jsonify({'error': True, 'message': 'Feature not available'}), 403
     
     data = request.get_json()
     name = data.get('name', '').strip()
@@ -114,9 +114,9 @@ def create_role():
 def update_role(role_id):
     """Update an existing role"""
     try:
-        from models.pro.rbac import CustomRole
+        from models.features.rbac import CustomRole
     except ImportError:
-        return jsonify({'error': True, 'message': 'Pro required'}), 403
+        return jsonify({'error': True, 'message': 'Feature not available'}), 403
     
     role = CustomRole.query.get(role_id)
     if not role:
@@ -153,9 +153,9 @@ def update_role(role_id):
 def delete_role(role_id):
     """Delete a custom role"""
     try:
-        from models.pro.rbac import CustomRole
+        from models.features.rbac import CustomRole
     except ImportError:
-        return jsonify({'error': True, 'message': 'Pro required'}), 403
+        return jsonify({'error': True, 'message': 'Feature not available'}), 403
     
     role = CustomRole.query.get(role_id)
     if not role:
@@ -175,13 +175,13 @@ def delete_role(role_id):
 def get_role_permissions(role_id):
     """Get all permissions for a role (including inherited)"""
     try:
-        from models.pro.rbac import CustomRole
+        from models.features.rbac import CustomRole
         role = CustomRole.query.get(role_id)
         if not role:
             return jsonify({'error': True, 'message': 'Role not found'}), 404
         return jsonify({'data': role.get_all_permissions()})
     except ImportError:
-        return jsonify({'error': True, 'message': 'Pro required'}), 404
+        return jsonify({'error': True, 'message': 'Feature not available'}), 404
 
 
 @bp.route('/users/<int:user_id>', methods=['POST'])

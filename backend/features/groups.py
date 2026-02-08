@@ -1,12 +1,12 @@
 """
-Groups API - UCM Pro Extensions
+Groups API - UCM Extensions
 Additional group features for enterprise deployments
 Note: Base Groups API is now in community (api/v2/groups.py)
 """
 
 from flask import Blueprint
 
-bp = Blueprint('groups_pro_ext', __name__)
+bp = Blueprint('groups_ext', __name__)
 
-# Pro features for groups can be added here
+# Extended features for groups can be added here
 # Currently, all group functionality is in community

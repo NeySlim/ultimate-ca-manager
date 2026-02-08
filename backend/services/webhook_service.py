@@ -1,5 +1,5 @@
 """
-Webhook Service - UCM Pro
+Webhook Service - UCM
 Sends HTTP notifications for certificate lifecycle events.
 """
 from datetime import datetime

@@ -1,5 +1,5 @@
 """
-Webhook API - UCM Pro
+Webhook API - UCM
 Endpoints for managing webhook configurations.
 """
 from flask import Blueprint, request
@@ -10,7 +10,7 @@ from services.webhook_service import WebhookEndpoint, WebhookService
 import json
 import secrets
 
-bp = Blueprint('webhooks_pro', __name__)
+bp = Blueprint('webhooks', __name__)
 
 
 @bp.route('/api/v2/webhooks', methods=['GET'])

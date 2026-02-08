@@ -1130,11 +1130,11 @@ export default function SettingsPage() {
         )
 
       default:
-        // Check if it's a Pro category with a custom component
-        const proCategory = SETTINGS_CATEGORIES.find(c => c.id === selectedCategory && c.component)
-        if (proCategory?.component) {
-          const ProComponent = proCategory.component
-          return <ProComponent />
+        // Check if it's a category with a custom component (e.g., SSO)
+        const customCategory = SETTINGS_CATEGORIES.find(c => c.id === selectedCategory && c.component)
+        if (customCategory?.component) {
+          const CustomComponent = customCategory.component
+          return <CustomComponent />
         }
         return null
     }

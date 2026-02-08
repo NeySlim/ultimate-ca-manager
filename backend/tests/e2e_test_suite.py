@@ -396,10 +396,10 @@ class UCMTestSuite:
         data = r.json().get('data', [])
         return True, f"Found {len(data)} expiring certs"
     
-    # ==================== PRO FEATURES TESTS ====================
+    # ==================== EXTENDED FEATURES TESTS ====================
     
     def test_list_groups(self) -> Tuple[bool, str]:
-        """Test listing groups (Pro)"""
+        """Test listing groups (Extended)"""
         r = self.api('GET', '/api/v2/groups')
         if r.status_code != 200:
             return False, f"Status {r.status_code}"
@@ -408,7 +408,7 @@ class UCMTestSuite:
         return True, f"Found {len(data)} groups"
     
     def test_create_group(self) -> Tuple[bool, str]:
-        """Test creating a group (Pro)"""
+        """Test creating a group (Extended)"""
         r = self.api('POST', '/api/v2/groups', json={
             'name': f'Test-Group-{int(time.time())}',
             'description': 'E2E test group',
@@ -423,7 +423,7 @@ class UCMTestSuite:
         return True, f"Created group id={group_id}"
     
     def test_list_rbac_roles(self) -> Tuple[bool, str]:
-        """Test listing RBAC roles (Pro)"""
+        """Test listing RBAC roles (Extended)"""
         r = self.api('GET', '/api/v2/rbac/roles')
         if r.status_code != 200:
             return False, f"Status {r.status_code}"
@@ -432,7 +432,7 @@ class UCMTestSuite:
         return True, f"Found {len(data)} roles"
     
     def test_list_hsm(self) -> Tuple[bool, str]:
-        """Test listing HSM configurations (Pro)"""
+        """Test listing HSM configurations (Extended)"""
         r = self.api('GET', '/api/v2/hsm/providers')
         if r.status_code == 404:
             return True, "HSM endpoint not found (expected in community)"
@@ -443,7 +443,7 @@ class UCMTestSuite:
         return True, f"Found {len(data)} HSM providers"
     
     def test_list_sso(self) -> Tuple[bool, str]:
-        """Test listing SSO providers (Pro)"""
+        """Test listing SSO providers (Extended)"""
         r = self.api('GET', '/api/v2/sso/providers')
         if r.status_code != 200:
             return False, f"Status {r.status_code}"
@@ -648,8 +648,8 @@ class UCMTestSuite:
         self.run_test("Expiry alerts config", self.test_expiry_alerts)
         self.run_test("Expiring certificates", self.test_expiring_certs)
         
-        # Pro Features
-        print(f"\n{Colors.BOLD}⭐ Pro Features{Colors.END}")
+        # Extended Features
+        print(f"\n{Colors.BOLD}⭐ Extended Features{Colors.END}")
         self.run_test("List groups", self.test_list_groups)
         self.run_test("Create group", self.test_create_group)
         self.run_test("List RBAC roles", self.test_list_rbac_roles)

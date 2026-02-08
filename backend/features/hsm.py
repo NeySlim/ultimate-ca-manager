@@ -1,5 +1,5 @@
 """
-HSM API - UCM Pro
+HSM API - UCM
 Hardware Security Module management
 """
 
@@ -7,7 +7,7 @@ from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db
-from models.pro.hsm import HSMProvider, HSMKey
+from models.features.hsm import HSMProvider, HSMKey
 from datetime import datetime
 
 bp = Blueprint('hsm_pro', __name__)

@@ -53,7 +53,7 @@ def _get_encryption_key() -> bytes:
     derived = hashlib.pbkdf2_hmac(
         'sha256',
         machine_id.encode(),
-        b'ucm-pro-encryption-salt',
+        b'ucm-encryption-salt',
         100000,
         dklen=32
     )

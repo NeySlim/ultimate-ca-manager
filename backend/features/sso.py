@@ -1,5 +1,5 @@
 """
-SSO API - UCM Pro
+SSO API - UCM
 SAML, OAuth2, LDAP authentication providers
 """
 
@@ -7,7 +7,7 @@ from flask import Blueprint, request, current_app, redirect, url_for, session
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, User
-from models.pro.sso import SSOProvider, SSOSession
+from models.features.sso import SSOProvider, SSOSession
 from datetime import datetime, timedelta
 import json
 
