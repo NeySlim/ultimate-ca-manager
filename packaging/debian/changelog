@@ -1,3 +1,12 @@
+ucm (2.1.0~dev) unstable; urgency=low
+
+  * Development version
+  * Pro features merged into main
+  * Interactive firewall configuration
+  * i18n support (9 languages)
+
+ -- UCM Team <dev@ucm.local>  Sat, 08 Feb 2026 00:17:00 +0100
+
 ucm (2.0.0~beta1) stable; urgency=medium
 
   * First beta release of UCM 2.0
