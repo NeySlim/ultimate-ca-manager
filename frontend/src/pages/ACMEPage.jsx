@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { 
   Key, Plus, Trash, CheckCircle, XCircle, FloppyDisk, ShieldCheck, 
   Globe, Lightning, Database, Gear, ClockCounterClockwise, Certificate, Clock,
-  ArrowsClockwise
+  ArrowsClockwise, CloudArrowUp, PlugsConnected, Play, Warning
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout,
@@ -30,7 +30,7 @@ export default function ACMEPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
   
-  // Data states
+  // Data states - ACME Server
   const [accounts, setAccounts] = useState([])
   const [selectedAccount, setSelectedAccount] = useState(null)
   const [selectedCert, setSelectedCert] = useState(null)
@@ -40,12 +40,22 @@ export default function ACMEPage() {
   const [cas, setCas] = useState([])
   const [history, setHistory] = useState([])
   
+  // Data states - Let's Encrypt Client
+  const [clientOrders, setClientOrders] = useState([])
+  const [clientSettings, setClientSettings] = useState({})
+  const [dnsProviders, setDnsProviders] = useState([])
+  const [dnsProviderTypes, setDnsProviderTypes] = useState([])
+  const [selectedClientOrder, setSelectedClientOrder] = useState(null)
+  const [selectedDnsProvider, setSelectedDnsProvider] = useState(null)
+  
   // UI states
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState('config')
+  const [activeTab, setActiveTab] = useState('letsencrypt')
   const [activeDetailTab, setActiveDetailTab] = useState('account')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showRequestModal, setShowRequestModal] = useState(false)
+  const [showDnsProviderModal, setShowDnsProviderModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [proxyEmail, setProxyEmail] = useState('')
   
@@ -64,16 +74,24 @@ export default function ACMEPage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [accountsRes, settingsRes, casRes, historyRes] = await Promise.all([
+      const [accountsRes, settingsRes, casRes, historyRes, clientOrdersRes, clientSettingsRes, dnsProvidersRes, dnsTypesRes] = await Promise.all([
         acmeService.getAccounts(),
         acmeService.getSettings(),
         casService.getAll(),
-        acmeService.getHistory()
+        acmeService.getHistory(),
+        acmeService.getClientOrders().catch(() => ({ data: [] })),
+        acmeService.getClientSettings().catch(() => ({ data: {} })),
+        acmeService.getDnsProviders().catch(() => ({ data: [] })),
+        acmeService.getDnsProviderTypes().catch(() => ({ data: [] }))
       ])
       setAccounts(accountsRes.data || accountsRes.accounts || [])
       setAcmeSettings(settingsRes.data || settingsRes || {})
       setCas(casRes.data || casRes.cas || [])
       setHistory(historyRes.data || [])
+      setClientOrders(clientOrdersRes.data || [])
+      setClientSettings(clientSettingsRes.data || {})
+      setDnsProviders(dnsProvidersRes.data || [])
+      setDnsProviderTypes(dnsTypesRes.data || [])
     } catch (error) {
       showError(error.message || ERRORS.LOAD_FAILED.ACME)
     } finally {
@@ -139,6 +157,101 @@ export default function ACMEPage() {
       loadData()
     } catch (error) {
       showError(error.message || t('acme.proxyUnregistrationFailed'))
+    }
+  }
+
+  // =========================================================================
+  // Let's Encrypt Client Handlers
+  // =========================================================================
+  
+  const handleUpdateClientSetting = async (key, value) => {
+    try {
+      const updated = { ...clientSettings, [key]: value }
+      setClientSettings(updated)
+      await acmeService.updateClientSettings({ [key]: value })
+    } catch (error) {
+      showError(error.message || ERRORS.UPDATE_FAILED.SETTINGS)
+      loadData() // Revert on error
+    }
+  }
+  
+  const handleRequestCertificate = async (data) => {
+    try {
+      const result = await acmeService.requestCertificate(data)
+      showSuccess(t('acme.certificateRequestCreated'))
+      setShowRequestModal(false)
+      loadData()
+      if (result.data) {
+        setSelectedClientOrder(result.data)
+      }
+    } catch (error) {
+      showError(error.message || t('acme.certificateRequestFailed'))
+    }
+  }
+  
+  const handleVerifyChallenge = async (order) => {
+    try {
+      await acmeService.verifyChallenge(order.id)
+      showSuccess(t('acme.challengeVerificationStarted'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('acme.challengeVerificationFailed'))
+    }
+  }
+  
+  const handleFinalizeOrder = async (order) => {
+    try {
+      await acmeService.finalizeOrder(order.id)
+      showSuccess(t('acme.orderFinalized'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('acme.orderFinalizationFailed'))
+    }
+  }
+  
+  // =========================================================================
+  // DNS Provider Handlers
+  // =========================================================================
+  
+  const handleSaveDnsProvider = async (data) => {
+    try {
+      if (selectedDnsProvider) {
+        await acmeService.updateDnsProvider(selectedDnsProvider.id, data)
+        showSuccess(t('acme.dnsProviderUpdated'))
+      } else {
+        await acmeService.createDnsProvider(data)
+        showSuccess(t('acme.dnsProviderCreated'))
+      }
+      setShowDnsProviderModal(false)
+      setSelectedDnsProvider(null)
+      loadData()
+    } catch (error) {
+      showError(error.message || ERRORS.SAVE_FAILED.GENERIC)
+    }
+  }
+  
+  const handleTestDnsProvider = async (provider) => {
+    try {
+      const result = await acmeService.testDnsProvider(provider.id)
+      if (result.success) {
+        showSuccess(t('acme.dnsProviderTestSuccess'))
+      } else {
+        showWarning(result.message || t('acme.dnsProviderTestFailed'))
+      }
+    } catch (error) {
+      showError(error.message || t('acme.dnsProviderTestFailed'))
+    }
+  }
+  
+  const handleDeleteDnsProvider = async (provider) => {
+    const confirmed = await showConfirm(t('acme.confirmDeleteDnsProvider', { name: provider.name }))
+    if (!confirmed) return
+    try {
+      await acmeService.deleteDnsProvider(provider.id)
+      showSuccess(t('acme.dnsProviderDeleted'))
+      loadData()
+    } catch (error) {
+      showError(error.message || ERRORS.DELETE_FAILED.GENERIC)
     }
   }
 
@@ -267,7 +380,9 @@ export default function ACMEPage() {
 
   // Main tabs
   const tabs = [
-    { id: 'config', label: t('acme.config'), icon: Gear },
+    { id: 'letsencrypt', label: t('acme.letsEncrypt'), icon: Globe },
+    { id: 'dns', label: t('acme.dnsProviders'), icon: PlugsConnected, count: dnsProviders.length },
+    { id: 'config', label: t('acme.server'), icon: Gear },
     { id: 'accounts', label: t('acme.accounts'), icon: Key, count: accounts.length },
     { id: 'history', label: t('acme.history'), icon: ClockCounterClockwise, count: history.length }
   ]
@@ -545,6 +660,240 @@ export default function ACMEPage() {
             </div>
           )}
         </CompactSection>
+      )}
+    </div>
+  )
+
+  // =========================================================================
+  // Let's Encrypt Tab Content
+  // =========================================================================
+  
+  const letsEncryptContent = (
+    <div className="p-4 space-y-4">
+      <HelpCard variant="info" title={t('acme.letsEncryptAbout')} compact>
+        {t('acme.letsEncryptAboutDesc')}
+      </HelpCard>
+      
+      {/* Request Certificate Button */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={() => setShowRequestModal(true)}>
+          <Plus size={14} />
+          {t('acme.requestCertificate')}
+        </Button>
+        <Button variant="secondary" onClick={loadData}>
+          <ArrowsClockwise size={14} />
+          {t('acme.refresh')}
+        </Button>
+      </div>
+      
+      {/* Orders List */}
+      <CompactSection title={t('acme.certificates')} icon={Certificate}>
+        {clientOrders.length === 0 ? (
+          <div className="text-center py-8 text-text-secondary">
+            <Certificate size={40} className="mx-auto mb-2 opacity-40" />
+            <p>{t('acme.noClientOrders')}</p>
+            <p className="text-sm text-text-tertiary mt-1">{t('acme.noClientOrdersDesc')}</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {clientOrders.map(order => (
+              <div 
+                key={order.id} 
+                className={cn(
+                  "p-3 rounded-lg border border-border cursor-pointer transition-all",
+                  "hover:bg-bg-tertiary/50",
+                  selectedClientOrder?.id === order.id && "ring-2 ring-accent-primary bg-bg-tertiary/50"
+                )}
+                onClick={() => setSelectedClientOrder(order)}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={cn(
+                      "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                      order.status === 'valid' && "icon-bg-green",
+                      order.status === 'pending' && "icon-bg-yellow",
+                      order.status === 'processing' && "icon-bg-blue",
+                      order.status === 'invalid' && "icon-bg-red"
+                    )}>
+                      {order.status === 'valid' ? <CheckCircle size={14} weight="fill" /> : 
+                       order.status === 'invalid' ? <XCircle size={14} weight="fill" /> :
+                       <Clock size={14} />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-text-primary truncate">
+                        {JSON.parse(order.domains || '[]').join(', ')}
+                      </p>
+                      <p className="text-xs text-text-tertiary">
+                        {order.environment} • {order.challenge_type} • {formatDate(order.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge 
+                    variant={order.status === 'valid' ? 'success' : 
+                             order.status === 'invalid' ? 'danger' : 
+                             order.status === 'pending' ? 'warning' : 'default'}
+                    size="sm"
+                  >
+                    {order.status}
+                  </Badge>
+                </div>
+                
+                {/* Show challenge info for pending orders */}
+                {order.status === 'pending' && order.challenges_data && (
+                  <div className="mt-3 p-2 bg-bg-tertiary/50 rounded border border-border text-xs">
+                    <p className="font-medium text-text-secondary mb-1">{t('acme.pendingChallenge')}</p>
+                    {(() => {
+                      try {
+                        const challenges = JSON.parse(order.challenges_data || '{}')
+                        return Object.entries(challenges).map(([domain, data]) => (
+                          <div key={domain} className="mb-2 last:mb-0">
+                            <p className="text-text-primary">{domain}</p>
+                            {order.challenge_type === 'dns-01' && (
+                              <div className="mt-1 space-y-1">
+                                <p className="text-text-tertiary">{t('acme.dnsRecordName')}: <code className="bg-bg-primary px-1 rounded">{data.record_name}</code></p>
+                                <p className="text-text-tertiary">{t('acme.dnsRecordValue')}: <code className="bg-bg-primary px-1 rounded break-all">{data.record_value}</code></p>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      } catch { return null }
+                    })()}
+                    <div className="flex gap-2 mt-2">
+                      <Button size="sm" onClick={(e) => { e.stopPropagation(); handleVerifyChallenge(order) }}>
+                        <Play size={12} />
+                        {t('acme.verifyChallenge')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Finalize button for ready orders */}
+                {order.status === 'processing' && (
+                  <div className="flex gap-2 mt-2">
+                    <Button size="sm" onClick={(e) => { e.stopPropagation(); handleFinalizeOrder(order) }}>
+                      <CheckCircle size={12} />
+                      {t('acme.finalize')}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CompactSection>
+      
+      {/* Client Settings */}
+      <CompactSection title={t('acme.clientSettings')} icon={Gear}>
+        <div className="space-y-3">
+          <Select
+            label={t('acme.defaultEnvironment')}
+            value={clientSettings.default_environment || 'staging'}
+            onChange={(val) => handleUpdateClientSetting('default_environment', val)}
+            options={[
+              { value: 'staging', label: t('acme.staging') + ' (Test)' },
+              { value: 'production', label: t('acme.production') + ' (Live)' }
+            ]}
+            helperText={t('acme.environmentHelper')}
+          />
+          
+          <Input
+            label={t('acme.contactEmail')}
+            type="email"
+            value={clientSettings.contact_email || ''}
+            onChange={(e) => handleUpdateClientSetting('contact_email', e.target.value)}
+            helperText={t('acme.contactEmailHelper')}
+          />
+          
+          <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+            <input
+              type="checkbox"
+              checked={clientSettings.auto_renewal ?? true}
+              onChange={(e) => handleUpdateClientSetting('auto_renewal', e.target.checked)}
+              className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
+            />
+            <div>
+              <p className="text-sm text-text-primary font-medium">{t('acme.autoRenewal')}</p>
+              <p className="text-xs text-text-secondary">{t('acme.autoRenewalDesc')}</p>
+            </div>
+          </label>
+        </div>
+      </CompactSection>
+    </div>
+  )
+  
+  // =========================================================================
+  // DNS Providers Tab Content
+  // =========================================================================
+  
+  const dnsProvidersContent = (
+    <div className="p-4 space-y-4">
+      <HelpCard variant="info" title={t('acme.dnsProvidersAbout')} compact>
+        {t('acme.dnsProvidersAboutDesc')}
+      </HelpCard>
+      
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={() => { setSelectedDnsProvider(null); setShowDnsProviderModal(true) }}>
+          <Plus size={14} />
+          {t('acme.addDnsProvider')}
+        </Button>
+      </div>
+      
+      {dnsProviders.length === 0 ? (
+        <div className="text-center py-8 text-text-secondary">
+          <PlugsConnected size={40} className="mx-auto mb-2 opacity-40" />
+          <p>{t('acme.noDnsProviders')}</p>
+          <p className="text-sm text-text-tertiary mt-1">{t('acme.noDnsProvidersDesc')}</p>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {dnsProviders.map(provider => (
+            <Card key={provider.id} className="p-4">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                    provider.is_default ? "icon-bg-green" : "icon-bg-blue"
+                  )}>
+                    <PlugsConnected size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{provider.name}</p>
+                    <p className="text-xs text-text-tertiary">{provider.provider_type}</p>
+                  </div>
+                </div>
+                {provider.is_default && (
+                  <Badge variant="success" size="sm">{t('acme.default')}</Badge>
+                )}
+              </div>
+              
+              <div className="flex gap-2 mt-3">
+                <Button 
+                  size="sm" 
+                  variant="secondary"
+                  onClick={() => handleTestDnsProvider(provider)}
+                >
+                  <Play size={12} />
+                  {t('acme.test')}
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="secondary"
+                  onClick={() => { setSelectedDnsProvider(provider); setShowDnsProviderModal(true) }}
+                >
+                  <Gear size={12} />
+                  {t('acme.edit')}
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="danger"
+                  onClick={() => handleDeleteDnsProvider(provider)}
+                >
+                  <Trash size={12} />
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -1018,6 +1367,8 @@ export default function ACMEPage() {
           }
         }}
       >
+        {activeTab === 'letsencrypt' && letsEncryptContent}
+        {activeTab === 'dns' && dnsProvidersContent}
         {activeTab === 'config' && configContent}
         {activeTab === 'accounts' && accountsContent}
         {activeTab === 'history' && historyContent}
@@ -1032,6 +1383,36 @@ export default function ACMEPage() {
         <CreateAccountForm
           onSubmit={handleCreate}
           onCancel={() => setShowCreateModal(false)}
+        />
+      </Modal>
+      
+      {/* Request Certificate Modal */}
+      <Modal
+        open={showRequestModal}
+        onClose={() => setShowRequestModal(false)}
+        title={t('acme.requestCertificateTitle')}
+        size="lg"
+      >
+        <RequestCertificateForm
+          onSubmit={handleRequestCertificate}
+          onCancel={() => setShowRequestModal(false)}
+          dnsProviders={dnsProviders}
+          defaultEnvironment={clientSettings.default_environment || 'staging'}
+          defaultEmail={clientSettings.contact_email || ''}
+        />
+      </Modal>
+      
+      {/* DNS Provider Modal */}
+      <Modal
+        open={showDnsProviderModal}
+        onClose={() => { setShowDnsProviderModal(false); setSelectedDnsProvider(null) }}
+        title={selectedDnsProvider ? t('acme.editDnsProvider') : t('acme.addDnsProvider')}
+      >
+        <DnsProviderForm
+          provider={selectedDnsProvider}
+          providerTypes={dnsProviderTypes}
+          onSubmit={handleSaveDnsProvider}
+          onCancel={() => { setShowDnsProviderModal(false); setSelectedDnsProvider(null) }}
         />
       </Modal>
     </>
@@ -1099,6 +1480,255 @@ function CreateAccountForm({ onSubmit, onCancel }) {
         <Button type="submit">
           <Plus size={14} />
           {t('acme.createAccount')}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+// Request Certificate Form Component (Let's Encrypt)
+function RequestCertificateForm({ onSubmit, onCancel, dnsProviders, defaultEnvironment, defaultEmail }) {
+  const { t } = useTranslation()
+  const { showWarning } = useNotification()
+  const [formData, setFormData] = useState({
+    domains: '',
+    email: defaultEmail,
+    challenge_type: 'dns-01',
+    environment: defaultEnvironment,
+    dns_provider_id: dnsProviders.find(p => p.is_default)?.id || null
+  })
+  
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    
+    // Parse domains
+    const domainList = formData.domains
+      .split(/[,\n]/)
+      .map(d => d.trim())
+      .filter(d => d)
+    
+    if (domainList.length === 0) {
+      showWarning(t('acme.atLeastOneDomainRequired'))
+      return
+    }
+    
+    // Validate domain format
+    const domainRegex = /^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i
+    const invalidDomains = domainList.filter(d => !domainRegex.test(d))
+    if (invalidDomains.length > 0) {
+      showWarning(t('acme.invalidDomainFormat', { domains: invalidDomains.join(', ') }))
+      return
+    }
+    
+    // Check for wildcards with HTTP-01
+    if (formData.challenge_type === 'http-01' && domainList.some(d => d.startsWith('*.'))) {
+      showWarning(t('acme.wildcardRequiresDns01'))
+      return
+    }
+    
+    if (!formData.email) {
+      showWarning(t('acme.emailRequired'))
+      return
+    }
+    
+    onSubmit({
+      ...formData,
+      domains: domainList
+    })
+  }
+  
+  return (
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      {formData.environment === 'production' && (
+        <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-2">
+          <Warning size={18} className="text-yellow-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">{t('acme.productionWarningTitle')}</p>
+            <p className="text-xs text-text-secondary mt-1">{t('acme.productionWarningDesc')}</p>
+          </div>
+        </div>
+      )}
+      
+      <div>
+        <label className="block text-sm font-medium text-text-primary mb-1">
+          {t('acme.domains')} <span className="text-red-500">*</span>
+        </label>
+        <textarea
+          className="w-full h-24 px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary text-sm resize-none focus:ring-2 focus:ring-accent-primary/50 focus:border-accent-primary"
+          value={formData.domains}
+          onChange={(e) => setFormData(prev => ({ ...prev, domains: e.target.value }))}
+          placeholder="example.com&#10;*.example.com&#10;sub.example.com"
+          required
+        />
+        <p className="text-xs text-text-tertiary mt-1">{t('acme.domainsHelper')}</p>
+      </div>
+      
+      <Input
+        label={t('acme.contactEmail')}
+        type="email"
+        value={formData.email}
+        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+        required
+        helperText={t('acme.contactEmailHelper')}
+      />
+      
+      <Select
+        label={t('acme.challengeType')}
+        value={formData.challenge_type}
+        onChange={(val) => setFormData(prev => ({ ...prev, challenge_type: val }))}
+        options={[
+          { value: 'dns-01', label: 'DNS-01 - ' + t('acme.dns01Desc') },
+          { value: 'http-01', label: 'HTTP-01 - ' + t('acme.http01Desc') }
+        ]}
+        helperText={t('acme.challengeTypeHelper')}
+      />
+      
+      {formData.challenge_type === 'dns-01' && (
+        <Select
+          label={t('acme.dnsProvider')}
+          value={formData.dns_provider_id?.toString() || ''}
+          onChange={(val) => setFormData(prev => ({ ...prev, dns_provider_id: val ? parseInt(val) : null }))}
+          placeholder={t('acme.selectDnsProvider')}
+          options={[
+            { value: '', label: t('acme.manualDns') },
+            ...dnsProviders.map(p => ({ 
+              value: p.id.toString(), 
+              label: p.name + (p.is_default ? ' (' + t('acme.default') + ')' : '')
+            }))
+          ]}
+          helperText={t('acme.dnsProviderHelper')}
+        />
+      )}
+      
+      <Select
+        label={t('acme.environment')}
+        value={formData.environment}
+        onChange={(val) => setFormData(prev => ({ ...prev, environment: val }))}
+        options={[
+          { value: 'staging', label: t('acme.staging') + ' - ' + t('acme.stagingDesc') },
+          { value: 'production', label: t('acme.production') + ' - ' + t('acme.productionDesc') }
+        ]}
+      />
+      
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          {t('acme.cancel')}
+        </Button>
+        <Button type="submit">
+          <CloudArrowUp size={14} />
+          {t('acme.requestCertificate')}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+// DNS Provider Form Component
+function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
+  const { t } = useTranslation()
+  const { showWarning } = useNotification()
+  const [formData, setFormData] = useState({
+    name: provider?.name || '',
+    provider_type: provider?.provider_type || 'manual',
+    credentials: provider?.credentials ? JSON.parse(provider.credentials) : {},
+    is_default: provider?.is_default || false
+  })
+  
+  const selectedType = providerTypes.find(pt => pt.type === formData.provider_type)
+  
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    
+    if (!formData.name.trim()) {
+      showWarning(t('acme.providerNameRequired'))
+      return
+    }
+    
+    // Validate required credentials
+    if (selectedType?.required_credentials) {
+      const missing = selectedType.required_credentials.filter(
+        cred => !formData.credentials[cred]
+      )
+      if (missing.length > 0) {
+        showWarning(t('acme.missingCredentials', { fields: missing.join(', ') }))
+        return
+      }
+    }
+    
+    onSubmit({
+      ...formData,
+      credentials: JSON.stringify(formData.credentials)
+    })
+  }
+  
+  const updateCredential = (key, value) => {
+    setFormData(prev => ({
+      ...prev,
+      credentials: { ...prev.credentials, [key]: value }
+    }))
+  }
+  
+  return (
+    <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <Input
+        label={t('acme.providerName')}
+        value={formData.name}
+        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+        required
+        placeholder={t('acme.providerNamePlaceholder')}
+      />
+      
+      <Select
+        label={t('acme.providerType')}
+        value={formData.provider_type}
+        onChange={(val) => setFormData(prev => ({ ...prev, provider_type: val, credentials: {} }))}
+        options={providerTypes.map(pt => ({
+          value: pt.type,
+          label: pt.name
+        }))}
+        disabled={!!provider}
+      />
+      
+      {/* Dynamic credential fields based on provider type */}
+      {selectedType?.required_credentials?.length > 0 && (
+        <div className="space-y-3 p-3 bg-bg-tertiary/50 rounded-lg">
+          <p className="text-sm font-medium text-text-secondary">{t('acme.credentials')}</p>
+          {selectedType.required_credentials.map(cred => (
+            <Input
+              key={cred}
+              label={cred.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              type={cred.includes('secret') || cred.includes('key') || cred.includes('password') ? 'password' : 'text'}
+              value={formData.credentials[cred] || ''}
+              onChange={(e) => updateCredential(cred, e.target.value)}
+              required
+            />
+          ))}
+        </div>
+      )}
+      
+      {formData.provider_type === 'manual' && (
+        <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <p className="text-sm text-text-secondary">{t('acme.manualDnsInfo')}</p>
+        </div>
+      )}
+      
+      <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary/50 transition-colors">
+        <input
+          type="checkbox"
+          checked={formData.is_default}
+          onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
+          className="w-4 h-4 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary/50"
+        />
+        <span className="text-sm text-text-primary">{t('acme.setAsDefault')}</span>
+      </label>
+      
+      <div className="flex justify-end gap-2 pt-4 border-t border-border">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          {t('acme.cancel')}
+        </Button>
+        <Button type="submit">
+          <FloppyDisk size={14} />
+          {provider ? t('acme.update') : t('acme.create')}
         </Button>
       </div>
     </form>

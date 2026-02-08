@@ -31,6 +31,8 @@ from api.v2.groups import bp as groups_bp
 from api.v2.search import bp as search_bp
 from api.v2.smart_import import bp as smart_import_bp
 from api.v2.tools import tools_bp
+from api.v2.dns_providers import bp as dns_providers_bp
+from api.v2.acme_client import bp as acme_client_bp
 
 # List of all core blueprints to register
 # Pro features are loaded separately via pro/__init__.py in app.py
@@ -60,6 +62,8 @@ API_V2_BLUEPRINTS = [
     search_bp,
     smart_import_bp,
     tools_bp,
+    dns_providers_bp,
+    acme_client_bp,
 ]
 
 
