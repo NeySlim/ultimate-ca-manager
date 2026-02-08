@@ -1,6 +1,6 @@
 /**
- * SSO Settings Section - Pro Feature
- * Embedded in Settings page when Pro module is present
+ * SSO Settings Section
+ * Configure LDAP, OAuth2, or SAML authentication providers
  */
 import { useState, useEffect } from 'react'
 import { 
@@ -139,7 +139,6 @@ export default function SSOSettingsSection() {
         icon={Key}
         title="Single Sign-On"
         subtitle="Configure LDAP, OAuth2, or SAML providers for centralized authentication"
-        badge={<Badge variant="info">Pro</Badge>}
         actions={[
           { label: 'Add Provider', icon: Plus, onClick: handleCreate }
         ]}

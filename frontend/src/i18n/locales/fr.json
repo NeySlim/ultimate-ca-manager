@@ -1491,6 +1491,7 @@
       "audit": "Audit",
       "database": "Base de données",
       "https": "HTTPS",
+      "sso": "SSO",
       "updates": "Mises à jour"
     },
     "systemNameHelper": "Nom d'affichage du système UCM",
