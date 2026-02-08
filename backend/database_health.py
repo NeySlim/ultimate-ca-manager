@@ -26,7 +26,7 @@ def check_and_repair_database(app):
                 logger.warning(f"Missing tables detected: {missing_tables}")
                 logger.info("Creating missing tables...")
                 try:
-                    db.create_all(checkfirst=True)
+                    db.create_all()
                     logger.info("Missing tables created")
                 except Exception as e:
                     logger.warning(f"Error creating tables (may already exist): {e}")

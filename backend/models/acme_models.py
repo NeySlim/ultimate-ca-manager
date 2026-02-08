@@ -233,3 +233,177 @@ class AcmeNonce(db.Model):
     
     def __repr__(self):
         return f'<AcmeNonce {self.token[:16]}...>'
+
+
+# =============================================================================
+# ACME Client Models (UCM as ACME client towards Let's Encrypt)
+# =============================================================================
+
+class DnsProvider(db.Model):
+    """DNS Provider for automated DNS-01 challenge validation"""
+    __tablename__ = 'dns_providers'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    provider_type = db.Column(db.String(50), nullable=False)  # ovh, cloudflare, hetzner, manual, etc.
+    credentials = db.Column(db.Text)  # Encrypted JSON with API keys
+    zones = db.Column(db.Text)  # JSON array of managed zones/domains
+    is_default = db.Column(db.Boolean, default=False)
+    enabled = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    client_orders = db.relationship('AcmeClientOrder', back_populates='dns_provider', lazy='dynamic')
+    
+    @property
+    def zones_list(self):
+        """Parse zones JSON to list"""
+        if not self.zones:
+            return []
+        try:
+            return json.loads(self.zones)
+        except:
+            return []
+    
+    def set_zones_list(self, zones):
+        """Set zones from array"""
+        self.zones = json.dumps(zones)
+    
+    def to_dict(self, include_credentials=False):
+        """Convert to dictionary for API responses"""
+        result = {
+            'id': self.id,
+            'name': self.name,
+            'provider_type': self.provider_type,
+            'zones': self.zones_list,
+            'is_default': self.is_default,
+            'enabled': self.enabled,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+        if include_credentials and self.credentials:
+            # Only return credential keys, not values (for UI display)
+            try:
+                creds = json.loads(self.credentials)
+                result['credential_keys'] = list(creds.keys())
+            except:
+                result['credential_keys'] = []
+        return result
+    
+    def __repr__(self):
+        return f'<DnsProvider {self.name} ({self.provider_type})>'
+
+
+class AcmeClientOrder(db.Model):
+    """ACME Client Order - Orders initiated BY UCM to external ACME (Let's Encrypt)"""
+    __tablename__ = 'acme_client_orders'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Domain(s) to request certificate for
+    domains = db.Column(db.Text, nullable=False)  # JSON array of domains
+    
+    # Challenge configuration
+    challenge_type = db.Column(db.String(20), nullable=False, default='dns-01')  # http-01, dns-01
+    environment = db.Column(db.String(20), nullable=False, default='staging')  # staging, production
+    
+    # Order status
+    status = db.Column(db.String(20), default='pending', nullable=False)
+    # Status: pending → processing → validating → valid → issued / invalid / expired
+    
+    # Let's Encrypt references
+    order_url = db.Column(db.String(500))  # LE order URL
+    account_url = db.Column(db.String(500))  # LE account URL
+    finalize_url = db.Column(db.String(500))  # LE finalize URL
+    certificate_url = db.Column(db.String(500))  # LE certificate download URL
+    
+    # Challenge data (for display and verification)
+    challenges_data = db.Column(db.Text)  # JSON with challenge tokens, values, etc.
+    
+    # DNS Provider for DNS-01 challenges
+    dns_provider_id = db.Column(db.Integer, db.ForeignKey('dns_providers.id'))
+    
+    # Resulting certificate (after issuance)
+    certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'))
+    
+    # Auto-renewal settings
+    renewal_enabled = db.Column(db.Boolean, default=True)
+    last_renewal_at = db.Column(db.DateTime)
+    renewal_failures = db.Column(db.Integer, default=0)
+    
+    # Error tracking
+    error_message = db.Column(db.Text)
+    last_error_at = db.Column(db.DateTime)
+    
+    # Timestamps
+    expires_at = db.Column(db.DateTime)  # Order expiration
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    dns_provider = db.relationship('DnsProvider', back_populates='client_orders')
+    certificate = db.relationship('Certificate', foreign_keys=[certificate_id])
+    
+    @property
+    def domains_list(self):
+        """Parse domains JSON to list"""
+        if not self.domains:
+            return []
+        try:
+            return json.loads(self.domains)
+        except:
+            return []
+    
+    def set_domains_list(self, domains):
+        """Set domains from array"""
+        self.domains = json.dumps(domains)
+    
+    @property
+    def challenges_dict(self):
+        """Parse challenges JSON to dict"""
+        if not self.challenges_data:
+            return {}
+        try:
+            return json.loads(self.challenges_data)
+        except:
+            return {}
+    
+    def set_challenges_dict(self, challenges):
+        """Set challenges from dict"""
+        self.challenges_data = json.dumps(challenges)
+    
+    @property
+    def primary_domain(self):
+        """Get the primary (first) domain"""
+        domains = self.domains_list
+        return domains[0] if domains else None
+    
+    @property
+    def is_wildcard(self):
+        """Check if order includes wildcard domains"""
+        return any(d.startswith('*.') for d in self.domains_list)
+    
+    def to_dict(self):
+        """Convert to dictionary for API responses"""
+        return {
+            'id': self.id,
+            'domains': self.domains_list,
+            'primary_domain': self.primary_domain,
+            'challenge_type': self.challenge_type,
+            'environment': self.environment,
+            'status': self.status,
+            'order_url': self.order_url,
+            'challenges': self.challenges_dict,
+            'dns_provider_id': self.dns_provider_id,
+            'dns_provider_name': self.dns_provider.name if self.dns_provider else None,
+            'certificate_id': self.certificate_id,
+            'renewal_enabled': self.renewal_enabled,
+            'error_message': self.error_message,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+    
+    def __repr__(self):
+        return f'<AcmeClientOrder {self.primary_domain} status={self.status}>'
