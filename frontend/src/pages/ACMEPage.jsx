@@ -1644,11 +1644,11 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
       return
     }
     
-    // Validate required credentials
-    if (selectedType?.required_credentials) {
-      const missing = selectedType.required_credentials.filter(
-        cred => !formData.credentials[cred]
-      )
+    // Validate required credentials using schema
+    if (selectedType?.credentials_schema) {
+      const missing = selectedType.credentials_schema
+        .filter(field => field.required && !formData.credentials[field.name])
+        .map(field => field.label)
       if (missing.length > 0) {
         showWarning(t('acme.missingCredentials', { fields: missing.join(', ') }))
         return
@@ -1689,19 +1689,34 @@ function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
         disabled={!!provider}
       />
       
-      {/* Dynamic credential fields based on provider type */}
-      {selectedType?.required_credentials?.length > 0 && (
+      {/* Dynamic credential fields based on provider type schema */}
+      {selectedType?.credentials_schema?.length > 0 && (
         <div className="space-y-3 p-3 bg-bg-tertiary/50 rounded-lg">
           <p className="text-sm font-medium text-text-secondary">{t('acme.credentials')}</p>
-          {selectedType.required_credentials.map(cred => (
-            <Input
-              key={cred}
-              label={cred.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              type={cred.includes('secret') || cred.includes('key') || cred.includes('password') ? 'password' : 'text'}
-              value={formData.credentials[cred] || ''}
-              onChange={(e) => updateCredential(cred, e.target.value)}
-              required
-            />
+          {selectedType.credentials_schema.map(field => (
+            <div key={field.name}>
+              {field.type === 'select' ? (
+                <Select
+                  label={field.label}
+                  value={formData.credentials[field.name] || field.default || ''}
+                  onChange={(val) => updateCredential(field.name, val)}
+                  options={field.options || []}
+                  required={field.required}
+                />
+              ) : (
+                <Input
+                  label={field.label}
+                  type={field.type === 'password' ? 'password' : 'text'}
+                  value={formData.credentials[field.name] || ''}
+                  onChange={(e) => updateCredential(field.name, e.target.value)}
+                  required={field.required}
+                  placeholder={field.placeholder}
+                />
+              )}
+              {field.help && (
+                <p className="text-xs text-text-tertiary mt-1 ml-1">{field.help}</p>
+              )}
+            </div>
           ))}
         </div>
       )}

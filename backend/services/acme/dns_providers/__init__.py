@@ -13,6 +13,12 @@ import logging
 
 from .base import BaseDnsProvider
 from .manual import ManualDnsProvider
+from .ovh import OvhDnsProvider
+from .cloudflare import CloudflareDnsProvider
+from .hetzner import HetznerDnsProvider
+from .gandi import GandiDnsProvider
+from .digitalocean import DigitalOceanDnsProvider
+from .infomaniak import InfomaniakDnsProvider
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +30,15 @@ logger = logging.getLogger(__name__)
 PROVIDER_REGISTRY: Dict[str, Type[BaseDnsProvider]] = {
     'manual': ManualDnsProvider,
     # European providers (priority)
-    # 'ovh': OvhDnsProvider,
-    # 'hetzner': HetznerDnsProvider,
-    # 'gandi': GandiDnsProvider,
+    'ovh': OvhDnsProvider,
+    'hetzner': HetznerDnsProvider,
+    'gandi': GandiDnsProvider,
+    'infomaniak': InfomaniakDnsProvider,
     # International providers
-    # 'cloudflare': CloudflareDnsProvider,
+    'cloudflare': CloudflareDnsProvider,
+    'digitalocean': DigitalOceanDnsProvider,
+    # Future providers (uncomment when implemented)
     # 'route53': Route53DnsProvider,
-    # 'digitalocean': DigitalOceanDnsProvider,
-    # 'infomaniak': InfomaniakDnsProvider,
     # 'bookmyname': BookMyNameDnsProvider,
     # 'scaleway': ScalewayDnsProvider,
     # 'ionos': IonosDnsProvider,
