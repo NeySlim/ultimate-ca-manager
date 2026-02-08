@@ -162,14 +162,14 @@ sudo systemctl enable --now ucm
 
 ```bash
 # From Docker Hub
-docker run -d \
+docker run -d --restart=unless-stopped \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
   neyslim/ultimate-ca-manager:2.0.0
 
 # Or from GitHub Container Registry
-docker run -d \
+docker run -d --restart=unless-stopped \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
