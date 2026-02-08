@@ -1,12 +1,12 @@
 """
-Certificate Policy API - UCM Pro
+Certificate Policy API - UCM
 Manages certificate policies and approval workflows.
 """
 from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db
-from models.pro.policy import CertificatePolicy, ApprovalRequest
+from models.features.policy import CertificatePolicy, ApprovalRequest
 from datetime import datetime, timedelta
 import json
 

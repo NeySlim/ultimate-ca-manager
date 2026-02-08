@@ -1,5 +1,5 @@
 """
-Report Service - UCM Pro
+Report Service - UCM
 Generates and schedules compliance reports (certificates, CAs, audit, expiry).
 """
 from datetime import datetime, timedelta

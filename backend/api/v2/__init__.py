@@ -35,7 +35,7 @@ from api.v2.dns_providers import bp as dns_providers_bp
 from api.v2.acme_client import bp as acme_client_bp
 
 # List of all core blueprints to register
-# Pro features are loaded separately via pro/__init__.py in app.py
+# Feature modules are loaded separately via features/__init__.py in app.py
 API_V2_BLUEPRINTS = [
     auth_bp,
     auth_methods_bp,
@@ -75,7 +75,7 @@ def register_api_v2(app):
         from api.v2 import register_api_v2
         register_api_v2(app)
     
-    Note: Pro features are loaded separately via pro/__init__.py
+    Note: Feature modules are loaded separately via features/__init__.py
     """
     for blueprint in API_V2_BLUEPRINTS:
         app.register_blueprint(blueprint)

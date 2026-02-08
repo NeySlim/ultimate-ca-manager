@@ -1,5 +1,5 @@
 """
-Advanced RBAC API - UCM Pro
+Advanced RBAC API - UCM
 Custom roles and fine-grained permissions
 """
 
@@ -7,7 +7,7 @@ from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db
-from models.pro.rbac import CustomRole, RolePermission
+from models.features.rbac import CustomRole, RolePermission
 
 bp = Blueprint('rbac_pro', __name__)
 
@@ -21,27 +21,27 @@ AVAILABLE_PERMISSIONS = [
     'read:csrs', 'write:csrs', 'delete:csrs', 'sign:csrs',
     # Users
     'read:users', 'write:users', 'delete:users', 'admin:users',
-    # Groups (Pro)
+    # Groups 
     'read:groups', 'write:groups', 'delete:groups', 'admin:groups',
     # Settings
     'read:settings', 'write:settings', 'admin:system',
     # Audit
     'read:audit', 'export:audit',
-    # ACME (Pro)
+    # ACME 
     'read:acme', 'write:acme', 'delete:acme',
-    # SCEP (Pro)
+    # SCEP 
     'read:scep', 'write:scep', 'delete:scep',
-    # Trust Store (Pro)
+    # Trust Store 
     'read:truststore', 'write:truststore', 'delete:truststore',
-    # HSM (Pro)
+    # HSM 
     'read:hsm', 'write:hsm', 'delete:hsm',
-    # SSO (Pro)
+    # SSO 
     'read:sso', 'write:sso', 'delete:sso',
     # Templates
     'read:templates', 'write:templates', 'delete:templates',
-    # Policies (Pro)
+    # Policies 
     'read:policies', 'write:policies', 'delete:policies',
-    # Approvals (Pro)
+    # Approvals 
     'read:approvals', 'write:approvals',
 ]
 

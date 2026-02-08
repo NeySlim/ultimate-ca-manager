@@ -1,6 +1,6 @@
 """
-Pro Dependencies Checker
-Automatically checks and installs missing Pro dependencies
+Feature Dependencies Checker
+Automatically checks and installs missing Feature dependencies
 """
 
 import subprocess
@@ -9,8 +9,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Pro feature dependencies mapping
-PRO_DEPENDENCIES = {
+# Feature dependencies mapping
+FEATURE_DEPENDENCIES = {
     'ldap': {
         'package': 'ldap3',
         'import': 'ldap3',
@@ -50,7 +50,7 @@ PRO_DEPENDENCIES = {
 
 def check_dependency(dep_name):
     """Check if a dependency is installed"""
-    dep = PRO_DEPENDENCIES.get(dep_name)
+    dep = FEATURE_DEPENDENCIES.get(dep_name)
     if not dep:
         return True
     
@@ -62,9 +62,9 @@ def check_dependency(dep_name):
 
 
 def check_all_dependencies():
-    """Check all Pro dependencies and return missing ones"""
+    """Check all Feature dependencies and return missing ones"""
     missing = []
-    for name, dep in PRO_DEPENDENCIES.items():
+    for name, dep in FEATURE_DEPENDENCIES.items():
         if not check_dependency(name):
             missing.append({
                 'name': name,
@@ -76,7 +76,7 @@ def check_all_dependencies():
 
 def install_dependency(dep_name, auto_install=False):
     """Install a missing dependency"""
-    dep = PRO_DEPENDENCIES.get(dep_name)
+    dep = FEATURE_DEPENDENCIES.get(dep_name)
     if not dep:
         return False, f"Unknown dependency: {dep_name}"
     
@@ -113,7 +113,7 @@ def install_missing_dependencies(auto_install=False):
     missing = check_all_dependencies()
     
     if not missing:
-        logger.info("✅ All Pro dependencies are installed")
+        logger.info("✅ All Feature dependencies are installed")
         return True, []
     
     results = []
@@ -136,9 +136,9 @@ def install_missing_dependencies(auto_install=False):
     return all_success, results
 
 
-def ensure_pro_dependencies(app):
+def ensure_feature_dependencies(app):
     """
-    Called during app startup to ensure Pro dependencies are available.
+    Called during app startup to ensure Feature dependencies are available.
     Checks and auto-installs if UCM_AUTO_INSTALL_DEPS=true
     """
     missing = check_all_dependencies()
@@ -147,17 +147,17 @@ def ensure_pro_dependencies(app):
         return True
     
     # Log missing dependencies
-    logger.warning(f"⚠️ Missing Pro dependencies: {[d['name'] for d in missing]}")
+    logger.warning(f"⚠️ Missing Feature dependencies: {[d['name'] for d in missing]}")
     
     # Check if auto-install is enabled
     auto_install = app.config.get('AUTO_INSTALL_DEPS', False)
     
     if auto_install:
-        logger.info("🔧 Auto-installing missing Pro dependencies...")
+        logger.info("🔧 Auto-installing missing Feature dependencies...")
         success, results = install_missing_dependencies(auto_install=True)
         
         if success:
-            logger.info("✅ All Pro dependencies installed successfully")
+            logger.info("✅ All Feature dependencies installed successfully")
             # Need to reload modules
             return True
         else:
@@ -174,9 +174,9 @@ def ensure_pro_dependencies(app):
 
 
 def get_dependency_status():
-    """Get status of all Pro dependencies for API/UI"""
+    """Get status of all Feature dependencies for API/UI"""
     status = {}
-    for name, dep in PRO_DEPENDENCIES.items():
+    for name, dep in FEATURE_DEPENDENCIES.items():
         installed = check_dependency(name)
         status[name] = {
             'installed': installed,

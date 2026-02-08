@@ -251,10 +251,10 @@ def create_app(config_name=None):
                 # Import Pro models to register them with SQLAlchemy (if Pro is available)
                 try:
                     # Groups are now in community (models.group), Pro only has RBAC/SSO/HSM/Policies
-                    from models.pro.rbac import CustomRole, RolePermission
-                    from models.pro.sso import SSOProvider, SSOSession
-                    from models.pro.policy import CertificatePolicy, ApprovalRequest
-                    from models.pro.hsm import HSMProvider, HSMKey
+                    from models.features.rbac import CustomRole, RolePermission
+                    from models.features.sso import SSOProvider, SSOSession
+                    from models.features.policy import CertificatePolicy, ApprovalRequest
+                    from models.features.hsm import HSMProvider, HSMKey
                     
                     # Check if Pro tables exist, create if missing
                     inspector = inspect(db.engine)
@@ -890,8 +890,8 @@ def init_database(app):
     
     # ===== INITIALIZE PRO DEFAULT DATA =====
     try:
-        from models.pro.group import Group
-        from models.pro.rbac import CustomRole, RolePermission
+        from models.features.group import Group
+        from models.features.rbac import CustomRole, RolePermission
         
         # Create default groups if none exist
         if Group.query.count() == 0:
@@ -1027,19 +1027,17 @@ def register_blueprints(app):
     from api.v2 import register_api_v2
     register_api_v2(app)
     
-    # ===== PRO MODULES =====
-    # Auto-load Pro modules if available (only in ucm-src-pro repo)
+    # ===== FEATURE MODULES =====
+    # Auto-load feature modules (SSO, HSM, RBAC, etc.)
     try:
-        from pro import register_pro_blueprints
-        register_pro_blueprints(app)
-        app.logger.info("✨ UCM Pro modules loaded successfully")
+        from features import register_feature_blueprints
+        register_feature_blueprints(app)
+        app.logger.info("✨ UCM feature modules loaded successfully")
     except ImportError as e:
-        app.config['PRO_ENABLED'] = False
-        app.logger.info(f"📦 Running UCM Community Edition")
+        app.logger.debug(f"Feature modules not available: {e}")
     except Exception as e:
-        app.config['PRO_ENABLED'] = False
-        app.logger.warning(f"⚠️ Pro modules failed to load: {e}")
-    # ========================
+        app.logger.warning(f"⚠️ Feature modules failed to load: {e}")
+    # ============================
     
     # Public endpoints (no auth, no /api prefix - standard paths)
     app.register_blueprint(cdp_bp, url_prefix='/cdp')     # CRL Distribution Points

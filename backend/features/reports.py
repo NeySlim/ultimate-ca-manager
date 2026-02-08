@@ -1,5 +1,5 @@
 """
-Report API - UCM Pro
+Report API - UCM
 Endpoints for generating and scheduling reports.
 """
 from flask import Blueprint, request, Response

@@ -65,7 +65,7 @@ class HSMProvider(db.Model):
         if not value:
             return None
         try:
-            from pro.encryption import encrypt_if_needed
+            from features.encryption import encrypt_if_needed
             return encrypt_if_needed(value)
         except:
             return value
@@ -74,7 +74,7 @@ class HSMProvider(db.Model):
         if not value:
             return None
         try:
-            from pro.encryption import decrypt_if_needed
+            from features.encryption import decrypt_if_needed
             return decrypt_if_needed(value)
         except:
             return value
