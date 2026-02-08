@@ -168,6 +168,13 @@ ENVEOF
         chown -R "$UCM_USER":"$UCM_GROUP" /var/log/ucm
         chmod 750 "$UCM_DATA"
         
+        # Install sudoers file to allow service management
+        if [ -f "$UCM_HOME/sudoers/ucm" ]; then
+            cp "$UCM_HOME/sudoers/ucm" /etc/sudoers.d/ucm
+            chmod 440 /etc/sudoers.d/ucm
+            chown root:root /etc/sudoers.d/ucm
+        fi
+        
         # Generate HTTPS cert if not exists
         if [ ! -f "$UCM_DATA/https_cert.pem" ]; then
             echo "Generating HTTPS certificate..."

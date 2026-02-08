@@ -39,6 +39,10 @@ override_dh_auto_install:
 	install -d debian/ucm/opt/ucm/scripts
 	install -m 755 packaging/scripts/configure-firewall.sh debian/ucm/opt/ucm/scripts/
 	
+	# Install sudoers file for service management
+	install -d debian/ucm/opt/ucm/sudoers
+	install -m 644 packaging/sudoers/ucm debian/ucm/opt/ucm/sudoers/ucm
+	
 	# Install firewall service definitions
 	install -d debian/ucm/usr/lib/firewalld/services
 	install -d debian/ucm/etc/ufw/applications.d

@@ -59,8 +59,17 @@ getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbi
 
 %post
 %systemd_post %{name}.service
-echo "ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm" > /etc/sudoers.d/ucm-service
-chmod 440 /etc/sudoers.d/ucm-service
+
+# Install sudoers for service management (HTTPS cert apply, etc.)
+cat > /etc/sudoers.d/ucm << 'SUDOERSEOF'
+# UCM service management - allows ucm user to restart service without password
+# This is required for HTTPS certificate application and other system operations
+ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm
+ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload ucm
+ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop ucm
+ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl start ucm
+SUDOERSEOF
+chmod 440 /etc/sudoers.d/ucm
 
 # Paths (same as DEB)
 UCM_HOME=%{ucm_home}

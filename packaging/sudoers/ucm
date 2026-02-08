@@ -1,0 +1,6 @@
+# UCM service management - allows ucm user to restart service without password
+# This is required for HTTPS certificate application and other system operations
+ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm
+ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload ucm
+ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop ucm
+ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl start ucm

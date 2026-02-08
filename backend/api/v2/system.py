@@ -384,9 +384,30 @@ def apply_https_cert():
             return success_response(message="Certificate applied. Reload signal sent.")
         else:
             # On systemd systems, restart the service
-            subprocess.Popen(['sudo', 'systemctl', 'restart', 'ucm'], 
-                            stdout=subprocess.DEVNULL, 
-                            stderr=subprocess.DEVNULL)
+            # Use subprocess.run for better error handling
+            try:
+                result = subprocess.run(
+                    ['sudo', '/usr/bin/systemctl', 'restart', 'ucm'],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                if result.returncode != 0:
+                    current_app.logger.error(f"Service restart failed: {result.stderr}")
+                    # Still return success for cert apply, but warn about restart
+                    return success_response(
+                        message="Certificate applied but service restart failed. Please restart manually: sudo systemctl restart ucm",
+                        data={'restart_failed': True, 'error': result.stderr}
+                    )
+            except subprocess.TimeoutExpired:
+                current_app.logger.warning("Service restart timed out - this is expected as the process restarts")
+            except Exception as e:
+                current_app.logger.error(f"Service restart error: {e}")
+                return success_response(
+                    message="Certificate applied but service restart failed. Please restart manually: sudo systemctl restart ucm",
+                    data={'restart_failed': True, 'error': str(e)}
+                )
+            
             return success_response(message="Certificate applied. Service restarting...")
         
     except Exception as e:
