@@ -19,6 +19,7 @@ import {
   DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent,
   UpdateChecker
 } from '../components'
+import { SmartImportModal } from '../components/SmartImport'
 import LanguageSelector from '../components/ui/LanguageSelector'
 import { settingsService, systemService, casService, certificatesService } from '../services'
 import { useNotification, useMobile } from '../contexts'
@@ -261,6 +262,9 @@ export default function SettingsPage() {
   const [restorePassword, setRestorePassword] = useState('')
   const [restoreFile, setRestoreFile] = useState(null)
   const [backupLoading, setBackupLoading] = useState(false)
+  
+  // HTTPS import modal
+  const [showHttpsImportModal, setShowHttpsImportModal] = useState(false)
 
   // Dynamically load Pro settings categories
   useEffect(() => {
@@ -1115,13 +1119,13 @@ export default function SettingsPage() {
                 <p className="text-xs text-text-secondary">
                   {t('settings.applyCustomCertificateDesc')}
                 </p>
-                <FileUpload
-                  accept=".pem,.crt,.key"
-                  onFileSelect={(file) => {
-                    showError(t('settings.featureComingSoon'))
-                  }}
-                  helperText={t('settings.selectCertOrKeyFile')}
-                />
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowHttpsImportModal(true)}
+                >
+                  <UploadSimple size={16} className="mr-2" />
+                  {t('common.importCertificate')}
+                </Button>
               </div>
             </DetailSection>
           </DetailContent>
@@ -1292,6 +1296,36 @@ export default function SettingsPage() {
           </div>
         </div>
       </Modal>
+      
+      {/* Smart Import Modal for HTTPS certificate */}
+      <SmartImportModal
+        isOpen={showHttpsImportModal}
+        onClose={() => setShowHttpsImportModal(false)}
+        onImportComplete={async (imported) => {
+          setShowHttpsImportModal(false)
+          // If a certificate was imported with private key, offer to apply it
+          if (imported?.id && imported?.has_private_key) {
+            const apply = await showConfirm(t('settings.applyImportedCertConfirm'), {
+              title: t('settings.applyCertificate'),
+              confirmText: t('settings.applyAndRestart')
+            })
+            if (apply) {
+              try {
+                await systemService.applyHttpsCert({ cert_id: imported.id })
+                showSuccess(SUCCESS.HTTPS.APPLIED)
+                setTimeout(() => window.location.reload(), 3000)
+              } catch (error) {
+                showError(error.message || ERRORS.HTTPS.APPLY_FAILED)
+              }
+            }
+          } else {
+            // Refresh cert list
+            loadCertificates()
+            showSuccess(t('common.importSuccess'))
+          }
+        }}
+        defaultType="certificate"
+      />
     </>
   )
 }

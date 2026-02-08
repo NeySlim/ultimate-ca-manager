@@ -1059,6 +1059,7 @@
     "resetDbCancelled": "Database reset cancelled",
     "selectCertificate": "Please select a certificate",
     "applyHttpsCertConfirm": "Apply selected certificate as HTTPS certificate? This will restart the server.",
+    "applyImportedCertConfirm": "Apply this imported certificate as HTTPS certificate? This will restart the server.",
     "applyCertificate": "Apply Certificate",
     "applyAndRestart": "Apply & Restart",
     "regenerateCertConfirm": "Regenerate HTTPS certificate? This will restart the server.",
