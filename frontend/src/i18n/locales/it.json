@@ -109,7 +109,11 @@
     "expires": "Expires",
     "loadingAccount": "Loading account...",
     "daysPlaceholder": "365",
-    "codePlaceholder": "000000"
+    "codePlaceholder": "000000",
+    "registrationFailed": "Failed to register security key",
+    "securityKey": "Security Key",
+    "deleteCertFailed": "Failed to delete certificate",
+    "deleteKeyFailed": "Failed to delete security key"
   },
   "acme": {
     "title": "Protocollo ACME",
@@ -209,7 +213,17 @@
     "acmeOrder": "ACME Order",
     "account": "Account",
     "orderStatus": "Order Status",
-    "emailPlaceholder": "admin@esempio.com"
+    "emailPlaceholder": "admin@esempio.com",
+    "proxyRegisteredSuccess": "Proxy account registered successfully",
+    "accountDeactivatedSuccess": "Account deactivated successfully",
+    "accountCreatedSuccess": "ACME account created successfully",
+    "proxyRegistrationFailed": "Failed to register proxy account",
+    "unknownCA": "Unknown CA",
+    "accountCreationFailed": "Failed to create ACME account",
+    "proxyUnregisteredSuccess": "Proxy account unregistered successfully",
+    "proxyUnregistrationFailed": "Failed to unregister proxy account",
+    "accountDeactivationFailed": "Failed to deactivate account",
+    "accountDeletedSuccess": "Account deleted successfully"
   },
   "audit": {
     "title": "Log di audit",
@@ -229,7 +243,13 @@
     "aboutAuditLogs": "Informazioni sui log di audit",
     "filteringSearch": "Filtraggio e ricerca",
     "dataRetention": "Conservazione dati",
-    "exportOptions": "Opzioni di esportazione"
+    "exportOptions": "Opzioni di esportazione",
+    "cleanupFailed": "Cleanup failed",
+    "allUsers": "All Users",
+    "allActions": "All Actions",
+    "cleanedUpLogs": "Cleaned up {{count}} old logs",
+    "status": "Status",
+    "allStatus": "All Status"
   },
   "auth": {
     "continue": "Continua",
@@ -265,7 +285,27 @@
     "signingIn": "Signing in...",
     "signingInAs": "Signing in as",
     "trySecurityKeyAgain": "Try Security Key Again",
-    "key": "Key"
+    "key": "Key",
+    "ssoInvalidState": "Invalid SSO state. Please try again.",
+    "ssoNoUsername": "SSO: Could not determine username",
+    "ssoCallbackError": "SSO authentication error",
+    "ssoAutoCreateDisabled": "User not found. Automatic account creation is disabled. Contact your administrator.",
+    "ssoProviderDisabled": "SSO provider is disabled",
+    "ssoError": "SSO authentication failed",
+    "waitingForSecurityKey": "Waiting for security key...",
+    "ssoTokenFailed": "SSO token exchange failed",
+    "authenticating": "Authenticating...",
+    "ssoUserinfoFailed": "Failed to get user information",
+    "ldapUsername": "Your LDAP username",
+    "ssoUserCreationFailed": "Failed to create user account",
+    "usePasswordInstead": "Use password instead",
+    "signingInWith": "Signing in with",
+    "securityKeyCancelled": "Security key cancelled. Use password instead.",
+    "ldapFailed": "LDAP authentication failed",
+    "enterCredentials": "Please enter username and password",
+    "welcomeBackUser": "Welcome back, {{username}}!",
+    "orContinueWith": "or continue with",
+    "touchSecurityKey": "Touch your security key..."
   },
   "cas": {
     "title": "Autorità di certificazione",
@@ -316,7 +356,16 @@
     "orgPlaceholder": "La mia azienda",
     "countryPlaceholder": "IT",
     "statePlaceholder": "Lombardia",
-    "localityPlaceholder": "Milano"
+    "localityPlaceholder": "Milano",
+    "deleteCA": "Delete Certificate Authority",
+    "unnamedCA": "Unnamed CA",
+    "exportedAs": "CA exported as {{format}}",
+    "intermediate": "Intermediate",
+    "deleteCAButton": "Delete CA",
+    "deleteFailed": "Failed to delete CA",
+    "exportFailed": "Failed to export CA",
+    "createFailed": "Failed to create CA",
+    "passwordTooShort": "Password must be at least 4 characters"
   },
   "certificates": {
     "title": "Certificati",
@@ -369,7 +418,8 @@
     "notes": "Note",
     "commonNamePlaceholder": "esempio.com",
     "sanPlaceholder": "DNS:esempio.com\nDNS:www.esempio.com\nIP:192.168.1.1",
-    "validityPlaceholder": "365"
+    "validityPlaceholder": "365",
+    "privateKeyPEM": "Private Key (PEM)"
   },
   "common": {
     "save": "Salva",
@@ -491,7 +541,11 @@
     "errors": "Errors",
     "live": "Live",
     "updateAvailable": "Update available",
-    "enterPassword": "Enter password"
+    "enterPassword": "Enter password",
+    "daysAgo": "{{count}}d ago",
+    "unknown": "Unknown",
+    "unnamed": "Unnamed",
+    "na": "N/A"
   },
   "compare": {
     "title": "Compare Certificates",
@@ -555,7 +609,8 @@
     "aia": "AIA (OCSP Responder)",
     "includeURLsNote": "Include these URLs in CA settings for automatic revocation checking.",
     "autoRegenEnabled": "Auto-regeneration enabled for {{name}}",
-    "autoRegenDisabled": "Auto-regeneration disabled for {{name}}"
+    "autoRegenDisabled": "Auto-regeneration disabled for {{name}}",
+    "toggleAutoRegenFailed": "Failed to toggle auto-regeneration"
   },
   "csrs": {
     "title": "Richieste di firma certificato",
@@ -650,7 +705,15 @@
     "csrPEMError": "Please paste a CSR in PEM format",
     "invalidCSRFormat": "Invalid CSR format. Must be in PEM format (-----BEGIN CERTIFICATE REQUEST-----)",
     "invalidKeyFormat": "Invalid private key format - must be PEM format",
-    "provideKey": "Please provide a private key"
+    "provideKey": "Please provide a private key",
+    "downloadFailed": "Failed to download",
+    "deleteFailed": "Failed to delete CSR",
+    "unnamedCSR": "Unnamed CSR",
+    "deleteCSR": "Delete CSR",
+    "uploadFailed": "Failed to upload CSR",
+    "keyUploadFailed": "Failed to upload private key",
+    "signFailed": "Failed to sign CSR",
+    "unnamedCertificate": "Unnamed Certificate"
   },
   "dashboard": {
     "title": "Pannello di controllo",
@@ -699,7 +762,8 @@
     "widgetRecentCertificates": "Certificati recenti",
     "widgetCertificateAuthorities": "Autorità di certificazione",
     "widgetAcmeAccounts": "Account ACME",
-    "showOrHideWidgets": "Mostra o nascondi widget"
+    "showOrHideWidgets": "Mostra o nascondi widget",
+    "loadFailed": "Failed to load dashboard"
   },
   "details": {
     "subject": "Subject",
@@ -787,7 +851,8 @@
     "permissions": "Permessi",
     "noGroups": "Nessun gruppo trovato",
     "namePlaceholder": "sviluppatori",
-    "descriptionPlaceholder": "Team di sviluppo"
+    "descriptionPlaceholder": "Team di sviluppo",
+    "confirmDelete": "Delete group \"{{name}}\"?"
   },
   "help": {
     "aboutCertificates": "Informazioni sui certificati",
@@ -1268,7 +1333,6 @@
   "settings": {
     "title": "Impostazioni",
     "general": "Generale",
-    "appearance": "Aspetto",
     "email": "Email",
     "security": "Sicurezza",
     "backup": "Backup e ripristino",
@@ -1475,7 +1539,22 @@
     "prerelease": "Pre-release",
     "current": "Current",
     "running": "Running",
-    "edition": "Edition"
+    "edition": "Edition",
+    "resetDbWarning": "⚠️ WARNING: This will DELETE ALL DATA and resand the database to initial state. Are yor absolutely one?",
+    "backupRestored": "Backup risored successfully: {{users}} users, {{cas}} CAs, {{certs}} certificatees",
+    "typeYesToConfirm": "Type YES to confirm database resand:",
+    "applyHttpsCertConfirm": "Apply sandhected certificatee as HTTPS certificatee? This will risart the server.",
+    "applyImportedCertConfirm": "Apply this imported certificatee as HTTPS certificatee? This will risart the server.",
+    "applyAndRestart": "Apply & Risart",
+    "applyCertificate": "Apply Certificatee",
+    "regenerateCertConfirm": "Regenerate HTTPS certificatee? This will risart the server.",
+    "passwordMinLength": "Password must be at theast 12 characters",
+    "integrityErrors": "Integrity check foad {{coat}} errors",
+    "confirmDeleteBackup": "Dandhande backup \"{{fithename}}\"?",
+    "resetDbCancelled": "Database resand cancelthed",
+    "finalConfirmation": "Final Confirmation",
+    "regenerateAndRestart": "Regenerate & Risart",
+    "deleteBackup": "Dandhande Backup"
   },
   "sso": {
     "title": "Single Sign-On",
@@ -1766,7 +1845,17 @@
     "bestPractices": "Best Practices",
     "bestPracticesDesc": "Only add certificates from trusted sources. Regularly review and remove expired or unnecessary certificates to maintain security.",
     "securityNote": "Security Note",
-    "securityNoteDesc": "Certificates in the Trust Store can validate any certificate chain. Be careful when adding third-party certificates."
+    "securityNoteDesc": "Certificates in the Trust Store can validate any certificate chain. Be careful when adding third-party certificates.",
+    "caTrust": "CA Trust",
+    "syncFailed": "Faithed to sync from system",
+    "clientAuthDesc": "Trusted for client authentication",
+    "tlsTrust": "TLS Trust",
+    "codeSigningDesc": "Trusted for coof signing",
+    "syncedCerts": "Synced {{coat}} certificatees",
+    "tlsTrustDesc": "Trusted for TLS/SSL connections",
+    "caTrustDesc": "Trusted for issuing certificatees",
+    "emailTrust": "Email",
+    "emailTrustDesc": "Trusted for S/MIME"
   },
   "users": {
     "title": "Utenti",
@@ -1792,7 +1881,13 @@
     "usernamePlaceholder": "mariorossi",
     "emailPlaceholder": "mario@esempio.com",
     "namePlaceholder": "Mario Rossi",
-    "passwordPlaceholder": "••••••••"
+    "passwordPlaceholder": "••••••••",
+    "userToggled": "User {{action}}",
+    "checkEmail": "Check email",
+    "confirmResetPassword": "Reset password for \"{{name}}\"?",
+    "confirmDelete": "Delete user \"{{name}}\"?",
+    "resetPasswordFailed": "Failed to reset password",
+    "newPassword": "New password: {{password}}"
   },
   "validation": {
     "required": "Questo campo è obbligatorio",
