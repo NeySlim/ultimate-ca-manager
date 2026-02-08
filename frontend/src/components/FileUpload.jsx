@@ -10,7 +10,9 @@ import { Button } from './Button'
 export function FileUpload({ 
   accept, 
   multiple = false, 
-  onUpload, 
+  onUpload,
+  onFileSelect, // Called immediately when file is selected (no upload button)
+  helperText,
   maxSize = 10 * 1024 * 1024, // 10MB default
   className 
 }) {
@@ -52,6 +54,11 @@ export function FileUpload({
     } else {
       setFiles(newFiles)
     }
+    
+    // If onFileSelect is provided, call it immediately (for modals, etc.)
+    if (onFileSelect) {
+      onFileSelect(multiple ? newFiles : newFiles[0])
+    }
   }
 
   const handleDrop = (e) => {
@@ -72,6 +79,7 @@ export function FileUpload({
 
   const handleUpload = async () => {
     if (files.length === 0) return
+    if (!onUpload) return // No upload handler, just use onFileSelect
     
     try {
       await onUpload(files)
@@ -109,7 +117,7 @@ export function FileUpload({
             {t('common.dropFilesOrBrowse')}
           </p>
           <p className="text-xs text-text-secondary">
-            {accept || t('common.anyFile')} • Max {(maxSize / 1024 / 1024).toFixed(0)}MB
+            {helperText || `${accept || t('common.anyFile')} • Max ${(maxSize / 1024 / 1024).toFixed(0)}MB`}
           </p>
         </label>
       </div>
@@ -120,7 +128,7 @@ export function FileUpload({
         </div>
       )}
 
-      {files.length > 0 && (
+      {files.length > 0 && !onFileSelect && (
         <div className="space-y-2">
           {files.map((file, index) => (
             <div
@@ -143,9 +151,11 @@ export function FileUpload({
             </div>
           ))}
 
-          <Button onClick={handleUpload} className="w-full">
-            Upload {files.length} file{files.length > 1 ? 's' : ''}
-          </Button>
+          {onUpload && (
+            <Button onClick={handleUpload} className="w-full">
+              Upload {files.length} file{files.length > 1 ? 's' : ''}
+            </Button>
+          )}
         </div>
       )}
     </div>
